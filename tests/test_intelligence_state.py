@@ -413,6 +413,46 @@ class IntelligenceStateTests(unittest.TestCase):
         self.assertEqual(mocked_rank.call_count, 2)
         self.assertEqual(mocked_pipeline.call_count, 2)
 
+    def test_compute_response_recomputes_when_cached_snapshot_is_stale(self) -> None:
+        service = IntelligenceStateService()
+        service._interval_seconds = 1
+        payload = {"question": "top edges today", "date": "2026-06-10", "limit": 5}
+        normalized = service._normalize_payload(payload)
+        snapshot_key = _payload_key(normalized)
+
+        service._snapshots[snapshot_key] = IntelligenceSnapshot(
+            key=snapshot_key,
+            payload=dict(normalized),
+            response={"ok": True, "top_opportunities": [], "by_sport": {}, "analysis": {}},
+            computed_at="2026-06-10T00:00:00Z",
+            source_fingerprint="fingerprint-1",
+        )
+        service._latest_key = snapshot_key
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            reports_root = Path(tmp_dir) / "reports"
+            manifests_root = reports_root / "manifests"
+            manifests_root.mkdir(parents=True, exist_ok=True)
+            (manifests_root / "mlb.json").write_text(
+                '{"sport":"mlb","last_updated":"2026-06-10T10:00:00Z","artifact_paths":["reports/intelligence/example.json"],"status":"complete"}',
+                encoding="utf-8",
+            )
+
+            with patch("pipeline.intelligence_state.reports_root", return_value=reports_root):
+                with patch("pipeline.intelligence_state.build_intelligence_status", return_value={"selected_date": "2026-06-10", "sports": []}):
+                    with patch("pipeline.intelligence_state.collect_all_recommendations", return_value=[{"name": "Play 1", "sport": "MLB", "market": "Hits", "score": 91.0}]) as mocked_collect:
+                        with patch("pipeline.intelligence_state.rank_global_recommendations", return_value=[{"name": "Play 1", "sport": "MLB", "market": "Hits", "score": 91.0}]) as mocked_rank:
+                            with patch("pipeline.intelligence_state.run_routed_intelligence_pipeline", return_value={"headline": "Test", "recommendations": []}) as mocked_pipeline:
+                                with patch.object(service, "_source_state_fingerprint", return_value="fingerprint-1"):
+                                    with patch.object(service, "_persist_locked", return_value=None):
+                                        response = service._compute_response(payload)
+
+        self.assertTrue(response.get("ok"))
+        self.assertIn("candidate_pool", response)
+        self.assertGreaterEqual(mocked_collect.call_count, 1)
+        self.assertGreaterEqual(mocked_rank.call_count, 1)
+        self.assertGreaterEqual(mocked_pipeline.call_count, 1)
+
     def test_background_refresh_recomputes_when_snapshot_fingerprint_matches(self) -> None:
         service = IntelligenceStateService()
         service._interval_seconds = 0

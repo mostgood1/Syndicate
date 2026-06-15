@@ -722,7 +722,7 @@ class IntelligenceStateService:
         cache_key = _payload_key(request_payload)
         with self._condition:
             snapshot = self._snapshots.get(cache_key)
-            if not force_refresh and snapshot is not None and snapshot.source_fingerprint == source_fingerprint:
+            if not force_refresh and snapshot is not None and snapshot.source_fingerprint == source_fingerprint and not self._is_stale(snapshot):
                 _log_stage_timing("request_total", (time.perf_counter() - request_started_at) * 1000.0)
                 return dict(snapshot.response)
 
