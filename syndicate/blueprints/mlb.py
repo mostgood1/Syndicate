@@ -312,7 +312,7 @@ def root_cards():
 
 @mlb_bp.get("/cards")
 def cards():
-    selected_date = _iso_or_today(request.args.get("date"))
+    selected_date = _iso_or_today(request.args.get("date")) if request.args.get("date") else _latest_available_cards_date()
     return _render_cards_page(selected_date)
 
 

@@ -573,7 +573,7 @@ def api_live_lines():
     except Exception:
         ttl = 20
     ttl = max(1, min(300, ttl))
-    include_period_totals = str(request.args.get("include_period_totals") or "").strip().lower() in {"1", "true", "yes", "on"}
+    include_period_totals = str(request.args.get("include_period_totals") or "1").strip().lower() in {"1", "true", "yes", "on"}
     try:
         return jsonify(
             build_live_lines_payload(
