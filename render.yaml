@@ -132,7 +132,7 @@ services:
       - key: SYNDICATE_LIVE_ODDS_REFRESH_INTERVAL_SECONDS
         value: "30"
       - key: SYNDICATE_LIVE_ODDS_REFRESH_PHASE
-        value: live
+        value: all
       - key: SYNDICATE_LIVE_ODDS_REFRESH_EXECUTION_MODE
         value: source
       - key: SYNDICATE_LIVE_ODDS_REFRESH_REGIONS
