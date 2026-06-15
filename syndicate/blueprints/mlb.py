@@ -581,6 +581,7 @@ from flask import request, jsonify
 @mlb_bp.get("/api/betting-card/")
 @mlb_bp.get("/betting-card/api")
 @mlb_bp.get("/betting-card/api/")
+@mlb_bp.get("/api/betting-card-api")
 @mlb_bp.route("/betting-card-api", methods=["GET"])  
 def mlb_betting_card_api():
     date = request.args.get("date")

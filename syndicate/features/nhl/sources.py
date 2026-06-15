@@ -38,13 +38,9 @@ def default_nhl_source_root() -> Path:
 
 def _data_roots() -> list[Path]:
     roots: list[Path] = []
-    seen: set[Path] = set()
-    for source_root in _artifact_roots():
-        candidate = source_root / "data"
-        if candidate in seen:
-            continue
-        seen.add(candidate)
-        roots.append(candidate)
+    source_roots = _source_roots()
+    if source_roots:
+        roots.append(source_roots[0] / "data")
     return roots
 
 

@@ -18,11 +18,20 @@ def _repo_root() -> Path:
 
 
 def _artifact_roots() -> list[Path]:
-    return preferred_artifact_roots(
+    roots = preferred_source_roots(
         __file__,
-        env_var="SYNDICATE_NBA_ARTIFACT_ROOT",
+        env_var="SYNDICATE_NBA_SOURCE_ROOT",
         local_dir_name="nba_source",
     )
+    deduped: list[Path] = []
+    seen: set[Path] = set()
+    for root in roots:
+        resolved = root.resolve()
+        if resolved in seen:
+            continue
+        seen.add(resolved)
+        deduped.append(resolved)
+    return deduped
 
 
 def _first_existing_path(candidates: list[Path]) -> Path | None:
@@ -37,20 +46,24 @@ def _first_existing_path(candidates: list[Path]) -> Path | None:
 
 def processed_path(filename: str) -> Path:
     roots = _artifact_roots()
-    candidates = [(root / "data" / "processed" / filename) for root in roots]
-    best = _first_existing_path(candidates)
-    if best is not None:
-        return best
-    return roots[0] / "data" / "processed" / filename if roots else Path(__file__).resolve().parents[3] / "data" / "nba_source" / "data" / "processed" / filename
+    if roots:
+        candidates = [(root / "data" / "processed" / filename) for root in roots]
+        best = _first_existing_path(candidates)
+        if best is not None:
+            return best
+        return roots[0] / "data" / "processed" / filename
+    return Path(__file__).resolve().parents[3] / "data" / "nba_source" / "data" / "processed" / filename
 
 
 def live_snapshot_path(filename: str) -> Path:
     roots = _artifact_roots()
-    candidates = [(root / "data" / "processed" / "live_snapshots" / filename) for root in roots]
-    best = _first_existing_path(candidates)
-    if best is not None:
-        return best
-    return roots[0] / "data" / "processed" / "live_snapshots" / filename if roots else Path(__file__).resolve().parents[3] / "data" / "nba_source" / "data" / "processed" / "live_snapshots" / filename
+    if roots:
+        candidates = [(root / "data" / "processed" / "live_snapshots" / filename) for root in roots]
+        best = _first_existing_path(candidates)
+        if best is not None:
+            return best
+        return roots[0] / "data" / "processed" / "live_snapshots" / filename
+    return Path(__file__).resolve().parents[3] / "data" / "nba_source" / "data" / "processed" / "live_snapshots" / filename
 
 
 def _processed_candidate_path(filename: str, *, root: Path | None = None) -> Path:
@@ -61,6 +74,8 @@ def _processed_candidate_path(filename: str, *, root: Path | None = None) -> Pat
 
 def _resolve_processed_candidates(filenames: list[str]) -> Path:
     roots = _artifact_roots()
+    if not roots:
+        return _processed_candidate_path(filenames[0], root=None)
     candidates: list[Path] = []
     for root in roots:
         for filename in filenames:
@@ -117,11 +132,11 @@ def available_dates() -> list[str]:
 
 
 def default_date() -> str:
-    return central_today_iso()
+    return date.today().isoformat()
 
 
 def default_date_for_season(season: int) -> str:
-    today_value = central_today_iso()
+    today_value = date.today().isoformat()
     if today_value.startswith(f"{int(season)}-"):
         return today_value
     season_str = str(int(season))

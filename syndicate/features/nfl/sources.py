@@ -24,9 +24,6 @@ def _source_roots() -> list[Path]:
 
 
 def _first_existing_root(roots: list[Path]) -> Path:
-    for root in roots:
-        if root.exists():
-            return root
     return roots[0]
 
 
@@ -62,7 +59,8 @@ def tracked_week() -> dict[str, int] | None:
 
 def week_summaries() -> list[dict[str, Any]]:
     grouped: dict[tuple[int, int], dict[str, Any]] = {}
-    for path in sorted(default_nfl_source_root().glob("upcoming_recs_*.csv")):
+    source_root = default_nfl_source_root()
+    for path in sorted(source_root.glob("upcoming_recs_*.csv")):
         match = _SNAPSHOT_RE.match(path.name)
         if not match:
             continue

@@ -36,7 +36,10 @@ def _artifact_roots() -> list[Path]:
 
 
 def data_path(*parts: str) -> Path:
-    return _artifact_roots()[0] / "data" / Path(*parts)
+    roots = _source_roots()
+    if roots:
+        return roots[0] / "data" / Path(*parts)
+    return Path(__file__).resolve().parents[3] / "data" / "ncaaf_source" / "data" / Path(*parts)
 
 
 def load_json(path: Path) -> dict[str, Any] | None:
