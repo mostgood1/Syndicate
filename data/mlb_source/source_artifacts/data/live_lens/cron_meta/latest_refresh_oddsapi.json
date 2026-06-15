@@ -1,0 +1,33 @@
+{
+  "recordedAt": "2026-06-15T17:12:08+00:00",
+  "date": "2026-06-15",
+  "overwrite": false,
+  "frozenPregame": {},
+  "result": {
+    "status": "skipped",
+    "date": "2026-06-15",
+    "out_dir": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\market\\oddsapi",
+    "game_lines_path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\market\\oddsapi\\oddsapi_game_lines_2026_06_15.json",
+    "pitcher_props_path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\market\\oddsapi\\oddsapi_pitcher_props_2026_06_15.json",
+    "hitter_props_path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\market\\oddsapi\\oddsapi_hitter_props_2026_06_15.json",
+    "reason": "overwrite=off and market files already exist"
+  },
+  "copied": {
+    "oddsapi_game_lines_2026_06_15.json": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\snapshots\\2026-06-15\\oddsapi_game_lines_2026_06_15.json",
+    "oddsapi_pitcher_props_2026_06_15.json": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\snapshots\\2026-06-15\\oddsapi_pitcher_props_2026_06_15.json",
+    "oddsapi_hitter_props_2026_06_15.json": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\snapshots\\2026-06-15\\oddsapi_hitter_props_2026_06_15.json"
+  },
+  "archived": {
+    "archiveDir": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\market\\oddsapi\\refresh_history\\2026_06_15\\20260615T171208_809048Z",
+    "files": {
+      "game_lines_path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\market\\oddsapi\\refresh_history\\2026_06_15\\20260615T171208_809048Z\\oddsapi_game_lines_2026_06_15.json",
+      "pitcher_props_path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\market\\oddsapi\\refresh_history\\2026_06_15\\20260615T171208_809048Z\\oddsapi_pitcher_props_2026_06_15.json",
+      "hitter_props_path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\market\\oddsapi\\refresh_history\\2026_06_15\\20260615T171208_809048Z\\oddsapi_hitter_props_2026_06_15.json"
+    },
+    "copied": {
+      "oddsapi_game_lines_2026_06_15.json": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\market\\oddsapi\\refresh_history\\2026_06_15\\20260615T171208_809048Z\\oddsapi_game_lines_2026_06_15.json",
+      "oddsapi_pitcher_props_2026_06_15.json": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\market\\oddsapi\\refresh_history\\2026_06_15\\20260615T171208_809048Z\\oddsapi_pitcher_props_2026_06_15.json",
+      "oddsapi_hitter_props_2026_06_15.json": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\market\\oddsapi\\refresh_history\\2026_06_15\\20260615T171208_809048Z\\oddsapi_hitter_props_2026_06_15.json"
+    }
+  }
+}

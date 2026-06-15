@@ -1,0 +1,22 @@
+﻿{
+    "sport":  "ncaab",
+    "date":  "2026-06-15",
+    "refreshedAtUtc":  "2026-06-15T17:26:20.0786147Z",
+    "sourceRepo":  null,
+    "sourceRootEnvVar":  "SYNDICATE_SOURCE_ROOT_NCAAB",
+    "destinationRoot":  "D:\\a\\Syndicate\\Syndicate\\data\\ncaab_source",
+    "usedExistingRawOutputs":  true,
+    "refreshedRawOutputsFromSource":  false,
+    "copiedArtifactCount":  3,
+    "artifactGroups":  {
+                           "api":  2,
+                           "raw_outputs_config":  1,
+                           "raw_outputs_date":  0,
+                           "other":  0
+                       },
+    "copiedArtifacts":  [
+                            "api/live_lens_tuning.json",
+                            "api/live_lines/live_lines_2026-06-15.json",
+                            "raw_outputs/config/live_lens_tuning.json"
+                        ]
+}
