@@ -56,6 +56,8 @@ class DailyUpdateOddsPassthroughTests(unittest.TestCase):
         self.assertIn('"$rootRelative/daily/daily_summary_${dateSlug}.json"', content)
         self.assertIn('"$rootRelative/live_lens/live_lens_report_${dateSlug}.json"', content)
         self.assertIn('"$rootRelative/daily/snapshots/${DateValue}/oddsapi_game_lines_${dateSlug}.json"', content)
+        self.assertIn("Add-PathsUnderRoot -RelativeRoot 'data/mlb_source/manifests'", content)
+        self.assertIn("Add-PathsUnderRoot -RelativeRoot 'data/mlb_source/source_artifacts/manifests'", content)
 
     def test_world_class_plan_explicitly_requires_unified_standardization(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]

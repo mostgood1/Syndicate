@@ -3087,6 +3087,9 @@ function Get-ForcedPublishArtifactPaths {
             Add-PathsByPattern -RelativePattern "$rootRelative/eval/seasons/*/betting_day_recaps*/season_betting_day_*_${dateSlug}*.json"
             Add-PathsUnderRoot -RelativeRoot "$rootRelative/../tracking"
         }
+
+        Add-PathsUnderRoot -RelativeRoot 'data/mlb_source/manifests'
+        Add-PathsUnderRoot -RelativeRoot 'data/mlb_source/source_artifacts/manifests'
     }
 
     if (-not $SkipNBA) {
