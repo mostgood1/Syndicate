@@ -71,6 +71,26 @@ class BootstrapDataRootTests(unittest.TestCase):
 
             self.assertEqual(dest_file.read_text(encoding="utf-8"), "aaaa\n")
 
+    def test_bootstrap_roots_include_render_critical_paths(self) -> None:
+        module = _load_module()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir) / "repo"
+            data_root = Path(temp_dir) / "data-root"
+
+            pairs = module._bootstrap_root_pairs(repo_root, data_root)
+            relative_sources = [source.relative_to(repo_root).as_posix() for source, _ in pairs]
+
+            self.assertEqual(
+                relative_sources,
+                [
+                    "data/nhl_source/source_artifacts",
+                    "data/nhl_source/manifests",
+                    "reports/intelligence",
+                    "reports/daily_update/latest",
+                    "reports/refresh_status/latest",
+                ],
+            )
+
 
 if __name__ == "__main__":
     unittest.main()
