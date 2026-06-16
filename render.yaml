@@ -8,6 +8,7 @@
 # Force redeploy after WNBA 2026-06-06 live lens fixes
 # Force redeploy after WNBA live-player odds fallback fix
 # Force redeploy after WNBA canonical live-lines source fix.
+# Force redeploy after Render runtime parity fix.
 services:
   - type: web
     name: syndicate
@@ -33,7 +34,7 @@ services:
       - key: SYNDICATE_REFRESH_LAUNCH_MODE
         value: manifest_only
       - key: SYNDICATE_REFRESH_STATE_BACKEND
-        value: keyvalue
+        value: filesystem
       - key: SYNDICATE_DATA_ROOT
         value: /opt/render/project/src/data
       - key: SYNDICATE_REPORTS_ROOT
@@ -55,11 +56,11 @@ services:
       - key: GUNICORN_KEEPALIVE
         value: "5"
       - key: SYNDICATE_BOOTSTRAP_ON_START
-        value: "1"
+        value: "0"
       - key: SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP
         value: "false"
       - key: SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP
-        value: "true"
+        value: "false"
       - key: SYNDICATE_LIVE_ODDS_REFRESH_INTERVAL_SECONDS
         value: "30"
       - key: SYNDICATE_LIVE_ODDS_REFRESH_PHASE
