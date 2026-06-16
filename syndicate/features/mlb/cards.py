@@ -4262,13 +4262,6 @@ def build_cards_page_context(selected_date: str) -> dict[str, Any]:
     ) if summary else []
     latest_live_odds_refreshed_at = None
     live_lens_report = None
-    if resolved_date == today_iso:
-        try:
-            from syndicate.features.mlb.live_lens import _persist_live_lens_report
-
-            live_lens_report = _persist_live_lens_report(resolved_date)
-        except Exception:
-            live_lens_report = None
     if not isinstance(live_lens_report, dict):
         live_lens_report = load_json_file(live_lens_path)
     live_lens_rows = (live_lens_report.get("games") if isinstance((live_lens_report or {}).get("games"), list) else [])
