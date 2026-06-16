@@ -1126,42 +1126,44 @@
 
 {% block content %}
   <section class="home-board">
-    <section class="home-command-center home-command-center--split" aria-label="Daily command center">
-      {% set command_center = command_center or {} %}
-      {% set command_shortcuts = command_center.shortcuts if command_center.shortcuts is defined and command_center.shortcuts else [] %}
-      {% set command_summary_cards = command_center.summary_cards if command_center.summary_cards is defined and command_center.summary_cards else dashboard.summary_cards or [] %}
-      {% set command_live_watch = command_center.live_watch if command_center.live_watch is defined and command_center.live_watch else dashboard.live_watch or [] %}
-      {% set command_top_props = command_center.top_props if command_center.top_props is defined and command_center.top_props else dashboard.top_props or [] %}
-      {% set command_top_game_bets = command_center.top_game_bets if command_center.top_game_bets is defined and command_center.top_game_bets else dashboard.top_game_bets or [] %}
-      {% set command_sport_summaries = command_center.sport_summaries if command_center.sport_summaries is defined and command_center.sport_summaries else dashboard.sport_summaries or [] %}
-      <div class="home-command-center__hero">
-        <div class="section-label">Daily command center</div>
-        <h2 class="home-command-center__headline">{{ command_center.headline or 'Syndicate main page' }}</h2>
-        <p class="home-command-center__lede">{{ command_center.lede or 'One hub for the day across all sports, with games, live game updates, pregame props, live props, and the highest-value actions surfaced first.' }}</p>
-        <div class="home-command-center__snapshot" aria-label="Selected slate snapshot">
-          <span class="home-command-center__snapshot-pill">Selected slate: {{ selected_home_date or command_center.selected_date or 'Today' }}</span>
-          <span class="home-command-center__snapshot-pill">Contract: {{ command_center.schema or 'home_command_center_v1' }}</span>
+    {% set command_center = command_center or {} %}
+    {% set command_shortcuts = command_center.shortcuts if command_center.shortcuts is defined and command_center.shortcuts else [] %}
+    {% set command_summary_cards = command_center.summary_cards if command_center.summary_cards is defined and command_center.summary_cards else dashboard.summary_cards or [] %}
+    {% set command_live_watch = command_center.live_watch if command_center.live_watch is defined and command_center.live_watch else dashboard.live_watch or [] %}
+    {% set command_top_props = command_center.top_props if command_center.top_props is defined and command_center.top_props else dashboard.top_props or [] %}
+    {% set command_top_game_bets = command_center.top_game_bets if command_center.top_game_bets is defined and command_center.top_game_bets else dashboard.top_game_bets or [] %}
+    {% set command_sport_summaries = command_center.sport_summaries if command_center.sport_summaries is defined and command_center.sport_summaries else dashboard.sport_summaries or [] %}
+    {% if show_command_center is not defined or show_command_center %}
+      <section class="home-command-center home-command-center--split" aria-label="Daily command center">
+        <div class="home-command-center__hero">
+          <div class="section-label">Daily command center</div>
+          <h2 class="home-command-center__headline">{{ command_center.headline or 'Syndicate main page' }}</h2>
+          <p class="home-command-center__lede">{{ command_center.lede or 'One hub for the day across all sports, with games, live game updates, pregame props, live props, and the highest-value actions surfaced first.' }}</p>
+          <div class="home-command-center__snapshot" aria-label="Selected slate snapshot">
+            <span class="home-command-center__snapshot-pill">Selected slate: {{ selected_home_date or command_center.selected_date or 'Today' }}</span>
+            <span class="home-command-center__snapshot-pill">Contract: {{ command_center.schema or 'home_command_center_v1' }}</span>
+          </div>
+          <div class="home-command-center__actions" aria-label="Home command center shortcuts">
+            {% for shortcut in command_shortcuts %}
+              <a class="cards-nav-pill" href="{{ shortcut.href }}">{{ shortcut.label }}</a>
+            {% endfor %}
+          </div>
         </div>
-        <div class="home-command-center__actions" aria-label="Home command center shortcuts">
-          {% for shortcut in command_shortcuts %}
-            <a class="cards-nav-pill" href="{{ shortcut.href }}">{{ shortcut.label }}</a>
-          {% endfor %}
-        </div>
-      </div>
 
-      <div class="home-command-center__summary-rail" aria-label="Today at a glance">
-        <div class="section-label">Today at a glance</div>
-        <div class="home-command-center__summary-grid">
-          {% for card in command_summary_cards %}
-            <article class="home-summary-card">
-              <div class="home-summary-card__label">{{ card.label }}</div>
-              <div class="home-summary-card__value">{{ card.value }}</div>
-              <div class="home-summary-card__meta">{{ card.meta }}</div>
-            </article>
-          {% endfor %}
+        <div class="home-command-center__summary-rail" aria-label="Today at a glance">
+          <div class="section-label">Today at a glance</div>
+          <div class="home-command-center__summary-grid">
+            {% for card in command_summary_cards %}
+              <article class="home-summary-card">
+                <div class="home-summary-card__label">{{ card.label }}</div>
+                <div class="home-summary-card__value">{{ card.value }}</div>
+                <div class="home-summary-card__meta">{{ card.meta }}</div>
+              </article>
+            {% endfor %}
+          </div>
         </div>
-      </div>
-    </section>
+      </section>
+    {% endif %}
 
     <section class="home-decision-grid" aria-label="Priority daily lanes">
       <article class="home-decision-card" id="home-live-lane">

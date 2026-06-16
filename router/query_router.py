@@ -127,7 +127,7 @@ class QueryRouter:
             match = pattern.search(normalized_question)
             if not match:
                 continue
-            subject = str(match.group("subject") or "").strip().strip(" .?!,;:\"")
+            subject = str(match.groupdict().get("subject") or match.group(0) or "").strip().strip(" .?!,;:\"")
             if subject.lower().startswith(("the ", "a ", "an ")):
                 subject = re.sub(r"^(?:the|a|an)\s+", "", subject, flags=re.IGNORECASE).strip()
             return subject or None
