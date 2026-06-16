@@ -205,6 +205,8 @@ The central tool is intentionally an orchestrator, not a new fetcher. It reuses 
 
 That keeps Syndicate aligned with the existing source models for pregame and live odds, while the mirror scripts now also copy the refreshed odds artifacts that those refreshes produce.
 
+For the required Render data-root contract, mounted disk layout, and fallback order, see [docs/render_data_authority.md](docs/render_data_authority.md).
+
 For NHL specifically, source mode now generates `scoreboard.csv`, team odds, and player-props lines directly inside [scripts/refresh_nhl_oddsapi.py](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_nhl_oddsapi.py) and writes them into the local or published artifact bundle root. Passing `--source-root` is now optional and only backfills extra processed or live-lens artifacts when needed for compatibility runs.
 
 For NCAAB specifically, source mode now writes the raw odds snapshot locally through [scripts/refresh_ncaab_odds_history.py](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_ncaab_odds_history.py), and `--mirror-only` still takes the hosted-friendly path through [scripts/refresh_ncaab_source_mirror.ps1](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_ncaab_source_mirror.ps1) with `-UseExistingRawOutputs`. That means both fresh raw-output generation and API export can now run without requiring a sibling `NCAAB` checkout on the normal path.

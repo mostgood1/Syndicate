@@ -5,12 +5,9 @@ from pathlib import Path
 from typing import Any
 
 from syndicate.features.shared.refresh_state_store import read_json_file
+from syndicate.features.shared.refresh_state_store import data_root
 from syndicate.features.shared.refresh_state_store import reports_root
 from syndicate.features.shared.refresh_state_store import write_json_file
-from syndicate.features.shared.source_roots import repo_root_from
-
-
-REPO_ROOT = repo_root_from(__file__)
 
 
 def _utc_now() -> str:
@@ -32,12 +29,10 @@ def shared_odds_history_root() -> Path:
 def odds_history_roots_for_sport(sport_slug: str) -> list[Path]:
     slug = str(sport_slug or "").strip().lower()
     roots: list[Path] = [shared_odds_history_root() / slug]
-    for base in (
-        REPO_ROOT / "data" / f"{slug}_source",
-        REPO_ROOT / f"{slug}_source",
-    ):
-        if base.exists() and base not in roots:
-            roots.append(base)
+    data_root_path = data_root()
+    sport_root = (data_root_path / f"{slug}_source").resolve()
+    if sport_root not in roots:
+        roots.append(sport_root)
     return roots
 
 

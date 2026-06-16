@@ -2,6 +2,8 @@
 
 This runbook completes NBA/WNBA recovery on Syndicate Render by wiring Syndicate to the working standalone source apps.
 
+This is a compatibility path, not the normal Render data path. The authoritative Render disk layout is documented in [docs/render_data_authority.md](render_data_authority.md).
+
 ## What is already in code
 
 Syndicate now supports source-app fallback for NBA and WNBA in these paths:

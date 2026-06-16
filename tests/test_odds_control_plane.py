@@ -14,11 +14,11 @@ from syndicate.features.shared.odds_control_plane import write_odds_control_plan
 class OddsControlPlaneTests(unittest.TestCase):
     def test_odds_history_prefers_artifact_history_over_tracking(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
-            repo_root = Path(tmp_dir)
-            report_root = repo_root / "reports"
+            data_root = Path(tmp_dir) / "data"
+            report_root = Path(tmp_dir) / "reports"
             shared_path = report_root / "odds_control_plane" / "odds_history" / "nba" / "odds_history.json"
-            artifact_path = repo_root / "data" / "nba_source" / "artifacts" / "nba" / "odds_history.json"
-            tracking_path = repo_root / "data" / "nba_source" / "tracking" / "odds_history.json"
+            artifact_path = data_root / "nba_source" / "artifacts" / "nba" / "odds_history.json"
+            tracking_path = data_root / "nba_source" / "tracking" / "odds_history.json"
             shared_path.parent.mkdir(parents=True, exist_ok=True)
             artifact_path.parent.mkdir(parents=True, exist_ok=True)
             tracking_path.parent.mkdir(parents=True, exist_ok=True)
@@ -26,19 +26,20 @@ class OddsControlPlaneTests(unittest.TestCase):
             artifact_path.write_text('{"source":"artifact"}', encoding="utf-8")
             tracking_path.write_text('{"source":"tracking"}', encoding="utf-8")
 
-            with patch("syndicate.features.shared.odds_control_plane.REPO_ROOT", repo_root), patch(
+            with patch("syndicate.features.shared.odds_control_plane.data_root", return_value=data_root), patch(
                 "syndicate.features.shared.odds_control_plane.reports_root",
                 return_value=report_root,
             ):
-                self.assertEqual(odds_history_paths_for_sport("nba"), [shared_path, artifact_path, tracking_path])
+                actual_paths = [path.resolve() for path in odds_history_paths_for_sport("nba")]
+                self.assertEqual(actual_paths, [shared_path.resolve(), artifact_path.resolve(), tracking_path.resolve()])
                 self.assertEqual(load_odds_history_payload_for_sport("nba"), {"source": "shared"})
 
     def test_control_plane_snapshot_writes_central_summary(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
-            repo_root = Path(tmp_dir)
-            report_root = repo_root / "reports"
+            data_root = Path(tmp_dir) / "data"
+            report_root = Path(tmp_dir) / "reports"
             control_plane_path = report_root / "odds_control_plane" / "latest.json"
-            with patch("syndicate.features.shared.odds_control_plane.REPO_ROOT", repo_root), patch(
+            with patch("syndicate.features.shared.odds_control_plane.data_root", return_value=data_root), patch(
                 "syndicate.features.shared.odds_control_plane.reports_root",
                 return_value=report_root,
             ):
@@ -55,7 +56,7 @@ class OddsControlPlaneTests(unittest.TestCase):
                                 "ok": True,
                                 "generation_mode": "local_artifact_bundle",
                                 "ingestion_mode": "mirror_script",
-                                "source_repo": str(repo_root / "nba_betting_repo"),
+                                "source_repo": str(Path(tmp_dir) / "nba_betting_repo"),
                                 "source_root_env_var": "SYNDICATE_SOURCE_ROOT_NBA",
                                 "artifact_paths": ["one", "two"],
                                 "sport_manifest": {"payload": {"metadata": {"post_refresh_ok": True, "mirror_ok": True}}},
@@ -79,6 +80,21 @@ class OddsControlPlaneTests(unittest.TestCase):
             self.assertEqual(snapshot["source_precedence"], ["shared_history", "artifact_history", "tracking_history"])
             self.assertEqual(snapshot["sports"][0]["sport"], "nba")
             self.assertEqual(snapshot["sports"][0]["odds_history"]["source_precedence"], ["shared_history", "artifact_history", "tracking_history"])
+
+    def test_odds_history_roots_stay_on_data_root_and_shared_history(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            data_root = Path(tmp_dir) / "data"
+            report_root = Path(tmp_dir) / "reports"
+            with patch("syndicate.features.shared.odds_control_plane.data_root", return_value=data_root), patch(
+                "syndicate.features.shared.odds_control_plane.reports_root",
+                return_value=report_root,
+            ):
+                roots = odds_history_roots_for_sport("wnba")
+
+            self.assertEqual([root.resolve() for root in roots], [
+                (report_root / "odds_control_plane" / "odds_history" / "wnba").resolve(),
+                (data_root / "wnba_source").resolve(),
+            ])
 
 
 if __name__ == "__main__":
