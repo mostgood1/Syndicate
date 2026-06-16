@@ -1,0 +1,3303 @@
+{
+  "date": "2026-06-16",
+  "counts": {
+    "games": 54,
+    "picks": 162
+  },
+  "per_game": [
+    {
+      "home": "IND",
+      "away": "TOR",
+      "matchup": "TOR @ IND",
+      "picks": [
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Marina Mabrey OVER 6.5",
+          "selection": "OVER 6.5",
+          "price": -112.0,
+          "score": 12.769053918074924,
+          "ev_pct": 12.769053918074924,
+          "win_prob": 0.5283018867924528,
+          "p_win": 0.5283018867924528,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.8%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Julie Allemand UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "price": 121.0,
+          "score": 12.728547357962983,
+          "ev_pct": 12.728547357962983,
+          "win_prob": 0.45248868778280543,
+          "p_win": 0.45248868778280543,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.7%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Brittney Sykes UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "price": 118.0,
+          "score": 11.236434876192725,
+          "ev_pct": 11.236434876192725,
+          "win_prob": 0.45871559633027525,
+          "p_win": 0.45871559633027525,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 11.2%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        }
+      ]
+    },
+    {
+      "home": "IND",
+      "away": "TOR",
+      "matchup": "TOR @ IND",
+      "picks": [
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Marina Mabrey OVER 6.5",
+          "selection": "OVER 6.5",
+          "price": -112.0,
+          "score": 12.769053918074924,
+          "ev_pct": 12.769053918074924,
+          "win_prob": 0.5283018867924528,
+          "p_win": 0.5283018867924528,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.8%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Julie Allemand UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "price": 121.0,
+          "score": 12.728547357962983,
+          "ev_pct": 12.728547357962983,
+          "win_prob": 0.45248868778280543,
+          "p_win": 0.45248868778280543,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.7%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Brittney Sykes UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "price": 118.0,
+          "score": 11.236434876192725,
+          "ev_pct": 11.236434876192725,
+          "win_prob": 0.45871559633027525,
+          "p_win": 0.45871559633027525,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 11.2%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        }
+      ]
+    },
+    {
+      "home": "IND",
+      "away": "TOR",
+      "matchup": "TOR @ IND",
+      "picks": [
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Marina Mabrey OVER 6.5",
+          "selection": "OVER 6.5",
+          "price": -112.0,
+          "score": 12.769053918074924,
+          "ev_pct": 12.769053918074924,
+          "win_prob": 0.5283018867924528,
+          "p_win": 0.5283018867924528,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.8%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Julie Allemand UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "price": 121.0,
+          "score": 12.728547357962983,
+          "ev_pct": 12.728547357962983,
+          "win_prob": 0.45248868778280543,
+          "p_win": 0.45248868778280543,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.7%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Brittney Sykes UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "price": 118.0,
+          "score": 11.236434876192725,
+          "ev_pct": 11.236434876192725,
+          "win_prob": 0.45871559633027525,
+          "p_win": 0.45871559633027525,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 11.2%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        }
+      ]
+    },
+    {
+      "home": "IND",
+      "away": "TOR",
+      "matchup": "TOR @ IND",
+      "picks": [
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Marina Mabrey OVER 6.5",
+          "selection": "OVER 6.5",
+          "price": -112.0,
+          "score": 12.769053918074924,
+          "ev_pct": 12.769053918074924,
+          "win_prob": 0.5283018867924528,
+          "p_win": 0.5283018867924528,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.8%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Julie Allemand UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "price": 121.0,
+          "score": 12.728547357962983,
+          "ev_pct": 12.728547357962983,
+          "win_prob": 0.45248868778280543,
+          "p_win": 0.45248868778280543,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.7%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Brittney Sykes UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "price": 118.0,
+          "score": 11.236434876192725,
+          "ev_pct": 11.236434876192725,
+          "win_prob": 0.45871559633027525,
+          "p_win": 0.45871559633027525,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 11.2%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        }
+      ]
+    },
+    {
+      "home": "IND",
+      "away": "TOR",
+      "matchup": "TOR @ IND",
+      "picks": [
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Marina Mabrey OVER 6.5",
+          "selection": "OVER 6.5",
+          "price": -112.0,
+          "score": 12.769053918074924,
+          "ev_pct": 12.769053918074924,
+          "win_prob": 0.5283018867924528,
+          "p_win": 0.5283018867924528,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.8%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Julie Allemand UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "price": 121.0,
+          "score": 12.728547357962983,
+          "ev_pct": 12.728547357962983,
+          "win_prob": 0.45248868778280543,
+          "p_win": 0.45248868778280543,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.7%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Brittney Sykes UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "price": 118.0,
+          "score": 11.236434876192725,
+          "ev_pct": 11.236434876192725,
+          "win_prob": 0.45871559633027525,
+          "p_win": 0.45871559633027525,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 11.2%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        }
+      ]
+    },
+    {
+      "home": "IND",
+      "away": "TOR",
+      "matchup": "TOR @ IND",
+      "picks": [
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Marina Mabrey OVER 6.5",
+          "selection": "OVER 6.5",
+          "price": -112.0,
+          "score": 12.769053918074924,
+          "ev_pct": 12.769053918074924,
+          "win_prob": 0.5283018867924528,
+          "p_win": 0.5283018867924528,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.8%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Julie Allemand UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "price": 121.0,
+          "score": 12.728547357962983,
+          "ev_pct": 12.728547357962983,
+          "win_prob": 0.45248868778280543,
+          "p_win": 0.45248868778280543,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.7%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Brittney Sykes UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "price": 118.0,
+          "score": 11.236434876192725,
+          "ev_pct": 11.236434876192725,
+          "win_prob": 0.45871559633027525,
+          "p_win": 0.45871559633027525,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 11.2%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        }
+      ]
+    },
+    {
+      "home": "IND",
+      "away": "TOR",
+      "matchup": "TOR @ IND",
+      "picks": [
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Marina Mabrey OVER 6.5",
+          "selection": "OVER 6.5",
+          "price": -112.0,
+          "score": 12.769053918074924,
+          "ev_pct": 12.769053918074924,
+          "win_prob": 0.5283018867924528,
+          "p_win": 0.5283018867924528,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.8%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Julie Allemand UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "price": 121.0,
+          "score": 12.728547357962983,
+          "ev_pct": 12.728547357962983,
+          "win_prob": 0.45248868778280543,
+          "p_win": 0.45248868778280543,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.7%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Brittney Sykes UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "price": 118.0,
+          "score": 11.236434876192725,
+          "ev_pct": 11.236434876192725,
+          "win_prob": 0.45871559633027525,
+          "p_win": 0.45871559633027525,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 11.2%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        }
+      ]
+    },
+    {
+      "home": "IND",
+      "away": "TOR",
+      "matchup": "TOR @ IND",
+      "picks": [
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Marina Mabrey OVER 6.5",
+          "selection": "OVER 6.5",
+          "price": -112.0,
+          "score": 12.769053918074924,
+          "ev_pct": 12.769053918074924,
+          "win_prob": 0.5283018867924528,
+          "p_win": 0.5283018867924528,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.8%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Julie Allemand UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "price": 121.0,
+          "score": 12.728547357962983,
+          "ev_pct": 12.728547357962983,
+          "win_prob": 0.45248868778280543,
+          "p_win": 0.45248868778280543,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.7%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Brittney Sykes UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "price": 118.0,
+          "score": 11.236434876192725,
+          "ev_pct": 11.236434876192725,
+          "win_prob": 0.45871559633027525,
+          "p_win": 0.45871559633027525,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 11.2%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        }
+      ]
+    },
+    {
+      "home": "IND",
+      "away": "TOR",
+      "matchup": "TOR @ IND",
+      "picks": [
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Marina Mabrey OVER 6.5",
+          "selection": "OVER 6.5",
+          "price": -112.0,
+          "score": 12.769053918074924,
+          "ev_pct": 12.769053918074924,
+          "win_prob": 0.5283018867924528,
+          "p_win": 0.5283018867924528,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.8%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Julie Allemand UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "price": 121.0,
+          "score": 12.728547357962983,
+          "ev_pct": 12.728547357962983,
+          "win_prob": 0.45248868778280543,
+          "p_win": 0.45248868778280543,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.7%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Brittney Sykes UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "price": 118.0,
+          "score": 11.236434876192725,
+          "ev_pct": 11.236434876192725,
+          "win_prob": 0.45871559633027525,
+          "p_win": 0.45871559633027525,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 11.2%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        }
+      ]
+    },
+    {
+      "home": "IND",
+      "away": "TOR",
+      "matchup": "TOR @ IND",
+      "picks": [
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Marina Mabrey OVER 6.5",
+          "selection": "OVER 6.5",
+          "price": -112.0,
+          "score": 12.769053918074924,
+          "ev_pct": 12.769053918074924,
+          "win_prob": 0.5283018867924528,
+          "p_win": 0.5283018867924528,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.8%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Julie Allemand UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "price": 121.0,
+          "score": 12.728547357962983,
+          "ev_pct": 12.728547357962983,
+          "win_prob": 0.45248868778280543,
+          "p_win": 0.45248868778280543,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.7%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Brittney Sykes UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "price": 118.0,
+          "score": 11.236434876192725,
+          "ev_pct": 11.236434876192725,
+          "win_prob": 0.45871559633027525,
+          "p_win": 0.45871559633027525,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 11.2%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        }
+      ]
+    },
+    {
+      "home": "IND",
+      "away": "TOR",
+      "matchup": "TOR @ IND",
+      "picks": [
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Marina Mabrey OVER 6.5",
+          "selection": "OVER 6.5",
+          "price": -112.0,
+          "score": 12.769053918074924,
+          "ev_pct": 12.769053918074924,
+          "win_prob": 0.5283018867924528,
+          "p_win": 0.5283018867924528,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.8%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Julie Allemand UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "price": 121.0,
+          "score": 12.728547357962983,
+          "ev_pct": 12.728547357962983,
+          "win_prob": 0.45248868778280543,
+          "p_win": 0.45248868778280543,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.7%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Brittney Sykes UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "price": 118.0,
+          "score": 11.236434876192725,
+          "ev_pct": 11.236434876192725,
+          "win_prob": 0.45871559633027525,
+          "p_win": 0.45871559633027525,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 11.2%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        }
+      ]
+    },
+    {
+      "home": "IND",
+      "away": "TOR",
+      "matchup": "TOR @ IND",
+      "picks": [
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Marina Mabrey OVER 6.5",
+          "selection": "OVER 6.5",
+          "price": -112.0,
+          "score": 12.769053918074924,
+          "ev_pct": 12.769053918074924,
+          "win_prob": 0.5283018867924528,
+          "p_win": 0.5283018867924528,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.8%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Julie Allemand UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "price": 121.0,
+          "score": 12.728547357962983,
+          "ev_pct": 12.728547357962983,
+          "win_prob": 0.45248868778280543,
+          "p_win": 0.45248868778280543,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.7%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Brittney Sykes UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "price": 118.0,
+          "score": 11.236434876192725,
+          "ev_pct": 11.236434876192725,
+          "win_prob": 0.45871559633027525,
+          "p_win": 0.45871559633027525,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 11.2%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        }
+      ]
+    },
+    {
+      "home": "IND",
+      "away": "TOR",
+      "matchup": "TOR @ IND",
+      "picks": [
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Marina Mabrey OVER 6.5",
+          "selection": "OVER 6.5",
+          "price": -112.0,
+          "score": 12.769053918074924,
+          "ev_pct": 12.769053918074924,
+          "win_prob": 0.5283018867924528,
+          "p_win": 0.5283018867924528,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.8%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Julie Allemand UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "price": 121.0,
+          "score": 12.728547357962983,
+          "ev_pct": 12.728547357962983,
+          "win_prob": 0.45248868778280543,
+          "p_win": 0.45248868778280543,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.7%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Brittney Sykes UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "price": 118.0,
+          "score": 11.236434876192725,
+          "ev_pct": 11.236434876192725,
+          "win_prob": 0.45871559633027525,
+          "p_win": 0.45871559633027525,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 11.2%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        }
+      ]
+    },
+    {
+      "home": "IND",
+      "away": "TOR",
+      "matchup": "TOR @ IND",
+      "picks": [
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Marina Mabrey OVER 6.5",
+          "selection": "OVER 6.5",
+          "price": -112.0,
+          "score": 12.769053918074924,
+          "ev_pct": 12.769053918074924,
+          "win_prob": 0.5283018867924528,
+          "p_win": 0.5283018867924528,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.8%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Julie Allemand UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "price": 121.0,
+          "score": 12.728547357962983,
+          "ev_pct": 12.728547357962983,
+          "win_prob": 0.45248868778280543,
+          "p_win": 0.45248868778280543,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.7%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Brittney Sykes UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "price": 118.0,
+          "score": 11.236434876192725,
+          "ev_pct": 11.236434876192725,
+          "win_prob": 0.45871559633027525,
+          "p_win": 0.45871559633027525,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 11.2%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        }
+      ]
+    },
+    {
+      "home": "IND",
+      "away": "TOR",
+      "matchup": "TOR @ IND",
+      "picks": [
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Marina Mabrey OVER 6.5",
+          "selection": "OVER 6.5",
+          "price": -112.0,
+          "score": 12.769053918074924,
+          "ev_pct": 12.769053918074924,
+          "win_prob": 0.5283018867924528,
+          "p_win": 0.5283018867924528,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.8%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Julie Allemand UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "price": 121.0,
+          "score": 12.728547357962983,
+          "ev_pct": 12.728547357962983,
+          "win_prob": 0.45248868778280543,
+          "p_win": 0.45248868778280543,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.7%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Brittney Sykes UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "price": 118.0,
+          "score": 11.236434876192725,
+          "ev_pct": 11.236434876192725,
+          "win_prob": 0.45871559633027525,
+          "p_win": 0.45871559633027525,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 11.2%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        }
+      ]
+    },
+    {
+      "home": "IND",
+      "away": "TOR",
+      "matchup": "TOR @ IND",
+      "picks": [
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Marina Mabrey OVER 6.5",
+          "selection": "OVER 6.5",
+          "price": -112.0,
+          "score": 12.769053918074924,
+          "ev_pct": 12.769053918074924,
+          "win_prob": 0.5283018867924528,
+          "p_win": 0.5283018867924528,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.8%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Julie Allemand UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "price": 121.0,
+          "score": 12.728547357962983,
+          "ev_pct": 12.728547357962983,
+          "win_prob": 0.45248868778280543,
+          "p_win": 0.45248868778280543,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.7%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Brittney Sykes UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "price": 118.0,
+          "score": 11.236434876192725,
+          "ev_pct": 11.236434876192725,
+          "win_prob": 0.45871559633027525,
+          "p_win": 0.45871559633027525,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 11.2%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        }
+      ]
+    },
+    {
+      "home": "IND",
+      "away": "TOR",
+      "matchup": "TOR @ IND",
+      "picks": [
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Marina Mabrey OVER 6.5",
+          "selection": "OVER 6.5",
+          "price": -112.0,
+          "score": 12.769053918074924,
+          "ev_pct": 12.769053918074924,
+          "win_prob": 0.5283018867924528,
+          "p_win": 0.5283018867924528,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.8%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Julie Allemand UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "price": 121.0,
+          "score": 12.728547357962983,
+          "ev_pct": 12.728547357962983,
+          "win_prob": 0.45248868778280543,
+          "p_win": 0.45248868778280543,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.7%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Brittney Sykes UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "price": 118.0,
+          "score": 11.236434876192725,
+          "ev_pct": 11.236434876192725,
+          "win_prob": 0.45871559633027525,
+          "p_win": 0.45871559633027525,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 11.2%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        }
+      ]
+    },
+    {
+      "home": "IND",
+      "away": "TOR",
+      "matchup": "TOR @ IND",
+      "picks": [
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Marina Mabrey OVER 6.5",
+          "selection": "OVER 6.5",
+          "price": -112.0,
+          "score": 12.769053918074924,
+          "ev_pct": 12.769053918074924,
+          "win_prob": 0.5283018867924528,
+          "p_win": 0.5283018867924528,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.8%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Julie Allemand UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "price": 121.0,
+          "score": 12.728547357962983,
+          "ev_pct": 12.728547357962983,
+          "win_prob": 0.45248868778280543,
+          "p_win": 0.45248868778280543,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.7%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Brittney Sykes UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "price": 118.0,
+          "score": 11.236434876192725,
+          "ev_pct": 11.236434876192725,
+          "win_prob": 0.45871559633027525,
+          "p_win": 0.45871559633027525,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 11.2%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        }
+      ]
+    },
+    {
+      "home": "IND",
+      "away": "TOR",
+      "matchup": "TOR @ IND",
+      "picks": [
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Marina Mabrey OVER 6.5",
+          "selection": "OVER 6.5",
+          "price": -112.0,
+          "score": 12.769053918074924,
+          "ev_pct": 12.769053918074924,
+          "win_prob": 0.5283018867924528,
+          "p_win": 0.5283018867924528,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.8%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Julie Allemand UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "price": 121.0,
+          "score": 12.728547357962983,
+          "ev_pct": 12.728547357962983,
+          "win_prob": 0.45248868778280543,
+          "p_win": 0.45248868778280543,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.7%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Brittney Sykes UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "price": 118.0,
+          "score": 11.236434876192725,
+          "ev_pct": 11.236434876192725,
+          "win_prob": 0.45871559633027525,
+          "p_win": 0.45871559633027525,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 11.2%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        }
+      ]
+    },
+    {
+      "home": "IND",
+      "away": "TOR",
+      "matchup": "TOR @ IND",
+      "picks": [
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Marina Mabrey OVER 6.5",
+          "selection": "OVER 6.5",
+          "price": -112.0,
+          "score": 12.769053918074924,
+          "ev_pct": 12.769053918074924,
+          "win_prob": 0.5283018867924528,
+          "p_win": 0.5283018867924528,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.8%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Julie Allemand UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "price": 121.0,
+          "score": 12.728547357962983,
+          "ev_pct": 12.728547357962983,
+          "win_prob": 0.45248868778280543,
+          "p_win": 0.45248868778280543,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.7%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Brittney Sykes UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "price": 118.0,
+          "score": 11.236434876192725,
+          "ev_pct": 11.236434876192725,
+          "win_prob": 0.45871559633027525,
+          "p_win": 0.45871559633027525,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 11.2%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        }
+      ]
+    },
+    {
+      "home": "IND",
+      "away": "TOR",
+      "matchup": "TOR @ IND",
+      "picks": [
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Marina Mabrey OVER 6.5",
+          "selection": "OVER 6.5",
+          "price": -112.0,
+          "score": 12.769053918074924,
+          "ev_pct": 12.769053918074924,
+          "win_prob": 0.5283018867924528,
+          "p_win": 0.5283018867924528,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.8%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Julie Allemand UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "price": 121.0,
+          "score": 12.728547357962983,
+          "ev_pct": 12.728547357962983,
+          "win_prob": 0.45248868778280543,
+          "p_win": 0.45248868778280543,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.7%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Brittney Sykes UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "price": 118.0,
+          "score": 11.236434876192725,
+          "ev_pct": 11.236434876192725,
+          "win_prob": 0.45871559633027525,
+          "p_win": 0.45871559633027525,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 11.2%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        }
+      ]
+    },
+    {
+      "home": "IND",
+      "away": "TOR",
+      "matchup": "TOR @ IND",
+      "picks": [
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Marina Mabrey OVER 6.5",
+          "selection": "OVER 6.5",
+          "price": -112.0,
+          "score": 12.769053918074924,
+          "ev_pct": 12.769053918074924,
+          "win_prob": 0.5283018867924528,
+          "p_win": 0.5283018867924528,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.8%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Julie Allemand UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "price": 121.0,
+          "score": 12.728547357962983,
+          "ev_pct": 12.728547357962983,
+          "win_prob": 0.45248868778280543,
+          "p_win": 0.45248868778280543,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.7%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Brittney Sykes UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "price": 118.0,
+          "score": 11.236434876192725,
+          "ev_pct": 11.236434876192725,
+          "win_prob": 0.45871559633027525,
+          "p_win": 0.45871559633027525,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 11.2%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        }
+      ]
+    },
+    {
+      "home": "IND",
+      "away": "TOR",
+      "matchup": "TOR @ IND",
+      "picks": [
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Marina Mabrey OVER 6.5",
+          "selection": "OVER 6.5",
+          "price": -112.0,
+          "score": 12.769053918074924,
+          "ev_pct": 12.769053918074924,
+          "win_prob": 0.5283018867924528,
+          "p_win": 0.5283018867924528,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.8%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Julie Allemand UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "price": 121.0,
+          "score": 12.728547357962983,
+          "ev_pct": 12.728547357962983,
+          "win_prob": 0.45248868778280543,
+          "p_win": 0.45248868778280543,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.7%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Brittney Sykes UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "price": 118.0,
+          "score": 11.236434876192725,
+          "ev_pct": 11.236434876192725,
+          "win_prob": 0.45871559633027525,
+          "p_win": 0.45871559633027525,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 11.2%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        }
+      ]
+    },
+    {
+      "home": "IND",
+      "away": "TOR",
+      "matchup": "TOR @ IND",
+      "picks": [
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Marina Mabrey OVER 6.5",
+          "selection": "OVER 6.5",
+          "price": -112.0,
+          "score": 12.769053918074924,
+          "ev_pct": 12.769053918074924,
+          "win_prob": 0.5283018867924528,
+          "p_win": 0.5283018867924528,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.8%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Julie Allemand UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "price": 121.0,
+          "score": 12.728547357962983,
+          "ev_pct": 12.728547357962983,
+          "win_prob": 0.45248868778280543,
+          "p_win": 0.45248868778280543,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.7%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Brittney Sykes UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "price": 118.0,
+          "score": 11.236434876192725,
+          "ev_pct": 11.236434876192725,
+          "win_prob": 0.45871559633027525,
+          "p_win": 0.45871559633027525,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 11.2%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        }
+      ]
+    },
+    {
+      "home": "IND",
+      "away": "TOR",
+      "matchup": "TOR @ IND",
+      "picks": [
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Marina Mabrey OVER 6.5",
+          "selection": "OVER 6.5",
+          "price": -112.0,
+          "score": 12.769053918074924,
+          "ev_pct": 12.769053918074924,
+          "win_prob": 0.5283018867924528,
+          "p_win": 0.5283018867924528,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.8%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Julie Allemand UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "price": 121.0,
+          "score": 12.728547357962983,
+          "ev_pct": 12.728547357962983,
+          "win_prob": 0.45248868778280543,
+          "p_win": 0.45248868778280543,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.7%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Brittney Sykes UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "price": 118.0,
+          "score": 11.236434876192725,
+          "ev_pct": 11.236434876192725,
+          "win_prob": 0.45871559633027525,
+          "p_win": 0.45871559633027525,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 11.2%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        }
+      ]
+    },
+    {
+      "home": "IND",
+      "away": "TOR",
+      "matchup": "TOR @ IND",
+      "picks": [
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Marina Mabrey OVER 6.5",
+          "selection": "OVER 6.5",
+          "price": -112.0,
+          "score": 12.769053918074924,
+          "ev_pct": 12.769053918074924,
+          "win_prob": 0.5283018867924528,
+          "p_win": 0.5283018867924528,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.8%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Julie Allemand UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "price": 121.0,
+          "score": 12.728547357962983,
+          "ev_pct": 12.728547357962983,
+          "win_prob": 0.45248868778280543,
+          "p_win": 0.45248868778280543,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.7%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Brittney Sykes UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "price": 118.0,
+          "score": 11.236434876192725,
+          "ev_pct": 11.236434876192725,
+          "win_prob": 0.45871559633027525,
+          "p_win": 0.45871559633027525,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 11.2%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        }
+      ]
+    },
+    {
+      "home": "IND",
+      "away": "TOR",
+      "matchup": "TOR @ IND",
+      "picks": [
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Marina Mabrey OVER 6.5",
+          "selection": "OVER 6.5",
+          "price": -112.0,
+          "score": 12.769053918074924,
+          "ev_pct": 12.769053918074924,
+          "win_prob": 0.5283018867924528,
+          "p_win": 0.5283018867924528,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.8%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Julie Allemand UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "price": 121.0,
+          "score": 12.728547357962983,
+          "ev_pct": 12.728547357962983,
+          "win_prob": 0.45248868778280543,
+          "p_win": 0.45248868778280543,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.7%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Brittney Sykes UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "price": 118.0,
+          "score": 11.236434876192725,
+          "ev_pct": 11.236434876192725,
+          "win_prob": 0.45871559633027525,
+          "p_win": 0.45871559633027525,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 11.2%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        }
+      ]
+    },
+    {
+      "home": "IND",
+      "away": "TOR",
+      "matchup": "TOR @ IND",
+      "picks": [
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Marina Mabrey OVER 6.5",
+          "selection": "OVER 6.5",
+          "price": -112.0,
+          "score": 12.769053918074924,
+          "ev_pct": 12.769053918074924,
+          "win_prob": 0.5283018867924528,
+          "p_win": 0.5283018867924528,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.8%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Julie Allemand UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "price": 121.0,
+          "score": 12.728547357962983,
+          "ev_pct": 12.728547357962983,
+          "win_prob": 0.45248868778280543,
+          "p_win": 0.45248868778280543,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.7%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Brittney Sykes UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "price": 118.0,
+          "score": 11.236434876192725,
+          "ev_pct": 11.236434876192725,
+          "win_prob": 0.45871559633027525,
+          "p_win": 0.45871559633027525,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 11.2%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        }
+      ]
+    },
+    {
+      "home": "IND",
+      "away": "TOR",
+      "matchup": "TOR @ IND",
+      "picks": [
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Marina Mabrey OVER 6.5",
+          "selection": "OVER 6.5",
+          "price": -112.0,
+          "score": 12.769053918074924,
+          "ev_pct": 12.769053918074924,
+          "win_prob": 0.5283018867924528,
+          "p_win": 0.5283018867924528,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.8%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Julie Allemand UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "price": 121.0,
+          "score": 12.728547357962983,
+          "ev_pct": 12.728547357962983,
+          "win_prob": 0.45248868778280543,
+          "p_win": 0.45248868778280543,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.7%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Brittney Sykes UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "price": 118.0,
+          "score": 11.236434876192725,
+          "ev_pct": 11.236434876192725,
+          "win_prob": 0.45871559633027525,
+          "p_win": 0.45871559633027525,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 11.2%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        }
+      ]
+    },
+    {
+      "home": "IND",
+      "away": "TOR",
+      "matchup": "TOR @ IND",
+      "picks": [
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Marina Mabrey OVER 6.5",
+          "selection": "OVER 6.5",
+          "price": -112.0,
+          "score": 12.769053918074924,
+          "ev_pct": 12.769053918074924,
+          "win_prob": 0.5283018867924528,
+          "p_win": 0.5283018867924528,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.8%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Julie Allemand UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "price": 121.0,
+          "score": 12.728547357962983,
+          "ev_pct": 12.728547357962983,
+          "win_prob": 0.45248868778280543,
+          "p_win": 0.45248868778280543,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.7%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Brittney Sykes UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "price": 118.0,
+          "score": 11.236434876192725,
+          "ev_pct": 11.236434876192725,
+          "win_prob": 0.45871559633027525,
+          "p_win": 0.45871559633027525,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 11.2%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        }
+      ]
+    },
+    {
+      "home": "IND",
+      "away": "TOR",
+      "matchup": "TOR @ IND",
+      "picks": [
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Marina Mabrey OVER 6.5",
+          "selection": "OVER 6.5",
+          "price": -112.0,
+          "score": 12.769053918074924,
+          "ev_pct": 12.769053918074924,
+          "win_prob": 0.5283018867924528,
+          "p_win": 0.5283018867924528,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.8%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Julie Allemand UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "price": 121.0,
+          "score": 12.728547357962983,
+          "ev_pct": 12.728547357962983,
+          "win_prob": 0.45248868778280543,
+          "p_win": 0.45248868778280543,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.7%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Brittney Sykes UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "price": 118.0,
+          "score": 11.236434876192725,
+          "ev_pct": 11.236434876192725,
+          "win_prob": 0.45871559633027525,
+          "p_win": 0.45871559633027525,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 11.2%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        }
+      ]
+    },
+    {
+      "home": "IND",
+      "away": "TOR",
+      "matchup": "TOR @ IND",
+      "picks": [
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Marina Mabrey OVER 6.5",
+          "selection": "OVER 6.5",
+          "price": -112.0,
+          "score": 12.769053918074924,
+          "ev_pct": 12.769053918074924,
+          "win_prob": 0.5283018867924528,
+          "p_win": 0.5283018867924528,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.8%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Julie Allemand UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "price": 121.0,
+          "score": 12.728547357962983,
+          "ev_pct": 12.728547357962983,
+          "win_prob": 0.45248868778280543,
+          "p_win": 0.45248868778280543,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.7%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Brittney Sykes UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "price": 118.0,
+          "score": 11.236434876192725,
+          "ev_pct": 11.236434876192725,
+          "win_prob": 0.45871559633027525,
+          "p_win": 0.45871559633027525,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 11.2%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        }
+      ]
+    },
+    {
+      "home": "IND",
+      "away": "TOR",
+      "matchup": "TOR @ IND",
+      "picks": [
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Marina Mabrey OVER 6.5",
+          "selection": "OVER 6.5",
+          "price": -112.0,
+          "score": 12.769053918074924,
+          "ev_pct": 12.769053918074924,
+          "win_prob": 0.5283018867924528,
+          "p_win": 0.5283018867924528,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.8%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Julie Allemand UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "price": 121.0,
+          "score": 12.728547357962983,
+          "ev_pct": 12.728547357962983,
+          "win_prob": 0.45248868778280543,
+          "p_win": 0.45248868778280543,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.7%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Brittney Sykes UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "price": 118.0,
+          "score": 11.236434876192725,
+          "ev_pct": 11.236434876192725,
+          "win_prob": 0.45871559633027525,
+          "p_win": 0.45871559633027525,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 11.2%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        }
+      ]
+    },
+    {
+      "home": "IND",
+      "away": "TOR",
+      "matchup": "TOR @ IND",
+      "picks": [
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Marina Mabrey OVER 6.5",
+          "selection": "OVER 6.5",
+          "price": -112.0,
+          "score": 12.769053918074924,
+          "ev_pct": 12.769053918074924,
+          "win_prob": 0.5283018867924528,
+          "p_win": 0.5283018867924528,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.8%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Julie Allemand UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "price": 121.0,
+          "score": 12.728547357962983,
+          "ev_pct": 12.728547357962983,
+          "win_prob": 0.45248868778280543,
+          "p_win": 0.45248868778280543,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.7%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Brittney Sykes UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "price": 118.0,
+          "score": 11.236434876192725,
+          "ev_pct": 11.236434876192725,
+          "win_prob": 0.45871559633027525,
+          "p_win": 0.45871559633027525,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 11.2%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        }
+      ]
+    },
+    {
+      "home": "IND",
+      "away": "TOR",
+      "matchup": "TOR @ IND",
+      "picks": [
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Marina Mabrey OVER 6.5",
+          "selection": "OVER 6.5",
+          "price": -112.0,
+          "score": 12.769053918074924,
+          "ev_pct": 12.769053918074924,
+          "win_prob": 0.5283018867924528,
+          "p_win": 0.5283018867924528,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.8%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Julie Allemand UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "price": 121.0,
+          "score": 12.728547357962983,
+          "ev_pct": 12.728547357962983,
+          "win_prob": 0.45248868778280543,
+          "p_win": 0.45248868778280543,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.7%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Brittney Sykes UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "price": 118.0,
+          "score": 11.236434876192725,
+          "ev_pct": 11.236434876192725,
+          "win_prob": 0.45871559633027525,
+          "p_win": 0.45871559633027525,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 11.2%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        }
+      ]
+    },
+    {
+      "home": "IND",
+      "away": "TOR",
+      "matchup": "TOR @ IND",
+      "picks": [
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Marina Mabrey OVER 6.5",
+          "selection": "OVER 6.5",
+          "price": -112.0,
+          "score": 12.769053918074924,
+          "ev_pct": 12.769053918074924,
+          "win_prob": 0.5283018867924528,
+          "p_win": 0.5283018867924528,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.8%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Julie Allemand UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "price": 121.0,
+          "score": 12.728547357962983,
+          "ev_pct": 12.728547357962983,
+          "win_prob": 0.45248868778280543,
+          "p_win": 0.45248868778280543,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.7%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Brittney Sykes UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "price": 118.0,
+          "score": 11.236434876192725,
+          "ev_pct": 11.236434876192725,
+          "win_prob": 0.45871559633027525,
+          "p_win": 0.45871559633027525,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 11.2%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        }
+      ]
+    },
+    {
+      "home": "IND",
+      "away": "TOR",
+      "matchup": "TOR @ IND",
+      "picks": [
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Marina Mabrey OVER 6.5",
+          "selection": "OVER 6.5",
+          "price": -112.0,
+          "score": 12.769053918074924,
+          "ev_pct": 12.769053918074924,
+          "win_prob": 0.5283018867924528,
+          "p_win": 0.5283018867924528,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.8%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Julie Allemand UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "price": 121.0,
+          "score": 12.728547357962983,
+          "ev_pct": 12.728547357962983,
+          "win_prob": 0.45248868778280543,
+          "p_win": 0.45248868778280543,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.7%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Brittney Sykes UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "price": 118.0,
+          "score": 11.236434876192725,
+          "ev_pct": 11.236434876192725,
+          "win_prob": 0.45871559633027525,
+          "p_win": 0.45871559633027525,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 11.2%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        }
+      ]
+    },
+    {
+      "home": "IND",
+      "away": "TOR",
+      "matchup": "TOR @ IND",
+      "picks": [
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Marina Mabrey OVER 6.5",
+          "selection": "OVER 6.5",
+          "price": -112.0,
+          "score": 12.769053918074924,
+          "ev_pct": 12.769053918074924,
+          "win_prob": 0.5283018867924528,
+          "p_win": 0.5283018867924528,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.8%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Julie Allemand UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "price": 121.0,
+          "score": 12.728547357962983,
+          "ev_pct": 12.728547357962983,
+          "win_prob": 0.45248868778280543,
+          "p_win": 0.45248868778280543,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.7%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Brittney Sykes UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "price": 118.0,
+          "score": 11.236434876192725,
+          "ev_pct": 11.236434876192725,
+          "win_prob": 0.45871559633027525,
+          "p_win": 0.45871559633027525,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 11.2%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        }
+      ]
+    },
+    {
+      "home": "IND",
+      "away": "TOR",
+      "matchup": "TOR @ IND",
+      "picks": [
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Marina Mabrey OVER 6.5",
+          "selection": "OVER 6.5",
+          "price": -112.0,
+          "score": 12.769053918074924,
+          "ev_pct": 12.769053918074924,
+          "win_prob": 0.5283018867924528,
+          "p_win": 0.5283018867924528,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.8%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Julie Allemand UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "price": 121.0,
+          "score": 12.728547357962983,
+          "ev_pct": 12.728547357962983,
+          "win_prob": 0.45248868778280543,
+          "p_win": 0.45248868778280543,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.7%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Brittney Sykes UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "price": 118.0,
+          "score": 11.236434876192725,
+          "ev_pct": 11.236434876192725,
+          "win_prob": 0.45871559633027525,
+          "p_win": 0.45871559633027525,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 11.2%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        }
+      ]
+    },
+    {
+      "home": "IND",
+      "away": "TOR",
+      "matchup": "TOR @ IND",
+      "picks": [
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Marina Mabrey OVER 6.5",
+          "selection": "OVER 6.5",
+          "price": -112.0,
+          "score": 12.769053918074924,
+          "ev_pct": 12.769053918074924,
+          "win_prob": 0.5283018867924528,
+          "p_win": 0.5283018867924528,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.8%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Julie Allemand UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "price": 121.0,
+          "score": 12.728547357962983,
+          "ev_pct": 12.728547357962983,
+          "win_prob": 0.45248868778280543,
+          "p_win": 0.45248868778280543,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.7%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Brittney Sykes UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "price": 118.0,
+          "score": 11.236434876192725,
+          "ev_pct": 11.236434876192725,
+          "win_prob": 0.45871559633027525,
+          "p_win": 0.45871559633027525,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 11.2%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        }
+      ]
+    },
+    {
+      "home": "IND",
+      "away": "TOR",
+      "matchup": "TOR @ IND",
+      "picks": [
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Marina Mabrey OVER 6.5",
+          "selection": "OVER 6.5",
+          "price": -112.0,
+          "score": 12.769053918074924,
+          "ev_pct": 12.769053918074924,
+          "win_prob": 0.5283018867924528,
+          "p_win": 0.5283018867924528,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.8%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Julie Allemand UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "price": 121.0,
+          "score": 12.728547357962983,
+          "ev_pct": 12.728547357962983,
+          "win_prob": 0.45248868778280543,
+          "p_win": 0.45248868778280543,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.7%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Brittney Sykes UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "price": 118.0,
+          "score": 11.236434876192725,
+          "ev_pct": 11.236434876192725,
+          "win_prob": 0.45871559633027525,
+          "p_win": 0.45871559633027525,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 11.2%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        }
+      ]
+    },
+    {
+      "home": "IND",
+      "away": "TOR",
+      "matchup": "TOR @ IND",
+      "picks": [
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Marina Mabrey OVER 6.5",
+          "selection": "OVER 6.5",
+          "price": -112.0,
+          "score": 12.769053918074924,
+          "ev_pct": 12.769053918074924,
+          "win_prob": 0.5283018867924528,
+          "p_win": 0.5283018867924528,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.8%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Julie Allemand UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "price": 121.0,
+          "score": 12.728547357962983,
+          "ev_pct": 12.728547357962983,
+          "win_prob": 0.45248868778280543,
+          "p_win": 0.45248868778280543,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.7%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Brittney Sykes UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "price": 118.0,
+          "score": 11.236434876192725,
+          "ev_pct": 11.236434876192725,
+          "win_prob": 0.45871559633027525,
+          "p_win": 0.45871559633027525,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 11.2%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        }
+      ]
+    },
+    {
+      "home": "IND",
+      "away": "TOR",
+      "matchup": "TOR @ IND",
+      "picks": [
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Marina Mabrey OVER 6.5",
+          "selection": "OVER 6.5",
+          "price": -112.0,
+          "score": 12.769053918074924,
+          "ev_pct": 12.769053918074924,
+          "win_prob": 0.5283018867924528,
+          "p_win": 0.5283018867924528,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.8%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Julie Allemand UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "price": 121.0,
+          "score": 12.728547357962983,
+          "ev_pct": 12.728547357962983,
+          "win_prob": 0.45248868778280543,
+          "p_win": 0.45248868778280543,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.7%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Brittney Sykes UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "price": 118.0,
+          "score": 11.236434876192725,
+          "ev_pct": 11.236434876192725,
+          "win_prob": 0.45871559633027525,
+          "p_win": 0.45871559633027525,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 11.2%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        }
+      ]
+    },
+    {
+      "home": "IND",
+      "away": "TOR",
+      "matchup": "TOR @ IND",
+      "picks": [
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Marina Mabrey OVER 6.5",
+          "selection": "OVER 6.5",
+          "price": -112.0,
+          "score": 12.769053918074924,
+          "ev_pct": 12.769053918074924,
+          "win_prob": 0.5283018867924528,
+          "p_win": 0.5283018867924528,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.8%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Julie Allemand UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "price": 121.0,
+          "score": 12.728547357962983,
+          "ev_pct": 12.728547357962983,
+          "win_prob": 0.45248868778280543,
+          "p_win": 0.45248868778280543,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.7%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Brittney Sykes UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "price": 118.0,
+          "score": 11.236434876192725,
+          "ev_pct": 11.236434876192725,
+          "win_prob": 0.45871559633027525,
+          "p_win": 0.45871559633027525,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 11.2%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        }
+      ]
+    },
+    {
+      "home": "IND",
+      "away": "TOR",
+      "matchup": "TOR @ IND",
+      "picks": [
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Marina Mabrey OVER 6.5",
+          "selection": "OVER 6.5",
+          "price": -112.0,
+          "score": 12.769053918074924,
+          "ev_pct": 12.769053918074924,
+          "win_prob": 0.5283018867924528,
+          "p_win": 0.5283018867924528,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.8%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Julie Allemand UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "price": 121.0,
+          "score": 12.728547357962983,
+          "ev_pct": 12.728547357962983,
+          "win_prob": 0.45248868778280543,
+          "p_win": 0.45248868778280543,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.7%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Brittney Sykes UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "price": 118.0,
+          "score": 11.236434876192725,
+          "ev_pct": 11.236434876192725,
+          "win_prob": 0.45871559633027525,
+          "p_win": 0.45871559633027525,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 11.2%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        }
+      ]
+    },
+    {
+      "home": "IND",
+      "away": "TOR",
+      "matchup": "TOR @ IND",
+      "picks": [
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Marina Mabrey OVER 6.5",
+          "selection": "OVER 6.5",
+          "price": -112.0,
+          "score": 12.769053918074924,
+          "ev_pct": 12.769053918074924,
+          "win_prob": 0.5283018867924528,
+          "p_win": 0.5283018867924528,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.8%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Julie Allemand UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "price": 121.0,
+          "score": 12.728547357962983,
+          "ev_pct": 12.728547357962983,
+          "win_prob": 0.45248868778280543,
+          "p_win": 0.45248868778280543,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.7%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Brittney Sykes UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "price": 118.0,
+          "score": 11.236434876192725,
+          "ev_pct": 11.236434876192725,
+          "win_prob": 0.45871559633027525,
+          "p_win": 0.45871559633027525,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 11.2%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        }
+      ]
+    },
+    {
+      "home": "IND",
+      "away": "TOR",
+      "matchup": "TOR @ IND",
+      "picks": [
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Marina Mabrey OVER 6.5",
+          "selection": "OVER 6.5",
+          "price": -112.0,
+          "score": 12.769053918074924,
+          "ev_pct": 12.769053918074924,
+          "win_prob": 0.5283018867924528,
+          "p_win": 0.5283018867924528,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.8%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Julie Allemand UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "price": 121.0,
+          "score": 12.728547357962983,
+          "ev_pct": 12.728547357962983,
+          "win_prob": 0.45248868778280543,
+          "p_win": 0.45248868778280543,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.7%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Brittney Sykes UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "price": 118.0,
+          "score": 11.236434876192725,
+          "ev_pct": 11.236434876192725,
+          "win_prob": 0.45871559633027525,
+          "p_win": 0.45871559633027525,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 11.2%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        }
+      ]
+    },
+    {
+      "home": "IND",
+      "away": "TOR",
+      "matchup": "TOR @ IND",
+      "picks": [
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Marina Mabrey OVER 6.5",
+          "selection": "OVER 6.5",
+          "price": -112.0,
+          "score": 12.769053918074924,
+          "ev_pct": 12.769053918074924,
+          "win_prob": 0.5283018867924528,
+          "p_win": 0.5283018867924528,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.8%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Julie Allemand UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "price": 121.0,
+          "score": 12.728547357962983,
+          "ev_pct": 12.728547357962983,
+          "win_prob": 0.45248868778280543,
+          "p_win": 0.45248868778280543,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.7%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Brittney Sykes UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "price": 118.0,
+          "score": 11.236434876192725,
+          "ev_pct": 11.236434876192725,
+          "win_prob": 0.45871559633027525,
+          "p_win": 0.45871559633027525,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 11.2%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        }
+      ]
+    },
+    {
+      "home": "IND",
+      "away": "TOR",
+      "matchup": "TOR @ IND",
+      "picks": [
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Marina Mabrey OVER 6.5",
+          "selection": "OVER 6.5",
+          "price": -112.0,
+          "score": 12.769053918074924,
+          "ev_pct": 12.769053918074924,
+          "win_prob": 0.5283018867924528,
+          "p_win": 0.5283018867924528,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.8%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Julie Allemand UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "price": 121.0,
+          "score": 12.728547357962983,
+          "ev_pct": 12.728547357962983,
+          "win_prob": 0.45248868778280543,
+          "p_win": 0.45248868778280543,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.7%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Brittney Sykes UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "price": 118.0,
+          "score": 11.236434876192725,
+          "ev_pct": 11.236434876192725,
+          "win_prob": 0.45871559633027525,
+          "p_win": 0.45871559633027525,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 11.2%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        }
+      ]
+    },
+    {
+      "home": "IND",
+      "away": "TOR",
+      "matchup": "TOR @ IND",
+      "picks": [
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Marina Mabrey OVER 6.5",
+          "selection": "OVER 6.5",
+          "price": -112.0,
+          "score": 12.769053918074924,
+          "ev_pct": 12.769053918074924,
+          "win_prob": 0.5283018867924528,
+          "p_win": 0.5283018867924528,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.8%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Julie Allemand UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "price": 121.0,
+          "score": 12.728547357962983,
+          "ev_pct": 12.728547357962983,
+          "win_prob": 0.45248868778280543,
+          "p_win": 0.45248868778280543,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.7%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Brittney Sykes UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "price": 118.0,
+          "score": 11.236434876192725,
+          "ev_pct": 11.236434876192725,
+          "win_prob": 0.45871559633027525,
+          "p_win": 0.45871559633027525,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 11.2%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        }
+      ]
+    },
+    {
+      "home": "IND",
+      "away": "TOR",
+      "matchup": "TOR @ IND",
+      "picks": [
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Marina Mabrey OVER 6.5",
+          "selection": "OVER 6.5",
+          "price": -112.0,
+          "score": 12.769053918074924,
+          "ev_pct": 12.769053918074924,
+          "win_prob": 0.5283018867924528,
+          "p_win": 0.5283018867924528,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.8%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Julie Allemand UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "price": 121.0,
+          "score": 12.728547357962983,
+          "ev_pct": 12.728547357962983,
+          "win_prob": 0.45248868778280543,
+          "p_win": 0.45248868778280543,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.7%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Brittney Sykes UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "price": 118.0,
+          "score": 11.236434876192725,
+          "ev_pct": 11.236434876192725,
+          "win_prob": 0.45871559633027525,
+          "p_win": 0.45871559633027525,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 11.2%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        }
+      ]
+    },
+    {
+      "home": "IND",
+      "away": "TOR",
+      "matchup": "TOR @ IND",
+      "picks": [
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Marina Mabrey OVER 6.5",
+          "selection": "OVER 6.5",
+          "price": -112.0,
+          "score": 12.769053918074924,
+          "ev_pct": 12.769053918074924,
+          "win_prob": 0.5283018867924528,
+          "p_win": 0.5283018867924528,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.8%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Julie Allemand UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "price": 121.0,
+          "score": 12.728547357962983,
+          "ev_pct": 12.728547357962983,
+          "win_prob": 0.45248868778280543,
+          "p_win": 0.45248868778280543,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.7%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Brittney Sykes UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "price": 118.0,
+          "score": 11.236434876192725,
+          "ev_pct": 11.236434876192725,
+          "win_prob": 0.45871559633027525,
+          "p_win": 0.45871559633027525,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 11.2%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        }
+      ]
+    },
+    {
+      "home": "IND",
+      "away": "TOR",
+      "matchup": "TOR @ IND",
+      "picks": [
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Marina Mabrey OVER 6.5",
+          "selection": "OVER 6.5",
+          "price": -112.0,
+          "score": 12.769053918074924,
+          "ev_pct": 12.769053918074924,
+          "win_prob": 0.5283018867924528,
+          "p_win": 0.5283018867924528,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.8%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Julie Allemand UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "price": 121.0,
+          "score": 12.728547357962983,
+          "ev_pct": 12.728547357962983,
+          "win_prob": 0.45248868778280543,
+          "p_win": 0.45248868778280543,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.7%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Brittney Sykes UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "price": 118.0,
+          "score": 11.236434876192725,
+          "ev_pct": 11.236434876192725,
+          "win_prob": 0.45871559633027525,
+          "p_win": 0.45871559633027525,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 11.2%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        }
+      ]
+    },
+    {
+      "home": "IND",
+      "away": "TOR",
+      "matchup": "TOR @ IND",
+      "picks": [
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Marina Mabrey OVER 6.5",
+          "selection": "OVER 6.5",
+          "price": -112.0,
+          "score": 12.769053918074924,
+          "ev_pct": 12.769053918074924,
+          "win_prob": 0.5283018867924528,
+          "p_win": 0.5283018867924528,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.8%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Julie Allemand UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "price": 121.0,
+          "score": 12.728547357962983,
+          "ev_pct": 12.728547357962983,
+          "win_prob": 0.45248868778280543,
+          "p_win": 0.45248868778280543,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.7%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Brittney Sykes UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "price": 118.0,
+          "score": 11.236434876192725,
+          "ev_pct": 11.236434876192725,
+          "win_prob": 0.45871559633027525,
+          "p_win": 0.45871559633027525,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 11.2%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ IND"
+        }
+      ]
+    }
+  ]
+}

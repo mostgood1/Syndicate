@@ -2,7 +2,7 @@
   "date": "2026-06-16",
   "season": 2026,
   "spring_mode": false,
-  "generated_at": "2026-06-15T17:11:36.162911",
+  "generated_at": "2026-06-16T08:04:57.828569",
   "games": [
     {
       "idx": 0,
@@ -267,7 +267,7 @@
         "team_id": 113,
         "abbr": "CIN"
       },
-      "away_probable_id": 681035,
+      "away_probable_id": 673540,
       "home_probable_id": 663903,
       "away_source": "feed_gameData_probablePitchers",
       "home_source": "feed_gameData_probablePitchers",
@@ -275,8 +275,8 @@
       "home_confidence": 0.75,
       "away_validation": {
         "status": "ok",
-        "selected_id": 681035,
-        "selected_name": "Christian Scott",
+        "selected_id": 673540,
+        "selected_name": "Kodai Senga",
         "selected_source": "feed_gameData_probablePitchers",
         "override_reason": "",
         "roster_team_ids": [
@@ -310,13 +310,13 @@
         "rejected_candidates": []
       },
       "raw": {
-        "away_schedule_id": 681035,
+        "away_schedule_id": 673540,
         "home_schedule_id": 663903,
-        "away_schedule_name": "Christian Scott",
+        "away_schedule_name": "Kodai Senga",
         "home_schedule_name": "Brady Singer",
-        "away_feed_id": 681035,
+        "away_feed_id": 673540,
         "home_feed_id": 663903,
-        "away_feed_name": "Christian Scott",
+        "away_feed_name": "Kodai Senga",
         "home_feed_name": "Brady Singer"
       }
     },

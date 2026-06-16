@@ -1,0 +1,131 @@
+{
+  "date": "2026-06-16",
+  "data": [
+    {
+      "game_key": "TOR@IND",
+      "game_id": "54",
+      "player": "Isabelle Harrison",
+      "team": "TOR",
+      "team_tricode": "TOR",
+      "opponent": "IND",
+      "score": 34.43164042141408,
+      "score_adj": 34.43164042141408,
+      "tier": "High",
+      "model": {
+        "pts": 0.0,
+        "reb": 0.0,
+        "ast": 0.0,
+        "threes": 0.0,
+        "stl": 0.176,
+        "blk": 0.144,
+        "tov": 0.48,
+        "pra": 0.0,
+        "pr": 0.0,
+        "pa": 0.0,
+        "ra": 0.0
+      },
+      "top_play": {
+        "market": "pts",
+        "side": "UNDER",
+        "line": 9.5,
+        "price": -102.0,
+        "edge": 0.17386273876159586,
+        "ev": 0.3443164042141408,
+        "ev_pct": 34.43164042141408,
+        "book": "fanduel",
+        "p_win": 0.8492668992636457,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 34.4%",
+        "Regular price range (-150 to +150)",
+        "Best line available"
+      ],
+      "basketball_summary": "model 0.0 vs line 9.5 (-9.5)"
+    },
+    {
+      "game_key": "TOR@IND",
+      "game_id": "54",
+      "player": "Laura Juskaite",
+      "team": "TOR",
+      "team_tricode": "TOR",
+      "opponent": "IND",
+      "score": 16.447888858256153,
+      "score_adj": 16.447888858256153,
+      "tier": "High",
+      "model": {
+        "pts": 6.926666666666667,
+        "reb": 3.3600000000000003,
+        "ast": 1.2544444444444445,
+        "threes": 0.7833333333333332,
+        "stl": 0.4848555555555554,
+        "blk": 0.3966999999999999,
+        "tov": 1.322333333333333,
+        "pra": 11.54111111111111,
+        "pr": 10.286666666666667,
+        "pa": 8.181111111111111,
+        "ra": 4.614444444444445
+      },
+      "top_play": {
+        "market": "pr",
+        "side": "UNDER",
+        "line": 13.5,
+        "price": -118.0,
+        "edge": 0.08902985712267097,
+        "ev": 0.16447888858256154,
+        "ev_pct": 16.447888858256153,
+        "book": "fanduel",
+        "p_win": 0.7057632922522863,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 16.4%",
+        "Regular price range (-150 to +150)",
+        "Best line available"
+      ],
+      "basketball_summary": "model 10.3 vs line 13.5 (-3.2)"
+    },
+    {
+      "game_key": "TOR@IND",
+      "game_id": "54",
+      "player": "Caitlin Clark",
+      "team": "IND",
+      "team_tricode": "IND",
+      "opponent": "TOR",
+      "score": 13.867833318562639,
+      "score_adj": 13.867833318562639,
+      "tier": "High",
+      "model": {
+        "pts": 18.063333333333333,
+        "reb": 3.034444444444444,
+        "ast": 7.176666666666667,
+        "threes": 2.6466666666666665,
+        "stl": 0.5180266666666666,
+        "blk": 0.42384,
+        "tov": 1.4128,
+        "pra": 28.27444444444444,
+        "pr": 21.097777777777775,
+        "pa": 25.24,
+        "ra": 10.21111111111111
+      },
+      "top_play": {
+        "market": "ra",
+        "side": "UNDER",
+        "line": 13.5,
+        "price": -138.0,
+        "edge": 0.08041012596477493,
+        "ev": 0.1386783331856264,
+        "ev_pct": 13.867833318562639,
+        "book": "fanduel",
+        "p_win": 0.7185102659587357,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 13.9%",
+        "Regular price range (-150 to +150)",
+        "Best line available"
+      ],
+      "basketball_summary": "model 10.2 vs line 13.5 (-3.3)"
+    }
+  ]
+}
