@@ -61,6 +61,14 @@ class DailyUpdateOddsPassthroughTests(unittest.TestCase):
         self.assertIn("Add-PathsUnderRoot -RelativeRoot 'data/mlb_source/manifests'", content)
         self.assertIn("Add-PathsUnderRoot -RelativeRoot 'data/mlb_source/source_artifacts/manifests'", content)
 
+    def test_prior_day_feed_live_refresh_uses_no_cache_statsapi_client(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        script_path = repo_root / "vendor" / "mlb_bettingv2" / "tools" / "daily_update.py"
+        content = script_path.read_text(encoding="utf-8")
+
+        self.assertIn("Refreshing prior-day StatsAPI feed/live cache", content)
+        self.assertIn("StatsApiClient(cache=None)", content)
+
     def test_world_class_plan_explicitly_requires_unified_standardization(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]
         script_path = repo_root / "docs" / "syndicate_world_class_implementation_plan.md"

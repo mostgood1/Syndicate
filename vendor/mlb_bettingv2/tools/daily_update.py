@@ -3008,7 +3008,8 @@ def _run_ui_daily_workflow(args: argparse.Namespace, *, raw_argv: List[str]) -> 
     if str(getattr(args, "refresh_prior_feed_live", "on") or "on") == "on":
         print(f"[ui-daily] Refreshing prior-day StatsAPI feed/live cache for {prior_date}...")
         try:
-            client = StatsApiClient.with_default_cache(ttl_seconds=int(args.cache_ttl_hours * 3600))
+            # Prior-day reconciliation must fetch the final game feed, not a stale pregame cache entry.
+            client = StatsApiClient(cache=None)
             refresh_stage = _refresh_feed_live_cache_for_date(
                 client=client,
                 date_str=str(prior_date),
@@ -5555,7 +5556,7 @@ def main() -> int:
     )
 
     client = StatsApiClient.with_default_cache(ttl_seconds=int(args.cache_ttl_hours * 3600))
-    live_context_refresh_client = StatsApiClient.with_default_cache(ttl_seconds=0)
+    live_context_refresh_client = StatsApiClient(cache=None)
 
     def _game_context_is_effectively_empty(weather, umpire) -> bool:
         if weather is None and umpire is None:
