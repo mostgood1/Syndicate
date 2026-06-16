@@ -9,6 +9,7 @@ from syndicate.features.mlb.sources import available_daily_summary_dates
 from syndicate.features.mlb.sources import daily_top_props_path
 from syndicate.features.mlb.sources import default_mlb_source_root
 from syndicate.features.mlb.sources import load_json_file
+from syndicate.features.mlb.sources import live_lens_report_path
 
 
 _DATE_TOKEN_RE = re.compile(r"(\d{4})_(\d{2})_(\d{2})")
@@ -70,15 +71,29 @@ def _top_prop_lane_counts(selected_date: str) -> dict[str, int]:
     return {"pitcher_rows": _section_row_count(pitcher_sections), "hitter_rows": _section_row_count(hitter_sections)}
 
 
+def _cards_launch_date(archive_dates: list[str]) -> str:
+    if not archive_dates:
+        return _latest_date("data/daily/daily_summary_*.json") or date.today().isoformat()
+
+    for selected_date in reversed(archive_dates):
+        top_prop_counts = _top_prop_lane_counts(selected_date)
+        if top_prop_counts["pitcher_rows"] and top_prop_counts["hitter_rows"]:
+            return selected_date
+        if load_json_file(live_lens_report_path(selected_date)):
+            return selected_date
+
+    return archive_dates[-1]
+
+
 def build_hub_context() -> dict[str, Any]:
     archive_dates = available_daily_summary_dates()
     today_date = date.today().isoformat()
     latest_archive_date = archive_dates[-1] if archive_dates else (_latest_date("data/daily/daily_summary_*.json") or today_date)
-    cards_date = latest_archive_date
+    cards_date = _cards_launch_date(archive_dates)
     season = _season_from_date(cards_date)
-    live_lens_date = latest_archive_date
-    hr_targets_date = latest_archive_date
-    rfi_targets_date = latest_archive_date
+    live_lens_date = cards_date
+    hr_targets_date = cards_date
+    rfi_targets_date = cards_date
     top_prop_counts = _top_prop_lane_counts(cards_date)
     profiles = _available_betting_profiles(season)
     default_profile = next((item["profile"] for item in profiles if item["profile"] == "retuned"), profiles[0]["profile"] if profiles else "retuned")
