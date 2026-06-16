@@ -206,13 +206,26 @@ def daily_sim_artifact_path(selected_date: str, game_pk: int) -> Path | None:
     if not roots:
         return None
 
-    sims_dir = roots[0] / "data" / "daily" / "sims" / selected_date
-    if sims_dir.exists() and sims_dir.is_dir():
+    relative_dir = Path("data", "daily", "sims", selected_date)
+    candidate_roots = []
+    for root in roots:
+        candidate_roots.append(root)
+        source_artifacts_root = root / "source_artifacts"
+        if source_artifacts_root.exists() and source_artifacts_root.is_dir():
+            candidate_roots.append(source_artifacts_root)
+
+    seen: set[Path] = set()
+    for root in candidate_roots:
+        if root in seen:
+            continue
+        seen.add(root)
+        sims_dir = root / relative_dir
+        if not sims_dir.exists() or not sims_dir.is_dir():
+            continue
         matches = sorted(sims_dir.glob(f"sim_*_pk{int(game_pk)}_*.json"))
         if matches:
             return matches[0]
 
-    relative_dir = Path("data", "daily", "sims", selected_date)
     for root in roots[1:]:
         fallback_dir = root / relative_dir
         if not fallback_dir.exists() or not fallback_dir.is_dir():
