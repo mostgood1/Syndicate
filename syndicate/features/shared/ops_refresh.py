@@ -16,6 +16,8 @@ from typing import Any
 
 from syndicate.features.shared.timezone import central_today_iso
 from syndicate.features.shared.refresh_state_store import list_refresh_status_manifest_paths
+from syndicate.features.shared.refresh_state_store import data_root
+from syndicate.features.shared.refresh_state_store import reports_root
 from syndicate.features.shared.refresh_state_store import path_exists
 from syndicate.features.shared.refresh_state_store import path_size
 from syndicate.features.shared.refresh_state_store import read_json_file
@@ -33,17 +35,11 @@ def _today_date() -> str:
 
 
 def _reports_root() -> Path:
-    override = str(os.environ.get("SYNDICATE_REPORTS_ROOT") or os.environ.get("SYNDICATE_STATE_ROOT") or "").strip()
-    if override:
-        return Path(override).expanduser().resolve()
-    return REPORTS_ROOT
+    return reports_root()
 
 
 def _data_root() -> Path:
-    override = str(os.environ.get("SYNDICATE_DATA_ROOT") or "").strip()
-    if override:
-        return Path(override).expanduser().resolve()
-    return REPO_ROOT / "data"
+    return data_root()
 
 
 def _load_mirror_manifest_summaries_from_current_data_root() -> list[dict[str, Any]]:

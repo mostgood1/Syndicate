@@ -14,6 +14,12 @@ REPO_ROOT = repo_root_from(__file__)
 REPORTS_ROOT = REPO_ROOT / "reports"
 REFRESH_STATE_PATH = REPORTS_ROOT / "refresh_state.json"
 
+def _strict_hosted_storage_enabled() -> bool:
+    raw_value = str(os.environ.get("SYNDICATE_REQUIRE_HOSTED_STORAGE") or "").strip().lower()
+    if raw_value in {"1", "true", "yes", "on"}:
+        return True
+    return str(os.environ.get("RENDER") or "").strip().lower() in {"1", "true", "yes", "on"}
+
 
 def _state_backend_kind() -> str:
     value = str(os.environ.get("SYNDICATE_REFRESH_STATE_BACKEND") or "filesystem").strip().lower()
@@ -90,6 +96,8 @@ def reports_root() -> Path:
     override = str(os.environ.get("SYNDICATE_REPORTS_ROOT") or os.environ.get("SYNDICATE_STATE_ROOT") or "").strip()
     if override:
         return Path(override).expanduser().resolve()
+    if _strict_hosted_storage_enabled():
+        raise RuntimeError("SYNDICATE_REPORTS_ROOT or SYNDICATE_STATE_ROOT must be set when hosted storage is required.")
     return REPORTS_ROOT
 
 
@@ -164,6 +172,8 @@ def data_root() -> Path:
     override = str(os.environ.get("SYNDICATE_DATA_ROOT") or "").strip()
     if override:
         return Path(override).expanduser().resolve()
+    if _strict_hosted_storage_enabled():
+        raise RuntimeError("SYNDICATE_DATA_ROOT must be set when hosted storage is required.")
     return REPO_ROOT / "data"
 
 

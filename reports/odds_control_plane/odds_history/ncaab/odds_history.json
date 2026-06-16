@@ -1,0 +1,147 @@
+{
+  "date": "2026-06-07",
+  "history_limit": 50,
+  "home_team=Home|away_team=Away|market=h2h|bookmaker=draftkings": {
+    "delta": null,
+    "delta_line": null,
+    "history": [
+      {
+        "captured_at": "2026-06-16T02:51:39+00:00",
+        "current_line": NaN,
+        "date": "2026-06-07",
+        "delta": null,
+        "delta_line": null,
+        "entity": "Home",
+        "event_id": "Away@Home",
+        "last_odds": -140.0,
+        "line": {
+          "point": NaN,
+          "price": -140
+        },
+        "market_id": "home_team=Home|away_team=Away|market=h2h|bookmaker=draftkings",
+        "market_key": "home_team=Home|away_team=Away|market=h2h|bookmaker=draftkings",
+        "market_type": "h2h",
+        "movement": "flat",
+        "normalized": {
+          "confidence": null,
+          "edge": null,
+          "entity": "Home",
+          "event_id": "Away@Home",
+          "line": NaN,
+          "market_id": "NCAAB:away_home:H2H:home:nan",
+          "market_key": "home_team=Home|away_team=Away|market=h2h|bookmaker=draftkings",
+          "market_probability": null,
+          "market_type": "h2h",
+          "model_probability": null,
+          "odds": -140.0,
+          "rank_score": 0.0,
+          "schema_version": 1,
+          "selection": null,
+          "source_path": "raw_outputs\\by_date\\2026-06-07\\odds_2026-06-07.csv",
+          "sport": "ncaab",
+          "timestamp": "2026-06-16T02:51:39+00:00"
+        },
+        "odds": -140.0,
+        "percent_change": null,
+        "previous_line": null,
+        "row": {
+          "away_team": "Away",
+          "bookmaker": "draftkings",
+          "entity": "Home",
+          "event_id": "Away@Home",
+          "home_team": "Home",
+          "line": NaN,
+          "market": "h2h",
+          "market_id": "NCAAB:away_home:H2H:home:nan",
+          "market_type": "h2h",
+          "point": NaN,
+          "price": -140
+        },
+        "source_path": "raw_outputs\\by_date\\2026-06-07\\odds_2026-06-07.csv",
+        "sport": "ncaab",
+        "timestamp": "2026-06-16T02:51:39+00:00"
+      }
+    ],
+    "last_line": NaN,
+    "last_odds": -140.0,
+    "last_source_path": "raw_outputs\\by_date\\2026-06-07\\odds_2026-06-07.csv",
+    "last_updated": "2026-06-16T02:51:39+00:00",
+    "movement": "flat",
+    "percent_change": null,
+    "previous_line": null
+  },
+  "markets": {
+    "home_team=Home|away_team=Away|market=h2h|bookmaker=draftkings": {
+      "delta": null,
+      "delta_line": null,
+      "history": [
+        {
+          "captured_at": "2026-06-16T02:51:39+00:00",
+          "current_line": NaN,
+          "date": "2026-06-07",
+          "delta": null,
+          "delta_line": null,
+          "entity": "Home",
+          "event_id": "Away@Home",
+          "last_odds": -140.0,
+          "line": {
+            "point": NaN,
+            "price": -140
+          },
+          "market_id": "home_team=Home|away_team=Away|market=h2h|bookmaker=draftkings",
+          "market_key": "home_team=Home|away_team=Away|market=h2h|bookmaker=draftkings",
+          "market_type": "h2h",
+          "movement": "flat",
+          "normalized": {
+            "confidence": null,
+            "edge": null,
+            "entity": "Home",
+            "event_id": "Away@Home",
+            "line": NaN,
+            "market_id": "NCAAB:away_home:H2H:home:nan",
+            "market_key": "home_team=Home|away_team=Away|market=h2h|bookmaker=draftkings",
+            "market_probability": null,
+            "market_type": "h2h",
+            "model_probability": null,
+            "odds": -140.0,
+            "rank_score": 0.0,
+            "schema_version": 1,
+            "selection": null,
+            "source_path": "raw_outputs\\by_date\\2026-06-07\\odds_2026-06-07.csv",
+            "sport": "ncaab",
+            "timestamp": "2026-06-16T02:51:39+00:00"
+          },
+          "odds": -140.0,
+          "percent_change": null,
+          "previous_line": null,
+          "row": {
+            "away_team": "Away",
+            "bookmaker": "draftkings",
+            "entity": "Home",
+            "event_id": "Away@Home",
+            "home_team": "Home",
+            "line": NaN,
+            "market": "h2h",
+            "market_id": "NCAAB:away_home:H2H:home:nan",
+            "market_type": "h2h",
+            "point": NaN,
+            "price": -140
+          },
+          "source_path": "raw_outputs\\by_date\\2026-06-07\\odds_2026-06-07.csv",
+          "sport": "ncaab",
+          "timestamp": "2026-06-16T02:51:39+00:00"
+        }
+      ],
+      "last_line": NaN,
+      "last_odds": -140.0,
+      "last_source_path": "raw_outputs\\by_date\\2026-06-07\\odds_2026-06-07.csv",
+      "last_updated": "2026-06-16T02:51:39+00:00",
+      "movement": "flat",
+      "percent_change": null,
+      "previous_line": null
+    }
+  },
+  "schema_version": 1,
+  "sport": "ncaab",
+  "updated_at": "2026-06-16T02:51:39+00:00"
+}

@@ -7,6 +7,12 @@ from pathlib import Path
 def repo_root_from(file_path: str | Path) -> Path:
     return Path(file_path).resolve().parents[3]
 
+def _strict_hosted_storage_enabled() -> bool:
+    raw_value = str(os.environ.get("SYNDICATE_REQUIRE_HOSTED_STORAGE") or "").strip().lower()
+    if raw_value in {"1", "true", "yes", "on"}:
+        return True
+    return str(os.environ.get("RENDER") or "").strip().lower() in {"1", "true", "yes", "on"}
+
 
 def preferred_source_roots(
     file_path: str | Path,
@@ -23,8 +29,13 @@ def preferred_source_roots(
     candidates: list[Path] = []
     if data_root:
         candidates.append((Path(data_root).resolve() / local_dir_name).resolve())
-    local_mirror = (repo_root / "data" / local_dir_name).resolve()
-    candidates.append(local_mirror)
+    if not _strict_hosted_storage_enabled():
+        local_mirror = (repo_root / "data" / local_dir_name).resolve()
+        candidates.append(local_mirror)
+    elif not candidates:
+        raise RuntimeError(
+            f"SYNDICATE_DATA_ROOT must be set when strict hosted storage is enabled for {local_dir_name}."
+        )
 
     deduped: list[Path] = []
     seen: set[Path] = set()
@@ -65,8 +76,13 @@ def preferred_artifact_roots(
         _append_root(base_root / "source_artifacts")
         _append_root(base_root)
 
-    local_mirror = (repo_root / "data" / local_dir_name).resolve()
-    _append_root(local_mirror / "source_artifacts")
-    _append_root(local_mirror)
+    if not _strict_hosted_storage_enabled():
+        local_mirror = (repo_root / "data" / local_dir_name).resolve()
+        _append_root(local_mirror / "source_artifacts")
+        _append_root(local_mirror)
+    elif not candidates:
+        raise RuntimeError(
+            f"SYNDICATE_DATA_ROOT must be set when strict hosted storage is enabled for {local_dir_name}."
+        )
 
     return candidates

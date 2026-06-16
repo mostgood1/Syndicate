@@ -10,6 +10,9 @@
 # Force redeploy after WNBA canonical live-lines source fix.
 # Force redeploy after Render runtime parity fix.
 services:
+  - type: keyvalue
+    name: syndicate-refresh-state
+    ipAllowList: []
   - type: web
     name: syndicate
     env: python
@@ -33,10 +36,17 @@ services:
         value: 77ae1c35140c82da1675af85dde36a44
       - key: SYNDICATE_REFRESH_LAUNCH_MODE
         value: manifest_only
+      - key: SYNDICATE_REQUIRE_HOSTED_STORAGE
+        value: "true"
       - key: SYNDICATE_REFRESH_STATE_BACKEND
-        value: filesystem
+        value: keyvalue
+      - key: SYNDICATE_REFRESH_STATE_URL
+        fromService:
+          name: syndicate-refresh-state
+          type: keyvalue
+          property: connectionString
       - key: SYNDICATE_DATA_ROOT
-        value: /opt/render/project/src/data
+        value: /opt/render/project/data
       - key: SYNDICATE_REPORTS_ROOT
         value: /opt/render/project/data/reports
       - key: SYNDICATE_NBA_SOURCE_APP_FALLBACK
@@ -118,8 +128,15 @@ services:
         value: 77ae1c35140c82da1675af85dde36a44
       - key: SYNDICATE_REFRESH_LAUNCH_MODE
         value: manifest_only
+      - key: SYNDICATE_REQUIRE_HOSTED_STORAGE
+        value: "true"
       - key: SYNDICATE_REFRESH_STATE_BACKEND
         value: keyvalue
+      - key: SYNDICATE_REFRESH_STATE_URL
+        fromService:
+          name: syndicate-refresh-state
+          type: keyvalue
+          property: connectionString
       - key: SYNDICATE_DATA_ROOT
         value: /opt/render/project/data
       - key: SYNDICATE_REPORTS_ROOT

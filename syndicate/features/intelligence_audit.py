@@ -1,3 +1,5 @@
+from syndicate.features.shared.refresh_state_store import reports_root
+
 from __future__ import annotations
 
 import argparse
@@ -120,22 +122,23 @@ def _load_audit_records(ledger_path: Path | str | None = None) -> tuple[Path, li
 
 
 def _resolve_audit_ledger_path(test_date: str | None = None) -> Path:
-    repo_root = DEFAULT_EVALUATION_LEDGER_PATH.parents[2]
+    data_root_path = data_root()
+    reports_root_path = reports_root()
     candidate_paths: list[Path] = [DEFAULT_EVALUATION_LEDGER_PATH]
     if test_date:
         date_token = _normalize_date(test_date)
         if date_token:
             candidate_paths.extend(
                 [
-                    repo_root / "data" / "predictions" / f"{date_token}.json",
-                    repo_root / "data" / "predictions" / f"{date_token}.jsonl",
-                    repo_root / "data" / "predictions" / f"predictions_{date_token}.json",
-                    repo_root / "data" / "predictions" / f"predictions_{date_token}.jsonl",
-                    repo_root / "reports" / "intelligence" / f"evaluation_ledger_{date_token}.jsonl",
+                    data_root_path / "predictions" / f"{date_token}.json",
+                    data_root_path / "predictions" / f"{date_token}.jsonl",
+                    data_root_path / "predictions" / f"predictions_{date_token}.json",
+                    data_root_path / "predictions" / f"predictions_{date_token}.jsonl",
+                    reports_root_path / "intelligence" / f"evaluation_ledger_{date_token}.jsonl",
                 ]
             )
-    candidate_paths.append(repo_root / "data" / "prediction_ledger.json")
-    candidate_paths.append(repo_root / "data" / "predictions.jsonl")
+    candidate_paths.append(data_root_path / "prediction_ledger.json")
+    candidate_paths.append(data_root_path / "predictions.jsonl")
     for candidate_path in candidate_paths:
         if candidate_path.exists():
             return candidate_path

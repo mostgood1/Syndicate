@@ -9,6 +9,7 @@ from typing import Any
 
 from syndicate.features.shared.ops_refresh import launch_refresh_run
 from syndicate.features.shared.refresh_state_store import read_json_file
+from syndicate.features.shared.refresh_state_store import reports_root
 from syndicate.features.shared.refresh_state_store import write_json_file
 from syndicate.features.shared.source_roots import repo_root_from
 from syndicate.features.shared.timezone import central_today_iso
@@ -43,10 +44,7 @@ def _env_bool(name: str, *, default: bool = False) -> bool:
 
 
 def _reports_root() -> Path:
-	override = str(os.environ.get("SYNDICATE_REPORTS_ROOT") or os.environ.get("SYNDICATE_STATE_ROOT") or "").strip()
-	if override:
-		return Path(override).expanduser().resolve()
-	return REPO_ROOT / "reports"
+	return reports_root()
 
 
 def _meta_dir() -> Path:

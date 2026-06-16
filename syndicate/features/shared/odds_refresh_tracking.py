@@ -9,6 +9,7 @@ import pandas as pd
 
 from syndicate.features.shared.basketball_props_tracking import sync_basketball_props_tracking_for_source_root
 from syndicate.features.shared.market_id import attach_market_id
+from syndicate.features.shared.odds_control_plane import shared_odds_history_root
 from syndicate.features.shared.odds_framework import normalize_odds_entry
 from syndicate.features.shared.recommendation_engine import build_recommendation_output
 
@@ -49,6 +50,10 @@ def _odds_history_path(tracking_root: Path) -> Path:
 
 def _odds_history_artifact_path(source_root: Path, sport: str) -> Path:
     return source_root / "artifacts" / sport / "odds_history.json"
+
+
+def _shared_odds_history_path(sport: str) -> Path:
+    return shared_odds_history_root() / str(sport or "").strip().lower() / "odds_history.json"
 
 
 def _json_safe(value: Any) -> Any:
@@ -476,6 +481,7 @@ def _sync_odds_history_for_refresh(*, sport: str, source_root: Path, date_str: s
     tracking_root = source_root / "tracking"
     history_path = _odds_history_path(tracking_root)
     artifact_history_path = _odds_history_artifact_path(source_root, slug)
+    shared_history_path = _shared_odds_history_path(slug)
     candidates = _odds_history_snapshot_paths(sport=slug, source_root=source_root, date_str=date_str)
     if not candidates:
         return {
@@ -485,6 +491,7 @@ def _sync_odds_history_for_refresh(*, sport: str, source_root: Path, date_str: s
             "sport": slug,
             "date": date_str,
             "history_path": str(history_path),
+            "shared_history_path": str(shared_history_path),
             "files_scanned": 0,
             "entries_appended": 0,
         }
@@ -644,6 +651,7 @@ def _sync_odds_history_for_refresh(*, sport: str, source_root: Path, date_str: s
     }
     payload.update(markets)
     _write_json(history_path, payload)
+    _write_json(shared_history_path, payload)
     _write_json(artifact_history_path, payload)
     return {
         "ok": True,
@@ -652,6 +660,7 @@ def _sync_odds_history_for_refresh(*, sport: str, source_root: Path, date_str: s
         "sport": slug,
         "date": date_str,
         "history_path": str(history_path),
+        "shared_history_path": str(shared_history_path),
         "artifact_history_path": str(artifact_history_path),
         "files_scanned": int(files_scanned),
         "entries_appended": int(entries_appended),

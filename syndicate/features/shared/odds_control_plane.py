@@ -25,9 +25,13 @@ def odds_control_plane_snapshot_path() -> Path:
     return odds_control_plane_root() / "latest.json"
 
 
+def shared_odds_history_root() -> Path:
+    return reports_root() / "odds_control_plane" / "odds_history"
+
+
 def odds_history_roots_for_sport(sport_slug: str) -> list[Path]:
     slug = str(sport_slug or "").strip().lower()
-    roots: list[Path] = []
+    roots: list[Path] = [shared_odds_history_root() / slug]
     for base in (
         REPO_ROOT / "data" / f"{slug}_source",
         REPO_ROOT / f"{slug}_source",
@@ -39,7 +43,11 @@ def odds_history_roots_for_sport(sport_slug: str) -> list[Path]:
 
 def odds_history_paths_for_sport(sport_slug: str) -> list[Path]:
     paths: list[Path] = []
+    shared_path = shared_odds_history_root() / str(sport_slug or "").strip().lower() / "odds_history.json"
+    paths.append(shared_path)
     for root in odds_history_roots_for_sport(sport_slug):
+        if root == shared_path.parent:
+            continue
         for candidate in (root / "artifacts" / str(sport_slug).strip().lower() / "odds_history.json", root / "tracking" / "odds_history.json"):
             if candidate not in paths:
                 paths.append(candidate)
@@ -48,8 +56,6 @@ def odds_history_paths_for_sport(sport_slug: str) -> list[Path]:
 
 def load_odds_history_payload_for_sport(sport_slug: str) -> dict[str, Any] | None:
     for path in odds_history_paths_for_sport(sport_slug):
-        if not path.exists():
-            continue
         payload = read_json_file(path)
         if isinstance(payload, dict):
             return payload
@@ -72,7 +78,7 @@ def odds_history_path_status_for_sport(sport_slug: str) -> dict[str, Any]:
         "candidate_paths": [str(path) for path in candidate_paths],
         "active_path": str(active_path) if active_path is not None else None,
         "has_payload": bool(active_payload),
-        "source_precedence": ["artifact_history", "tracking_history"],
+        "source_precedence": ["shared_history", "artifact_history", "tracking_history"],
     }
 
 

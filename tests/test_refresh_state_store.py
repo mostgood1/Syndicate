@@ -9,6 +9,8 @@ from unittest.mock import patch
 
 from syndicate.features.shared import ops_refresh
 from syndicate.features.shared import refresh_state_store
+from syndicate.features.shared.source_roots import preferred_artifact_roots
+from syndicate.features.shared.source_roots import preferred_source_roots
 
 
 class _FakeKeyValueClient:
@@ -29,6 +31,34 @@ class _FakeKeyValueClient:
 class RefreshStateStoreTests(unittest.TestCase):
     def tearDown(self) -> None:
         refresh_state_store.reset_state_store_caches()
+
+    def test_hosted_storage_requires_explicit_roots(self) -> None:
+        with patch.dict(
+            os.environ,
+            {
+                "SYNDICATE_REQUIRE_HOSTED_STORAGE": "true",
+            },
+            clear=False,
+        ):
+            with self.assertRaises(RuntimeError):
+                refresh_state_store.data_root()
+            with self.assertRaises(RuntimeError):
+                refresh_state_store.reports_root()
+
+        with TemporaryDirectory() as tmp_dir:
+            probe_file = Path(tmp_dir) / "probe.py"
+            probe_file.write_text("", encoding="utf-8")
+            with patch.dict(
+                os.environ,
+                {
+                    "SYNDICATE_REQUIRE_HOSTED_STORAGE": "true",
+                },
+                clear=False,
+            ):
+                with self.assertRaises(RuntimeError):
+                    preferred_source_roots(probe_file, env_var="SYNDICATE_SOURCE_ROOT_NBA", local_dir_name="nba_source")
+                with self.assertRaises(RuntimeError):
+                    preferred_artifact_roots(probe_file, env_var="SYNDICATE_ARTIFACT_ROOT_NBA", local_dir_name="nba_source")
 
     def test_keyvalue_backend_round_trips_json_and_text_by_path(self) -> None:
         fake_client = _FakeKeyValueClient()

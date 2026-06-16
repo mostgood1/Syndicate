@@ -34,9 +34,13 @@ class OddsRefreshTrackingTests(unittest.TestCase):
             self.assertFalse(result.get("skipped", False))
             self.assertTrue((root / "tracking" / "odds_nhl_player_props_opening_2026-06-07.csv").exists())
             history_path = root / "tracking" / "odds_history.json"
+            shared_history_path = Path(result["artifacts"]["odds_history"]["shared_history_path"])
             self.assertTrue(history_path.exists())
+            self.assertTrue(shared_history_path.exists())
 
             history_payload = json.loads(history_path.read_text(encoding="utf-8"))
+            shared_history_payload = json.loads(shared_history_path.read_text(encoding="utf-8"))
+            self.assertEqual(shared_history_payload["markets"].keys(), history_payload["markets"].keys())
             market_key = next(key for key in history_payload["markets"] if "selection=over" in key)
             self.assertEqual(len(history_payload["markets"][market_key]["history"]), 1)
             first_state = history_payload["markets"][market_key]
