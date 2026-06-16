@@ -546,19 +546,22 @@ def _normalize_default_query_payload(payload: dict[str, object]) -> dict[str, ob
 
 
 def _empty_default_intelligence_response() -> dict[str, object]:
+    empty_analysis = {
+        "recommendations": [],
+        "picks": [],
+        "top_live_opportunities": [],
+        "portfolio": {},
+        "parlays": [],
+        "movement": {},
+    }
     return {
         "ok": True,
         "top_opportunities": [],
         "by_sport": {},
-        "analysis": None,
+        "analysis": dict(empty_analysis),
         "response": {
-            "recommendations": [],
-            "picks": [],
+            **empty_analysis,
             "top_opportunities": [],
-            "top_live_opportunities": [],
-            "portfolio": {},
-            "parlays": [],
-            "movement": {},
         },
     }
 
