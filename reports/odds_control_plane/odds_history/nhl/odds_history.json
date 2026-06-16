@@ -6,7 +6,7 @@
     "delta_line": null,
     "history": [
       {
-        "captured_at": "2026-06-16T02:51:39+00:00",
+        "captured_at": "2026-06-16T03:58:15+00:00",
         "current_line": 6.5,
         "date": "2026-06-07",
         "delta": null,
@@ -39,7 +39,7 @@
           "selection": "over",
           "source_path": "data\\odds\\team\\date=2026-06-07\\oddsapi.csv",
           "sport": "nhl",
-          "timestamp": "2026-06-16T02:51:39+00:00"
+          "timestamp": "2026-06-16T03:58:15+00:00"
         },
         "odds": -110.0,
         "percent_change": null,
@@ -59,13 +59,13 @@
         },
         "source_path": "data\\odds\\team\\date=2026-06-07\\oddsapi.csv",
         "sport": "nhl",
-        "timestamp": "2026-06-16T02:51:39+00:00"
+        "timestamp": "2026-06-16T03:58:15+00:00"
       }
     ],
     "last_line": 6.5,
     "last_odds": -110.0,
     "last_source_path": "data\\odds\\team\\date=2026-06-07\\oddsapi.csv",
-    "last_updated": "2026-06-16T02:51:39+00:00",
+    "last_updated": "2026-06-16T03:58:15+00:00",
     "movement": "flat",
     "percent_change": null,
     "previous_line": null
@@ -76,7 +76,7 @@
       "delta_line": null,
       "history": [
         {
-          "captured_at": "2026-06-16T02:51:39+00:00",
+          "captured_at": "2026-06-16T03:58:15+00:00",
           "current_line": 6.5,
           "date": "2026-06-07",
           "delta": null,
@@ -109,7 +109,7 @@
             "selection": "over",
             "source_path": "data\\odds\\team\\date=2026-06-07\\oddsapi.csv",
             "sport": "nhl",
-            "timestamp": "2026-06-16T02:51:39+00:00"
+            "timestamp": "2026-06-16T03:58:15+00:00"
           },
           "odds": -110.0,
           "percent_change": null,
@@ -129,13 +129,13 @@
           },
           "source_path": "data\\odds\\team\\date=2026-06-07\\oddsapi.csv",
           "sport": "nhl",
-          "timestamp": "2026-06-16T02:51:39+00:00"
+          "timestamp": "2026-06-16T03:58:15+00:00"
         }
       ],
       "last_line": 6.5,
       "last_odds": -110.0,
       "last_source_path": "data\\odds\\team\\date=2026-06-07\\oddsapi.csv",
-      "last_updated": "2026-06-16T02:51:39+00:00",
+      "last_updated": "2026-06-16T03:58:15+00:00",
       "movement": "flat",
       "percent_change": null,
       "previous_line": null
@@ -145,7 +145,7 @@
       "delta_line": null,
       "history": [
         {
-          "captured_at": "2026-06-16T02:51:39+00:00",
+          "captured_at": "2026-06-16T03:58:15+00:00",
           "current_line": 2.5,
           "date": "2026-06-07",
           "delta": null,
@@ -178,7 +178,7 @@
             "selection": null,
             "source_path": "data\\props\\player_props_lines\\date=2026-06-07\\oddsapi.csv",
             "sport": "nhl",
-            "timestamp": "2026-06-16T02:51:39+00:00"
+            "timestamp": "2026-06-16T03:58:15+00:00"
           },
           "odds": -110.0,
           "percent_change": null,
@@ -197,13 +197,13 @@
           },
           "source_path": "data\\props\\player_props_lines\\date=2026-06-07\\oddsapi.csv",
           "sport": "nhl",
-          "timestamp": "2026-06-16T02:51:39+00:00"
+          "timestamp": "2026-06-16T03:58:15+00:00"
         }
       ],
       "last_line": 2.5,
       "last_odds": -110.0,
       "last_source_path": "data\\props\\player_props_lines\\date=2026-06-07\\oddsapi.csv",
-      "last_updated": "2026-06-16T02:51:39+00:00",
+      "last_updated": "2026-06-16T03:58:15+00:00",
       "movement": "flat",
       "percent_change": null,
       "previous_line": null
@@ -214,7 +214,7 @@
     "delta_line": null,
     "history": [
       {
-        "captured_at": "2026-06-16T02:51:39+00:00",
+        "captured_at": "2026-06-16T03:58:15+00:00",
         "current_line": 2.5,
         "date": "2026-06-07",
         "delta": null,
@@ -247,7 +247,7 @@
           "selection": null,
           "source_path": "data\\props\\player_props_lines\\date=2026-06-07\\oddsapi.csv",
           "sport": "nhl",
-          "timestamp": "2026-06-16T02:51:39+00:00"
+          "timestamp": "2026-06-16T03:58:15+00:00"
         },
         "odds": -110.0,
         "percent_change": null,
@@ -266,18 +266,18 @@
         },
         "source_path": "data\\props\\player_props_lines\\date=2026-06-07\\oddsapi.csv",
         "sport": "nhl",
-        "timestamp": "2026-06-16T02:51:39+00:00"
+        "timestamp": "2026-06-16T03:58:15+00:00"
       }
     ],
     "last_line": 2.5,
     "last_odds": -110.0,
     "last_source_path": "data\\props\\player_props_lines\\date=2026-06-07\\oddsapi.csv",
-    "last_updated": "2026-06-16T02:51:39+00:00",
+    "last_updated": "2026-06-16T03:58:15+00:00",
     "movement": "flat",
     "percent_change": null,
     "previous_line": null
   },
   "schema_version": 1,
   "sport": "nhl",
-  "updated_at": "2026-06-16T02:51:39+00:00"
+  "updated_at": "2026-06-16T03:58:15+00:00"
 }
