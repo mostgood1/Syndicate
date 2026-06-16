@@ -4285,14 +4285,7 @@ def _home_payload(*, selected_date: str | None = None, cached_only: bool = False
 
 @home_bp.get("/")
 def home():
-    payload = _home_payload(selected_date=request.args.get("date"), force_refresh=True)
-    return render_template(
-        "home.html",
-        selected_home_date=payload.get("selected_date") or "",
-        sports=payload.get("sports") or [],
-        dashboard=payload.get("dashboard") or {},
-        command_center=payload.get("command_center") or {},
-    )
+    return render_template("syndicate.html", show_app_header=False)
 
 
 @home_bp.get("/syndicate")
@@ -4302,7 +4295,8 @@ def syndicate():
 
 @home_bp.get("/api/home")
 def api_home():
-    payload = _home_payload(selected_date=request.args.get("date"), force_refresh=True)
+    refresh_requested = str(request.args.get("refresh") or "").strip().lower() in {"1", "true", "yes", "on"}
+    payload = _home_payload(selected_date=request.args.get("date"), force_refresh=refresh_requested)
     return jsonify(
         {
             "ok": True,
