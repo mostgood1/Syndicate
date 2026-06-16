@@ -5,9 +5,6 @@ import hashlib
 import json
 import os
 import re
-import threading
-import time
-from collections import OrderedDict
 
 from flask import Blueprint
 from flask import jsonify
@@ -27,10 +24,6 @@ from syndicate.features.intelligence_board import build_intelligence_board_contr
 ask_the_syndicate_bp = Blueprint("ask_the_syndicate", __name__)
 _QUERY_ROUTER = SyndicateQueryRouter()
 _INTELLIGENCE_ROUTER = IntelligenceQueryRouter()
-_QUERY_CACHE_LOCK = threading.Lock()
-_QUERY_CACHE: OrderedDict[str, tuple[float, dict[str, Any]]] = OrderedDict()
-_QUERY_CACHE_TTL_SECONDS = max(30, int(os.environ.get("SYNDICATE_ASK_QUERY_CACHE_TTL_SECONDS", "180")))
-_QUERY_CACHE_MAX_ENTRIES = max(8, int(os.environ.get("SYNDICATE_ASK_QUERY_CACHE_MAX_ENTRIES", "64")))
 
 _SPORT_HINTS: tuple[tuple[str, tuple[str, ...]], ...] = (
     (
@@ -262,9 +255,9 @@ def _build_fast_state_result(shaped_payload: dict[str, Any]) -> dict[str, Any] |
         "confidence": "low" if not bool(routing_context.get("sport")) and not bool(detected_sports) else "medium",
         "detected_sports": detected_sports,
         "multi_sport": len(detected_sports) > 1,
-        "assumptions": ["Used the cached intelligence state response and preserved the route metadata."] if latest_state else [],
+        "assumptions": ["Used the latest intelligence state response and preserved the route metadata."] if latest_state else [],
         "clarifying_questions": [],
-        "reasoning": "The response was served from cached state, so the API preserved the route and context fields for consistency.",
+        "reasoning": "The response was served from the latest state snapshot, so the API preserved the route and context fields for consistency.",
         "recommendation_count": len(analysis.get("recommendations") or []),
         "reasoning_step_count": len(analysis.get("reasoning_steps") or []),
     }
@@ -279,8 +272,8 @@ def _build_fast_state_result(shaped_payload: dict[str, Any]) -> dict[str, Any] |
         "board_contract": board_contract,
         "routing_context": routing_context,
         "context_awareness": context_awareness,
-        "served_from": "state_cache",
-        "served_from_state_cache": True,
+        "served_from": "latest_state",
+        "served_from_state_cache": False,
         "state_cache_latest_key": latest_state.get("latestKey") if isinstance(latest_state.get("latestKey"), str) else None,
         "state_cache_latest_computed_at": latest_state.get("latestComputedAt") if isinstance(latest_state.get("latestComputedAt"), str) else None,
     }
@@ -318,28 +311,11 @@ def _query_cache_key(question: str, payload: dict[str, Any], decision: RouteDeci
 
 
 def _read_cached_response(cache_key: str) -> dict[str, Any] | None:
-    now = time.time()
-    with _QUERY_CACHE_LOCK:
-        cached = _QUERY_CACHE.get(cache_key)
-        if cached is None:
-          return None
-        created_at, response = cached
-        if now - created_at > _QUERY_CACHE_TTL_SECONDS:
-            _QUERY_CACHE.pop(cache_key, None)
-            return None
-        _QUERY_CACHE.move_to_end(cache_key)
-        cached_response = dict(response)
-        cached_response["cached"] = True
-        cached_response["cache_age_seconds"] = round(now - created_at, 3)
-        return cached_response
+    return None
 
 
 def _store_cached_response(cache_key: str, response: dict[str, Any]) -> None:
-    with _QUERY_CACHE_LOCK:
-        _QUERY_CACHE[cache_key] = (time.time(), dict(response))
-        _QUERY_CACHE.move_to_end(cache_key)
-        while len(_QUERY_CACHE) > _QUERY_CACHE_MAX_ENTRIES:
-            _QUERY_CACHE.popitem(last=False)
+    return None
 
 
 def _apply_intent_hints(pipeline_payload: dict[str, Any], intent: str) -> dict[str, Any]:
@@ -400,19 +376,15 @@ def ask_the_syndicate_query_api():
     decision = _QUERY_ROUTER.route(str(shaped_payload.get("question") or question))
 
     cache_key = _query_cache_key(question, payload, decision)
-    cached_response = _read_cached_response(cache_key)
-    if cached_response is not None:
-        return _with_cors_headers(jsonify(cached_response))
+    _read_cached_response(cache_key)
 
     artifact_response = _build_artifact_response(shaped_payload, decision)
     if artifact_response is not None:
-        _store_cached_response(cache_key, artifact_response)
         _maybe_queue_exact_refresh(shaped_payload)
         return _with_cors_headers(jsonify(artifact_response))
 
     fast_state_response = _build_fast_state_result(shaped_payload)
     if fast_state_response is not None:
-        _store_cached_response(cache_key, fast_state_response)
         _maybe_queue_exact_refresh(shaped_payload)
         return _with_cors_headers(jsonify(fast_state_response))
 
@@ -422,5 +394,4 @@ def ask_the_syndicate_query_api():
         "handle_market_summary": handle_market_summary,
     }[decision.handler_name]
     response = handler(shaped_payload)
-    _store_cached_response(cache_key, response)
     return _with_cors_headers(jsonify(response))

@@ -36,9 +36,7 @@ _QUERY_RESPONSE_VERSION_PATH = Path(__file__).resolve().parents[2] / "reports" /
 _QUERY_RESPONSE_CACHE_PATH = Path(__file__).resolve().parents[2] / "reports" / "intelligence" / "query_response_cache.json"
 _STATUS_RESPONSE_CACHE_PATH = Path(__file__).resolve().parents[2] / "reports" / "intelligence" / "status_response_cache.json"
 _QUERY_RESPONSE_VERSION_LOCK = threading.Lock()
-_STATUS_RESPONSE_CACHE_LOCK = threading.Lock()
 _QUERY_RESPONSE_VERSION_STATE: dict[str, object] | None = None
-_STATUS_RESPONSE_CACHE_STATE: dict[str, object] | None = None
 
 # ✅ GLOBAL CACHE
 LAST_RESULT = {
@@ -154,14 +152,6 @@ def _versioned_query_response(response_payload: dict[str, object]) -> dict[str, 
 
 
 def _load_response_cache_state() -> dict[str, object] | None:
-    try:
-        if not _QUERY_RESPONSE_CACHE_PATH.exists():
-            return None
-        payload = json.loads(_QUERY_RESPONSE_CACHE_PATH.read_text(encoding="utf-8"))
-        if isinstance(payload, dict) and isinstance(payload.get("response"), dict):
-            return payload
-    except Exception:
-        return None
     return None
 
 
@@ -267,9 +257,11 @@ def _cached_intelligence_response_with_source(payload: dict[str, object]) -> tup
     cached_response = read_latest_intelligence_state_response(payload, force_refresh=False)
     if _is_board_response(cached_response):
         return dict(cached_response or {}), "worker"
-    cached_response = _load_response_cache_state()
-    if _is_board_response(cached_response):
-        return dict(cached_response or {}), "fallback"
+    computed_response = compute_intelligence_state_response(dict(payload))
+    if isinstance(computed_response, dict):
+        normalized_response = _unwrap_response_payload(computed_response)
+        if _is_board_response(normalized_response):
+            return dict(normalized_response), "computed"
     return None, "fallback"
 
 
@@ -358,30 +350,10 @@ def _debug_state_fields(response_payload: dict[str, object] | None, *, source: s
 
 
 def _store_response_cache_state(state: dict[str, object]) -> None:
-    try:
-        _QUERY_RESPONSE_CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
-        _QUERY_RESPONSE_CACHE_PATH.write_text(json.dumps(state, sort_keys=True), encoding="utf-8")
-    except Exception:
-        pass
+    return None
 
 
 def _load_status_response_cache_state() -> dict[str, object] | None:
-    global _STATUS_RESPONSE_CACHE_STATE
-    if _STATUS_RESPONSE_CACHE_STATE is not None:
-        return dict(_STATUS_RESPONSE_CACHE_STATE)
-    try:
-        if not _STATUS_RESPONSE_CACHE_PATH.exists():
-            return None
-        payload = json.loads(_STATUS_RESPONSE_CACHE_PATH.read_text(encoding="utf-8"))
-        if isinstance(payload, dict) and isinstance(payload.get("status"), dict):
-            _STATUS_RESPONSE_CACHE_STATE = {
-                "selected_date": str(payload.get("selected_date") or ""),
-                "source_fingerprint": str(payload.get("source_fingerprint") or ""),
-                "status": dict(payload.get("status") or {}),
-            }
-            return dict(_STATUS_RESPONSE_CACHE_STATE)
-    except Exception:
-        return None
     return None
 
 
@@ -398,34 +370,11 @@ def _status_source_fingerprint(selected_date: str) -> str:
 
 
 def _store_status_response_cache_state(selected_date: str, status: dict[str, object], *, source_fingerprint: str) -> None:
-    global _STATUS_RESPONSE_CACHE_STATE
-    _STATUS_RESPONSE_CACHE_STATE = {
-        "selected_date": str(selected_date or "").strip(),
-        "source_fingerprint": str(source_fingerprint or "").strip(),
-        "status": dict(status or {}),
-    }
-    try:
-        _STATUS_RESPONSE_CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
-        _STATUS_RESPONSE_CACHE_PATH.write_text(json.dumps(_STATUS_RESPONSE_CACHE_STATE, sort_keys=True), encoding="utf-8")
-    except Exception:
-        pass
+    return None
 
 
 def _cached_intelligence_status(selected_date: str, *, force_refresh: bool = False, cache_ttl_seconds: int = 60) -> dict[str, object]:
-    source_fingerprint = _status_source_fingerprint(selected_date)
-    if not force_refresh:
-        with _STATUS_RESPONSE_CACHE_LOCK:
-            cached_state = _load_status_response_cache_state()
-            if isinstance(cached_state, dict) and str(cached_state.get("selected_date") or "") == str(selected_date or "") and str(cached_state.get("source_fingerprint") or "") == source_fingerprint:
-                status = cached_state.get("status")
-                if isinstance(status, dict):
-                    return dict(status)
-
-    status = build_intelligence_status(selected_date=selected_date)
-    if isinstance(status, dict):
-        with _STATUS_RESPONSE_CACHE_LOCK:
-            _store_status_response_cache_state(selected_date, status, source_fingerprint=source_fingerprint)
-    return status
+    return build_intelligence_status(selected_date=selected_date)
 
 
 def _number_value(value: object) -> float | None:
@@ -721,9 +670,9 @@ def intelligence_query_api():
             else:
                 cached_response = get_intelligence_state_response(payload, refresh=False, wait=False)
                 if cached_response is None:
-                    cached_response = _load_response_cache_state()
-            if not _is_board_response(cached_response):
-                cached_response = _load_response_cache_state()
+                    computed_response = compute_intelligence_state_response(dict(payload))
+                    if isinstance(computed_response, dict):
+                        cached_response = computed_response
             if not _is_board_response(cached_response) or cached_response.get("ok") is False:
                 queue_intelligence_state_refresh(dict(payload))
                 cached_response = {

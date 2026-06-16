@@ -80,26 +80,14 @@ ENABLE_PREDICTION_TRACKING = True
 _SIMULATION_ENGINE = SimulationEngine()
 MAX_CORRELATION_THRESHOLD = 0.65
 logger = logging.getLogger(__name__)
-_INTELLIGENCE_QUERY_CACHE_LOCK = threading.Lock()
-_INTELLIGENCE_QUERY_CACHE: OrderedDict[str, dict[str, Any]] = OrderedDict()
-_INTELLIGENCE_QUERY_CACHE_LIMIT = 12
 
 
 def _cache_query_response(cache_key: str, response_payload: dict[str, Any]) -> None:
-    with _INTELLIGENCE_QUERY_CACHE_LOCK:
-        _INTELLIGENCE_QUERY_CACHE[cache_key] = dict(response_payload)
-        _INTELLIGENCE_QUERY_CACHE.move_to_end(cache_key)
-        while len(_INTELLIGENCE_QUERY_CACHE) > _INTELLIGENCE_QUERY_CACHE_LIMIT:
-            _INTELLIGENCE_QUERY_CACHE.popitem(last=False)
+    return None
 
 
 def _read_cached_query_response(cache_key: str) -> dict[str, Any] | None:
-    with _INTELLIGENCE_QUERY_CACHE_LOCK:
-        cached = _INTELLIGENCE_QUERY_CACHE.get(cache_key)
-        if cached is None:
-            return None
-        _INTELLIGENCE_QUERY_CACHE.move_to_end(cache_key)
-        return json.loads(json.dumps(cached, default=str))
+    return None
 
 
 def _attach_intelligence_response_aliases(response: dict[str, Any]) -> dict[str, Any]:
@@ -6150,6 +6138,4 @@ def run_intelligence_query(
     final_response["portfolio_events"] = dict(final_response.get("evaluation_bundle", {}).get("portfolio_events") or {})
     final_response["portfolio_event_records"] = list(final_response.get("evaluation_bundle", {}).get("portfolio_event_records") or [])
     _attach_intelligence_response_aliases(final_response)
-    if not force_refresh:
-        _cache_query_response(cache_key, final_response)
     return final_response

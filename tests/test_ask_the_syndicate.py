@@ -341,7 +341,7 @@ class AskTheSyndicateApiTests(unittest.TestCase):
         self.assertEqual(payload["schema"]["teams"], ["NBA side", "WNBA side"])
         self.assertEqual([section["title"] for section in payload["supporting_evidence"]], ["Comparison evidence", "Cross-sport reasoning"])
 
-    def test_query_route_preserves_routing_context_on_state_cache_responses(self) -> None:
+    def test_query_route_preserves_routing_context_on_latest_state_responses(self) -> None:
         app = Flask(__name__)
         app.register_blueprint(ask_the_syndicate_bp)
 
@@ -376,7 +376,8 @@ class AskTheSyndicateApiTests(unittest.TestCase):
 
         payload = response.get_json()
         self.assertEqual(response.status_code, 200)
-        self.assertTrue(payload["served_from_state_cache"])
+        self.assertFalse(payload["served_from_state_cache"])
+        self.assertEqual(payload["served_from"], "latest_state")
         self.assertEqual(payload["routing_context"]["question"], "Compare NBA and WNBA picks tonight")
         self.assertEqual(payload["routing_context"]["sport"], "nba")
         self.assertEqual(payload["context_awareness"]["detected_sports"], ["nba", "wnba"])

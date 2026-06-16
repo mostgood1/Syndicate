@@ -1137,7 +1137,7 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertTrue(any("reliability" in str(flag).lower() for flag in risk_flags))
         self.assertGreaterEqual(recommendation.get("confidence") or 0.0, 0.0)
 
-    def test_intelligence_query_api_force_refresh_queues_refresh_and_returns_cached_response(self) -> None:
+    def test_intelligence_query_api_force_refresh_returns_live_response(self) -> None:
         state_response = {
             "top_opportunities": [
                 {
@@ -1156,56 +1156,38 @@ class IntelligenceBlueprintTests(unittest.TestCase):
                 "portfolio": {},
             },
         }
-        cached_response = {
-            "version": 116,
-            "timestamp": "2026-06-11T04:09:58.646260+00:00",
-            "response": {
-                "ok": True,
-                "response": {
-                    "structured_response": {
-                        "summary": "Cached answer",
-                        "key_factors": ["pace"],
-                        "risks": ["variance"],
-                        "confidence": 0.61,
-                        "supporting_data": [],
-                        "recommendations": [{"recommendation_id": "rec-1", "event_id": "evt-1", "reasoning": "cached", "risk_factors": [], "confidence_drivers": []}],
-                        "player_analysis": {"player": "Jayson Tatum", "matchup": "BOS at NYK"},
-                    },
-                    "selected_date": "2026-06-04",
-                    "query_type": "player_analysis",
-                },
-                "player_analysis": {"player": "Jayson Tatum", "matchup": "BOS at NYK"},
-            },
+        live_result = {
+            "ok": True,
+            "analysis": {"recommendations": [{"recommendation_id": "rec-1", "name": "Jayson Tatum Over 28.5"}]},
+            "top_opportunities": [{"recommendation_id": "rec-1", "name": "Jayson Tatum Over 28.5"}],
+            "by_sport": {"nba": [{"recommendation_id": "rec-1", "name": "Jayson Tatum Over 28.5"}]},
+            "response": {"analysis": {"recommendations": [{"recommendation_id": "rec-1", "name": "Jayson Tatum Over 28.5"}]}},
         }
+        board_contract = {"schema": "intelligence_board_v1", "cards": [{"name": "Jayson Tatum Over 28.5"}]}
 
         with patch("syndicate.blueprints.intelligence.queue_intelligence_state_refresh") as queue_mock:
-            with patch("syndicate.blueprints.intelligence.get_intelligence_state_response", return_value=state_response) as state_mock:
-                with patch("syndicate.blueprints.intelligence._load_response_cache_state", return_value=cached_response) as cache_mock:
-                    with patch("syndicate.features.intelligence.build_intelligence_overview", return_value=_sample_overview()):
-                        with patch("syndicate.features.intelligence._tracked_repo_files", return_value=set()):
-                            with patch("syndicate.features.intelligence._advanced_input_rows_for_sport", return_value=[]):
-                                with patch("syndicate.features.intelligence.load_artifact_manifests", return_value=[]):
-                                    response = self.client.post(
-                                        "/api/intelligence/query",
-                                        json={
-                                            "question": "Analyze Jayson Tatum tonight",
-                                            "date": "2026-06-04",
-                                            "force_refresh": True,
-                                        },
-                                    )
+            with patch("syndicate.blueprints.intelligence.read_latest_intelligence_state_response", return_value=state_response) as state_mock:
+                with patch("syndicate.blueprints.intelligence.run_intelligence_query", return_value=dict(live_result)) as query_mock:
+                    with patch("syndicate.blueprints.intelligence.build_intelligence_board_contract", return_value=dict(board_contract)):
+                        response = self.client.post(
+                            "/api/intelligence/query",
+                            json={
+                                "question": "Analyze Jayson Tatum tonight",
+                                "date": "2026-06-04",
+                                "force_refresh": True,
+                            },
+                        )
 
         self.assertEqual(response.status_code, 200)
         payload = response.get_json()
         self.assertIn("version", payload)
         self.assertIn("timestamp", payload)
         self.assertTrue(payload.get("response"))
-        board_contract = (payload.get("response") or {}).get("board_contract") or {}
-        self.assertTrue(board_contract)
-        self.assertTrue((board_contract.get("cards") or []))
-        self.assertEqual((board_contract.get("cards") or [])[0].get("name"), "Jayson Tatum Over 28.5")
+        self.assertEqual((payload.get("response") or {}).get("board_contract"), board_contract)
+        self.assertEqual((payload.get("response") or {}).get("analysis", {}).get("recommendations", [])[0].get("name"), "Jayson Tatum Over 28.5")
         queue_mock.assert_not_called()
-        state_mock.assert_not_called()
-        cache_mock.assert_not_called()
+        state_mock.assert_called_once()
+        query_mock.assert_called_once()
 
     def test_intelligence_query_api_returns_live_recommendations_with_sparse_advanced_signals(self) -> None:
         advanced_rows = [
@@ -3984,35 +3966,34 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         payload = response.get_json()
         self.assertFalse(payload.get("ok"))
 
-    def test_intelligence_query_reuses_cached_result_for_identical_request(self) -> None:
+    def test_intelligence_query_recomputes_for_identical_request(self) -> None:
         overview = _sample_overview()
         candidate = {"name": "Play 1", "sport": "NBA", "market": "PTS", "score": 91.0}
 
-        with patch("syndicate.features.intelligence._INTELLIGENCE_QUERY_CACHE", OrderedDict()):
-            with patch("syndicate.features.intelligence.ENABLE_PREDICTION_TRACKING", False):
-                with patch("syndicate.features.intelligence.build_intelligence_overview", return_value=overview):
-                    with patch("syndicate.features.intelligence._odds_history_payloads_by_sport", return_value={}):
-                        with patch("syndicate.features.intelligence._tracked_repo_files", return_value=set()):
-                            with patch("syndicate.features.intelligence._advanced_input_rows_for_sport", return_value=[]):
-                                with patch("syndicate.features.intelligence.collect_all_recommendations", return_value=[candidate]) as mocked_collect:
-                                    with patch("syndicate.features.intelligence._resolved_requested_subjects", return_value=[]):
-                                        with patch("syndicate.features.intelligence._resolved_requested_markets", return_value=[]):
-                                            with patch("syndicate.features.intelligence._analysis_focus_from_resolved_candidates", return_value=None):
-                                                with patch("syndicate.features.intelligence._enrich_candidates_with_odds_history", side_effect=lambda candidates, _: candidates):
-                                                    with patch("syndicate.features.intelligence._score_candidates", side_effect=lambda candidates, advanced_by_sport, preferences: candidates):
-                                                        with patch("syndicate.features.intelligence.filter_candidates", side_effect=lambda candidates, sport=None: candidates):
-                                                            with patch("syndicate.features.intelligence.rank_candidates", side_effect=lambda candidates, sport=None, limit=None: candidates):
-                                                                with patch("syndicate.features.intelligence._greedy_low_correlation_selection", side_effect=lambda candidates, limit, threshold: candidates):
-                                                                    with patch("syndicate.features.intelligence._analysis_views_for_query", return_value={}):
-                                                                        with patch("syndicate.features.intelligence._build_supporting_evidence", return_value={}):
-                                                                            with patch("syndicate.features.intelligence._build_analysis_brief", return_value={"summary": "ok"}):
-                                                                                with patch("syndicate.features.intelligence.build_response", side_effect=lambda recommendations, parlays: {"recommendations": recommendations, "parlays": parlays}) as mocked_build_response:
-                                                                                    first = run_intelligence_query("top edges today", selected_date="2026-06-11")
-                                                                                    second = run_intelligence_query("top edges today", selected_date="2026-06-11")
+        with patch("syndicate.features.intelligence.ENABLE_PREDICTION_TRACKING", False):
+            with patch("syndicate.features.intelligence.build_intelligence_overview", return_value=overview):
+                with patch("syndicate.features.intelligence._odds_history_payloads_by_sport", return_value={}):
+                    with patch("syndicate.features.intelligence._tracked_repo_files", return_value=set()):
+                        with patch("syndicate.features.intelligence._advanced_input_rows_for_sport", return_value=[]):
+                            with patch("syndicate.features.intelligence.collect_all_recommendations", return_value=[candidate]) as mocked_collect:
+                                with patch("syndicate.features.intelligence._resolved_requested_subjects", return_value=[]):
+                                    with patch("syndicate.features.intelligence._resolved_requested_markets", return_value=[]):
+                                        with patch("syndicate.features.intelligence._analysis_focus_from_resolved_candidates", return_value=None):
+                                            with patch("syndicate.features.intelligence._enrich_candidates_with_odds_history", side_effect=lambda candidates, _: candidates):
+                                                with patch("syndicate.features.intelligence._score_candidates", side_effect=lambda candidates, advanced_by_sport, preferences: candidates):
+                                                    with patch("syndicate.features.intelligence.filter_candidates", side_effect=lambda candidates, sport=None: candidates):
+                                                        with patch("syndicate.features.intelligence.rank_candidates", side_effect=lambda candidates, sport=None, limit=None: candidates):
+                                                            with patch("syndicate.features.intelligence._greedy_low_correlation_selection", side_effect=lambda candidates, limit, threshold: candidates):
+                                                                with patch("syndicate.features.intelligence._analysis_views_for_query", return_value={}):
+                                                                    with patch("syndicate.features.intelligence._build_supporting_evidence", return_value={}):
+                                                                        with patch("syndicate.features.intelligence._build_analysis_brief", return_value={"summary": "ok"}):
+                                                                            with patch("syndicate.features.intelligence.build_response", side_effect=lambda recommendations, parlays: {"recommendations": recommendations, "parlays": parlays}) as mocked_build_response:
+                                                                                first = run_intelligence_query("top edges today", selected_date="2026-06-11")
+                                                                                second = run_intelligence_query("top edges today", selected_date="2026-06-11")
 
         self.assertEqual(first, second)
-        self.assertEqual(mocked_collect.call_count, 1)
-        self.assertEqual(mocked_build_response.call_count, 1)
+        self.assertEqual(mocked_collect.call_count, 2)
+        self.assertEqual(mocked_build_response.call_count, 2)
 
     def test_intelligence_status_reports_tracked_artifacts(self) -> None:
         status_overview = [
@@ -4058,7 +4039,7 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertIn("advanced_gate", mlb_row or {})
         self.assertIn("publish_missing_inputs", (mlb_row or {}).get("advanced_gate") or {})
 
-    def test_status_endpoint_uses_cached_status_when_available(self) -> None:
+    def test_status_endpoint_builds_fresh_status_without_cache(self) -> None:
         app = Flask(__name__)
         app.register_blueprint(intelligence_bp)
 
@@ -4070,11 +4051,9 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         }
 
         with app.test_request_context("/api/intelligence/status?date=2026-06-10", method="GET"):
-            with patch("syndicate.blueprints.intelligence._status_source_fingerprint", return_value="fingerprint-1"):
-                with patch("syndicate.blueprints.intelligence._load_status_response_cache_state", return_value={"selected_date": "2026-06-10", "source_fingerprint": "fingerprint-1", "status": cached_status}):
-                    with patch("syndicate.blueprints.intelligence.build_intelligence_status", side_effect=AssertionError("should not rebuild")):
-                        with patch("syndicate.blueprints.intelligence.read_latest_intelligence_state_response", return_value=dict(state_response)):
-                            response = intelligence_status_api()
+            with patch("syndicate.blueprints.intelligence.build_intelligence_status", return_value=dict(cached_status)) as build_status_mock:
+                with patch("syndicate.blueprints.intelligence.read_latest_intelligence_state_response", return_value=dict(state_response)):
+                    response = intelligence_status_api()
 
         payload = response.get_json()
         self.assertIsNotNone(payload)
@@ -4082,11 +4061,12 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertEqual(payload["state_last_updated"], "2026-06-11T16:05:00Z")
         self.assertEqual(payload["candidate_count"], 1)
         self.assertEqual(payload["debug_source"], "worker")
+        build_status_mock.assert_called_once_with(selected_date="2026-06-10")
         self.assertEqual(response.headers.get("Cache-Control"), "no-cache, no-store, must-revalidate")
         self.assertEqual(response.headers.get("Pragma"), "no-cache")
         self.assertEqual(response.headers.get("Expires"), "0")
 
-    def test_status_endpoint_rebuilds_when_source_fingerprint_changes(self) -> None:
+    def test_status_endpoint_ignores_status_cache_artifacts(self) -> None:
         app = Flask(__name__)
         app.register_blueprint(intelligence_bp)
 
@@ -4098,17 +4078,18 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         }
 
         with app.test_request_context("/api/intelligence/status?date=2026-06-10", method="GET"):
-            with patch("syndicate.blueprints.intelligence._status_source_fingerprint", return_value="fingerprint-2"):
-                with patch("syndicate.blueprints.intelligence._load_status_response_cache_state", return_value={"selected_date": "2026-06-10", "source_fingerprint": "fingerprint-1", "status": {"ok": True, "threadAlive": True, "cachedSnapshots": 3}}):
-                    with patch("syndicate.blueprints.intelligence.build_intelligence_status", return_value=dict(rebuilt_status)):
-                        with patch("syndicate.blueprints.intelligence._store_status_response_cache_state") as store_cache:
-                            with patch("syndicate.blueprints.intelligence.read_latest_intelligence_state_response", return_value=dict(state_response)):
-                                response = intelligence_status_api()
+            with patch("syndicate.blueprints.intelligence.build_intelligence_status", return_value=dict(rebuilt_status)) as build_status_mock:
+                with patch("syndicate.blueprints.intelligence._load_status_response_cache_state") as load_cache_mock:
+                    with patch("syndicate.blueprints.intelligence._store_status_response_cache_state") as store_cache_mock:
+                        with patch("syndicate.blueprints.intelligence.read_latest_intelligence_state_response", return_value=dict(state_response)):
+                            response = intelligence_status_api()
 
         payload = response.get_json()
         self.assertIsNotNone(payload)
         self.assertEqual(payload["status"], rebuilt_status)
-        store_cache.assert_called_once()
+        build_status_mock.assert_called_once_with(selected_date="2026-06-10")
+        load_cache_mock.assert_not_called()
+        store_cache_mock.assert_not_called()
 
     def test_intelligence_page_renders_embedded_console(self) -> None:
         fake_response = {
