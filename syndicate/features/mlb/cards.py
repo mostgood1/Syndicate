@@ -1772,6 +1772,7 @@ def source_cards_api_payload(context: dict[str, Any]) -> dict[str, Any]:
             selected_date,
             _today_cache_bucket(),
             _path_cache_signature(daily_artifact_path(selected_date)),
+            _path_cache_signature(live_lens_report_path(selected_date)),
         )
         cached_payload = _MLB_TODAY_CACHE.get(cache_key)
         if cached_payload is not None:
@@ -4232,6 +4233,7 @@ def build_cards_page_context(selected_date: str) -> dict[str, Any]:
     next_date = (resolved_parsed_date + timedelta(days=1)).isoformat()
     today_iso = central_today_iso()
     summary_path = daily_artifact_path(resolved_date)
+    live_lens_path = live_lens_report_path(resolved_date)
     cache_key = None
     if selected_date == today_iso:
         cache_key = (
@@ -4239,6 +4241,7 @@ def build_cards_page_context(selected_date: str) -> dict[str, Any]:
             selected_date,
             _today_cache_bucket(),
             _path_cache_signature(summary_path),
+            _path_cache_signature(live_lens_path),
         )
         cached_context = _MLB_TODAY_CACHE.get(cache_key)
         if cached_context is not None:
@@ -4267,7 +4270,16 @@ def build_cards_page_context(selected_date: str) -> dict[str, Any]:
         first1_signals_by_game=_rfi_targets_signal_index(rfi_targets),
     ) if summary else []
     latest_live_odds_refreshed_at = None
-    live_lens_report = load_json_file(live_lens_report_path(resolved_date))
+    live_lens_report = None
+    if resolved_date == today_iso:
+        try:
+            from syndicate.features.mlb.live_lens import _persist_live_lens_report
+
+            live_lens_report = _persist_live_lens_report(resolved_date)
+        except Exception:
+            live_lens_report = None
+    if not isinstance(live_lens_report, dict):
+        live_lens_report = load_json_file(live_lens_path)
     live_lens_rows = (live_lens_report.get("games") if isinstance((live_lens_report or {}).get("games"), list) else [])
     if live_lens_rows:
         live_lens_by_game_pk: dict[int, dict[str, Any]] = {}

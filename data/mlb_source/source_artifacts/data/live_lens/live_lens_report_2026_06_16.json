@@ -1,8 +1,8 @@
 {
   "date": "2026-06-16",
-  "generatedAt": "2026-06-16T11:53:37-05:00",
-  "dataRoot": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data",
-  "liveLensDir": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/live_lens",
+  "generatedAt": "2026-06-16T14:06:50-05:00",
+  "dataRoot": "data",
+  "liveLensDir": "data/live_lens",
   "optimizationRegime": {
     "date": "2026-06-16",
     "kind": "forward_tuned_live",
@@ -19,17 +19,17 @@
     "live": 0,
     "final": 0,
     "pregame": 15,
-    "props": 48,
+    "props": 51,
     "archivedLiveProps": 0
   },
   "performance": {
     "marketsRefreshed": false,
     "marketRefreshMs": 0.0,
-    "totalMs": 1063.5,
-    "snapshotLoadMs": 1.9,
-    "simContextLoadMs": 1.3,
+    "totalMs": 4448.3,
+    "snapshotLoadMs": 2.6,
+    "simContextLoadMs": 2.6,
     "propEvalMs": 0.2,
-    "gameLensMs": 1.8,
+    "gameLensMs": 1.9,
     "gameCount": 15,
     "liveGameCount": 0,
     "feedFetchCount": 15,
@@ -60,7 +60,7 @@
           "away": 0,
           "home": 0
         },
-        "liveText": "Tyler Phillips vs Jes\u00fas Luzardo | 1 official pick(s) | +3 playable"
+        "liveText": "Tyler Phillips vs Jes\u00fas Luzardo | 1 official pick(s) | +6 playable"
       },
       "predictions": {
         "first1": {
@@ -517,21 +517,21 @@
           "closed": false,
           "badge": "No bet",
           "score": "MIA 0 - PHI 0",
-          "subtitle": "MIA 5.08 - PHI 3.83 | Total 8.91",
+          "subtitle": "MIA 5.23 - PHI 3.71 | Total 8.94",
           "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
           "projection": {
-            "total": 8.91,
-            "homeMargin": -1.24
+            "total": 8.94,
+            "homeMargin": -1.53
           },
           "markets": {
             "total": {
               "pick": null,
-              "line": 8.91,
+              "line": 8.94,
               "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
             },
             "spread": {
               "pick": null,
-              "homeLine": -1.24,
+              "homeLine": -1.53,
               "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
             },
             "moneyline": {
@@ -611,18 +611,18 @@
           "label": "Full game",
           "closed": false,
           "badge": "",
-          "score": "MIA 61.4% | PHI 38.6% | Tie 0.0%",
-          "subtitle": "MIA 61.4% | PHI 38.6% | Tie 0.0%",
-          "reason": "MIA 61.4% | PHI 38.6% | Tie 0.0%",
+          "score": "MIA 62.1% | PHI 37.9% | Tie 0.0%",
+          "subtitle": "MIA 62.1% | PHI 37.9% | Tie 0.0%",
+          "reason": "MIA 62.1% | PHI 37.9% | Tie 0.0%",
           "projection": {
-            "total": 61.4,
-            "homeMargin": 38.6
+            "total": 62.1,
+            "homeMargin": 37.9
           },
           "markets": {
             "total": {
               "pick": null,
-              "line": 61.4,
-              "reason": "MIA 61.4% | PHI 38.6% | Tie 0.0%"
+              "line": 62.1,
+              "reason": "MIA 62.1% | PHI 37.9% | Tie 0.0%"
             },
             "spread": {},
             "moneyline": {}
@@ -1004,12 +1004,12 @@
         {
           "label": "Pitcher props",
           "title": "Tyler Phillips Over 3.5 Strikeouts",
-          "sub": "Playable only | -138"
+          "sub": "Playable only | -144"
         },
         {
           "label": "Hitter props",
-          "title": "Otto Lopez Over 1.5 Batter Total Bases",
-          "sub": "+115"
+          "title": "Esteury Ruiz Over 0.5 Batter Total Bases",
+          "sub": "-134"
         }
       ],
       "probable": {
@@ -1018,15 +1018,27 @@
           "fullName": "Tyler Phillips",
           "ladderBadges": [
             {
-              "label": "K up to 4",
+              "label": "K up to 5",
               "stat": "strikeouts",
-              "target": 4,
+              "target": 5,
               "targets": [
-                4
+                4,
+                5
               ],
               "tone": "solid",
-              "detail": "Supported ladders: 4/5/6/7 Last supported rung: 7 Supported ladders: 4 Last supported rung: 4",
-              "hitProb": 0.257
+              "detail": "Supported ladders: 4/5/6/7 Last supported rung: 7 Supported ladders: 4/5 Last supported rung: 5",
+              "hitProb": 0.264
+            },
+            {
+              "label": "O up to 16",
+              "stat": "outs",
+              "target": 16,
+              "targets": [
+                16
+              ],
+              "tone": "strong",
+              "detail": "Supported ladders: 16/17 Last supported rung: 17 Supported ladders: 16 Last supported rung: 16",
+              "hitProb": 0.854
             },
             {
               "label": "H up to 5",
@@ -1037,20 +1049,32 @@
               ],
               "tone": "solid",
               "detail": "Supported ladders: 5/6/7/8 Last supported rung: 8 Supported ladders: 5 Last supported rung: 5",
-              "hitProb": 0.316
+              "hitProb": 0.317
             }
           ],
           "pregameLadderBadges": [
             {
-              "label": "K up to 4",
+              "label": "K up to 5",
               "stat": "strikeouts",
-              "target": 4,
+              "target": 5,
               "targets": [
-                4
+                4,
+                5
               ],
               "tone": "solid",
-              "detail": "Supported ladders: 4/5/6/7 Last supported rung: 7 Supported ladders: 4 Last supported rung: 4",
-              "hitProb": 0.257
+              "detail": "Supported ladders: 4/5/6/7 Last supported rung: 7 Supported ladders: 4/5 Last supported rung: 5",
+              "hitProb": 0.264
+            },
+            {
+              "label": "O up to 16",
+              "stat": "outs",
+              "target": 16,
+              "targets": [
+                16
+              ],
+              "tone": "strong",
+              "detail": "Supported ladders: 16/17 Last supported rung: 17 Supported ladders: 16 Last supported rung: 16",
+              "hitProb": 0.854
             },
             {
               "label": "H up to 5",
@@ -1061,12 +1085,12 @@
               ],
               "tone": "solid",
               "detail": "Supported ladders: 5/6/7/8 Last supported rung: 8 Supported ladders: 5 Last supported rung: 5",
-              "hitProb": 0.316
+              "hitProb": 0.317
             }
           ]
         },
         "home": {
-          "id": 666200,
+          "id": null,
           "fullName": "Jes\u00fas Luzardo",
           "ladderBadges": [
             {
@@ -1081,26 +1105,27 @@
               "hitProb": 0.273
             },
             {
-              "label": "H up to 5",
-              "stat": "hits_allowed",
-              "target": 5,
-              "targets": [
-                5
-              ],
-              "tone": "soft",
-              "detail": "Supported ladders: 5/6/7/8/9/10 Last supported rung: 10 Supported ladders: 5 Last supported rung: 5",
-              "hitProb": 0.242
-            },
-            {
-              "label": "O 18+",
+              "label": "O up to 19",
               "stat": "outs",
-              "target": 18,
+              "target": 19,
               "targets": [
-                18
+                19
               ],
               "tone": "strong",
-              "detail": "Jes\u00fas Luzardo Over 17.5 Outs | Odds -140 | Edge 24.0%",
-              "hitProb": 0.786
+              "detail": "Supported ladders: 19/20 Last supported rung: 20 Supported ladders: 19 Last supported rung: 19",
+              "hitProb": 0.624
+            },
+            {
+              "label": "H up to 6",
+              "stat": "hits_allowed",
+              "target": 6,
+              "targets": [
+                5,
+                6
+              ],
+              "tone": "soft",
+              "detail": "Supported ladders: 5/6/7/8/9/10 Last supported rung: 10 Supported ladders: 5/6 Last supported rung: 6",
+              "hitProb": 0.241
             }
           ],
           "pregameLadderBadges": [
@@ -1116,26 +1141,27 @@
               "hitProb": 0.273
             },
             {
-              "label": "H up to 5",
-              "stat": "hits_allowed",
-              "target": 5,
-              "targets": [
-                5
-              ],
-              "tone": "soft",
-              "detail": "Supported ladders: 5/6/7/8/9/10 Last supported rung: 10 Supported ladders: 5 Last supported rung: 5",
-              "hitProb": 0.242
-            },
-            {
-              "label": "O 18+",
+              "label": "O up to 19",
               "stat": "outs",
-              "target": 18,
+              "target": 19,
               "targets": [
-                18
+                19
               ],
               "tone": "strong",
-              "detail": "Jes\u00fas Luzardo Over 17.5 Outs | Odds -140 | Edge 24.0%",
-              "hitProb": 0.786
+              "detail": "Supported ladders: 19/20 Last supported rung: 20 Supported ladders: 19 Last supported rung: 19",
+              "hitProb": 0.624
+            },
+            {
+              "label": "H up to 6",
+              "stat": "hits_allowed",
+              "target": 6,
+              "targets": [
+                5,
+                6
+              ],
+              "tone": "soft",
+              "detail": "Supported ladders: 5/6/7/8/9/10 Last supported rung: 10 Supported ladders: 5/6 Last supported rung: 6",
+              "hitProb": 0.241
             }
           ]
         }
@@ -1496,7 +1522,7 @@
           "away": 0,
           "home": 0
         },
-        "liveText": "Michael Wacha vs Foster Griffin | +5 playable"
+        "liveText": "Michael Wacha vs Foster Griffin | +6 playable"
       },
       "predictions": {
         "first1": {
@@ -2072,16 +2098,16 @@
           "closed": false,
           "badge": "No bet",
           "score": "KC 0 - WSH 0",
-          "subtitle": "KC 2.77 - WSH 2.36 | Total 5.13",
+          "subtitle": "KC 2.77 - WSH 2.36 | Total 5.14",
           "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
           "projection": {
-            "total": 5.13,
+            "total": 5.14,
             "homeMargin": -0.41
           },
           "markets": {
             "total": {
               "pick": null,
-              "line": 5.13,
+              "line": 5.14,
               "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
             },
             "spread": {
@@ -2101,21 +2127,21 @@
           "closed": false,
           "badge": "No bet",
           "score": "KC 0 - WSH 0",
-          "subtitle": "KC 4.86 - WSH 4.3 | Total 9.15",
+          "subtitle": "KC 4.92 - WSH 4.2 | Total 9.12",
           "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
           "projection": {
-            "total": 9.15,
-            "homeMargin": -0.56
+            "total": 9.12,
+            "homeMargin": -0.72
           },
           "markets": {
             "total": {
               "pick": null,
-              "line": 9.15,
+              "line": 9.12,
               "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
             },
             "spread": {
               "pick": null,
-              "homeLine": -0.56,
+              "homeLine": -0.72,
               "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
             },
             "moneyline": {
@@ -2195,18 +2221,18 @@
           "label": "Full game",
           "closed": false,
           "badge": "",
-          "score": "KC 54.0% | WSH 46.0% | Tie 0.0%",
-          "subtitle": "KC 54.0% | WSH 46.0% | Tie 0.0%",
-          "reason": "KC 54.0% | WSH 46.0% | Tie 0.0%",
+          "score": "KC 55.7% | WSH 44.3% | Tie 0.0%",
+          "subtitle": "KC 55.7% | WSH 44.3% | Tie 0.0%",
+          "reason": "KC 55.7% | WSH 44.3% | Tie 0.0%",
           "projection": {
-            "total": 54.0,
-            "homeMargin": 46.0
+            "total": 55.7,
+            "homeMargin": 44.3
           },
           "markets": {
             "total": {
               "pick": null,
-              "line": 54.0,
-              "reason": "KC 54.0% | WSH 46.0% | Tie 0.0%"
+              "line": 55.7,
+              "reason": "KC 55.7% | WSH 44.3% | Tie 0.0%"
             },
             "spread": {},
             "moneyline": {}
@@ -2674,18 +2700,18 @@
         },
         {
           "label": "Pitcher props",
-          "title": "Michael Wacha Over 4.5 Strikeouts",
-          "sub": "Playable only | +132"
+          "title": "No locked pitcher prop",
+          "sub": "Off card"
         },
         {
           "label": "Hitter props",
           "title": "Maikel Garcia Over 0.5 Batter Rbis",
-          "sub": "Playable only | +192"
+          "sub": "Playable only | +184"
         }
       ],
       "probable": {
         "away": {
-          "id": 608379,
+          "id": null,
           "fullName": "Michael Wacha",
           "ladderBadges": [
             {
@@ -2697,7 +2723,7 @@
               ],
               "tone": "solid",
               "detail": "Supported ladders: 5/6/7 Last supported rung: 7 Supported ladders: 5 Last supported rung: 5",
-              "hitProb": 0.289
+              "hitProb": 0.296
             }
           ],
           "pregameLadderBadges": [
@@ -2710,7 +2736,7 @@
               ],
               "tone": "solid",
               "detail": "Supported ladders: 5/6/7 Last supported rung: 7 Supported ladders: 5 Last supported rung: 5",
-              "hitProb": 0.289
+              "hitProb": 0.296
             }
           ]
         },
@@ -2727,7 +2753,7 @@
               ],
               "tone": "solid",
               "detail": "Supported ladders: 6/7 Last supported rung: 7 Supported ladders: 6 Last supported rung: 6",
-              "hitProb": 0.268
+              "hitProb": 0.267
             },
             {
               "label": "H up to 6",
@@ -2736,9 +2762,9 @@
               "targets": [
                 6
               ],
-              "tone": "soft",
-              "detail": "Supported ladders: 6/7/8/9/10 Last supported rung: 10 Supported ladders: 6 Last supported rung: 6",
-              "hitProb": 0.202
+              "tone": "solid",
+              "detail": "Supported ladders: 6/7/8/9 Last supported rung: 9 Supported ladders: 6 Last supported rung: 6",
+              "hitProb": 0.293
             }
           ],
           "pregameLadderBadges": [
@@ -2751,7 +2777,7 @@
               ],
               "tone": "solid",
               "detail": "Supported ladders: 6/7 Last supported rung: 7 Supported ladders: 6 Last supported rung: 6",
-              "hitProb": 0.268
+              "hitProb": 0.267
             },
             {
               "label": "H up to 6",
@@ -2760,9 +2786,9 @@
               "targets": [
                 6
               ],
-              "tone": "soft",
-              "detail": "Supported ladders: 6/7/8/9/10 Last supported rung: 10 Supported ladders: 6 Last supported rung: 6",
-              "hitProb": 0.202
+              "tone": "solid",
+              "detail": "Supported ladders: 6/7/8/9 Last supported rung: 9 Supported ladders: 6 Last supported rung: 6",
+              "hitProb": 0.293
             }
           ]
         }
@@ -3271,7 +3297,7 @@
           "away": 0,
           "home": 0
         },
-        "liveText": "Kevin Gausman vs Payton Tolle | +2 playable"
+        "liveText": "Kevin Gausman vs Payton Tolle | +5 playable"
       },
       "predictions": {
         "first1": {
@@ -3886,8 +3912,8 @@
         },
         {
           "label": "Hitter props",
-          "title": "Charles McAdoo Over 0.5 Batter Hits",
-          "sub": "Playable only | -132"
+          "title": "Jarren Duran Over 0.5 Batter Hits",
+          "sub": "Playable only | -136"
         }
       ],
       "probable": {
@@ -4167,7 +4193,7 @@
           "away": 0,
           "home": 0
         },
-        "liveText": "Davis Martin vs Gerrit Cole | +2 playable"
+        "liveText": "Davis Martin vs Gerrit Cole | +3 playable"
       },
       "predictions": {
         "first1": {
@@ -4729,12 +4755,12 @@
         {
           "label": "Pitcher props",
           "title": "Davis Martin Over 17.5 Outs",
-          "sub": "Playable only | -136"
+          "sub": "Playable only | -125"
         },
         {
           "label": "Hitter props",
-          "title": "No locked hitter prop",
-          "sub": "Off card"
+          "title": "Sam Antonacci Over 0.5 Batter Runs Scored",
+          "sub": "Playable only | +140"
         }
       ],
       "probable": {
@@ -4754,14 +4780,15 @@
               "hitProb": 0.301
             },
             {
-              "label": "H up to 5",
+              "label": "H up to 6",
               "stat": "hits_allowed",
-              "target": 5,
+              "target": 6,
               "targets": [
-                5
+                5,
+                6
               ],
               "tone": "soft",
-              "detail": "Supported ladders: 5/6/7/8/9 Last supported rung: 9 Supported ladders: 5 Last supported rung: 5",
+              "detail": "Supported ladders: 5/6/7/8/9 Last supported rung: 9 Supported ladders: 5/6 Last supported rung: 6",
               "hitProb": 0.229
             },
             {
@@ -4772,7 +4799,7 @@
                 18
               ],
               "tone": "strong",
-              "detail": "Davis Martin Over 17.5 Outs | Odds -136 | Edge 29.9%",
+              "detail": "Davis Martin Over 17.5 Outs | Odds -125 | Edge 32.8%",
               "hitProb": 0.837
             }
           ],
@@ -4789,14 +4816,15 @@
               "hitProb": 0.301
             },
             {
-              "label": "H up to 5",
+              "label": "H up to 6",
               "stat": "hits_allowed",
-              "target": 5,
+              "target": 6,
               "targets": [
-                5
+                5,
+                6
               ],
               "tone": "soft",
-              "detail": "Supported ladders: 5/6/7/8/9 Last supported rung: 9 Supported ladders: 5 Last supported rung: 5",
+              "detail": "Supported ladders: 5/6/7/8/9 Last supported rung: 9 Supported ladders: 5/6 Last supported rung: 6",
               "hitProb": 0.229
             },
             {
@@ -4807,7 +4835,7 @@
                 18
               ],
               "tone": "strong",
-              "detail": "Davis Martin Over 17.5 Outs | Odds -136 | Edge 29.9%",
+              "detail": "Davis Martin Over 17.5 Outs | Odds -125 | Edge 32.8%",
               "hitProb": 0.837
             }
           ]
@@ -5013,7 +5041,7 @@
           "away": 0,
           "home": 0
         },
-        "liveText": "Christian Scott vs Brady Singer | 1 official pick(s) | +4 playable"
+        "liveText": "Kodai Senga vs Brady Singer | 1 official pick(s) | +5 playable"
       },
       "predictions": {
         "first1": {
@@ -5472,21 +5500,21 @@
           "closed": false,
           "badge": "No bet",
           "score": "NYM 0 - CIN 0",
-          "subtitle": "NYM 0.58 - CIN 0.48 | Total 1.07",
+          "subtitle": "NYM 0.57 - CIN 0.61 | Total 1.18",
           "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
           "projection": {
-            "total": 1.07,
-            "homeMargin": -0.1
+            "total": 1.18,
+            "homeMargin": 0.04
           },
           "markets": {
             "total": {
               "pick": null,
-              "line": 1.07,
+              "line": 1.18,
               "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
             },
             "spread": {
               "pick": null,
-              "homeLine": -0.1,
+              "homeLine": 0.04,
               "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
             },
             "moneyline": {
@@ -5501,21 +5529,21 @@
           "closed": false,
           "badge": "No bet",
           "score": "NYM 0 - CIN 0",
-          "subtitle": "NYM 1.77 - CIN 1.4 | Total 3.17",
+          "subtitle": "NYM 1.72 - CIN 1.69 | Total 3.41",
           "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
           "projection": {
-            "total": 3.17,
-            "homeMargin": -0.37
+            "total": 3.41,
+            "homeMargin": -0.03
           },
           "markets": {
             "total": {
               "pick": null,
-              "line": 3.17,
+              "line": 3.41,
               "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
             },
             "spread": {
               "pick": null,
-              "homeLine": -0.37,
+              "homeLine": -0.03,
               "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
             },
             "moneyline": {
@@ -5530,21 +5558,21 @@
           "closed": false,
           "badge": "No bet",
           "score": "NYM 0 - CIN 0",
-          "subtitle": "NYM 2.88 - CIN 2.29 | Total 5.16",
+          "subtitle": "NYM 2.75 - CIN 2.83 | Total 5.57",
           "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
           "projection": {
-            "total": 5.16,
-            "homeMargin": -0.59
+            "total": 5.57,
+            "homeMargin": 0.08
           },
           "markets": {
             "total": {
               "pick": null,
-              "line": 5.16,
+              "line": 5.57,
               "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
             },
             "spread": {
               "pick": null,
-              "homeLine": -0.59,
+              "homeLine": 0.08,
               "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
             },
             "moneyline": {
@@ -5557,28 +5585,28 @@
           "key": "first5",
           "label": "Full game",
           "closed": false,
-          "badge": "ML bet",
+          "badge": "No bet",
           "score": "NYM 0 - CIN 0",
-          "subtitle": "NYM 4.91 - CIN 3.97 | Total 8.88",
-          "reason": "Official full-game recommendation surfaced from the saved market payload.",
+          "subtitle": "NYM 4.84 - CIN 4.61 | Total 9.44",
+          "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
           "projection": {
-            "total": 8.88,
-            "homeMargin": -0.94
+            "total": 9.44,
+            "homeMargin": -0.23
           },
           "markets": {
             "total": {
-              "pick": "NYM ML",
-              "line": 8.88,
-              "reason": "Official full-game recommendation surfaced from the saved market payload."
+              "pick": null,
+              "line": 9.44,
+              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
             },
             "spread": {
               "pick": null,
-              "homeLine": -0.94,
-              "reason": "Official full-game recommendation surfaced from the saved market payload."
+              "homeLine": -0.23,
+              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
             },
             "moneyline": {
               "pick": null,
-              "reason": "Official full-game recommendation surfaced from the saved market payload."
+              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
             }
           }
         },
@@ -5587,18 +5615,18 @@
           "label": "First 1",
           "closed": false,
           "badge": "",
-          "score": "NYM 24.4% | CIN 19.2% | Tie 56.4%",
-          "subtitle": "NYM 24.4% | CIN 19.2% | Tie 56.4%",
-          "reason": "NYM 24.4% | CIN 19.2% | Tie 56.4%",
+          "score": "NYM 23.3% | CIN 23.5% | Tie 53.2%",
+          "subtitle": "NYM 23.3% | CIN 23.5% | Tie 53.2%",
+          "reason": "NYM 23.3% | CIN 23.5% | Tie 53.2%",
           "projection": {
-            "total": 24.4,
-            "homeMargin": 19.2
+            "total": 23.3,
+            "homeMargin": 23.5
           },
           "markets": {
             "total": {
               "pick": null,
-              "line": 24.4,
-              "reason": "NYM 24.4% | CIN 19.2% | Tie 56.4%"
+              "line": 23.3,
+              "reason": "NYM 23.3% | CIN 23.5% | Tie 53.2%"
             },
             "spread": {},
             "moneyline": {}
@@ -5609,18 +5637,18 @@
           "label": "First 3",
           "closed": false,
           "badge": "",
-          "score": "NYM 45.3% | CIN 32.4% | Tie 22.3%",
-          "subtitle": "NYM 45.3% | CIN 32.4% | Tie 22.3%",
-          "reason": "NYM 45.3% | CIN 32.4% | Tie 22.3%",
+          "score": "NYM 40.3% | CIN 37.5% | Tie 22.2%",
+          "subtitle": "NYM 40.3% | CIN 37.5% | Tie 22.2%",
+          "reason": "NYM 40.3% | CIN 37.5% | Tie 22.2%",
           "projection": {
-            "total": 45.3,
-            "homeMargin": 32.4
+            "total": 40.3,
+            "homeMargin": 37.5
           },
           "markets": {
             "total": {
               "pick": null,
-              "line": 45.3,
-              "reason": "NYM 45.3% | CIN 32.4% | Tie 22.3%"
+              "line": 40.3,
+              "reason": "NYM 40.3% | CIN 37.5% | Tie 22.2%"
             },
             "spread": {},
             "moneyline": {}
@@ -5631,18 +5659,18 @@
           "label": "First 5",
           "closed": false,
           "badge": "",
-          "score": "NYM 51.0% | CIN 33.4% | Tie 15.6%",
-          "subtitle": "NYM 51.0% | CIN 33.4% | Tie 15.6%",
-          "reason": "NYM 51.0% | CIN 33.4% | Tie 15.6%",
+          "score": "NYM 42.4% | CIN 43.4% | Tie 14.2%",
+          "subtitle": "NYM 42.4% | CIN 43.4% | Tie 14.2%",
+          "reason": "NYM 42.4% | CIN 43.4% | Tie 14.2%",
           "projection": {
-            "total": 51.0,
-            "homeMargin": 33.4
+            "total": 42.4,
+            "homeMargin": 43.4
           },
           "markets": {
             "total": {
               "pick": null,
-              "line": 51.0,
-              "reason": "NYM 51.0% | CIN 33.4% | Tie 15.6%"
+              "line": 42.4,
+              "reason": "NYM 42.4% | CIN 43.4% | Tie 14.2%"
             },
             "spread": {},
             "moneyline": {}
@@ -5653,18 +5681,18 @@
           "label": "Full game",
           "closed": false,
           "badge": "",
-          "score": "NYM 58.0% | CIN 42.0% | Tie 0.0%",
-          "subtitle": "NYM 58.0% | CIN 42.0% | Tie 0.0%",
-          "reason": "NYM 58.0% | CIN 42.0% | Tie 0.0%",
+          "score": "NYM 49.0% | CIN 51.0% | Tie 0.0%",
+          "subtitle": "NYM 49.0% | CIN 51.0% | Tie 0.0%",
+          "reason": "NYM 49.0% | CIN 51.0% | Tie 0.0%",
           "projection": {
-            "total": 58.0,
-            "homeMargin": 42.0
+            "total": 49.0,
+            "homeMargin": 51.0
           },
           "markets": {
             "total": {
               "pick": null,
-              "line": 58.0,
-              "reason": "NYM 58.0% | CIN 42.0% | Tie 0.0%"
+              "line": 49.0,
+              "reason": "NYM 49.0% | CIN 51.0% | Tie 0.0%"
             },
             "spread": {},
             "moneyline": {}
@@ -6040,24 +6068,94 @@
         },
         {
           "label": "Moneyline",
-          "title": "NYM -126",
-          "sub": "model 42.0%"
+          "title": "No ML play",
+          "sub": "Off card"
         },
         {
           "label": "Pitcher props",
-          "title": "Brady Singer Over 4.5 Strikeouts",
-          "sub": "Playable only | +110"
+          "title": "Kodai Senga Over 13.5 Outs",
+          "sub": "-145"
         },
         {
           "label": "Hitter props",
           "title": "JJ Bleday Over 0.5 Batter Rbis",
-          "sub": "Playable only | +178"
+          "sub": "Playable only | +155"
         }
       ],
       "probable": {
         "away": {
-          "id": null,
-          "fullName": "Christian Scott"
+          "id": 673540,
+          "fullName": "Kodai Senga",
+          "ladderBadges": [
+            {
+              "label": "K up to 6",
+              "stat": "strikeouts",
+              "target": 6,
+              "targets": [
+                6
+              ],
+              "tone": "strong",
+              "detail": "Supported ladders: 6 Last supported rung: 6",
+              "hitProb": 0.382
+            },
+            {
+              "label": "H up to 5",
+              "stat": "hits_allowed",
+              "target": 5,
+              "targets": [
+                5
+              ],
+              "tone": "soft",
+              "detail": "Supported ladders: 5/6/7/8/9/10 Last supported rung: 10 Supported ladders: 5 Last supported rung: 5",
+              "hitProb": 0.213
+            },
+            {
+              "label": "O 14+",
+              "stat": "outs",
+              "target": 14,
+              "targets": [
+                14
+              ],
+              "tone": "strong",
+              "detail": "Kodai Senga Over 13.5 Outs | Odds -145 | Edge 43.2%",
+              "hitProb": 0.984
+            }
+          ],
+          "pregameLadderBadges": [
+            {
+              "label": "K up to 6",
+              "stat": "strikeouts",
+              "target": 6,
+              "targets": [
+                6
+              ],
+              "tone": "strong",
+              "detail": "Supported ladders: 6 Last supported rung: 6",
+              "hitProb": 0.382
+            },
+            {
+              "label": "H up to 5",
+              "stat": "hits_allowed",
+              "target": 5,
+              "targets": [
+                5
+              ],
+              "tone": "soft",
+              "detail": "Supported ladders: 5/6/7/8/9/10 Last supported rung: 10 Supported ladders: 5 Last supported rung: 5",
+              "hitProb": 0.213
+            },
+            {
+              "label": "O 14+",
+              "stat": "outs",
+              "target": 14,
+              "targets": [
+                14
+              ],
+              "tone": "strong",
+              "detail": "Kodai Senga Over 13.5 Outs | Odds -145 | Edge 43.2%",
+              "hitProb": 0.984
+            }
+          ]
         },
         "home": {
           "id": 663903,
@@ -6072,7 +6170,7 @@
               ],
               "tone": "solid",
               "detail": "Supported ladders: 5/6/7 Last supported rung: 7 Supported ladders: 5 Last supported rung: 5",
-              "hitProb": 0.29
+              "hitProb": 0.298
             },
             {
               "label": "H up to 6",
@@ -6081,9 +6179,9 @@
               "targets": [
                 6
               ],
-              "tone": "soft",
+              "tone": "solid",
               "detail": "Supported ladders: 6/7/8/9/10 Last supported rung: 10 Supported ladders: 6 Last supported rung: 6",
-              "hitProb": 0.247
+              "hitProb": 0.271
             }
           ],
           "pregameLadderBadges": [
@@ -6096,7 +6194,7 @@
               ],
               "tone": "solid",
               "detail": "Supported ladders: 5/6/7 Last supported rung: 7 Supported ladders: 5 Last supported rung: 5",
-              "hitProb": 0.29
+              "hitProb": 0.298
             },
             {
               "label": "H up to 6",
@@ -6105,9 +6203,9 @@
               "targets": [
                 6
               ],
-              "tone": "soft",
+              "tone": "solid",
               "detail": "Supported ladders: 6/7/8/9/10 Last supported rung: 10 Supported ladders: 6 Last supported rung: 6",
-              "hitProb": 0.247
+              "hitProb": 0.271
             }
           ]
         }
@@ -6557,7 +6655,7 @@
           "away": 0,
           "home": 0
         },
-        "liveText": "Adrian Houser vs Grant Holmes | +3 playable"
+        "liveText": "Adrian Houser vs Grant Holmes | +5 playable"
       },
       "predictions": {
         "first1": {
@@ -7356,12 +7454,12 @@
         {
           "label": "Pitcher props",
           "title": "Adrian Houser Over 3.5 Strikeouts",
-          "sub": "Playable only | -105"
+          "sub": "Playable only | -102"
         },
         {
           "label": "Hitter props",
-          "title": "Rafael Devers Over 1.5 Batter Total Bases",
-          "sub": "Playable only | +138"
+          "title": "Ozzie Albies Under 0.5 Batter Runs Scored",
+          "sub": "Playable only | -140"
         }
       ],
       "probable": {
@@ -7746,7 +7844,7 @@
           "away": 0,
           "home": 0
         },
-        "liveText": "Slade Cecconi vs Robert Gasser | 2 official pick(s) | +1 playable"
+        "liveText": "Slade Cecconi vs Robert Gasser | 3 official pick(s) | +1 playable"
       },
       "predictions": {
         "first1": {
@@ -8596,7 +8694,7 @@
         {
           "label": "Hitter props",
           "title": "Garrett Mitchell Over 0.5 Batter Hits",
-          "sub": "-130"
+          "sub": "-129"
         }
       ],
       "probable": {
@@ -9049,7 +9147,7 @@
           "away": 0,
           "home": 0
         },
-        "liveText": "Michael King vs Andre Pallante | 1 official pick(s) | +4 playable"
+        "liveText": "Michael King vs Andre Pallante | 1 official pick(s) | +7 playable"
       },
       "predictions": {
         "first1": {
@@ -10137,12 +10235,12 @@
         {
           "label": "Pitcher props",
           "title": "Andre Pallante Over 3.5 Strikeouts",
-          "sub": "Playable only | -128"
+          "sub": "Playable only | -142"
         },
         {
           "label": "Hitter props",
           "title": "Nathan Church Over 0.5 Batter Total Bases",
-          "sub": "-140"
+          "sub": "-145"
         }
       ],
       "probable": {
@@ -10169,7 +10267,7 @@
                 18
               ],
               "tone": "strong",
-              "detail": "Michael King Over 17.5 Outs | Odds -140 | Edge 24.3%",
+              "detail": "Michael King Over 17.5 Outs | Odds -120 | Edge 28.9%",
               "hitProb": 0.789
             }
           ],
@@ -10193,7 +10291,7 @@
                 18
               ],
               "tone": "strong",
-              "detail": "Michael King Over 17.5 Outs | Odds -140 | Edge 24.3%",
+              "detail": "Michael King Over 17.5 Outs | Odds -120 | Edge 28.9%",
               "hitProb": 0.789
             }
           ]
@@ -10232,7 +10330,7 @@
                 17
               ],
               "tone": "strong",
-              "detail": "Andre Pallante Over 16.5 Outs | Odds -110 | Edge 35.0%",
+              "detail": "Andre Pallante Over 16.5 Outs | Odds -120 | Edge 33.1%",
               "hitProb": 0.831
             }
           ],
@@ -10267,7 +10365,7 @@
                 17
               ],
               "tone": "strong",
-              "detail": "Andre Pallante Over 16.5 Outs | Odds -110 | Edge 35.0%",
+              "detail": "Andre Pallante Over 16.5 Outs | Odds -120 | Edge 33.1%",
               "hitProb": 0.831
             }
           ]
@@ -10686,7 +10784,7 @@
           "away": 0,
           "home": 0
         },
-        "liveText": "Zebby Matthews vs Kumar Rocker | +2 playable"
+        "liveText": "Zebby Matthews vs Kumar Rocker | +5 playable"
       },
       "predictions": {
         "first1": {
@@ -10935,21 +11033,21 @@
           "closed": false,
           "badge": "No bet",
           "score": "MIN 0 - TEX 0",
-          "subtitle": "MIN 3.81 - TEX 4.43 | Total 8.24",
+          "subtitle": "MIN 3.88 - TEX 4.62 | Total 8.5",
           "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
           "projection": {
-            "total": 8.24,
-            "homeMargin": 0.63
+            "total": 8.5,
+            "homeMargin": 0.74
           },
           "markets": {
             "total": {
               "pick": null,
-              "line": 8.24,
+              "line": 8.5,
               "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
             },
             "spread": {
               "pick": null,
-              "homeLine": 0.63,
+              "homeLine": 0.74,
               "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
             },
             "moneyline": {
@@ -11029,18 +11127,18 @@
           "label": "Full game",
           "closed": false,
           "badge": "",
-          "score": "MIN 43.0% | TEX 57.0% | Tie 0.0%",
-          "subtitle": "MIN 43.0% | TEX 57.0% | Tie 0.0%",
-          "reason": "MIN 43.0% | TEX 57.0% | Tie 0.0%",
+          "score": "MIN 41.4% | TEX 58.6% | Tie 0.0%",
+          "subtitle": "MIN 41.4% | TEX 58.6% | Tie 0.0%",
+          "reason": "MIN 41.4% | TEX 58.6% | Tie 0.0%",
           "projection": {
-            "total": 43.0,
-            "homeMargin": 57.0
+            "total": 41.4,
+            "homeMargin": 58.6
           },
           "markets": {
             "total": {
               "pick": null,
-              "line": 43.0,
-              "reason": "MIN 43.0% | TEX 57.0% | Tie 0.0%"
+              "line": 41.4,
+              "reason": "MIN 41.4% | TEX 58.6% | Tie 0.0%"
             },
             "spread": {},
             "moneyline": {}
@@ -11247,13 +11345,13 @@
         },
         {
           "label": "Pitcher props",
-          "title": "Zebby Matthews Over 17.5 Outs",
-          "sub": "Playable only | -110"
+          "title": "Zebby Matthews Over 16.5 Outs",
+          "sub": "Playable only | -120"
         },
         {
           "label": "Hitter props",
-          "title": "No locked hitter prop",
-          "sub": "Off card"
+          "title": "Royce Lewis Over 0.5 Batter Hits",
+          "sub": "Playable only | -139"
         }
       ],
       "probable": {
@@ -11284,15 +11382,15 @@
               "hitProb": 0.276
             },
             {
-              "label": "O 18+",
+              "label": "O 17+",
               "stat": "outs",
-              "target": 18,
+              "target": 17,
               "targets": [
-                18
+                17
               ],
               "tone": "strong",
-              "detail": "Zebby Matthews Over 17.5 Outs | Odds -110 | Edge 30.7%",
-              "hitProb": 0.788
+              "detail": "Zebby Matthews Over 16.5 Outs | Odds -120 | Edge 34.6%",
+              "hitProb": 0.846
             }
           ],
           "pregameLadderBadges": [
@@ -11319,20 +11417,20 @@
               "hitProb": 0.276
             },
             {
-              "label": "O 18+",
+              "label": "O 17+",
               "stat": "outs",
-              "target": 18,
+              "target": 17,
               "targets": [
-                18
+                17
               ],
               "tone": "strong",
-              "detail": "Zebby Matthews Over 17.5 Outs | Odds -110 | Edge 30.7%",
-              "hitProb": 0.788
+              "detail": "Zebby Matthews Over 16.5 Outs | Odds -120 | Edge 34.6%",
+              "hitProb": 0.846
             }
           ]
         },
         "home": {
-          "id": null,
+          "id": 677958,
           "fullName": "Kumar Rocker",
           "ladderBadges": [
             {
@@ -11512,7 +11610,7 @@
           "away": 0,
           "home": 0
         },
-        "liveText": "Ryan Feltner vs Edward Cabrera | 1 official pick(s) | +3 playable"
+        "liveText": "Ryan Feltner vs Edward Cabrera | +6 playable"
       },
       "predictions": {
         "first1": {
@@ -12019,21 +12117,21 @@
           "closed": false,
           "badge": "No bet",
           "score": "COL 0 - CHC 0",
-          "subtitle": "COL 5.25 - CHC 4.22 | Total 9.47",
+          "subtitle": "COL 5.18 - CHC 4.3 | Total 9.49",
           "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
           "projection": {
-            "total": 9.47,
-            "homeMargin": -1.03
+            "total": 9.49,
+            "homeMargin": -0.88
           },
           "markets": {
             "total": {
               "pick": null,
-              "line": 9.47,
+              "line": 9.49,
               "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
             },
             "spread": {
               "pick": null,
-              "homeLine": -1.03,
+              "homeLine": -0.88,
               "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
             },
             "moneyline": {
@@ -12113,18 +12211,18 @@
           "label": "Full game",
           "closed": false,
           "badge": "",
-          "score": "COL 58.2% | CHC 41.8% | Tie 0.0%",
-          "subtitle": "COL 58.2% | CHC 41.8% | Tie 0.0%",
-          "reason": "COL 58.2% | CHC 41.8% | Tie 0.0%",
+          "score": "COL 55.7% | CHC 44.3% | Tie 0.0%",
+          "subtitle": "COL 55.7% | CHC 44.3% | Tie 0.0%",
+          "reason": "COL 55.7% | CHC 44.3% | Tie 0.0%",
           "projection": {
-            "total": 58.2,
-            "homeMargin": 41.8
+            "total": 55.7,
+            "homeMargin": 44.3
           },
           "markets": {
             "total": {
               "pick": null,
-              "line": 58.2,
-              "reason": "COL 58.2% | CHC 41.8% | Tie 0.0%"
+              "line": 55.7,
+              "reason": "COL 55.7% | CHC 44.3% | Tie 0.0%"
             },
             "spread": {},
             "moneyline": {}
@@ -12505,18 +12603,18 @@
         },
         {
           "label": "Pitcher props",
-          "title": "Edward Cabrera Over 5.5 Strikeouts",
-          "sub": "Playable only | -105"
+          "title": "Ryan Feltner Over 14.5 Outs",
+          "sub": "Playable only | -143"
         },
         {
           "label": "Hitter props",
           "title": "Ezequiel Tovar Over 0.5 Batter Hits",
-          "sub": "-134"
+          "sub": "Playable only | -133"
         }
       ],
       "probable": {
         "away": {
-          "id": null,
+          "id": 663372,
           "fullName": "Ryan Feltner",
           "ladderBadges": [
             {
@@ -12528,7 +12626,7 @@
               ],
               "tone": "solid",
               "detail": "Supported ladders: 4/5/6/7 Last supported rung: 7 Supported ladders: 4 Last supported rung: 4",
-              "hitProb": 0.264
+              "hitProb": 0.27
             },
             {
               "label": "H up to 6",
@@ -12539,7 +12637,18 @@
               ],
               "tone": "solid",
               "detail": "Supported ladders: 6/7/8/9 Last supported rung: 9 Supported ladders: 6 Last supported rung: 6",
-              "hitProb": 0.252
+              "hitProb": 0.257
+            },
+            {
+              "label": "O 15+",
+              "stat": "outs",
+              "target": 15,
+              "targets": [
+                15
+              ],
+              "tone": "strong",
+              "detail": "Ryan Feltner Over 14.5 Outs | Odds -143 | Edge 43.1%",
+              "hitProb": 0.981
             }
           ],
           "pregameLadderBadges": [
@@ -12552,7 +12661,7 @@
               ],
               "tone": "solid",
               "detail": "Supported ladders: 4/5/6/7 Last supported rung: 7 Supported ladders: 4 Last supported rung: 4",
-              "hitProb": 0.264
+              "hitProb": 0.27
             },
             {
               "label": "H up to 6",
@@ -12563,7 +12672,18 @@
               ],
               "tone": "solid",
               "detail": "Supported ladders: 6/7/8/9 Last supported rung: 9 Supported ladders: 6 Last supported rung: 6",
-              "hitProb": 0.252
+              "hitProb": 0.257
+            },
+            {
+              "label": "O 15+",
+              "stat": "outs",
+              "target": 15,
+              "targets": [
+                15
+              ],
+              "tone": "strong",
+              "detail": "Ryan Feltner Over 14.5 Outs | Odds -143 | Edge 43.1%",
+              "hitProb": 0.981
             }
           ]
         },
@@ -12580,7 +12700,7 @@
               ],
               "tone": "solid",
               "detail": "Supported ladders: 6/7 Last supported rung: 7 Supported ladders: 6 Last supported rung: 6",
-              "hitProb": 0.318
+              "hitProb": 0.315
             },
             {
               "label": "H up to 5",
@@ -12591,7 +12711,7 @@
               ],
               "tone": "soft",
               "detail": "Supported ladders: 5/6/7/8/9/10/11 Last supported rung: 11 Supported ladders: 5 Last supported rung: 5",
-              "hitProb": 0.201
+              "hitProb": 0.202
             }
           ],
           "pregameLadderBadges": [
@@ -12604,7 +12724,7 @@
               ],
               "tone": "solid",
               "detail": "Supported ladders: 6/7 Last supported rung: 7 Supported ladders: 6 Last supported rung: 6",
-              "hitProb": 0.318
+              "hitProb": 0.315
             },
             {
               "label": "H up to 5",
@@ -12615,7 +12735,7 @@
               ],
               "tone": "soft",
               "detail": "Supported ladders: 5/6/7/8/9/10/11 Last supported rung: 11 Supported ladders: 5 Last supported rung: 5",
-              "hitProb": 0.201
+              "hitProb": 0.202
             }
           ]
         }
@@ -13026,7 +13146,7 @@
           "away": 0,
           "home": 0
         },
-        "liveText": "Framber Valdez vs Hunter Brown"
+        "liveText": "Framber Valdez vs Hunter Brown | +3 playable"
       },
       "predictions": {
         "first1": {
@@ -13060,7 +13180,276 @@
       },
       "gameMarkets": {
         "totals": null,
-        "ml": null
+        "ml": null,
+        "pitcherProps": [],
+        "hitterProps": [],
+        "extraPitcherProps": [
+          {
+            "date": "2026-06-16",
+            "game_pk": 824182,
+            "away": "Detroit Tigers",
+            "home": "Houston Astros",
+            "away_abbr": "DET",
+            "home_abbr": "HOU",
+            "double_header": "N",
+            "game_number": 1,
+            "event_id": null,
+            "commence_time": null,
+            "market": "pitcher_props",
+            "pitcher_id": 686613,
+            "pitcher_name": "Hunter Brown",
+            "team": "HOU",
+            "team_side": "home",
+            "prop": "outs",
+            "selection": "over",
+            "edge": 0.31809421668218063,
+            "market_line": 15.5,
+            "model_prob_over": 0.81,
+            "market_prob_over": 0.4919057833178194,
+            "market_prob_under": 0.5080942166821806,
+            "market_prob_mode": "no_vig_two_way",
+            "market_no_vig_prob_over": 0.4919057833178194,
+            "selected_side_market_prob": 0.4919057833178194,
+            "selected_side_model_prob": 0.81,
+            "mean_support": 4.006,
+            "outs_mean": 19.506,
+            "market_alternates": [],
+            "odds": "-111",
+            "stake_u": 1.0,
+            "sim_sample_size": 1000,
+            "baseball_reasons": [
+              "Across his last 5 starts, he has averaged 17 outs.",
+              "His modeled workload cap still reaches roughly 96 pitches, so the deeper-start path is still available if the outing stays efficient."
+            ],
+            "explanation_diagnostic": {
+              "status": "supported",
+              "flag_sparse_support": false,
+              "support_min_reasons": 2,
+              "baseball_reasons_n": 2,
+              "reason_sentences_n": 5,
+              "market": "pitcher_props:outs",
+              "subject": "Hunter Brown",
+              "supporting_reasons": [
+                "Across his last 5 starts, he has averaged 17 outs.",
+                "His modeled workload cap still reaches roughly 96 pitches, so the deeper-start path is still available if the outing stays efficient."
+              ]
+            },
+            "reasons": [
+              "The model lands on the over side in 81.0% of sims, while the market is pricing it closer to 49.2%. Across his last 5 starts, he has averaged 17 outs. His modeled workload cap still reaches roughly 96 pitches, so the deeper-start path is still available if the outing stays efficient. The model baseline sits around 19.5 outs against a line of 15.5. If he stays on his normal starter path, the matchup against DET gives him a fair shot to reach full workload volume."
+            ],
+            "reason_summary": "The model lands on the over side in 81.0% of sims, while the market is pricing it closer to 49.2%. Across his last 5 starts, he has averaged 17 outs. His modeled workload cap still reaches roughly 96 pitches, so the deeper-start path is still available if the outing stays efficient. The model baseline sits around 19.5 outs against a line of 15.5. If he stays on his normal starter path, the matchup against DET gives him a fair shot to reach full workload volume.",
+            "rank": 13,
+            "recommendation_tier": "candidate"
+          }
+        ],
+        "extraHitterProps": [
+          {
+            "date": "2026-06-16",
+            "game_pk": 824182,
+            "away": "Detroit Tigers",
+            "home": "Houston Astros",
+            "away_abbr": "DET",
+            "home_abbr": "HOU",
+            "double_header": "N",
+            "game_number": 1,
+            "event_id": null,
+            "commence_time": null,
+            "batter_id": 681481,
+            "batter_hand": "L",
+            "opponent_pitcher_id": 686613,
+            "opponent_pitcher_hand": "R",
+            "opponent_pitcher_name": "Hunter Brown",
+            "opponent": "HOU",
+            "opponent_team_id": 117,
+            "lineup_source": "projected_rotowire_default_vs_rhp",
+            "lineup_confidence": 0.66,
+            "lineup_status": "projected",
+            "batter_k_rate": 0.3044239631336405,
+            "batter_bb_rate": 0.0784331797235023,
+            "batter_hr_rate": 0.06006912442396313,
+            "batter_inplay_hit_rate": 0.2596629213483146,
+            "batter_xb_hit_share": 0.15625,
+            "pitcher_k_rate": 0.3953488372093023,
+            "pitcher_bb_rate": 0.13953488372093023,
+            "pitcher_hr_rate": 0.0,
+            "pitcher_inplay_hit_rate": 0.25,
+            "pitcher_availability_mult": 1.0,
+            "pitcher_stamina_pitches": 96.0,
+            "pitcher_platoon_k_mult": 1.0228373702422144,
+            "pitcher_platoon_bb_mult": 1.1455882352941178,
+            "pitcher_platoon_hr_mult": 1.0,
+            "pitcher_platoon_inplay_mult": 0.8075,
+            "batter_platoon_k_mult": 1.0225428867482829,
+            "batter_platoon_bb_mult": 1.0919746445772165,
+            "batter_platoon_hr_mult": 1.030317347120699,
+            "batter_platoon_inplay_mult": 0.992448100811601,
+            "opponent_primary_pitch_type": "FF",
+            "weather_source": "statsapi_live_feed",
+            "weather_wind_direction": "unknown",
+            "weather_hr_mult": 1.0,
+            "weather_inplay_hit_mult": 1.0,
+            "weather_xb_share_mult": 1.0,
+            "park_source": "statsapi_live_feed",
+            "venue_id": 2392,
+            "venue_name": "Daikin Park",
+            "roof_type": "Retractable",
+            "park_hr_mult": 1.04,
+            "park_inplay_hit_mult": 0.984,
+            "park_xb_share_mult": 0.98,
+            "market": "hitter_hits",
+            "market_label": "Hitter Hits",
+            "market_group": "hitter_props",
+            "player_name": "Kerry Carpenter",
+            "team": "DET",
+            "prop": "batter_hits",
+            "prop_market_key": "batter_hits",
+            "selection": "over",
+            "edge": 0.061115183246073235,
+            "market_line": 0.5,
+            "model_prob_over": 0.603,
+            "market_prob_over": 0.5418848167539267,
+            "market_prob_under": 0.4581151832460733,
+            "market_prob_mode": "no_vig_two_way",
+            "market_no_vig_prob_over": 0.5418848167539267,
+            "selected_side_market_prob": 0.5418848167539267,
+            "selected_side_model_prob": 0.603,
+            "mean_support": 0.33399999999999996,
+            "h_mean": 0.834,
+            "pa_mean": 4.725,
+            "ab_mean": 3.981,
+            "lineup_order": 3,
+            "market_alternates": [],
+            "odds": "-138",
+            "stake_u": 0.5,
+            "sim_sample_size": 1000,
+            "baseball_reasons": [
+              "Against HOU, he has recorded a hit in 3 of 5 games.",
+              "Over his last 10 games, he has recorded a hit in 7 of 10 games."
+            ],
+            "explanation_diagnostic": {
+              "status": "supported",
+              "flag_sparse_support": false,
+              "support_min_reasons": 2,
+              "baseball_reasons_n": 2,
+              "reason_sentences_n": 5,
+              "market": "hitter_hits",
+              "subject": "Kerry Carpenter",
+              "supporting_reasons": [
+                "Against HOU, he has recorded a hit in 3 of 5 games.",
+                "Over his last 10 games, he has recorded a hit in 7 of 10 games."
+              ]
+            },
+            "reasons": [
+              "The model lands on the over side in 60.3% of sims, while the market is pricing it closer to 54.2%. Against HOU, he has recorded a hit in 3 of 5 games. Over his last 10 games, he has recorded a hit in 7 of 10 games. The model baseline comes in around 0.8 batter hits against a line of 0.5. He is projected to hit in the 3 spot, which points to about 4.7 plate appearances."
+            ],
+            "reason_summary": "The model lands on the over side in 60.3% of sims, while the market is pricing it closer to 54.2%. Against HOU, he has recorded a hit in 3 of 5 games. Over his last 10 games, he has recorded a hit in 7 of 10 games. The model baseline comes in around 0.8 batter hits against a line of 0.5. He is projected to hit in the 3 spot, which points to about 4.7 plate appearances.",
+            "rank": 14,
+            "recommendation_tier": "candidate"
+          },
+          {
+            "date": "2026-06-16",
+            "game_pk": 824182,
+            "away": "Detroit Tigers",
+            "home": "Houston Astros",
+            "away_abbr": "DET",
+            "home_abbr": "HOU",
+            "double_header": "N",
+            "game_number": 1,
+            "event_id": null,
+            "commence_time": null,
+            "batter_id": 679529,
+            "batter_hand": "R",
+            "opponent_pitcher_id": 686613,
+            "opponent_pitcher_hand": "R",
+            "opponent_pitcher_name": "Hunter Brown",
+            "opponent": "HOU",
+            "opponent_team_id": 117,
+            "lineup_source": "projected_rotowire_default_vs_rhp",
+            "lineup_confidence": 0.66,
+            "lineup_status": "projected",
+            "batter_k_rate": 0.3378787878787879,
+            "batter_bb_rate": 0.10535353535353535,
+            "batter_hr_rate": 0.04281144781144781,
+            "batter_inplay_hit_rate": 0.2599425541316836,
+            "batter_xb_hit_share": 0.2857142857142857,
+            "pitcher_k_rate": 0.3953488372093023,
+            "pitcher_bb_rate": 0.13953488372093023,
+            "pitcher_hr_rate": 0.0,
+            "pitcher_inplay_hit_rate": 0.25,
+            "pitcher_availability_mult": 1.0,
+            "pitcher_stamina_pitches": 96.0,
+            "pitcher_platoon_k_mult": 0.9850678733031675,
+            "pitcher_platoon_bb_mult": 0.9048076923076923,
+            "pitcher_platoon_hr_mult": 1.0,
+            "pitcher_platoon_inplay_mult": 1.126923076923077,
+            "batter_platoon_k_mult": 1.0058350650771082,
+            "batter_platoon_bb_mult": 0.9083869232747936,
+            "batter_platoon_hr_mult": 1.0766844422278279,
+            "batter_platoon_inplay_mult": 0.9555575822993806,
+            "opponent_primary_pitch_type": "FF",
+            "weather_source": "statsapi_live_feed",
+            "weather_wind_direction": "unknown",
+            "weather_hr_mult": 1.0,
+            "weather_inplay_hit_mult": 1.0,
+            "weather_xb_share_mult": 1.0,
+            "park_source": "statsapi_live_feed",
+            "venue_id": 2392,
+            "venue_name": "Daikin Park",
+            "roof_type": "Retractable",
+            "park_hr_mult": 1.04,
+            "park_inplay_hit_mult": 0.984,
+            "park_xb_share_mult": 0.98,
+            "market": "hitter_hits",
+            "market_label": "Hitter Hits",
+            "market_group": "hitter_props",
+            "player_name": "Spencer Torkelson",
+            "team": "DET",
+            "prop": "batter_hits",
+            "prop_market_key": "batter_hits",
+            "selection": "over",
+            "edge": 0.060875332420017636,
+            "market_line": 0.5,
+            "model_prob_over": 0.578,
+            "market_prob_over": 0.5171246675799823,
+            "market_prob_under": 0.48287533242001773,
+            "market_prob_mode": "no_vig_two_way",
+            "market_no_vig_prob_over": 0.5171246675799823,
+            "selected_side_market_prob": 0.5171246675799823,
+            "selected_side_model_prob": 0.578,
+            "mean_support": 0.31599999999999995,
+            "h_mean": 0.816,
+            "pa_mean": 4.399,
+            "ab_mean": 3.782,
+            "lineup_order": 6,
+            "market_alternates": [],
+            "odds": "-124",
+            "stake_u": 0.5,
+            "sim_sample_size": 1000,
+            "baseball_reasons": [
+              "Over his last 10 games, he has recorded a hit in 6 of 10 games.",
+              "The handedness matchup leans his way here, with his expected damage against R-handed pitching grading above baseline."
+            ],
+            "explanation_diagnostic": {
+              "status": "supported",
+              "flag_sparse_support": false,
+              "support_min_reasons": 2,
+              "baseball_reasons_n": 2,
+              "reason_sentences_n": 5,
+              "market": "hitter_hits",
+              "subject": "Spencer Torkelson",
+              "supporting_reasons": [
+                "Over his last 10 games, he has recorded a hit in 6 of 10 games.",
+                "The handedness matchup leans his way here, with his expected damage against R-handed pitching grading above baseline."
+              ]
+            },
+            "reasons": [
+              "The model lands on the over side in 57.8% of sims, while the market is pricing it closer to 51.7%. Over his last 10 games, he has recorded a hit in 6 of 10 games. The handedness matchup leans his way here, with his expected damage against R-handed pitching grading above baseline. The model baseline comes in around 0.8 batter hits against a line of 0.5. He is projected to hit in the 6 spot, which points to about 4.4 plate appearances."
+            ],
+            "reason_summary": "The model lands on the over side in 57.8% of sims, while the market is pricing it closer to 51.7%. Over his last 10 games, he has recorded a hit in 6 of 10 games. The handedness matchup leans his way here, with his expected damage against R-handed pitching grading above baseline. The model baseline comes in around 0.8 batter hits against a line of 0.5. He is projected to hit in the 6 spot, which points to about 4.4 plate appearances.",
+            "rank": 20,
+            "recommendation_tier": "candidate"
+          }
+        ]
       },
       "gameLens": [
         {
@@ -13127,21 +13516,21 @@
           "closed": false,
           "badge": "No bet",
           "score": "DET 0 - HOU 0",
-          "subtitle": "DET 2.15 - HOU 2.21 | Total 4.37",
+          "subtitle": "DET 2.14 - HOU 2.21 | Total 4.35",
           "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
           "projection": {
-            "total": 4.37,
-            "homeMargin": 0.06
+            "total": 4.35,
+            "homeMargin": 0.07
           },
           "markets": {
             "total": {
               "pick": null,
-              "line": 4.37,
+              "line": 4.35,
               "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
             },
             "spread": {
               "pick": null,
-              "homeLine": 0.06,
+              "homeLine": 0.07,
               "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
             },
             "moneyline": {
@@ -13156,21 +13545,21 @@
           "closed": false,
           "badge": "No bet",
           "score": "DET 0 - HOU 0",
-          "subtitle": "DET 3.91 - HOU 4 | Total 7.9",
+          "subtitle": "DET 3.55 - HOU 3.9 | Total 7.45",
           "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
           "projection": {
-            "total": 7.9,
-            "homeMargin": 0.09
+            "total": 7.45,
+            "homeMargin": 0.36
           },
           "markets": {
             "total": {
               "pick": null,
-              "line": 7.9,
+              "line": 7.45,
               "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
             },
             "spread": {
               "pick": null,
-              "homeLine": 0.09,
+              "homeLine": 0.36,
               "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
             },
             "moneyline": {
@@ -13228,18 +13617,18 @@
           "label": "First 5",
           "closed": false,
           "badge": "",
-          "score": "DET 39.8% | HOU 42.1% | Tie 18.1%",
-          "subtitle": "DET 39.8% | HOU 42.1% | Tie 18.1%",
-          "reason": "DET 39.8% | HOU 42.1% | Tie 18.1%",
+          "score": "DET 39.6% | HOU 42.3% | Tie 18.1%",
+          "subtitle": "DET 39.6% | HOU 42.3% | Tie 18.1%",
+          "reason": "DET 39.6% | HOU 42.3% | Tie 18.1%",
           "projection": {
-            "total": 39.8,
-            "homeMargin": 42.1
+            "total": 39.6,
+            "homeMargin": 42.3
           },
           "markets": {
             "total": {
               "pick": null,
-              "line": 39.8,
-              "reason": "DET 39.8% | HOU 42.1% | Tie 18.1%"
+              "line": 39.6,
+              "reason": "DET 39.6% | HOU 42.3% | Tie 18.1%"
             },
             "spread": {},
             "moneyline": {}
@@ -13250,28 +13639,292 @@
           "label": "Full game",
           "closed": false,
           "badge": "",
-          "score": "DET 48.7% | HOU 51.3% | Tie 0.0%",
-          "subtitle": "DET 48.7% | HOU 51.3% | Tie 0.0%",
-          "reason": "DET 48.7% | HOU 51.3% | Tie 0.0%",
+          "score": "DET 46.8% | HOU 53.2% | Tie 0.0%",
+          "subtitle": "DET 46.8% | HOU 53.2% | Tie 0.0%",
+          "reason": "DET 46.8% | HOU 53.2% | Tie 0.0%",
           "projection": {
-            "total": 48.7,
-            "homeMargin": 51.3
+            "total": 46.8,
+            "homeMargin": 53.2
           },
           "markets": {
             "total": {
               "pick": null,
-              "line": 48.7,
-              "reason": "DET 48.7% | HOU 51.3% | Tie 0.0%"
+              "line": 46.8,
+              "reason": "DET 46.8% | HOU 53.2% | Tie 0.0%"
             },
             "spread": {},
             "moneyline": {}
           }
         }
       ],
-      "props": [],
-      "liveProps": [],
+      "props": [
+        {
+          "playerName": "Hunter Brown",
+          "prop": "outs",
+          "selection": "Over",
+          "marketLabel": "Outs Recorded",
+          "market": "pitcher_props",
+          "line": 15.5,
+          "odds": "-111",
+          "modelProbOver": 0.81,
+          "estimatedWinProb": 0.81,
+          "rankingScore": 0.31809421668218063,
+          "actual": null,
+          "actualSoFar": null,
+          "actualValue": null,
+          "liveProjection": null,
+          "liveEdge": null,
+          "projectionGap": null,
+          "modelMean": null,
+          "outsMean": 19.506,
+          "outsRecorded": null,
+          "strikeoutRate": null,
+          "strikeRate": null,
+          "pitchCount": null,
+          "pitchCountBuffer": null,
+          "pitchesPerBatter": null,
+          "expectedPitchesPerBatter": null,
+          "staminaPitches": null,
+          "timesThroughOrder": null
+        },
+        {
+          "playerName": "Kerry Carpenter",
+          "prop": "batter_hits",
+          "selection": "Over",
+          "marketLabel": "Hitter Hits",
+          "market": "hitter_hits",
+          "line": 0.5,
+          "odds": "-138",
+          "modelProbOver": 0.603,
+          "estimatedWinProb": 0.603,
+          "rankingScore": 0.061115183246073235,
+          "actual": null,
+          "actualSoFar": null,
+          "actualValue": null,
+          "liveProjection": null,
+          "liveEdge": null,
+          "projectionGap": null,
+          "modelMean": null,
+          "outsMean": null,
+          "outsRecorded": null,
+          "strikeoutRate": null,
+          "strikeRate": null,
+          "pitchCount": null,
+          "pitchCountBuffer": null,
+          "pitchesPerBatter": null,
+          "expectedPitchesPerBatter": null,
+          "staminaPitches": null,
+          "timesThroughOrder": null
+        },
+        {
+          "playerName": "Spencer Torkelson",
+          "prop": "batter_hits",
+          "selection": "Over",
+          "marketLabel": "Hitter Hits",
+          "market": "hitter_hits",
+          "line": 0.5,
+          "odds": "-124",
+          "modelProbOver": 0.578,
+          "estimatedWinProb": 0.578,
+          "rankingScore": 0.060875332420017636,
+          "actual": null,
+          "actualSoFar": null,
+          "actualValue": null,
+          "liveProjection": null,
+          "liveEdge": null,
+          "projectionGap": null,
+          "modelMean": null,
+          "outsMean": null,
+          "outsRecorded": null,
+          "strikeoutRate": null,
+          "strikeRate": null,
+          "pitchCount": null,
+          "pitchCountBuffer": null,
+          "pitchesPerBatter": null,
+          "expectedPitchesPerBatter": null,
+          "staminaPitches": null,
+          "timesThroughOrder": null
+        }
+      ],
+      "liveProps": [
+        {
+          "playerName": "Hunter Brown",
+          "prop": "outs",
+          "selection": "Over",
+          "marketLabel": "Outs Recorded",
+          "market": "pitcher_props",
+          "line": 15.5,
+          "odds": "-111",
+          "modelProbOver": 0.81,
+          "estimatedWinProb": 0.81,
+          "rankingScore": 0.31809421668218063,
+          "actual": null,
+          "actualSoFar": null,
+          "actualValue": null,
+          "liveProjection": null,
+          "liveEdge": null,
+          "projectionGap": null,
+          "modelMean": null,
+          "outsMean": 19.506,
+          "outsRecorded": null,
+          "strikeoutRate": null,
+          "strikeRate": null,
+          "pitchCount": null,
+          "pitchCountBuffer": null,
+          "pitchesPerBatter": null,
+          "expectedPitchesPerBatter": null,
+          "staminaPitches": null,
+          "timesThroughOrder": null
+        },
+        {
+          "playerName": "Kerry Carpenter",
+          "prop": "batter_hits",
+          "selection": "Over",
+          "marketLabel": "Hitter Hits",
+          "market": "hitter_hits",
+          "line": 0.5,
+          "odds": "-138",
+          "modelProbOver": 0.603,
+          "estimatedWinProb": 0.603,
+          "rankingScore": 0.061115183246073235,
+          "actual": null,
+          "actualSoFar": null,
+          "actualValue": null,
+          "liveProjection": null,
+          "liveEdge": null,
+          "projectionGap": null,
+          "modelMean": null,
+          "outsMean": null,
+          "outsRecorded": null,
+          "strikeoutRate": null,
+          "strikeRate": null,
+          "pitchCount": null,
+          "pitchCountBuffer": null,
+          "pitchesPerBatter": null,
+          "expectedPitchesPerBatter": null,
+          "staminaPitches": null,
+          "timesThroughOrder": null
+        },
+        {
+          "playerName": "Spencer Torkelson",
+          "prop": "batter_hits",
+          "selection": "Over",
+          "marketLabel": "Hitter Hits",
+          "market": "hitter_hits",
+          "line": 0.5,
+          "odds": "-124",
+          "modelProbOver": 0.578,
+          "estimatedWinProb": 0.578,
+          "rankingScore": 0.060875332420017636,
+          "actual": null,
+          "actualSoFar": null,
+          "actualValue": null,
+          "liveProjection": null,
+          "liveEdge": null,
+          "projectionGap": null,
+          "modelMean": null,
+          "outsMean": null,
+          "outsRecorded": null,
+          "strikeoutRate": null,
+          "strikeRate": null,
+          "pitchCount": null,
+          "pitchCountBuffer": null,
+          "pitchesPerBatter": null,
+          "expectedPitchesPerBatter": null,
+          "staminaPitches": null,
+          "timesThroughOrder": null
+        }
+      ],
       "archivedLiveProps": [],
-      "trackedProps": [],
+      "trackedProps": [
+        {
+          "playerName": "Hunter Brown",
+          "prop": "outs",
+          "selection": "Over",
+          "marketLabel": "Outs Recorded",
+          "market": "pitcher_props",
+          "line": 15.5,
+          "odds": "-111",
+          "modelProbOver": 0.81,
+          "estimatedWinProb": 0.81,
+          "rankingScore": 0.31809421668218063,
+          "actual": null,
+          "actualSoFar": null,
+          "actualValue": null,
+          "liveProjection": null,
+          "liveEdge": null,
+          "projectionGap": null,
+          "modelMean": null,
+          "outsMean": 19.506,
+          "outsRecorded": null,
+          "strikeoutRate": null,
+          "strikeRate": null,
+          "pitchCount": null,
+          "pitchCountBuffer": null,
+          "pitchesPerBatter": null,
+          "expectedPitchesPerBatter": null,
+          "staminaPitches": null,
+          "timesThroughOrder": null
+        },
+        {
+          "playerName": "Kerry Carpenter",
+          "prop": "batter_hits",
+          "selection": "Over",
+          "marketLabel": "Hitter Hits",
+          "market": "hitter_hits",
+          "line": 0.5,
+          "odds": "-138",
+          "modelProbOver": 0.603,
+          "estimatedWinProb": 0.603,
+          "rankingScore": 0.061115183246073235,
+          "actual": null,
+          "actualSoFar": null,
+          "actualValue": null,
+          "liveProjection": null,
+          "liveEdge": null,
+          "projectionGap": null,
+          "modelMean": null,
+          "outsMean": null,
+          "outsRecorded": null,
+          "strikeoutRate": null,
+          "strikeRate": null,
+          "pitchCount": null,
+          "pitchCountBuffer": null,
+          "pitchesPerBatter": null,
+          "expectedPitchesPerBatter": null,
+          "staminaPitches": null,
+          "timesThroughOrder": null
+        },
+        {
+          "playerName": "Spencer Torkelson",
+          "prop": "batter_hits",
+          "selection": "Over",
+          "marketLabel": "Hitter Hits",
+          "market": "hitter_hits",
+          "line": 0.5,
+          "odds": "-124",
+          "modelProbOver": 0.578,
+          "estimatedWinProb": 0.578,
+          "rankingScore": 0.060875332420017636,
+          "actual": null,
+          "actualSoFar": null,
+          "actualValue": null,
+          "liveProjection": null,
+          "liveEdge": null,
+          "projectionGap": null,
+          "modelMean": null,
+          "outsMean": null,
+          "outsRecorded": null,
+          "strikeoutRate": null,
+          "strikeRate": null,
+          "pitchCount": null,
+          "pitchCountBuffer": null,
+          "pitchesPerBatter": null,
+          "expectedPitchesPerBatter": null,
+          "staminaPitches": null,
+          "timesThroughOrder": null
+        }
+      ],
       "simContextAvailable": false,
       "snapshotAvailable": true,
       "score": {
@@ -13291,13 +13944,13 @@
         },
         {
           "label": "Pitcher props",
-          "title": "No locked pitcher prop",
-          "sub": "Off card"
+          "title": "Hunter Brown Over 15.5 Outs",
+          "sub": "Playable only | -111"
         },
         {
           "label": "Hitter props",
-          "title": "No locked hitter prop",
-          "sub": "Off card"
+          "title": "Kerry Carpenter Over 0.5 Batter Hits",
+          "sub": "Playable only | -138"
         }
       ],
       "probable": {
@@ -13314,18 +13967,30 @@
               ],
               "tone": "solid",
               "detail": "Supported ladders: 5/6/7 Last supported rung: 7 Supported ladders: 5 Last supported rung: 5",
-              "hitProb": 0.271
+              "hitProb": 0.262
             },
             {
-              "label": "H up to 6",
-              "stat": "hits_allowed",
-              "target": 6,
+              "label": "O up to 19",
+              "stat": "outs",
+              "target": 19,
               "targets": [
-                6
+                19
+              ],
+              "tone": "strong",
+              "detail": "Supported ladders: 19/20 Last supported rung: 20 Supported ladders: 19 Last supported rung: 19",
+              "hitProb": 0.659
+            },
+            {
+              "label": "H up to 7",
+              "stat": "hits_allowed",
+              "target": 7,
+              "targets": [
+                6,
+                7
               ],
               "tone": "soft",
-              "detail": "Supported ladders: 6/7/8/9 Last supported rung: 9 Supported ladders: 6 Last supported rung: 6",
-              "hitProb": 0.237
+              "detail": "Supported ladders: 6/7/8/9 Last supported rung: 9 Supported ladders: 6/7 Last supported rung: 7",
+              "hitProb": 0.235
             }
           ],
           "pregameLadderBadges": [
@@ -13338,23 +14003,35 @@
               ],
               "tone": "solid",
               "detail": "Supported ladders: 5/6/7 Last supported rung: 7 Supported ladders: 5 Last supported rung: 5",
-              "hitProb": 0.271
+              "hitProb": 0.262
             },
             {
-              "label": "H up to 6",
-              "stat": "hits_allowed",
-              "target": 6,
+              "label": "O up to 19",
+              "stat": "outs",
+              "target": 19,
               "targets": [
-                6
+                19
+              ],
+              "tone": "strong",
+              "detail": "Supported ladders: 19/20 Last supported rung: 20 Supported ladders: 19 Last supported rung: 19",
+              "hitProb": 0.659
+            },
+            {
+              "label": "H up to 7",
+              "stat": "hits_allowed",
+              "target": 7,
+              "targets": [
+                6,
+                7
               ],
               "tone": "soft",
-              "detail": "Supported ladders: 6/7/8/9 Last supported rung: 9 Supported ladders: 6 Last supported rung: 6",
-              "hitProb": 0.237
+              "detail": "Supported ladders: 6/7/8/9 Last supported rung: 9 Supported ladders: 6/7 Last supported rung: 7",
+              "hitProb": 0.235
             }
           ]
         },
         "home": {
-          "id": null,
+          "id": 686613,
           "fullName": "Hunter Brown",
           "ladderBadges": [
             {
@@ -13367,6 +14044,17 @@
               "tone": "soft",
               "detail": "Supported ladders: 7 Last supported rung: 7",
               "hitProb": 0.214
+            },
+            {
+              "label": "O 16+",
+              "stat": "outs",
+              "target": 16,
+              "targets": [
+                16
+              ],
+              "tone": "strong",
+              "detail": "Hunter Brown Over 15.5 Outs | Odds -111 | Edge 31.8%",
+              "hitProb": 0.81
             }
           ],
           "pregameLadderBadges": [
@@ -13380,11 +14068,294 @@
               "tone": "soft",
               "detail": "Supported ladders: 7 Last supported rung: 7",
               "hitProb": 0.214
+            },
+            {
+              "label": "O 16+",
+              "stat": "outs",
+              "target": 16,
+              "targets": [
+                16
+              ],
+              "tone": "strong",
+              "detail": "Hunter Brown Over 15.5 Outs | Odds -111 | Edge 31.8%",
+              "hitProb": 0.81
             }
           ]
         }
       },
-      "markets": {}
+      "markets": {
+        "totals": null,
+        "ml": null,
+        "pitcherProps": [],
+        "hitterProps": [],
+        "extraPitcherProps": [
+          {
+            "date": "2026-06-16",
+            "game_pk": 824182,
+            "away": "Detroit Tigers",
+            "home": "Houston Astros",
+            "away_abbr": "DET",
+            "home_abbr": "HOU",
+            "double_header": "N",
+            "game_number": 1,
+            "event_id": null,
+            "commence_time": null,
+            "market": "pitcher_props",
+            "pitcher_id": 686613,
+            "pitcher_name": "Hunter Brown",
+            "team": "HOU",
+            "team_side": "home",
+            "prop": "outs",
+            "selection": "over",
+            "edge": 0.31809421668218063,
+            "market_line": 15.5,
+            "model_prob_over": 0.81,
+            "market_prob_over": 0.4919057833178194,
+            "market_prob_under": 0.5080942166821806,
+            "market_prob_mode": "no_vig_two_way",
+            "market_no_vig_prob_over": 0.4919057833178194,
+            "selected_side_market_prob": 0.4919057833178194,
+            "selected_side_model_prob": 0.81,
+            "mean_support": 4.006,
+            "outs_mean": 19.506,
+            "market_alternates": [],
+            "odds": "-111",
+            "stake_u": 1.0,
+            "sim_sample_size": 1000,
+            "baseball_reasons": [
+              "Across his last 5 starts, he has averaged 17 outs.",
+              "His modeled workload cap still reaches roughly 96 pitches, so the deeper-start path is still available if the outing stays efficient."
+            ],
+            "explanation_diagnostic": {
+              "status": "supported",
+              "flag_sparse_support": false,
+              "support_min_reasons": 2,
+              "baseball_reasons_n": 2,
+              "reason_sentences_n": 5,
+              "market": "pitcher_props:outs",
+              "subject": "Hunter Brown",
+              "supporting_reasons": [
+                "Across his last 5 starts, he has averaged 17 outs.",
+                "His modeled workload cap still reaches roughly 96 pitches, so the deeper-start path is still available if the outing stays efficient."
+              ]
+            },
+            "reasons": [
+              "The model lands on the over side in 81.0% of sims, while the market is pricing it closer to 49.2%. Across his last 5 starts, he has averaged 17 outs. His modeled workload cap still reaches roughly 96 pitches, so the deeper-start path is still available if the outing stays efficient. The model baseline sits around 19.5 outs against a line of 15.5. If he stays on his normal starter path, the matchup against DET gives him a fair shot to reach full workload volume."
+            ],
+            "reason_summary": "The model lands on the over side in 81.0% of sims, while the market is pricing it closer to 49.2%. Across his last 5 starts, he has averaged 17 outs. His modeled workload cap still reaches roughly 96 pitches, so the deeper-start path is still available if the outing stays efficient. The model baseline sits around 19.5 outs against a line of 15.5. If he stays on his normal starter path, the matchup against DET gives him a fair shot to reach full workload volume.",
+            "rank": 13,
+            "recommendation_tier": "candidate"
+          }
+        ],
+        "extraHitterProps": [
+          {
+            "date": "2026-06-16",
+            "game_pk": 824182,
+            "away": "Detroit Tigers",
+            "home": "Houston Astros",
+            "away_abbr": "DET",
+            "home_abbr": "HOU",
+            "double_header": "N",
+            "game_number": 1,
+            "event_id": null,
+            "commence_time": null,
+            "batter_id": 681481,
+            "batter_hand": "L",
+            "opponent_pitcher_id": 686613,
+            "opponent_pitcher_hand": "R",
+            "opponent_pitcher_name": "Hunter Brown",
+            "opponent": "HOU",
+            "opponent_team_id": 117,
+            "lineup_source": "projected_rotowire_default_vs_rhp",
+            "lineup_confidence": 0.66,
+            "lineup_status": "projected",
+            "batter_k_rate": 0.3044239631336405,
+            "batter_bb_rate": 0.0784331797235023,
+            "batter_hr_rate": 0.06006912442396313,
+            "batter_inplay_hit_rate": 0.2596629213483146,
+            "batter_xb_hit_share": 0.15625,
+            "pitcher_k_rate": 0.3953488372093023,
+            "pitcher_bb_rate": 0.13953488372093023,
+            "pitcher_hr_rate": 0.0,
+            "pitcher_inplay_hit_rate": 0.25,
+            "pitcher_availability_mult": 1.0,
+            "pitcher_stamina_pitches": 96.0,
+            "pitcher_platoon_k_mult": 1.0228373702422144,
+            "pitcher_platoon_bb_mult": 1.1455882352941178,
+            "pitcher_platoon_hr_mult": 1.0,
+            "pitcher_platoon_inplay_mult": 0.8075,
+            "batter_platoon_k_mult": 1.0225428867482829,
+            "batter_platoon_bb_mult": 1.0919746445772165,
+            "batter_platoon_hr_mult": 1.030317347120699,
+            "batter_platoon_inplay_mult": 0.992448100811601,
+            "opponent_primary_pitch_type": "FF",
+            "weather_source": "statsapi_live_feed",
+            "weather_wind_direction": "unknown",
+            "weather_hr_mult": 1.0,
+            "weather_inplay_hit_mult": 1.0,
+            "weather_xb_share_mult": 1.0,
+            "park_source": "statsapi_live_feed",
+            "venue_id": 2392,
+            "venue_name": "Daikin Park",
+            "roof_type": "Retractable",
+            "park_hr_mult": 1.04,
+            "park_inplay_hit_mult": 0.984,
+            "park_xb_share_mult": 0.98,
+            "market": "hitter_hits",
+            "market_label": "Hitter Hits",
+            "market_group": "hitter_props",
+            "player_name": "Kerry Carpenter",
+            "team": "DET",
+            "prop": "batter_hits",
+            "prop_market_key": "batter_hits",
+            "selection": "over",
+            "edge": 0.061115183246073235,
+            "market_line": 0.5,
+            "model_prob_over": 0.603,
+            "market_prob_over": 0.5418848167539267,
+            "market_prob_under": 0.4581151832460733,
+            "market_prob_mode": "no_vig_two_way",
+            "market_no_vig_prob_over": 0.5418848167539267,
+            "selected_side_market_prob": 0.5418848167539267,
+            "selected_side_model_prob": 0.603,
+            "mean_support": 0.33399999999999996,
+            "h_mean": 0.834,
+            "pa_mean": 4.725,
+            "ab_mean": 3.981,
+            "lineup_order": 3,
+            "market_alternates": [],
+            "odds": "-138",
+            "stake_u": 0.5,
+            "sim_sample_size": 1000,
+            "baseball_reasons": [
+              "Against HOU, he has recorded a hit in 3 of 5 games.",
+              "Over his last 10 games, he has recorded a hit in 7 of 10 games."
+            ],
+            "explanation_diagnostic": {
+              "status": "supported",
+              "flag_sparse_support": false,
+              "support_min_reasons": 2,
+              "baseball_reasons_n": 2,
+              "reason_sentences_n": 5,
+              "market": "hitter_hits",
+              "subject": "Kerry Carpenter",
+              "supporting_reasons": [
+                "Against HOU, he has recorded a hit in 3 of 5 games.",
+                "Over his last 10 games, he has recorded a hit in 7 of 10 games."
+              ]
+            },
+            "reasons": [
+              "The model lands on the over side in 60.3% of sims, while the market is pricing it closer to 54.2%. Against HOU, he has recorded a hit in 3 of 5 games. Over his last 10 games, he has recorded a hit in 7 of 10 games. The model baseline comes in around 0.8 batter hits against a line of 0.5. He is projected to hit in the 3 spot, which points to about 4.7 plate appearances."
+            ],
+            "reason_summary": "The model lands on the over side in 60.3% of sims, while the market is pricing it closer to 54.2%. Against HOU, he has recorded a hit in 3 of 5 games. Over his last 10 games, he has recorded a hit in 7 of 10 games. The model baseline comes in around 0.8 batter hits against a line of 0.5. He is projected to hit in the 3 spot, which points to about 4.7 plate appearances.",
+            "rank": 14,
+            "recommendation_tier": "candidate"
+          },
+          {
+            "date": "2026-06-16",
+            "game_pk": 824182,
+            "away": "Detroit Tigers",
+            "home": "Houston Astros",
+            "away_abbr": "DET",
+            "home_abbr": "HOU",
+            "double_header": "N",
+            "game_number": 1,
+            "event_id": null,
+            "commence_time": null,
+            "batter_id": 679529,
+            "batter_hand": "R",
+            "opponent_pitcher_id": 686613,
+            "opponent_pitcher_hand": "R",
+            "opponent_pitcher_name": "Hunter Brown",
+            "opponent": "HOU",
+            "opponent_team_id": 117,
+            "lineup_source": "projected_rotowire_default_vs_rhp",
+            "lineup_confidence": 0.66,
+            "lineup_status": "projected",
+            "batter_k_rate": 0.3378787878787879,
+            "batter_bb_rate": 0.10535353535353535,
+            "batter_hr_rate": 0.04281144781144781,
+            "batter_inplay_hit_rate": 0.2599425541316836,
+            "batter_xb_hit_share": 0.2857142857142857,
+            "pitcher_k_rate": 0.3953488372093023,
+            "pitcher_bb_rate": 0.13953488372093023,
+            "pitcher_hr_rate": 0.0,
+            "pitcher_inplay_hit_rate": 0.25,
+            "pitcher_availability_mult": 1.0,
+            "pitcher_stamina_pitches": 96.0,
+            "pitcher_platoon_k_mult": 0.9850678733031675,
+            "pitcher_platoon_bb_mult": 0.9048076923076923,
+            "pitcher_platoon_hr_mult": 1.0,
+            "pitcher_platoon_inplay_mult": 1.126923076923077,
+            "batter_platoon_k_mult": 1.0058350650771082,
+            "batter_platoon_bb_mult": 0.9083869232747936,
+            "batter_platoon_hr_mult": 1.0766844422278279,
+            "batter_platoon_inplay_mult": 0.9555575822993806,
+            "opponent_primary_pitch_type": "FF",
+            "weather_source": "statsapi_live_feed",
+            "weather_wind_direction": "unknown",
+            "weather_hr_mult": 1.0,
+            "weather_inplay_hit_mult": 1.0,
+            "weather_xb_share_mult": 1.0,
+            "park_source": "statsapi_live_feed",
+            "venue_id": 2392,
+            "venue_name": "Daikin Park",
+            "roof_type": "Retractable",
+            "park_hr_mult": 1.04,
+            "park_inplay_hit_mult": 0.984,
+            "park_xb_share_mult": 0.98,
+            "market": "hitter_hits",
+            "market_label": "Hitter Hits",
+            "market_group": "hitter_props",
+            "player_name": "Spencer Torkelson",
+            "team": "DET",
+            "prop": "batter_hits",
+            "prop_market_key": "batter_hits",
+            "selection": "over",
+            "edge": 0.060875332420017636,
+            "market_line": 0.5,
+            "model_prob_over": 0.578,
+            "market_prob_over": 0.5171246675799823,
+            "market_prob_under": 0.48287533242001773,
+            "market_prob_mode": "no_vig_two_way",
+            "market_no_vig_prob_over": 0.5171246675799823,
+            "selected_side_market_prob": 0.5171246675799823,
+            "selected_side_model_prob": 0.578,
+            "mean_support": 0.31599999999999995,
+            "h_mean": 0.816,
+            "pa_mean": 4.399,
+            "ab_mean": 3.782,
+            "lineup_order": 6,
+            "market_alternates": [],
+            "odds": "-124",
+            "stake_u": 0.5,
+            "sim_sample_size": 1000,
+            "baseball_reasons": [
+              "Over his last 10 games, he has recorded a hit in 6 of 10 games.",
+              "The handedness matchup leans his way here, with his expected damage against R-handed pitching grading above baseline."
+            ],
+            "explanation_diagnostic": {
+              "status": "supported",
+              "flag_sparse_support": false,
+              "support_min_reasons": 2,
+              "baseball_reasons_n": 2,
+              "reason_sentences_n": 5,
+              "market": "hitter_hits",
+              "subject": "Spencer Torkelson",
+              "supporting_reasons": [
+                "Over his last 10 games, he has recorded a hit in 6 of 10 games.",
+                "The handedness matchup leans his way here, with his expected damage against R-handed pitching grading above baseline."
+              ]
+            },
+            "reasons": [
+              "The model lands on the over side in 57.8% of sims, while the market is pricing it closer to 51.7%. Over his last 10 games, he has recorded a hit in 6 of 10 games. The handedness matchup leans his way here, with his expected damage against R-handed pitching grading above baseline. The model baseline comes in around 0.8 batter hits against a line of 0.5. He is projected to hit in the 6 spot, which points to about 4.4 plate appearances."
+            ],
+            "reason_summary": "The model lands on the over side in 57.8% of sims, while the market is pricing it closer to 51.7%. Over his last 10 games, he has recorded a hit in 6 of 10 games. The handedness matchup leans his way here, with his expected damage against R-handed pitching grading above baseline. The model baseline comes in around 0.8 batter hits against a line of 0.5. He is projected to hit in the 6 spot, which points to about 4.4 plate appearances.",
+            "rank": 20,
+            "recommendation_tier": "candidate"
+          }
+        ]
+      }
     },
     {
       "gamePk": 823128,
@@ -13410,7 +14381,7 @@
           "away": 0,
           "home": 0
         },
-        "liveText": "Brandon Young vs Logan Gilbert | 2 official pick(s) | +2 playable"
+        "liveText": "Brandon Young vs Logan Gilbert | 2 official pick(s) | +7 playable"
       },
       "predictions": {
         "first1": {
@@ -14400,12 +15371,12 @@
         {
           "label": "Pitcher props",
           "title": "Brandon Young Over 17.5 Outs",
-          "sub": "Playable only | -117"
+          "sub": "Playable only | -120"
         },
         {
           "label": "Hitter props",
           "title": "Leody Taveras Over 0.5 Batter Hits",
-          "sub": "-127"
+          "sub": "-135"
         }
       ],
       "probable": {
@@ -14443,7 +15414,7 @@
                 18
               ],
               "tone": "strong",
-              "detail": "Brandon Young Over 17.5 Outs | Odds -117 | Edge 31.2%",
+              "detail": "Brandon Young Over 17.5 Outs | Odds -120 | Edge 31.5%",
               "hitProb": 0.815
             }
           ],
@@ -14478,13 +15449,13 @@
                 18
               ],
               "tone": "strong",
-              "detail": "Brandon Young Over 17.5 Outs | Odds -117 | Edge 31.2%",
+              "detail": "Brandon Young Over 17.5 Outs | Odds -120 | Edge 31.5%",
               "hitProb": 0.815
             }
           ]
         },
         "home": {
-          "id": null,
+          "id": 669302,
           "fullName": "Logan Gilbert",
           "ladderBadges": [
             {
@@ -14497,6 +15468,17 @@
               "tone": "soft",
               "detail": "Supported ladders: 7/8 Last supported rung: 8 Supported ladders: 7 Last supported rung: 7",
               "hitProb": 0.207
+            },
+            {
+              "label": "O 18+",
+              "stat": "outs",
+              "target": 18,
+              "targets": [
+                18
+              ],
+              "tone": "strong",
+              "detail": "Logan Gilbert Over 17.5 Outs | Odds -120 | Edge 29.4%",
+              "hitProb": 0.794
             }
           ],
           "pregameLadderBadges": [
@@ -14510,6 +15492,17 @@
               "tone": "soft",
               "detail": "Supported ladders: 7/8 Last supported rung: 8 Supported ladders: 7 Last supported rung: 7",
               "hitProb": 0.207
+            },
+            {
+              "label": "O 18+",
+              "stat": "outs",
+              "target": 18,
+              "targets": [
+                18
+              ],
+              "tone": "strong",
+              "detail": "Logan Gilbert Over 17.5 Outs | Odds -120 | Edge 29.4%",
+              "hitProb": 0.794
             }
           ]
         }
@@ -14916,7 +15909,7 @@
           "away": 0,
           "home": 0
         },
-        "liveText": "Mitch Keller vs Jack Perkins | 2 official pick(s) | +1 playable"
+        "liveText": "Mitch Keller vs Jack Perkins | 2 official pick(s) | +2 playable"
       },
       "predictions": {
         "first1": {
@@ -15241,21 +16234,21 @@
           "closed": false,
           "badge": "No bet",
           "score": "PIT 0 - ATH 0",
-          "subtitle": "PIT 3.08 - ATH 2.43 | Total 5.51",
+          "subtitle": "PIT 3.1 - ATH 2.43 | Total 5.53",
           "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
           "projection": {
-            "total": 5.51,
-            "homeMargin": -0.65
+            "total": 5.53,
+            "homeMargin": -0.67
           },
           "markets": {
             "total": {
               "pick": null,
-              "line": 5.51,
+              "line": 5.53,
               "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
             },
             "spread": {
               "pick": null,
-              "homeLine": -0.65,
+              "homeLine": -0.67,
               "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
             },
             "moneyline": {
@@ -15270,21 +16263,21 @@
           "closed": false,
           "badge": "No bet",
           "score": "PIT 0 - ATH 0",
-          "subtitle": "PIT 5.02 - ATH 4.31 | Total 9.33",
+          "subtitle": "PIT 5.6 - ATH 4.34 | Total 9.94",
           "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
           "projection": {
-            "total": 9.33,
-            "homeMargin": -0.71
+            "total": 9.94,
+            "homeMargin": -1.26
           },
           "markets": {
             "total": {
               "pick": null,
-              "line": 9.33,
+              "line": 9.94,
               "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
             },
             "spread": {
               "pick": null,
-              "homeLine": -0.71,
+              "homeLine": -1.26,
               "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
             },
             "moneyline": {
@@ -15342,18 +16335,18 @@
           "label": "First 5",
           "closed": false,
           "badge": "",
-          "score": "PIT 48.9% | ATH 36.6% | Tie 14.5%",
-          "subtitle": "PIT 48.9% | ATH 36.6% | Tie 14.5%",
-          "reason": "PIT 48.9% | ATH 36.6% | Tie 14.5%",
+          "score": "PIT 49.0% | ATH 36.6% | Tie 14.4%",
+          "subtitle": "PIT 49.0% | ATH 36.6% | Tie 14.4%",
+          "reason": "PIT 49.0% | ATH 36.6% | Tie 14.4%",
           "projection": {
-            "total": 48.9,
+            "total": 49.0,
             "homeMargin": 36.6
           },
           "markets": {
             "total": {
               "pick": null,
-              "line": 48.9,
-              "reason": "PIT 48.9% | ATH 36.6% | Tie 14.5%"
+              "line": 49.0,
+              "reason": "PIT 49.0% | ATH 36.6% | Tie 14.4%"
             },
             "spread": {},
             "moneyline": {}
@@ -15364,18 +16357,18 @@
           "label": "Full game",
           "closed": false,
           "badge": "",
-          "score": "PIT 55.9% | ATH 44.1% | Tie 0.0%",
-          "subtitle": "PIT 55.9% | ATH 44.1% | Tie 0.0%",
-          "reason": "PIT 55.9% | ATH 44.1% | Tie 0.0%",
+          "score": "PIT 56.6% | ATH 43.4% | Tie 0.0%",
+          "subtitle": "PIT 56.6% | ATH 43.4% | Tie 0.0%",
+          "reason": "PIT 56.6% | ATH 43.4% | Tie 0.0%",
           "projection": {
-            "total": 55.9,
-            "homeMargin": 44.1
+            "total": 56.6,
+            "homeMargin": 43.4
           },
           "markets": {
             "total": {
               "pick": null,
-              "line": 55.9,
-              "reason": "PIT 55.9% | ATH 44.1% | Tie 0.0%"
+              "line": 56.6,
+              "reason": "PIT 56.6% | ATH 43.4% | Tie 0.0%"
             },
             "spread": {},
             "moneyline": {}
@@ -15670,12 +16663,12 @@
         {
           "label": "Pitcher props",
           "title": "Jack Perkins Over 14.5 Outs",
-          "sub": "-103"
+          "sub": "Playable only | -110"
         },
         {
           "label": "Hitter props",
-          "title": "Jacob Wilson Under 1.5 Batter Total Bases",
-          "sub": "-137"
+          "title": "Lawrence Butler Under 0.5 Batter Runs Scored",
+          "sub": "-140"
         }
       ],
       "probable": {
@@ -15692,7 +16685,7 @@
               ],
               "tone": "soft",
               "detail": "Supported ladders: 5/6/7 Last supported rung: 7 Supported ladders: 5 Last supported rung: 5",
-              "hitProb": 0.222
+              "hitProb": 0.235
             },
             {
               "label": "H up to 7",
@@ -15703,7 +16696,7 @@
               ],
               "tone": "solid",
               "detail": "Supported ladders: 7/8/9 Last supported rung: 9 Supported ladders: 7 Last supported rung: 7",
-              "hitProb": 0.289
+              "hitProb": 0.296
             }
           ],
           "pregameLadderBadges": [
@@ -15716,7 +16709,7 @@
               ],
               "tone": "soft",
               "detail": "Supported ladders: 5/6/7 Last supported rung: 7 Supported ladders: 5 Last supported rung: 5",
-              "hitProb": 0.222
+              "hitProb": 0.235
             },
             {
               "label": "H up to 7",
@@ -15727,7 +16720,7 @@
               ],
               "tone": "solid",
               "detail": "Supported ladders: 7/8/9 Last supported rung: 9 Supported ladders: 7 Last supported rung: 7",
-              "hitProb": 0.289
+              "hitProb": 0.296
             }
           ]
         },
@@ -15755,7 +16748,7 @@
               ],
               "tone": "soft",
               "detail": "Supported ladders: 5/6/7/8/9/10 Last supported rung: 10 Supported ladders: 5 Last supported rung: 5",
-              "hitProb": 0.232
+              "hitProb": 0.231
             },
             {
               "label": "O 15+",
@@ -15765,7 +16758,7 @@
                 15
               ],
               "tone": "strong",
-              "detail": "Jack Perkins Over 14.5 Outs | Odds -103 | Edge 47.9%",
+              "detail": "Jack Perkins Over 14.5 Outs | Odds -110 | Edge 46.5%",
               "hitProb": 0.954
             }
           ],
@@ -15790,7 +16783,7 @@
               ],
               "tone": "soft",
               "detail": "Supported ladders: 5/6/7/8/9/10 Last supported rung: 10 Supported ladders: 5 Last supported rung: 5",
-              "hitProb": 0.232
+              "hitProb": 0.231
             },
             {
               "label": "O 15+",
@@ -15800,7 +16793,7 @@
                 15
               ],
               "tone": "strong",
-              "detail": "Jack Perkins Over 14.5 Outs | Odds -103 | Edge 47.9%",
+              "detail": "Jack Perkins Over 14.5 Outs | Odds -110 | Edge 46.5%",
               "hitProb": 0.954
             }
           ]
@@ -16059,7 +17052,7 @@
           "away": 0,
           "home": 0
         },
-        "liveText": "Reid Detmers vs Merrill Kelly | 1 official pick(s) | +4 playable"
+        "liveText": "Reid Detmers vs Merrill Kelly | 2 official pick(s) | +3 playable"
       },
       "predictions": {
         "first1": {
@@ -16573,28 +17566,28 @@
           "key": "first5",
           "label": "Full game",
           "closed": false,
-          "badge": "No bet",
+          "badge": "ML bet",
           "score": "LAA 0 - AZ 0",
-          "subtitle": "LAA 4.57 - AZ 4.04 | Total 8.61",
-          "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
+          "subtitle": "LAA 4.57 - AZ 4.05 | Total 8.62",
+          "reason": "Official full-game recommendation surfaced from the saved market payload.",
           "projection": {
-            "total": 8.61,
+            "total": 8.62,
             "homeMargin": -0.53
           },
           "markets": {
             "total": {
-              "pick": null,
-              "line": 8.61,
-              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              "pick": "LAA ML",
+              "line": 8.62,
+              "reason": "Official full-game recommendation surfaced from the saved market payload."
             },
             "spread": {
               "pick": null,
               "homeLine": -0.53,
-              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              "reason": "Official full-game recommendation surfaced from the saved market payload."
             },
             "moneyline": {
               "pick": null,
-              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              "reason": "Official full-game recommendation surfaced from the saved market payload."
             }
           }
         },
@@ -16669,18 +17662,18 @@
           "label": "Full game",
           "closed": false,
           "badge": "",
-          "score": "LAA 53.5% | AZ 46.5% | Tie 0.0%",
-          "subtitle": "LAA 53.5% | AZ 46.5% | Tie 0.0%",
-          "reason": "LAA 53.5% | AZ 46.5% | Tie 0.0%",
+          "score": "LAA 53.3% | AZ 46.7% | Tie 0.0%",
+          "subtitle": "LAA 53.3% | AZ 46.7% | Tie 0.0%",
+          "reason": "LAA 53.3% | AZ 46.7% | Tie 0.0%",
           "projection": {
-            "total": 53.5,
-            "homeMargin": 46.5
+            "total": 53.3,
+            "homeMargin": 46.7
           },
           "markets": {
             "total": {
               "pick": null,
-              "line": 53.5,
-              "reason": "LAA 53.5% | AZ 46.5% | Tie 0.0%"
+              "line": 53.3,
+              "reason": "LAA 53.3% | AZ 46.7% | Tie 0.0%"
             },
             "spread": {},
             "moneyline": {}
@@ -17143,18 +18136,18 @@
         },
         {
           "label": "Moneyline",
-          "title": "No ML play",
-          "sub": "Off card"
+          "title": "LAA -109",
+          "sub": "model 46.7%"
         },
         {
           "label": "Pitcher props",
           "title": "Reid Detmers Over 17.5 Outs",
-          "sub": "Playable only | -115"
+          "sub": "Playable only | -120"
         },
         {
           "label": "Hitter props",
-          "title": "Jordan Lawlar Over 0.5 Batter Total Bases",
-          "sub": "-125"
+          "title": "Jordan Lawlar Over 0.5 Batter Hits",
+          "sub": "-122"
         }
       ],
       "probable": {
@@ -17192,7 +18185,7 @@
                 18
               ],
               "tone": "strong",
-              "detail": "Reid Detmers Over 17.5 Outs | Odds -115 | Edge 32.7%",
+              "detail": "Reid Detmers Over 17.5 Outs | Odds -120 | Edge 32.7%",
               "hitProb": 0.827
             }
           ],
@@ -17227,7 +18220,7 @@
                 18
               ],
               "tone": "strong",
-              "detail": "Reid Detmers Over 17.5 Outs | Odds -115 | Edge 32.7%",
+              "detail": "Reid Detmers Over 17.5 Outs | Odds -120 | Edge 32.7%",
               "hitProb": 0.827
             }
           ]
@@ -17700,7 +18693,7 @@
           "away": 0,
           "home": 0
         },
-        "liveText": "Drew Rasmussen vs Justin Wrobleski | 1 official pick(s) | +1 playable"
+        "liveText": "Drew Rasmussen vs Justin Wrobleski | 1 official pick(s) | +4 playable"
       },
       "predictions": {
         "first1": {
@@ -17967,7 +18960,7 @@
           "closed": false,
           "badge": "No bet",
           "score": "TB 0 - LAD 0",
-          "subtitle": "TB 1.77 - LAD 2.06 | Total 3.84",
+          "subtitle": "TB 1.77 - LAD 2.07 | Total 3.84",
           "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
           "projection": {
             "total": 3.84,
@@ -17996,21 +18989,21 @@
           "closed": false,
           "badge": "No bet",
           "score": "TB 0 - LAD 0",
-          "subtitle": "TB 3.3 - LAD 3.69 | Total 6.99",
+          "subtitle": "TB 3.31 - LAD 3.81 | Total 7.13",
           "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
           "projection": {
-            "total": 6.99,
-            "homeMargin": 0.4
+            "total": 7.13,
+            "homeMargin": 0.5
           },
           "markets": {
             "total": {
               "pick": null,
-              "line": 6.99,
+              "line": 7.13,
               "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
             },
             "spread": {
               "pick": null,
-              "homeLine": 0.4,
+              "homeLine": 0.5,
               "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
             },
             "moneyline": {
@@ -18068,18 +19061,18 @@
           "label": "First 5",
           "closed": false,
           "badge": "",
-          "score": "TB 37.0% | LAD 44.2% | Tie 18.8%",
-          "subtitle": "TB 37.0% | LAD 44.2% | Tie 18.8%",
-          "reason": "TB 37.0% | LAD 44.2% | Tie 18.8%",
+          "score": "TB 37.0% | LAD 44.3% | Tie 18.7%",
+          "subtitle": "TB 37.0% | LAD 44.3% | Tie 18.7%",
+          "reason": "TB 37.0% | LAD 44.3% | Tie 18.7%",
           "projection": {
             "total": 37.0,
-            "homeMargin": 44.2
+            "homeMargin": 44.3
           },
           "markets": {
             "total": {
               "pick": null,
               "line": 37.0,
-              "reason": "TB 37.0% | LAD 44.2% | Tie 18.8%"
+              "reason": "TB 37.0% | LAD 44.3% | Tie 18.7%"
             },
             "spread": {},
             "moneyline": {}
@@ -18090,18 +19083,18 @@
           "label": "Full game",
           "closed": false,
           "badge": "",
-          "score": "TB 44.9% | LAD 55.1% | Tie 0.0%",
-          "subtitle": "TB 44.9% | LAD 55.1% | Tie 0.0%",
-          "reason": "TB 44.9% | LAD 55.1% | Tie 0.0%",
+          "score": "TB 44.4% | LAD 55.6% | Tie 0.0%",
+          "subtitle": "TB 44.4% | LAD 55.6% | Tie 0.0%",
+          "reason": "TB 44.4% | LAD 55.6% | Tie 0.0%",
           "projection": {
-            "total": 44.9,
-            "homeMargin": 55.1
+            "total": 44.4,
+            "homeMargin": 55.6
           },
           "markets": {
             "total": {
               "pick": null,
-              "line": 44.9,
-              "reason": "TB 44.9% | LAD 55.1% | Tie 0.0%"
+              "line": 44.4,
+              "reason": "TB 44.4% | LAD 55.6% | Tie 0.0%"
             },
             "spread": {},
             "moneyline": {}
@@ -18309,12 +19302,12 @@
         {
           "label": "Pitcher props",
           "title": "Drew Rasmussen Over 16.5 Outs",
-          "sub": "Playable only | -109"
+          "sub": "Playable only | -110"
         },
         {
           "label": "Hitter props",
           "title": "Yandy D\u00edaz Under 1.5 Batter Total Bases",
-          "sub": "-102"
+          "sub": "-130"
         }
       ],
       "probable": {
@@ -18341,7 +19334,7 @@
                 17
               ],
               "tone": "strong",
-              "detail": "Drew Rasmussen Over 16.5 Outs | Odds -109 | Edge 40.6%",
+              "detail": "Drew Rasmussen Over 16.5 Outs | Odds -110 | Edge 41.3%",
               "hitProb": 0.894
             }
           ],
@@ -18365,13 +19358,13 @@
                 17
               ],
               "tone": "strong",
-              "detail": "Drew Rasmussen Over 16.5 Outs | Odds -109 | Edge 40.6%",
+              "detail": "Drew Rasmussen Over 16.5 Outs | Odds -110 | Edge 41.3%",
               "hitProb": 0.894
             }
           ]
         },
         "home": {
-          "id": null,
+          "id": 680736,
           "fullName": "Justin Wrobleski",
           "ladderBadges": [
             {
@@ -18383,7 +19376,7 @@
               ],
               "tone": "solid",
               "detail": "Supported ladders: 5/6/7 Last supported rung: 7 Supported ladders: 5 Last supported rung: 5",
-              "hitProb": 0.273
+              "hitProb": 0.271
             },
             {
               "label": "H up to 6",
@@ -18394,7 +19387,18 @@
               ],
               "tone": "solid",
               "detail": "Supported ladders: 6/7/8 Last supported rung: 8 Supported ladders: 6 Last supported rung: 6",
-              "hitProb": 0.276
+              "hitProb": 0.277
+            },
+            {
+              "label": "O 18+",
+              "stat": "outs",
+              "target": 18,
+              "targets": [
+                18
+              ],
+              "tone": "strong",
+              "detail": "Justin Wrobleski Over 17.5 Outs | Odds -140 | Edge 34.4%",
+              "hitProb": 0.882
             }
           ],
           "pregameLadderBadges": [
@@ -18407,7 +19411,7 @@
               ],
               "tone": "solid",
               "detail": "Supported ladders: 5/6/7 Last supported rung: 7 Supported ladders: 5 Last supported rung: 5",
-              "hitProb": 0.273
+              "hitProb": 0.271
             },
             {
               "label": "H up to 6",
@@ -18418,7 +19422,18 @@
               ],
               "tone": "solid",
               "detail": "Supported ladders: 6/7/8 Last supported rung: 8 Supported ladders: 6 Last supported rung: 6",
-              "hitProb": 0.276
+              "hitProb": 0.277
+            },
+            {
+              "label": "O 18+",
+              "stat": "outs",
+              "target": 18,
+              "targets": [
+                18
+              ],
+              "tone": "strong",
+              "detail": "Justin Wrobleski Over 17.5 Outs | Odds -140 | Edge 34.4%",
+              "hitProb": 0.882
             }
           ]
         }
