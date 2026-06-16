@@ -1138,9 +1138,20 @@ function recommendationState(item) {
     return "unknown";
   }
   const status = String(item.status_display || item.status_context || item.game_state?.detailed || item.game_state?.abstract || "").trim().toLowerCase();
+  const settlement = item.settlement && typeof item.settlement === "object" ? item.settlement : {};
+  const settlementStatus = String(
+    settlement.status || settlement.status_label || item.settlement_status || item.settlement_state || item.settlement_label || ""
+  ).trim().toLowerCase();
+  const settlementResult = String(settlement.result || item.settlement_result || item.result || "").trim().toLowerCase();
   const liveFlag = typeof item.is_live === "boolean" ? item.is_live : null;
 
-  if (status.includes("final") || status.includes("completed")) {
+  if (status.includes("final") || status.includes("completed") || status.includes("settled") || status.includes("resolved") || status.includes("graded")) {
+    return "final";
+  }
+  if (["final", "completed", "settled", "resolved", "graded"].includes(settlementStatus)) {
+    return "final";
+  }
+  if (["won", "lost", "push", "graded", "final", "completed", "settled", "resolved"].includes(settlementResult)) {
     return "final";
   }
   if (status.includes("warmup") || status.includes("scheduled") || status.includes("pregame")) {

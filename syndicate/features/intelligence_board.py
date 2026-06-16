@@ -64,7 +64,26 @@ def _recommendation_lane(item: Mapping[str, Any]) -> str:
         item.get("game_state", {}).get("abstract") if isinstance(item.get("game_state"), Mapping) else None,
         default="",
     ).lower()
-    if "final" in status or "completed" in status or "settled" in status:
+    settlement = item.get("settlement") if isinstance(item.get("settlement"), Mapping) else {}
+    settlement_status = _safe_text(
+        settlement.get("status") if isinstance(settlement, Mapping) else None,
+        settlement.get("status_label") if isinstance(settlement, Mapping) else None,
+        item.get("settlement_status"),
+        item.get("settlement_state"),
+        item.get("settlement_label"),
+        default="",
+    ).lower()
+    settlement_result = _safe_text(
+        settlement.get("result") if isinstance(settlement, Mapping) else None,
+        item.get("settlement_result"),
+        item.get("result"),
+        default="",
+    ).lower()
+    if any(token in status for token in ("final", "completed", "settled", "resolved", "graded")):
+        return "archived"
+    if settlement_status in {"final", "completed", "settled", "resolved", "graded"}:
+        return "archived"
+    if settlement_result in {"won", "lost", "push", "graded", "final", "completed", "settled", "resolved"}:
         return "archived"
     if bool(item.get("is_live")) or "live" in status or "in progress" in status or _safe_text(item.get("live_projection"), default="") not in {"", "-"}:
         return "live"

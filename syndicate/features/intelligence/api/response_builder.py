@@ -27,6 +27,7 @@ def _has_live_signal(candidate: dict[str, Any]) -> bool:
 
 def _recommendation_state(candidate: dict[str, Any]) -> str:
     game_state = candidate.get("game_state") if isinstance(candidate.get("game_state"), dict) else {}
+    settlement = candidate.get("settlement") if isinstance(candidate.get("settlement"), dict) else {}
     status = _safe_text(
         candidate.get("status_display")
         or candidate.get("status_context")
@@ -34,8 +35,26 @@ def _recommendation_state(candidate: dict[str, Any]) -> str:
         or game_state.get("abstract"),
         "",
     ).lower()
+    settlement_status = _safe_text(
+        settlement.get("status") if isinstance(settlement, dict) else None,
+        settlement.get("status_label") if isinstance(settlement, dict) else None,
+        candidate.get("settlement_status"),
+        candidate.get("settlement_state"),
+        candidate.get("settlement_label"),
+        "",
+    ).lower()
+    settlement_result = _safe_text(
+        settlement.get("result") if isinstance(settlement, dict) else None,
+        candidate.get("settlement_result"),
+        candidate.get("result"),
+        "",
+    ).lower()
     live_flag = candidate.get("is_live") if isinstance(candidate.get("is_live"), bool) else None
-    if "final" in status or "completed" in status:
+    if any(token in status for token in ("final", "completed", "settled", "resolved", "graded")):
+        return "final"
+    if settlement_status in {"final", "completed", "settled", "resolved", "graded"}:
+        return "final"
+    if settlement_result in {"won", "lost", "push", "graded", "final", "completed", "settled", "resolved"}:
         return "final"
     if "warmup" in status or "scheduled" in status or "pregame" in status:
         return "pregame"

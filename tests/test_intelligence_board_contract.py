@@ -91,6 +91,29 @@ class IntelligenceBoardContractTests(unittest.TestCase):
         self.assertEqual(contract["cards"][0]["movement"], "+0.5 (up)")
         self.assertEqual(contract["cards"][1]["lane"], "pregame")
 
+    def test_build_intelligence_board_contract_marks_settled_cards_archived(self) -> None:
+        contract = build_intelligence_board_contract(
+            {
+                "headline": "The Syndicate board",
+                "recommendations": [
+                    {
+                        "sport": "nba",
+                        "team": "Boston Celtics",
+                        "name": "Jayson Tatum",
+                        "market": "points",
+                        "line": 28.5,
+                        "movement": {"delta": 0.0, "trend": "flat"},
+                        "expected_value": 0.044,
+                        "is_live": False,
+                        "settlement": {"status": "settled", "result": "won"},
+                    }
+                ],
+            }
+        )
+
+        self.assertEqual(contract["lane_counts"]["archived"], 1)
+        self.assertEqual(contract["cards"][0]["lane"], "archived")
+
     def test_run_intelligence_query_emits_board_contract(self) -> None:
         with patch("syndicate.features.intelligence.build_intelligence_overview", return_value=_sample_overview()):
             with patch("syndicate.features.intelligence._tracked_repo_files", return_value=set()):
