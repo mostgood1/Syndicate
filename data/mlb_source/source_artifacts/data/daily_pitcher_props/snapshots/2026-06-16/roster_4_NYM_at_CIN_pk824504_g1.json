@@ -54,18 +54,18 @@
     "lineup_source": "projected_rotowire_default_vs_rhp",
     "lineup_confidence": 0.66,
     "probable_pitcher": {
-      "id": 681035,
+      "id": 673540,
       "source": "feed_gameData_probablePitchers",
       "confidence": 0.75,
-      "raw_schedule_id": 681035,
-      "raw_feed_id": 681035
+      "raw_schedule_id": 673540,
+      "raw_feed_id": 673540
     },
     "starter": {
-      "id": 681035,
-      "name": "Christian Scott",
+      "id": 673540,
+      "name": "Kodai Senga",
       "role": "SP",
       "selection_source": "probable",
-      "requested_id": 681035
+      "requested_id": 673540
     },
     "bullpen": [
       {
@@ -493,45 +493,45 @@
       }
     ],
     "starter_profile": {
-      "id": 681035,
-      "name": "Christian Scott",
+      "id": 673540,
+      "name": "Kodai Senga",
       "throw": "R",
       "role": "SP",
       "leverage_skill": 0.5,
       "stamina_pitches": 94,
       "availability_mult": 1.0,
       "platoon_mult_vs_lhb": {
-        "k": 1.02918352431377,
-        "bb": 0.9807558770151622,
-        "hr": 1.1209143912463604,
-        "inplay": 0.9281596554975464
+        "k": 0.9233806566104703,
+        "bb": 1.1200156985871272,
+        "hr": 1.103265306122449,
+        "inplay": 1.0656578333003706
       },
       "platoon_mult_vs_rhb": {
-        "k": 0.9684671838422296,
-        "bb": 1.059774867927828,
-        "hr": 0.8032834234099193,
-        "inplay": 1.1169714168991418
+        "k": 1.078215579710145,
+        "bb": 0.8774839743589744,
+        "hr": 0.8945833333333333,
+        "inplay": 0.9326191290929341
       },
       "statcast_quality_mult": {},
       "arsenal_source": "statsapi_pitchArsenal",
-      "arsenal_sample_size": 745,
+      "arsenal_sample_size": 367,
       "statcast_splits_found": false,
       "statcast_splits_source": "",
       "statcast_splits_n_pitches": 0,
       "statcast_splits_start_date": "",
       "statcast_splits_end_date": "",
-      "k_rate": 0.2613612791702679,
-      "bb_rate": 0.10457649092480552,
-      "hbp_rate": 0.028089887640449437,
-      "hr_rate": 0.02256266205704408,
-      "inplay_hit_rate": 0.33830688980656376,
+      "k_rate": 0.23711340206185566,
+      "bb_rate": 0.13402061855670103,
+      "hbp_rate": 0.010309278350515464,
+      "hr_rate": 0.05154639175257732,
+      "inplay_hit_rate": 0.4322677595628415,
       "arsenal": {
-        "FF": 0.5060402868429525,
-        "OTHER": 0.2322147539624164,
-        "SI": 0.028187919267114104,
-        "SL": 0.021476509441610756,
-        "FC": 0.17046979556778533,
-        "FS": 0.041610734918120895
+        "FF": 0.3760217986463215,
+        "OTHER": 0.34059945877384196,
+        "CU": 0.0027247955901907356,
+        "SI": 0.04359672984305177,
+        "SL": 0.01362397795095368,
+        "FC": 0.22343323919564032
       },
       "pitch_type_whiff_mult": {},
       "pitch_type_inplay_mult": {},
@@ -1361,7 +1361,7 @@
         "role": "SU",
         "leverage_skill": 0.7,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.85,
         "platoon_mult_vs_lhb": {
           "k": 0.9235492577597841,
           "bb": 0.9259615384615385,
@@ -1404,7 +1404,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.775,
         "platoon_mult_vs_lhb": {
           "k": 1.0058181799081864,
           "bb": 0.8075,
@@ -1619,7 +1619,7 @@
         "role": "LR",
         "leverage_skill": 0.35,
         "stamina_pitches": 28,
-        "availability_mult": 1.0,
+        "availability_mult": 0.8333333333333334,
         "platoon_mult_vs_lhb": {
           "k": 1.1925000000000001,
           "bb": 0.8302469135802468,

@@ -1708,7 +1708,7 @@
           "arsenal_sample_size": 491,
           "stamina_pitches": 25,
           "role": "SU",
-          "availability_mult": 1.0,
+          "availability_mult": 0.95,
           "platoon_mult_vs_lhb": {
             "k": 1.068675054505814,
             "bb": 0.9597713266299059,
@@ -3550,7 +3550,7 @@
         "statcast_splits_end_date": "",
         "arsenal_source": "statsapi_pitchArsenal",
         "arsenal_sample_size": 925,
-        "stamina_pitches": 88,
+        "stamina_pitches": 94,
         "role": "SP",
         "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
@@ -4434,7 +4434,7 @@
           "arsenal_sample_size": 509,
           "stamina_pitches": 25,
           "role": "MR",
-          "availability_mult": 1.0,
+          "availability_mult": 0.895,
           "platoon_mult_vs_lhb": {
             "k": 0.997233653406493,
             "bb": 1.0415966386554623,
@@ -4696,7 +4696,7 @@
           "arsenal_sample_size": 150,
           "stamina_pitches": 27,
           "role": "MR",
-          "availability_mult": 1.0,
+          "availability_mult": 0.84,
           "platoon_mult_vs_lhb": {
             "k": 0.9788461538461538,
             "bb": 0.8075,

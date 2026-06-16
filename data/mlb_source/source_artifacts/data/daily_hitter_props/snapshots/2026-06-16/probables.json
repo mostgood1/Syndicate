@@ -2,7 +2,7 @@
   "date": "2026-06-16",
   "season": 2026,
   "spring_mode": false,
-  "generated_at": "2026-06-16T08:04:57.828569",
+  "generated_at": "2026-06-16T16:49:42.862390",
   "games": [
     {
       "idx": 0,
@@ -143,23 +143,27 @@
         "team_id": 111,
         "abbr": "BOS"
       },
-      "away_probable_id": null,
+      "away_probable_id": 656302,
       "home_probable_id": 801139,
-      "away_source": "none",
+      "away_source": "feed_gameData_probablePitchers",
       "home_source": "feed_gameData_probablePitchers",
-      "away_confidence": 0.0,
+      "away_confidence": 0.75,
       "home_confidence": 0.75,
       "away_validation": {
-        "status": "none",
-        "selected_id": null,
-        "selected_name": "",
-        "selected_source": "none",
+        "status": "ok",
+        "selected_id": 656302,
+        "selected_name": "Dylan Cease",
+        "selected_source": "feed_gameData_probablePitchers",
         "override_reason": "",
-        "roster_team_ids": [],
-        "registry_team_ids": [],
-        "on_expected_team": false,
+        "roster_team_ids": [
+          141
+        ],
+        "registry_team_ids": [
+          141
+        ],
+        "on_expected_team": true,
         "on_opponent_team": false,
-        "on_expected_registry_team": false,
+        "on_expected_registry_team": true,
         "on_opponent_registry_team": false,
         "rejected_candidates": []
       },
@@ -182,13 +186,13 @@
         "rejected_candidates": []
       },
       "raw": {
-        "away_schedule_id": null,
+        "away_schedule_id": 656302,
         "home_schedule_id": 801139,
-        "away_schedule_name": "",
+        "away_schedule_name": "Dylan Cease",
         "home_schedule_name": "Payton Tolle",
-        "away_feed_id": null,
+        "away_feed_id": 656302,
         "home_feed_id": 801139,
-        "away_feed_name": "",
+        "away_feed_name": "Dylan Cease",
         "home_feed_name": "Payton Tolle"
       }
     },

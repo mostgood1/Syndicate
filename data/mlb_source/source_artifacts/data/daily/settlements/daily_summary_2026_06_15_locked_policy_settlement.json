@@ -44,54 +44,210 @@
     "combined": 5
   },
   "results": {
-    "combined": {
-      "n": 0,
-      "wins": 0,
+    "hitter_hits": {
+      "n": 4,
+      "wins": 1,
+      "losses": 3,
+      "stake_u": 2.0,
+      "profit_u": -1.1622,
+      "roi": -0.5811
+    },
+    "hitter_runs": {
+      "n": 1,
+      "wins": 1,
       "losses": 0,
-      "stake_u": 0.0,
-      "profit_u": 0.0,
-      "roi": null
+      "stake_u": 0.5,
+      "profit_u": 0.4167,
+      "roi": 0.8334
+    },
+    "hitter_total_bases": {
+      "n": 6,
+      "wins": 2,
+      "losses": 4,
+      "stake_u": 3.0,
+      "profit_u": -1.2619,
+      "roi": -0.4206
+    },
+    "ml": {
+      "n": 1,
+      "wins": 1,
+      "losses": 0,
+      "stake_u": 1.0,
+      "profit_u": 1.02,
+      "roi": 1.02
+    },
+    "pitcher_props": {
+      "n": 1,
+      "wins": 0,
+      "losses": 1,
+      "stake_u": 1.0,
+      "profit_u": -1.0,
+      "roi": -1.0
+    },
+    "hitter_props": {
+      "n": 11,
+      "wins": 4,
+      "losses": 7,
+      "stake_u": 5.5,
+      "profit_u": -2.0074,
+      "roi": -0.365
+    },
+    "combined": {
+      "n": 13,
+      "wins": 5,
+      "losses": 8,
+      "stake_u": 7.5,
+      "profit_u": -1.9874,
+      "roi": -0.265
     }
   },
   "playable_results": {
+    "hitter_hits": {
+      "n": 15,
+      "wins": 8,
+      "losses": 7,
+      "stake_u": 7.5,
+      "profit_u": -0.446,
+      "roi": -0.0595
+    },
+    "hitter_rbis": {
+      "n": 5,
+      "wins": 2,
+      "losses": 3,
+      "stake_u": 2.5,
+      "profit_u": 0.295,
+      "roi": 0.118
+    },
+    "hitter_total_bases": {
+      "n": 7,
+      "wins": 3,
+      "losses": 4,
+      "stake_u": 3.5,
+      "profit_u": -0.4949,
+      "roi": -0.1414
+    },
+    "pitcher_props": {
+      "n": 6,
+      "wins": 3,
+      "losses": 3,
+      "stake_u": 6.0,
+      "profit_u": -0.3946,
+      "roi": -0.0658
+    },
+    "hitter_props": {
+      "n": 27,
+      "wins": 13,
+      "losses": 14,
+      "stake_u": 13.5,
+      "profit_u": -0.6459,
+      "roi": -0.0478
+    },
     "combined": {
-      "n": 0,
-      "wins": 0,
-      "losses": 0,
-      "stake_u": 0.0,
-      "profit_u": 0.0,
-      "roi": null
+      "n": 33,
+      "wins": 16,
+      "losses": 17,
+      "stake_u": 19.5,
+      "profit_u": -1.0405,
+      "roi": -0.0534
     }
   },
   "shadow_results": {
+    "pitcher_props": {
+      "n": 5,
+      "wins": 2,
+      "losses": 3,
+      "stake_u": 0.0,
+      "profit_u": 0.0,
+      "roi": null
+    },
     "combined": {
-      "n": 0,
-      "wins": 0,
-      "losses": 0,
+      "n": 5,
+      "wins": 2,
+      "losses": 3,
       "stake_u": 0.0,
       "profit_u": 0.0,
       "roi": null
     }
   },
   "all_results": {
-    "combined": {
-      "n": 0,
-      "wins": 0,
+    "hitter_hits": {
+      "n": 19,
+      "wins": 9,
+      "losses": 10,
+      "stake_u": 9.5,
+      "profit_u": -1.6082,
+      "roi": -0.1693
+    },
+    "hitter_rbis": {
+      "n": 5,
+      "wins": 2,
+      "losses": 3,
+      "stake_u": 2.5,
+      "profit_u": 0.295,
+      "roi": 0.118
+    },
+    "hitter_runs": {
+      "n": 1,
+      "wins": 1,
       "losses": 0,
-      "stake_u": 0.0,
-      "profit_u": 0.0,
-      "roi": null
+      "stake_u": 0.5,
+      "profit_u": 0.4167,
+      "roi": 0.8334
+    },
+    "hitter_total_bases": {
+      "n": 13,
+      "wins": 5,
+      "losses": 8,
+      "stake_u": 6.5,
+      "profit_u": -1.7568,
+      "roi": -0.2703
+    },
+    "ml": {
+      "n": 1,
+      "wins": 1,
+      "losses": 0,
+      "stake_u": 1.0,
+      "profit_u": 1.02,
+      "roi": 1.02
+    },
+    "pitcher_props": {
+      "n": 7,
+      "wins": 3,
+      "losses": 4,
+      "stake_u": 7.0,
+      "profit_u": -1.3946,
+      "roi": -0.1992
+    },
+    "hitter_props": {
+      "n": 38,
+      "wins": 17,
+      "losses": 21,
+      "stake_u": 19.0,
+      "profit_u": -2.6533,
+      "roi": -0.1396
+    },
+    "combined": {
+      "n": 46,
+      "wins": 21,
+      "losses": 25,
+      "stake_u": 27.0,
+      "profit_u": -3.0279,
+      "roi": -0.1121
     }
   },
-  "settled_n": 0,
-  "playable_settled_n": 0,
-  "shadow_settled_n": 0,
-  "all_settled_n": 0,
-  "unresolved_n": 13,
-  "playable_unresolved_n": 33,
-  "shadow_unresolved_n": 5,
-  "all_unresolved_n": 46,
-  "unresolved_recommendations": [
+  "settled_n": 13,
+  "playable_settled_n": 33,
+  "shadow_settled_n": 5,
+  "all_settled_n": 46,
+  "unresolved_n": 0,
+  "playable_unresolved_n": 0,
+  "shadow_unresolved_n": 0,
+  "all_unresolved_n": 0,
+  "unresolved_recommendations": [],
+  "playable_unresolved_recommendations": [],
+  "shadow_unresolved_recommendations": [],
+  "all_unresolved_recommendations": [],
+  "_settled_rows": [
     {
       "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_15_locked_policy.json",
       "date": "2026-06-15",
@@ -103,7 +259,11 @@
       "prop": "strikeouts",
       "selection": "away",
       "market_line": 0.0,
-      "reason": "game not final",
+      "odds": "+102",
+      "stake_u": 1.0,
+      "actual": "away",
+      "result": "win",
+      "profit_u": 1.02,
       "recommendation_tier": "official"
     },
     {
@@ -117,7 +277,11 @@
       "prop": "outs",
       "selection": "over",
       "market_line": 7.5,
-      "reason": "game not final",
+      "odds": "-120",
+      "stake_u": 1.0,
+      "actual": 4.0,
+      "result": "loss",
+      "profit_u": -1.0,
       "recommendation_tier": "official"
     },
     {
@@ -131,7 +295,11 @@
       "prop": "batter_hits",
       "selection": "over",
       "market_line": 0.5,
-      "reason": "game not final",
+      "odds": "-147",
+      "stake_u": 0.5,
+      "actual": 0.0,
+      "result": "loss",
+      "profit_u": -0.5,
       "recommendation_tier": "official"
     },
     {
@@ -145,7 +313,11 @@
       "prop": "batter_hits",
       "selection": "over",
       "market_line": 0.5,
-      "reason": "game not final",
+      "odds": "-118",
+      "stake_u": 0.5,
+      "actual": 0.0,
+      "result": "loss",
+      "profit_u": -0.5,
       "recommendation_tier": "official"
     },
     {
@@ -159,7 +331,11 @@
       "prop": "batter_hits",
       "selection": "over",
       "market_line": 0.5,
-      "reason": "game not final",
+      "odds": "-122",
+      "stake_u": 0.5,
+      "actual": 0.0,
+      "result": "loss",
+      "profit_u": -0.5,
       "recommendation_tier": "official"
     },
     {
@@ -173,7 +349,11 @@
       "prop": "batter_hits",
       "selection": "over",
       "market_line": 0.5,
-      "reason": "game not final",
+      "odds": "-148",
+      "stake_u": 0.5,
+      "actual": 2.0,
+      "result": "win",
+      "profit_u": 0.3378,
       "recommendation_tier": "official"
     },
     {
@@ -187,7 +367,11 @@
       "prop": "batter_total_bases",
       "selection": "over",
       "market_line": 0.5,
-      "reason": "game not final",
+      "odds": "-134",
+      "stake_u": 0.5,
+      "actual": 1.0,
+      "result": "win",
+      "profit_u": 0.3731,
       "recommendation_tier": "official"
     },
     {
@@ -201,7 +385,11 @@
       "prop": "batter_total_bases",
       "selection": "under",
       "market_line": 1.5,
-      "reason": "game not final",
+      "odds": "-138",
+      "stake_u": 0.5,
+      "actual": 2.0,
+      "result": "loss",
+      "profit_u": -0.5,
       "recommendation_tier": "official"
     },
     {
@@ -215,7 +403,11 @@
       "prop": "batter_total_bases",
       "selection": "over",
       "market_line": 0.5,
-      "reason": "game not final",
+      "odds": "-137",
+      "stake_u": 0.5,
+      "actual": 1.0,
+      "result": "win",
+      "profit_u": 0.365,
       "recommendation_tier": "official"
     },
     {
@@ -229,7 +421,11 @@
       "prop": "batter_total_bases",
       "selection": "over",
       "market_line": 0.5,
-      "reason": "game not final",
+      "odds": "-130",
+      "stake_u": 0.5,
+      "actual": 0.0,
+      "result": "loss",
+      "profit_u": -0.5,
       "recommendation_tier": "official"
     },
     {
@@ -243,7 +439,11 @@
       "prop": "batter_total_bases",
       "selection": "over",
       "market_line": 0.5,
-      "reason": "game not final",
+      "odds": "-141",
+      "stake_u": 0.5,
+      "actual": 0.0,
+      "result": "loss",
+      "profit_u": -0.5,
       "recommendation_tier": "official"
     },
     {
@@ -257,7 +457,11 @@
       "prop": "batter_total_bases",
       "selection": "over",
       "market_line": 0.5,
-      "reason": "game not final",
+      "odds": "-137",
+      "stake_u": 0.5,
+      "actual": 0.0,
+      "result": "loss",
+      "profit_u": -0.5,
       "recommendation_tier": "official"
     },
     {
@@ -271,11 +475,15 @@
       "prop": "batter_runs_scored",
       "selection": "under",
       "market_line": 0.5,
-      "reason": "game not final",
+      "odds": "-120",
+      "stake_u": 0.5,
+      "actual": 0.0,
+      "result": "win",
+      "profit_u": 0.4167,
       "recommendation_tier": "official"
     }
   ],
-  "playable_unresolved_recommendations": [
+  "_playable_settled_rows": [
     {
       "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_15_locked_policy.json",
       "date": "2026-06-15",
@@ -287,7 +495,11 @@
       "prop": "outs",
       "selection": "over",
       "market_line": 14.5,
-      "reason": "game not final",
+      "odds": "-149",
+      "stake_u": 1.0,
+      "actual": 16.0,
+      "result": "win",
+      "profit_u": 0.6711,
       "recommendation_tier": "candidate"
     },
     {
@@ -301,7 +513,11 @@
       "prop": "outs",
       "selection": "over",
       "market_line": 15.5,
-      "reason": "game not final",
+      "odds": "-128",
+      "stake_u": 1.0,
+      "actual": 0.0,
+      "result": "loss",
+      "profit_u": -1.0,
       "recommendation_tier": "candidate"
     },
     {
@@ -315,7 +531,11 @@
       "prop": "outs",
       "selection": "over",
       "market_line": 15.0,
-      "reason": "game not final",
+      "odds": "-140",
+      "stake_u": 1.0,
+      "actual": 21.0,
+      "result": "win",
+      "profit_u": 0.7143,
       "recommendation_tier": "candidate"
     },
     {
@@ -329,7 +549,11 @@
       "prop": "strikeouts",
       "selection": "over",
       "market_line": 3.5,
-      "reason": "game not final",
+      "odds": "+122",
+      "stake_u": 1.0,
+      "actual": 4.0,
+      "result": "win",
+      "profit_u": 1.22,
       "recommendation_tier": "candidate"
     },
     {
@@ -343,7 +567,11 @@
       "prop": "outs",
       "selection": "over",
       "market_line": 17.5,
-      "reason": "game not final",
+      "odds": "-114",
+      "stake_u": 1.0,
+      "actual": 15.0,
+      "result": "loss",
+      "profit_u": -1.0,
       "recommendation_tier": "candidate"
     },
     {
@@ -357,7 +585,11 @@
       "prop": "strikeouts",
       "selection": "over",
       "market_line": 4.5,
-      "reason": "game not final",
+      "odds": "+118",
+      "stake_u": 1.0,
+      "actual": 3.0,
+      "result": "loss",
+      "profit_u": -1.0,
       "recommendation_tier": "candidate"
     },
     {
@@ -371,7 +603,11 @@
       "prop": "batter_hits",
       "selection": "over",
       "market_line": 0.5,
-      "reason": "game not final",
+      "odds": "-140",
+      "stake_u": 0.5,
+      "actual": 1.0,
+      "result": "win",
+      "profit_u": 0.3571,
       "recommendation_tier": "candidate"
     },
     {
@@ -385,7 +621,11 @@
       "prop": "batter_hits",
       "selection": "over",
       "market_line": 0.5,
-      "reason": "game not final",
+      "odds": "-142",
+      "stake_u": 0.5,
+      "actual": 1.0,
+      "result": "win",
+      "profit_u": 0.3521,
       "recommendation_tier": "candidate"
     },
     {
@@ -399,7 +639,11 @@
       "prop": "batter_hits",
       "selection": "over",
       "market_line": 0.5,
-      "reason": "game not final",
+      "odds": "-120",
+      "stake_u": 0.5,
+      "actual": 1.0,
+      "result": "win",
+      "profit_u": 0.4167,
       "recommendation_tier": "candidate"
     },
     {
@@ -413,7 +657,11 @@
       "prop": "batter_hits",
       "selection": "over",
       "market_line": 0.5,
-      "reason": "game not final",
+      "odds": "-134",
+      "stake_u": 0.5,
+      "actual": 0.0,
+      "result": "loss",
+      "profit_u": -0.5,
       "recommendation_tier": "candidate"
     },
     {
@@ -427,7 +675,11 @@
       "prop": "batter_hits",
       "selection": "over",
       "market_line": 0.5,
-      "reason": "game not final",
+      "odds": "-144",
+      "stake_u": 0.5,
+      "actual": 0.0,
+      "result": "loss",
+      "profit_u": -0.5,
       "recommendation_tier": "candidate"
     },
     {
@@ -441,7 +693,11 @@
       "prop": "batter_hits",
       "selection": "over",
       "market_line": 0.5,
-      "reason": "game not final",
+      "odds": "-140",
+      "stake_u": 0.5,
+      "actual": 0.0,
+      "result": "loss",
+      "profit_u": -0.5,
       "recommendation_tier": "candidate"
     },
     {
@@ -455,7 +711,11 @@
       "prop": "batter_hits",
       "selection": "over",
       "market_line": 0.5,
-      "reason": "game not final",
+      "odds": "-138",
+      "stake_u": 0.5,
+      "actual": 1.0,
+      "result": "win",
+      "profit_u": 0.3623,
       "recommendation_tier": "candidate"
     },
     {
@@ -469,7 +729,11 @@
       "prop": "batter_hits",
       "selection": "over",
       "market_line": 0.5,
-      "reason": "game not final",
+      "odds": "-133",
+      "stake_u": 0.5,
+      "actual": 1.0,
+      "result": "win",
+      "profit_u": 0.3759,
       "recommendation_tier": "candidate"
     },
     {
@@ -483,7 +747,11 @@
       "prop": "batter_hits",
       "selection": "over",
       "market_line": 0.5,
-      "reason": "game not final",
+      "odds": "-137",
+      "stake_u": 0.5,
+      "actual": 1.0,
+      "result": "win",
+      "profit_u": 0.365,
       "recommendation_tier": "candidate"
     },
     {
@@ -497,7 +765,11 @@
       "prop": "batter_hits",
       "selection": "over",
       "market_line": 0.5,
-      "reason": "game not final",
+      "odds": "-110",
+      "stake_u": 0.5,
+      "actual": 1.0,
+      "result": "win",
+      "profit_u": 0.4545,
       "recommendation_tier": "candidate"
     },
     {
@@ -511,7 +783,11 @@
       "prop": "batter_hits",
       "selection": "over",
       "market_line": 0.5,
-      "reason": "game not final",
+      "odds": "-140",
+      "stake_u": 0.5,
+      "actual": 0.0,
+      "result": "loss",
+      "profit_u": -0.5,
       "recommendation_tier": "candidate"
     },
     {
@@ -525,7 +801,11 @@
       "prop": "batter_hits",
       "selection": "over",
       "market_line": 0.5,
-      "reason": "game not final",
+      "odds": "-135",
+      "stake_u": 0.5,
+      "actual": 0.0,
+      "result": "loss",
+      "profit_u": -0.5,
       "recommendation_tier": "candidate"
     },
     {
@@ -539,7 +819,11 @@
       "prop": "batter_hits",
       "selection": "over",
       "market_line": 0.5,
-      "reason": "game not final",
+      "odds": "-135",
+      "stake_u": 0.5,
+      "actual": 1.0,
+      "result": "win",
+      "profit_u": 0.3704,
       "recommendation_tier": "candidate"
     },
     {
@@ -553,7 +837,11 @@
       "prop": "batter_hits",
       "selection": "over",
       "market_line": 0.5,
-      "reason": "game not final",
+      "odds": "-120",
+      "stake_u": 0.5,
+      "actual": 0.0,
+      "result": "loss",
+      "profit_u": -0.5,
       "recommendation_tier": "candidate"
     },
     {
@@ -567,7 +855,11 @@
       "prop": "batter_hits",
       "selection": "over",
       "market_line": 0.5,
-      "reason": "game not final",
+      "odds": "-136",
+      "stake_u": 0.5,
+      "actual": 0.0,
+      "result": "loss",
+      "profit_u": -0.5,
       "recommendation_tier": "candidate"
     },
     {
@@ -581,7 +873,11 @@
       "prop": "batter_total_bases",
       "selection": "over",
       "market_line": 0.5,
-      "reason": "game not final",
+      "odds": "-129",
+      "stake_u": 0.5,
+      "actual": 1.0,
+      "result": "win",
+      "profit_u": 0.3876,
       "recommendation_tier": "candidate"
     },
     {
@@ -595,7 +891,11 @@
       "prop": "batter_total_bases",
       "selection": "over",
       "market_line": 0.5,
-      "reason": "game not final",
+      "odds": "-113",
+      "stake_u": 0.5,
+      "actual": 2.0,
+      "result": "win",
+      "profit_u": 0.4425,
       "recommendation_tier": "candidate"
     },
     {
@@ -609,7 +909,11 @@
       "prop": "batter_total_bases",
       "selection": "over",
       "market_line": 0.5,
-      "reason": "game not final",
+      "odds": "-145",
+      "stake_u": 0.5,
+      "actual": 0.0,
+      "result": "loss",
+      "profit_u": -0.5,
       "recommendation_tier": "candidate"
     },
     {
@@ -623,7 +927,11 @@
       "prop": "batter_total_bases",
       "selection": "over",
       "market_line": 0.5,
-      "reason": "game not final",
+      "odds": "-145",
+      "stake_u": 0.5,
+      "actual": 0.0,
+      "result": "loss",
+      "profit_u": -0.5,
       "recommendation_tier": "candidate"
     },
     {
@@ -637,7 +945,11 @@
       "prop": "batter_total_bases",
       "selection": "over",
       "market_line": 0.5,
-      "reason": "game not final",
+      "odds": "-121",
+      "stake_u": 0.5,
+      "actual": 0.0,
+      "result": "loss",
+      "profit_u": -0.5,
       "recommendation_tier": "candidate"
     },
     {
@@ -651,7 +963,11 @@
       "prop": "batter_total_bases",
       "selection": "over",
       "market_line": 1.5,
-      "reason": "game not final",
+      "odds": "+135",
+      "stake_u": 0.5,
+      "actual": 2.0,
+      "result": "win",
+      "profit_u": 0.675,
       "recommendation_tier": "candidate"
     },
     {
@@ -665,7 +981,11 @@
       "prop": "batter_total_bases",
       "selection": "over",
       "market_line": 1.5,
-      "reason": "game not final",
+      "odds": "+142",
+      "stake_u": 0.5,
+      "actual": 0.0,
+      "result": "loss",
+      "profit_u": -0.5,
       "recommendation_tier": "candidate"
     },
     {
@@ -679,7 +999,11 @@
       "prop": "batter_rbis",
       "selection": "over",
       "market_line": 0.5,
-      "reason": "game not final",
+      "odds": "+148",
+      "stake_u": 0.5,
+      "actual": 0.0,
+      "result": "loss",
+      "profit_u": -0.5,
       "recommendation_tier": "candidate"
     },
     {
@@ -693,7 +1017,11 @@
       "prop": "batter_rbis",
       "selection": "over",
       "market_line": 0.5,
-      "reason": "game not final",
+      "odds": "+145",
+      "stake_u": 0.5,
+      "actual": 0.0,
+      "result": "loss",
+      "profit_u": -0.5,
       "recommendation_tier": "candidate"
     },
     {
@@ -707,7 +1035,11 @@
       "prop": "batter_rbis",
       "selection": "over",
       "market_line": 0.5,
-      "reason": "game not final",
+      "odds": "+180",
+      "stake_u": 0.5,
+      "actual": 2.0,
+      "result": "win",
+      "profit_u": 0.9,
       "recommendation_tier": "candidate"
     },
     {
@@ -721,7 +1053,11 @@
       "prop": "batter_rbis",
       "selection": "over",
       "market_line": 0.5,
-      "reason": "game not final",
+      "odds": "+228",
+      "stake_u": 0.5,
+      "actual": 0.0,
+      "result": "loss",
+      "profit_u": -0.5,
       "recommendation_tier": "candidate"
     },
     {
@@ -735,11 +1071,15 @@
       "prop": "batter_rbis",
       "selection": "over",
       "market_line": 0.5,
-      "reason": "game not final",
+      "odds": "+179",
+      "stake_u": 0.5,
+      "actual": 4.0,
+      "result": "win",
+      "profit_u": 0.895,
       "recommendation_tier": "candidate"
     }
   ],
-  "shadow_unresolved_recommendations": [
+  "_shadow_settled_rows": [
     {
       "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_15_locked_policy.json",
       "date": "2026-06-15",
@@ -751,7 +1091,11 @@
       "prop": "hits_allowed",
       "selection": "over",
       "market_line": 5.5,
-      "reason": "game not final",
+      "odds": "-115",
+      "stake_u": 0.0,
+      "actual": 5.0,
+      "result": "loss",
+      "profit_u": -0.0,
       "recommendation_tier": "shadow"
     },
     {
@@ -765,7 +1109,11 @@
       "prop": "hits_allowed",
       "selection": "over",
       "market_line": 5.5,
-      "reason": "game not final",
+      "odds": "-120",
+      "stake_u": 0.0,
+      "actual": 9.0,
+      "result": "win",
+      "profit_u": 0.0,
       "recommendation_tier": "shadow"
     },
     {
@@ -779,7 +1127,11 @@
       "prop": "hits_allowed",
       "selection": "over",
       "market_line": 5.5,
-      "reason": "game not final",
+      "odds": "+120",
+      "stake_u": 0.0,
+      "actual": 5.0,
+      "result": "loss",
+      "profit_u": -0.0,
       "recommendation_tier": "shadow"
     },
     {
@@ -793,7 +1145,11 @@
       "prop": "hits_allowed",
       "selection": "over",
       "market_line": 5.5,
-      "reason": "game not final",
+      "odds": "-115",
+      "stake_u": 0.0,
+      "actual": 5.0,
+      "result": "loss",
+      "profit_u": -0.0,
       "recommendation_tier": "shadow"
     },
     {
@@ -807,11 +1163,15 @@
       "prop": "hits_allowed",
       "selection": "over",
       "market_line": 5.5,
-      "reason": "game not final",
+      "odds": "+125",
+      "stake_u": 0.0,
+      "actual": 7.0,
+      "result": "win",
+      "profit_u": 0.0,
       "recommendation_tier": "shadow"
     }
   ],
-  "all_unresolved_recommendations": [
+  "_all_settled_rows": [
     {
       "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_15_locked_policy.json",
       "date": "2026-06-15",
@@ -823,7 +1183,11 @@
       "prop": "strikeouts",
       "selection": "away",
       "market_line": 0.0,
-      "reason": "game not final",
+      "odds": "+102",
+      "stake_u": 1.0,
+      "actual": "away",
+      "result": "win",
+      "profit_u": 1.02,
       "recommendation_tier": "official"
     },
     {
@@ -837,7 +1201,11 @@
       "prop": "outs",
       "selection": "over",
       "market_line": 7.5,
-      "reason": "game not final",
+      "odds": "-120",
+      "stake_u": 1.0,
+      "actual": 4.0,
+      "result": "loss",
+      "profit_u": -1.0,
       "recommendation_tier": "official"
     },
     {
@@ -851,7 +1219,11 @@
       "prop": "batter_hits",
       "selection": "over",
       "market_line": 0.5,
-      "reason": "game not final",
+      "odds": "-147",
+      "stake_u": 0.5,
+      "actual": 0.0,
+      "result": "loss",
+      "profit_u": -0.5,
       "recommendation_tier": "official"
     },
     {
@@ -865,7 +1237,11 @@
       "prop": "batter_hits",
       "selection": "over",
       "market_line": 0.5,
-      "reason": "game not final",
+      "odds": "-118",
+      "stake_u": 0.5,
+      "actual": 0.0,
+      "result": "loss",
+      "profit_u": -0.5,
       "recommendation_tier": "official"
     },
     {
@@ -879,7 +1255,11 @@
       "prop": "batter_hits",
       "selection": "over",
       "market_line": 0.5,
-      "reason": "game not final",
+      "odds": "-122",
+      "stake_u": 0.5,
+      "actual": 0.0,
+      "result": "loss",
+      "profit_u": -0.5,
       "recommendation_tier": "official"
     },
     {
@@ -893,7 +1273,11 @@
       "prop": "batter_hits",
       "selection": "over",
       "market_line": 0.5,
-      "reason": "game not final",
+      "odds": "-148",
+      "stake_u": 0.5,
+      "actual": 2.0,
+      "result": "win",
+      "profit_u": 0.3378,
       "recommendation_tier": "official"
     },
     {
@@ -907,7 +1291,11 @@
       "prop": "batter_total_bases",
       "selection": "over",
       "market_line": 0.5,
-      "reason": "game not final",
+      "odds": "-134",
+      "stake_u": 0.5,
+      "actual": 1.0,
+      "result": "win",
+      "profit_u": 0.3731,
       "recommendation_tier": "official"
     },
     {
@@ -921,7 +1309,11 @@
       "prop": "batter_total_bases",
       "selection": "under",
       "market_line": 1.5,
-      "reason": "game not final",
+      "odds": "-138",
+      "stake_u": 0.5,
+      "actual": 2.0,
+      "result": "loss",
+      "profit_u": -0.5,
       "recommendation_tier": "official"
     },
     {
@@ -935,7 +1327,11 @@
       "prop": "batter_total_bases",
       "selection": "over",
       "market_line": 0.5,
-      "reason": "game not final",
+      "odds": "-137",
+      "stake_u": 0.5,
+      "actual": 1.0,
+      "result": "win",
+      "profit_u": 0.365,
       "recommendation_tier": "official"
     },
     {
@@ -949,7 +1345,11 @@
       "prop": "batter_total_bases",
       "selection": "over",
       "market_line": 0.5,
-      "reason": "game not final",
+      "odds": "-130",
+      "stake_u": 0.5,
+      "actual": 0.0,
+      "result": "loss",
+      "profit_u": -0.5,
       "recommendation_tier": "official"
     },
     {
@@ -963,7 +1363,11 @@
       "prop": "batter_total_bases",
       "selection": "over",
       "market_line": 0.5,
-      "reason": "game not final",
+      "odds": "-141",
+      "stake_u": 0.5,
+      "actual": 0.0,
+      "result": "loss",
+      "profit_u": -0.5,
       "recommendation_tier": "official"
     },
     {
@@ -977,7 +1381,11 @@
       "prop": "batter_total_bases",
       "selection": "over",
       "market_line": 0.5,
-      "reason": "game not final",
+      "odds": "-137",
+      "stake_u": 0.5,
+      "actual": 0.0,
+      "result": "loss",
+      "profit_u": -0.5,
       "recommendation_tier": "official"
     },
     {
@@ -991,7 +1399,11 @@
       "prop": "batter_runs_scored",
       "selection": "under",
       "market_line": 0.5,
-      "reason": "game not final",
+      "odds": "-120",
+      "stake_u": 0.5,
+      "actual": 0.0,
+      "result": "win",
+      "profit_u": 0.4167,
       "recommendation_tier": "official"
     },
     {
@@ -1005,7 +1417,11 @@
       "prop": "outs",
       "selection": "over",
       "market_line": 14.5,
-      "reason": "game not final",
+      "odds": "-149",
+      "stake_u": 1.0,
+      "actual": 16.0,
+      "result": "win",
+      "profit_u": 0.6711,
       "recommendation_tier": "candidate"
     },
     {
@@ -1019,7 +1435,11 @@
       "prop": "outs",
       "selection": "over",
       "market_line": 15.5,
-      "reason": "game not final",
+      "odds": "-128",
+      "stake_u": 1.0,
+      "actual": 0.0,
+      "result": "loss",
+      "profit_u": -1.0,
       "recommendation_tier": "candidate"
     },
     {
@@ -1033,7 +1453,11 @@
       "prop": "outs",
       "selection": "over",
       "market_line": 15.0,
-      "reason": "game not final",
+      "odds": "-140",
+      "stake_u": 1.0,
+      "actual": 21.0,
+      "result": "win",
+      "profit_u": 0.7143,
       "recommendation_tier": "candidate"
     },
     {
@@ -1047,7 +1471,11 @@
       "prop": "strikeouts",
       "selection": "over",
       "market_line": 3.5,
-      "reason": "game not final",
+      "odds": "+122",
+      "stake_u": 1.0,
+      "actual": 4.0,
+      "result": "win",
+      "profit_u": 1.22,
       "recommendation_tier": "candidate"
     },
     {
@@ -1061,7 +1489,11 @@
       "prop": "outs",
       "selection": "over",
       "market_line": 17.5,
-      "reason": "game not final",
+      "odds": "-114",
+      "stake_u": 1.0,
+      "actual": 15.0,
+      "result": "loss",
+      "profit_u": -1.0,
       "recommendation_tier": "candidate"
     },
     {
@@ -1075,7 +1507,11 @@
       "prop": "strikeouts",
       "selection": "over",
       "market_line": 4.5,
-      "reason": "game not final",
+      "odds": "+118",
+      "stake_u": 1.0,
+      "actual": 3.0,
+      "result": "loss",
+      "profit_u": -1.0,
       "recommendation_tier": "candidate"
     },
     {
@@ -1089,7 +1525,11 @@
       "prop": "batter_hits",
       "selection": "over",
       "market_line": 0.5,
-      "reason": "game not final",
+      "odds": "-140",
+      "stake_u": 0.5,
+      "actual": 1.0,
+      "result": "win",
+      "profit_u": 0.3571,
       "recommendation_tier": "candidate"
     },
     {
@@ -1103,7 +1543,11 @@
       "prop": "batter_hits",
       "selection": "over",
       "market_line": 0.5,
-      "reason": "game not final",
+      "odds": "-142",
+      "stake_u": 0.5,
+      "actual": 1.0,
+      "result": "win",
+      "profit_u": 0.3521,
       "recommendation_tier": "candidate"
     },
     {
@@ -1117,7 +1561,11 @@
       "prop": "batter_hits",
       "selection": "over",
       "market_line": 0.5,
-      "reason": "game not final",
+      "odds": "-120",
+      "stake_u": 0.5,
+      "actual": 1.0,
+      "result": "win",
+      "profit_u": 0.4167,
       "recommendation_tier": "candidate"
     },
     {
@@ -1131,7 +1579,11 @@
       "prop": "batter_hits",
       "selection": "over",
       "market_line": 0.5,
-      "reason": "game not final",
+      "odds": "-134",
+      "stake_u": 0.5,
+      "actual": 0.0,
+      "result": "loss",
+      "profit_u": -0.5,
       "recommendation_tier": "candidate"
     },
     {
@@ -1145,7 +1597,11 @@
       "prop": "batter_hits",
       "selection": "over",
       "market_line": 0.5,
-      "reason": "game not final",
+      "odds": "-144",
+      "stake_u": 0.5,
+      "actual": 0.0,
+      "result": "loss",
+      "profit_u": -0.5,
       "recommendation_tier": "candidate"
     },
     {
@@ -1159,7 +1615,11 @@
       "prop": "batter_hits",
       "selection": "over",
       "market_line": 0.5,
-      "reason": "game not final",
+      "odds": "-140",
+      "stake_u": 0.5,
+      "actual": 0.0,
+      "result": "loss",
+      "profit_u": -0.5,
       "recommendation_tier": "candidate"
     },
     {
@@ -1173,7 +1633,11 @@
       "prop": "batter_hits",
       "selection": "over",
       "market_line": 0.5,
-      "reason": "game not final",
+      "odds": "-138",
+      "stake_u": 0.5,
+      "actual": 1.0,
+      "result": "win",
+      "profit_u": 0.3623,
       "recommendation_tier": "candidate"
     },
     {
@@ -1187,7 +1651,11 @@
       "prop": "batter_hits",
       "selection": "over",
       "market_line": 0.5,
-      "reason": "game not final",
+      "odds": "-133",
+      "stake_u": 0.5,
+      "actual": 1.0,
+      "result": "win",
+      "profit_u": 0.3759,
       "recommendation_tier": "candidate"
     },
     {
@@ -1201,7 +1669,11 @@
       "prop": "batter_hits",
       "selection": "over",
       "market_line": 0.5,
-      "reason": "game not final",
+      "odds": "-137",
+      "stake_u": 0.5,
+      "actual": 1.0,
+      "result": "win",
+      "profit_u": 0.365,
       "recommendation_tier": "candidate"
     },
     {
@@ -1215,7 +1687,11 @@
       "prop": "batter_hits",
       "selection": "over",
       "market_line": 0.5,
-      "reason": "game not final",
+      "odds": "-110",
+      "stake_u": 0.5,
+      "actual": 1.0,
+      "result": "win",
+      "profit_u": 0.4545,
       "recommendation_tier": "candidate"
     },
     {
@@ -1229,7 +1705,11 @@
       "prop": "batter_hits",
       "selection": "over",
       "market_line": 0.5,
-      "reason": "game not final",
+      "odds": "-140",
+      "stake_u": 0.5,
+      "actual": 0.0,
+      "result": "loss",
+      "profit_u": -0.5,
       "recommendation_tier": "candidate"
     },
     {
@@ -1243,7 +1723,11 @@
       "prop": "batter_hits",
       "selection": "over",
       "market_line": 0.5,
-      "reason": "game not final",
+      "odds": "-135",
+      "stake_u": 0.5,
+      "actual": 0.0,
+      "result": "loss",
+      "profit_u": -0.5,
       "recommendation_tier": "candidate"
     },
     {
@@ -1257,7 +1741,11 @@
       "prop": "batter_hits",
       "selection": "over",
       "market_line": 0.5,
-      "reason": "game not final",
+      "odds": "-135",
+      "stake_u": 0.5,
+      "actual": 1.0,
+      "result": "win",
+      "profit_u": 0.3704,
       "recommendation_tier": "candidate"
     },
     {
@@ -1271,7 +1759,11 @@
       "prop": "batter_hits",
       "selection": "over",
       "market_line": 0.5,
-      "reason": "game not final",
+      "odds": "-120",
+      "stake_u": 0.5,
+      "actual": 0.0,
+      "result": "loss",
+      "profit_u": -0.5,
       "recommendation_tier": "candidate"
     },
     {
@@ -1285,7 +1777,11 @@
       "prop": "batter_hits",
       "selection": "over",
       "market_line": 0.5,
-      "reason": "game not final",
+      "odds": "-136",
+      "stake_u": 0.5,
+      "actual": 0.0,
+      "result": "loss",
+      "profit_u": -0.5,
       "recommendation_tier": "candidate"
     },
     {
@@ -1299,7 +1795,11 @@
       "prop": "batter_total_bases",
       "selection": "over",
       "market_line": 0.5,
-      "reason": "game not final",
+      "odds": "-129",
+      "stake_u": 0.5,
+      "actual": 1.0,
+      "result": "win",
+      "profit_u": 0.3876,
       "recommendation_tier": "candidate"
     },
     {
@@ -1313,7 +1813,11 @@
       "prop": "batter_total_bases",
       "selection": "over",
       "market_line": 0.5,
-      "reason": "game not final",
+      "odds": "-113",
+      "stake_u": 0.5,
+      "actual": 2.0,
+      "result": "win",
+      "profit_u": 0.4425,
       "recommendation_tier": "candidate"
     },
     {
@@ -1327,7 +1831,11 @@
       "prop": "batter_total_bases",
       "selection": "over",
       "market_line": 0.5,
-      "reason": "game not final",
+      "odds": "-145",
+      "stake_u": 0.5,
+      "actual": 0.0,
+      "result": "loss",
+      "profit_u": -0.5,
       "recommendation_tier": "candidate"
     },
     {
@@ -1341,7 +1849,11 @@
       "prop": "batter_total_bases",
       "selection": "over",
       "market_line": 0.5,
-      "reason": "game not final",
+      "odds": "-145",
+      "stake_u": 0.5,
+      "actual": 0.0,
+      "result": "loss",
+      "profit_u": -0.5,
       "recommendation_tier": "candidate"
     },
     {
@@ -1355,7 +1867,11 @@
       "prop": "batter_total_bases",
       "selection": "over",
       "market_line": 0.5,
-      "reason": "game not final",
+      "odds": "-121",
+      "stake_u": 0.5,
+      "actual": 0.0,
+      "result": "loss",
+      "profit_u": -0.5,
       "recommendation_tier": "candidate"
     },
     {
@@ -1369,7 +1885,11 @@
       "prop": "batter_total_bases",
       "selection": "over",
       "market_line": 1.5,
-      "reason": "game not final",
+      "odds": "+135",
+      "stake_u": 0.5,
+      "actual": 2.0,
+      "result": "win",
+      "profit_u": 0.675,
       "recommendation_tier": "candidate"
     },
     {
@@ -1383,7 +1903,11 @@
       "prop": "batter_total_bases",
       "selection": "over",
       "market_line": 1.5,
-      "reason": "game not final",
+      "odds": "+142",
+      "stake_u": 0.5,
+      "actual": 0.0,
+      "result": "loss",
+      "profit_u": -0.5,
       "recommendation_tier": "candidate"
     },
     {
@@ -1397,7 +1921,11 @@
       "prop": "batter_rbis",
       "selection": "over",
       "market_line": 0.5,
-      "reason": "game not final",
+      "odds": "+148",
+      "stake_u": 0.5,
+      "actual": 0.0,
+      "result": "loss",
+      "profit_u": -0.5,
       "recommendation_tier": "candidate"
     },
     {
@@ -1411,7 +1939,11 @@
       "prop": "batter_rbis",
       "selection": "over",
       "market_line": 0.5,
-      "reason": "game not final",
+      "odds": "+145",
+      "stake_u": 0.5,
+      "actual": 0.0,
+      "result": "loss",
+      "profit_u": -0.5,
       "recommendation_tier": "candidate"
     },
     {
@@ -1425,7 +1957,11 @@
       "prop": "batter_rbis",
       "selection": "over",
       "market_line": 0.5,
-      "reason": "game not final",
+      "odds": "+180",
+      "stake_u": 0.5,
+      "actual": 2.0,
+      "result": "win",
+      "profit_u": 0.9,
       "recommendation_tier": "candidate"
     },
     {
@@ -1439,7 +1975,11 @@
       "prop": "batter_rbis",
       "selection": "over",
       "market_line": 0.5,
-      "reason": "game not final",
+      "odds": "+228",
+      "stake_u": 0.5,
+      "actual": 0.0,
+      "result": "loss",
+      "profit_u": -0.5,
       "recommendation_tier": "candidate"
     },
     {
@@ -1453,12 +1993,12 @@
       "prop": "batter_rbis",
       "selection": "over",
       "market_line": 0.5,
-      "reason": "game not final",
+      "odds": "+179",
+      "stake_u": 0.5,
+      "actual": 4.0,
+      "result": "win",
+      "profit_u": 0.895,
       "recommendation_tier": "candidate"
     }
-  ],
-  "_settled_rows": [],
-  "_playable_settled_rows": [],
-  "_shadow_settled_rows": [],
-  "_all_settled_rows": []
+  ]
 }

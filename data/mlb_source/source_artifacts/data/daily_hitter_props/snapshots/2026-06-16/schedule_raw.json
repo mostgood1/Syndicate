@@ -430,6 +430,11 @@
           "ties": 0,
           "pct": ".472"
         },
+        "probablePitcher": {
+          "id": 656302,
+          "fullName": "Dylan Cease",
+          "link": "/api/v1/people/656302"
+        },
         "splitSquad": false,
         "seriesNumber": 24,
         "springLeague": {

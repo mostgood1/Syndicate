@@ -1,20 +1,20 @@
 {
   "date": "2026-06-16",
-  "generatedAt": "2026-06-16T03:05:23-05:00",
+  "generatedAt": "2026-06-16T11:49:58-05:00",
   "summary": {
     "cards": 15,
-    "badges": 74,
+    "badges": 76,
     "sources": {
-      "none": 74
+      "none": 76
     },
     "tones": {
-      "solid": 33,
-      "strong": 25,
-      "soft": 16
+      "solid": 35,
+      "strong": 26,
+      "soft": 15
     },
     "stats": {
       "hits_allowed": {
-        "badges": 21,
+        "badges": 22,
         "rungWins": 0,
         "rungLosses": 0
       },
@@ -24,7 +24,7 @@
         "rungLosses": 0
       },
       "strikeouts": {
-        "badges": 28,
+        "badges": 29,
         "rungWins": 0,
         "rungLosses": 0
       }
@@ -256,22 +256,21 @@
       "status": "",
       "side": "home",
       "starter": "Foster Griffin",
-      "label": "H up to 10",
+      "label": "H up to 9",
       "stat": "hits_allowed",
-      "tone": "soft",
+      "tone": "solid",
       "source": "none",
       "actual": null,
       "wins": 0,
       "losses": 0,
-      "targetCount": 5,
+      "targetCount": 4,
       "targets": [
         6,
         7,
         8,
-        9,
-        10
+        9
       ],
-      "detail": "Supported ladders: 6/7/8/9/10 Last supported rung: 10"
+      "detail": "Supported ladders: 6/7/8/9 Last supported rung: 9"
     },
     {
       "gamePk": 824750,
@@ -464,6 +463,49 @@
       "gamePk": 824504,
       "matchup": "? @ ?",
       "status": "",
+      "side": "away",
+      "starter": "Kodai Senga",
+      "label": "K up to 6",
+      "stat": "strikeouts",
+      "tone": "strong",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 1,
+      "targets": [
+        6
+      ],
+      "detail": "Supported ladders: 6 Last supported rung: 6"
+    },
+    {
+      "gamePk": 824504,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "away",
+      "starter": "Kodai Senga",
+      "label": "H up to 10",
+      "stat": "hits_allowed",
+      "tone": "soft",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 6,
+      "targets": [
+        5,
+        6,
+        7,
+        8,
+        9,
+        10
+      ],
+      "detail": "Supported ladders: 5/6/7/8/9/10 Last supported rung: 10"
+    },
+    {
+      "gamePk": 824504,
+      "matchup": "? @ ?",
+      "status": "",
       "side": "home",
       "starter": "Brady Singer",
       "label": "K up to 7",
@@ -509,7 +551,7 @@
       "starter": "Brady Singer",
       "label": "H up to 10",
       "stat": "hits_allowed",
-      "tone": "soft",
+      "tone": "solid",
       "source": "none",
       "actual": null,
       "wins": 0,
