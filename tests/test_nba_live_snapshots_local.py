@@ -197,6 +197,50 @@ class NbaLiveSnapshotLocalTests(unittest.TestCase):
         self.assertIsNotNone(row.get("live_edge"))
         self.assertEqual(row.get("line_source"), "boxscore_sim_fallback")
 
+    def test_live_player_lens_payload_keeps_surpassed_live_line(self) -> None:
+        with patch("syndicate.features.nba.cards.build_cards_page_context", return_value={"date": "2026-05-21"}), patch(
+            "syndicate.features.nba.cards._filtered_local_live_snapshot_payload",
+            return_value={
+                "ok": True,
+                "date": "2026-05-21",
+                "games": [
+                    {
+                        "event_id": "evt-2",
+                        "rows": [
+                            {
+                                "player": "Jayson Tatum",
+                                "team_tri": "BOS",
+                                "stat": "pts",
+                                "line_live": 18.5,
+                                "price": -115,
+                            }
+                        ],
+                    }
+                ],
+            },
+        ), patch(
+            "syndicate.features.nba.cards.build_live_player_boxscore_payload",
+            return_value={
+                "games": [
+                    {
+                        "event_id": "evt-2",
+                        "players": [
+                            {"team_tri": "BOS", "player": "Jayson Tatum", "pts": 20, "reb": 5, "ast": 3, "mp": 24}
+                        ],
+                    }
+                ]
+            },
+        ), patch(
+            "syndicate.features.nba.cards.build_live_state_payload",
+            return_value={"games": [{"event_id": "evt-2", "status": {"in_progress": True, "period": 2, "clock": "8:00", "status": "8:00 - 2nd"}}]},
+        ):
+            payload = build_live_player_lens_payload("2026-05-21", ["evt-2"], ttl=20)
+
+        row = ((payload.get("games") or [{}])[0].get("rows") or [{}])[0]
+        self.assertEqual(row.get("actual"), 20)
+        self.assertEqual(row.get("line_live"), 18.5)
+        self.assertEqual(row.get("line_source"), "boxscore_sim_fallback")
+
     def test_live_lens_card_surface_shows_total_points_and_live_line(self) -> None:
         with patch(
             "syndicate.features.nba.live_lens.build_cards_page_context",

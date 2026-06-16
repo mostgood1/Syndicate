@@ -816,6 +816,48 @@ class WnbaLiveSnapshotLocalTests(unittest.TestCase):
         self.assertEqual(row.get("book"), "FanDuel")
         self.assertEqual(row.get("line_source"), "oddsapi_player_props_fallback")
 
+    def test_live_player_lens_payload_keeps_surpassed_live_line(self) -> None:
+        with patch(
+            "syndicate.features.wnba.cards.build_cards_page_context",
+            return_value={"date": "2026-05-21"},
+        ), patch(
+            "syndicate.features.wnba.cards._filtered_local_live_snapshot_payload",
+            return_value={
+                "ok": True,
+                "date": "2026-05-21",
+                "games": [
+                    {
+                        "event_id": "evt-2",
+                        "rows": [
+                            {
+                                "player": "Arike Ogunbowale",
+                                "team_tri": "DAL",
+                                "stat": "threes",
+                                "line_live": 1.5,
+                                "line_source": "live_lens_projection_artifact",
+                                "price": -129,
+                                "price_over": -129,
+                                "price_under": None,
+                            }
+                        ],
+                    }
+                ],
+            },
+        ), patch(
+            "syndicate.features.wnba.cards.build_live_player_boxscore_payload",
+            return_value={"games": [{"event_id": "evt-2", "players": [{"player": "Arike Ogunbowale", "team_tri": "DAL", "threes_made": 3}]}]},
+        ), patch(
+            "syndicate.features.wnba.cards.build_live_state_payload",
+            return_value={"games": [{"event_id": "evt-2", "status": {"in_progress": True, "period": 3, "clock": "4:08", "status": "4:08 - 3rd"}}]},
+        ):
+            payload = build_live_player_lens_payload("2026-05-21", ["evt-2"], ttl=20)
+
+        row = ((payload.get("games") or [{}])[0].get("rows") or [{}])[0]
+        self.assertEqual(row.get("actual"), 3)
+        self.assertEqual(row.get("line_live"), 1.5)
+        self.assertEqual(row.get("price"), -129)
+        self.assertEqual(row.get("line_source"), "boxscore_sim_fallback")
+
     def test_live_player_lens_payload_reconciles_status_from_top_level_live_state_rows(self) -> None:
         with patch(
             "syndicate.features.wnba.cards.build_cards_page_context",

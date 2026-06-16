@@ -40014,7 +40014,7 @@ def api_live_player_lens():
                                             elif float(line_live_age_sec) > float(max_age_sec):
                                                 line_live_filter_reason = "stale"
 
-                                if line_live_filter_reason is not None:
+                                if line_live_filter_reason is not None and line_live_filter_reason != "surpassed":
                                     line_live = None
                                     line_live_filtered = True
                         except Exception:

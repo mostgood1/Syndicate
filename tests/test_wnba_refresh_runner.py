@@ -894,6 +894,49 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
 
         self.assertEqual(rows, source_rows)
 
+    def test_generate_offline_live_lens_signals_emits_period_totals(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        script_path = repo_root / "vendor" / "wnba_betting_repo" / "tools" / "generate_offline_live_lens_signals.py"
+        spec = importlib.util.spec_from_file_location("test_generate_offline_live_lens_signals", script_path)
+        assert spec is not None and spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            processed_root = Path(tmp_dir)
+            date_str = "2026-05-22"
+            (processed_root / f"game_cards_{date_str}.csv").write_text(
+                "date,game_id,home_team,visitor_team,commence_time,home_ml,away_ml,home_spread,away_spread,total,halves_h1_total,quarters_q1_total,quarters_q2_total,quarters_q3_total,quarters_q4_total,bookmaker,home_tri,away_tri\n"
+                "2026-05-22,0401,Chicago Sky,Minnesota Lynx,2026-05-22T23:00:00Z,-140,120,-4.5,4.5,164.5,82.0,40.5,41.5,39.5,42.5,oddsapi_consensus,CHI,MIN\n",
+                encoding="utf-8",
+            )
+            (processed_root / f"_predictions_backup_{date_str}.csv").write_text(
+                "home_team,visitor_team,totals,pred_h1_total,pred_q1_total,pred_q2_total,pred_q3_total,pred_q4_total\n"
+                "Chicago Sky,Minnesota Lynx,170.0,86.0,45.0,39.5,41.0,43.0\n",
+                encoding="utf-8",
+            )
+
+            out_path = processed_root / f"live_lens_signals_{date_str}.jsonl"
+            argv = ["generate_offline_live_lens_signals.py", "--date", date_str, "--out", str(out_path), "--min-left", "40"]
+            with patch.object(module, "PROCESSED", processed_root), patch("sys.argv", argv):
+                rc = module.main()
+
+            self.assertEqual(rc, 0)
+            rows = [
+                json.loads(line)
+                for line in out_path.read_text(encoding="utf-8").splitlines()
+                if line.strip()
+            ]
+
+        self.assertEqual(len(rows), 6)
+        markets = {(row["market"], row.get("horizon")) for row in rows}
+        self.assertIn(("total", "game"), markets)
+        self.assertIn(("half_total", "h1"), markets)
+        self.assertIn(("quarter_total", "q1"), markets)
+        self.assertIn(("quarter_total", "q2"), markets)
+        self.assertIn(("quarter_total", "q3"), markets)
+        self.assertIn(("quarter_total", "q4"), markets)
+
     def test_live_lens_projections_export_uses_local_predictions_builder(self) -> None:
         module = self._load_module()
 

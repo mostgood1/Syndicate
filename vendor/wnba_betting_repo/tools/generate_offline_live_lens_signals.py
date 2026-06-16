@@ -6,6 +6,8 @@ POST-appended live logs.
 
 Currently supported:
 - Full-game totals (market="total")
+- Half totals (market="half_total")
+- Quarter totals (market="quarter_total")
 
 Inputs:
 - data/processed/game_cards_<date>.csv (market lines + game_id)
@@ -74,6 +76,14 @@ def _classify(abs_edge: float, watch: float, bet: float) -> str:
     if abs_edge >= watch:
         return "WATCH"
     return "NONE"
+
+
+def _first_float(row: pd.Series, *keys: str) -> float | None:
+    for key in keys:
+        value = _n(row.get(key))
+        if value is not None:
+            return float(value)
+    return None
 
 
 def main() -> int:
@@ -163,6 +173,39 @@ def main() -> int:
     by_klass: dict[str, int] = {"BET": 0, "WATCH": 0, "NONE": 0}
     by_side: dict[str, int] = {"over": 0, "under": 0}
 
+    period_specs = [
+        {
+            "market": "half_total",
+            "horizon": "h1",
+            "line_keys": ("halves_h1_total", "h1_total"),
+            "pred_keys": ("pred_h1_total",),
+        },
+        {
+            "market": "quarter_total",
+            "horizon": "q1",
+            "line_keys": ("quarters_q1_total", "q1_total"),
+            "pred_keys": ("pred_q1_total",),
+        },
+        {
+            "market": "quarter_total",
+            "horizon": "q2",
+            "line_keys": ("quarters_q2_total", "q2_total"),
+            "pred_keys": ("pred_q2_total",),
+        },
+        {
+            "market": "quarter_total",
+            "horizon": "q3",
+            "line_keys": ("quarters_q3_total", "q3_total"),
+            "pred_keys": ("pred_q3_total",),
+        },
+        {
+            "market": "quarter_total",
+            "horizon": "q4",
+            "line_keys": ("quarters_q4_total", "q4_total"),
+            "pred_keys": ("pred_q4_total",),
+        },
+    ]
+
     now_iso = datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
     with out_path.open("w", encoding="utf-8") as f:
         for _, c in cards.iterrows():
@@ -178,62 +221,94 @@ def main() -> int:
             away_tri = str(c.get("away_tri") or "").strip().upper() or None
             commence_time = str(c.get("commence_time") or "").strip() or None
 
-            live_line = _n(c.get("total"))
-            pred_total_raw = _n(pr.get("totals"))
-            if live_line is None or pred_total_raw is None:
+            market_rows: list[dict[str, Any]] = []
+            total_live_line = _n(c.get("total"))
+            total_pred_raw = _n(pr.get("totals"))
+            if total_live_line is not None and total_pred_raw is not None:
+                market_rows.append(
+                    {
+                        "market": "total",
+                        "horizon": "game",
+                        "live_line": float(total_live_line),
+                        "pred_raw": float(total_pred_raw),
+                    }
+                )
+
+            for spec in period_specs:
+                live_line = _first_float(c, *spec["line_keys"])
+                pred_raw = _first_float(pr, *spec["pred_keys"])
+                if live_line is None or pred_raw is None:
+                    continue
+                market_rows.append(
+                    {
+                        "market": str(spec["market"]),
+                        "horizon": str(spec["horizon"]),
+                        "live_line": float(live_line),
+                        "pred_raw": float(pred_raw),
+                    }
+                )
+
+            if not market_rows:
                 continue
 
-            edge = float(pred_total_raw) - float(live_line)
-            edge_adj = edge + float(bias_eff)
+            for market_row in market_rows:
+                live_line = float(market_row["live_line"])
+                pred_raw = float(market_row["pred_raw"])
+                edge = pred_raw - live_line
+                edge_adj = edge + float(bias_eff) if market_row["market"] == "total" else edge
 
-            # Mirror the frontend: only choose a side if the edge is meaningfully directional.
-            side = None
-            if edge_adj > 1.0:
-                side = "over"
-            elif edge_adj < -1.0:
-                side = "under"
+                # Mirror the frontend: only choose a side if the edge is meaningfully directional.
+                side = None
+                if edge_adj > 1.0:
+                    side = "over"
+                elif edge_adj < -1.0:
+                    side = "under"
 
-            klass = _classify(abs(edge_adj), float(args.watch), float(args.bet))
-            if side is None:
-                klass = "NONE"
+                klass = _classify(abs(edge_adj), float(args.watch), float(args.bet))
+                if side is None:
+                    klass = "NONE"
 
-            pred_adj = float(live_line) + float(edge_adj)
+                pred_adj = live_line + edge_adj
+                market = str(market_row["market"])
+                horizon = str(market_row["horizon"])
+                signal_name = "total" if market == "total" else horizon
 
-            obj = {
-                "date": ds,
-                "market": "total",
-                "game_id": game_id,
-                "home": home_tri,
-                "away": away_tri,
-                "live_line": float(live_line),
-                "pred": float(pred_adj),
-                "edge": float(edge),
-                "edge_adj": float(edge_adj),
-                "side": side,
-                "klass": klass,
-                "elapsed": float(elapsed_min),
-                "remaining": float(min_left),
-                "strength": float(abs(edge_adj)),
-                "received_at": commence_time or now_iso,
-                "signal_key": f"total::{game_id or (home_tri or '?') + '_' + (away_tri or '?')}::{side or 'none'}",
-                "context": {
-                    "source": "offline_generate_offline_live_lens_signals",
-                    "pred_source": str(preds_path.name),
-                    "cards_source": str(cards_path.name),
-                    "pred_total_raw": float(pred_total_raw),
-                    "bias_points": float(bias_points),
-                    "bias_cap_points": float(bias_cap),
-                    "bias_eff": float(bias_eff),
-                    "bias_frac": float(frac),
-                    "min_left_assumed": float(min_left),
-                },
-            }
+                obj = {
+                    "date": ds,
+                    "market": market,
+                    "horizon": horizon,
+                    "game_id": game_id,
+                    "home": home_tri,
+                    "away": away_tri,
+                    "live_line": live_line,
+                    "pred": float(pred_adj),
+                    "edge": float(edge),
+                    "edge_adj": float(edge_adj),
+                    "side": side,
+                    "klass": klass,
+                    "elapsed": float(elapsed_min),
+                    "remaining": float(min_left),
+                    "strength": float(abs(edge_adj)),
+                    "received_at": commence_time or now_iso,
+                    "signal_key": f"{signal_name}::{game_id or (home_tri or '?') + '_' + (away_tri or '?')}::{side or 'none'}",
+                    "context": {
+                        "source": "offline_generate_offline_live_lens_signals",
+                        "pred_source": str(preds_path.name),
+                        "cards_source": str(cards_path.name),
+                        "pred_total_raw": float(pred_raw),
+                        "bias_points": float(bias_points),
+                        "bias_cap_points": float(bias_cap),
+                        "bias_eff": float(bias_eff),
+                        "bias_frac": float(frac),
+                        "min_left_assumed": float(min_left),
+                    },
+                }
 
-            f.write(json.dumps(obj, ensure_ascii=False) + "\n")
-            written += 1
-            by_klass[klass] = by_klass.get(klass, 0) + 1
-            if side in {"over", "under"}:
-                by_side[side] = by_side.get(side, 0) + 1
+                f.write(json.dumps(obj, ensure_ascii=False) + "\n")
+                written += 1
+                by_klass[klass] = by_klass.get(klass, 0) + 1
+                if side in {"over", "under"}:
+                    by_side[side] = by_side.get(side, 0) + 1
 
     print(
         json.dumps(
