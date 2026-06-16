@@ -13,7 +13,7 @@ def central_now() -> datetime:
 
 
 def central_today() -> date:
-    return date.today()
+    return central_now().date()
 
 
 def central_today_iso() -> str:
@@ -21,7 +21,7 @@ def central_today_iso() -> str:
 
 
 def central_year() -> int:
-    return date.today().year
+    return central_now().year
 
 
 def central_datetime_from_epoch(epoch: float) -> datetime:
