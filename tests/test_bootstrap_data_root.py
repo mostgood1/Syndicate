@@ -85,8 +85,12 @@ class BootstrapDataRootTests(unittest.TestCase):
                 [
                     "data/mlb_source/source_artifacts",
                     "data/mlb_source/manifests",
+                    "data/nba_source/source_artifacts",
+                    "data/nba_source/manifests",
                     "data/nhl_source/source_artifacts",
                     "data/nhl_source/manifests",
+                    "data/wnba_source/source_artifacts",
+                    "data/wnba_source/manifests",
                     "reports/intelligence",
                     "reports/daily_update/latest",
                     "reports/refresh_status/latest",

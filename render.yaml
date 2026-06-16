@@ -69,8 +69,6 @@ services:
         value: "30"
       - key: GUNICORN_KEEPALIVE
         value: "5"
-      - key: SYNDICATE_BOOTSTRAP_ON_START
-        value: "0"
       - key: SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP
         value: "false"
       - key: SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP

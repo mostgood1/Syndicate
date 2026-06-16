@@ -8,8 +8,12 @@ from pathlib import Path
 BOOTSTRAP_ROOTS = (
     Path("data/mlb_source/source_artifacts"),
     Path("data/mlb_source/manifests"),
+    Path("data/nba_source/source_artifacts"),
+    Path("data/nba_source/manifests"),
     Path("data/nhl_source/source_artifacts"),
     Path("data/nhl_source/manifests"),
+    Path("data/wnba_source/source_artifacts"),
+    Path("data/wnba_source/manifests"),
     Path("reports/intelligence"),
     Path("reports/daily_update/latest"),
     Path("reports/refresh_status/latest"),
