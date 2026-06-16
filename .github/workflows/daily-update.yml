@@ -161,6 +161,8 @@ jobs:
 
           git commit -m "Update daily pipeline outputs"
           $branch = $env:GITHUB_REF_NAME
+          git fetch origin $branch
+          git rebase "origin/$branch"
           Write-Host "Pushing commit to origin/$branch"
           git push origin "HEAD:$branch"
 
