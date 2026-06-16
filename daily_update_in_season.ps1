@@ -6,6 +6,7 @@ param(
     [string]$OddsPhase = 'all',
     [string]$OddsSports = 'all',
     [string]$OddsRegions = 'us',
+    [int]$EventSimForceWindowMinutes = 30,
     [switch]$SkipTests,
     [switch]$SkipSmoke,
     [switch]$SkipSourceUpdates,

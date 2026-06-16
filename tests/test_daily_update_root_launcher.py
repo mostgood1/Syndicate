@@ -28,3 +28,10 @@ class DailyUpdateRootLauncherTests(unittest.TestCase):
             "ForceNCAAB",
         ):
             self.assertIn(f"[switch]${switch_name}", content)
+
+    def test_root_wrapper_preserves_event_sim_force_window(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        script_path = repo_root / "daily_update_in_season.ps1"
+        content = script_path.read_text(encoding="utf-8")
+
+        self.assertIn("[int]$EventSimForceWindowMinutes = 30", content)

@@ -82,10 +82,13 @@ jobs:
       - name: Run archive regression suite
         run: python -m unittest tests.test_archives || true
 
+      - name: Run active-sport gate regression
+        run: python -m unittest tests.test_migration_gate.MigrationGateRuntimeDependencyTests.test_evaluate_active_sport_advanced_readiness_skips_out_of_season_and_no_games
+
       - name: Run daily pipeline
         shell: pwsh
         run: |
-          Write-Host 'Starting scripts/daily_update.ps1'
+          Write-Host 'Starting daily_update_in_season.ps1'
           Write-Host "Using Date=$env:DATE"
           Write-Host "Using BaseUrl=$(if ($env:BASE_URL) { $env:BASE_URL } else { '<empty>' })"
           Write-Host "Using EventSimForceWindowMinutes=$env:EVENT_SIM_FORCE_WINDOW_MINUTES"
@@ -101,7 +104,7 @@ jobs:
           $forceWindowMinutes = [int]$env:EVENT_SIM_FORCE_WINDOW_MINUTES
 
           if ([string]::IsNullOrWhiteSpace($env:BASE_URL)) {
-            & ./scripts/daily_update.ps1 `
+            & ./daily_update_in_season.ps1 `
               -Date $env:DATE `
               -RefreshOdds `
               -OddsPhase all `
@@ -111,7 +114,7 @@ jobs:
               -EventSimForceWindowMinutes $forceWindowMinutes 2>&1 | Tee-Object -FilePath daily-update.log
           }
           else {
-            & ./scripts/daily_update.ps1 `
+            & ./daily_update_in_season.ps1 `
               -Date $env:DATE `
               -BaseUrl $env:BASE_URL `
               -RefreshOdds `

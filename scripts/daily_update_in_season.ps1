@@ -6,6 +6,7 @@ param(
     [string]$OddsPhase = 'all',
     [string]$OddsSports = 'all',
     [string]$OddsRegions = 'us',
+    [int]$EventSimForceWindowMinutes = 30,
     [switch]$SkipTests,
     [switch]$SkipSmoke,
     [switch]$SkipSourceUpdates,
@@ -258,6 +259,7 @@ if ($RefreshOdds) { $dailyArgs += '-RefreshOdds' }
 if ($OddsPhase) { $dailyArgs += @('-OddsPhase', $OddsPhase) }
 if ($OddsSports) { $dailyArgs += @('-OddsSports', $OddsSports) }
 if ($OddsRegions) { $dailyArgs += @('-OddsRegions', $OddsRegions) }
+if ($PSBoundParameters.ContainsKey('EventSimForceWindowMinutes')) { $dailyArgs += @('-EventSimForceWindowMinutes', $EventSimForceWindowMinutes) }
 if ($effectiveSkipTests) { $dailyArgs += '-SkipTests' }
 if ($effectiveSkipSmoke) { $dailyArgs += '-SkipSmoke' }
 if ($SkipSourceUpdates) { $dailyArgs += '-SkipSourceUpdates' }

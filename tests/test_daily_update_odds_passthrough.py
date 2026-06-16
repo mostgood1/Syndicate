@@ -14,16 +14,18 @@ class DailyUpdateOddsPassthroughTests(unittest.TestCase):
         self.assertIn("[string]$OddsPhase = 'all'", content)
         self.assertIn("[string]$OddsSports = 'all'", content)
         self.assertIn("[string]$OddsRegions = 'us'", content)
+        self.assertIn("[int]$EventSimForceWindowMinutes = 30", content)
 
     def test_daily_update_wrapper_passes_refresh_odds_args(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]
-        script_path = repo_root / "scripts" / "daily_update.ps1"
+        script_path = repo_root / "scripts" / "daily_update_in_season.ps1"
         content = script_path.read_text(encoding="utf-8")
 
-        self.assertIn("if ($RefreshOdds) { $unifiedArgs += '-RefreshOdds' }", content)
-        self.assertIn("if ($OddsPhase) { $unifiedArgs += @('-OddsPhase', $OddsPhase) }", content)
-        self.assertIn("if ($OddsSports) { $unifiedArgs += @('-OddsSports', $OddsSports) }", content)
-        self.assertIn("if ($OddsRegions) { $unifiedArgs += @('-OddsRegions', $OddsRegions) }", content)
+        self.assertIn("if ($RefreshOdds) { $dailyArgs += '-RefreshOdds' }", content)
+        self.assertIn("if ($OddsPhase) { $dailyArgs += @('-OddsPhase', $OddsPhase) }", content)
+        self.assertIn("if ($OddsSports) { $dailyArgs += @('-OddsSports', $OddsSports) }", content)
+        self.assertIn("if ($OddsRegions) { $dailyArgs += @('-OddsRegions', $OddsRegions) }", content)
+        self.assertIn("if ($PSBoundParameters.ContainsKey('EventSimForceWindowMinutes')) { $dailyArgs += @('-EventSimForceWindowMinutes', $EventSimForceWindowMinutes) }", content)
 
     def test_unified_daily_update_passes_refresh_odds_to_refresh_gate(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]
