@@ -862,7 +862,7 @@ def build_source_cards_payload(selected_date: str, *, allow_stored_date_fallback
     requested_date = str(selected_date or "").strip() or parse_iso_date(selected_date).isoformat()
     resolved_date = requested_date
     bundle = _artifact_bundle(resolved_date)
-    if not bundle["rows"] and allow_stored_date_fallback:
+    if not bundle["rows"] and (allow_stored_date_fallback or resolved_date == central_today_iso()):
         fallback_date = _nearest_available_cards_date(resolved_date)
         if fallback_date and fallback_date != resolved_date:
             resolved_date = fallback_date
