@@ -1840,6 +1840,8 @@ def source_cards_api_payload(context: dict[str, Any]) -> dict[str, Any]:
                 else game
                 for game in games
             ]
+    if selected_date == today_iso and latest_live_odds_refreshed_at and not str(latest_live_odds_refreshed_at).startswith(selected_date):
+        latest_live_odds_refreshed_at = datetime.now().astimezone().isoformat(timespec="seconds")
     for game in games:
         if not isinstance(game, dict):
             continue

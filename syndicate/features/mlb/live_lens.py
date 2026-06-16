@@ -989,12 +989,27 @@ def build_live_lens_page_context(selected_date: str, *, season: int | None = Non
         fallback_report = _cards_backed_live_lens_report(selected_date)
         if fallback_report is not None:
             report = fallback_report
+    elif isinstance(report, dict):
+        merged_report = _merge_cards_context_into_report(report, selected_date)
+        if isinstance(merged_report, dict):
+            report = merged_report
     runtime_live_lens_dir = str(report_path.parent)
     runtime_data_root = str(report_path.parent.parent)
-    odds_refreshed_at = datetime.now().astimezone().isoformat(timespec="seconds") if persist else None
-    generated_at = str((report or {}).get("generatedAt") or datetime.now().astimezone().isoformat(timespec="seconds")).strip() or selected_date
+    current_odds_refreshed_at = datetime.now().astimezone().isoformat(timespec="seconds")
     rows = (report or {}).get("games") if isinstance((report or {}).get("games"), list) else []
+    odds_refreshed_at = current_odds_refreshed_at if persist or bool(rows) else None
+    generated_at = str((report or {}).get("generatedAt") or datetime.now().astimezone().isoformat(timespec="seconds")).strip() or selected_date
     games = [_game_from_report_row(row, report_date=selected_date, generated_at=generated_at) for row in rows if isinstance(row, dict)]
+    if odds_refreshed_at:
+        games = [
+            {
+                **game,
+                "oddsRefreshedAt": odds_refreshed_at,
+                "odds_refreshed_at": odds_refreshed_at,
+            }
+            for game in games
+            if isinstance(game, dict)
+        ]
     if persist and games:
         persisted_games = [dict(game) for game in games if isinstance(game, dict)]
         persisted_counts = {
@@ -1067,6 +1082,8 @@ def build_live_lens_page_context(selected_date: str, *, season: int | None = Non
         "scoreboard_items": scoreboard_items,
         "source_path": str(report_path),
         "using_sample_data": using_sample_data,
+        "odds_refreshed_at": odds_refreshed_at,
+        "oddsRefreshedAt": odds_refreshed_at,
         "source_title": "MLB live-lens report artifact" if games else "MLB live lens unavailable",
         "generatedAt": generated_at,
         "counts": counts,

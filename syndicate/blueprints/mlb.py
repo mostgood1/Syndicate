@@ -767,7 +767,7 @@ def live_lens():
 def api_live_lens():
     selected_date = _iso_or_today(request.args.get("date"))
     persist_raw = request.args.get("persist")
-    persist = _query_bool(persist_raw, default=False)
+    persist = _query_bool(persist_raw, default=True)
     context = build_live_lens_page_context(selected_date, persist=persist)
     return jsonify(build_live_lens_api_payload(context))
 

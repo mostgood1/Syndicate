@@ -4210,6 +4210,41 @@ class HomeBoardTests(unittest.TestCase):
         self.assertEqual(context.get("source_title"), "WNBA live scoreboard fallback")
         self.assertEqual((context.get("games") or [{}])[0].get("event_id"), "evt-9")
 
+    def test_wnba_cards_page_uses_public_scoreboard_fallback_when_local_live_state_is_empty(self) -> None:
+        from syndicate.features.wnba.cards import build_cards_page_context as build_wnba_cards_page_context
+
+        public_payload = {
+            "ok": True,
+            "source": "espn_scoreboard_fallback",
+            "games": [
+                {
+                    "event_id": "evt-public-1",
+                    "away": "TOR",
+                    "home": "IND",
+                    "away_pts": 0,
+                    "home_pts": 0,
+                    "status": "6/16 - 7:00 PM EDT",
+                    "clock": "",
+                    "period": None,
+                    "in_progress": False,
+                    "final": False,
+                    "periods": [],
+                }
+            ],
+        }
+
+        with patch("syndicate.features.wnba.cards._games_from_artifacts", return_value=([], "cards.csv", "recs.json")), patch(
+            "syndicate.features.wnba.cards._local_live_state_payload",
+            return_value=None,
+        ), patch(
+            "syndicate.features.wnba.cards._public_scoreboard_live_state_payload",
+            return_value=public_payload,
+        ):
+            context = build_wnba_cards_page_context("2026-06-16", allow_stored_date_fallback=False)
+
+        self.assertEqual(context.get("source_title"), "WNBA live scoreboard fallback")
+        self.assertEqual((context.get("games") or [{}])[0].get("event_id"), "evt-public-1")
+
     def test_wnba_processed_card_rows_include_live_lens_client_fields(self) -> None:
         from syndicate.features.wnba.cards import _game_from_row
 
@@ -5462,6 +5497,16 @@ class ArchiveRouteTests(unittest.TestCase):
         self.assertIn('Loading live lens', body)
         self.assertNotIn('Live Lens Accuracy', body)
         self.assertNotIn('Market Accuracy', body)
+
+    def test_mlb_live_lens_api_defaults_to_persisting_current_day_state(self) -> None:
+        with patch("syndicate.blueprints.mlb.build_live_lens_page_context", return_value={"date": "2026-06-16"}) as build_context, patch(
+            "syndicate.blueprints.mlb.build_live_lens_api_payload",
+            return_value={"ok": True},
+        ):
+            response = self.client.get("/mlb/api/live-lens?date=2026-06-16")
+
+        self.assertEqual(response.status_code, 200)
+        build_context.assert_called_once_with("2026-06-16", persist=True)
 
     def test_ncaaf_picks_api_exposes_rank_board_navigation_metadata(self) -> None:
         ncaaf_season = default_ncaaf_season()

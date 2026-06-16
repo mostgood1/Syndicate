@@ -1252,6 +1252,11 @@ def _games_from_live_state_fallback(selected_date: str, ttl: int = 12) -> tuple[
             source_path = str(live_snapshot_path(f"live_state_{selected_date}.jsonl"))
         except FileNotFoundError:
             source_path = None
+    if not isinstance(payload, dict) or not isinstance(payload.get("games"), list) or not payload.get("games"):
+        public_payload = _public_scoreboard_live_state_payload(selected_date)
+        if isinstance(public_payload, dict) and isinstance(public_payload.get("games"), list) and public_payload.get("games"):
+            payload = public_payload
+            source_path = "espn_scoreboard_fallback"
     rows = payload.get("games") if isinstance((payload or {}).get("games"), list) else []
     sim_index = _artifact_bundle(selected_date).get("sim", {})
     games: list[dict[str, Any]] = []
