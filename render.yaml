@@ -35,7 +35,7 @@ services:
       - key: SYNDICATE_REFRESH_STATE_BACKEND
         value: keyvalue
       - key: SYNDICATE_DATA_ROOT
-        value: /opt/render/project/data
+        value: /opt/render/project/src/data
       - key: SYNDICATE_REPORTS_ROOT
         value: /opt/render/project/data/reports
       - key: SYNDICATE_NBA_SOURCE_APP_FALLBACK
@@ -59,7 +59,7 @@ services:
       - key: SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP
         value: "false"
       - key: SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP
-        value: "false"
+        value: "true"
       - key: SYNDICATE_LIVE_ODDS_REFRESH_INTERVAL_SECONDS
         value: "30"
       - key: SYNDICATE_LIVE_ODDS_REFRESH_PHASE
@@ -71,21 +71,21 @@ services:
       - key: SYNDICATE_LIVE_ODDS_REFRESH_SKIP_MIRROR
         value: "true"
       - key: MLB_BETTING_DATA_ROOT
-        value: /opt/render/project/data/mlb_source/source_artifacts/data
+        value: /opt/render/project/src/data/mlb_source/source_artifacts/data
       - key: MLB_LIVE_LENS_DIR
-        value: /opt/render/project/data/mlb_source/source_artifacts/data/live_lens
+        value: /opt/render/project/src/data/mlb_source/source_artifacts/data/live_lens
       - key: NBA_BETTING_DATA_ROOT
-        value: /opt/render/project/data/nba_source/source_artifacts/data
+        value: /opt/render/project/src/data/nba_source/source_artifacts/data
       - key: NBA_LIVE_LENS_DIR
-        value: /opt/render/project/data/nba_source/source_artifacts/data/live_lens
+        value: /opt/render/project/src/data/nba_source/source_artifacts/data/live_lens
       - key: WNBA_BETTING_DATA_ROOT
-        value: /opt/render/project/data/wnba_source/source_artifacts/data
+        value: /opt/render/project/src/data/wnba_source/source_artifacts/data
       - key: WNBA_LIVE_LENS_DIR
-        value: /opt/render/project/data/wnba_source/source_artifacts/data/live_lens
+        value: /opt/render/project/src/data/wnba_source/source_artifacts/data/live_lens
       - key: NHL_LIVE_LENS_DIR
-        value: /opt/render/project/data/nhl_source/source_artifacts/data/live_lens
+        value: /opt/render/project/src/data/nhl_source/source_artifacts/data/live_lens
       - key: NHL_DATA_DIR
-        value: /opt/render/project/data/nhl_source/source_artifacts/data
+        value: /opt/render/project/src/data/nhl_source/source_artifacts/data
       - key: MLB_ENABLE_LIVE_LENS_LOOP
         value: "true"
       - key: MLB_ENABLE_LIVE_LENS_BACKGROUND_REPORTS
