@@ -105,11 +105,11 @@ def available_dates() -> list[str]:
 
 
 def default_date() -> str:
-    return date.today().isoformat()
+    return central_today_iso()
 
 
 def default_date_for_season(season: int) -> str:
-    today_value = date.today().isoformat()
+    today_value = central_today_iso()
     if today_value.startswith(f"{int(season)}-"):
         return today_value
     season_str = str(int(season))

@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from datetime import datetime
+from datetime import timedelta
+from datetime import timezone
 import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -857,6 +860,15 @@ class WnbaLiveSnapshotLocalTests(unittest.TestCase):
         self.assertEqual(row.get("line_live"), 1.5)
         self.assertEqual(row.get("price"), -129)
         self.assertEqual(row.get("line_source"), "boxscore_sim_fallback")
+
+    def test_attach_odds_refresh_timestamp_normalizes_to_central(self) -> None:
+        from syndicate.features.wnba import cards as module
+
+        with patch.object(module, "central_now", return_value=datetime(2026, 6, 15, 12, 21, 0, tzinfo=timezone(timedelta(hours=-5)))):
+            out = module._attach_odds_refresh_timestamp({"generated_at": "2026-06-15T17:21:00Z"})
+
+        self.assertEqual(out.get("odds_refreshed_at"), "2026-06-15T12:21:00-05:00")
+        self.assertEqual(out.get("generated_at"), "2026-06-15T17:21:00Z")
 
     def test_live_player_lens_payload_reconciles_status_from_top_level_live_state_rows(self) -> None:
         with patch(

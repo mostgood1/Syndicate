@@ -27,6 +27,7 @@ from syndicate.features.shared.basketball_live_artifacts import build_live_lines
 from syndicate.features.shared.basketball_live_artifacts import build_live_player_lens_payload_from_artifacts
 from syndicate.features.shared.game_board_contract import apply_game_board_contract
 from syndicate.features.shared.game_board_contract import build_game_board_api_payload
+from syndicate.features.shared.timezone import central_now
 from syndicate.features.shared.timezone import central_today_iso
 
 
@@ -1057,7 +1058,15 @@ def _attach_odds_refresh_timestamp(payload: dict[str, Any]) -> dict[str, Any]:
     out = dict(payload)
     timestamp = str(out.get("odds_refreshed_at") or out.get("generated_at") or "").strip()
     if not timestamp:
-        timestamp = datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+        timestamp = central_now().isoformat(timespec="seconds")
+    else:
+        try:
+            parsed = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
+            if parsed.tzinfo is None:
+                parsed = parsed.replace(tzinfo=timezone.utc)
+            timestamp = parsed.astimezone(central_now().tzinfo).isoformat(timespec="seconds")
+        except Exception:
+            pass
     out["odds_refreshed_at"] = timestamp
     out.setdefault("generated_at", timestamp)
     return out

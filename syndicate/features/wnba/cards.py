@@ -30,6 +30,7 @@ from syndicate.features.wnba.sources import parse_iso_date
 from syndicate.features.wnba.sources import processed_path
 from syndicate.features.wnba.sources import _source_roots as _wnba_source_roots
 from syndicate.features.shared.source_roots import repo_root_from as _repo_root_from
+from syndicate.features.shared.timezone import central_now
 from syndicate.features.shared.timezone import central_today_iso
 
 
@@ -1794,7 +1795,15 @@ def _attach_odds_refresh_timestamp(payload: dict[str, Any]) -> dict[str, Any]:
     out = dict(payload)
     timestamp = str(out.get("odds_refreshed_at") or out.get("generated_at") or "").strip()
     if not timestamp:
-        timestamp = datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+        timestamp = central_now().isoformat(timespec="seconds")
+    else:
+        try:
+            parsed = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
+            if parsed.tzinfo is None:
+                parsed = parsed.replace(tzinfo=timezone.utc)
+            timestamp = parsed.astimezone(central_now().tzinfo).isoformat(timespec="seconds")
+        except Exception:
+            pass
     out["odds_refreshed_at"] = timestamp
     out.setdefault("generated_at", timestamp)
     return out
@@ -3014,7 +3023,7 @@ def _fallback_live_player_lens_game(game: dict[str, Any], *, event_id: str | Non
 
 
 def build_live_state_payload(selected_date: str, ttl: int = 12, *, allow_stored_date_fallback: bool = True) -> dict[str, Any]:
-    is_today = str(selected_date).strip() == date.today().isoformat()
+    is_today = str(selected_date).strip() == central_today_iso()
 
     # Live-state is operationally critical for in-progress scoreboards on WNBA and Home.
     # For today's slate, prefer fresher remote/public live sources ahead of the local snapshot
@@ -3243,7 +3252,7 @@ def build_live_player_lens_payload(
     context = build_cards_page_context(selected_date, allow_stored_date_fallback=allow_stored_date_fallback)
     resolved_date = str(context.get("date") or selected_date).strip() or selected_date
     local_payload = _filtered_local_live_snapshot_payload("live_player_lens", resolved_date, normalized_event_ids)
-    is_today = str(selected_date).strip() == date.today().isoformat()
+    is_today = str(selected_date).strip() == central_today_iso()
     local_timestamp = _parse_payload_timestamp((local_payload or {}).get("odds_refreshed_at") or (local_payload or {}).get("generated_at"))
     if is_today and local_timestamp and (datetime.now(timezone.utc) - local_timestamp) > timedelta(minutes=20):
         local_payload = None
@@ -3355,7 +3364,7 @@ def build_live_lines_payload(
     context = build_cards_page_context(selected_date, allow_stored_date_fallback=allow_stored_date_fallback)
     resolved_date = str(context.get("date") or selected_date).strip() or selected_date
     local_payload = _filtered_local_live_snapshot_payload("live_lines", resolved_date, normalized_event_ids)
-    is_today = str(selected_date).strip() == date.today().isoformat()
+    is_today = str(selected_date).strip() == central_today_iso()
     local_timestamp = _parse_payload_timestamp((local_payload or {}).get("odds_refreshed_at") or (local_payload or {}).get("generated_at"))
     if is_today and local_timestamp and (datetime.now(timezone.utc) - local_timestamp) > timedelta(minutes=20):
         local_payload = None
