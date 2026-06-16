@@ -129,18 +129,9 @@ class IntelligenceStateTests(unittest.TestCase):
         self.assertEqual(mocked_print.call_args.args[1]["candidate_count"], 0)
         self.assertEqual(payload["response"]["analysis"]["recommendations"], [])
 
-    def test_query_endpoint_uses_synchronous_state_compute_when_default_cache_is_empty(self) -> None:
+    def test_query_endpoint_queues_refresh_when_default_cache_is_empty(self) -> None:
         app = Flask(__name__)
         app.register_blueprint(intelligence_bp)
-
-        computed_response = {
-            "ok": True,
-            "last_updated": "2026-06-11T16:07:00Z",
-            "candidate_pool": {"candidate_count": 1, "candidates": [{"name": "Play 1"}]},
-            "top_opportunities": [{"name": "Play 1"}],
-            "by_sport": {},
-            "analysis": {"recommendations": [{"name": "Play 1"}], "picks": [], "top_live_opportunities": [], "portfolio": {}, "parlays": []},
-        }
 
         with app.test_request_context(
             "/api/intelligence/query",
@@ -149,8 +140,7 @@ class IntelligenceStateTests(unittest.TestCase):
         ):
             with patch("syndicate.blueprints.intelligence.read_latest_intelligence_state_response", return_value=None):
                 with patch("syndicate.blueprints.intelligence.queue_intelligence_state_refresh") as mocked_queue:
-                    with patch("syndicate.blueprints.intelligence.compute_intelligence_state_response", return_value=dict(computed_response)) as mocked_compute:
-                        response = intelligence_query_api()
+                    response = intelligence_query_api()
 
         payload = response.get_json()
         self.assertIsNotNone(payload)
@@ -158,12 +148,12 @@ class IntelligenceStateTests(unittest.TestCase):
         self.assertIn("version", payload)
         self.assertIn("timestamp", payload)
         self.assertIn("response", payload)
-        self.assertEqual(payload["response"]["top_opportunities"][0]["name"], "Play 1")
-        self.assertEqual(payload["response"]["candidate_pool"]["candidate_count"], 1)
-        mocked_compute.assert_called_once()
-        mocked_queue.assert_not_called()
+        self.assertEqual(payload["response"]["top_opportunities"], [])
+        self.assertEqual(payload["response"]["analysis"]["recommendations"], [])
+        self.assertEqual(payload["response"]["analysis"]["portfolio"], {})
+        mocked_queue.assert_called_once()
 
-    def test_query_endpoint_computes_when_default_cache_exists_but_is_empty(self) -> None:
+    def test_query_endpoint_returns_empty_default_response_when_default_cache_exists_but_is_empty(self) -> None:
         app = Flask(__name__)
         app.register_blueprint(intelligence_bp)
 
@@ -189,8 +179,7 @@ class IntelligenceStateTests(unittest.TestCase):
         ):
             with patch("syndicate.blueprints.intelligence.read_latest_intelligence_state_response", return_value=dict(empty_cached_response)):
                 with patch("syndicate.blueprints.intelligence.queue_intelligence_state_refresh") as mocked_queue:
-                    with patch("syndicate.blueprints.intelligence.compute_intelligence_state_response", return_value=dict(computed_response)) as mocked_compute:
-                        response = intelligence_query_api()
+                    response = intelligence_query_api()
 
         payload = response.get_json()
         self.assertIsNotNone(payload)
@@ -198,11 +187,10 @@ class IntelligenceStateTests(unittest.TestCase):
         self.assertIn("version", payload)
         self.assertIn("timestamp", payload)
         self.assertIn("response", payload)
-        self.assertEqual(payload["response"]["top_opportunities"][0]["name"], "Play 1")
-        self.assertEqual(payload["response"]["candidate_pool"]["candidate_count"], 1)
-        self.assertEqual(payload["candidate_count"], 1)
-        mocked_compute.assert_called_once()
-        mocked_queue.assert_not_called()
+        self.assertEqual(payload["response"]["top_opportunities"], [])
+        self.assertEqual(payload["response"]["analysis"]["recommendations"], [])
+        self.assertEqual(payload["response"]["analysis"]["portfolio"], {})
+        mocked_queue.assert_called_once()
 
     def test_query_endpoint_exposes_line_move_tracking_fields(self) -> None:
         app = Flask(__name__)

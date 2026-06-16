@@ -398,6 +398,7 @@
           <p class="intelligence-card__lede">This lane reflects the active response payload that powers Ask, the home command center, and the live board.</p>
         </div>
       </div>
+      <div id="top-opportunities-evidence"></div>
       <div id="top-opportunities"></div>
     </div>
   </div>
@@ -1179,6 +1180,7 @@ function isPregameRecommendation(item) {
 
 function renderLoadingState() {
   const portfolioEl = document.getElementById("portfolio");
+  const topOpportunitiesEvidenceEl = document.getElementById("top-opportunities-evidence");
   const topOpportunitiesEl = document.getElementById("top-opportunities");
   const scannerEl = document.getElementById("scanner");
   const picksEl = document.getElementById("picks");
@@ -1190,6 +1192,14 @@ function renderLoadingState() {
         <div style="height:18px;width:180px;background:rgba(255,255,255,.08);border-radius:999px;margin-bottom:12px;animation:pulse 1.4s ease-in-out infinite;"></div>
         <div style="height:14px;width:85%;background:rgba(255,255,255,.06);border-radius:999px;margin-bottom:10px;animation:pulse 1.4s ease-in-out infinite;"></div>
         <div style="height:14px;width:72%;background:rgba(255,255,255,.06);border-radius:999px;animation:pulse 1.4s ease-in-out infinite;"></div>
+      </div>
+    `;
+  }
+
+  if (topOpportunitiesEvidenceEl) {
+    topOpportunitiesEvidenceEl.innerHTML = `
+      <div style="background:#101010;color:white;padding:16px;border-radius:14px;border:1px solid rgba(255,255,255,.08);margin-bottom:12px;">
+        <div style="opacity:.65;">Loading supporting evidence…</div>
       </div>
     `;
   }
@@ -1237,6 +1247,7 @@ function renderLoadingState() {
 
 function renderEmptyState() {
   const portfolioEl = document.getElementById("portfolio");
+  const topOpportunitiesEvidenceEl = document.getElementById("top-opportunities-evidence");
   const topOpportunitiesEl = document.getElementById("top-opportunities");
   const scannerEl = document.getElementById("scanner");
   const picksEl = document.getElementById("picks");
@@ -1256,6 +1267,14 @@ function renderEmptyState() {
       <div style="background:#101010;color:white;padding:18px;border-radius:14px;border:1px solid rgba(255,255,255,.08);">
         <h3 style="margin:0 0 8px 0;">Top Opportunities Right Now</h3>
         <div style="opacity:.65;">No opportunities available</div>
+      </div>
+    `;
+  }
+
+  if (topOpportunitiesEvidenceEl) {
+    topOpportunitiesEvidenceEl.innerHTML = `
+      <div style="background:#101010;color:white;padding:16px;border-radius:14px;border:1px solid rgba(255,255,255,.08);margin-bottom:12px;">
+        <div style="opacity:.65;">No supporting evidence available</div>
       </div>
     `;
   }
@@ -1286,11 +1305,20 @@ function renderEmptyState() {
 
 function renderErrorState(message) {
   const portfolioEl = document.getElementById("portfolio");
+  const topOpportunitiesEvidenceEl = document.getElementById("top-opportunities-evidence");
   const topOpportunitiesEl = document.getElementById("top-opportunities");
   const scannerEl = document.getElementById("scanner");
   const picksEl = document.getElementById("picks");
   const parlaysEl = document.getElementById("parlays");
   const safeMessage = message || "Failed to load data";
+
+  if (topOpportunitiesEvidenceEl) {
+    topOpportunitiesEvidenceEl.innerHTML = `
+      <div style="background:#2a1111;color:#ffd4d4;padding:18px;border-radius:14px;border:1px solid rgba(255,100,100,.18);margin-bottom:12px;">
+        <div>${safeMessage}</div>
+      </div>
+    `;
+  }
 
   if (topOpportunitiesEl) {
     topOpportunitiesEl.innerHTML = `
@@ -1339,6 +1367,14 @@ function renderIntelligence(response) {
 
   const data = normalizeIntelligenceResponse(response);
   console.log("[FRONTEND DATA]", data.state_last_updated, data.candidate_count);
+  const initialEvidenceEl = document.getElementById("top-opportunities-evidence");
+  if (initialEvidenceEl) {
+    initialEvidenceEl.innerHTML = `
+      <div style="background:#101010;color:white;padding:18px;border-radius:14px;border:1px solid rgba(255,255,255,.08);">
+        ${renderSupportingEvidence(data)}
+      </div>
+    `;
+  }
 
   // ===== PORTFOLIO =====
   const portfolio = data.portfolio || {};
@@ -1691,11 +1727,8 @@ function renderIntelligence(response) {
         border:1px solid rgba(255,255,255,.08);
         margin-bottom:20px;
       ">
-        <div style="margin-bottom:14px; padding:14px; border-radius:12px; background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.08);">
-          ${renderSupportingEvidence(data)}
-        </div>
         <h3 style="margin:0 0 12px 0;">Top Opportunities Right Now</h3>
-        ${renderRefreshStamp()}
+          ${renderRefreshStamp()}
         ${recs.map((item, index) => {
           const theme = edgeTheme(item);
           const expectedValue = typeof item.expected_value === "number"
@@ -1867,12 +1900,6 @@ function renderIntelligence(response) {
     }
     if (policyControl && policyControl.policy_status) {
       summaryParts.push(`Policy ${policyControl.selected_policy || "default"}`);
-    }
-    if (data.line_moves_tracked) {
-      summaryParts.push(`${data.line_moves_tracked} line moves tracked`);
-    }
-    if (data.line_move_history_count) {
-      summaryParts.push(`${data.line_move_history_count} movement entries`);
     }
     if (trackedOddsCount > 0) {
       summaryParts.push(`${trackedOddsCount} odds tracked`);

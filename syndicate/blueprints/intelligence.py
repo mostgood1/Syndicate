@@ -257,11 +257,6 @@ def _cached_intelligence_response_with_source(payload: dict[str, object]) -> tup
     cached_response = read_latest_intelligence_state_response(payload, force_refresh=False)
     if _is_board_response(cached_response):
         return dict(cached_response or {}), "worker"
-    computed_response = compute_intelligence_state_response(dict(payload))
-    if isinstance(computed_response, dict):
-        normalized_response = _unwrap_response_payload(computed_response)
-        if _is_board_response(normalized_response):
-            return dict(normalized_response), "computed"
     return None, "fallback"
 
 
@@ -574,15 +569,11 @@ def intelligence_home():
     payload = _intelligence_page_payload(selected_date)
     initial_response: dict[str, Any] = {}
     try:
-            cached_response, _ = _cached_intelligence_response_with_source(payload)
-            if cached_response is not None:
-                initial_response = dict(cached_response)
-            if not _response_has_content(initial_response):
-                computed_response = compute_intelligence_state_response(dict(payload))
-                if isinstance(computed_response, dict):
-                    initial_response = _unwrap_response_payload(computed_response)
-            if not _response_has_content(initial_response):
-                queue_intelligence_state_refresh(dict(payload))
+        cached_response, _ = _cached_intelligence_response_with_source(payload)
+        if cached_response is not None:
+            initial_response = dict(cached_response)
+        if not _response_has_content(initial_response):
+            queue_intelligence_state_refresh(dict(payload))
     except Exception:
         initial_response = {}
     return render_template(
@@ -615,20 +606,12 @@ def intelligence_query_api():
         _log_api_state_read(cached_response if isinstance(cached_response, dict) else {})
         if question == DEFAULT_QUESTION and cached_response is not None:
             response_payload = dict(cached_response)
-            if not _response_has_content(response_payload):
-                computed_response = compute_intelligence_state_response(dict(payload))
-                if isinstance(computed_response, dict):
-                    response_payload = _unwrap_response_payload(computed_response)
             if want_refresh or not _response_has_content(response_payload):
                 queue_intelligence_state_refresh(dict(payload))
         elif question == DEFAULT_QUESTION:
             if want_refresh and not bool(payload.get("background")):
                 queue_intelligence_state_refresh(dict(payload))
             cached_response = _cached_intelligence_response(dict(payload))
-            if cached_response is None or not _response_has_content(cached_response):
-                computed_response = compute_intelligence_state_response(dict(payload))
-                if isinstance(computed_response, dict):
-                    cached_response = computed_response
             if cached_response is None:
                 cached_response = _empty_default_intelligence_response()
             response_payload = _unwrap_response_payload(cached_response)
@@ -669,10 +652,6 @@ def intelligence_query_api():
                 cached_response = get_intelligence_state_response(payload, refresh=False, wait=False)
             else:
                 cached_response = get_intelligence_state_response(payload, refresh=False, wait=False)
-                if cached_response is None:
-                    computed_response = compute_intelligence_state_response(dict(payload))
-                    if isinstance(computed_response, dict):
-                        cached_response = computed_response
             if not _is_board_response(cached_response) or cached_response.get("ok") is False:
                 queue_intelligence_state_refresh(dict(payload))
                 cached_response = {
