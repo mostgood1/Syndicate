@@ -6,6 +6,8 @@ from pathlib import Path
 
 
 BOOTSTRAP_ROOTS = (
+    Path("data/mlb_source/source_artifacts"),
+    Path("data/mlb_source/manifests"),
     Path("data/nhl_source/source_artifacts"),
     Path("data/nhl_source/manifests"),
     Path("reports/intelligence"),

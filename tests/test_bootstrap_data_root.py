@@ -83,6 +83,8 @@ class BootstrapDataRootTests(unittest.TestCase):
             self.assertEqual(
                 relative_sources,
                 [
+                    "data/mlb_source/source_artifacts",
+                    "data/mlb_source/manifests",
                     "data/nhl_source/source_artifacts",
                     "data/nhl_source/manifests",
                     "reports/intelligence",
