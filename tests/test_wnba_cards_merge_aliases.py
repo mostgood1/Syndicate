@@ -4,6 +4,7 @@ import unittest
 from unittest.mock import patch
 
 from syndicate.features.wnba.cards import _supplement_games_with_live_state
+from syndicate.features.wnba.cards import build_source_cards_payload
 
 
 class WnbaCardsMergeAliasTests(unittest.TestCase):
@@ -80,6 +81,28 @@ class WnbaCardsMergeAliasTests(unittest.TestCase):
 
         self.assertEqual(len(merged_games), 1)
         self.assertEqual(supplemented_count, 0)
+
+    def test_source_cards_payload_falls_back_to_latest_stored_slate_for_today(self) -> None:
+        empty_bundle = {"rows": [], "recommendations": {}, "sim": {}, "props": {}}
+        fallback_bundle = {
+            "rows": [{"away_tri": "LAS", "home_tri": "CON", "gamePk": "1", "commence_time": "2026-06-11T18:00:00Z"}],
+            "recommendations": {},
+            "sim": {},
+            "props": {},
+        }
+
+        with patch("syndicate.features.wnba.cards.central_today_iso", return_value="2026-06-15"), patch(
+            "syndicate.features.wnba.cards.available_dates",
+            return_value=["2026-06-11", "2026-06-15"],
+        ), patch(
+            "syndicate.features.wnba.cards._artifact_bundle",
+            side_effect=lambda selected_date: fallback_bundle if selected_date == "2026-06-11" else empty_bundle,
+        ):
+            payload = build_source_cards_payload("2026-06-15")
+
+        self.assertEqual(payload["date"], "2026-06-11")
+        self.assertTrue(payload["lookahead_applied"])
+        self.assertEqual(len(payload["games"]), 1)
 
 
 if __name__ == "__main__":
