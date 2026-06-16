@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from typing import Callable
 
 from flask import Flask
 from syndicate.blueprints.ask_the_syndicate import ask_the_syndicate_bp
@@ -25,12 +26,28 @@ def _env_bool(name: str, *, default: bool = False) -> bool:
         return bool(default)
     return raw in {"1", "true", "yes", "on"}
 
+
+def _bootstrap_render_data(bootstrap_main: Callable[[], int] | None = None) -> None:
+    if not _env_bool("SYNDICATE_BOOTSTRAP_ON_START", default=False):
+        return
+    if bootstrap_main is None:
+        try:
+            from scripts.bootstrap_data_root import main as bootstrap_main  # type: ignore
+        except Exception:
+            return
+    try:
+        bootstrap_main()
+    except Exception:
+        return
+
 def create_app() -> Flask:
     app = Flask(
         __name__,
         template_folder="templates",
         static_folder="static",
     )
+
+    _bootstrap_render_data()
 
     if not app.config.get("SYNDICATE_SPORTS"):
         app.config["SYNDICATE_SPORTS"] = [

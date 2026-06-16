@@ -51,6 +51,8 @@ services:
         value: /opt/render/project/data/wnba_source
       - key: SYNDICATE_REPORTS_ROOT
         value: /opt/render/project/data/reports
+      - key: SYNDICATE_BOOTSTRAP_ON_START
+        value: "1"
       - key: SYNDICATE_NBA_SOURCE_APP_FALLBACK
         value: "false"
       - key: SYNDICATE_WNBA_SOURCE_APP_FALLBACK
@@ -146,7 +148,7 @@ services:
       - key: SYNDICATE_REPORTS_ROOT
         value: /opt/render/project/data/reports
       - key: SYNDICATE_BOOTSTRAP_ON_START
-        value: "0"
+        value: "1"
       - key: SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP
         value: "true"
       - key: SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP
