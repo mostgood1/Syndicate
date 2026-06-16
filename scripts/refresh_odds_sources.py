@@ -1035,6 +1035,16 @@ def _build_summary(args: argparse.Namespace) -> dict[str, Any]:
 
     summary["finished_at"] = _utc_now()
     summary["ok"] = not any_failure
+    publish_parity_paths: list[str] = []
+    for sport_result in summary.get("results", []) if isinstance(summary.get("results"), list) else []:
+        if not isinstance(sport_result, dict):
+            continue
+        publish_parity_paths.extend(_sport_artifact_paths(sport_result))
+    summary["publish_parity"] = build_publish_parity_summary(
+        date=summary.get("date"),
+        forced_paths=publish_parity_paths,
+        intelligence_paths=[],
+    )
     return summary
 
 
@@ -1083,18 +1093,6 @@ def main() -> int:
         payload = {"ok": False, "error": f"{type(exc).__name__}: {exc}"}
         print(json.dumps(payload, indent=2))
         return 1
-
-        publish_parity_paths: list[str] = []
-        for sport_result in summary.get("results", []) if isinstance(summary.get("results"), list) else []:
-            if not isinstance(sport_result, dict):
-                continue
-            publish_parity_paths.extend(_sport_artifact_paths(sport_result))
-
-        summary["publish_parity"] = build_publish_parity_summary(
-            date=summary.get("date"),
-            forced_paths=publish_parity_paths,
-            intelligence_paths=[],
-        )
 
     summary["odds_control_plane"] = write_odds_control_plane_snapshot(summary)
 

@@ -466,7 +466,7 @@ function Set-RunFailureState {
     Sync-RunStateArtifacts -Manifest $Manifest
 }
 
-function Apply-RunReplayContext {
+function Set-RunReplayContext {
     param(
         [psobject]$Manifest,
         [psobject]$ReplayContext
@@ -3027,15 +3027,6 @@ function Get-ForcedPublishArtifactPaths {
 
     $forcedPublishArtifactPaths = @()
     $intelligencePublishArtifactPaths = @()
-    $publishParitySummary = [ordered]@{
-        date = $Date
-        skipped = [bool]$SkipGitPush
-        forcedPublishArtifactPathCount = 0
-        intelligencePublishArtifactPathCount = 0
-        missingForcedPublishArtifactPaths = @()
-        missingIntelligencePublishArtifactPaths = @()
-        status = if ($SkipGitPush) { 'skipped' } else { 'pending' }
-    }
     if (-not $SkipGitPush) {
         $forcedPublishArtifactPaths = @(
             Get-ForcedPublishArtifactPaths -RepoPath $repoRoot -DateValue $Date -SkipGitPush ([bool]$SkipGitPush) -SkipMLB ([bool]$SkipMLB) -SkipNBA ([bool]$SkipNBA) -SkipNHL ([bool]$SkipNHL) -SkipWNBA ([bool]$SkipWNBA) -SkipNFL ([bool]$SkipNFL) -SkipNCAAF ([bool]$SkipNCAAF) -SkipNCAAB ([bool]$SkipNCAAB)
@@ -3044,6 +3035,17 @@ function Get-ForcedPublishArtifactPaths {
             Get-IntelligencePublishArtifactPaths -RepoPath $repoRoot -DateValue $Date -SkipMLB ([bool]$SkipMLB) -SkipNBA ([bool]$SkipNBA) -SkipNHL ([bool]$SkipNHL) -SkipWNBA ([bool]$SkipWNBA) -SkipNFL ([bool]$SkipNFL) -SkipNCAAF ([bool]$SkipNCAAF) -SkipNCAAB ([bool]$SkipNCAAB)
         )
         $publishParitySummary = Get-PublishParitySummary -DateValue $Date -ForcedPublishArtifactPaths $forcedPublishArtifactPaths -IntelligencePublishArtifactPaths $intelligencePublishArtifactPaths
+    }
+    else {
+        $publishParitySummary = [ordered]@{
+            date = $Date
+            skipped = $true
+            forcedPublishArtifactPathCount = 0
+            intelligencePublishArtifactPathCount = 0
+            missingForcedPublishArtifactPaths = @()
+            missingIntelligencePublishArtifactPaths = @()
+            status = 'skipped'
+        }
     }
 
     if (-not $SkipMLB) {
@@ -4068,7 +4070,7 @@ if ($null -ne $latestManifest) {
     $runManifest.runPlan.artifactUpdates = @($latestManifest.artifactUpdates)
 }
 
-Apply-RunReplayContext -Manifest $runManifest -ReplayContext $runManifest.replayContext
+Set-RunReplayContext -Manifest $runManifest -ReplayContext $runManifest.replayContext
 
 Sync-RunManifestPolicyPerformance -Manifest $runManifest
 

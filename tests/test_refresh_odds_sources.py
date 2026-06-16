@@ -90,3 +90,38 @@ class RefreshOddsSourcesTests(unittest.TestCase):
         self.assertEqual(kwargs["sport"], "wnba")
         self.assertIn("artifact_paths", kwargs)
         self.assertEqual(kwargs["metadata"]["execution_mode"], "source")
+
+    def test_build_summary_emits_publish_parity_on_success(self) -> None:
+        module = self._load_module()
+        args = argparse.Namespace(
+            date="2026-06-07",
+            sports="wnba",
+            phase="all",
+            regions="us",
+            bookmakers="",
+            markets="",
+            season=None,
+            week=None,
+            skip_mirror=True,
+            execution_mode="source",
+            mirror_only=False,
+            continue_on_error=True,
+            dry_run=False,
+            json=False,
+            list=False,
+        )
+
+        with patch.object(module, "_run_command", return_value={"ok": True, "name": "wnba_oddsapi_props_job", "dry_run": False}), patch.object(
+            module,
+            "_sync_post_refresh_tracking_step",
+            return_value={"ok": True, "name": "wnba_post_refresh_tracking_sync", "dry_run": False, "meta": {"signals_rows": 3}},
+        ), patch.object(module, "publish_sport_manifest", return_value={"path": "reports/manifests/wnba.json", "payload": {"sport": "wnba"}}), patch.object(
+            module,
+            "build_publish_parity_summary",
+            return_value={"date": "2026-06-07", "sports": [], "totalForcedPublishPaths": 3},
+        ) as mocked_publish_parity:
+            summary = module._build_summary(args)
+
+        self.assertTrue(summary["ok"])
+        self.assertEqual(summary["publish_parity"]["totalForcedPublishPaths"], 3)
+        mocked_publish_parity.assert_called_once()
