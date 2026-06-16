@@ -1,6 +1,6 @@
 {
   "date": "2026-06-16",
-  "generatedAt": "2026-06-16T14:56:41-05:00",
+  "generatedAt": "2026-06-16T15:48:32-05:00",
   "dataRoot": "data",
   "liveLensDir": "data/live_lens",
   "optimizationRegime": {
@@ -25,11 +25,11 @@
   "performance": {
     "marketsRefreshed": false,
     "marketRefreshMs": 0.0,
-    "totalMs": 3913.1,
-    "snapshotLoadMs": 2.6,
-    "simContextLoadMs": 1.6,
+    "totalMs": 5676.4,
+    "snapshotLoadMs": 3.7,
+    "simContextLoadMs": 3.9,
     "propEvalMs": 0.1,
-    "gameLensMs": 1.8,
+    "gameLensMs": 1.9,
     "gameCount": 15,
     "liveGameCount": 0,
     "feedFetchCount": 15,
@@ -57,8 +57,8 @@
           "name": "Philadelphia Phillies"
         },
         "score": {
-          "away": null,
-          "home": null
+          "away": 0,
+          "home": 0
         },
         "liveText": "Tyler Phillips vs Jes\u00fas Luzardo | 1 official pick(s) | +6 playable"
       },
@@ -1608,10 +1608,10 @@
         }
       ],
       "simContextAvailable": false,
-      "snapshotAvailable": false,
+      "snapshotAvailable": true,
       "score": {
-        "away": null,
-        "home": null
+        "away": 0,
+        "home": 0
       },
       "market_tiles": [
         {
@@ -2504,8 +2504,8 @@
           "name": "Washington Nationals"
         },
         "score": {
-          "away": null,
-          "home": null
+          "away": 0,
+          "home": 0
         },
         "liveText": "Michael Wacha vs Foster Griffin | +6 playable"
       },
@@ -3902,10 +3902,10 @@
         }
       ],
       "simContextAvailable": false,
-      "snapshotAvailable": false,
+      "snapshotAvailable": true,
       "score": {
-        "away": null,
-        "home": null
+        "away": 0,
+        "home": 0
       },
       "market_tiles": [
         {
@@ -4662,8 +4662,8 @@
           "name": "Boston Red Sox"
         },
         "score": {
-          "away": null,
-          "home": null
+          "away": 0,
+          "home": 0
         },
         "liveText": "Kevin Gausman vs Payton Tolle | +5 playable"
       },
@@ -5836,10 +5836,10 @@
         }
       ],
       "simContextAvailable": false,
-      "snapshotAvailable": false,
+      "snapshotAvailable": true,
       "score": {
-        "away": null,
-        "home": null
+        "away": 0,
+        "home": 0
       },
       "market_tiles": [
         {
@@ -6455,8 +6455,8 @@
           "name": "New York Yankees"
         },
         "score": {
-          "away": null,
-          "home": null
+          "away": 0,
+          "home": 0
         },
         "liveText": "Davis Martin vs Gerrit Cole | +3 playable"
       },
@@ -7192,10 +7192,10 @@
         }
       ],
       "simContextAvailable": false,
-      "snapshotAvailable": false,
+      "snapshotAvailable": true,
       "score": {
-        "away": null,
-        "home": null
+        "away": 0,
+        "home": 0
       },
       "market_tiles": [
         {
@@ -9620,8 +9620,8 @@
           "name": "Atlanta Braves"
         },
         "score": {
-          "away": null,
-          "home": null
+          "away": 0,
+          "home": 0
         },
         "liveText": "Adrian Houser vs Grant Holmes | +5 playable"
       },
@@ -10797,10 +10797,10 @@
         }
       ],
       "simContextAvailable": false,
-      "snapshotAvailable": false,
+      "snapshotAvailable": true,
       "score": {
-        "away": null,
-        "home": null
+        "away": 0,
+        "home": 0
       },
       "market_tiles": [
         {
@@ -11406,7 +11406,7 @@
       "gamePk": 823775,
       "status": {
         "abstract": "Preview",
-        "detailed": "Scheduled"
+        "detailed": "Pre-Game"
       },
       "startTime": "6:40 PM",
       "matchup": {
@@ -19206,8 +19206,8 @@
           "name": "Houston Astros"
         },
         "score": {
-          "away": 0,
-          "home": 0
+          "away": null,
+          "home": null
         },
         "liveText": "Framber Valdez vs Hunter Brown | +3 playable"
       },
@@ -19989,10 +19989,10 @@
         }
       ],
       "simContextAvailable": false,
-      "snapshotAvailable": true,
+      "snapshotAvailable": false,
       "score": {
-        "away": 0,
-        "home": 0
+        "away": null,
+        "home": null
       },
       "market_tiles": [
         {
