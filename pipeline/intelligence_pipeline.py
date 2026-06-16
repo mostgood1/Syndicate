@@ -122,6 +122,7 @@ class IntelligencePipelineRequest:
     timing: str | None = None
     include_props: bool | None = None
     include_games: bool | None = None
+    enable_reasoning_steps: bool = False
     force_refresh: bool = True
 
     def to_dict(self) -> dict[str, Any]:
@@ -138,6 +139,7 @@ class IntelligencePipelineRequest:
             "timing": self.timing,
             "include_props": self.include_props,
             "include_games": self.include_games,
+            "enable_reasoning_steps": self.enable_reasoning_steps,
             "force_refresh": self.force_refresh,
         }
 
@@ -199,6 +201,7 @@ def _normalize_request(request_or_payload: Any) -> IntelligencePipelineRequest:
         timing=str(payload.get("timing") or "").strip() or None,
         include_props=_optional_bool(payload.get("include_props")),
         include_games=_optional_bool(payload.get("include_games")),
+        enable_reasoning_steps=_optional_bool(payload.get("enable_reasoning_steps")) or False,
         force_refresh=_optional_bool(payload.get("force_refresh")) if payload.get("force_refresh") is not None else True,
     )
 
@@ -999,6 +1002,8 @@ def _summarize_step_result(step_question: str, step_result: IntelligenceResult) 
 
 
 def _run_reasoning_steps(normalized_request: IntelligencePipelineRequest) -> tuple[dict[str, Any], tuple[Evidence, ...]]:
+    if not normalized_request.enable_reasoning_steps and normalized_request.query_type not in {"comparison", "risk_evaluation"}:
+        return (), ()
     step_defs = _decompose_reasoning_steps(normalized_request)
     if len(step_defs) <= 1:
         return (), ()
@@ -1284,5 +1289,23 @@ def run_intelligence_pipeline(request_or_payload: Any) -> IntelligenceResult:
         limit=normalized_request.limit,
         timing=normalized_request.timing,
     )
+    from pipeline.intelligence_state import acquire_intelligence_execution_guard
+    from pipeline.intelligence_state import get_latest_intelligence_cached_response
+    from pipeline.intelligence_state import release_intelligence_execution_guard
+
+    if not acquire_intelligence_execution_guard():
+        cached_response = get_latest_intelligence_cached_response(normalized_request.to_dict())
+        if cached_response is not None:
+            return _time_stage(
+                "cached_fallback",
+                IntelligenceResult.from_raw,
+                cached_response,
+                pipeline_request=normalized_request.to_dict(),
+                pipeline_context={"cached_fallback": True},
+                pipeline_stages=("input_normalization", "cached_fallback"),
+            )
     context = _time_stage("context_enrichment", _enrich_context, normalized_request)
-    return _call_intelligence(normalized_request, context)
+    try:
+        return _call_intelligence(normalized_request, context)
+    finally:
+        release_intelligence_execution_guard()

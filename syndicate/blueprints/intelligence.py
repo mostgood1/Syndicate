@@ -97,6 +97,13 @@ def _no_cache_response(response):
     return response
 
 
+def _query_bool(value: object) -> bool:
+    if isinstance(value, bool):
+        return value
+    normalized = str(value or "").strip().lower()
+    return normalized in {"1", "true", "t", "yes", "y", "on"}
+
+
 def _response_hash(payload: dict[str, object]) -> str:
     canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str)
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
@@ -599,6 +606,7 @@ def intelligence_query_api():
             return _no_cache_response(response)
         user_profile = _normalize_user_profile(payload)
         want_refresh = bool(payload.get("force_refresh")) or bool(payload.get("background"))
+        explicit_override = _query_bool(payload.get("override_compute")) or _query_bool(payload.get("direct_compute"))
 
         response_payload: dict[str, object] | None = None
         selected_date = str(payload.get("date") or payload.get("selected_date") or "").strip() or None
@@ -621,21 +629,36 @@ def intelligence_query_api():
             if not _response_has_content(response_payload):
                 queue_intelligence_state_refresh(dict(payload))
         else:
-            board_result = run_intelligence_query(
-                question,
-                selected_date=selected_date,
-                mode=str(payload.get("mode") or "").strip() or None,
-                sport=str(payload.get("sport") or "").strip() or None,
-                game_state=str(payload.get("game_state") or "").strip() or None,
-                limit=payload.get("limit"),
-                timing=str(payload.get("timing") or "").strip() or None,
-                include_props=payload.get("include_props"),
-                include_games=payload.get("include_games"),
-                policy=str(payload.get("policy") or "").strip() or None,
-                force_refresh=bool(payload.get("force_refresh")) if payload.get("force_refresh") is not None else False,
-            )
-            if isinstance(board_result, dict):
-                response_payload = dict(board_result)
+            if cached_response is not None:
+                response_payload = dict(cached_response)
+                if want_refresh or not _response_has_content(response_payload):
+                    queue_intelligence_state_refresh(dict(payload))
+            else:
+                queue_intelligence_state_refresh(dict(payload))
+                board_result = get_intelligence_state_response(
+                    payload,
+                    refresh=True,
+                    wait=False,
+                    force_refresh=False,
+                )
+                if isinstance(board_result, dict):
+                    response_payload = _unwrap_response_payload(board_result)
+                elif explicit_override:
+                    board_result = run_intelligence_query(
+                        question,
+                        selected_date=selected_date,
+                        mode=str(payload.get("mode") or "").strip() or None,
+                        sport=str(payload.get("sport") or "").strip() or None,
+                        game_state=str(payload.get("game_state") or "").strip() or None,
+                        limit=payload.get("limit"),
+                        timing=str(payload.get("timing") or "").strip() or None,
+                        include_props=payload.get("include_props"),
+                        include_games=payload.get("include_games"),
+                        policy=str(payload.get("policy") or "").strip() or None,
+                        force_refresh=bool(payload.get("force_refresh")) if payload.get("force_refresh") is not None else False,
+                    )
+                    if isinstance(board_result, dict):
+                        response_payload = dict(board_result)
 
         if not isinstance(response_payload, dict) or not response_payload:
             if question == DEFAULT_QUESTION:

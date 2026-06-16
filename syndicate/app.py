@@ -17,7 +17,6 @@ from syndicate.blueprints.mlb import mlb_bp
 from syndicate.blueprints.sports import sports_bp
 from syndicate.blueprints.wnba import wnba_bp
 from syndicate.features.shared.live_refresh_loop import start_live_refresh_background_loop
-from pipeline.intelligence_state import start_intelligence_state_background_loop
 
 
 def _env_bool(name: str, *, default: bool = False) -> bool:
@@ -190,8 +189,6 @@ def create_app() -> Flask:
     app.register_blueprint(sports_bp)
     if _env_bool("SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP", default=False):
         start_live_refresh_background_loop()
-    if _env_bool("SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP", default=False):
-        start_intelligence_state_background_loop(app)
     return app
 
 

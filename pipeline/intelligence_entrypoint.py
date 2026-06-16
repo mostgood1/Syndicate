@@ -14,4 +14,16 @@ def route_intelligence_request(request_or_payload: Any) -> dict[str, Any]:
 
 
 def run_routed_intelligence_pipeline(request_or_payload: Any):
-    return run_intelligence_pipeline(route_intelligence_request(request_or_payload))
+    routed_request = route_intelligence_request(request_or_payload)
+    from pipeline.intelligence_state import acquire_intelligence_execution_guard
+    from pipeline.intelligence_state import get_latest_intelligence_cached_response
+    from pipeline.intelligence_state import release_intelligence_execution_guard
+
+    if not acquire_intelligence_execution_guard():
+        cached_response = get_latest_intelligence_cached_response(routed_request)
+        if cached_response is not None:
+            return cached_response
+    try:
+        return run_intelligence_pipeline(routed_request)
+    finally:
+        release_intelligence_execution_guard()

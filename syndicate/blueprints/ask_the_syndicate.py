@@ -1,29 +1,33 @@
 from __future__ import annotations
 
 from typing import Any
+import calendar
 import hashlib
 import json
 import os
 import re
+import threading
+import time
 
 from flask import Blueprint
 from flask import jsonify
 from flask import request
 
 from router.query_router import QueryRouter as IntelligenceQueryRouter
-from pipeline.intelligence_entrypoint import run_routed_intelligence_pipeline
 from pipeline.intelligence_state import queue_intelligence_state_refresh
 from pipeline.intelligence_state import read_latest_intelligence_state_response
 from syndicate.blueprints.ask_the_syndicate_adapter import build_syndicate_query_response
 from syndicate.blueprints.ask_the_syndicate_router import SyndicateQueryRouter
 from syndicate.blueprints.ask_the_syndicate_router import RouteDecision
-from syndicate.features.intelligence import run_intelligence_query
 from syndicate.features.intelligence_board import build_intelligence_board_contract
 
 
 ask_the_syndicate_bp = Blueprint("ask_the_syndicate", __name__)
 _QUERY_ROUTER = SyndicateQueryRouter()
 _INTELLIGENCE_ROUTER = IntelligenceQueryRouter()
+_REFRESH_QUEUE_LOCK = threading.Lock()
+_REFRESH_QUEUE_DEDUPE_SECONDS = 15.0
+_REFRESH_QUEUE_STATE: dict[str, float] = {}
 
 _SPORT_HINTS: tuple[tuple[str, tuple[str, ...]], ...] = (
     (
@@ -158,28 +162,43 @@ def _smart_route_payload(payload: dict[str, Any]) -> dict[str, Any]:
 
 
 def _build_artifact_response(shaped_payload: dict[str, Any], decision: RouteDecision) -> dict[str, Any] | None:
-    question = str(shaped_payload.get("question") or "").strip()
-    try:
-        result = run_intelligence_query(
-            question,
-            selected_date=str(shaped_payload.get("selected_date") or shaped_payload.get("date") or "").strip() or None,
-            mode=str(shaped_payload.get("mode") or "").strip() or None,
-            sport=str(shaped_payload.get("sport") or shaped_payload.get("sport_slug") or "").strip() or None,
-            limit=shaped_payload.get("limit"),
-            timing=str(shaped_payload.get("timing") or "").strip() or None,
-            include_props=shaped_payload.get("include_props"),
-            include_games=shaped_payload.get("include_games"),
-            force_refresh=bool(shaped_payload.get("force_refresh")),
-        )
-    except Exception:
-        return None
+    return None
 
-    return build_syndicate_query_response(
-        question=str(shaped_payload.get("original_question") or question).strip(),
-        context=_coerce_context(shaped_payload),
-        decision=decision,
-        result=result,
-    )
+
+def _refresh_queue_key(shaped_payload: dict[str, Any]) -> str:
+    queue_payload = {
+        key: shaped_payload.get(key)
+        for key in (
+            "question",
+            "original_question",
+            "query_type",
+            "sport",
+            "sport_slug",
+            "mode",
+            "selected_date",
+            "date",
+            "limit",
+            "include_props",
+            "include_games",
+            "timing",
+        )
+    }
+    canonical = json.dumps(queue_payload, sort_keys=True, separators=(",", ":"), default=str)
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def _latest_state_is_fresh(latest_state: dict[str, Any] | None) -> bool:
+    if not isinstance(latest_state, dict):
+        return False
+    latest_updated_at = str(latest_state.get("latestComputedAt") or latest_state.get("last_updated") or "").strip()
+    if not latest_updated_at:
+        return False
+    try:
+        computed_at = time.strptime(latest_updated_at, "%Y-%m-%dT%H:%M:%SZ")
+    except Exception:
+        return False
+    computed_epoch = calendar.timegm(computed_at)
+    return (time.time() - computed_epoch) <= _REFRESH_QUEUE_DEDUPE_SECONDS
 
 
 def _build_fast_state_result(shaped_payload: dict[str, Any]) -> dict[str, Any] | None:
@@ -280,10 +299,49 @@ def _build_fast_state_result(shaped_payload: dict[str, Any]) -> dict[str, Any] |
 
 
 def _maybe_queue_exact_refresh(shaped_payload: dict[str, Any]) -> None:
+    latest_state = read_latest_intelligence_state_response(shaped_payload)
+    if _latest_state_is_fresh(latest_state):
+        return
+
+    queue_key = _refresh_queue_key(shaped_payload)
+    current_time = time.time()
+    with _REFRESH_QUEUE_LOCK:
+        last_queued_at = _REFRESH_QUEUE_STATE.get(queue_key)
+        if last_queued_at is not None and (current_time - last_queued_at) < _REFRESH_QUEUE_DEDUPE_SECONDS:
+            return
+        _REFRESH_QUEUE_STATE[queue_key] = current_time
+        stale_keys = [key for key, queued_at in _REFRESH_QUEUE_STATE.items() if (current_time - queued_at) >= _REFRESH_QUEUE_DEDUPE_SECONDS]
+        for stale_key in stale_keys:
+            _REFRESH_QUEUE_STATE.pop(stale_key, None)
+
     try:
         queue_intelligence_state_refresh(shaped_payload)
     except Exception:
-        pass
+        with _REFRESH_QUEUE_LOCK:
+            _REFRESH_QUEUE_STATE.pop(queue_key, None)
+
+
+def _build_placeholder_response(shaped_payload: dict[str, Any], decision: RouteDecision, *, reason: str) -> dict[str, Any]:
+    empty_result: dict[str, Any] = {
+        "query_type": decision.intent,
+        "parsed_request": {
+            "question": str(shaped_payload.get("original_question") or shaped_payload.get("question") or "").strip(),
+        },
+        "analysis_views": {},
+        "recommendations": [],
+        "top_opportunities": [],
+        "board_notes": [],
+        "reasoning_steps": [],
+        "summary": None,
+        "pipeline_context": {"routing_context": {"question": str(shaped_payload.get("original_question") or shaped_payload.get("question") or "").strip()}},
+        "structured_response": {"context_awareness": {"reasoning": reason}},
+    }
+    return build_syndicate_query_response(
+        question=str(shaped_payload.get("original_question") or shaped_payload.get("question") or "").strip(),
+        context=_coerce_context(shaped_payload),
+        decision=decision,
+        result=empty_result,
+    )
 
 
 def _base_pipeline_payload(payload: dict[str, Any]) -> dict[str, Any]:
@@ -335,7 +393,17 @@ def _apply_intent_hints(pipeline_payload: dict[str, Any], intent: str) -> dict[s
 
 def _build_route_payload(payload: dict[str, Any], decision: RouteDecision) -> dict[str, Any]:
     pipeline_payload = _apply_intent_hints(payload, decision.intent)
-    result = run_routed_intelligence_pipeline(pipeline_payload)
+    cached_result = read_latest_intelligence_state_response(pipeline_payload)
+    if isinstance(cached_result, dict):
+        return build_syndicate_query_response(
+            question=str(payload.get("original_question") or payload.get("question") or "").strip(),
+            context=_coerce_context(payload),
+            decision=decision,
+            result=cached_result,
+        )
+
+    _maybe_queue_exact_refresh(pipeline_payload)
+    result = _build_placeholder_response(payload, decision, reason="queued_refresh")
     return build_syndicate_query_response(
         question=str(payload.get("original_question") or payload.get("question") or "").strip(),
         context=_coerce_context(payload),
@@ -379,13 +447,14 @@ def ask_the_syndicate_query_api():
     _read_cached_response(cache_key)
 
     artifact_response = _build_artifact_response(shaped_payload, decision)
-    if artifact_response is not None:
-        _maybe_queue_exact_refresh(shaped_payload)
-        return _with_cors_headers(jsonify(artifact_response))
-
     fast_state_response = _build_fast_state_result(shaped_payload)
     if fast_state_response is not None:
         _maybe_queue_exact_refresh(shaped_payload)
+        return _with_cors_headers(jsonify(fast_state_response))
+
+    _maybe_queue_exact_refresh(shaped_payload)
+    fast_state_response = _build_fast_state_result(shaped_payload)
+    if fast_state_response is not None:
         return _with_cors_headers(jsonify(fast_state_response))
 
     handler = {

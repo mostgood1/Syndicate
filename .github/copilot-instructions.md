@@ -32,6 +32,10 @@ The intelligence layer must:
 - Track recommendations, performance, and drift
 - Be model-aware, data-aware, and reliability-aware
 - Incorporate evaluation feedback into confidence and recommendation behavior
+- Treat `run_intelligence_query()` as a worker-owned capability, not a free request-path primitive
+- Prefer cached intelligence state on all routes and use the background worker as the primary compute engine
+- Avoid direct pipeline execution from request handlers unless there is no cache-backed alternative and the route explicitly requires it
+- Ensure only one refresh owner computes intelligence state and prevent concurrent intelligence recomputation across requests/workers
 
 ### Daily Update Root Direction
 The root daily update system is evolving from a time-driven wrapper into a state-aware execution controller.

@@ -33,6 +33,11 @@ REPO_ROOT = repo_root_from(__file__)
 STATE_PATH = reports_root() / "intelligence" / "query_state_cache.json"
 STATUS_CACHE_PATH = reports_root() / "intelligence" / "status_response_cache.json"
 logger = logging.getLogger(__name__)
+_INTELLIGENCE_EXECUTION_GUARD = threading.RLock()
+_INTELLIGENCE_LAST_RUN_STARTED_AT: float = 0.0
+_INTELLIGENCE_LAST_RUN_FINISHED_AT: float = 0.0
+_INTELLIGENCE_LAST_RUN_KEY: str | None = None
+_INTELLIGENCE_GUARD_OWNER = threading.local()
 
 
 def _state_backend_kind() -> str:
@@ -66,6 +71,61 @@ def _payload_key(payload: dict[str, Any]) -> str:
 
 def _utc_now() -> str:
     return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+
+
+def _utc_from_epoch(epoch_seconds: float) -> str | None:
+    if epoch_seconds <= 0.0:
+        return None
+    return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(epoch_seconds))
+
+
+def _intelligence_guard_is_busy() -> bool:
+    return bool(getattr(_INTELLIGENCE_GUARD_OWNER, "depth", 0)) or _INTELLIGENCE_EXECUTION_GUARD._is_owned()  # type: ignore[attr-defined]
+
+
+def acquire_intelligence_execution_guard() -> bool:
+    acquired = _INTELLIGENCE_EXECUTION_GUARD.acquire(blocking=False)
+    if acquired:
+        _INTELLIGENCE_GUARD_OWNER.depth = int(getattr(_INTELLIGENCE_GUARD_OWNER, "depth", 0)) + 1
+    return acquired
+
+
+def release_intelligence_execution_guard() -> None:
+    depth = int(getattr(_INTELLIGENCE_GUARD_OWNER, "depth", 0))
+    if depth > 0:
+        _INTELLIGENCE_GUARD_OWNER.depth = depth - 1
+        _INTELLIGENCE_EXECUTION_GUARD.release()
+
+
+def intelligence_guard_last_run_state() -> dict[str, Any]:
+    return {
+        "last_run_started_at": _utc_from_epoch(_INTELLIGENCE_LAST_RUN_STARTED_AT),
+        "last_run_finished_at": _utc_from_epoch(_INTELLIGENCE_LAST_RUN_FINISHED_AT),
+        "last_run_key": _INTELLIGENCE_LAST_RUN_KEY,
+        "busy": _intelligence_guard_is_busy(),
+    }
+
+
+def _update_intelligence_guard_run_state(*, key: str | None = None, started_at: float | None = None, finished_at: float | None = None) -> None:
+    global _INTELLIGENCE_LAST_RUN_STARTED_AT
+    global _INTELLIGENCE_LAST_RUN_FINISHED_AT
+    global _INTELLIGENCE_LAST_RUN_KEY
+    if started_at is not None:
+        _INTELLIGENCE_LAST_RUN_STARTED_AT = float(started_at)
+    if finished_at is not None:
+        _INTELLIGENCE_LAST_RUN_FINISHED_AT = float(finished_at)
+    if key is not None:
+        _INTELLIGENCE_LAST_RUN_KEY = key
+
+
+def get_latest_intelligence_cached_response(payload: dict[str, Any] | None = None) -> dict[str, Any] | None:
+    normalized_payload = payload or {"question": "top edges today", "date": central_today_iso()}
+    service = _INTELLIGENCE_STATE_SERVICE
+    return service.read_latest_response(normalized_payload, force_refresh=False)
+
+
+def _get_cached_or_latest_response(payload: dict[str, Any] | None = None) -> dict[str, Any] | None:
+    return get_latest_intelligence_cached_response(payload)
 
 
 def _log_worker_state_write(state: dict[str, Any]) -> None:
@@ -104,6 +164,7 @@ class IntelligenceStateService:
     def __init__(self) -> None:
         self._lock = threading.Lock()
         self._condition = threading.Condition(self._lock)
+        self._execution_guard = threading.Lock()
         self._thread: threading.Thread | None = None
         self._stop = threading.Event()
         self._running = False
@@ -116,6 +177,9 @@ class IntelligenceStateService:
         self._candidate_pools: OrderedDict[str, dict[str, Any]] = OrderedDict()
         self._source_fingerprints: OrderedDict[str, tuple[float, str]] = OrderedDict()
         self._latest_key: str | None = None
+        self._last_run_started_at: float = 0.0
+        self._last_run_finished_at: float = 0.0
+        self._last_run_key: str | None = None
         self._loaded_from_disk = False
         self._app: Flask | None = None
 
@@ -562,6 +626,9 @@ class IntelligenceStateService:
                 "latestComputedAt": latest_snapshot.computed_at if latest_snapshot else None,
                 "latestSourceFingerprint": latest_snapshot.source_fingerprint if latest_snapshot else None,
                 "latestSnapshotAgeSeconds": latest_age_seconds,
+                "lastRunStartedAt": _utc_from_epoch(self._last_run_started_at),
+                "lastRunFinishedAt": _utc_from_epoch(self._last_run_finished_at),
+                "lastRunKey": self._last_run_key,
                 "freshnessSlaSeconds": freshness_sla_seconds,
                 "freshnessStatus": "fresh" if latest_age_seconds is not None and latest_age_seconds <= freshness_sla_seconds else "stale",
                 "isFresh": bool(latest_age_seconds is not None and latest_age_seconds <= freshness_sla_seconds),
@@ -642,6 +709,15 @@ class IntelligenceStateService:
 
     def _enqueue_locked(self, payload: dict[str, Any]) -> str:
         key = _payload_key(payload)
+        snapshot = self._snapshots.get(key)
+        if snapshot is not None and not self._is_stale(snapshot):
+            return key
+        if key in self._pending_keys:
+            self._pending_keys[key] = payload
+            self._pending_keys.move_to_end(key)
+            return key
+        if self._last_run_key == key and self._last_run_finished_at > 0.0 and (time.time() - self._last_run_finished_at) < float(self._interval_seconds):
+            return key
         self._pending_keys[key] = payload
         self._pending_keys.move_to_end(key)
         self._trim_ordered_dict(self._pending_keys, self._max_snapshots)
@@ -666,7 +742,17 @@ class IntelligenceStateService:
                     continue
             if payload_to_process is None:
                 continue
+            guard_acquired = False
+            run_started_at = time.time()
             try:
+                guard_acquired = self._execution_guard.acquire(blocking=False)
+                if not guard_acquired:
+                    with self._condition:
+                        self._pending_keys[_payload_key(payload_to_process)] = payload_to_process
+                        self._pending_keys.move_to_end(_payload_key(payload_to_process))
+                        self._trim_ordered_dict(self._pending_keys, self._max_snapshots)
+                        self._condition.wait(timeout=min(1.0, float(self._interval_seconds)))
+                    continue
                 selected_date = str(payload_to_process.get("date") or payload_to_process.get("selected_date") or "").strip() or None
                 source_fingerprint = self._source_state_fingerprint(selected_date)
                 candidate_pool = self._build_candidate_pool(selected_date, source_fingerprint)
@@ -701,11 +787,16 @@ class IntelligenceStateService:
                 self._snapshots[snapshot.key] = snapshot
                 self._snapshots.move_to_end(snapshot.key)
                 self._latest_key = snapshot.key
+                self._last_run_key = snapshot.key
+                self._last_run_started_at = run_started_at
+                self._last_run_finished_at = time.time()
                 self._trim_ordered_dict(self._snapshots, self._max_snapshots)
                 _log_worker_state_write(worker_state)
                 self._persist_locked()
                 self._condition.notify_all()
                 self._condition.wait(timeout=self._interval_seconds)
+            if guard_acquired:
+                self._execution_guard.release()
 
     def _compute_response(self, payload: dict[str, Any], *, force_refresh: bool = False) -> dict[str, Any]:
         request_started_at = time.perf_counter()
@@ -726,63 +817,84 @@ class IntelligenceStateService:
                 _log_stage_timing("request_total", (time.perf_counter() - request_started_at) * 1000.0)
                 return dict(snapshot.response)
 
-        candidate_pool = self._build_candidate_pool(selected_date, source_fingerprint)
-        candidates = [dict(candidate) for candidate in candidate_pool.get("candidates") if isinstance(candidate, dict)]
+        guard_acquired = self._execution_guard.acquire(blocking=False)
+        if not guard_acquired:
+            with self._condition:
+                snapshot = self._snapshots.get(cache_key)
+                if snapshot is not None:
+                    _log_stage_timing("request_total", (time.perf_counter() - request_started_at) * 1000.0)
+                    return dict(snapshot.response)
+                if self._latest_key and self._latest_key in self._snapshots:
+                    _log_stage_timing("request_total", (time.perf_counter() - request_started_at) * 1000.0)
+                    return dict(self._snapshots[self._latest_key].response)
+            return {"ok": False, "error": "intelligence worker busy", "response": {}, "top_opportunities": [], "by_sport": {}, "analysis": None}
 
-        top_opportunities = _profile_stage("candidate_scoring", rank_global_recommendations, candidates, limit=limit_value)
-        by_sport: dict[str, list[dict[str, object]]] = {}
-        for recommendation in top_opportunities:
-            sport_key = str(recommendation.get("sport") or recommendation.get("sport_slug") or "unknown").strip().lower() or "unknown"
-            by_sport.setdefault(sport_key, []).append(dict(recommendation))
+        try:
+            with self._condition:
+                self._last_run_key = cache_key
+                self._last_run_started_at = time.time()
 
-        response_build_started_at = time.perf_counter()
-        if self._app is not None:
-            with self._app.app_context():
+            candidate_pool = self._build_candidate_pool(selected_date, source_fingerprint)
+            candidates = [dict(candidate) for candidate in candidate_pool.get("candidates") if isinstance(candidate, dict)]
+
+            top_opportunities = _profile_stage("candidate_scoring", rank_global_recommendations, candidates, limit=limit_value)
+            by_sport: dict[str, list[dict[str, object]]] = {}
+            for recommendation in top_opportunities:
+                sport_key = str(recommendation.get("sport") or recommendation.get("sport_slug") or "unknown").strip().lower() or "unknown"
+                by_sport.setdefault(sport_key, []).append(dict(recommendation))
+
+            response_build_started_at = time.perf_counter()
+            if self._app is not None:
+                with self._app.app_context():
+                    analysis_result = run_routed_intelligence_pipeline(request_payload)
+            else:
                 analysis_result = run_routed_intelligence_pipeline(request_payload)
-        else:
-            analysis_result = run_routed_intelligence_pipeline(request_payload)
-        if hasattr(analysis_result, "to_dict"):
-            analysis = analysis_result.to_dict()
-        elif isinstance(analysis_result, dict):
-            analysis = dict(analysis_result)
-        else:
-            analysis = {}
+            if hasattr(analysis_result, "to_dict"):
+                analysis = analysis_result.to_dict()
+            elif isinstance(analysis_result, dict):
+                analysis = dict(analysis_result)
+            else:
+                analysis = {}
 
-        analysis_recommendations = analysis.get("recommendations") if isinstance(analysis.get("recommendations"), list) else []
-        if not any(isinstance(item, dict) for item in analysis_recommendations):
-            fallback_recommendations = [dict(item) for item in top_opportunities if isinstance(item, dict)]
-            if fallback_recommendations:
-                analysis["recommendations"] = fallback_recommendations
-                if not isinstance(analysis.get("picks"), list) or not analysis.get("picks"):
-                    analysis["picks"] = [dict(item) for item in fallback_recommendations]
-                if not isinstance(analysis.get("top_live_opportunities"), list) or not analysis.get("top_live_opportunities"):
-                    analysis["top_live_opportunities"] = [dict(item) for item in fallback_recommendations]
+            analysis_recommendations = analysis.get("recommendations") if isinstance(analysis.get("recommendations"), list) else []
+            if not any(isinstance(item, dict) for item in analysis_recommendations):
+                fallback_recommendations = [dict(item) for item in top_opportunities if isinstance(item, dict)]
+                if fallback_recommendations:
+                    analysis["recommendations"] = fallback_recommendations
+                    if not isinstance(analysis.get("picks"), list) or not analysis.get("picks"):
+                        analysis["picks"] = [dict(item) for item in fallback_recommendations]
+                    if not isinstance(analysis.get("top_live_opportunities"), list) or not analysis.get("top_live_opportunities"):
+                        analysis["top_live_opportunities"] = [dict(item) for item in fallback_recommendations]
 
-        response: dict[str, Any] = {
-            "ok": True,
-            "top_opportunities": top_opportunities,
-            "by_sport": by_sport,
-            "analysis": analysis,
-            "candidate_pool": candidate_pool,
-        }
-        if analysis:
-            response["response"] = analysis
-        _log_stage_timing("response_building", (time.perf_counter() - response_build_started_at) * 1000.0)
-        with self._condition:
-            snapshot = IntelligenceSnapshot(
-                key=cache_key,
-                payload=dict(request_payload),
-                response=dict(response),
-                computed_at=_utc_now(),
-                source_fingerprint=source_fingerprint,
-            )
-            self._snapshots[snapshot.key] = snapshot
-            self._snapshots.move_to_end(snapshot.key)
-            self._latest_key = snapshot.key
-            self._trim_ordered_dict(self._snapshots, self._max_snapshots)
-            self._persist_locked()
-        _log_stage_timing("request_total", (time.perf_counter() - request_started_at) * 1000.0)
-        return response
+            response: dict[str, Any] = {
+                "ok": True,
+                "top_opportunities": top_opportunities,
+                "by_sport": by_sport,
+                "analysis": analysis,
+                "candidate_pool": candidate_pool,
+            }
+            if analysis:
+                response["response"] = analysis
+            _log_stage_timing("response_building", (time.perf_counter() - response_build_started_at) * 1000.0)
+            with self._condition:
+                snapshot = IntelligenceSnapshot(
+                    key=cache_key,
+                    payload=dict(request_payload),
+                    response=dict(response),
+                    computed_at=_utc_now(),
+                    source_fingerprint=source_fingerprint,
+                )
+                self._snapshots[snapshot.key] = snapshot
+                self._snapshots.move_to_end(snapshot.key)
+                self._latest_key = snapshot.key
+                self._last_run_finished_at = time.time()
+                self._trim_ordered_dict(self._snapshots, self._max_snapshots)
+                self._persist_locked()
+            _log_stage_timing("request_total", (time.perf_counter() - request_started_at) * 1000.0)
+            return response
+        finally:
+            if guard_acquired:
+                self._execution_guard.release()
 
     def _is_stale(self, snapshot: IntelligenceSnapshot) -> bool:
         try:

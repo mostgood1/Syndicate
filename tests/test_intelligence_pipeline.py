@@ -564,6 +564,36 @@ class IntelligencePipelineTests(unittest.TestCase):
         self.assertEqual(result.headline, "Recovered headline")
         self.assertEqual(mocked_query.call_count, 2)
 
+    def test_pipeline_skips_reasoning_steps_for_typical_queries(self) -> None:
+        fake_request = SimpleNamespace(
+            get_json=lambda silent=True: {
+                "question": "What are the best live bets?",
+                "date": "2026-06-04",
+                "mode": "live",
+                "sport": "nba",
+                "enable_reasoning_steps": False,
+            },
+            form={},
+        )
+
+        with patch(
+            "pipeline.intelligence_pipeline.run_intelligence_query",
+            return_value={
+                "headline": "Test headline",
+                "selected_date": "2026-06-04",
+                "recommendations": [{"name": "Darius Garland Over 7.5 Assists", "score": 91.2}],
+                "supporting_evidence": {
+                    "kind": "bundle",
+                    "title": "Supporting evidence",
+                    "sections": [{"kind": "metrics", "title": "Top case evidence", "items": [{"label": "Projection", "value": 8.3}]}],
+                },
+            },
+        ) as mocked_query, patch("pipeline.intelligence_pipeline.logger.info"):
+            result = run_intelligence_pipeline(fake_request)
+
+        self.assertEqual(result.reasoning_steps, ())
+        self.assertEqual(mocked_query.call_count, 1)
+
     def test_pipeline_returns_partial_result_after_retry_failure(self) -> None:
         fake_request = SimpleNamespace(
             get_json=lambda silent=True: {
