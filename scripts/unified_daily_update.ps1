@@ -1576,7 +1576,7 @@ function Get-PolicyPerformance {
         }) | Out-Null
     }
 
-    return @($performanceRows)
+    return $performanceRows.ToArray()
 }
 
 function Sync-RunManifestPolicyPerformance {
