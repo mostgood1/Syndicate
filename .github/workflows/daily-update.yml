@@ -146,6 +146,9 @@ jobs:
           git add -f -- data/*_source/manifests || true
           git add -f -- data/*_source/manifests/* || true
           git add -f -- data/*_source/source_artifacts/data/daily || true
+          # Ensure raw statsapi feed files are published when present
+          git add -f -- data/*_source/source_artifacts/data/raw || true
+          git add -f -- data/*_source/source_artifacts/data/raw/** || true
           git add -f -- data/mlb_source/source_artifacts || true
           git add -f -- data/mlb_source/manifests || true
           git add -f -- reports/intelligence || true
