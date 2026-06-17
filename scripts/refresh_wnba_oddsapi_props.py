@@ -3789,39 +3789,40 @@ def _materialize_artifact_bundle(*, state: dict[str, object], artifact_root: Pat
         )
         if smart_sim_files:
             copied["smart_sim_paths"] = smart_sim_files
-        if not reuse_local_processed:
-            recon_games_path = _export_recon_games_artifact(source_root=source_root, date_str=date_text, processed_root=processed_root)
-            if recon_games_path:
-                copied["recon_games_path"] = recon_games_path
-            recon_quarters_path = _export_recon_quarters_artifact(source_root=source_root, date_str=date_text, processed_root=processed_root)
-            if recon_quarters_path:
-                copied["recon_quarters_path"] = recon_quarters_path
-            game_cards_path = _export_game_cards_artifact(source_root=source_root, date_str=date_text, processed_root=processed_root)
-            if game_cards_path:
-                copied["game_cards_path"] = game_cards_path
-            boxscores_path = _export_boxscores_artifact(source_root=source_root, date_str=date_text, processed_root=processed_root)
-            if boxscores_path:
-                copied["boxscores_path"] = boxscores_path
-            recommendations_path = _export_recommendations_artifact(source_root=source_root, date_str=date_text, processed_root=processed_root)
-            if recommendations_path:
-                copied["recommendations_path"] = recommendations_path
-            recon_props_path = _export_recon_props_artifact(source_root=source_root, date_str=date_text, processed_root=processed_root)
-            if recon_props_path:
-                copied["recon_props_path"] = recon_props_path
-            recommendations_slate_path = _export_recommendations_slate_snapshot(source_root=source_root, date_str=date_text, processed_root=processed_root)
-            if recommendations_slate_path:
-                copied["recommendations_slate_path"] = recommendations_slate_path
-            cards_props_snapshot_path = _export_cards_props_snapshot(source_root=source_root, date_str=date_text, processed_root=processed_root)
-            if cards_props_snapshot_path:
-                copied["cards_props_snapshot_path"] = cards_props_snapshot_path
-            cards_sim_detail_path = _export_cards_sim_detail_snapshot(source_root=source_root, date_str=date_text, processed_root=processed_root)
-            if cards_sim_detail_path:
-                copied["cards_sim_detail_path"] = cards_sim_detail_path
-            top_by_game_path = _export_top_by_game_snapshot(source_root=source_root, date_str=date_text, processed_root=processed_root)
-            if top_by_game_path:
-                copied["top_by_game_path"] = top_by_game_path
-            copied.update(_export_live_lens_artifacts(source_root=source_root, date_str=date_text, processed_root=processed_root, live_lens_root=live_lens_root))
-            copied.update(_build_optional_player_recon_artifacts(source_root=source_root, date_str=date_text, processed_root=processed_root))
+        # Reused refresh states can still be incomplete, so always materialize the
+        # render-facing WNBA exports into the published artifact tree.
+        recon_games_path = _export_recon_games_artifact(source_root=source_root, date_str=date_text, processed_root=processed_root)
+        if recon_games_path:
+            copied["recon_games_path"] = recon_games_path
+        recon_quarters_path = _export_recon_quarters_artifact(source_root=source_root, date_str=date_text, processed_root=processed_root)
+        if recon_quarters_path:
+            copied["recon_quarters_path"] = recon_quarters_path
+        game_cards_path = _export_game_cards_artifact(source_root=source_root, date_str=date_text, processed_root=processed_root)
+        if game_cards_path:
+            copied["game_cards_path"] = game_cards_path
+        boxscores_path = _export_boxscores_artifact(source_root=source_root, date_str=date_text, processed_root=processed_root)
+        if boxscores_path:
+            copied["boxscores_path"] = boxscores_path
+        recommendations_path = _export_recommendations_artifact(source_root=source_root, date_str=date_text, processed_root=processed_root)
+        if recommendations_path:
+            copied["recommendations_path"] = recommendations_path
+        recon_props_path = _export_recon_props_artifact(source_root=source_root, date_str=date_text, processed_root=processed_root)
+        if recon_props_path:
+            copied["recon_props_path"] = recon_props_path
+        recommendations_slate_path = _export_recommendations_slate_snapshot(source_root=source_root, date_str=date_text, processed_root=processed_root)
+        if recommendations_slate_path:
+            copied["recommendations_slate_path"] = recommendations_slate_path
+        cards_props_snapshot_path = _export_cards_props_snapshot(source_root=source_root, date_str=date_text, processed_root=processed_root)
+        if cards_props_snapshot_path:
+            copied["cards_props_snapshot_path"] = cards_props_snapshot_path
+        cards_sim_detail_path = _export_cards_sim_detail_snapshot(source_root=source_root, date_str=date_text, processed_root=processed_root)
+        if cards_sim_detail_path:
+            copied["cards_sim_detail_path"] = cards_sim_detail_path
+        top_by_game_path = _export_top_by_game_snapshot(source_root=source_root, date_str=date_text, processed_root=processed_root)
+        if top_by_game_path:
+            copied["top_by_game_path"] = top_by_game_path
+        copied.update(_export_live_lens_artifacts(source_root=source_root, date_str=date_text, processed_root=processed_root, live_lens_root=live_lens_root))
+        copied.update(_build_optional_player_recon_artifacts(source_root=source_root, date_str=date_text, processed_root=processed_root))
         if not reuse_existing_run:
             copied.update(_export_live_snapshot_artifacts(source_root=source_root, date_str=date_text, processed_root=processed_root))
     boxscores_history_path = _refresh_boxscores_history_artifact(source_root=source_root, processed_root=processed_root)
