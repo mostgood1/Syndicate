@@ -53,7 +53,21 @@ def _sync_tree(src: Path, dst: Path, counters: Dict[str, int], key: str) -> None
 
 
 def _bootstrap_root_pairs(repo_root: Path, data_root: Path) -> list[tuple[Path, Path]]:
-    return [(repo_root / relative_root, data_root / relative_root, str(relative_root)) for relative_root in BOOTSTRAP_ROOTS]
+    pairs: list[tuple[Path, Path]] = []
+    for relative_root in BOOTSTRAP_ROOTS:
+        src = repo_root / relative_root
+        # If the relative root begins with a leading 'data' segment, strip it when
+        # composing the destination under the mounted data root so we don't create
+        # a duplicated 'data/data/...' path. Example: repo 'data/mlb_source' ->
+        # dest '/opt/render/project/data/mlb_source'
+        parts = list(relative_root.parts)
+        if parts and parts[0] == "data":
+            dest_relative = Path(*parts[1:]) if len(parts) > 1 else Path('.')
+        else:
+            dest_relative = relative_root
+        dst = data_root / dest_relative
+        pairs.append((src, dst, str(relative_root)))
+    return pairs
 
 
 def _sync_bootstrap_roots(repo_root: Path, data_root: Path) -> Dict[str, int]:
