@@ -37,6 +37,9 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -137,34 +140,25 @@ jobs:
           git config user.name 'github-actions[bot]'
           git config user.email 'github-actions[bot]@users.noreply.github.com'
 
-          # Every sport mirror writes ignored source_artifacts locally, but the daily GitHub Action
-          # must publish them explicitly so Render receives the updated bundle.
-          foreach ($sportRoot in @(Get-ChildItem -Path data -Directory -Filter '*_source' -ErrorAction SilentlyContinue)) {
-            $sourceArtifactsPath = Join-Path $sportRoot.FullName 'source_artifacts'
-            if (Test-Path $sourceArtifactsPath) {
-              git add -f -- (($sourceArtifactsPath -replace '\\', '/'))
-            }
+          # Explicitly stage artifact trees and manifests so they are committed even if ignored.
+          # Stage all sport source_artifacts (data/*_source/source_artifacts), manifests, and known report roots.
+          git add -f -- data/*_source/source_artifacts || true
+          git add -f -- data/*_source/manifests || true
+          git add -f -- data/*_source/manifests/* || true
+          git add -f -- data/*_source/source_artifacts/data/daily || true
+          git add -f -- data/mlb_source/source_artifacts || true
+          git add -f -- data/mlb_source/manifests || true
+          git add -f -- reports/intelligence || true
+          git add -f -- reports/daily_update/latest || true
+          git add -f -- reports/refresh_status/latest || true
+          git add -f -- reports/odds_control_plane || true
 
-            $mirrorManifestPath = Join-Path $sportRoot.FullName 'manifests\mirror_refresh_latest.json'
-            if (Test-Path $mirrorManifestPath) {
-              git add -f -- (($mirrorManifestPath -replace '\\', '/'))
-            }
-          }
-
-          # Render bootstraps the mounted disk from these report roots on startup, so they must be
-          # committed alongside the sport artifact bundles.
-          foreach ($reportRoot in @(
-            'reports/intelligence',
-            'reports/daily_update/latest',
-            'reports/refresh_status/latest',
-            'reports/odds_control_plane'
-          )) {
-            if (Test-Path $reportRoot) {
-              git add -f -- $reportRoot
-            }
-          }
-
+          # Fallback: add all changes except the verbose daily log
           git add -A -- . ':(exclude)daily-update.log'
+
+          # Show staged files for debugging
+          Write-Host 'Staged files:'
+          git --no-pager status --porcelain=v1
 
           $status = git status --short
           if ([string]::IsNullOrWhiteSpace($status)) {
@@ -175,10 +169,27 @@ jobs:
           Write-Host 'Pipeline output changes detected:'
           Write-Host $status
 
-          git commit -m "Update daily pipeline outputs"
+          git commit -m "Update daily pipeline outputs" || true
           $branch = $env:GITHUB_REF_NAME
-          git fetch origin $branch
-          git rebase "origin/$branch"
+          Write-Host "Preparing to push commit to origin/$branch"
+
+          # Verify artifacts are present in HEAD; fail loudly if missing
+          $filesInHead = git --no-pager show --name-only --pretty=format:'' HEAD
+          Write-Host 'Files included in HEAD commit:'
+          Write-Host $filesInHead
+          if ($filesInHead -notmatch 'data/mlb_source/source_artifacts') {
+            Write-Error 'ERROR: artifacts not found in HEAD commit; failing workflow to indicate Stage 2 failure.'
+            exit 1
+          }
+
+          # Ensure push uses the available GitHub token if needed
+          if ($env:GITHUB_TOKEN) {
+            $repo = "${{ github.repository }}"
+            git remote set-url origin "https://x-access-token:$env:GITHUB_TOKEN@github.com/$repo"
+          }
+
+          git fetch origin $branch || true
+          git rebase "origin/$branch" || true
           Write-Host "Pushing commit to origin/$branch"
           git push origin "HEAD:$branch"
 

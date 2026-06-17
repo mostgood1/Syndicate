@@ -238,6 +238,22 @@ def api_ops_version() -> Any:
     return jsonify({"ok": True, "version": _build_version_payload()})
 
 
+@ops_bp.post("/api/ops/bootstrap/run")
+def api_ops_bootstrap_run() -> Any:
+    try:
+        # Import and run the bootstrap script to copy repo data into the mounted data root
+        try:
+            from scripts.bootstrap_data_root import main as _bootstrap_main  # type: ignore
+        except Exception as exc:
+            return jsonify({"ok": False, "error": f"ImportError: {type(exc).__name__}: {exc}"}), 500
+        exit_code = _bootstrap_main()
+        if exit_code == 0:
+            return jsonify({"ok": True, "message": "bootstrap completed"}), 200
+        return jsonify({"ok": False, "error": f"bootstrap returned exit code {exit_code}"}), 500
+    except Exception as exc:
+        return jsonify({"ok": False, "error": f"{type(exc).__name__}: {exc}"}), 500
+
+
 @ops_bp.get("/api/ops/odds-refresh/plan")
 def api_ops_odds_refresh_plan() -> Any:
     try:

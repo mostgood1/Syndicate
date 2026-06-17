@@ -1,9 +1,15 @@
 from __future__ import annotations
 
+import logging
 import os
 import shutil
 from pathlib import Path
+from typing import Dict
 
+
+logging.basicConfig()
+logger = logging.getLogger("bootstrap_data_root")
+logger.setLevel(logging.INFO)
 
 BOOTSTRAP_ROOTS = (
     Path("data/mlb_source/source_artifacts"),
@@ -29,27 +35,33 @@ BOOTSTRAP_ROOTS = (
 
 def _copy_file_if_needed(src: Path, dst: Path) -> None:
     shutil.copy2(src, dst)
+    logger.debug("copied %s -> %s", src, dst)
 
 
-def _sync_tree(src: Path, dst: Path) -> None:
+def _sync_tree(src: Path, dst: Path, counters: Dict[str, int], key: str) -> None:
     if not src.exists() or not src.is_dir():
+        logger.debug("source root missing or not a dir: %s", src)
         return
     dst.mkdir(parents=True, exist_ok=True)
     for item in src.iterdir():
         target = dst / item.name
         if item.is_dir():
-            _sync_tree(item, target)
+            _sync_tree(item, target, counters, key)
         else:
             _copy_file_if_needed(item, target)
+            counters[key] = counters.get(key, 0) + 1
 
 
 def _bootstrap_root_pairs(repo_root: Path, data_root: Path) -> list[tuple[Path, Path]]:
-    return [(repo_root / relative_root, data_root / relative_root) for relative_root in BOOTSTRAP_ROOTS]
+    return [(repo_root / relative_root, data_root / relative_root, str(relative_root)) for relative_root in BOOTSTRAP_ROOTS]
 
 
-def _sync_bootstrap_roots(repo_root: Path, data_root: Path) -> None:
-    for source_root, destination_root in _bootstrap_root_pairs(repo_root, data_root):
-        _sync_tree(source_root, destination_root)
+def _sync_bootstrap_roots(repo_root: Path, data_root: Path) -> Dict[str, int]:
+    counters: Dict[str, int] = {}
+    for source_root, destination_root, key in _bootstrap_root_pairs(repo_root, data_root):
+        logger.info("Syncing %s -> %s", source_root, destination_root)
+        _sync_tree(source_root, destination_root, counters, key)
+    return counters
 
 
 def main() -> int:
@@ -57,7 +69,20 @@ def main() -> int:
     repo_root = Path(__file__).resolve().parents[1]
 
     # Merge the Render-critical published artifact roots into the mounted data root on startup.
-    _sync_bootstrap_roots(repo_root, data_root)
+    logger.info("Bootstrapping data root: repo=%s data_root=%s", repo_root, data_root)
+    counters = _sync_bootstrap_roots(repo_root, data_root)
+
+    # Log summary counts
+    if counters:
+        logger.info("Bootstrap copy summary:")
+        total = 0
+        for key, count in counters.items():
+            logger.info("  %s: %d files copied", key, count)
+            total += count
+        logger.info("Total files copied: %d", total)
+    else:
+        logger.info("No files copied by bootstrap (no source roots present or empty)")
+
     return 0
 
 
