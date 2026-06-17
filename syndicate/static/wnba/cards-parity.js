@@ -4349,12 +4349,12 @@
     return null;
   }
 
-  function emptyLensMarket(shortLabel, note) {
+  function emptyLensMarket(shortLabel, note, isLive = false) {
     const waitingForLive = /waiting for live lines/i.test(String(note || ''));
     return {
       shortLabel,
       klass: '',
-      main: waitingForLive ? `${shortLabel} live` : `${shortLabel} off card`,
+      main: waitingForLive ? `${shortLabel} live` : (isLive ? `${shortLabel} unavailable` : `${shortLabel} off card`),
       sub: note || (waitingForLive ? 'Waiting for live lines.' : 'No tracked market line.'),
       note: '',
       edgeValue: null,
@@ -4554,6 +4554,8 @@
   }
 
   function buildGameLensRows(game) {
+    const liveState = getLiveState(game);
+    const isLiveGame = hasStartedGame(liveState);
     const liveRows = liveGameLensRows(game);
     if (liveRows.length) {
       return liveRows;
@@ -4680,7 +4682,7 @@
               edgeClass: spreadEdgeRaw >= 0 ? 'is-positive' : 'is-negative',
               isEmpty: false,
             }
-            : emptyLensMarket('ATS', 'No tracked spread line.'),
+            : emptyLensMarket('ATS', 'No tracked spread line.', isLiveGame),
           total: Number.isFinite(totalEdgeRaw)
             ? {
               shortLabel: 'Total',
@@ -4693,7 +4695,7 @@
               edgeClass: totalEdgeRaw >= 0 ? 'is-positive' : 'is-negative',
               isEmpty: false,
             }
-            : emptyLensMarket('Total', 'No tracked total line.'),
+            : emptyLensMarket('Total', 'No tracked total line.', isLiveGame),
         },
       };
     });
