@@ -254,6 +254,48 @@ def api_ops_bootstrap_run() -> Any:
         return jsonify({"ok": False, "error": f"{type(exc).__name__}: {exc}"}), 500
 
 
+@ops_bp.get("/api/ops/mlb/sims-list")
+def api_ops_mlb_sims_list() -> Any:
+    # Protected endpoint: requires admin token (enforced by before_request)
+    date = str(request.args.get("date") or "").strip()
+    if not date:
+        return jsonify({"ok": False, "error": "date parameter required (YYYY-MM-DD)"}), 400
+    try:
+        from syndicate.features.mlb import sources as mlb_sources
+    except Exception as exc:
+        return jsonify({"ok": False, "error": f"ImportError: {type(exc).__name__}: {exc}"}), 500
+
+    # Build candidate roots similar to sources.daily_sim_artifact_path
+    repo_root = Path(current_app.root_path).resolve().parent
+    roots: list[Path] = []
+    env_value = str(os.environ.get("SYNDICATE_MLB_SOURCE_ROOT") or "").strip()
+    if env_value:
+        roots.append(Path(env_value))
+    data_root = str(os.environ.get("SYNDICATE_DATA_ROOT") or "").strip()
+    if data_root:
+        roots.append(Path(data_root).resolve() / "mlb_source")
+    roots.append(repo_root / "data" / "mlb_source")
+
+    results = []
+    rel = Path("data", "daily", "sims", date)
+    for root in roots:
+        try:
+            cand = root
+            # check both root and root/source_artifacts
+            for probe in (cand, cand / "source_artifacts"):
+                if not probe.exists() or not probe.is_dir():
+                    continue
+                sims_dir = (probe / rel)
+                if not sims_dir.exists() or not sims_dir.is_dir():
+                    continue
+                files = [p.name for p in sorted(sims_dir.glob("*.json")) if p.is_file()]
+                results.append({"root": str(probe), "count": len(files), "files": files[:200]})
+        except Exception:
+            continue
+
+    return jsonify({"ok": True, "date": date, "results": results})
+
+
 @ops_bp.get("/api/ops/odds-refresh/plan")
 def api_ops_odds_refresh_plan() -> Any:
     try:
