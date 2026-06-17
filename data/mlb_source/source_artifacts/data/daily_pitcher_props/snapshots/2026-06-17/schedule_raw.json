@@ -9,9 +9,9 @@
     "officialDate": "2026-06-17",
     "status": {
       "abstractGameState": "Preview",
-      "codedGameState": "S",
-      "detailedState": "Scheduled",
-      "statusCode": "S",
+      "codedGameState": "P",
+      "detailedState": "Pre-Game",
+      "statusCode": "P",
       "startTimeTBD": false,
       "abstractGameCode": "P"
     },
@@ -70,6 +70,7 @@
           "ties": 0,
           "pct": ".438"
         },
+        "score": 0,
         "probablePitcher": {
           "id": 690997,
           "fullName": "Nolan McLean",
@@ -138,6 +139,7 @@
           "ties": 0,
           "pct": ".486"
         },
+        "score": 0,
         "probablePitcher": {
           "id": 666157,
           "fullName": "Nick Lodolo",
@@ -250,6 +252,7 @@
           "ties": 0,
           "pct": ".392"
         },
+        "score": 0,
         "probablePitcher": {
           "id": 679883,
           "fullName": "Luinder Avila",
@@ -318,6 +321,7 @@
           "ties": 0,
           "pct": ".527"
         },
+        "score": 0,
         "probablePitcher": {
           "id": 641793,
           "fullName": "Zack Littell",
@@ -369,9 +373,9 @@
     "officialDate": "2026-06-17",
     "status": {
       "abstractGameState": "Preview",
-      "codedGameState": "S",
-      "detailedState": "Scheduled",
-      "statusCode": "S",
+      "codedGameState": "P",
+      "detailedState": "Pre-Game",
+      "statusCode": "P",
       "startTimeTBD": false,
       "abstractGameCode": "P"
     },
@@ -430,6 +434,7 @@
           "ties": 0,
           "pct": ".486"
         },
+        "score": 0,
         "probablePitcher": {
           "id": 645261,
           "fullName": "Sandy Alcantara",
@@ -498,6 +503,7 @@
           "ties": 0,
           "pct": ".548"
         },
+        "score": 0,
         "probablePitcher": {
           "id": 691725,
           "fullName": "Andrew Painter",
@@ -732,9 +738,9 @@
     "officialDate": "2026-06-17",
     "status": {
       "abstractGameState": "Preview",
-      "codedGameState": "S",
-      "detailedState": "Scheduled",
-      "statusCode": "S",
+      "codedGameState": "P",
+      "detailedState": "Pre-Game",
+      "statusCode": "P",
       "startTimeTBD": false,
       "abstractGameCode": "P"
     },
@@ -793,6 +799,7 @@
           "ties": 0,
           "pct": ".411"
         },
+        "score": 0,
         "probablePitcher": {
           "id": 663554,
           "fullName": "Casey Mize",
@@ -861,6 +868,7 @@
           "ties": 0,
           "pct": ".453"
         },
+        "score": 0,
         "probablePitcher": {
           "id": 663567,
           "fullName": "Peter Lambert",
@@ -912,9 +920,9 @@
     "officialDate": "2026-06-17",
     "status": {
       "abstractGameState": "Preview",
-      "codedGameState": "S",
-      "detailedState": "Scheduled",
-      "statusCode": "S",
+      "codedGameState": "P",
+      "detailedState": "Pre-Game",
+      "statusCode": "P",
       "startTimeTBD": false,
       "abstractGameCode": "P"
     },
@@ -972,6 +980,11 @@
           "losses": 35,
           "ties": 0,
           "pct": ".514"
+        },
+        "probablePitcher": {
+          "id": 699134,
+          "fullName": "Bradgley Rodriguez",
+          "link": "/api/v1/people/699134"
         },
         "splitSquad": false,
         "seriesNumber": 24,

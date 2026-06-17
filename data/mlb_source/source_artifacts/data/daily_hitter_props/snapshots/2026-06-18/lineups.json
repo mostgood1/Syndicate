@@ -2,7 +2,7 @@
   "date": "2026-06-18",
   "season": 2026,
   "spring_mode": false,
-  "generated_at": "2026-06-17T15:23:02.914828",
+  "generated_at": "2026-06-17T16:32:52.928788",
   "summary": {
     "games": 9,
     "projected_teams": 18,
@@ -822,7 +822,7 @@
       },
       "away_source": "projected_rotowire_default_vs_rhp",
       "home_source": "projected_rotowire_default_vs_lhp",
-      "away_confidence": 0.58,
+      "away_confidence": 0.66,
       "home_confidence": 0.66,
       "away_comparison": {
         "status": "projected_only",

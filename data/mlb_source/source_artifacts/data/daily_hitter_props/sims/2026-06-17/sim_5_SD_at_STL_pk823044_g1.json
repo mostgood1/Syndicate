@@ -9409,7 +9409,7 @@
     "spring_mode": false,
     "stats_season": 2026,
     "away_lineup_source": "confirmed_feed_live",
-    "home_lineup_source": "projected_rotowire_default_vs_rhp",
+    "home_lineup_source": "confirmed_feed_live",
     "hitter_hr_topn": 24,
     "hitter_props_topn": 24,
     "hitter_props_topn_effective": 24,

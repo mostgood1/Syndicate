@@ -906,20 +906,20 @@
       "use_closer_in_9th_only": true,
       "pinch_hit_aggressiveness": 0.15
     },
-    "confirmed_lineup_ids": [],
-    "projected_lineup_ids": [
-      660271,
+    "confirmed_lineup_ids": [
+      669242,
       681624,
       518692,
       605141,
-      663656,
       500743,
+      663656,
       669743,
       687221,
-      669289
+      690976
     ],
-    "lineup_source": "projected_rotowire_default_vs_lhp",
-    "lineup_confidence": 0.66,
+    "projected_lineup_ids": [],
+    "lineup_source": "confirmed_feed_live",
+    "lineup_confidence": 1.0,
     "probable_pitcher": {
       "id": 660271,
       "source": "feed_gameData_probablePitchers",
@@ -985,35 +985,6 @@
       }
     ],
     "lineup": [
-      {
-        "id": 660271,
-        "name": "Shohei Ohtani",
-        "pos": "TWP",
-        "bat": "L",
-        "throw": "R",
-        "k_rate": 0.22509994288977725,
-        "bb_rate": 0.16676185037121644,
-        "hbp_rate": 0.016181229773462782,
-        "hr_rate": 0.04954073862554731,
-        "inplay_hit_rate": 0.34929347826086954,
-        "xb_hit_share": 0.22666666666666666,
-        "vs_pitch_type": {},
-        "vs_pitch_type_hr": {},
-        "platoon_mult_vs_lhp": {
-          "k": 0.9555225780487911,
-          "bb": 0.8075,
-          "hr": 1.0880444918517733,
-          "inplay": 0.9303886147687326
-        },
-        "platoon_mult_vs_rhp": {
-          "k": 1.0113122319325543,
-          "bb": 1.1036807355300506,
-          "hr": 0.9000800334413861,
-          "inplay": 0.991664851408122
-        },
-        "statcast_quality_mult": {},
-        "vs_pitcher_history": {}
-      },
       {
         "id": 681624,
         "name": "Andy Pages",
@@ -1102,35 +1073,6 @@
         "vs_pitcher_history": {}
       },
       {
-        "id": 663656,
-        "name": "Kyle Tucker",
-        "pos": "RF",
-        "bat": "L",
-        "throw": "R",
-        "k_rate": 0.21340569574218093,
-        "bb_rate": 0.12455099871314271,
-        "hbp_rate": 0.006825938566552901,
-        "hr_rate": 0.01696413584736754,
-        "inplay_hit_rate": 0.2760716223548562,
-        "xb_hit_share": 0.3050847457627119,
-        "vs_pitch_type": {},
-        "vs_pitch_type_hr": {},
-        "platoon_mult_vs_lhp": {
-          "k": 0.9456251537775842,
-          "bb": 1.0727497440044047,
-          "hr": 0.8656581929504092,
-          "inplay": 0.9968884880996424
-        },
-        "platoon_mult_vs_rhp": {
-          "k": 0.9894245859718823,
-          "bb": 0.9840111969729103,
-          "hr": 1.0531877032582684,
-          "inplay": 1.0072689888727626
-        },
-        "statcast_quality_mult": {},
-        "vs_pitcher_history": {}
-      },
-      {
         "id": 500743,
         "name": "Miguel Rojas",
         "pos": "SS",
@@ -1155,6 +1097,35 @@
           "bb": 0.8176748072672382,
           "hr": 0.78,
           "inplay": 0.8400837300935807
+        },
+        "statcast_quality_mult": {},
+        "vs_pitcher_history": {}
+      },
+      {
+        "id": 663656,
+        "name": "Kyle Tucker",
+        "pos": "RF",
+        "bat": "L",
+        "throw": "R",
+        "k_rate": 0.21340569574218093,
+        "bb_rate": 0.12455099871314271,
+        "hbp_rate": 0.006825938566552901,
+        "hr_rate": 0.01696413584736754,
+        "inplay_hit_rate": 0.2760716223548562,
+        "xb_hit_share": 0.3050847457627119,
+        "vs_pitch_type": {},
+        "vs_pitch_type_hr": {},
+        "platoon_mult_vs_lhp": {
+          "k": 0.9456251537775842,
+          "bb": 1.0727497440044047,
+          "hr": 0.8656581929504092,
+          "inplay": 0.9968884880996424
+        },
+        "platoon_mult_vs_rhp": {
+          "k": 0.9894245859718823,
+          "bb": 0.9840111969729103,
+          "hr": 1.0531877032582684,
+          "inplay": 1.0072689888727626
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -1218,37 +1189,6 @@
         "vs_pitcher_history": {}
       },
       {
-        "id": 669289,
-        "name": "Santiago Espinal",
-        "pos": "3B",
-        "bat": "R",
-        "throw": "R",
-        "k_rate": 0.1337878787878788,
-        "bb_rate": 0.020984848484848485,
-        "hbp_rate": 0.0,
-        "hr_rate": 0.014166666666666666,
-        "inplay_hit_rate": 0.3,
-        "xb_hit_share": 0.2,
-        "vs_pitch_type": {},
-        "vs_pitch_type_hr": {},
-        "platoon_mult_vs_lhp": {
-          "k": 0.9067761419403548,
-          "bb": 1.1780385078219013,
-          "hr": 1.275,
-          "inplay": 0.8075
-        },
-        "platoon_mult_vs_rhp": {
-          "k": 1.1351642129105322,
-          "bb": 0.8075,
-          "hr": 0.78,
-          "inplay": 1.1925000000000001
-        },
-        "statcast_quality_mult": {},
-        "vs_pitcher_history": {}
-      }
-    ],
-    "bench": [
-      {
         "id": 690976,
         "name": "Alex Freeland",
         "pos": "2B",
@@ -1305,7 +1245,9 @@
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
-      },
+      }
+    ],
+    "bench": [
       {
         "id": 571970,
         "name": "Max Muncy",
@@ -1360,6 +1302,64 @@
           "bb": 1.043421052631579,
           "hr": 1.043421052631579,
           "inplay": 1.0229166666666667
+        },
+        "statcast_quality_mult": {},
+        "vs_pitcher_history": {}
+      },
+      {
+        "id": 669289,
+        "name": "Santiago Espinal",
+        "pos": "3B",
+        "bat": "R",
+        "throw": "R",
+        "k_rate": 0.1337878787878788,
+        "bb_rate": 0.020984848484848485,
+        "hbp_rate": 0.0,
+        "hr_rate": 0.014166666666666666,
+        "inplay_hit_rate": 0.3,
+        "xb_hit_share": 0.2,
+        "vs_pitch_type": {},
+        "vs_pitch_type_hr": {},
+        "platoon_mult_vs_lhp": {
+          "k": 0.9067761419403548,
+          "bb": 1.1780385078219013,
+          "hr": 1.275,
+          "inplay": 0.8075
+        },
+        "platoon_mult_vs_rhp": {
+          "k": 1.1351642129105322,
+          "bb": 0.8075,
+          "hr": 0.78,
+          "inplay": 1.1925000000000001
+        },
+        "statcast_quality_mult": {},
+        "vs_pitcher_history": {}
+      },
+      {
+        "id": 660271,
+        "name": "Shohei Ohtani",
+        "pos": "TWP",
+        "bat": "L",
+        "throw": "R",
+        "k_rate": 0.22509994288977725,
+        "bb_rate": 0.16676185037121644,
+        "hbp_rate": 0.016181229773462782,
+        "hr_rate": 0.04954073862554731,
+        "inplay_hit_rate": 0.34929347826086954,
+        "xb_hit_share": 0.22666666666666666,
+        "vs_pitch_type": {},
+        "vs_pitch_type_hr": {},
+        "platoon_mult_vs_lhp": {
+          "k": 0.9555225780487911,
+          "bb": 0.8075,
+          "hr": 1.0880444918517733,
+          "inplay": 0.9303886147687326
+        },
+        "platoon_mult_vs_rhp": {
+          "k": 1.0113122319325543,
+          "bb": 1.1036807355300506,
+          "hr": 0.9000800334413861,
+          "inplay": 0.991664851408122
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -1756,16 +1756,16 @@
   },
   "weather": {
     "source": "statsapi_live_feed",
-    "condition": "",
-    "temperature_f": null,
-    "wind_speed_mph": null,
-    "wind_direction": "unknown",
-    "wind_raw": "",
+    "condition": "Partly Cloudy",
+    "temperature_f": 77.0,
+    "wind_speed_mph": 7.0,
+    "wind_direction": "out",
+    "wind_raw": "7 mph, Out To CF",
     "is_dome": null,
     "multipliers": {
-      "hr_mult": 1.0,
-      "inplay_hit_mult": 1.0,
-      "xb_share_mult": 1.0
+      "hr_mult": 1.021,
+      "inplay_hit_mult": 1.0105,
+      "xb_share_mult": 1.0056
     }
   },
   "park": {
@@ -1785,8 +1785,8 @@
   },
   "umpire": {
     "source": "statsapi_live_feed",
-    "home_plate_umpire_id": null,
-    "home_plate_umpire_name": "",
+    "home_plate_umpire_id": 483919,
+    "home_plate_umpire_name": "Mark Ripperger",
     "called_strike_mult": 1.0,
     "multipliers": {
       "called_strike_mult": 1.0

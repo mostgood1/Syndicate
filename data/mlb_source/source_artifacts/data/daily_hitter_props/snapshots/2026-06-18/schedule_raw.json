@@ -858,6 +858,11 @@
           "ties": 0,
           "pct": ".548"
         },
+        "probablePitcher": {
+          "id": 605400,
+          "fullName": "Aaron Nola",
+          "link": "/api/v1/people/605400"
+        },
         "splitSquad": false,
         "seriesNumber": 25,
         "springLeague": {

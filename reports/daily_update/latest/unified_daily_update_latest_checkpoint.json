@@ -3,11 +3,11 @@
     "date":  "2026-06-17",
     "runMode":  "standard",
     "overallStatus":  "ok",
-    "generatedAt":  "2026-06-17T15:11:55.9109363+00:00",
-    "updatedAt":  "2026-06-17T15:31:05.6233420+00:00",
-    "runDir":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-06-17\\20260617_151155",
+    "generatedAt":  "2026-06-17T16:21:10.6534109+00:00",
+    "updatedAt":  "2026-06-17T16:37:32.7328474+00:00",
+    "runDir":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-06-17\\20260617_162109",
     "latestDir":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest",
-    "lastUpdatedAt":  "2026-06-17T15:31:05.6175558+00:00",
+    "lastUpdatedAt":  "2026-06-17T16:37:32.7270501+00:00",
     "currentStage":  "queued",
     "completedStages":  [
                             "source_update",
@@ -179,7 +179,7 @@
                   "inputFingerprintCount":  3,
                   "artifactPathCount":  21,
                   "inputFingerprints":  [
-                                            "4dd44cfddfe8bfa01f392c55a4b3f1364db42a56ba0f965dbfdd3da303ca066c",
+                                            "d1a39d9ee0c3c8fe660b138dec9fbeb1878b942789ec19af345bb41ff90a88e8",
                                             "04c5f51b9a83653b59fa69757209bde5fe1980791938c7c649ed44b11d8b8d53",
                                             "4a57d34024d5809c0516a43142be0e0352fe5316d550f250c63957b9528ce7dd"
                                         ],

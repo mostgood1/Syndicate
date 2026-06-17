@@ -1817,9 +1817,9 @@
     "source": "statsapi_live_feed",
     "condition": "Partly Cloudy",
     "temperature_f": 81.0,
-    "wind_speed_mph": 8.0,
+    "wind_speed_mph": 10.0,
     "wind_direction": "out",
-    "wind_raw": "8 mph, Out To LF",
+    "wind_raw": "10 mph, Out To CF",
     "is_dome": null,
     "multipliers": {
       "hr_mult": 1.033,

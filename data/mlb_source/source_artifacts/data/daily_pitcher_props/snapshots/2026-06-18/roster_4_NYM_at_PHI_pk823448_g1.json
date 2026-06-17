@@ -52,7 +52,7 @@
       682626
     ],
     "lineup_source": "projected_rotowire_default_vs_rhp",
-    "lineup_confidence": 0.58,
+    "lineup_confidence": 0.66,
     "probable_pitcher": {
       "id": 640455,
       "source": "feed_gameData_probablePitchers",
@@ -820,18 +820,18 @@
     "lineup_source": "projected_rotowire_default_vs_lhp",
     "lineup_confidence": 0.66,
     "probable_pitcher": {
-      "id": null,
-      "source": "none",
-      "confidence": 0.0,
-      "raw_schedule_id": null,
+      "id": 605400,
+      "source": "schedule_probablePitcher",
+      "confidence": 0.8,
+      "raw_schedule_id": 605400,
       "raw_feed_id": null
     },
     "starter": {
-      "id": 650911,
-      "name": "Cristopher S\u00e1nchez",
+      "id": 605400,
+      "name": "Aaron Nola",
       "role": "SP",
-      "selection_source": "heuristic",
-      "requested_id": null
+      "selection_source": "probable",
+      "requested_id": 605400
     },
     "bullpen": [
       {
@@ -1254,42 +1254,44 @@
       }
     ],
     "starter_profile": {
-      "id": 650911,
-      "name": "Cristopher S\u00e1nchez",
-      "throw": "L",
+      "id": 605400,
+      "name": "Aaron Nola",
+      "throw": "R",
       "role": "SP",
       "leverage_skill": 0.5,
-      "stamina_pitches": 96,
+      "stamina_pitches": 94,
       "availability_mult": 1.0,
       "platoon_mult_vs_lhb": {
-        "k": 1.1628077285837308,
-        "bb": 0.8075,
-        "hr": 0.812222811202403,
-        "inplay": 0.8452533817613354
+        "k": 0.9393795416433762,
+        "bb": 1.1925000000000001,
+        "hr": 0.9841460129310345,
+        "inplay": 1.0033095148552087
       },
       "platoon_mult_vs_rhb": {
-        "k": 0.9438748375420838,
-        "bb": 1.1387992191153238,
-        "hr": 1.0377125082423095,
-        "inplay": 1.0594063464438706
+        "k": 1.084539681029459,
+        "bb": 0.8075,
+        "hr": 0.9955108217168013,
+        "inplay": 0.9996931127973316
       },
       "statcast_quality_mult": {},
       "arsenal_source": "statsapi_pitchArsenal",
-      "arsenal_sample_size": 1442,
+      "arsenal_sample_size": 1249,
       "statcast_splits_found": false,
       "statcast_splits_source": "",
       "statcast_splits_n_pitches": 0,
       "statcast_splits_start_date": "",
       "statcast_splits_end_date": "",
-      "k_rate": 0.2913170731707317,
-      "bb_rate": 0.044948170731707315,
-      "hbp_rate": 0.0025,
-      "hr_rate": 0.01549390243902439,
-      "inplay_hit_rate": 0.3301893939393939,
+      "k_rate": 0.22745030050855292,
+      "bb_rate": 0.07673370319001387,
+      "hbp_rate": 0.0,
+      "hr_rate": 0.04290337494220989,
+      "inplay_hit_rate": 0.37275700934579437,
       "arsenal": {
-        "CH": 0.38765603775312074,
-        "SI": 0.4327323086546462,
-        "SL": 0.17961165359223308
+        "FF": 0.24659727753402724,
+        "CH": 0.12009607879903922,
+        "SI": 0.19935948800640513,
+        "KC": 0.34027221659727785,
+        "FC": 0.09367493906325061
       },
       "pitch_type_whiff_mult": {},
       "pitch_type_inplay_mult": {},

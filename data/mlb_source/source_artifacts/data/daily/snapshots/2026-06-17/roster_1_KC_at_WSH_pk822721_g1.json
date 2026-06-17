@@ -901,20 +901,20 @@
       "use_closer_in_9th_only": true,
       "pinch_hit_aggressiveness": 0.15
     },
-    "confirmed_lineup_ids": [],
-    "projected_lineup_ids": [
+    "confirmed_lineup_ids": [
       695578,
       671277,
       678554,
       682928,
-      695734,
       686611,
+      695734,
       660688,
-      696285,
+      677588,
       683083
     ],
-    "lineup_source": "projected_rotowire_default_vs_rhp",
-    "lineup_confidence": 0.66,
+    "projected_lineup_ids": [],
+    "lineup_source": "confirmed_feed_live",
+    "lineup_confidence": 1.0,
     "probable_pitcher": {
       "id": 641793,
       "source": "feed_gameData_probablePitchers",
@@ -1091,35 +1091,6 @@
         "vs_pitcher_history": {}
       },
       {
-        "id": 695734,
-        "name": "Daylen Lile",
-        "pos": "LF",
-        "bat": "L",
-        "throw": "R",
-        "k_rate": 0.16569187271316113,
-        "bb_rate": 0.07320656392061203,
-        "hbp_rate": 0.006430868167202572,
-        "hr_rate": 0.024451158665040468,
-        "inplay_hit_rate": 0.286491195891416,
-        "xb_hit_share": 0.25675675675675674,
-        "vs_pitch_type": {},
-        "vs_pitch_type_hr": {},
-        "platoon_mult_vs_lhp": {
-          "k": 1.040118128165807,
-          "bb": 1.1178211115318273,
-          "hr": 0.78,
-          "inplay": 1.070236538646219
-        },
-        "platoon_mult_vs_rhp": {
-          "k": 1.0207590493006389,
-          "bb": 0.9599312786017912,
-          "hr": 1.2642559841513543,
-          "inplay": 0.9673059240205846
-        },
-        "statcast_quality_mult": {},
-        "vs_pitcher_history": {}
-      },
-      {
         "id": 686611,
         "name": "Dylan Crews",
         "pos": "RF",
@@ -1144,6 +1115,35 @@
           "bb": 0.8075,
           "hr": 0.9556150430921913,
           "inplay": 1.0847883022290183
+        },
+        "statcast_quality_mult": {},
+        "vs_pitcher_history": {}
+      },
+      {
+        "id": 695734,
+        "name": "Daylen Lile",
+        "pos": "LF",
+        "bat": "L",
+        "throw": "R",
+        "k_rate": 0.16569187271316113,
+        "bb_rate": 0.07320656392061203,
+        "hbp_rate": 0.006430868167202572,
+        "hr_rate": 0.024451158665040468,
+        "inplay_hit_rate": 0.286491195891416,
+        "xb_hit_share": 0.25675675675675674,
+        "vs_pitch_type": {},
+        "vs_pitch_type_hr": {},
+        "platoon_mult_vs_lhp": {
+          "k": 1.040118128165807,
+          "bb": 1.1178211115318273,
+          "hr": 0.78,
+          "inplay": 1.070236538646219
+        },
+        "platoon_mult_vs_rhp": {
+          "k": 1.0207590493006389,
+          "bb": 0.9599312786017912,
+          "hr": 1.2642559841513543,
+          "inplay": 0.9673059240205846
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -1178,30 +1178,30 @@
         "vs_pitcher_history": {}
       },
       {
-        "id": 696285,
-        "name": "Jacob Young",
-        "pos": "CF",
-        "bat": "R",
+        "id": 677588,
+        "name": "Jos\u00e9 Tena",
+        "pos": "DH",
+        "bat": "L",
         "throw": "R",
-        "k_rate": 0.21013437849944006,
-        "bb_rate": 0.04373460246360582,
-        "hbp_rate": 0.01702127659574468,
-        "hr_rate": 0.03288353863381859,
-        "inplay_hit_rate": 0.26171428571428573,
-        "xb_hit_share": 0.19230769230769232,
+        "k_rate": 0.3267287784679089,
+        "bb_rate": 0.06400621118012423,
+        "hbp_rate": 0.007246376811594203,
+        "hr_rate": 0.018478260869565215,
+        "inplay_hit_rate": 0.29047619047619044,
+        "xb_hit_share": 0.2857142857142857,
         "vs_pitch_type": {},
         "vs_pitch_type_hr": {},
         "platoon_mult_vs_lhp": {
-          "k": 0.9118893120797481,
+          "k": 1.0111177998859389,
           "bb": 1.1925000000000001,
           "hr": 0.78,
-          "inplay": 1.0268901447041698
+          "inplay": 1.0811475409836067
         },
         "platoon_mult_vs_rhp": {
-          "k": 0.9672053973587598,
-          "bb": 0.9018271100865738,
-          "hr": 1.1510769878597986,
-          "inplay": 0.958434286519228
+          "k": 0.9850192975656626,
+          "bb": 0.9162822668306572,
+          "hr": 1.142202462380301,
+          "inplay": 1.0110200364298725
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -1296,6 +1296,35 @@
         "vs_pitcher_history": {}
       },
       {
+        "id": 696285,
+        "name": "Jacob Young",
+        "pos": "CF",
+        "bat": "R",
+        "throw": "R",
+        "k_rate": 0.21013437849944006,
+        "bb_rate": 0.04373460246360582,
+        "hbp_rate": 0.01702127659574468,
+        "hr_rate": 0.03288353863381859,
+        "inplay_hit_rate": 0.26171428571428573,
+        "xb_hit_share": 0.19230769230769232,
+        "vs_pitch_type": {},
+        "vs_pitch_type_hr": {},
+        "platoon_mult_vs_lhp": {
+          "k": 0.9118893120797481,
+          "bb": 1.1925000000000001,
+          "hr": 0.78,
+          "inplay": 1.0268901447041698
+        },
+        "platoon_mult_vs_rhp": {
+          "k": 0.9672053973587598,
+          "bb": 0.9018271100865738,
+          "hr": 1.1510769878597986,
+          "inplay": 0.958434286519228
+        },
+        "statcast_quality_mult": {},
+        "vs_pitcher_history": {}
+      },
+      {
         "id": 678391,
         "name": "Jorbit Vivas",
         "pos": "3B",
@@ -1320,35 +1349,6 @@
           "bb": 0.9709684634309999,
           "hr": 0.9029411764705882,
           "inplay": 0.9805538439829732
-        },
-        "statcast_quality_mult": {},
-        "vs_pitcher_history": {}
-      },
-      {
-        "id": 677588,
-        "name": "Jos\u00e9 Tena",
-        "pos": "DH",
-        "bat": "L",
-        "throw": "R",
-        "k_rate": 0.3267287784679089,
-        "bb_rate": 0.06400621118012423,
-        "hbp_rate": 0.007246376811594203,
-        "hr_rate": 0.018478260869565215,
-        "inplay_hit_rate": 0.29047619047619044,
-        "xb_hit_share": 0.2857142857142857,
-        "vs_pitch_type": {},
-        "vs_pitch_type_hr": {},
-        "platoon_mult_vs_lhp": {
-          "k": 1.0111177998859389,
-          "bb": 1.1925000000000001,
-          "hr": 0.78,
-          "inplay": 1.0811475409836067
-        },
-        "platoon_mult_vs_rhp": {
-          "k": 0.9850192975656626,
-          "bb": 0.9162822668306572,
-          "hr": 1.142202462380301,
-          "inplay": 1.0110200364298725
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -1703,15 +1703,15 @@
   "weather": {
     "source": "statsapi_live_feed",
     "condition": "Partly Cloudy",
-    "temperature_f": 81.0,
-    "wind_speed_mph": 8.0,
+    "temperature_f": 83.0,
+    "wind_speed_mph": 6.0,
     "wind_direction": "out",
-    "wind_raw": "8 mph, Out To LF",
+    "wind_raw": "6 mph, Out To RF",
     "is_dome": null,
     "multipliers": {
-      "hr_mult": 1.033,
-      "inplay_hit_mult": 1.0165,
-      "xb_share_mult": 1.0088
+      "hr_mult": 1.039,
+      "inplay_hit_mult": 1.0195,
+      "xb_share_mult": 1.0104
     }
   },
   "park": {
