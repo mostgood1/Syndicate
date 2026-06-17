@@ -3075,6 +3075,11 @@ def _existing_artifact_bundle_state(*, artifact_root: Path, date_str: str, do_ed
     predictions_path = processed_root / f"props_predictions_{date_str}.csv"
     edges_path = processed_root / f"props_edges_{date_str}.csv"
     recs_path = processed_root / f"props_recommendations_{date_str}.csv"
+    game_cards_path = processed_root / f"game_cards_{date_str}.csv"
+    recommendations_slate_path = processed_root / f"recommendations_slate_{date_str}.json"
+    cards_props_snapshot_path = processed_root / f"cards_props_snapshot_{date_str}.json"
+    cards_sim_detail_path = processed_root / f"cards_sim_detail_{date_str}.json"
+    top_by_game_path = processed_root / f"props_recommendations_top_by_game_{date_str}.json"
 
     required_paths = [snapshot_path, snapshot_alias_path]
     if do_edges or do_export:
@@ -3083,11 +3088,18 @@ def _existing_artifact_bundle_state(*, artifact_root: Path, date_str: str, do_ed
         required_paths.append(edges_path)
     if do_export:
         required_paths.append(recs_path)
+        required_paths.extend(
+            [
+                game_cards_path,
+                recommendations_slate_path,
+                cards_props_snapshot_path,
+                cards_sim_detail_path,
+                top_by_game_path,
+            ]
+        )
     if any(not path.exists() or not path.is_file() for path in required_paths):
         return None
 
-    game_cards_path = processed_root / f"game_cards_{date_str}.csv"
-    cards_sim_detail_path = processed_root / f"cards_sim_detail_{date_str}.json"
     game_cards_rows = int(_count_csv_rows_quick(game_cards_path))
     cards_sim_detail_games = int(_count_cards_sim_detail_games(cards_sim_detail_path))
     smart_sim_files = int(_count_matching_files(processed_root, f"smart_sim_{date_str}_*.json"))

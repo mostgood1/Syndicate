@@ -1809,6 +1809,10 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
                 processed_root / f"props_edges_{date_str}.csv": "player\nA\n",
                 processed_root / f"props_recommendations_{date_str}.csv": "player\nA\n",
                 processed_root / f"game_cards_{date_str}.csv": "game_id\n1\n",
+                processed_root / f"recommendations_slate_{date_str}.json": "{\"ok\": true}\n",
+                processed_root / f"cards_props_snapshot_{date_str}.json": "{\"ok\": true}\n",
+                processed_root / f"cards_sim_detail_{date_str}.json": "{\"ok\": true}\n",
+                processed_root / f"props_recommendations_top_by_game_{date_str}.json": "{\"ok\": true}\n",
                 processed_root / f"boxscores_{date_str}.csv": "game_id\n1\n",
                 processed_root / f"recommendations_{date_str}.csv": "market\nATS\n",
                 processed_root / f"recon_quarters_{date_str}.csv": "game_id\n1\n",
@@ -1877,6 +1881,12 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
                 processed_root / f"props_predictions_{date_str}.csv": "player\nA\n",
                 processed_root / f"props_edges_{date_str}.csv": "player\nA\n",
                 processed_root / f"props_recommendations_{date_str}.csv": "player\nA\n",
+                processed_root / f"game_cards_{date_str}.csv": "game_id\n1\n",
+                processed_root / f"recommendations_slate_{date_str}.json": "{\"ok\": true}\n",
+                processed_root / f"cards_props_snapshot_{date_str}.json": "{\"ok\": true}\n",
+                processed_root / f"cards_sim_detail_{date_str}.json": "{\"ok\": true}\n",
+                processed_root / f"props_recommendations_top_by_game_{date_str}.json": "{\"ok\": true}\n",
+                processed_root / f"smart_sim_{date_str}_ATL_DAL.json": "{\"ok\": true}\n",
             }
             for path, content in required_files.items():
                 path.parent.mkdir(parents=True, exist_ok=True)
