@@ -99,8 +99,8 @@
       }
     },
     "nfl_artifact_bundle": {
-      "inputHash": "bd600ea332d97fefae9c103865439b64548b7c54fe084118643ad3835eda720b",
-      "updatedAt": "2026-06-17T16:36:48.608327",
+      "inputHash": "27df35b0e1c2309b875d7ec07442cdce8719a5ab3248b9e8fc1f84e3129544ad",
+      "updatedAt": "2026-06-17T17:03:44.405899",
       "outputs": [
         "data\\nfl_source\\source_artifacts\\current_week.json",
         "data\\nfl_source\\source_artifacts\\real_betting_lines_2026_06_15.json",
@@ -527,8 +527,8 @@
       }
     },
     "mlb_live_lens:2026-06-17": {
-      "inputHash": "6be0a8af3e66d369688a37fdb98c705ad5e76eabf6a0964cce4d119d903fed60",
-      "updatedAt": "2026-06-17T16:33:28.220610",
+      "inputHash": "7636599dfc6ef4778d18edab5eb821e5863f82b7d4d6d4d098a83cc61df9d991",
+      "updatedAt": "2026-06-17T17:01:32.967060",
       "outputs": [
         "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\live_lens\\live_lens_report_2026_06_17.json",
         "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\live_lens\\live_lens_2026_06_17.jsonl",

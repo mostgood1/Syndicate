@@ -2,16 +2,16 @@
   "date": "2026-06-17",
   "season": 2026,
   "spring_mode": false,
-  "generated_at": "2026-06-17T16:24:34.471054",
+  "generated_at": "2026-06-17T16:55:17.480448",
   "summary": {
     "games": 15,
-    "projected_teams": 19,
+    "projected_teams": 17,
     "adjusted_teams": 2,
     "partial_teams": 0,
     "fallback_pool_teams": 0,
-    "confirmed_teams": 11,
-    "projected_only_teams": 19,
-    "confirmed_only_teams": 11,
+    "confirmed_teams": 13,
+    "projected_only_teams": 17,
+    "confirmed_only_teams": 13,
     "comparable_teams": 0,
     "exact_match_teams": 0,
     "true_mismatch_teams": 0
@@ -379,9 +379,7 @@
         695238,
         660710
       ],
-      "home_confirmed_ids": [],
-      "away_projected_ids": [],
-      "home_projected_ids": [
+      "home_confirmed_ids": [
         802139,
         671056,
         676475,
@@ -392,68 +390,22 @@
         691458,
         701675
       ],
+      "away_projected_ids": [],
+      "home_projected_ids": [],
       "away_projected_validation": {
         "status": "none",
         "raw_ids": [],
         "ids": []
       },
       "home_projected_validation": {
-        "status": "ok",
-        "raw_ids": [
-          802139,
-          671056,
-          676475,
-          691023,
-          663457,
-          691026,
-          699625,
-          691458,
-          701675
-        ],
-        "ids": [
-          802139,
-          671056,
-          676475,
-          691023,
-          663457,
-          691026,
-          699625,
-          691458,
-          701675
-        ],
-        "missing_ids": [],
-        "backfilled_ids": [],
-        "pool_source": "active+40Man",
-        "pool_size": 20,
-        "raw_names": [
-          "JJ Wetherholt",
-          "Ivan Herrera",
-          "Alec Burleson",
-          "Jordan Walker",
-          "Lars Nootbaar",
-          "Masyn Winn",
-          "Jimmy Crooks",
-          "Blaze Jordan",
-          "Nathan Church"
-        ],
-        "matched_names": [
-          "JJ Wetherholt",
-          "Iv\u00e1n Herrera",
-          "Alec Burleson",
-          "Jordan Walker",
-          "Lars Nootbaar",
-          "Masyn Winn",
-          "Jimmy Crooks",
-          "Blaze Jordan",
-          "Nathan Church"
-        ],
-        "missing_name_labels": [],
-        "mapping_source": "projected_rotowire_default_vs_rhp"
+        "status": "none",
+        "raw_ids": [],
+        "ids": []
       },
       "away_source": "confirmed_feed_live",
-      "home_source": "projected_rotowire_default_vs_rhp",
+      "home_source": "confirmed_feed_live",
       "away_confidence": 1.0,
-      "home_confidence": 0.66,
+      "home_confidence": 1.0,
       "away_comparison": {
         "status": "confirmed_only",
         "is_true_mismatch": false,
@@ -464,10 +416,10 @@
         "extra_in_projection": []
       },
       "home_comparison": {
-        "status": "projected_only",
+        "status": "confirmed_only",
         "is_true_mismatch": false,
-        "confirmed_count": 0,
-        "projected_count": 9,
+        "confirmed_count": 9,
+        "projected_count": 0,
         "overlap_count": 0,
         "missing_from_projection": [],
         "extra_in_projection": []
@@ -485,7 +437,17 @@
         "abbr": "LAD"
       },
       "away_confirmed_ids": [],
-      "home_confirmed_ids": [],
+      "home_confirmed_ids": [
+        669242,
+        681624,
+        518692,
+        605141,
+        500743,
+        663656,
+        669743,
+        687221,
+        690976
+      ],
       "away_projected_ids": [
         650490,
         666018,
@@ -497,17 +459,7 @@
         676439,
         670764
       ],
-      "home_projected_ids": [
-        660271,
-        681624,
-        518692,
-        605141,
-        663656,
-        500743,
-        669743,
-        687221,
-        669289
-      ],
+      "home_projected_ids": [],
       "away_projected_validation": {
         "status": "ok",
         "raw_ids": [
@@ -562,62 +514,14 @@
         "mapping_source": "projected_rotowire_default_vs_rhp"
       },
       "home_projected_validation": {
-        "status": "ok",
-        "raw_ids": [
-          660271,
-          681624,
-          518692,
-          605141,
-          663656,
-          500743,
-          669743,
-          687221,
-          669289
-        ],
-        "ids": [
-          660271,
-          681624,
-          518692,
-          605141,
-          663656,
-          500743,
-          669743,
-          687221,
-          669289
-        ],
-        "missing_ids": [],
-        "backfilled_ids": [],
-        "pool_source": "active+40Man",
-        "pool_size": 15,
-        "raw_names": [
-          "Shohei Ohtani",
-          "Andy Pages",
-          "Freddie Freeman",
-          "Mookie Betts",
-          "Kyle Tucker",
-          "Miguel Rojas",
-          "Alex Call",
-          "Dalton Rushing",
-          "Santiago Espinal"
-        ],
-        "matched_names": [
-          "Shohei Ohtani",
-          "Andy Pages",
-          "Freddie Freeman",
-          "Mookie Betts",
-          "Kyle Tucker",
-          "Miguel Rojas",
-          "Alex Call",
-          "Dalton Rushing",
-          "Santiago Espinal"
-        ],
-        "missing_name_labels": [],
-        "mapping_source": "projected_rotowire_default_vs_lhp"
+        "status": "none",
+        "raw_ids": [],
+        "ids": []
       },
       "away_source": "projected_rotowire_default_vs_rhp",
-      "home_source": "projected_rotowire_default_vs_lhp",
+      "home_source": "confirmed_feed_live",
       "away_confidence": 0.66,
-      "home_confidence": 0.66,
+      "home_confidence": 1.0,
       "away_comparison": {
         "status": "projected_only",
         "is_true_mismatch": false,
@@ -628,10 +532,10 @@
         "extra_in_projection": []
       },
       "home_comparison": {
-        "status": "projected_only",
+        "status": "confirmed_only",
         "is_true_mismatch": false,
-        "confirmed_count": 0,
-        "projected_count": 9,
+        "confirmed_count": 9,
+        "projected_count": 0,
         "overlap_count": 0,
         "missing_from_projection": [],
         "extra_in_projection": []

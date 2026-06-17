@@ -9,9 +9,9 @@
     "officialDate": "2026-06-17",
     "status": {
       "abstractGameState": "Live",
-      "codedGameState": "P",
-      "detailedState": "Warmup",
-      "statusCode": "PW",
+      "codedGameState": "I",
+      "detailedState": "In Progress",
+      "statusCode": "I",
       "startTimeTBD": false,
       "abstractGameCode": "L"
     },
@@ -190,12 +190,12 @@
     "gameDate": "2026-06-17T17:05:00Z",
     "officialDate": "2026-06-17",
     "status": {
-      "abstractGameState": "Preview",
+      "abstractGameState": "Live",
       "codedGameState": "P",
-      "detailedState": "Pre-Game",
-      "statusCode": "P",
+      "detailedState": "Warmup",
+      "statusCode": "PW",
       "startTimeTBD": false,
-      "abstractGameCode": "P"
+      "abstractGameCode": "L"
     },
     "teams": {
       "away": {
@@ -372,12 +372,12 @@
     "gameDate": "2026-06-17T17:05:00Z",
     "officialDate": "2026-06-17",
     "status": {
-      "abstractGameState": "Preview",
+      "abstractGameState": "Live",
       "codedGameState": "P",
-      "detailedState": "Pre-Game",
-      "statusCode": "P",
+      "detailedState": "Warmup",
+      "statusCode": "PW",
       "startTimeTBD": false,
-      "abstractGameCode": "P"
+      "abstractGameCode": "L"
     },
     "teams": {
       "away": {
@@ -1882,6 +1882,11 @@
           "losses": 43,
           "ties": 0,
           "pct": ".403"
+        },
+        "probablePitcher": {
+          "id": 687931,
+          "fullName": "Carson Whisenhunt",
+          "link": "/api/v1/people/687931"
         },
         "splitSquad": false,
         "seriesNumber": 24,

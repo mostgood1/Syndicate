@@ -8,12 +8,12 @@
     "gameDate": "2026-06-17T16:40:00Z",
     "officialDate": "2026-06-17",
     "status": {
-      "abstractGameState": "Preview",
+      "abstractGameState": "Live",
       "codedGameState": "P",
-      "detailedState": "Pre-Game",
-      "statusCode": "P",
+      "detailedState": "Warmup",
+      "statusCode": "PW",
       "startTimeTBD": false,
-      "abstractGameCode": "P"
+      "abstractGameCode": "L"
     },
     "teams": {
       "away": {
@@ -981,6 +981,7 @@
           "ties": 0,
           "pct": ".514"
         },
+        "score": 0,
         "probablePitcher": {
           "id": 699134,
           "fullName": "Bradgley Rodriguez",
@@ -1049,6 +1050,7 @@
           "ties": 0,
           "pct": ".563"
         },
+        "score": 0,
         "probablePitcher": {
           "id": 681517,
           "fullName": "Kyle Leahy",
@@ -1100,9 +1102,9 @@
     "officialDate": "2026-06-17",
     "status": {
       "abstractGameState": "Preview",
-      "codedGameState": "S",
-      "detailedState": "Scheduled",
-      "statusCode": "S",
+      "codedGameState": "P",
+      "detailedState": "Pre-Game",
+      "statusCode": "P",
       "startTimeTBD": false,
       "abstractGameCode": "P"
     },

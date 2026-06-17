@@ -6,7 +6,7 @@
     "jobs": 0,
     "use_raw": true,
     "skipped_games": 0,
-    "generated_at": "2026-06-17T16:21:19.471521",
+    "generated_at": "2026-06-17T16:53:08.481829",
     "tool": "tools/eval/reconcile_daily_sim_artifacts.py",
     "source_sim_dir": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-16",
     "prop_lines_source": "auto",

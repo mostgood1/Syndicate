@@ -841,8 +841,7 @@
       "use_closer_in_9th_only": true,
       "pinch_hit_aggressiveness": 0.15
     },
-    "confirmed_lineup_ids": [],
-    "projected_lineup_ids": [
+    "confirmed_lineup_ids": [
       802139,
       671056,
       676475,
@@ -853,8 +852,9 @@
       691458,
       701675
     ],
-    "lineup_source": "projected_rotowire_default_vs_rhp",
-    "lineup_confidence": 0.66,
+    "projected_lineup_ids": [],
+    "lineup_source": "confirmed_feed_live",
+    "lineup_confidence": 1.0,
     "probable_pitcher": {
       "id": 681517,
       "source": "feed_gameData_probablePitchers",

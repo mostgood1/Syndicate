@@ -1660,15 +1660,15 @@
   "weather": {
     "source": "statsapi_live_feed",
     "condition": "Partly Cloudy",
-    "temperature_f": 77.0,
+    "temperature_f": 78.0,
     "wind_speed_mph": 7.0,
     "wind_direction": "cross",
     "wind_raw": "7 mph, R To L",
     "is_dome": null,
     "multipliers": {
-      "hr_mult": 1.021,
-      "inplay_hit_mult": 1.0105,
-      "xb_share_mult": 1.0056
+      "hr_mult": 1.024,
+      "inplay_hit_mult": 1.012,
+      "xb_share_mult": 1.0064
     }
   },
   "park": {

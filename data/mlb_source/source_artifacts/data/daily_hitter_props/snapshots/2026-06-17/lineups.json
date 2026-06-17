@@ -2,7 +2,7 @@
   "date": "2026-06-17",
   "season": 2026,
   "spring_mode": false,
-  "generated_at": "2026-06-17T16:30:14.124119",
+  "generated_at": "2026-06-17T16:59:20.012293",
   "summary": {
     "games": 15,
     "projected_teams": 17,
@@ -1060,15 +1060,15 @@
         687551
       ],
       "home_projected_ids": [
-        671739,
         643289,
-        621566,
         645277,
-        642086,
+        621566,
         663586,
         642201,
-        573262,
-        642851
+        671739,
+        622761,
+        673490,
+        506702
       ],
       "away_projected_validation": {
         "status": "ok",
@@ -1126,60 +1126,60 @@
       "home_projected_validation": {
         "status": "ok",
         "raw_ids": [
-          671739,
           643289,
-          621566,
           645277,
-          642086,
+          621566,
           663586,
           642201,
-          573262,
-          642851
+          671739,
+          622761,
+          673490,
+          506702
         ],
         "ids": [
-          671739,
           643289,
-          621566,
           645277,
-          642086,
+          621566,
           663586,
           642201,
-          573262,
-          642851
+          671739,
+          622761,
+          673490,
+          506702
         ],
         "missing_ids": [],
         "backfilled_ids": [],
         "pool_source": "active+40Man",
         "pool_size": 16,
         "raw_names": [
-          "Michael Harris",
           "Mauricio Dubon",
-          "Matt Olson",
           "Ozzie Albies",
-          "Dominic Smith",
+          "Matt Olson",
           "Austin Riley",
           "Eli White",
-          "Mike Yastrzemski",
-          "Austin Wynns"
+          "Michael Harris",
+          "Jorge Mateo",
+          "Ha-Seong Kim",
+          "Sandy Leon"
         ],
         "matched_names": [
-          "Michael Harris II",
           "Mauricio Dub\u00f3n",
-          "Matt Olson",
           "Ozzie Albies",
-          "Dominic Smith",
+          "Matt Olson",
           "Austin Riley",
           "Eli White",
-          "Mike Yastrzemski",
-          "Austin Wynns"
+          "Michael Harris II",
+          "Jorge Mateo",
+          "Ha-Seong Kim",
+          "Sandy Le\u00f3n"
         ],
         "missing_name_labels": [],
-        "mapping_source": "projected_rotowire_default_vs_rhp"
+        "mapping_source": "projected_rotowire_default_vs_lhp"
       },
       "away_source": "projected_rotowire_default_vs_rhp",
-      "home_source": "projected_rotowire_default_vs_rhp",
+      "home_source": "projected_rotowire_default_vs_lhp",
       "away_confidence": 0.66,
-      "home_confidence": 0.58,
+      "home_confidence": 0.66,
       "away_comparison": {
         "status": "projected_only",
         "is_true_mismatch": false,

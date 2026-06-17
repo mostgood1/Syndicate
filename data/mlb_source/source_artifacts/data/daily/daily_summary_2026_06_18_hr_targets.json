@@ -1,7 +1,7 @@
 {
   "date": "2026-06-18",
   "season": 2026,
-  "generated_at": "2026-06-17T16:32:53.210079",
+  "generated_at": "2026-06-17T17:01:08.230684",
   "tool": "tools/daily_update_multi_profile.py",
   "source_sim_dir": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-18",
   "source_snapshot_dir": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\snapshots\\2026-06-18",

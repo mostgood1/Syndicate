@@ -1,20 +1,20 @@
 {
   "date": "2026-06-17",
-  "generatedAt": "2026-06-17T11:30:36-05:00",
+  "generatedAt": "2026-06-17T11:59:34-05:00",
   "summary": {
     "cards": 15,
-    "badges": 84,
+    "badges": 90,
     "sources": {
-      "none": 84
+      "none": 90
     },
     "tones": {
       "soft": 19,
-      "strong": 24,
-      "solid": 41
+      "strong": 27,
+      "solid": 44
     },
     "stats": {
       "hits_allowed": {
-        "badges": 25,
+        "badges": 24,
         "rungWins": 0,
         "rungLosses": 0
       },
@@ -29,7 +29,7 @@
         "rungLosses": 0
       },
       "walks_allowed": {
-        "badges": 13,
+        "badges": 20,
         "rungWins": 0,
         "rungLosses": 0
       }
@@ -121,11 +121,12 @@
       "actual": null,
       "wins": 0,
       "losses": 0,
-      "targetCount": 1,
+      "targetCount": 2,
       "targets": [
+        2,
         3
       ],
-      "detail": "Supported ladders: 3 Last supported rung: 3"
+      "detail": "Supported ladders: 2/3 Last supported rung: 3"
     },
     {
       "gamePk": 824503,
@@ -140,12 +141,13 @@
       "actual": null,
       "wins": 0,
       "losses": 0,
-      "targetCount": 2,
+      "targetCount": 3,
       "targets": [
+        5,
         6,
         7
       ],
-      "detail": "Supported ladders: 6/7 Last supported rung: 7"
+      "detail": "Supported ladders: 5/6/7 Last supported rung: 7"
     },
     {
       "gamePk": 824503,
@@ -580,12 +582,13 @@
       "actual": null,
       "wins": 0,
       "losses": 0,
-      "targetCount": 2,
+      "targetCount": 3,
       "targets": [
+        5,
         6,
         7
       ],
-      "detail": "Supported ladders: 6/7 Last supported rung: 7"
+      "detail": "Supported ladders: 5/6/7 Last supported rung: 7"
     },
     {
       "gamePk": 824178,
@@ -863,21 +866,20 @@
       "status": "",
       "side": "home",
       "starter": "Shohei Ohtani",
-      "label": "H up to 8",
+      "label": "H up to 7",
       "stat": "hits_allowed",
-      "tone": "soft",
+      "tone": "solid",
       "source": "none",
       "actual": null,
       "wins": 0,
       "losses": 0,
-      "targetCount": 4,
+      "targetCount": 3,
       "targets": [
         5,
         6,
-        7,
-        8
+        7
       ],
-      "detail": "Supported ladders: 5/6/7/8 Last supported rung: 8"
+      "detail": "Supported ladders: 5/6/7 Last supported rung: 7"
     },
     {
       "gamePk": 823940,
@@ -887,7 +889,7 @@
       "starter": "Shohei Ohtani",
       "label": "BB up to 3",
       "stat": "walks_allowed",
-      "tone": "solid",
+      "tone": "strong",
       "source": "none",
       "actual": null,
       "wins": 0,
@@ -1214,6 +1216,26 @@
       "gamePk": 823536,
       "matchup": "? @ ?",
       "status": "",
+      "side": "away",
+      "starter": "Anthony Kay",
+      "label": "BB up to 3",
+      "stat": "walks_allowed",
+      "tone": "solid",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 2,
+      "targets": [
+        2,
+        3
+      ],
+      "detail": "Supported ladders: 2/3 Last supported rung: 3"
+    },
+    {
+      "gamePk": 823536,
+      "matchup": "? @ ?",
+      "status": "",
       "side": "home",
       "starter": "Carlos Rod\u00f3n",
       "label": "K up to 7",
@@ -1272,26 +1294,23 @@
       "detail": "Supported ladders: 5/6/7 Last supported rung: 7"
     },
     {
-      "gamePk": 824913,
+      "gamePk": 823536,
       "matchup": "? @ ?",
       "status": "",
-      "side": "away",
-      "starter": "Robbie Ray",
-      "label": "H up to 9",
-      "stat": "hits_allowed",
+      "side": "home",
+      "starter": "Carlos Rod\u00f3n",
+      "label": "BB up to 3",
+      "stat": "walks_allowed",
       "tone": "solid",
       "source": "none",
       "actual": null,
       "wins": 0,
       "losses": 0,
-      "targetCount": 4,
+      "targetCount": 1,
       "targets": [
-        6,
-        7,
-        8,
-        9
+        3
       ],
-      "detail": "Supported ladders: 6/7/8/9 Last supported rung: 9"
+      "detail": "Supported ladders: 3 Last supported rung: 3"
     },
     {
       "gamePk": 824913,
@@ -1403,6 +1422,25 @@
       "gamePk": 823774,
       "matchup": "? @ ?",
       "status": "",
+      "side": "away",
+      "starter": "Gavin Williams",
+      "label": "BB up to 3",
+      "stat": "walks_allowed",
+      "tone": "strong",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 1,
+      "targets": [
+        3
+      ],
+      "detail": "Supported ladders: 3 Last supported rung: 3"
+    },
+    {
+      "gamePk": 823774,
+      "matchup": "? @ ?",
+      "status": "",
       "side": "home",
       "starter": "Brandon Sproat",
       "label": "K up to 7",
@@ -1463,6 +1501,25 @@
         10
       ],
       "detail": "Supported ladders: 5/6/7/8/9/10 Last supported rung: 10"
+    },
+    {
+      "gamePk": 823774,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "home",
+      "starter": "Brandon Sproat",
+      "label": "BB up to 3",
+      "stat": "walks_allowed",
+      "tone": "strong",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 1,
+      "targets": [
+        3
+      ],
+      "detail": "Supported ladders: 3 Last supported rung: 3"
     },
     {
       "gamePk": 824668,
@@ -1549,6 +1606,26 @@
       "detail": "Supported ladders: 6/7/8 Last supported rung: 8"
     },
     {
+      "gamePk": 824668,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "home",
+      "starter": "Javier Assad",
+      "label": "BB up to 3",
+      "stat": "walks_allowed",
+      "tone": "soft",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 2,
+      "targets": [
+        2,
+        3
+      ],
+      "detail": "Supported ladders: 2/3 Last supported rung: 3"
+    },
+    {
       "gamePk": 823127,
       "matchup": "? @ ?",
       "status": "",
@@ -1616,6 +1693,25 @@
       "gamePk": 823127,
       "matchup": "? @ ?",
       "status": "",
+      "side": "away",
+      "starter": "Kyle Bradish",
+      "label": "BB up to 3",
+      "stat": "walks_allowed",
+      "tone": "solid",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 1,
+      "targets": [
+        3
+      ],
+      "detail": "Supported ladders: 3 Last supported rung: 3"
+    },
+    {
+      "gamePk": 823127,
+      "matchup": "? @ ?",
+      "status": "",
       "side": "home",
       "starter": "George Kirby",
       "label": "K up to 7",
@@ -1675,6 +1771,26 @@
       "detail": "Supported ladders: 6/7/8/9/10 Last supported rung: 10"
     },
     {
+      "gamePk": 823127,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "home",
+      "starter": "George Kirby",
+      "label": "BB up to 3",
+      "stat": "walks_allowed",
+      "tone": "solid",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 2,
+      "targets": [
+        2,
+        3
+      ],
+      "detail": "Supported ladders: 2/3 Last supported rung: 3"
+    },
+    {
       "gamePk": 824992,
       "matchup": "? @ ?",
       "status": "",
@@ -1700,7 +1816,7 @@
       "status": "",
       "side": "away",
       "starter": "Braxton Ashcraft",
-      "label": "O 19/20",
+      "label": "O 18/19",
       "stat": "outs",
       "tone": "strong",
       "source": "none",
@@ -1709,10 +1825,10 @@
       "losses": 0,
       "targetCount": 2,
       "targets": [
-        19,
-        20
+        18,
+        19
       ],
-      "detail": "Supported ladders: 19/20 Last supported rung: 20"
+      "detail": "Supported ladders: 18/19 Last supported rung: 19"
     },
     {
       "gamePk": 824992,
