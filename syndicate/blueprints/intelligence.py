@@ -449,10 +449,10 @@ def _response_needs_refresh(request_payload: dict[str, object], response_payload
 
 def _cached_intelligence_response_with_source(payload: dict[str, object]) -> tuple[dict[str, object] | None, str]:
     board_snapshot_response = read_latest_intelligence_board_snapshot_response(payload, force_refresh=False)
-    if _is_board_response(board_snapshot_response):
+    if _is_board_response(board_snapshot_response) and not _response_needs_refresh(payload, board_snapshot_response):
         return dict(board_snapshot_response or {}), "board_snapshot"
     cached_response = read_latest_intelligence_state_response(payload, force_refresh=False)
-    if _is_board_response(cached_response):
+    if _is_board_response(cached_response) and not _response_needs_refresh(payload, cached_response):
         return dict(cached_response or {}), "worker"
     return None, "fallback"
 

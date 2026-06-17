@@ -1066,7 +1066,10 @@ function normalizeIntelligenceResponse(response) {
   const hasOwnTopOpportunities = Object.prototype.hasOwnProperty.call(response || {}, "top_opportunities");
   const hasOwnRecommendations = Object.prototype.hasOwnProperty.call(response || {}, "recommendations");
   const hasOwnParlays = Object.prototype.hasOwnProperty.call(response || {}, "parlays");
-  const outerTopOpportunitiesEmpty = hasOwnTopOpportunities && Array.isArray(response.top_opportunities) && response.top_opportunities.length === 0;
+  const nestedRecommendations = Array.isArray(nestedResponse.recommendations) ? nestedResponse.recommendations : [];
+  const nestedTopOpportunities = Array.isArray(nestedResponse.top_opportunities) ? nestedResponse.top_opportunities : [];
+  const nestedTopLiveOpportunities = Array.isArray(nestedResponse.top_live_opportunities) ? nestedResponse.top_live_opportunities : [];
+  const nestedParlays = Array.isArray(nestedResponse.parlays) ? nestedResponse.parlays : [];
   const recommendationHistory = response.recommendation_history && typeof response.recommendation_history === "object"
     ? response.recommendation_history
     : (analysis.recommendation_history && typeof analysis.recommendation_history === "object" ? analysis.recommendation_history : (nestedResponse.recommendation_history && typeof nestedResponse.recommendation_history === "object" ? nestedResponse.recommendation_history : {}));
@@ -1082,23 +1085,21 @@ function normalizeIntelligenceResponse(response) {
   const boardContract = response.board_contract && typeof response.board_contract === "object"
     ? response.board_contract
     : (analysis.board_contract && typeof analysis.board_contract === "object" ? analysis.board_contract : (nestedResponse.board_contract && typeof nestedResponse.board_contract === "object" ? nestedResponse.board_contract : {}));
-  const boardLaneCounts = boardContract.lane_counts && typeof boardContract.lane_counts === "object" ? boardContract.lane_counts : {};
-  const boardHasActiveLanes = Number(boardLaneCounts.live || 0) + Number(boardLaneCounts.pregame || 0) > 0;
   const recommendations = Array.isArray(response.recommendations)
     ? response.recommendations
-    : (hasOwnRecommendations ? [] : (Array.isArray(nestedResponse.recommendations) && (boardHasActiveLanes || !outerTopOpportunitiesEmpty) ? nestedResponse.recommendations : (Array.isArray(analysis.recommendations) ? analysis.recommendations : (Array.isArray(analysis.picks) ? analysis.picks : []))));
+    : (hasOwnRecommendations ? [] : (nestedRecommendations.length ? nestedRecommendations : (Array.isArray(analysis.recommendations) ? analysis.recommendations : (Array.isArray(analysis.picks) ? analysis.picks : []))));
   const topOpportunities = Array.isArray(response.top_opportunities)
     ? response.top_opportunities
-    : (hasOwnTopOpportunities ? [] : (Array.isArray(nestedResponse.top_opportunities) && (boardHasActiveLanes || !outerTopOpportunitiesEmpty) ? nestedResponse.top_opportunities : (Array.isArray(analysis.top_opportunities) ? analysis.top_opportunities : recommendations)));
+    : (hasOwnTopOpportunities ? [] : (nestedTopOpportunities.length ? nestedTopOpportunities : recommendations));
   const topLiveOpportunities = Array.isArray(response.top_live_opportunities) && response.top_live_opportunities.length
     ? response.top_live_opportunities
-    : (hasOwnTopOpportunities ? [] : (Array.isArray(nestedResponse.top_live_opportunities) && (boardHasActiveLanes || !outerTopOpportunitiesEmpty) ? nestedResponse.top_live_opportunities : (Array.isArray(analysis.top_live_opportunities) ? analysis.top_live_opportunities : recommendations.filter((item) => String(item.tag || item.timing || item.phase || "").trim().toUpperCase() === "LIVE"))));
+    : (hasOwnTopOpportunities ? [] : (nestedTopLiveOpportunities.length ? nestedTopLiveOpportunities : (Array.isArray(analysis.top_live_opportunities) ? analysis.top_live_opportunities : recommendations.filter((item) => String(item.tag || item.timing || item.phase || "").trim().toUpperCase() === "LIVE"))));
   const portfolio = response.portfolio && typeof response.portfolio === "object"
     ? response.portfolio
     : (analysis.portfolio && typeof analysis.portfolio === "object" ? analysis.portfolio : (nestedResponse.portfolio && typeof nestedResponse.portfolio === "object" ? nestedResponse.portfolio : {}));
   const parlays = Array.isArray(response.parlays) && response.parlays.length
     ? response.parlays
-    : (hasOwnParlays ? [] : (Array.isArray(nestedResponse.parlays) && (boardHasActiveLanes || !outerTopOpportunitiesEmpty) ? nestedResponse.parlays : (Array.isArray(analysis.parlays) ? analysis.parlays : [])));
+    : (hasOwnParlays ? [] : (nestedParlays.length ? nestedParlays : (Array.isArray(analysis.parlays) ? analysis.parlays : [])));
 
   return {
     analysis,
