@@ -343,6 +343,128 @@ class IntelligenceStateTests(unittest.TestCase):
         queued_payload = mocked_queue.call_args.args[0]
         self.assertEqual(queued_payload["date"], "2026-06-13")
 
+    def test_intelligence_home_queues_refresh_when_cached_board_snapshot_is_stale(self) -> None:
+        app = create_app()
+        app.testing = True
+
+        stale_response = {
+            "ok": True,
+            "selected_date": "2026-06-16",
+            "last_updated": "2026-06-16T19:13:08Z",
+            "top_opportunities": [{"name": "Stale Play"}],
+            "by_sport": {},
+            "analysis": {"recommendations": [{"name": "Stale Play"}], "picks": [], "top_live_opportunities": [], "portfolio": {}, "parlays": []},
+        }
+
+        with app.test_client() as client:
+            with patch("syndicate.blueprints.intelligence.read_latest_intelligence_board_snapshot_response", return_value=dict(stale_response)):
+                with patch("syndicate.blueprints.intelligence.read_latest_intelligence_state_response", return_value=None):
+                    with patch("syndicate.blueprints.intelligence.queue_intelligence_state_refresh") as mocked_queue:
+                        response = client.get("/intelligence?date=2026-06-17")
+
+        self.assertEqual(response.status_code, 200)
+        mocked_queue.assert_called_once()
+
+    def test_intelligence_home_suppresses_live_snapshot_missing_hydration(self) -> None:
+        app = create_app()
+        app.testing = True
+
+        stale_live_response = {
+            "ok": True,
+            "selected_date": "2026-06-17",
+            "top_opportunities": [
+                {
+                    "name": "Live Play",
+                    "event_id": "evt-1",
+                    "is_live": True,
+                    "status_display": "Live",
+                    "status_context": "In Progress",
+                    "movement_history": [{"timestamp": "2026-06-17T17:15:00Z"}],
+                }
+            ],
+            "by_sport": {},
+            "analysis": {
+                "recommendations": [
+                    {
+                        "name": "Live Play",
+                        "event_id": "evt-1",
+                        "is_live": True,
+                        "status_display": "Live",
+                        "status_context": "In Progress",
+                        "movement_history": [{"timestamp": "2026-06-17T17:15:00Z"}],
+                    }
+                ],
+                "top_live_opportunities": [],
+                "picks": [],
+                "portfolio": {},
+                "parlays": [],
+            },
+        }
+
+        with app.test_client() as client:
+            with patch("syndicate.blueprints.intelligence.read_latest_intelligence_board_snapshot_response", return_value=dict(stale_live_response)):
+                with patch("syndicate.blueprints.intelligence.read_latest_intelligence_state_response", return_value=None):
+                    with patch("syndicate.blueprints.intelligence.queue_intelligence_state_refresh") as mocked_queue:
+                        response = client.get("/intelligence?date=2026-06-17")
+
+        self.assertEqual(response.status_code, 200)
+        html = response.get_data(as_text=True)
+        self.assertNotIn("Live Play", html)
+        mocked_queue.assert_called_once()
+
+    def test_query_endpoint_returns_empty_board_when_cached_live_snapshot_is_missing_hydration(self) -> None:
+        app = Flask(__name__)
+        app.register_blueprint(intelligence_bp)
+
+        stale_live_response = {
+            "ok": True,
+            "selected_date": "2026-06-17",
+            "top_opportunities": [
+                {
+                    "name": "Live Play",
+                    "event_id": "evt-1",
+                    "is_live": True,
+                    "status_display": "Live",
+                    "status_context": "In Progress",
+                    "movement_history": [{"timestamp": "2026-06-17T17:15:00Z"}],
+                }
+            ],
+            "by_sport": {},
+            "analysis": {
+                "recommendations": [
+                    {
+                        "name": "Live Play",
+                        "event_id": "evt-1",
+                        "is_live": True,
+                        "status_display": "Live",
+                        "status_context": "In Progress",
+                        "movement_history": [{"timestamp": "2026-06-17T17:15:00Z"}],
+                    }
+                ],
+                "top_live_opportunities": [],
+                "picks": [],
+                "portfolio": {},
+                "parlays": [],
+            },
+        }
+
+        with app.test_request_context(
+            "/api/intelligence/query",
+            method="POST",
+            json={"question": "top edges today", "date": "2026-06-17"},
+        ):
+            with patch("syndicate.blueprints.intelligence.read_latest_intelligence_board_snapshot_response", return_value=dict(stale_live_response)):
+                with patch("syndicate.blueprints.intelligence.read_latest_intelligence_state_response", return_value=None):
+                    with patch("syndicate.blueprints.intelligence.queue_intelligence_state_refresh") as mocked_queue:
+                        response = intelligence_query_api()
+
+        payload = response.get_json()
+        self.assertIsNotNone(payload)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(payload["response"]["top_opportunities"], [])
+        self.assertEqual(payload["response"]["analysis"]["recommendations"], [])
+        mocked_queue.assert_called_once()
+
     def test_query_endpoint_preserves_recommendation_history_from_engine_response(self) -> None:
         app = Flask(__name__)
         app.register_blueprint(intelligence_bp)

@@ -1010,14 +1010,14 @@ def read_latest_intelligence_state_response(payload: dict[str, Any] | None = Non
 
 def read_latest_intelligence_board_snapshot_response(payload: dict[str, Any] | None = None, *, force_refresh: bool = True) -> dict[str, Any] | None:
     _ = payload
-    if force_refresh:
-        snapshot = read_json_file(BOARD_SNAPSHOT_PATH)
-        if isinstance(snapshot, dict):
-            response = snapshot.get("response")
-            if isinstance(response, dict):
-                return dict(response)
-            if all(key in snapshot for key in ("ok", "analysis", "top_opportunities")):
-                return dict(snapshot)
+    _ = force_refresh
+    snapshot = read_json_file(BOARD_SNAPSHOT_PATH)
+    if isinstance(snapshot, dict):
+        response = snapshot.get("response")
+        if isinstance(response, dict):
+            return dict(response)
+        if all(key in snapshot for key in ("ok", "analysis", "top_opportunities")):
+            return dict(snapshot)
     return None
 
 

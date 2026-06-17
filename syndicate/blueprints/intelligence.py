@@ -4,6 +4,7 @@ import hashlib
 import json
 import threading
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -259,6 +260,190 @@ def _response_has_content(payload: dict[str, object] | None) -> bool:
             if isinstance(value, list) and value:
                 return True
     return False
+
+
+def _response_contains_unhydrated_live_items(payload: dict[str, object] | None) -> bool:
+    current = dict(payload or {})
+    sources: list[dict[str, object]] = []
+
+    for key in ("top_opportunities", "recommendations"):
+        items = current.get(key)
+        if isinstance(items, list):
+            sources.extend(item for item in items if isinstance(item, dict))
+
+    analysis = current.get("analysis") if isinstance(current.get("analysis"), dict) else None
+    if isinstance(analysis, dict):
+        for key in ("recommendations", "top_live_opportunities"):
+            items = analysis.get(key)
+            if isinstance(items, list):
+                sources.extend(item for item in items if isinstance(item, dict))
+
+    for item in sources:
+        status_text = " ".join(
+            str(part or "").strip().lower()
+            for part in (
+                item.get("status_display"),
+                item.get("status_context"),
+                item.get("game_state"),
+            )
+        )
+        if not (
+            bool(item.get("is_live"))
+            or "live" in status_text
+            or "in progress" in status_text
+        ):
+            continue
+        has_live_projection = item.get("live_projection") is not None and str(item.get("live_projection") or item.get("liveProjection") or "").strip() not in {"", "-"}
+        has_actual = item.get("actual") is not None
+        live_state = item.get("live_state") if isinstance(item.get("live_state"), dict) else {}
+        has_live_state = bool(live_state) and any(bool(live_state.get(key)) for key in ("in_progress", "final", "period", "clock", "players", "boxscore"))
+        if not has_actual and not has_live_projection and not has_live_state:
+            return True
+    return False
+
+
+def _response_selected_date(payload: dict[str, object] | None) -> str | None:
+    current = dict(payload or {})
+    for key in ("selected_date", "date"):
+        value = str(current.get(key) or "").strip()
+        if value:
+            return value
+    nested = current.get("response") if isinstance(current.get("response"), dict) else None
+    if isinstance(nested, dict):
+        for key in ("selected_date", "date"):
+            value = str(nested.get(key) or "").strip()
+            if value:
+                return value
+    return None
+
+
+def _response_age_seconds(payload: dict[str, object] | None) -> float | None:
+    current = dict(payload or {})
+    for key in ("last_updated", "updated_at", "computed_at", "latestComputedAt", "timestamp"):
+        raw_value = str(current.get(key) or "").strip()
+        if not raw_value:
+            continue
+        normalized = raw_value.replace("Z", "+00:00")
+        try:
+            parsed = datetime.fromisoformat(normalized)
+        except Exception:
+            continue
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+        return max(0.0, (datetime.now(timezone.utc) - parsed.astimezone(timezone.utc)).total_seconds())
+    return None
+
+
+def _response_item_latest_timestamp(item: dict[str, object] | None) -> datetime | None:
+    current = dict(item or {})
+    candidates: list[str] = []
+    for key in ("last_updated", "updated_at", "computed_at", "latestComputedAt", "timestamp", "generated_at", "odds_refreshed_at"):
+        value = str(current.get(key) or "").strip()
+        if value:
+            candidates.append(value)
+
+    movement = current.get("movement") if isinstance(current.get("movement"), dict) else None
+    if isinstance(movement, dict):
+        for key in ("last_updated", "updated_at", "computed_at", "timestamp", "generated_at"):
+            value = str(movement.get(key) or "").strip()
+            if value:
+                candidates.append(value)
+
+    movement_history = current.get("movement_history") if isinstance(current.get("movement_history"), list) else None
+    if isinstance(movement_history, list) and movement_history:
+        tail = movement_history[-1] if isinstance(movement_history[-1], dict) else None
+        if isinstance(tail, dict):
+            for key in ("timestamp", "last_updated", "updated_at", "computed_at", "generated_at"):
+                value = str(tail.get(key) or "").strip()
+                if value:
+                    candidates.append(value)
+
+    parsed_values: list[datetime] = []
+    for raw_value in candidates:
+        normalized = raw_value.replace("Z", "+00:00")
+        try:
+            parsed = datetime.fromisoformat(normalized)
+        except Exception:
+            continue
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+        parsed_values.append(parsed.astimezone(timezone.utc))
+    if not parsed_values:
+        return None
+    return max(parsed_values)
+
+
+def _response_has_live_hydration(item: dict[str, object] | None) -> bool:
+    current = dict(item or {})
+    live_projection = current.get("live_projection") if current.get("live_projection") is not None else current.get("liveProjection")
+    actual = current.get("actual")
+    if actual is not None:
+        return True
+    if live_projection is not None and str(live_projection).strip() not in {"", "-"}:
+        return True
+    live_state = current.get("live_state") if isinstance(current.get("live_state"), dict) else None
+    if isinstance(live_state, dict) and bool(live_state):
+        return any(
+            bool(live_state.get(key))
+            for key in ("in_progress", "final", "period", "clock", "players", "boxscore")
+        )
+    return False
+
+
+def _board_response_needs_refresh(
+    request_payload: dict[str, object],
+    response_payload: dict[str, object] | None,
+    *,
+    live_freshness_seconds: float = 45.0,
+    pregame_freshness_seconds: float = 300.0,
+) -> bool:
+    if not _response_has_content(response_payload):
+        return True
+    if _response_contains_unhydrated_live_items(response_payload):
+        return True
+    request_date = str(request_payload.get("date") or request_payload.get("selected_date") or "").strip()
+    response_date = _response_selected_date(response_payload)
+    if request_date and response_date and request_date != response_date:
+        return True
+
+    response_age_seconds = _response_age_seconds(response_payload)
+    try:
+        sources = _recommendation_sources(response_payload)
+    except Exception:
+        sources = []
+
+    live_sources = [item for item in sources if isinstance(item, dict) and _recommendation_lane(item) == "live"]
+    if live_sources:
+        live_event_ids = {
+            str(item.get("event_id") or item.get("game_id") or "").strip()
+            for item in live_sources
+            if str(item.get("event_id") or item.get("game_id") or "").strip()
+        }
+        if not live_event_ids:
+            return True
+        hydrated_live_sources = [item for item in live_sources if _response_has_live_hydration(item)]
+        if not hydrated_live_sources:
+            return True
+        if response_age_seconds is not None and response_age_seconds > float(live_freshness_seconds):
+            return True
+        latest_signal = max(
+            (timestamp for item in live_sources if (timestamp := _response_item_latest_timestamp(item)) is not None),
+            default=None,
+        )
+        if latest_signal is not None:
+            latest_signal_age = max(0.0, (datetime.now(timezone.utc) - latest_signal).total_seconds())
+            if latest_signal_age > float(live_freshness_seconds):
+                return True
+        return False
+
+    if response_age_seconds is not None and response_age_seconds > float(pregame_freshness_seconds):
+        return True
+    return False
+
+
+def _response_needs_refresh(request_payload: dict[str, object], response_payload: dict[str, object] | None, *, freshness_seconds: float = 90.0) -> bool:
+    _ = freshness_seconds
+    return _board_response_needs_refresh(request_payload, response_payload)
 
 
 def _cached_intelligence_response_with_source(payload: dict[str, object]) -> tuple[dict[str, object] | None, str]:
@@ -584,9 +769,9 @@ def intelligence_home():
     initial_response: dict[str, Any] = {}
     try:
         cached_response, _ = _cached_intelligence_response_with_source(payload)
-        if cached_response is not None:
+        if cached_response is not None and not _response_needs_refresh(payload, cached_response):
             initial_response = dict(cached_response)
-        if not _response_has_content(initial_response):
+        else:
             queue_intelligence_state_refresh(dict(payload))
     except Exception:
         initial_response = {}
@@ -619,21 +804,23 @@ def intelligence_query_api():
             cache_payload["date"] = selected_date
         cached_response, cached_source = _cached_intelligence_response_with_source(cache_payload)
         _log_api_state_read(cached_response if isinstance(cached_response, dict) else {})
-        if question == DEFAULT_QUESTION and cached_response is not None:
+        cached_is_fresh = cached_response is not None and not _response_needs_refresh(cache_payload, cached_response)
+        if question == DEFAULT_QUESTION and cached_is_fresh:
             response_payload = dict(cached_response)
             if want_refresh or not _response_has_content(response_payload):
                 queue_intelligence_state_refresh(dict(payload))
         elif question == DEFAULT_QUESTION:
             if want_refresh and not bool(payload.get("background")):
                 queue_intelligence_state_refresh(dict(payload))
-            cached_response = _cached_intelligence_response(dict(payload))
-            if cached_response is None:
-                cached_response = _empty_default_intelligence_response()
-            response_payload = _unwrap_response_payload(cached_response)
+            if cached_is_fresh:
+                response_payload = _unwrap_response_payload(cached_response)
+            else:
+                response_payload = _unwrap_response_payload(_empty_default_intelligence_response())
+                queue_intelligence_state_refresh(dict(payload))
             if not _response_has_content(response_payload):
                 queue_intelligence_state_refresh(dict(payload))
         else:
-            if cached_response is not None:
+            if cached_is_fresh:
                 response_payload = dict(cached_response)
                 if want_refresh or not _response_has_content(response_payload):
                     queue_intelligence_state_refresh(dict(payload))
@@ -698,6 +885,9 @@ def intelligence_query_api():
                     "analysis": None,
                 }
             response_payload = _unwrap_response_payload(cached_response)
+
+        if _response_needs_refresh(cache_payload, response_payload) and not bool(payload.get("background")):
+            queue_intelligence_state_refresh(dict(payload))
 
         board_headline = _board_headline_for_question(question, response_payload)
         parsed_request = _parsed_request_for_question(question, payload)
