@@ -1429,6 +1429,73 @@ def _build_local_game_cards_artifact(*, source_root: Path, processed_root: Path,
     ]
     raw_path = next((path for path in raw_candidates if path.exists() and path.is_file()), None)
     if raw_path is None:
+        props_snapshot_path = source_root / "data" / "raw" / f"odds_wnba_player_props_{date_str}.csv"
+        if props_snapshot_path.exists() and props_snapshot_path.is_file() and _count_csv_rows_quick(props_snapshot_path) > 0:
+            try:
+                import pandas as pd
+
+                props_frame = pd.read_csv(props_snapshot_path)
+            except Exception as exc:
+                _append_log(log_file, f"Failed to read raw player props snapshot {props_snapshot_path}: {exc}")
+                props_frame = pd.DataFrame()
+
+            required_columns = {"event_id", "commence_time", "home_team", "away_team"}
+            if not props_frame.empty and required_columns.issubset(set(str(column) for column in props_frame.columns)):
+                working = props_frame.copy()
+                working["commence_time"] = working["commence_time"].astype(str)
+                working = working[working["commence_time"].str.startswith(date_str)].copy()
+                if not working.empty:
+                    rows_out: list[dict[str, object]] = []
+                    grouped = working.groupby(["event_id", "commence_time", "home_team", "away_team"], dropna=False, sort=True)
+                    for (event_id, commence_time, home_team, away_team), _group in grouped:
+                        home_name = str(home_team or "").strip()
+                        away_name = str(away_team or "").strip()
+                        if not home_name or not away_name:
+                            continue
+                        rows_out.append(
+                            {
+                                "date": date_str,
+                                "game_id": f"0{str(event_id or '').strip()}" if str(event_id or '').strip() else "",
+                                "home_team": home_name,
+                                "visitor_team": away_name,
+                                "commence_time": str(commence_time or "").strip(),
+                                "home_ml": None,
+                                "away_ml": None,
+                                "home_spread": None,
+                                "away_spread": None,
+                                "total": None,
+                                "bookmaker": "oddsapi_consensus",
+                                "home_tri": _to_tricode_local(home_name),
+                                "away_tri": _to_tricode_local(away_name),
+                            }
+                        )
+
+                    if rows_out:
+                        header_order = [
+                            "date",
+                            "game_id",
+                            "home_team",
+                            "visitor_team",
+                            "commence_time",
+                            "home_ml",
+                            "away_ml",
+                            "home_spread",
+                            "away_spread",
+                            "total",
+                            "bookmaker",
+                            "home_tri",
+                            "away_tri",
+                        ]
+                        out_path.parent.mkdir(parents=True, exist_ok=True)
+                        with out_path.open("w", encoding="utf-8", newline="") as handle:
+                            writer = csv.DictWriter(handle, fieldnames=header_order)
+                            writer.writeheader()
+                            for current in rows_out:
+                                writer.writerow({field: current.get(field, "") for field in header_order})
+
+                        _append_log(log_file, f"Built local game_cards from raw player props snapshot fallback: {out_path} (rows={len(rows_out)})")
+                        return len(rows_out), out_path
+
         # Fallback to processed game_odds when raw team odds snapshots are unavailable.
         game_odds_path = source_root / "data" / "processed" / f"game_odds_{date_str}.csv"
         if not game_odds_path.exists() or not game_odds_path.is_file() or _count_csv_rows_quick(game_odds_path) <= 0:

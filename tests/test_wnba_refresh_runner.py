@@ -181,6 +181,43 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
         self.assertEqual(written[0].get("away_tri"), "MIN")
         self.assertEqual(written[0].get("bookmaker"), "oddsapi_consensus")
 
+    def test_build_local_game_cards_artifact_uses_raw_player_props_snapshot_fallback(self) -> None:
+        module = self._load_module()
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            source_root = Path(tmp_dir) / "source"
+            processed_root = source_root / "data" / "processed"
+            raw_root = source_root / "data" / "raw"
+            processed_root.mkdir(parents=True, exist_ok=True)
+            raw_root.mkdir(parents=True, exist_ok=True)
+            date_str = "2026-06-17"
+            (raw_root / f"odds_wnba_player_props_{date_str}.csv").write_text(
+                "snapshot_ts,event_id,commence_time,bookmaker,bookmaker_title,market,outcome_name,player_name,point,price,last_update,home_team,away_team\n"
+                "2026-06-17T13:55:26Z,401,2026-06-17T23:00:00Z,draftkings,DraftKings,player_points,Over,Sonia Citron,16.5,-113,2026-06-17T13:55:01Z,Connecticut Sun,Washington Mystics\n"
+                "2026-06-17T13:55:26Z,401,2026-06-17T23:00:00Z,draftkings,DraftKings,player_points,Under,Sonia Citron,16.5,-117,2026-06-17T13:55:01Z,Connecticut Sun,Washington Mystics\n",
+                encoding="utf-8",
+            )
+
+            rows, out_path = module._build_local_game_cards_artifact(
+                source_root=source_root,
+                processed_root=processed_root,
+                date_str=date_str,
+                log_file=Path(tmp_dir) / "refresh.log",
+            )
+
+            self.assertEqual(rows, 1)
+            self.assertIsNotNone(out_path)
+            assert out_path is not None
+            with out_path.open("r", encoding="utf-8", newline="") as handle:
+                written = list(csv.DictReader(handle))
+
+        self.assertEqual(len(written), 1)
+        self.assertEqual(written[0].get("home_team"), "Connecticut Sun")
+        self.assertEqual(written[0].get("visitor_team"), "Washington Mystics")
+        self.assertEqual(written[0].get("home_tri"), "CON")
+        self.assertEqual(written[0].get("away_tri"), "WSH")
+        self.assertEqual(written[0].get("bookmaker"), "oddsapi_consensus")
+
     def test_repair_predictions_slate_rebuilds_when_predictions_missing(self) -> None:
         module = self._load_module()
 
