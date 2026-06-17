@@ -1064,6 +1064,8 @@ function normalizeIntelligenceResponse(response) {
   const analysis = response && typeof response.analysis === "object" && response.analysis ? response.analysis : (response && typeof response.response === "object" && response.response ? response.response : {});
   const hasOwnTopOpportunities = Object.prototype.hasOwnProperty.call(response || {}, "top_opportunities");
   const hasOwnRecommendations = Object.prototype.hasOwnProperty.call(response || {}, "recommendations");
+  const hasOwnParlays = Object.prototype.hasOwnProperty.call(response || {}, "parlays");
+  const suppressNestedFallback = hasOwnTopOpportunities && Array.isArray(response.top_opportunities) && response.top_opportunities.length === 0;
   const recommendationHistory = response.recommendation_history && typeof response.recommendation_history === "object"
     ? response.recommendation_history
     : (analysis.recommendation_history && typeof analysis.recommendation_history === "object" ? analysis.recommendation_history : {});
@@ -1081,19 +1083,19 @@ function normalizeIntelligenceResponse(response) {
     : (analysis.board_contract && typeof analysis.board_contract === "object" ? analysis.board_contract : {});
   const recommendations = Array.isArray(response.recommendations)
     ? response.recommendations
-    : (hasOwnRecommendations ? [] : (Array.isArray(analysis.recommendations) ? analysis.recommendations : (Array.isArray(analysis.picks) ? analysis.picks : [])));
+    : (hasOwnRecommendations || suppressNestedFallback ? [] : (Array.isArray(analysis.recommendations) ? analysis.recommendations : (Array.isArray(analysis.picks) ? analysis.picks : [])));
   const topOpportunities = Array.isArray(response.top_opportunities)
     ? response.top_opportunities
-    : (hasOwnTopOpportunities ? [] : (Array.isArray(analysis.top_opportunities) ? analysis.top_opportunities : recommendations));
+    : (hasOwnTopOpportunities || suppressNestedFallback ? [] : (Array.isArray(analysis.top_opportunities) ? analysis.top_opportunities : recommendations));
   const topLiveOpportunities = Array.isArray(response.top_live_opportunities) && response.top_live_opportunities.length
     ? response.top_live_opportunities
-    : (hasOwnTopOpportunities ? [] : (Array.isArray(analysis.top_live_opportunities) ? analysis.top_live_opportunities : recommendations.filter((item) => String(item.tag || item.timing || item.phase || "").trim().toUpperCase() === "LIVE")));
+    : (hasOwnTopOpportunities || suppressNestedFallback ? [] : (Array.isArray(analysis.top_live_opportunities) ? analysis.top_live_opportunities : recommendations.filter((item) => String(item.tag || item.timing || item.phase || "").trim().toUpperCase() === "LIVE")));
   const portfolio = response.portfolio && typeof response.portfolio === "object"
     ? response.portfolio
     : (analysis.portfolio && typeof analysis.portfolio === "object" ? analysis.portfolio : {});
   const parlays = Array.isArray(response.parlays) && response.parlays.length
     ? response.parlays
-    : (Array.isArray(analysis.parlays) ? analysis.parlays : []);
+    : (hasOwnParlays || suppressNestedFallback ? [] : (Array.isArray(analysis.parlays) ? analysis.parlays : []));
 
   return {
     analysis,
