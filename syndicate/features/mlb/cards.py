@@ -4370,7 +4370,7 @@ def build_cards_page_context(selected_date: str) -> dict[str, Any]:
         "page_shell_class": "syndicate-mlb-cards-shell",
         "cards_grid_class": "cards-grid",
         "cards_stylesheet": "mlb/cards_exact.css",
-        "cards_script": "mlb/board.js",
+        "cards_script": "mlb/cards_source.js",
     }, sport="mlb", module="cards")
     if cache_key is not None and games:
         _MLB_TODAY_CACHE[cache_key] = result

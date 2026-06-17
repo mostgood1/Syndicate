@@ -18,16 +18,23 @@ def _repo_root() -> Path:
     return Path(__file__).resolve().parents[3]
 
 
+def _normalize_source_root(root: Path) -> Path:
+    resolved = root.resolve()
+    if resolved.name == "data" and resolved.parent.name == "source_artifacts":
+        return resolved.parent
+    return resolved
+
+
 def _source_roots() -> list[Path]:
     env_value = str(os.environ.get("SYNDICATE_MLB_SOURCE_ROOT") or "").strip()
     if env_value:
-        return [Path(env_value).resolve()]
+        return [_normalize_source_root(Path(env_value))]
 
     data_root = str(os.environ.get("SYNDICATE_DATA_ROOT") or "").strip()
     roots: list[Path] = []
     if data_root:
-        roots.append((Path(data_root).resolve() / "mlb_source").resolve())
-    roots.append((_repo_root() / "data" / "mlb_source").resolve())
+        roots.append(_normalize_source_root(Path(data_root).resolve() / "mlb_source"))
+    roots.append(_normalize_source_root(_repo_root() / "data" / "mlb_source"))
 
     expanded: list[Path] = []
     for root in list(roots):
@@ -202,7 +209,7 @@ def daily_ops_report_path(selected_date: str) -> Path:
 
 
 def daily_sim_artifact_path(selected_date: str, game_pk: int) -> Path | None:
-    roots = _source_roots()
+    roots = [*_artifact_roots(), *_source_roots()]
     if not roots:
         return None
 
@@ -233,7 +240,7 @@ def daily_sim_artifact_path(selected_date: str, game_pk: int) -> Path | None:
         matches = sorted(fallback_dir.glob(f"sim_*_pk{int(game_pk)}_*.json"))
         if not matches:
             continue
-        target = sims_dir / matches[0].name
+        target = fallback_dir / matches[0].name
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(matches[0], target)
         return target
