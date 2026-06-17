@@ -296,6 +296,50 @@ def api_ops_mlb_sims_list() -> Any:
     return jsonify({"ok": True, "date": date, "results": results})
 
 
+@ops_bp.get("/api/ops/mlb/live-check")
+def api_ops_mlb_live_check() -> Any:
+    # Protected endpoint: requires admin token
+    date = str(request.args.get("date") or "").strip()
+    game_pk_raw = request.args.get("game_pk") or request.args.get("gamePk") or request.args.get("game")
+    try:
+        game_pk = int(str(game_pk_raw)) if game_pk_raw is not None else None
+    except Exception:
+        game_pk = None
+    if not date:
+        return jsonify({"ok": False, "error": "date parameter required (YYYY-MM-DD)"}), 400
+    try:
+        repo_root = Path(current_app.root_path).resolve().parent
+        data_root = Path(str(os.environ.get("SYNDICATE_DATA_ROOT") or "").strip() or "/opt/render/project/data").resolve()
+        # live_lens report path candidates
+        live_lens_candidates = []
+        for base in (data_root / "mlb_source", repo_root / "data" / "mlb_source"):
+            live_path = base / "source_artifacts" / "data" / "live_lens" / f"live_lens_report_{date.replace('-', '_')}.json"
+            live_lens_candidates.append(str(live_path))
+        # raw feed candidates
+        raw_candidates = []
+        season = date.split("-", 1)[0] if date else None
+        if season and game_pk:
+            for base in (data_root / "mlb_source", repo_root / "data" / "mlb_source"):
+                raw_dir = base / "source_artifacts" / "data" / "raw" / "statsapi" / season / date
+                for suffix in (".json.gz", ".json"):
+                    raw_candidates.append(str(raw_dir / f"{int(game_pk)}{suffix}"))
+
+        # check existence and sizes
+        live_results = []
+        for path in live_lens_candidates:
+            p = Path(path)
+            live_results.append({"path": path, "exists": p.exists() and p.is_file(), "size": p.stat().st_size if p.exists() and p.is_file() else None})
+
+        raw_results = []
+        for path in raw_candidates:
+            p = Path(path)
+            raw_results.append({"path": path, "exists": p.exists() and p.is_file(), "size": p.stat().st_size if p.exists() and p.is_file() else None})
+
+        return jsonify({"ok": True, "date": date, "game_pk": game_pk, "live_lens": live_results, "raw_feed": raw_results})
+    except Exception as exc:
+        return jsonify({"ok": False, "error": f"{type(exc).__name__}: {exc}"}), 500
+
+
 @ops_bp.get("/api/ops/odds-refresh/plan")
 def api_ops_odds_refresh_plan() -> Any:
     try:
