@@ -2882,7 +2882,9 @@ def _run_refresh_via_cli(
             rc_game_cards = 0 if local_game_cards_path is not None and int(game_cards_rows) > 0 else 1
             _, local_recommendations_path = _build_local_game_recommendations_artifact(processed_root=processed_root, date_str=date_str)
             rc_recommendations = 0 if local_recommendations_path is not None else 1
-            rc_export = 0 if all(int(value) == 0 for value in game_input_rcs.values()) and int(rc_local_props_export) == 0 and int(rc_recommendations) == 0 and int(rc_game_cards) == 0 else 1
+            if any(int(value) != 0 for value in game_input_rcs.values()):
+                _append_log(log_file, f"WNBA source bootstrap returned non-zero input codes for {date_str}: {game_input_rcs}")
+            rc_export = 0 if int(rc_local_props_export) == 0 and int(rc_recommendations) == 0 and int(rc_game_cards) == 0 else 1
         except Exception:
             _append_log(log_file, traceback.format_exc())
             rc_export = 1

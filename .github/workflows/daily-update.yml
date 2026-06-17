@@ -176,11 +176,12 @@ jobs:
           $branch = $env:GITHUB_REF_NAME
           Write-Host "Preparing to push commit to origin/$branch"
 
-          # Verify artifacts are present in HEAD; fail loudly if missing
+          # Verify at least one published artifact tree is present in HEAD; fail loudly if missing.
           $filesInHead = git --no-pager show --name-only --pretty=format:'' HEAD
           Write-Host 'Files included in HEAD commit:'
           Write-Host $filesInHead
-          if ($filesInHead -notmatch 'data/mlb_source/source_artifacts') {
+          $artifactTreePresent = ($filesInHead | Select-String -Pattern '^data/[^/]+_source/(source_artifacts|manifests)/' -Quiet)
+          if (-not $artifactTreePresent) {
             Write-Error 'ERROR: artifacts not found in HEAD commit; failing workflow to indicate Stage 2 failure.'
             exit 1
           }

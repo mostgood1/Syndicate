@@ -646,7 +646,7 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
                 out_path.write_text("player\nA\n", encoding="utf-8")
                 return 1, out_path
 
-            with patch.object(module, "_run_to_file", side_effect=_fake_run), patch.object(module, "export_props_predictions_local", side_effect=_fake_predict_export), patch.object(module, "export_props_edges_local", side_effect=_fake_edges_export), patch.object(module, "export_props_recommendations_local", side_effect=_fake_export), patch.object(module, "_ensure_player_logs_for_props_refresh", return_value=(True, None)), patch.object(module, "_ensure_game_predictions_for_props_refresh", return_value=(True, None)):
+            with patch.object(module, "_run_to_file", side_effect=_fake_run), patch.object(module, "export_props_predictions_local", side_effect=_fake_predict_export), patch.object(module, "export_props_edges_local", side_effect=_fake_edges_export), patch.object(module, "export_props_recommendations_local", side_effect=_fake_export), patch.object(module, "_ensure_player_logs_for_props_refresh", return_value=(True, None)), patch.object(module, "_ensure_game_predictions_for_props_refresh", return_value=(True, None)), patch.object(module, "_ensure_source_game_inputs", return_value={"schedule": 1, "fetch": 0, "build_features": 0, "predict_date": 0}):
                 state = module._run_refresh_via_cli(
                     source_root=source_root,
                     date_str="2026-05-22",
