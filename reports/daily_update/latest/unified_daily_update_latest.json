@@ -1,0 +1,2006 @@
+﻿{
+    "date":  "2026-06-17",
+    "generatedAt":  "2026-06-17T13:36:49.0136685+00:00",
+    "lastUpdatedAt":  "2026-06-17T14:01:16.7177635+00:00",
+    "completedAt":  "2026-06-17T14:01:16.7177635+00:00",
+    "runMode":  "standard",
+    "overallStatus":  "ok",
+    "error":  null,
+    "runDir":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-06-17\\20260617_133648",
+    "latestDir":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest",
+    "runtimePolicy":  {
+                          "MLB":  {
+                                      "simsPerGame":  1000,
+                                      "workers":  3
+                                  },
+                          "NBA":  {
+                                      "smartsimNSims":  1000,
+                                      "smartsimWorkers":  3
+                                  },
+                          "WNBA":  {
+                                       "smartsimNSims":  1000,
+                                       "smartsimWorkers":  3
+                                   },
+                          "NHL":  {
+                                      "gameSimSamples":  1000,
+                                      "propsBoxscoreNSims":  1000
+                                  },
+                          "NFL":  {
+                                      "scenarioNSims":  1000
+                                  }
+                      },
+    "runPlan":  {
+                    "simExecution":  null,
+                    "eventSimExecution":  [
+                                              {
+                                                  "sport":  "mlb",
+                                                  "workflow":  "vendored_daily_update",
+                                                  "eventKey":  "sim_0_NYM_at_CIN_pk824503_g1",
+                                                  "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_0_NYM_at_CIN_pk824503_g1.json",
+                                                  "candidateArtifactPaths":  [
+                                                                                 "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_0_NYM_at_CIN_pk824503_g1.json"
+                                                                             ],
+                                                  "inputFingerprint":  "18c7525c7d5373bc751a608685923c3dda0756c48e1fd34a919641fafe26999e",
+                                                  "decision":  "planned",
+                                                  "status":  "pending"
+                                              },
+                                              {
+                                                  "sport":  "mlb",
+                                                  "workflow":  "vendored_daily_update",
+                                                  "eventKey":  "sim_10_CLE_at_MIL_pk823774_g1",
+                                                  "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_10_CLE_at_MIL_pk823774_g1.json",
+                                                  "candidateArtifactPaths":  [
+                                                                                 "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_10_CLE_at_MIL_pk823774_g1.json"
+                                                                             ],
+                                                  "inputFingerprint":  "18c7525c7d5373bc751a608685923c3dda0756c48e1fd34a919641fafe26999e",
+                                                  "decision":  "planned",
+                                                  "status":  "pending"
+                                              },
+                                              {
+                                                  "sport":  "mlb",
+                                                  "workflow":  "vendored_daily_update",
+                                                  "eventKey":  "sim_11_COL_at_CHC_pk824668_g1",
+                                                  "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_11_COL_at_CHC_pk824668_g1.json",
+                                                  "candidateArtifactPaths":  [
+                                                                                 "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_11_COL_at_CHC_pk824668_g1.json"
+                                                                             ],
+                                                  "inputFingerprint":  "18c7525c7d5373bc751a608685923c3dda0756c48e1fd34a919641fafe26999e",
+                                                  "decision":  "planned",
+                                                  "status":  "pending"
+                                              },
+                                              {
+                                                  "sport":  "mlb",
+                                                  "workflow":  "vendored_daily_update",
+                                                  "eventKey":  "sim_12_PIT_at_ATH_pk824992_g1",
+                                                  "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_12_PIT_at_ATH_pk824992_g1.json",
+                                                  "candidateArtifactPaths":  [
+                                                                                 "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_12_PIT_at_ATH_pk824992_g1.json"
+                                                                             ],
+                                                  "inputFingerprint":  "18c7525c7d5373bc751a608685923c3dda0756c48e1fd34a919641fafe26999e",
+                                                  "decision":  "planned",
+                                                  "status":  "pending"
+                                              },
+                                              {
+                                                  "sport":  "mlb",
+                                                  "workflow":  "vendored_daily_update",
+                                                  "eventKey":  "sim_13_BAL_at_SEA_pk823127_g1",
+                                                  "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_13_BAL_at_SEA_pk823127_g1.json",
+                                                  "candidateArtifactPaths":  [
+                                                                                 "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_13_BAL_at_SEA_pk823127_g1.json"
+                                                                             ],
+                                                  "inputFingerprint":  "18c7525c7d5373bc751a608685923c3dda0756c48e1fd34a919641fafe26999e",
+                                                  "decision":  "planned",
+                                                  "status":  "pending"
+                                              },
+                                              {
+                                                  "sport":  "mlb",
+                                                  "workflow":  "vendored_daily_update",
+                                                  "eventKey":  "sim_1_KC_at_WSH_pk822721_g1",
+                                                  "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_1_KC_at_WSH_pk822721_g1.json",
+                                                  "candidateArtifactPaths":  [
+                                                                                 "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_1_KC_at_WSH_pk822721_g1.json"
+                                                                             ],
+                                                  "inputFingerprint":  "18c7525c7d5373bc751a608685923c3dda0756c48e1fd34a919641fafe26999e",
+                                                  "decision":  "planned",
+                                                  "status":  "pending"
+                                              },
+                                              {
+                                                  "sport":  "mlb",
+                                                  "workflow":  "vendored_daily_update",
+                                                  "eventKey":  "sim_2_MIA_at_PHI_pk823450_g1",
+                                                  "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_2_MIA_at_PHI_pk823450_g1.json",
+                                                  "candidateArtifactPaths":  [
+                                                                                 "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_2_MIA_at_PHI_pk823450_g1.json"
+                                                                             ],
+                                                  "inputFingerprint":  "18c7525c7d5373bc751a608685923c3dda0756c48e1fd34a919641fafe26999e",
+                                                  "decision":  "planned",
+                                                  "status":  "pending"
+                                              },
+                                              {
+                                                  "sport":  "mlb",
+                                                  "workflow":  "vendored_daily_update",
+                                                  "eventKey":  "sim_3_DET_at_HOU_pk824178_g1",
+                                                  "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_3_DET_at_HOU_pk824178_g1.json",
+                                                  "candidateArtifactPaths":  [
+                                                                                 "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_3_DET_at_HOU_pk824178_g1.json"
+                                                                             ],
+                                                  "inputFingerprint":  "18c7525c7d5373bc751a608685923c3dda0756c48e1fd34a919641fafe26999e",
+                                                  "decision":  "planned",
+                                                  "status":  "pending"
+                                              },
+                                              {
+                                                  "sport":  "mlb",
+                                                  "workflow":  "vendored_daily_update",
+                                                  "eventKey":  "sim_4_SD_at_STL_pk823044_g1",
+                                                  "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_4_SD_at_STL_pk823044_g1.json",
+                                                  "candidateArtifactPaths":  [
+                                                                                 "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_4_SD_at_STL_pk823044_g1.json"
+                                                                             ],
+                                                  "inputFingerprint":  "18c7525c7d5373bc751a608685923c3dda0756c48e1fd34a919641fafe26999e",
+                                                  "decision":  "planned",
+                                                  "status":  "pending"
+                                              },
+                                              {
+                                                  "sport":  "mlb",
+                                                  "workflow":  "vendored_daily_update",
+                                                  "eventKey":  "sim_5_TB_at_LAD_pk823940_g1",
+                                                  "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_5_TB_at_LAD_pk823940_g1.json",
+                                                  "candidateArtifactPaths":  [
+                                                                                 "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_5_TB_at_LAD_pk823940_g1.json"
+                                                                             ],
+                                                  "inputFingerprint":  "18c7525c7d5373bc751a608685923c3dda0756c48e1fd34a919641fafe26999e",
+                                                  "decision":  "planned",
+                                                  "status":  "pending"
+                                              },
+                                              {
+                                                  "sport":  "mlb",
+                                                  "workflow":  "vendored_daily_update",
+                                                  "eventKey":  "sim_6_LAA_at_AZ_pk825072_g1",
+                                                  "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_6_LAA_at_AZ_pk825072_g1.json",
+                                                  "candidateArtifactPaths":  [
+                                                                                 "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_6_LAA_at_AZ_pk825072_g1.json"
+                                                                             ],
+                                                  "inputFingerprint":  "18c7525c7d5373bc751a608685923c3dda0756c48e1fd34a919641fafe26999e",
+                                                  "decision":  "planned",
+                                                  "status":  "pending"
+                                              },
+                                              {
+                                                  "sport":  "mlb",
+                                                  "workflow":  "vendored_daily_update",
+                                                  "eventKey":  "sim_7_TOR_at_BOS_pk824746_g1",
+                                                  "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_7_TOR_at_BOS_pk824746_g1.json",
+                                                  "candidateArtifactPaths":  [
+                                                                                 "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_7_TOR_at_BOS_pk824746_g1.json"
+                                                                             ],
+                                                  "inputFingerprint":  "18c7525c7d5373bc751a608685923c3dda0756c48e1fd34a919641fafe26999e",
+                                                  "decision":  "planned",
+                                                  "status":  "pending"
+                                              },
+                                              {
+                                                  "sport":  "mlb",
+                                                  "workflow":  "vendored_daily_update",
+                                                  "eventKey":  "sim_8_CWS_at_NYY_pk823536_g1",
+                                                  "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_8_CWS_at_NYY_pk823536_g1.json",
+                                                  "candidateArtifactPaths":  [
+                                                                                 "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_8_CWS_at_NYY_pk823536_g1.json"
+                                                                             ],
+                                                  "inputFingerprint":  "18c7525c7d5373bc751a608685923c3dda0756c48e1fd34a919641fafe26999e",
+                                                  "decision":  "planned",
+                                                  "status":  "pending"
+                                              },
+                                              {
+                                                  "sport":  "mlb",
+                                                  "workflow":  "vendored_daily_update",
+                                                  "eventKey":  "sim_9_SF_at_ATL_pk824913_g1",
+                                                  "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_9_SF_at_ATL_pk824913_g1.json",
+                                                  "candidateArtifactPaths":  [
+                                                                                 "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_9_SF_at_ATL_pk824913_g1.json"
+                                                                             ],
+                                                  "inputFingerprint":  "18c7525c7d5373bc751a608685923c3dda0756c48e1fd34a919641fafe26999e",
+                                                  "decision":  "planned",
+                                                  "status":  "pending"
+                                              },
+                                              {
+                                                  "sport":  "wnba",
+                                                  "workflow":  "vendored_daily_update",
+                                                  "eventKey":  "smart_sim_2026-06-17_CHI_NYL",
+                                                  "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_CHI_NYL.json",
+                                                  "candidateArtifactPaths":  [
+                                                                                 "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_CHI_NYL.json"
+                                                                             ],
+                                                  "inputFingerprint":  "04c5f51b9a83653b59fa69757209bde5fe1980791938c7c649ed44b11d8b8d53",
+                                                  "decision":  "planned",
+                                                  "status":  "pending"
+                                              },
+                                              {
+                                                  "sport":  "wnba",
+                                                  "workflow":  "vendored_daily_update",
+                                                  "eventKey":  "smart_sim_2026-06-17_CON_WSH",
+                                                  "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_CON_WSH.json",
+                                                  "candidateArtifactPaths":  [
+                                                                                 "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_CON_WSH.json"
+                                                                             ],
+                                                  "inputFingerprint":  "04c5f51b9a83653b59fa69757209bde5fe1980791938c7c649ed44b11d8b8d53",
+                                                  "decision":  "planned",
+                                                  "status":  "pending"
+                                              },
+                                              {
+                                                  "sport":  "wnba",
+                                                  "workflow":  "vendored_daily_update",
+                                                  "eventKey":  "smart_sim_2026-06-17_GSV_DAL",
+                                                  "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_GSV_DAL.json",
+                                                  "candidateArtifactPaths":  [
+                                                                                 "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_GSV_DAL.json"
+                                                                             ],
+                                                  "inputFingerprint":  "04c5f51b9a83653b59fa69757209bde5fe1980791938c7c649ed44b11d8b8d53",
+                                                  "decision":  "planned",
+                                                  "status":  "pending"
+                                              },
+                                              {
+                                                  "sport":  "wnba",
+                                                  "workflow":  "vendored_daily_update",
+                                                  "eventKey":  "smart_sim_2026-06-17_LAS_MIN",
+                                                  "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_LAS_MIN.json",
+                                                  "candidateArtifactPaths":  [
+                                                                                 "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_LAS_MIN.json"
+                                                                             ],
+                                                  "inputFingerprint":  "04c5f51b9a83653b59fa69757209bde5fe1980791938c7c649ed44b11d8b8d53",
+                                                  "decision":  "planned",
+                                                  "status":  "pending"
+                                              },
+                                              {
+                                                  "sport":  "wnba",
+                                                  "workflow":  "vendored_daily_update",
+                                                  "eventKey":  "smart_sim_2026-06-17_PHX_LVA",
+                                                  "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_PHX_LVA.json",
+                                                  "candidateArtifactPaths":  [
+                                                                                 "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_PHX_LVA.json"
+                                                                             ],
+                                                  "inputFingerprint":  "04c5f51b9a83653b59fa69757209bde5fe1980791938c7c649ed44b11d8b8d53",
+                                                  "decision":  "planned",
+                                                  "status":  "pending"
+                                              },
+                                              {
+                                                  "sport":  "wnba",
+                                                  "workflow":  "vendored_daily_update",
+                                                  "eventKey":  "smart_sim_2026-06-17_POR_SEA",
+                                                  "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_POR_SEA.json",
+                                                  "candidateArtifactPaths":  [
+                                                                                 "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_POR_SEA.json"
+                                                                             ],
+                                                  "inputFingerprint":  "04c5f51b9a83653b59fa69757209bde5fe1980791938c7c649ed44b11d8b8d53",
+                                                  "decision":  "planned",
+                                                  "status":  "pending"
+                                              },
+                                              {
+                                                  "sport":  "nhl",
+                                                  "workflow":  "vendored_daily_update",
+                                                  "eventKey":  "smart_sim_2026-06-17_bundle",
+                                                  "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_bundle.json",
+                                                  "candidateArtifactPaths":  [
+                                                                                 "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_bundle.json"
+                                                                             ],
+                                                  "inputFingerprint":  "582b694af97eff8e94b7d95373abc74fd155f08d59849d605d3af903909f3ae7",
+                                                  "decision":  "planned",
+                                                  "status":  "pending"
+                                              }
+                                          ],
+                    "artifactUpdates":  [
+                                            {
+                                                "sport":  "mlb",
+                                                "workflow":  "vendored_daily_update",
+                                                "eventKey":  "sim_0_NYM_at_CIN_pk824503_g1",
+                                                "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_0_NYM_at_CIN_pk824503_g1.json",
+                                                "candidateArtifactPaths":  [
+                                                                               "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_0_NYM_at_CIN_pk824503_g1.json"
+                                                                           ],
+                                                "inputFingerprint":  "18c7525c7d5373bc751a608685923c3dda0756c48e1fd34a919641fafe26999e",
+                                                "decision":  "planned",
+                                                "status":  "pending"
+                                            },
+                                            {
+                                                "sport":  "mlb",
+                                                "workflow":  "vendored_daily_update",
+                                                "eventKey":  "sim_10_CLE_at_MIL_pk823774_g1",
+                                                "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_10_CLE_at_MIL_pk823774_g1.json",
+                                                "candidateArtifactPaths":  [
+                                                                               "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_10_CLE_at_MIL_pk823774_g1.json"
+                                                                           ],
+                                                "inputFingerprint":  "18c7525c7d5373bc751a608685923c3dda0756c48e1fd34a919641fafe26999e",
+                                                "decision":  "planned",
+                                                "status":  "pending"
+                                            },
+                                            {
+                                                "sport":  "mlb",
+                                                "workflow":  "vendored_daily_update",
+                                                "eventKey":  "sim_11_COL_at_CHC_pk824668_g1",
+                                                "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_11_COL_at_CHC_pk824668_g1.json",
+                                                "candidateArtifactPaths":  [
+                                                                               "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_11_COL_at_CHC_pk824668_g1.json"
+                                                                           ],
+                                                "inputFingerprint":  "18c7525c7d5373bc751a608685923c3dda0756c48e1fd34a919641fafe26999e",
+                                                "decision":  "planned",
+                                                "status":  "pending"
+                                            },
+                                            {
+                                                "sport":  "mlb",
+                                                "workflow":  "vendored_daily_update",
+                                                "eventKey":  "sim_12_PIT_at_ATH_pk824992_g1",
+                                                "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_12_PIT_at_ATH_pk824992_g1.json",
+                                                "candidateArtifactPaths":  [
+                                                                               "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_12_PIT_at_ATH_pk824992_g1.json"
+                                                                           ],
+                                                "inputFingerprint":  "18c7525c7d5373bc751a608685923c3dda0756c48e1fd34a919641fafe26999e",
+                                                "decision":  "planned",
+                                                "status":  "pending"
+                                            },
+                                            {
+                                                "sport":  "mlb",
+                                                "workflow":  "vendored_daily_update",
+                                                "eventKey":  "sim_13_BAL_at_SEA_pk823127_g1",
+                                                "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_13_BAL_at_SEA_pk823127_g1.json",
+                                                "candidateArtifactPaths":  [
+                                                                               "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_13_BAL_at_SEA_pk823127_g1.json"
+                                                                           ],
+                                                "inputFingerprint":  "18c7525c7d5373bc751a608685923c3dda0756c48e1fd34a919641fafe26999e",
+                                                "decision":  "planned",
+                                                "status":  "pending"
+                                            },
+                                            {
+                                                "sport":  "mlb",
+                                                "workflow":  "vendored_daily_update",
+                                                "eventKey":  "sim_1_KC_at_WSH_pk822721_g1",
+                                                "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_1_KC_at_WSH_pk822721_g1.json",
+                                                "candidateArtifactPaths":  [
+                                                                               "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_1_KC_at_WSH_pk822721_g1.json"
+                                                                           ],
+                                                "inputFingerprint":  "18c7525c7d5373bc751a608685923c3dda0756c48e1fd34a919641fafe26999e",
+                                                "decision":  "planned",
+                                                "status":  "pending"
+                                            },
+                                            {
+                                                "sport":  "mlb",
+                                                "workflow":  "vendored_daily_update",
+                                                "eventKey":  "sim_2_MIA_at_PHI_pk823450_g1",
+                                                "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_2_MIA_at_PHI_pk823450_g1.json",
+                                                "candidateArtifactPaths":  [
+                                                                               "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_2_MIA_at_PHI_pk823450_g1.json"
+                                                                           ],
+                                                "inputFingerprint":  "18c7525c7d5373bc751a608685923c3dda0756c48e1fd34a919641fafe26999e",
+                                                "decision":  "planned",
+                                                "status":  "pending"
+                                            },
+                                            {
+                                                "sport":  "mlb",
+                                                "workflow":  "vendored_daily_update",
+                                                "eventKey":  "sim_3_DET_at_HOU_pk824178_g1",
+                                                "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_3_DET_at_HOU_pk824178_g1.json",
+                                                "candidateArtifactPaths":  [
+                                                                               "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_3_DET_at_HOU_pk824178_g1.json"
+                                                                           ],
+                                                "inputFingerprint":  "18c7525c7d5373bc751a608685923c3dda0756c48e1fd34a919641fafe26999e",
+                                                "decision":  "planned",
+                                                "status":  "pending"
+                                            },
+                                            {
+                                                "sport":  "mlb",
+                                                "workflow":  "vendored_daily_update",
+                                                "eventKey":  "sim_4_SD_at_STL_pk823044_g1",
+                                                "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_4_SD_at_STL_pk823044_g1.json",
+                                                "candidateArtifactPaths":  [
+                                                                               "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_4_SD_at_STL_pk823044_g1.json"
+                                                                           ],
+                                                "inputFingerprint":  "18c7525c7d5373bc751a608685923c3dda0756c48e1fd34a919641fafe26999e",
+                                                "decision":  "planned",
+                                                "status":  "pending"
+                                            },
+                                            {
+                                                "sport":  "mlb",
+                                                "workflow":  "vendored_daily_update",
+                                                "eventKey":  "sim_5_TB_at_LAD_pk823940_g1",
+                                                "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_5_TB_at_LAD_pk823940_g1.json",
+                                                "candidateArtifactPaths":  [
+                                                                               "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_5_TB_at_LAD_pk823940_g1.json"
+                                                                           ],
+                                                "inputFingerprint":  "18c7525c7d5373bc751a608685923c3dda0756c48e1fd34a919641fafe26999e",
+                                                "decision":  "planned",
+                                                "status":  "pending"
+                                            },
+                                            {
+                                                "sport":  "mlb",
+                                                "workflow":  "vendored_daily_update",
+                                                "eventKey":  "sim_6_LAA_at_AZ_pk825072_g1",
+                                                "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_6_LAA_at_AZ_pk825072_g1.json",
+                                                "candidateArtifactPaths":  [
+                                                                               "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_6_LAA_at_AZ_pk825072_g1.json"
+                                                                           ],
+                                                "inputFingerprint":  "18c7525c7d5373bc751a608685923c3dda0756c48e1fd34a919641fafe26999e",
+                                                "decision":  "planned",
+                                                "status":  "pending"
+                                            },
+                                            {
+                                                "sport":  "mlb",
+                                                "workflow":  "vendored_daily_update",
+                                                "eventKey":  "sim_7_TOR_at_BOS_pk824746_g1",
+                                                "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_7_TOR_at_BOS_pk824746_g1.json",
+                                                "candidateArtifactPaths":  [
+                                                                               "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_7_TOR_at_BOS_pk824746_g1.json"
+                                                                           ],
+                                                "inputFingerprint":  "18c7525c7d5373bc751a608685923c3dda0756c48e1fd34a919641fafe26999e",
+                                                "decision":  "planned",
+                                                "status":  "pending"
+                                            },
+                                            {
+                                                "sport":  "mlb",
+                                                "workflow":  "vendored_daily_update",
+                                                "eventKey":  "sim_8_CWS_at_NYY_pk823536_g1",
+                                                "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_8_CWS_at_NYY_pk823536_g1.json",
+                                                "candidateArtifactPaths":  [
+                                                                               "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_8_CWS_at_NYY_pk823536_g1.json"
+                                                                           ],
+                                                "inputFingerprint":  "18c7525c7d5373bc751a608685923c3dda0756c48e1fd34a919641fafe26999e",
+                                                "decision":  "planned",
+                                                "status":  "pending"
+                                            },
+                                            {
+                                                "sport":  "mlb",
+                                                "workflow":  "vendored_daily_update",
+                                                "eventKey":  "sim_9_SF_at_ATL_pk824913_g1",
+                                                "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_9_SF_at_ATL_pk824913_g1.json",
+                                                "candidateArtifactPaths":  [
+                                                                               "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_9_SF_at_ATL_pk824913_g1.json"
+                                                                           ],
+                                                "inputFingerprint":  "18c7525c7d5373bc751a608685923c3dda0756c48e1fd34a919641fafe26999e",
+                                                "decision":  "planned",
+                                                "status":  "pending"
+                                            },
+                                            {
+                                                "sport":  "wnba",
+                                                "workflow":  "vendored_daily_update",
+                                                "eventKey":  "smart_sim_2026-06-17_CHI_NYL",
+                                                "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_CHI_NYL.json",
+                                                "candidateArtifactPaths":  [
+                                                                               "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_CHI_NYL.json"
+                                                                           ],
+                                                "inputFingerprint":  "04c5f51b9a83653b59fa69757209bde5fe1980791938c7c649ed44b11d8b8d53",
+                                                "decision":  "planned",
+                                                "status":  "pending"
+                                            },
+                                            {
+                                                "sport":  "wnba",
+                                                "workflow":  "vendored_daily_update",
+                                                "eventKey":  "smart_sim_2026-06-17_CON_WSH",
+                                                "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_CON_WSH.json",
+                                                "candidateArtifactPaths":  [
+                                                                               "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_CON_WSH.json"
+                                                                           ],
+                                                "inputFingerprint":  "04c5f51b9a83653b59fa69757209bde5fe1980791938c7c649ed44b11d8b8d53",
+                                                "decision":  "planned",
+                                                "status":  "pending"
+                                            },
+                                            {
+                                                "sport":  "wnba",
+                                                "workflow":  "vendored_daily_update",
+                                                "eventKey":  "smart_sim_2026-06-17_GSV_DAL",
+                                                "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_GSV_DAL.json",
+                                                "candidateArtifactPaths":  [
+                                                                               "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_GSV_DAL.json"
+                                                                           ],
+                                                "inputFingerprint":  "04c5f51b9a83653b59fa69757209bde5fe1980791938c7c649ed44b11d8b8d53",
+                                                "decision":  "planned",
+                                                "status":  "pending"
+                                            },
+                                            {
+                                                "sport":  "wnba",
+                                                "workflow":  "vendored_daily_update",
+                                                "eventKey":  "smart_sim_2026-06-17_LAS_MIN",
+                                                "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_LAS_MIN.json",
+                                                "candidateArtifactPaths":  [
+                                                                               "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_LAS_MIN.json"
+                                                                           ],
+                                                "inputFingerprint":  "04c5f51b9a83653b59fa69757209bde5fe1980791938c7c649ed44b11d8b8d53",
+                                                "decision":  "planned",
+                                                "status":  "pending"
+                                            },
+                                            {
+                                                "sport":  "wnba",
+                                                "workflow":  "vendored_daily_update",
+                                                "eventKey":  "smart_sim_2026-06-17_PHX_LVA",
+                                                "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_PHX_LVA.json",
+                                                "candidateArtifactPaths":  [
+                                                                               "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_PHX_LVA.json"
+                                                                           ],
+                                                "inputFingerprint":  "04c5f51b9a83653b59fa69757209bde5fe1980791938c7c649ed44b11d8b8d53",
+                                                "decision":  "planned",
+                                                "status":  "pending"
+                                            },
+                                            {
+                                                "sport":  "wnba",
+                                                "workflow":  "vendored_daily_update",
+                                                "eventKey":  "smart_sim_2026-06-17_POR_SEA",
+                                                "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_POR_SEA.json",
+                                                "candidateArtifactPaths":  [
+                                                                               "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_POR_SEA.json"
+                                                                           ],
+                                                "inputFingerprint":  "04c5f51b9a83653b59fa69757209bde5fe1980791938c7c649ed44b11d8b8d53",
+                                                "decision":  "planned",
+                                                "status":  "pending"
+                                            },
+                                            {
+                                                "sport":  "nhl",
+                                                "workflow":  "vendored_daily_update",
+                                                "eventKey":  "smart_sim_2026-06-17_bundle",
+                                                "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_bundle.json",
+                                                "candidateArtifactPaths":  [
+                                                                               "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_bundle.json"
+                                                                           ],
+                                                "inputFingerprint":  "582b694af97eff8e94b7d95373abc74fd155f08d59849d605d3af903909f3ae7",
+                                                "decision":  "planned",
+                                                "status":  "pending"
+                                            }
+                                        ],
+                    "policyPerformance":  [
+
+                                          ],
+                    "sourceUpdates":  true,
+                    "refreshGate":  true,
+                    "artifactGeneration":  false,
+                    "manifestGeneration":  true,
+                    "publish":  false,
+                    "refreshOdds":  false,
+                    "oddsPhase":  null,
+                    "oddsSports":  null,
+                    "oddsRegions":  null,
+                    "oddsHistoryTriggerPlan":  [
+                                                   null,
+                                                   null,
+                                                   null,
+                                                   null,
+                                                   {
+                                                       "sport":  "wnba",
+                                                       "workflow":  "vendored_daily_update",
+                                                       "date":  "2026-06-17",
+                                                       "oddsHistoryPath":  "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\tracking\\odds_history.json",
+                                                       "hasLineMovement":  true,
+                                                       "maxDeltaDetected":  8,
+                                                       "lastOddsUpdateTimestamp":  "2026-06-12T16:30:32+00:00",
+                                                       "runSimulation":  true,
+                                                       "priorityScoring":  false,
+                                                       "skipHeavyComputation":  false,
+                                                       "trigger":  "simulation",
+                                                       "reason":  "delta_threshold"
+                                                   },
+                                                   {
+                                                       "sport":  "wnba",
+                                                       "workflow":  "syndicate_mirror",
+                                                       "date":  "2026-06-17",
+                                                       "oddsHistoryPath":  "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\tracking\\odds_history.json",
+                                                       "hasLineMovement":  true,
+                                                       "maxDeltaDetected":  8,
+                                                       "lastOddsUpdateTimestamp":  "2026-06-12T16:30:32+00:00",
+                                                       "runSimulation":  true,
+                                                       "priorityScoring":  false,
+                                                       "skipHeavyComputation":  false,
+                                                       "trigger":  "simulation",
+                                                       "reason":  "delta_threshold"
+                                                   },
+                                                   {
+                                                       "sport":  "nhl",
+                                                       "workflow":  "vendored_daily_update",
+                                                       "date":  "2026-06-17",
+                                                       "oddsHistoryPath":  "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\tracking\\odds_history.json",
+                                                       "hasLineMovement":  false,
+                                                       "maxDeltaDetected":  null,
+                                                       "lastOddsUpdateTimestamp":  null,
+                                                       "runSimulation":  false,
+                                                       "priorityScoring":  false,
+                                                       "skipHeavyComputation":  true,
+                                                       "trigger":  "skip_heavy_computation",
+                                                       "reason":  "flat_history"
+                                                   },
+                                                   null,
+                                                   null
+                                               ]
+                },
+    "publishParity":  null,
+    "runProvenance":  {
+                          "sourceStepCount":  9,
+                          "sourceSteps":  [
+                                              {
+                                                  "sport":  "mlb",
+                                                  "workflow":  "vendored_daily_update",
+                                                  "name":  "MLB vendored daily update"
+                                              },
+                                              {
+                                                  "sport":  "mlb",
+                                                  "workflow":  "syndicate_refresh",
+                                                  "name":  "MLB current-day live-lens refresh"
+                                              },
+                                              {
+                                                  "sport":  "nba",
+                                                  "workflow":  "vendored_daily_update",
+                                                  "name":  "NBA vendored daily update"
+                                              },
+                                              {
+                                                  "sport":  "nba",
+                                                  "workflow":  "syndicate_mirror",
+                                                  "name":  "NBA source mirror refresh"
+                                              },
+                                              {
+                                                  "sport":  "wnba",
+                                                  "workflow":  "vendored_daily_update",
+                                                  "name":  "WNBA vendored daily update"
+                                              },
+                                              {
+                                                  "sport":  "wnba",
+                                                  "workflow":  "syndicate_mirror",
+                                                  "name":  "WNBA source mirror refresh"
+                                              },
+                                              {
+                                                  "sport":  "nhl",
+                                                  "workflow":  "vendored_daily_update",
+                                                  "name":  "NHL vendored daily update"
+                                              },
+                                              {
+                                                  "sport":  null,
+                                                  "workflow":  null,
+                                                  "name":  "NFL local odds refresh"
+                                              },
+                                              {
+                                                  "sport":  "ncaab",
+                                                  "workflow":  "syndicate_mirror",
+                                                  "name":  "NCAAB source mirror export"
+                                              }
+                                          ],
+                          "latestManifestLoaded":  false,
+                          "latestEventSimExecutionPlanCount":  0,
+                          "latestArtifactUpdateCount":  1,
+                          "oddsHistoryTriggerPlanCount":  9,
+                          "simExecutionDecision":  null
+                      },
+    "replayContext":  {
+                          "latestCheckpointLoaded":  true,
+                          "latestCheckpointPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest_checkpoint.json",
+                          "latestCheckpointStage":  "queued",
+                          "latestCheckpointFailedStage":  "",
+                          "latestCheckpointCompletedStageCount":  2,
+                          "latestCheckpointCompletedStages":  [
+                                                                  "source_update",
+                                                                  "refresh_gate"
+                                                              ],
+                          "resumeEligible":  false,
+                          "resumedFromCheckpoint":  true
+                      },
+    "runState":  {
+                     "currentStage":  "queued",
+                     "completedStages":  [
+                                             "source_update",
+                                             "refresh_gate"
+                                         ],
+                     "failedStage":  null,
+                     "lastUpdatedAt":  "2026-06-17T14:01:16.7177635+00:00"
+                 },
+    "eventSimExecution":  [
+                              {
+                                  "sport":  "mlb",
+                                  "workflow":  "vendored_daily_update",
+                                  "eventKey":  "sim_0_NYM_at_CIN_pk824503_g1",
+                                  "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_0_NYM_at_CIN_pk824503_g1.json",
+                                  "candidateArtifactPaths":  [
+                                                                 "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_0_NYM_at_CIN_pk824503_g1.json"
+                                                             ],
+                                  "inputFingerprint":  "18c7525c7d5373bc751a608685923c3dda0756c48e1fd34a919641fafe26999e",
+                                  "decision":  "planned",
+                                  "status":  "pending"
+                              },
+                              {
+                                  "sport":  "mlb",
+                                  "workflow":  "vendored_daily_update",
+                                  "eventKey":  "sim_10_CLE_at_MIL_pk823774_g1",
+                                  "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_10_CLE_at_MIL_pk823774_g1.json",
+                                  "candidateArtifactPaths":  [
+                                                                 "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_10_CLE_at_MIL_pk823774_g1.json"
+                                                             ],
+                                  "inputFingerprint":  "18c7525c7d5373bc751a608685923c3dda0756c48e1fd34a919641fafe26999e",
+                                  "decision":  "planned",
+                                  "status":  "pending"
+                              },
+                              {
+                                  "sport":  "mlb",
+                                  "workflow":  "vendored_daily_update",
+                                  "eventKey":  "sim_11_COL_at_CHC_pk824668_g1",
+                                  "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_11_COL_at_CHC_pk824668_g1.json",
+                                  "candidateArtifactPaths":  [
+                                                                 "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_11_COL_at_CHC_pk824668_g1.json"
+                                                             ],
+                                  "inputFingerprint":  "18c7525c7d5373bc751a608685923c3dda0756c48e1fd34a919641fafe26999e",
+                                  "decision":  "planned",
+                                  "status":  "pending"
+                              },
+                              {
+                                  "sport":  "mlb",
+                                  "workflow":  "vendored_daily_update",
+                                  "eventKey":  "sim_12_PIT_at_ATH_pk824992_g1",
+                                  "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_12_PIT_at_ATH_pk824992_g1.json",
+                                  "candidateArtifactPaths":  [
+                                                                 "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_12_PIT_at_ATH_pk824992_g1.json"
+                                                             ],
+                                  "inputFingerprint":  "18c7525c7d5373bc751a608685923c3dda0756c48e1fd34a919641fafe26999e",
+                                  "decision":  "planned",
+                                  "status":  "pending"
+                              },
+                              {
+                                  "sport":  "mlb",
+                                  "workflow":  "vendored_daily_update",
+                                  "eventKey":  "sim_13_BAL_at_SEA_pk823127_g1",
+                                  "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_13_BAL_at_SEA_pk823127_g1.json",
+                                  "candidateArtifactPaths":  [
+                                                                 "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_13_BAL_at_SEA_pk823127_g1.json"
+                                                             ],
+                                  "inputFingerprint":  "18c7525c7d5373bc751a608685923c3dda0756c48e1fd34a919641fafe26999e",
+                                  "decision":  "planned",
+                                  "status":  "pending"
+                              },
+                              {
+                                  "sport":  "mlb",
+                                  "workflow":  "vendored_daily_update",
+                                  "eventKey":  "sim_1_KC_at_WSH_pk822721_g1",
+                                  "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_1_KC_at_WSH_pk822721_g1.json",
+                                  "candidateArtifactPaths":  [
+                                                                 "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_1_KC_at_WSH_pk822721_g1.json"
+                                                             ],
+                                  "inputFingerprint":  "18c7525c7d5373bc751a608685923c3dda0756c48e1fd34a919641fafe26999e",
+                                  "decision":  "planned",
+                                  "status":  "pending"
+                              },
+                              {
+                                  "sport":  "mlb",
+                                  "workflow":  "vendored_daily_update",
+                                  "eventKey":  "sim_2_MIA_at_PHI_pk823450_g1",
+                                  "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_2_MIA_at_PHI_pk823450_g1.json",
+                                  "candidateArtifactPaths":  [
+                                                                 "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_2_MIA_at_PHI_pk823450_g1.json"
+                                                             ],
+                                  "inputFingerprint":  "18c7525c7d5373bc751a608685923c3dda0756c48e1fd34a919641fafe26999e",
+                                  "decision":  "planned",
+                                  "status":  "pending"
+                              },
+                              {
+                                  "sport":  "mlb",
+                                  "workflow":  "vendored_daily_update",
+                                  "eventKey":  "sim_3_DET_at_HOU_pk824178_g1",
+                                  "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_3_DET_at_HOU_pk824178_g1.json",
+                                  "candidateArtifactPaths":  [
+                                                                 "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_3_DET_at_HOU_pk824178_g1.json"
+                                                             ],
+                                  "inputFingerprint":  "18c7525c7d5373bc751a608685923c3dda0756c48e1fd34a919641fafe26999e",
+                                  "decision":  "planned",
+                                  "status":  "pending"
+                              },
+                              {
+                                  "sport":  "mlb",
+                                  "workflow":  "vendored_daily_update",
+                                  "eventKey":  "sim_4_SD_at_STL_pk823044_g1",
+                                  "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_4_SD_at_STL_pk823044_g1.json",
+                                  "candidateArtifactPaths":  [
+                                                                 "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_4_SD_at_STL_pk823044_g1.json"
+                                                             ],
+                                  "inputFingerprint":  "18c7525c7d5373bc751a608685923c3dda0756c48e1fd34a919641fafe26999e",
+                                  "decision":  "planned",
+                                  "status":  "pending"
+                              },
+                              {
+                                  "sport":  "mlb",
+                                  "workflow":  "vendored_daily_update",
+                                  "eventKey":  "sim_5_TB_at_LAD_pk823940_g1",
+                                  "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_5_TB_at_LAD_pk823940_g1.json",
+                                  "candidateArtifactPaths":  [
+                                                                 "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_5_TB_at_LAD_pk823940_g1.json"
+                                                             ],
+                                  "inputFingerprint":  "18c7525c7d5373bc751a608685923c3dda0756c48e1fd34a919641fafe26999e",
+                                  "decision":  "planned",
+                                  "status":  "pending"
+                              },
+                              {
+                                  "sport":  "mlb",
+                                  "workflow":  "vendored_daily_update",
+                                  "eventKey":  "sim_6_LAA_at_AZ_pk825072_g1",
+                                  "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_6_LAA_at_AZ_pk825072_g1.json",
+                                  "candidateArtifactPaths":  [
+                                                                 "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_6_LAA_at_AZ_pk825072_g1.json"
+                                                             ],
+                                  "inputFingerprint":  "18c7525c7d5373bc751a608685923c3dda0756c48e1fd34a919641fafe26999e",
+                                  "decision":  "planned",
+                                  "status":  "pending"
+                              },
+                              {
+                                  "sport":  "mlb",
+                                  "workflow":  "vendored_daily_update",
+                                  "eventKey":  "sim_7_TOR_at_BOS_pk824746_g1",
+                                  "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_7_TOR_at_BOS_pk824746_g1.json",
+                                  "candidateArtifactPaths":  [
+                                                                 "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_7_TOR_at_BOS_pk824746_g1.json"
+                                                             ],
+                                  "inputFingerprint":  "18c7525c7d5373bc751a608685923c3dda0756c48e1fd34a919641fafe26999e",
+                                  "decision":  "planned",
+                                  "status":  "pending"
+                              },
+                              {
+                                  "sport":  "mlb",
+                                  "workflow":  "vendored_daily_update",
+                                  "eventKey":  "sim_8_CWS_at_NYY_pk823536_g1",
+                                  "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_8_CWS_at_NYY_pk823536_g1.json",
+                                  "candidateArtifactPaths":  [
+                                                                 "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_8_CWS_at_NYY_pk823536_g1.json"
+                                                             ],
+                                  "inputFingerprint":  "18c7525c7d5373bc751a608685923c3dda0756c48e1fd34a919641fafe26999e",
+                                  "decision":  "planned",
+                                  "status":  "pending"
+                              },
+                              {
+                                  "sport":  "mlb",
+                                  "workflow":  "vendored_daily_update",
+                                  "eventKey":  "sim_9_SF_at_ATL_pk824913_g1",
+                                  "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_9_SF_at_ATL_pk824913_g1.json",
+                                  "candidateArtifactPaths":  [
+                                                                 "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_9_SF_at_ATL_pk824913_g1.json"
+                                                             ],
+                                  "inputFingerprint":  "18c7525c7d5373bc751a608685923c3dda0756c48e1fd34a919641fafe26999e",
+                                  "decision":  "planned",
+                                  "status":  "pending"
+                              },
+                              {
+                                  "sport":  "wnba",
+                                  "workflow":  "vendored_daily_update",
+                                  "eventKey":  "smart_sim_2026-06-17_CHI_NYL",
+                                  "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_CHI_NYL.json",
+                                  "candidateArtifactPaths":  [
+                                                                 "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_CHI_NYL.json"
+                                                             ],
+                                  "inputFingerprint":  "04c5f51b9a83653b59fa69757209bde5fe1980791938c7c649ed44b11d8b8d53",
+                                  "decision":  "planned",
+                                  "status":  "pending"
+                              },
+                              {
+                                  "sport":  "wnba",
+                                  "workflow":  "vendored_daily_update",
+                                  "eventKey":  "smart_sim_2026-06-17_CON_WSH",
+                                  "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_CON_WSH.json",
+                                  "candidateArtifactPaths":  [
+                                                                 "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_CON_WSH.json"
+                                                             ],
+                                  "inputFingerprint":  "04c5f51b9a83653b59fa69757209bde5fe1980791938c7c649ed44b11d8b8d53",
+                                  "decision":  "planned",
+                                  "status":  "pending"
+                              },
+                              {
+                                  "sport":  "wnba",
+                                  "workflow":  "vendored_daily_update",
+                                  "eventKey":  "smart_sim_2026-06-17_GSV_DAL",
+                                  "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_GSV_DAL.json",
+                                  "candidateArtifactPaths":  [
+                                                                 "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_GSV_DAL.json"
+                                                             ],
+                                  "inputFingerprint":  "04c5f51b9a83653b59fa69757209bde5fe1980791938c7c649ed44b11d8b8d53",
+                                  "decision":  "planned",
+                                  "status":  "pending"
+                              },
+                              {
+                                  "sport":  "wnba",
+                                  "workflow":  "vendored_daily_update",
+                                  "eventKey":  "smart_sim_2026-06-17_LAS_MIN",
+                                  "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_LAS_MIN.json",
+                                  "candidateArtifactPaths":  [
+                                                                 "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_LAS_MIN.json"
+                                                             ],
+                                  "inputFingerprint":  "04c5f51b9a83653b59fa69757209bde5fe1980791938c7c649ed44b11d8b8d53",
+                                  "decision":  "planned",
+                                  "status":  "pending"
+                              },
+                              {
+                                  "sport":  "wnba",
+                                  "workflow":  "vendored_daily_update",
+                                  "eventKey":  "smart_sim_2026-06-17_PHX_LVA",
+                                  "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_PHX_LVA.json",
+                                  "candidateArtifactPaths":  [
+                                                                 "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_PHX_LVA.json"
+                                                             ],
+                                  "inputFingerprint":  "04c5f51b9a83653b59fa69757209bde5fe1980791938c7c649ed44b11d8b8d53",
+                                  "decision":  "planned",
+                                  "status":  "pending"
+                              },
+                              {
+                                  "sport":  "wnba",
+                                  "workflow":  "vendored_daily_update",
+                                  "eventKey":  "smart_sim_2026-06-17_POR_SEA",
+                                  "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_POR_SEA.json",
+                                  "candidateArtifactPaths":  [
+                                                                 "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_POR_SEA.json"
+                                                             ],
+                                  "inputFingerprint":  "04c5f51b9a83653b59fa69757209bde5fe1980791938c7c649ed44b11d8b8d53",
+                                  "decision":  "planned",
+                                  "status":  "pending"
+                              },
+                              {
+                                  "sport":  "nhl",
+                                  "workflow":  "vendored_daily_update",
+                                  "eventKey":  "smart_sim_2026-06-17_bundle",
+                                  "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_bundle.json",
+                                  "candidateArtifactPaths":  [
+                                                                 "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_bundle.json"
+                                                             ],
+                                  "inputFingerprint":  "582b694af97eff8e94b7d95373abc74fd155f08d59849d605d3af903909f3ae7",
+                                  "decision":  "planned",
+                                  "status":  "pending"
+                              }
+                          ],
+    "artifactUpdates":  [
+                            {
+                                "sport":  "mlb",
+                                "workflow":  "vendored_daily_update",
+                                "eventKey":  "sim_0_NYM_at_CIN_pk824503_g1",
+                                "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_0_NYM_at_CIN_pk824503_g1.json",
+                                "candidateArtifactPaths":  [
+                                                               "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_0_NYM_at_CIN_pk824503_g1.json"
+                                                           ],
+                                "inputFingerprint":  "18c7525c7d5373bc751a608685923c3dda0756c48e1fd34a919641fafe26999e",
+                                "decision":  "planned",
+                                "status":  "pending"
+                            },
+                            {
+                                "sport":  "mlb",
+                                "workflow":  "vendored_daily_update",
+                                "eventKey":  "sim_10_CLE_at_MIL_pk823774_g1",
+                                "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_10_CLE_at_MIL_pk823774_g1.json",
+                                "candidateArtifactPaths":  [
+                                                               "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_10_CLE_at_MIL_pk823774_g1.json"
+                                                           ],
+                                "inputFingerprint":  "18c7525c7d5373bc751a608685923c3dda0756c48e1fd34a919641fafe26999e",
+                                "decision":  "planned",
+                                "status":  "pending"
+                            },
+                            {
+                                "sport":  "mlb",
+                                "workflow":  "vendored_daily_update",
+                                "eventKey":  "sim_11_COL_at_CHC_pk824668_g1",
+                                "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_11_COL_at_CHC_pk824668_g1.json",
+                                "candidateArtifactPaths":  [
+                                                               "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_11_COL_at_CHC_pk824668_g1.json"
+                                                           ],
+                                "inputFingerprint":  "18c7525c7d5373bc751a608685923c3dda0756c48e1fd34a919641fafe26999e",
+                                "decision":  "planned",
+                                "status":  "pending"
+                            },
+                            {
+                                "sport":  "mlb",
+                                "workflow":  "vendored_daily_update",
+                                "eventKey":  "sim_12_PIT_at_ATH_pk824992_g1",
+                                "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_12_PIT_at_ATH_pk824992_g1.json",
+                                "candidateArtifactPaths":  [
+                                                               "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_12_PIT_at_ATH_pk824992_g1.json"
+                                                           ],
+                                "inputFingerprint":  "18c7525c7d5373bc751a608685923c3dda0756c48e1fd34a919641fafe26999e",
+                                "decision":  "planned",
+                                "status":  "pending"
+                            },
+                            {
+                                "sport":  "mlb",
+                                "workflow":  "vendored_daily_update",
+                                "eventKey":  "sim_13_BAL_at_SEA_pk823127_g1",
+                                "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_13_BAL_at_SEA_pk823127_g1.json",
+                                "candidateArtifactPaths":  [
+                                                               "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_13_BAL_at_SEA_pk823127_g1.json"
+                                                           ],
+                                "inputFingerprint":  "18c7525c7d5373bc751a608685923c3dda0756c48e1fd34a919641fafe26999e",
+                                "decision":  "planned",
+                                "status":  "pending"
+                            },
+                            {
+                                "sport":  "mlb",
+                                "workflow":  "vendored_daily_update",
+                                "eventKey":  "sim_1_KC_at_WSH_pk822721_g1",
+                                "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_1_KC_at_WSH_pk822721_g1.json",
+                                "candidateArtifactPaths":  [
+                                                               "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_1_KC_at_WSH_pk822721_g1.json"
+                                                           ],
+                                "inputFingerprint":  "18c7525c7d5373bc751a608685923c3dda0756c48e1fd34a919641fafe26999e",
+                                "decision":  "planned",
+                                "status":  "pending"
+                            },
+                            {
+                                "sport":  "mlb",
+                                "workflow":  "vendored_daily_update",
+                                "eventKey":  "sim_2_MIA_at_PHI_pk823450_g1",
+                                "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_2_MIA_at_PHI_pk823450_g1.json",
+                                "candidateArtifactPaths":  [
+                                                               "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_2_MIA_at_PHI_pk823450_g1.json"
+                                                           ],
+                                "inputFingerprint":  "18c7525c7d5373bc751a608685923c3dda0756c48e1fd34a919641fafe26999e",
+                                "decision":  "planned",
+                                "status":  "pending"
+                            },
+                            {
+                                "sport":  "mlb",
+                                "workflow":  "vendored_daily_update",
+                                "eventKey":  "sim_3_DET_at_HOU_pk824178_g1",
+                                "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_3_DET_at_HOU_pk824178_g1.json",
+                                "candidateArtifactPaths":  [
+                                                               "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_3_DET_at_HOU_pk824178_g1.json"
+                                                           ],
+                                "inputFingerprint":  "18c7525c7d5373bc751a608685923c3dda0756c48e1fd34a919641fafe26999e",
+                                "decision":  "planned",
+                                "status":  "pending"
+                            },
+                            {
+                                "sport":  "mlb",
+                                "workflow":  "vendored_daily_update",
+                                "eventKey":  "sim_4_SD_at_STL_pk823044_g1",
+                                "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_4_SD_at_STL_pk823044_g1.json",
+                                "candidateArtifactPaths":  [
+                                                               "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_4_SD_at_STL_pk823044_g1.json"
+                                                           ],
+                                "inputFingerprint":  "18c7525c7d5373bc751a608685923c3dda0756c48e1fd34a919641fafe26999e",
+                                "decision":  "planned",
+                                "status":  "pending"
+                            },
+                            {
+                                "sport":  "mlb",
+                                "workflow":  "vendored_daily_update",
+                                "eventKey":  "sim_5_TB_at_LAD_pk823940_g1",
+                                "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_5_TB_at_LAD_pk823940_g1.json",
+                                "candidateArtifactPaths":  [
+                                                               "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_5_TB_at_LAD_pk823940_g1.json"
+                                                           ],
+                                "inputFingerprint":  "18c7525c7d5373bc751a608685923c3dda0756c48e1fd34a919641fafe26999e",
+                                "decision":  "planned",
+                                "status":  "pending"
+                            },
+                            {
+                                "sport":  "mlb",
+                                "workflow":  "vendored_daily_update",
+                                "eventKey":  "sim_6_LAA_at_AZ_pk825072_g1",
+                                "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_6_LAA_at_AZ_pk825072_g1.json",
+                                "candidateArtifactPaths":  [
+                                                               "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_6_LAA_at_AZ_pk825072_g1.json"
+                                                           ],
+                                "inputFingerprint":  "18c7525c7d5373bc751a608685923c3dda0756c48e1fd34a919641fafe26999e",
+                                "decision":  "planned",
+                                "status":  "pending"
+                            },
+                            {
+                                "sport":  "mlb",
+                                "workflow":  "vendored_daily_update",
+                                "eventKey":  "sim_7_TOR_at_BOS_pk824746_g1",
+                                "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_7_TOR_at_BOS_pk824746_g1.json",
+                                "candidateArtifactPaths":  [
+                                                               "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_7_TOR_at_BOS_pk824746_g1.json"
+                                                           ],
+                                "inputFingerprint":  "18c7525c7d5373bc751a608685923c3dda0756c48e1fd34a919641fafe26999e",
+                                "decision":  "planned",
+                                "status":  "pending"
+                            },
+                            {
+                                "sport":  "mlb",
+                                "workflow":  "vendored_daily_update",
+                                "eventKey":  "sim_8_CWS_at_NYY_pk823536_g1",
+                                "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_8_CWS_at_NYY_pk823536_g1.json",
+                                "candidateArtifactPaths":  [
+                                                               "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_8_CWS_at_NYY_pk823536_g1.json"
+                                                           ],
+                                "inputFingerprint":  "18c7525c7d5373bc751a608685923c3dda0756c48e1fd34a919641fafe26999e",
+                                "decision":  "planned",
+                                "status":  "pending"
+                            },
+                            {
+                                "sport":  "mlb",
+                                "workflow":  "vendored_daily_update",
+                                "eventKey":  "sim_9_SF_at_ATL_pk824913_g1",
+                                "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_9_SF_at_ATL_pk824913_g1.json",
+                                "candidateArtifactPaths":  [
+                                                               "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_9_SF_at_ATL_pk824913_g1.json"
+                                                           ],
+                                "inputFingerprint":  "18c7525c7d5373bc751a608685923c3dda0756c48e1fd34a919641fafe26999e",
+                                "decision":  "planned",
+                                "status":  "pending"
+                            },
+                            {
+                                "sport":  "wnba",
+                                "workflow":  "vendored_daily_update",
+                                "eventKey":  "smart_sim_2026-06-17_CHI_NYL",
+                                "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_CHI_NYL.json",
+                                "candidateArtifactPaths":  [
+                                                               "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_CHI_NYL.json"
+                                                           ],
+                                "inputFingerprint":  "04c5f51b9a83653b59fa69757209bde5fe1980791938c7c649ed44b11d8b8d53",
+                                "decision":  "planned",
+                                "status":  "pending"
+                            },
+                            {
+                                "sport":  "wnba",
+                                "workflow":  "vendored_daily_update",
+                                "eventKey":  "smart_sim_2026-06-17_CON_WSH",
+                                "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_CON_WSH.json",
+                                "candidateArtifactPaths":  [
+                                                               "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_CON_WSH.json"
+                                                           ],
+                                "inputFingerprint":  "04c5f51b9a83653b59fa69757209bde5fe1980791938c7c649ed44b11d8b8d53",
+                                "decision":  "planned",
+                                "status":  "pending"
+                            },
+                            {
+                                "sport":  "wnba",
+                                "workflow":  "vendored_daily_update",
+                                "eventKey":  "smart_sim_2026-06-17_GSV_DAL",
+                                "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_GSV_DAL.json",
+                                "candidateArtifactPaths":  [
+                                                               "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_GSV_DAL.json"
+                                                           ],
+                                "inputFingerprint":  "04c5f51b9a83653b59fa69757209bde5fe1980791938c7c649ed44b11d8b8d53",
+                                "decision":  "planned",
+                                "status":  "pending"
+                            },
+                            {
+                                "sport":  "wnba",
+                                "workflow":  "vendored_daily_update",
+                                "eventKey":  "smart_sim_2026-06-17_LAS_MIN",
+                                "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_LAS_MIN.json",
+                                "candidateArtifactPaths":  [
+                                                               "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_LAS_MIN.json"
+                                                           ],
+                                "inputFingerprint":  "04c5f51b9a83653b59fa69757209bde5fe1980791938c7c649ed44b11d8b8d53",
+                                "decision":  "planned",
+                                "status":  "pending"
+                            },
+                            {
+                                "sport":  "wnba",
+                                "workflow":  "vendored_daily_update",
+                                "eventKey":  "smart_sim_2026-06-17_PHX_LVA",
+                                "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_PHX_LVA.json",
+                                "candidateArtifactPaths":  [
+                                                               "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_PHX_LVA.json"
+                                                           ],
+                                "inputFingerprint":  "04c5f51b9a83653b59fa69757209bde5fe1980791938c7c649ed44b11d8b8d53",
+                                "decision":  "planned",
+                                "status":  "pending"
+                            },
+                            {
+                                "sport":  "wnba",
+                                "workflow":  "vendored_daily_update",
+                                "eventKey":  "smart_sim_2026-06-17_POR_SEA",
+                                "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_POR_SEA.json",
+                                "candidateArtifactPaths":  [
+                                                               "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_POR_SEA.json"
+                                                           ],
+                                "inputFingerprint":  "04c5f51b9a83653b59fa69757209bde5fe1980791938c7c649ed44b11d8b8d53",
+                                "decision":  "planned",
+                                "status":  "pending"
+                            },
+                            {
+                                "sport":  "nhl",
+                                "workflow":  "vendored_daily_update",
+                                "eventKey":  "smart_sim_2026-06-17_bundle",
+                                "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_bundle.json",
+                                "candidateArtifactPaths":  [
+                                                               "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_bundle.json"
+                                                           ],
+                                "inputFingerprint":  "582b694af97eff8e94b7d95373abc74fd155f08d59849d605d3af903909f3ae7",
+                                "decision":  "planned",
+                                "status":  "pending"
+                            }
+                        ],
+    "policyPerformance":  [
+
+                          ],
+    "sourceSteps":  [
+                        {
+                            "sport":  "mlb",
+                            "workflow":  "vendored_daily_update",
+                            "name":  "MLB vendored daily update",
+                            "workingDirectory":  "D:\\a\\Syndicate\\Syndicate\\vendor\\mlb_bettingv2",
+                            "environmentOverrides":  {
+                                                         "MLB_BETTING_DATA_ROOT":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data",
+                                                         "MLB_LIVE_LENS_DIR":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\live_lens",
+                                                         "ODDS_API_KEY":  "77ae1c35140c82da1675af85dde36a44"
+                                                     },
+                            "runtimePolicy":  {
+                                                  "simsPerGame":  1000,
+                                                  "workers":  3
+                                              },
+                            "command":  [
+                                            "C:\\hostedtoolcache\\windows\\Python\\3.11.9\\x64\\python.exe",
+                                            "tools\\daily_update.py",
+                                            "--workflow",
+                                            "ui-daily",
+                                            "--date",
+                                            "2026-06-17",
+                                            "--season",
+                                            "2026",
+                                            "--sims",
+                                            "1000",
+                                            "--workers",
+                                            "3",
+                                            "--git-push",
+                                            "off",
+                                            "--validate-render-frontend",
+                                            "off",
+                                            "--build-next-day",
+                                            "on"
+                                        ]
+                        },
+                        {
+                            "sport":  "mlb",
+                            "workflow":  "syndicate_refresh",
+                            "name":  "MLB current-day live-lens refresh",
+                            "workingDirectory":  "D:\\a\\Syndicate\\Syndicate",
+                            "environmentOverrides":  {
+                                                         "MLB_BETTING_DATA_ROOT":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data",
+                                                         "MLB_LIVE_LENS_DIR":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\live_lens",
+                                                         "ODDS_API_KEY":  "77ae1c35140c82da1675af85dde36a44"
+                                                     },
+                            "runtimePolicy":  {
+                                                  "simsPerGame":  1000,
+                                                  "workers":  3
+                                              },
+                            "command":  [
+                                            "C:\\hostedtoolcache\\windows\\Python\\3.11.9\\x64\\python.exe",
+                                            "scripts\\refresh_mlb_oddsapi.py",
+                                            "--date",
+                                            "2026-06-17",
+                                            "--source-root",
+                                            "data\\mlb_source\\source_artifacts",
+                                            "--artifact-root",
+                                            "data\\mlb_source",
+                                            "--overwrite",
+                                            "off"
+                                        ]
+                        },
+                        {
+                            "sport":  "nba",
+                            "workflow":  "vendored_daily_update",
+                            "name":  "NBA vendored daily update",
+                            "workingDirectory":  "D:\\a\\Syndicate\\Syndicate",
+                            "environmentOverrides":  {
+                                                         "REFRESH_PREDICT_PROPS_SMART_SIM_N_SIMS":  "1000",
+                                                         "APP_TZ_OFFSET_HOURS":  "-6",
+                                                         "APP_TZ":  "America/Chicago",
+                                                         "REFRESH_PREDICT_PROPS_SMART_SIM_WORKERS":  "3",
+                                                         "ODDS_API_KEY":  "77ae1c35140c82da1675af85dde36a44"
+                                                     },
+                            "runtimePolicy":  {
+                                                  "smartsimNSims":  1000,
+                                                  "smartsimWorkers":  3
+                                              },
+                            "command":  [
+                                            "C:\\hostedtoolcache\\windows\\Python\\3.11.9\\x64\\python.exe",
+                                            "scripts\\refresh_nba_oddsapi_props.py",
+                                            "--date",
+                                            "2026-06-17",
+                                            "--source-root",
+                                            "vendor\\nba_betting_repo",
+                                            "--artifact-root",
+                                            "data\\nba_source\\source_artifacts",
+                                            "--log-file",
+                                            "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-06-17\\20260617_133648\\nba_props_refresh.log",
+                                            "--force-refresh",
+                                            "--days-ahead",
+                                            "0",
+                                            "--do-edges",
+                                            "--do-export"
+                                        ]
+                        },
+                        {
+                            "sport":  "nba",
+                            "workflow":  "syndicate_mirror",
+                            "name":  "NBA source mirror refresh",
+                            "workingDirectory":  "D:\\a\\Syndicate\\Syndicate",
+                            "environmentOverrides":  {
+
+                                                     },
+                            "runtimePolicy":  {
+                                                  "smartsimNSims":  1000,
+                                                  "smartsimWorkers":  3
+                                              },
+                            "command":  [
+                                            "powershell.exe",
+                                            "-NoProfile",
+                                            "-ExecutionPolicy",
+                                            "Bypass",
+                                            "-File",
+                                            "scripts\\refresh_nba_source_mirror.ps1",
+                                            "-Date",
+                                            "2026-06-17"
+                                        ]
+                        },
+                        {
+                            "sport":  "wnba",
+                            "workflow":  "vendored_daily_update",
+                            "name":  "WNBA vendored daily update",
+                            "workingDirectory":  "D:\\a\\Syndicate\\Syndicate",
+                            "environmentOverrides":  {
+                                                         "REFRESH_PREDICT_PROPS_SMART_SIM_N_SIMS":  "1000",
+                                                         "REFRESH_PREDICT_PROPS_SMART_SIM_WORKERS":  "3",
+                                                         "SYNDICATE_WNBA_SOURCE_APP_FALLBACK":  "1",
+                                                         "APP_TZ":  "America/Chicago",
+                                                         "APP_TZ_OFFSET_HOURS":  "-6",
+                                                         "ODDS_API_KEY":  "77ae1c35140c82da1675af85dde36a44"
+                                                     },
+                            "runtimePolicy":  {
+                                                  "smartsimNSims":  1000,
+                                                  "smartsimWorkers":  3
+                                              },
+                            "command":  [
+                                            "C:\\hostedtoolcache\\windows\\Python\\3.11.9\\x64\\python.exe",
+                                            "scripts\\refresh_wnba_oddsapi_props.py",
+                                            "--date",
+                                            "2026-06-17",
+                                            "--source-root",
+                                            "vendor\\wnba_betting_repo",
+                                            "--artifact-root",
+                                            "data\\wnba_source\\source_artifacts",
+                                            "--log-file",
+                                            "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-06-17\\20260617_133648\\wnba_props_refresh.log",
+                                            "--force-refresh",
+                                            "--days-ahead",
+                                            "0",
+                                            "--do-edges",
+                                            "--do-export"
+                                        ]
+                        },
+                        {
+                            "sport":  "wnba",
+                            "workflow":  "syndicate_mirror",
+                            "name":  "WNBA source mirror refresh",
+                            "workingDirectory":  "D:\\a\\Syndicate\\Syndicate",
+                            "environmentOverrides":  {
+
+                                                     },
+                            "runtimePolicy":  {
+                                                  "smartsimNSims":  1000,
+                                                  "smartsimWorkers":  3
+                                              },
+                            "command":  [
+                                            "powershell.exe",
+                                            "-NoProfile",
+                                            "-ExecutionPolicy",
+                                            "Bypass",
+                                            "-File",
+                                            "scripts\\refresh_wnba_source_mirror.ps1",
+                                            "-Date",
+                                            "2026-06-17"
+                                        ]
+                        },
+                        {
+                            "sport":  "nhl",
+                            "workflow":  "vendored_daily_update",
+                            "name":  "NHL vendored daily update",
+                            "workingDirectory":  "D:\\a\\Syndicate\\Syndicate",
+                            "environmentOverrides":  {
+                                                         "ODDS_API_KEY":  "77ae1c35140c82da1675af85dde36a44"
+                                                     },
+                            "runtimePolicy":  {
+                                                  "gameSimSamples":  1000,
+                                                  "propsBoxscoreNSims":  1000
+                                              },
+                            "command":  [
+                                            "C:\\hostedtoolcache\\windows\\Python\\3.11.9\\x64\\python.exe",
+                                            "scripts\\refresh_nhl_oddsapi.py",
+                                            "--date",
+                                            "2026-06-17",
+                                            "--source-root",
+                                            "vendor\\nhl_betting_repo",
+                                            "--artifact-root",
+                                            "data\\nhl_source\\source_artifacts",
+                                            "--days-ahead",
+                                            "1",
+                                            "--props-boxscore-n-sims",
+                                            "1000"
+                                        ]
+                        },
+                        {
+                            "sport":  null,
+                            "workflow":  null,
+                            "name":  "NFL local odds refresh",
+                            "workingDirectory":  "D:\\a\\Syndicate\\Syndicate",
+                            "environmentOverrides":  {
+                                                         "ODDS_API_KEY":  "77ae1c35140c82da1675af85dde36a44"
+                                                     },
+                            "runtimePolicy":  null,
+                            "command":  [
+                                            "C:\\hostedtoolcache\\windows\\Python\\3.11.9\\x64\\python.exe",
+                                            "scripts\\refresh_nfl_oddsapi.py",
+                                            "--artifact-root",
+                                            "data\\nfl_source\\source_artifacts"
+                                        ]
+                        },
+                        {
+                            "sport":  "ncaab",
+                            "workflow":  "syndicate_mirror",
+                            "name":  "NCAAB source mirror export",
+                            "workingDirectory":  "D:\\a\\Syndicate\\Syndicate",
+                            "environmentOverrides":  {
+
+                                                     },
+                            "runtimePolicy":  {
+
+                                              },
+                            "command":  [
+                                            "C:\\hostedtoolcache\\windows\\Python\\3.11.9\\x64\\python.exe",
+                                            "scripts\\export_ncaab_source_mirror.py",
+                                            "data\\ncaab_source\\api",
+                                            "2026-06-17",
+                                            "--raw-root",
+                                            "data\\ncaab_source\\raw_outputs"
+                                        ]
+                        }
+                    ],
+    "stageDecisions":  [
+                           {
+                               "stage":  "source_update",
+                               "sport":  "mlb",
+                               "workflow":  "vendored_daily_update",
+                               "name":  "MLB vendored daily update",
+                               "decision":  "planned",
+                               "status":  "pending"
+                           },
+                           {
+                               "stage":  "source_update",
+                               "sport":  "mlb",
+                               "workflow":  "syndicate_refresh",
+                               "name":  "MLB current-day live-lens refresh",
+                               "decision":  "planned",
+                               "status":  "pending"
+                           },
+                           {
+                               "stage":  "source_update",
+                               "sport":  "nba",
+                               "workflow":  "vendored_daily_update",
+                               "name":  "NBA vendored daily update",
+                               "decision":  "planned",
+                               "status":  "pending"
+                           },
+                           {
+                               "stage":  "source_update",
+                               "sport":  "nba",
+                               "workflow":  "syndicate_mirror",
+                               "name":  "NBA source mirror refresh",
+                               "decision":  "planned",
+                               "status":  "pending"
+                           },
+                           {
+                               "stage":  "source_update",
+                               "sport":  "wnba",
+                               "workflow":  "vendored_daily_update",
+                               "name":  "WNBA vendored daily update",
+                               "decision":  "planned",
+                               "status":  "pending"
+                           },
+                           {
+                               "stage":  "source_update",
+                               "sport":  "wnba",
+                               "workflow":  "syndicate_mirror",
+                               "name":  "WNBA source mirror refresh",
+                               "decision":  "planned",
+                               "status":  "pending"
+                           },
+                           {
+                               "stage":  "source_update",
+                               "sport":  "nhl",
+                               "workflow":  "vendored_daily_update",
+                               "name":  "NHL vendored daily update",
+                               "decision":  "planned",
+                               "status":  "pending"
+                           },
+                           {
+                               "stage":  "source_update",
+                               "sport":  null,
+                               "workflow":  null,
+                               "name":  "NFL local odds refresh",
+                               "decision":  "planned",
+                               "status":  "pending"
+                           },
+                           {
+                               "stage":  "source_update",
+                               "sport":  "ncaab",
+                               "workflow":  "syndicate_mirror",
+                               "name":  "NCAAB source mirror export",
+                               "decision":  "planned",
+                               "status":  "pending"
+                           },
+                           {
+                               "stage":  "sim_execution",
+                               "decision":  "planned",
+                               "status":  "pending"
+                           },
+                           {
+                               "stage":  "event_sim_execution",
+                               "decision":  "planned",
+                               "status":  "pending"
+                           },
+                           {
+                               "stage":  "refresh_gate",
+                               "decision":  "planned",
+                               "status":  "pending"
+                           },
+                           {
+                               "stage":  "artifact_generation",
+                               "decision":  "skipped",
+                               "status":  "skipped"
+                           },
+                           {
+                               "stage":  "manifest_generation",
+                               "decision":  "planned",
+                               "status":  "pending"
+                           },
+                           {
+                               "stage":  "git_publish",
+                               "decision":  "skipped",
+                               "status":  "skipped"
+                           }
+                       ],
+    "simTriggerPlan":  [
+                           {
+                               "trigger":  "planned",
+                               "status":  "pending",
+                               "reason":  "simulation compute is foundational and deferred until source-stage completion"
+                           },
+                           {
+                               "trigger":  "planned",
+                               "status":  "pending",
+                               "reason":  "simulation compute is foundational and deferred until source-stage completion"
+                           },
+                           {
+                               "trigger":  "planned",
+                               "status":  "pending",
+                               "reason":  "simulation compute is foundational and deferred until source-stage completion"
+                           },
+                           {
+                               "trigger":  "planned",
+                               "status":  "pending",
+                               "reason":  "simulation compute is foundational and deferred until source-stage completion"
+                           },
+                           {
+                               "sport":  "wnba",
+                               "workflow":  "vendored_daily_update",
+                               "trigger":  "simulation",
+                               "status":  "pending",
+                               "reason":  "delta_threshold",
+                               "hasLineMovement":  true,
+                               "maxDeltaDetected":  8,
+                               "lastOddsUpdateTimestamp":  "2026-06-12T16:30:32+00:00",
+                               "priorityScoring":  false,
+                               "runSimulation":  true,
+                               "oddsHistoryPath":  "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\tracking\\odds_history.json"
+                           },
+                           {
+                               "sport":  "wnba",
+                               "workflow":  "syndicate_mirror",
+                               "trigger":  "simulation",
+                               "status":  "pending",
+                               "reason":  "delta_threshold",
+                               "hasLineMovement":  true,
+                               "maxDeltaDetected":  8,
+                               "lastOddsUpdateTimestamp":  "2026-06-12T16:30:32+00:00",
+                               "priorityScoring":  false,
+                               "runSimulation":  true,
+                               "oddsHistoryPath":  "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\tracking\\odds_history.json"
+                           },
+                           {
+                               "sport":  "nhl",
+                               "workflow":  "vendored_daily_update",
+                               "trigger":  "skip_heavy_computation",
+                               "status":  "pending",
+                               "reason":  "flat_history",
+                               "hasLineMovement":  false,
+                               "maxDeltaDetected":  null,
+                               "lastOddsUpdateTimestamp":  null,
+                               "priorityScoring":  false,
+                               "runSimulation":  false,
+                               "oddsHistoryPath":  "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\tracking\\odds_history.json"
+                           },
+                           {
+                               "trigger":  "planned",
+                               "status":  "pending",
+                               "reason":  "simulation compute is foundational and deferred until source-stage completion"
+                           },
+                           {
+                               "trigger":  "planned",
+                               "status":  "pending",
+                               "reason":  "simulation compute is foundational and deferred until source-stage completion"
+                           }
+                       ],
+    "statusArtifact":  {
+                           "format":  "json",
+                           "scope":  "daily_update",
+                           "runManifestPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-06-17\\20260617_133648\\unified_daily_update_run.json",
+                           "latestManifestPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest.json",
+                           "runCheckpointPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-06-17\\20260617_133648\\unified_daily_update_checkpoint.json",
+                           "latestCheckpointPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest_checkpoint.json",
+                           "state":  {
+                                         "runMode":  "standard",
+                                         "overallStatus":  "ok",
+                                         "currentStage":  "queued",
+                                         "completedStages":  [
+                                                                 "source_update",
+                                                                 "refresh_gate"
+                                                             ],
+                                         "failedStage":  null,
+                                         "policyPerformance":  [
+
+                                                               ],
+                                         "replayContext":  {
+                                                               "latestCheckpointLoaded":  true,
+                                                               "latestCheckpointPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest_checkpoint.json",
+                                                               "latestCheckpointStage":  "queued",
+                                                               "latestCheckpointFailedStage":  "",
+                                                               "latestCheckpointCompletedStageCount":  2,
+                                                               "latestCheckpointCompletedStages":  [
+                                                                                                       "source_update",
+                                                                                                       "refresh_gate"
+                                                                                                   ],
+                                                               "resumeEligible":  false,
+                                                               "resumedFromCheckpoint":  true
+                                                           },
+                                         "publishParity":  null,
+                                         "lastUpdatedAt":  "2026-06-17T14:01:16.7177635+00:00"
+                                     }
+                       },
+    "sportRuns":  [
+                      {
+                          "sport":  "mlb",
+                          "workflow":  "vendored_daily_update",
+                          "name":  "MLB vendored daily update",
+                          "startedAt":  "2026-06-17T13:36:49.1801260+00:00",
+                          "completedAt":  "2026-06-17T13:48:01.8012397+00:00",
+                          "status":  "ok",
+                          "error":  null,
+                          "workingDirectory":  "D:\\a\\Syndicate\\Syndicate\\vendor\\mlb_bettingv2",
+                          "environmentOverrides":  {
+                                                       "MLB_BETTING_DATA_ROOT":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data",
+                                                       "MLB_LIVE_LENS_DIR":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\live_lens",
+                                                       "ODDS_API_KEY":  "77ae1c35140c82da1675af85dde36a44"
+                                                   },
+                          "runtimePolicy":  {
+                                                "simsPerGame":  1000,
+                                                "workers":  3
+                                            },
+                          "command":  [
+                                          "C:\\hostedtoolcache\\windows\\Python\\3.11.9\\x64\\python.exe",
+                                          "tools\\daily_update.py",
+                                          "--workflow",
+                                          "ui-daily",
+                                          "--date",
+                                          "2026-06-17",
+                                          "--season",
+                                          "2026",
+                                          "--sims",
+                                          "1000",
+                                          "--workers",
+                                          "3",
+                                          "--git-push",
+                                          "off",
+                                          "--validate-render-frontend",
+                                          "off",
+                                          "--build-next-day",
+                                          "on"
+                                      ],
+                          "mirrorManifestPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\manifests\\mirror_refresh_2026-06-17.json",
+                          "mirrorManifestExists":  true
+                      },
+                      {
+                          "sport":  "mlb",
+                          "workflow":  "syndicate_refresh",
+                          "name":  "MLB current-day live-lens refresh",
+                          "startedAt":  "2026-06-17T13:48:01.9599657+00:00",
+                          "completedAt":  "2026-06-17T13:48:06.9156259+00:00",
+                          "status":  "ok",
+                          "error":  null,
+                          "workingDirectory":  "D:\\a\\Syndicate\\Syndicate",
+                          "environmentOverrides":  {
+                                                       "MLB_BETTING_DATA_ROOT":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data",
+                                                       "MLB_LIVE_LENS_DIR":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\live_lens",
+                                                       "ODDS_API_KEY":  "77ae1c35140c82da1675af85dde36a44"
+                                                   },
+                          "runtimePolicy":  {
+                                                "simsPerGame":  1000,
+                                                "workers":  3
+                                            },
+                          "command":  [
+                                          "C:\\hostedtoolcache\\windows\\Python\\3.11.9\\x64\\python.exe",
+                                          "scripts\\refresh_mlb_oddsapi.py",
+                                          "--date",
+                                          "2026-06-17",
+                                          "--source-root",
+                                          "data\\mlb_source\\source_artifacts",
+                                          "--artifact-root",
+                                          "data\\mlb_source",
+                                          "--overwrite",
+                                          "off"
+                                      ],
+                          "mirrorManifestPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\manifests\\mirror_refresh_2026-06-17.json",
+                          "mirrorManifestExists":  true
+                      },
+                      {
+                          "sport":  "nba",
+                          "workflow":  "vendored_daily_update",
+                          "name":  "NBA vendored daily update",
+                          "startedAt":  "2026-06-17T13:48:26.2869167+00:00",
+                          "completedAt":  "2026-06-17T13:50:02.2290597+00:00",
+                          "status":  "ok",
+                          "error":  null,
+                          "workingDirectory":  "D:\\a\\Syndicate\\Syndicate",
+                          "environmentOverrides":  {
+                                                       "REFRESH_PREDICT_PROPS_SMART_SIM_N_SIMS":  "1000",
+                                                       "APP_TZ_OFFSET_HOURS":  "-6",
+                                                       "APP_TZ":  "America/Chicago",
+                                                       "REFRESH_PREDICT_PROPS_SMART_SIM_WORKERS":  "3",
+                                                       "ODDS_API_KEY":  "77ae1c35140c82da1675af85dde36a44"
+                                                   },
+                          "runtimePolicy":  {
+                                                "smartsimNSims":  1000,
+                                                "smartsimWorkers":  3
+                                            },
+                          "command":  [
+                                          "C:\\hostedtoolcache\\windows\\Python\\3.11.9\\x64\\python.exe",
+                                          "scripts\\refresh_nba_oddsapi_props.py",
+                                          "--date",
+                                          "2026-06-17",
+                                          "--source-root",
+                                          "vendor\\nba_betting_repo",
+                                          "--artifact-root",
+                                          "data\\nba_source\\source_artifacts",
+                                          "--log-file",
+                                          "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-06-17\\20260617_133648\\nba_props_refresh.log",
+                                          "--force-refresh",
+                                          "--days-ahead",
+                                          "0",
+                                          "--do-edges",
+                                          "--do-export"
+                                      ],
+                          "mirrorManifestPath":  "D:\\a\\Syndicate\\Syndicate\\data\\nba_source\\manifests\\mirror_refresh_2026-06-17.json",
+                          "mirrorManifestExists":  true
+                      },
+                      {
+                          "sport":  "nba",
+                          "workflow":  "syndicate_mirror",
+                          "name":  "NBA source mirror refresh",
+                          "startedAt":  "2026-06-17T13:50:02.2456929+00:00",
+                          "completedAt":  "2026-06-17T13:50:03.0025026+00:00",
+                          "status":  "ok",
+                          "error":  null,
+                          "workingDirectory":  "D:\\a\\Syndicate\\Syndicate",
+                          "environmentOverrides":  {
+
+                                                   },
+                          "runtimePolicy":  {
+                                                "smartsimNSims":  1000,
+                                                "smartsimWorkers":  3
+                                            },
+                          "command":  [
+                                          "powershell.exe",
+                                          "-NoProfile",
+                                          "-ExecutionPolicy",
+                                          "Bypass",
+                                          "-File",
+                                          "scripts\\refresh_nba_source_mirror.ps1",
+                                          "-Date",
+                                          "2026-06-17"
+                                      ],
+                          "mirrorManifestPath":  "D:\\a\\Syndicate\\Syndicate\\data\\nba_source\\manifests\\mirror_refresh_2026-06-17.json",
+                          "mirrorManifestExists":  true
+                      },
+                      {
+                          "sport":  "wnba",
+                          "workflow":  "vendored_daily_update",
+                          "name":  "WNBA vendored daily update",
+                          "startedAt":  "2026-06-17T13:50:24.1114640+00:00",
+                          "completedAt":  "2026-06-17T13:57:08.3124830+00:00",
+                          "status":  "ok",
+                          "error":  null,
+                          "workingDirectory":  "D:\\a\\Syndicate\\Syndicate",
+                          "environmentOverrides":  {
+                                                       "REFRESH_PREDICT_PROPS_SMART_SIM_N_SIMS":  "1000",
+                                                       "REFRESH_PREDICT_PROPS_SMART_SIM_WORKERS":  "3",
+                                                       "SYNDICATE_WNBA_SOURCE_APP_FALLBACK":  "1",
+                                                       "APP_TZ":  "America/Chicago",
+                                                       "APP_TZ_OFFSET_HOURS":  "-6",
+                                                       "ODDS_API_KEY":  "77ae1c35140c82da1675af85dde36a44"
+                                                   },
+                          "runtimePolicy":  {
+                                                "smartsimNSims":  1000,
+                                                "smartsimWorkers":  3
+                                            },
+                          "command":  [
+                                          "C:\\hostedtoolcache\\windows\\Python\\3.11.9\\x64\\python.exe",
+                                          "scripts\\refresh_wnba_oddsapi_props.py",
+                                          "--date",
+                                          "2026-06-17",
+                                          "--source-root",
+                                          "vendor\\wnba_betting_repo",
+                                          "--artifact-root",
+                                          "data\\wnba_source\\source_artifacts",
+                                          "--log-file",
+                                          "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-06-17\\20260617_133648\\wnba_props_refresh.log",
+                                          "--force-refresh",
+                                          "--days-ahead",
+                                          "0",
+                                          "--do-edges",
+                                          "--do-export"
+                                      ],
+                          "mirrorManifestPath":  "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\manifests\\mirror_refresh_2026-06-17.json",
+                          "mirrorManifestExists":  true
+                      },
+                      {
+                          "sport":  "wnba",
+                          "workflow":  "syndicate_mirror",
+                          "name":  "WNBA source mirror refresh",
+                          "startedAt":  "2026-06-17T13:57:08.3662809+00:00",
+                          "completedAt":  "2026-06-17T13:57:08.9716539+00:00",
+                          "status":  "ok",
+                          "error":  null,
+                          "workingDirectory":  "D:\\a\\Syndicate\\Syndicate",
+                          "environmentOverrides":  {
+
+                                                   },
+                          "runtimePolicy":  {
+                                                "smartsimNSims":  1000,
+                                                "smartsimWorkers":  3
+                                            },
+                          "command":  [
+                                          "powershell.exe",
+                                          "-NoProfile",
+                                          "-ExecutionPolicy",
+                                          "Bypass",
+                                          "-File",
+                                          "scripts\\refresh_wnba_source_mirror.ps1",
+                                          "-Date",
+                                          "2026-06-17"
+                                      ],
+                          "mirrorManifestPath":  "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\manifests\\mirror_refresh_2026-06-17.json",
+                          "mirrorManifestExists":  true
+                      },
+                      {
+                          "sport":  "nhl",
+                          "workflow":  "vendored_daily_update",
+                          "name":  "NHL vendored daily update",
+                          "startedAt":  "2026-06-17T13:57:28.8603364+00:00",
+                          "completedAt":  "2026-06-17T14:00:24.6690929+00:00",
+                          "status":  "ok",
+                          "error":  null,
+                          "workingDirectory":  "D:\\a\\Syndicate\\Syndicate",
+                          "environmentOverrides":  {
+                                                       "ODDS_API_KEY":  "77ae1c35140c82da1675af85dde36a44"
+                                                   },
+                          "runtimePolicy":  {
+                                                "gameSimSamples":  1000,
+                                                "propsBoxscoreNSims":  1000
+                                            },
+                          "command":  [
+                                          "C:\\hostedtoolcache\\windows\\Python\\3.11.9\\x64\\python.exe",
+                                          "scripts\\refresh_nhl_oddsapi.py",
+                                          "--date",
+                                          "2026-06-17",
+                                          "--source-root",
+                                          "vendor\\nhl_betting_repo",
+                                          "--artifact-root",
+                                          "data\\nhl_source\\source_artifacts",
+                                          "--days-ahead",
+                                          "1",
+                                          "--props-boxscore-n-sims",
+                                          "1000"
+                                      ],
+                          "mirrorManifestPath":  "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\manifests\\mirror_refresh_2026-06-17.json",
+                          "mirrorManifestExists":  true
+                      },
+                      {
+                          "sport":  null,
+                          "workflow":  null,
+                          "name":  "NFL local odds refresh",
+                          "startedAt":  "2026-06-17T14:00:44.7640529+00:00",
+                          "completedAt":  "2026-06-17T14:00:46.1691255+00:00",
+                          "status":  "ok",
+                          "error":  null,
+                          "workingDirectory":  "D:\\a\\Syndicate\\Syndicate",
+                          "environmentOverrides":  {
+                                                       "ODDS_API_KEY":  "77ae1c35140c82da1675af85dde36a44"
+                                                   },
+                          "runtimePolicy":  null,
+                          "command":  [
+                                          "C:\\hostedtoolcache\\windows\\Python\\3.11.9\\x64\\python.exe",
+                                          "scripts\\refresh_nfl_oddsapi.py",
+                                          "--artifact-root",
+                                          "data\\nfl_source\\source_artifacts"
+                                      ],
+                          "mirrorManifestPath":  null,
+                          "mirrorManifestExists":  false
+                      },
+                      {
+                          "sport":  "ncaab",
+                          "workflow":  "syndicate_mirror",
+                          "name":  "NCAAB source mirror export",
+                          "startedAt":  "2026-06-17T14:00:46.1873382+00:00",
+                          "completedAt":  "2026-06-17T14:00:46.2841443+00:00",
+                          "status":  "ok",
+                          "error":  null,
+                          "workingDirectory":  "D:\\a\\Syndicate\\Syndicate",
+                          "environmentOverrides":  {
+
+                                                   },
+                          "runtimePolicy":  {
+
+                                            },
+                          "command":  [
+                                          "C:\\hostedtoolcache\\windows\\Python\\3.11.9\\x64\\python.exe",
+                                          "scripts\\export_ncaab_source_mirror.py",
+                                          "data\\ncaab_source\\api",
+                                          "2026-06-17",
+                                          "--raw-root",
+                                          "data\\ncaab_source\\raw_outputs"
+                                      ],
+                          "mirrorManifestPath":  "D:\\a\\Syndicate\\Syndicate\\data\\ncaab_source\\manifests\\mirror_refresh_2026-06-17.json",
+                          "mirrorManifestExists":  true
+                      }
+                  ],
+    "skipGitPush":  true,
+    "gitRemote":  null,
+    "commitMessagePrefix":  null,
+    "skipped":  {
+                    "sourceUpdates":  false,
+                    "refreshGate":  false,
+                    "mlb":  false,
+                    "nba":  false,
+                    "nhl":  false,
+                    "wnba":  false,
+                    "nfl":  false,
+                    "ncaaf":  false,
+                    "ncaab":  false
+                },
+    "dryRun":  false,
+    "refreshGate":  {
+                        "requested":  true,
+                        "refreshOdds":  false,
+                        "oddsPhase":  null,
+                        "oddsSports":  null,
+                        "oddsRegions":  null,
+                        "manifestPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-06-17\\20260617_133648\\migration\\refresh_status_manifest.json",
+                        "runSummaryPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-06-17\\20260617_133648\\migration\\refresh_and_gate_run.json",
+                        "status":  "ok"
+                    },
+    "pushResults":  [
+
+                    ],
+    "runTrace":  {
+                     "eventSimExecutionCount":  21,
+                     "artifactUpdateCount":  21,
+                     "inputFingerprintCount":  3,
+                     "artifactPathCount":  21,
+                     "inputFingerprints":  [
+                                               "18c7525c7d5373bc751a608685923c3dda0756c48e1fd34a919641fafe26999e",
+                                               "04c5f51b9a83653b59fa69757209bde5fe1980791938c7c649ed44b11d8b8d53",
+                                               "582b694af97eff8e94b7d95373abc74fd155f08d59849d605d3af903909f3ae7"
+                                           ],
+                     "artifactPaths":  [
+                                           "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_0_NYM_at_CIN_pk824503_g1.json",
+                                           "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_10_CLE_at_MIL_pk823774_g1.json",
+                                           "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_11_COL_at_CHC_pk824668_g1.json",
+                                           "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_12_PIT_at_ATH_pk824992_g1.json",
+                                           "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_13_BAL_at_SEA_pk823127_g1.json",
+                                           "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_1_KC_at_WSH_pk822721_g1.json",
+                                           "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_2_MIA_at_PHI_pk823450_g1.json",
+                                           "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_3_DET_at_HOU_pk824178_g1.json",
+                                           "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_4_SD_at_STL_pk823044_g1.json",
+                                           "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_5_TB_at_LAD_pk823940_g1.json",
+                                           "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_6_LAA_at_AZ_pk825072_g1.json",
+                                           "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_7_TOR_at_BOS_pk824746_g1.json",
+                                           "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_8_CWS_at_NYY_pk823536_g1.json",
+                                           "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_9_SF_at_ATL_pk824913_g1.json",
+                                           "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_CHI_NYL.json",
+                                           "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_CON_WSH.json",
+                                           "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_GSV_DAL.json",
+                                           "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_LAS_MIN.json",
+                                           "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_PHX_LVA.json",
+                                           "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_POR_SEA.json",
+                                           "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_bundle.json"
+                                       ],
+                     "simExecutionDecision":  null
+                 }
+}

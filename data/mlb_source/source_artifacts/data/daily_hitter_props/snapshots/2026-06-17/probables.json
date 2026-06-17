@@ -2,7 +2,7 @@
   "date": "2026-06-17",
   "season": 2026,
   "spring_mode": false,
-  "generated_at": "2026-06-16T16:53:05.672233",
+  "generated_at": "2026-06-17T13:44:56.495939",
   "games": [
     {
       "idx": 0,
@@ -198,6 +198,70 @@
     },
     {
       "idx": 3,
+      "game_pk": 824912,
+      "away": {
+        "team_id": 137,
+        "abbr": "SF"
+      },
+      "home": {
+        "team_id": 144,
+        "abbr": "ATL"
+      },
+      "away_probable_id": 605288,
+      "home_probable_id": 656550,
+      "away_source": "feed_gameData_probablePitchers",
+      "home_source": "feed_gameData_probablePitchers",
+      "away_confidence": 0.75,
+      "home_confidence": 0.75,
+      "away_validation": {
+        "status": "ok",
+        "selected_id": 605288,
+        "selected_name": "Adrian Houser",
+        "selected_source": "feed_gameData_probablePitchers",
+        "override_reason": "",
+        "roster_team_ids": [
+          137
+        ],
+        "registry_team_ids": [
+          137
+        ],
+        "on_expected_team": true,
+        "on_opponent_team": false,
+        "on_expected_registry_team": true,
+        "on_opponent_registry_team": false,
+        "rejected_candidates": []
+      },
+      "home_validation": {
+        "status": "ok",
+        "selected_id": 656550,
+        "selected_name": "Grant Holmes",
+        "selected_source": "feed_gameData_probablePitchers",
+        "override_reason": "",
+        "roster_team_ids": [
+          144
+        ],
+        "registry_team_ids": [
+          144
+        ],
+        "on_expected_team": true,
+        "on_opponent_team": false,
+        "on_expected_registry_team": true,
+        "on_opponent_registry_team": false,
+        "rejected_candidates": []
+      },
+      "raw": {
+        "away_schedule_id": 605288,
+        "home_schedule_id": 656550,
+        "away_schedule_name": "Adrian Houser",
+        "home_schedule_name": "Grant Holmes",
+        "away_feed_id": 605288,
+        "home_feed_id": 656550,
+        "away_feed_name": "Adrian Houser",
+        "home_feed_name": "Grant Holmes"
+      }
+    },
+    {
+      "idx": 4,
       "game_pk": 824178,
       "away": {
         "team_id": 116,
@@ -261,7 +325,7 @@
       }
     },
     {
-      "idx": 4,
+      "idx": 5,
       "game_pk": 823044,
       "away": {
         "team_id": 135,
@@ -321,7 +385,7 @@
       }
     },
     {
-      "idx": 5,
+      "idx": 6,
       "game_pk": 823940,
       "away": {
         "team_id": 139,
@@ -385,7 +449,7 @@
       }
     },
     {
-      "idx": 6,
+      "idx": 7,
       "game_pk": 825072,
       "away": {
         "team_id": 108,
@@ -449,7 +513,7 @@
       }
     },
     {
-      "idx": 7,
+      "idx": 8,
       "game_pk": 824746,
       "away": {
         "team_id": 141,
@@ -459,23 +523,27 @@
         "team_id": 111,
         "abbr": "BOS"
       },
-      "away_probable_id": null,
+      "away_probable_id": 453286,
       "home_probable_id": 687562,
-      "away_source": "none",
+      "away_source": "feed_gameData_probablePitchers",
       "home_source": "feed_gameData_probablePitchers",
-      "away_confidence": 0.0,
+      "away_confidence": 0.75,
       "home_confidence": 0.75,
       "away_validation": {
-        "status": "none",
-        "selected_id": null,
-        "selected_name": "",
-        "selected_source": "none",
+        "status": "ok",
+        "selected_id": 453286,
+        "selected_name": "Max Scherzer",
+        "selected_source": "feed_gameData_probablePitchers",
         "override_reason": "",
-        "roster_team_ids": [],
-        "registry_team_ids": [],
-        "on_expected_team": false,
+        "roster_team_ids": [
+          141
+        ],
+        "registry_team_ids": [
+          141
+        ],
+        "on_expected_team": true,
         "on_opponent_team": false,
-        "on_expected_registry_team": false,
+        "on_expected_registry_team": true,
         "on_opponent_registry_team": false,
         "rejected_candidates": []
       },
@@ -498,18 +566,18 @@
         "rejected_candidates": []
       },
       "raw": {
-        "away_schedule_id": null,
+        "away_schedule_id": 453286,
         "home_schedule_id": 687562,
-        "away_schedule_name": "",
+        "away_schedule_name": "Max Scherzer",
         "home_schedule_name": "Jake Bennett",
-        "away_feed_id": null,
+        "away_feed_id": 453286,
         "home_feed_id": 687562,
-        "away_feed_name": "",
+        "away_feed_name": "Max Scherzer",
         "home_feed_name": "Jake Bennett"
       }
     },
     {
-      "idx": 8,
+      "idx": 9,
       "game_pk": 823536,
       "away": {
         "team_id": 145,
@@ -573,7 +641,7 @@
       }
     },
     {
-      "idx": 9,
+      "idx": 10,
       "game_pk": 824913,
       "away": {
         "team_id": 137,
@@ -583,27 +651,23 @@
         "team_id": 144,
         "abbr": "ATL"
       },
-      "away_probable_id": 592662,
+      "away_probable_id": null,
       "home_probable_id": 702275,
-      "away_source": "feed_gameData_probablePitchers",
+      "away_source": "none",
       "home_source": "feed_gameData_probablePitchers",
-      "away_confidence": 0.75,
+      "away_confidence": 0.0,
       "home_confidence": 0.75,
       "away_validation": {
-        "status": "ok",
-        "selected_id": 592662,
-        "selected_name": "Robbie Ray",
-        "selected_source": "feed_gameData_probablePitchers",
+        "status": "none",
+        "selected_id": null,
+        "selected_name": "",
+        "selected_source": "none",
         "override_reason": "",
-        "roster_team_ids": [
-          137
-        ],
-        "registry_team_ids": [
-          137
-        ],
-        "on_expected_team": true,
+        "roster_team_ids": [],
+        "registry_team_ids": [],
+        "on_expected_team": false,
         "on_opponent_team": false,
-        "on_expected_registry_team": true,
+        "on_expected_registry_team": false,
         "on_opponent_registry_team": false,
         "rejected_candidates": []
       },
@@ -626,18 +690,18 @@
         "rejected_candidates": []
       },
       "raw": {
-        "away_schedule_id": 592662,
+        "away_schedule_id": null,
         "home_schedule_id": 702275,
-        "away_schedule_name": "Robbie Ray",
+        "away_schedule_name": "",
         "home_schedule_name": "JR Ritchie",
-        "away_feed_id": 592662,
+        "away_feed_id": null,
         "home_feed_id": 702275,
-        "away_feed_name": "Robbie Ray",
+        "away_feed_name": "",
         "home_feed_name": "JR Ritchie"
       }
     },
     {
-      "idx": 10,
+      "idx": 11,
       "game_pk": 823774,
       "away": {
         "team_id": 114,
@@ -701,7 +765,7 @@
       }
     },
     {
-      "idx": 11,
+      "idx": 12,
       "game_pk": 824668,
       "away": {
         "team_id": 115,
@@ -765,7 +829,7 @@
       }
     },
     {
-      "idx": 12,
+      "idx": 13,
       "game_pk": 824992,
       "away": {
         "team_id": 134,
@@ -829,7 +893,7 @@
       }
     },
     {
-      "idx": 13,
+      "idx": 14,
       "game_pk": 823127,
       "away": {
         "team_id": 110,

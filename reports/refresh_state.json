@@ -99,12 +99,13 @@
       }
     },
     "nfl_artifact_bundle": {
-      "inputHash": "ab942a698c198bdde63a5c3476821e44b526b04f563cbc49e634f29a018429b1",
-      "updatedAt": "2026-06-16T17:08:47.078439",
+      "inputHash": "dfde9bbbdd7557f628c129d866f27705259ba9ad6b5aaa4223cca8492d687e84",
+      "updatedAt": "2026-06-17T14:00:46.109794",
       "outputs": [
         "data\\nfl_source\\source_artifacts\\current_week.json",
         "data\\nfl_source\\source_artifacts\\real_betting_lines_2026_06_15.json",
         "data\\nfl_source\\source_artifacts\\real_betting_lines_2026_06_16.json",
+        "data\\nfl_source\\source_artifacts\\real_betting_lines_2026_06_17.json",
         "data\\nfl_source\\source_artifacts\\oddsapi_player_props_2026_wk1.csv"
       ],
       "metadata": {
@@ -498,21 +499,63 @@
       }
     },
     "nhl_artifact_bundle:2026-06-17": {
-      "inputHash": "bca4525789d24894fc3127bb0e68864d7170e811b7f4215dbf6499910701b928",
-      "updatedAt": "2026-06-16T17:08:23.920511",
+      "inputHash": "6ae1872bcdbbb940804bbc4b5629ad1116807f545e5696a9e7beb14d0f385b43",
+      "updatedAt": "2026-06-17T14:00:24.569066",
       "outputs": [
         "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\odds\\team\\date=2026-06-17\\oddsapi.csv",
         "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\props\\player_props_lines\\date=2026-06-17\\oddsapi.csv",
+        "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\predictions_2026-06-17.csv",
+        "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\predictions_sim_2026-06-17.csv",
+        "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\recommendations_sim_2026-06-17.csv",
         "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\props_projections_all_2026-06-17.csv",
+        "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\props_boxscores_sim_2026-06-17.csv",
+        "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\props_boxscores_sim_hist_2026-06-17.csv",
+        "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\props_boxscores_sim_samples_2026-06-17.csv",
         "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\props_predictions_2026-06-17.csv",
+        "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\props_recommendations_2026-06-17.csv",
         "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\roster_snapshot_2026-06-17.csv",
+        "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\injuries_2026-06-17.csv",
         "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\lineups_2026-06-17.csv",
         "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\lineups_co_toi_2026-06-17.csv",
+        "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\shifts_2026-06-17.csv",
+        "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\co_toi_shifts_2026-06-17.csv",
         "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\starting_goalies_2026-06-17.csv"
       ],
       "metadata": {
         "artifact_root": "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts",
         "date": "2026-06-17"
+      }
+    },
+    "mlb_live_lens:2026-06-17": {
+      "inputHash": "6558310f10f3fc692a0ff3807a414d4d726672d66c6b4013d881b2b01906b09b",
+      "updatedAt": "2026-06-17T13:48:02.609591",
+      "outputs": [
+        "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\live_lens\\live_lens_report_2026_06_17.json",
+        "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\live_lens\\live_lens_2026_06_17.jsonl",
+        "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\live_lens\\prop_registry\\live_prop_registry_2026_06_17.json"
+      ],
+      "metadata": {
+        "date": "2026-06-17",
+        "trigger": "syndicate_refresh",
+        "source_root": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts"
+      }
+    },
+    "nhl_artifact_bundle:2026-06-18": {
+      "inputHash": "4028d6c03901275caad7a20b5e49b750bd37958cdcc793b8d5001c0fcf1cc969",
+      "updatedAt": "2026-06-17T14:00:24.591828",
+      "outputs": [
+        "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\odds\\team\\date=2026-06-18\\oddsapi.csv",
+        "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\props\\player_props_lines\\date=2026-06-18\\oddsapi.csv",
+        "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\props_projections_all_2026-06-18.csv",
+        "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\roster_snapshot_2026-06-18.csv",
+        "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\lineups_2026-06-18.csv",
+        "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\lineups_co_toi_2026-06-18.csv",
+        "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\starting_goalies_2026-06-18.csv",
+        "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\props_predictions_2026-06-18.csv"
+      ],
+      "metadata": {
+        "artifact_root": "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts",
+        "date": "2026-06-18"
       }
     }
   }

@@ -628,7 +628,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.9733333333333334,
+        "availability_mult": 0.7316666666666667,
         "platoon_mult_vs_lhb": {
           "k": 1.013600782778865,
           "bb": 0.8075,
@@ -1491,7 +1491,7 @@
         "role": "CL",
         "leverage_skill": 0.85,
         "stamina_pitches": 25,
-        "availability_mult": 0.9,
+        "availability_mult": 0.6020833333333333,
         "platoon_mult_vs_lhb": {
           "k": 1.1128825504943,
           "bb": 1.1195154577883473,
@@ -1576,7 +1576,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.8833333333333333,
         "platoon_mult_vs_lhb": {
           "k": 1.0036105032822757,
           "bb": 1.1925000000000001,
@@ -1619,7 +1619,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.875,
         "platoon_mult_vs_lhb": {
           "k": 0.9600401606425703,
           "bb": 1.1925000000000001,
@@ -1662,7 +1662,7 @@
         "role": "SU",
         "leverage_skill": 0.7,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.9,
         "platoon_mult_vs_lhb": {
           "k": 1.078238707060708,
           "bb": 0.8545506861443116,
@@ -1702,16 +1702,16 @@
   },
   "weather": {
     "source": "statsapi_live_feed",
-    "condition": "",
-    "temperature_f": null,
-    "wind_speed_mph": null,
-    "wind_direction": "unknown",
-    "wind_raw": "",
+    "condition": "Partly Cloudy",
+    "temperature_f": 81.0,
+    "wind_speed_mph": 8.0,
+    "wind_direction": "out",
+    "wind_raw": "8 mph, Out To LF",
     "is_dome": null,
     "multipliers": {
-      "hr_mult": 1.0,
-      "inplay_hit_mult": 1.0,
-      "xb_share_mult": 1.0
+      "hr_mult": 1.033,
+      "inplay_hit_mult": 1.0165,
+      "xb_share_mult": 1.0088
     }
   },
   "park": {
@@ -1731,8 +1731,8 @@
   },
   "umpire": {
     "source": "statsapi_live_feed",
-    "home_plate_umpire_id": null,
-    "home_plate_umpire_name": "",
+    "home_plate_umpire_id": 427344,
+    "home_plate_umpire_name": "Bill Miller",
     "called_strike_mult": 1.0,
     "multipliers": {
       "called_strike_mult": 1.0

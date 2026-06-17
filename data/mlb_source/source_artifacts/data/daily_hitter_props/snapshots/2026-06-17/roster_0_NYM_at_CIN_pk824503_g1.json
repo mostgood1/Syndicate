@@ -630,7 +630,7 @@
         "role": "SU",
         "leverage_skill": 0.7,
         "stamina_pitches": 25,
-        "availability_mult": 0.9333333333333333,
+        "availability_mult": 0.7166666666666667,
         "platoon_mult_vs_lhb": {
           "k": 0.8075,
           "bb": 0.8997162889876757,
@@ -759,7 +759,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.8916666666666666,
         "platoon_mult_vs_lhb": {
           "k": 1.001792733199118,
           "bb": 1.1925000000000001,
@@ -802,7 +802,7 @@
         "role": "LR",
         "leverage_skill": 0.35,
         "stamina_pitches": 25,
-        "availability_mult": 0.9633333333333334,
+        "availability_mult": 0.8383333333333334,
         "platoon_mult_vs_lhb": {
           "k": 0.8075,
           "bb": 1.1925000000000001,
@@ -1360,7 +1360,7 @@
         "role": "SU",
         "leverage_skill": 0.7,
         "stamina_pitches": 25,
-        "availability_mult": 0.91,
+        "availability_mult": 0.7380833333333334,
         "platoon_mult_vs_lhb": {
           "k": 0.9235492577597841,
           "bb": 0.9259615384615385,
@@ -1446,7 +1446,7 @@
         "role": "SU",
         "leverage_skill": 0.7,
         "stamina_pitches": 25,
-        "availability_mult": 0.96,
+        "availability_mult": 0.7183333333333334,
         "platoon_mult_vs_lhb": {
           "k": 1.0492159020565377,
           "bb": 0.8730610173314786,
@@ -1489,7 +1489,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.95,
+        "availability_mult": 0.7583333333333333,
         "platoon_mult_vs_lhb": {
           "k": 0.8075,
           "bb": 1.1925000000000001,
@@ -1534,7 +1534,7 @@
         "role": "CL",
         "leverage_skill": 0.85,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.8333333333333334,
         "platoon_mult_vs_lhb": {
           "k": 0.81335930395458,
           "bb": 1.1925000000000001,

@@ -1,18 +1,18 @@
 # MLB Season Eval 2026
 
-- Generated: 2026-06-16T16:40:54.069727
+- Generated: 2026-06-17T13:36:55.506792
 - Batch: D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/eval/batches/season_2026_ui_daily_live
-- Status: partial (2 of ? reports published)
-- Days: 2 | Games: 24 | Season card days: 0 | Legacy cards-page days: 0
+- Status: partial (3 of ? reports published)
+- Days: 3 | Games: 38 | Season card days: 0 | Legacy cards-page days: 0
 
 ## Overall recap
 
-- Full-game moneyline: brier 0.2601798333333334, logloss 0.7137751447161044, accuracy 0.5
-- Totals: mae 3.0587083333333336, rmse 5.121725097618372, avg exact-total nll 3.1112980140901545
-- Runline (-1.5 fav): brier 0.24472620833333333, accuracy 0.5833333333333334
-- Starter props: SO mae 2.429155555555555, Outs mae 5.351755555555555
-- Hitter HR 1+: brier 0.1154272708333333, logloss 0.40480934534119006, avg p 0.0778078703703704, emp rate 0.12962962962962962
-- Segment error: full total mae 3.0587083333333336, first5 total mae 2.8117083333333337, first3 total mae 2.1835416666666667
+- Full-game moneyline: brier 0.2606832105263158, logloss 0.7148758862922489, accuracy 0.5
+- Totals: mae 3.0839473684210525, rmse 4.638723993481269, avg exact-total nll 2.9843135579924973
+- Runline (-1.5 fav): brier 0.23701076315789474, accuracy 0.631578947368421
+- Starter props: SO mae 2.1281666666666665, Outs mae 4.901305555555555
+- Hitter HR 1+: brier 0.10949997807017539, logloss 0.3852203304918492, avg p 0.07931725146198833, emp rate 0.12280701754385964
+- Segment error: full total mae 3.0839473684210525, first5 total mae 2.7607105263157896, first3 total mae 2.053342105263158
 
 ## Day leaders
 
@@ -23,4 +23,4 @@
 
 | Month | Days | Games | ML Brier | Total MAE | SO MAE | Outs MAE |
 |---|---|---|---|---|---|---|
-| Jun 2026 | 2 | 24 | 0.2601798333333334 | 3.0587083333333336 | 2.429155555555555 | 5.351755555555555 |
+| Jun 2026 | 3 | 38 | 0.2606832105263158 | 3.0839473684210525 | 2.1281666666666665 | 4.901305555555555 |

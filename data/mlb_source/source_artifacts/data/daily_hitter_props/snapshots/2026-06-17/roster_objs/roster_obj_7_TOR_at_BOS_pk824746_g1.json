@@ -1702,7 +1702,7 @@
           "arsenal_sample_size": 565,
           "stamina_pitches": 25,
           "role": "SU",
-          "availability_mult": 0.96,
+          "availability_mult": 0.885,
           "platoon_mult_vs_lhb": {
             "k": 1.0441358024691358,
             "bb": 1.164451403386685,
@@ -1789,7 +1789,7 @@
           "arsenal_sample_size": 600,
           "stamina_pitches": 25,
           "role": "CL",
-          "availability_mult": 1.0,
+          "availability_mult": 0.8416666666666667,
           "platoon_mult_vs_lhb": {
             "k": 0.9400153609831029,
             "bb": 1.017413731768054,
@@ -1874,7 +1874,7 @@
           "arsenal_sample_size": 344,
           "stamina_pitches": 25,
           "role": "MR",
-          "availability_mult": 0.97,
+          "availability_mult": 0.8366666666666667,
           "platoon_mult_vs_lhb": {
             "k": 0.9758964143426294,
             "bb": 1.1484126984126983,
@@ -1958,7 +1958,7 @@
           "arsenal_sample_size": 459,
           "stamina_pitches": 25,
           "role": "SU",
-          "availability_mult": 1.0,
+          "availability_mult": 0.8583333333333334,
           "platoon_mult_vs_lhb": {
             "k": 0.916961260863161,
             "bb": 1.1659093475280264,
@@ -4012,7 +4012,7 @@
           "arsenal_sample_size": 456,
           "stamina_pitches": 25,
           "role": "MR",
-          "availability_mult": 0.95,
+          "availability_mult": 0.8583333333333334,
           "platoon_mult_vs_lhb": {
             "k": 0.8075,
             "bb": 1.1925000000000001,
@@ -4187,7 +4187,7 @@
           "arsenal_sample_size": 677,
           "stamina_pitches": 27,
           "role": "SU",
-          "availability_mult": 0.9133333333333333,
+          "availability_mult": 0.655,
           "platoon_mult_vs_lhb": {
             "k": 0.8567415730337079,
             "bb": 1.1925000000000001,
@@ -4272,7 +4272,7 @@
           "arsenal_sample_size": 75,
           "stamina_pitches": 25,
           "role": "MR",
-          "availability_mult": 0.9466666666666667,
+          "availability_mult": 0.755,
           "platoon_mult_vs_lhb": {
             "k": 0.8075,
             "bb": 1.1925000000000001,

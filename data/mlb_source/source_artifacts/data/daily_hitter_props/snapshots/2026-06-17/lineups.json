@@ -2,16 +2,16 @@
   "date": "2026-06-17",
   "season": 2026,
   "spring_mode": false,
-  "generated_at": "2026-06-16T16:53:05.668187",
+  "generated_at": "2026-06-17T13:44:56.491914",
   "summary": {
-    "games": 14,
-    "projected_teams": 28,
+    "games": 15,
+    "projected_teams": 27,
     "adjusted_teams": 2,
     "partial_teams": 0,
     "fallback_pool_teams": 0,
-    "confirmed_teams": 0,
-    "projected_only_teams": 28,
-    "confirmed_only_teams": 0,
+    "confirmed_teams": 3,
+    "projected_only_teams": 27,
+    "confirmed_only_teams": 3,
     "comparable_teams": 0,
     "exact_match_teams": 0,
     "true_mismatch_teams": 0
@@ -192,19 +192,19 @@
         "team_id": 120,
         "abbr": "WSH"
       },
-      "away_confirmed_ids": [],
-      "home_confirmed_ids": [],
-      "away_projected_ids": [
+      "away_confirmed_ids": [
         695600,
         677951,
         695506,
-        672580,
+        657041,
         686681,
         521692,
-        670224,
-        657041,
+        670231,
+        679845,
         686555
       ],
+      "home_confirmed_ids": [],
+      "away_projected_ids": [],
       "home_projected_ids": [
         695578,
         671277,
@@ -217,57 +217,9 @@
         683083
       ],
       "away_projected_validation": {
-        "status": "ok",
-        "raw_ids": [
-          695600,
-          677951,
-          695506,
-          672580,
-          686681,
-          521692,
-          670224,
-          657041,
-          686555
-        ],
-        "ids": [
-          695600,
-          677951,
-          695506,
-          672580,
-          686681,
-          521692,
-          670224,
-          657041,
-          686555
-        ],
-        "missing_ids": [],
-        "backfilled_ids": [],
-        "pool_source": "active+40Man",
-        "pool_size": 15,
-        "raw_names": [
-          "Carter Jensen",
-          "Bobby Witt",
-          "Jac Caglianone",
-          "Maikel Garcia",
-          "Michael Massey",
-          "Salvador Perez",
-          "Kameron Misner",
-          "Lane Thomas",
-          "Isaac Collins"
-        ],
-        "matched_names": [
-          "Carter Jensen",
-          "Bobby Witt Jr.",
-          "Jac Caglianone",
-          "Maikel Garcia",
-          "Michael Massey",
-          "Salvador Perez",
-          "Kameron Misner",
-          "Lane Thomas",
-          "Isaac Collins"
-        ],
-        "missing_name_labels": [],
-        "mapping_source": "projected_rotowire_default_vs_rhp"
+        "status": "none",
+        "raw_ids": [],
+        "ids": []
       },
       "home_projected_validation": {
         "status": "ok",
@@ -322,15 +274,15 @@
         "missing_name_labels": [],
         "mapping_source": "projected_rotowire_default_vs_rhp"
       },
-      "away_source": "projected_rotowire_default_vs_rhp",
+      "away_source": "confirmed_feed_live",
       "home_source": "projected_rotowire_default_vs_rhp",
-      "away_confidence": 0.66,
+      "away_confidence": 1.0,
       "home_confidence": 0.66,
       "away_comparison": {
-        "status": "projected_only",
+        "status": "confirmed_only",
         "is_true_mismatch": false,
-        "confirmed_count": 0,
-        "projected_count": 9,
+        "confirmed_count": 9,
+        "projected_count": 0,
         "overlap_count": 0,
         "missing_from_projection": [],
         "extra_in_projection": []
@@ -511,6 +463,74 @@
     },
     {
       "idx": 3,
+      "game_pk": 824912,
+      "away": {
+        "team_id": 137,
+        "abbr": "SF"
+      },
+      "home": {
+        "team_id": 144,
+        "abbr": "ATL"
+      },
+      "away_confirmed_ids": [
+        650333,
+        805811,
+        656305,
+        646240,
+        808982,
+        642715,
+        669477,
+        687551,
+        691740
+      ],
+      "home_confirmed_ids": [
+        686948,
+        642201,
+        621566,
+        645277,
+        642086,
+        643289,
+        663586,
+        573262,
+        673490
+      ],
+      "away_projected_ids": [],
+      "home_projected_ids": [],
+      "away_projected_validation": {
+        "status": "none",
+        "raw_ids": [],
+        "ids": []
+      },
+      "home_projected_validation": {
+        "status": "none",
+        "raw_ids": [],
+        "ids": []
+      },
+      "away_source": "confirmed_feed_live",
+      "home_source": "confirmed_feed_live",
+      "away_confidence": 1.0,
+      "home_confidence": 1.0,
+      "away_comparison": {
+        "status": "confirmed_only",
+        "is_true_mismatch": false,
+        "confirmed_count": 9,
+        "projected_count": 0,
+        "overlap_count": 0,
+        "missing_from_projection": [],
+        "extra_in_projection": []
+      },
+      "home_comparison": {
+        "status": "confirmed_only",
+        "is_true_mismatch": false,
+        "confirmed_count": 9,
+        "projected_count": 0,
+        "overlap_count": 0,
+        "missing_from_projection": [],
+        "extra_in_projection": []
+      }
+    },
+    {
+      "idx": 4,
       "game_pk": 824178,
       "away": {
         "team_id": 116,
@@ -674,7 +694,7 @@
       }
     },
     {
-      "idx": 4,
+      "idx": 5,
       "game_pk": 823044,
       "away": {
         "team_id": 135,
@@ -838,7 +858,7 @@
       }
     },
     {
-      "idx": 5,
+      "idx": 6,
       "game_pk": 823940,
       "away": {
         "team_id": 139,
@@ -1002,7 +1022,7 @@
       }
     },
     {
-      "idx": 6,
+      "idx": 7,
       "game_pk": 825072,
       "away": {
         "team_id": 108,
@@ -1168,7 +1188,7 @@
       }
     },
     {
-      "idx": 7,
+      "idx": 8,
       "game_pk": 824746,
       "away": {
         "team_id": 141,
@@ -1311,7 +1331,7 @@
       "away_source": "projected_rotowire_default_vs_lhp",
       "home_source": "projected_rotowire_default_vs_rhp",
       "away_confidence": 0.66,
-      "home_confidence": 0.58,
+      "home_confidence": 0.66,
       "away_comparison": {
         "status": "projected_only",
         "is_true_mismatch": false,
@@ -1332,7 +1352,7 @@
       }
     },
     {
-      "idx": 8,
+      "idx": 9,
       "game_pk": 823536,
       "away": {
         "team_id": 145,
@@ -1496,7 +1516,7 @@
       }
     },
     {
-      "idx": 9,
+      "idx": 10,
       "game_pk": 824913,
       "away": {
         "team_id": 137,
@@ -1520,15 +1540,15 @@
         687551
       ],
       "home_projected_ids": [
+        671739,
         643289,
-        645277,
         621566,
+        645277,
+        642086,
         663586,
         642201,
-        671739,
-        622761,
-        673490,
-        506702
+        573262,
+        642851
       ],
       "away_projected_validation": {
         "status": "ok",
@@ -1586,60 +1606,60 @@
       "home_projected_validation": {
         "status": "ok",
         "raw_ids": [
+          671739,
           643289,
-          645277,
           621566,
+          645277,
+          642086,
           663586,
           642201,
-          671739,
-          622761,
-          673490,
-          506702
+          573262,
+          642851
         ],
         "ids": [
+          671739,
           643289,
-          645277,
           621566,
+          645277,
+          642086,
           663586,
           642201,
-          671739,
-          622761,
-          673490,
-          506702
+          573262,
+          642851
         ],
         "missing_ids": [],
         "backfilled_ids": [],
         "pool_source": "active+40Man",
         "pool_size": 16,
         "raw_names": [
+          "Michael Harris",
           "Mauricio Dubon",
-          "Ozzie Albies",
           "Matt Olson",
+          "Ozzie Albies",
+          "Dominic Smith",
           "Austin Riley",
           "Eli White",
-          "Michael Harris",
-          "Jorge Mateo",
-          "Ha-Seong Kim",
-          "Sandy Leon"
+          "Mike Yastrzemski",
+          "Austin Wynns"
         ],
         "matched_names": [
+          "Michael Harris II",
           "Mauricio Dub\u00f3n",
-          "Ozzie Albies",
           "Matt Olson",
+          "Ozzie Albies",
+          "Dominic Smith",
           "Austin Riley",
           "Eli White",
-          "Michael Harris II",
-          "Jorge Mateo",
-          "Ha-Seong Kim",
-          "Sandy Le\u00f3n"
+          "Mike Yastrzemski",
+          "Austin Wynns"
         ],
         "missing_name_labels": [],
-        "mapping_source": "projected_rotowire_default_vs_lhp"
+        "mapping_source": "projected_rotowire_default_vs_rhp"
       },
       "away_source": "projected_rotowire_default_vs_rhp",
-      "home_source": "projected_rotowire_default_vs_lhp",
+      "home_source": "projected_rotowire_default_vs_rhp",
       "away_confidence": 0.66,
-      "home_confidence": 0.66,
+      "home_confidence": 0.58,
       "away_comparison": {
         "status": "projected_only",
         "is_true_mismatch": false,
@@ -1660,7 +1680,7 @@
       }
     },
     {
-      "idx": 10,
+      "idx": 11,
       "game_pk": 823774,
       "away": {
         "team_id": 114,
@@ -1824,7 +1844,7 @@
       }
     },
     {
-      "idx": 11,
+      "idx": 12,
       "game_pk": 824668,
       "away": {
         "team_id": 115,
@@ -1988,7 +2008,7 @@
       }
     },
     {
-      "idx": 12,
+      "idx": 13,
       "game_pk": 824992,
       "away": {
         "team_id": 134,
@@ -2152,7 +2172,7 @@
       }
     },
     {
-      "idx": 13,
+      "idx": 14,
       "game_pk": 823127,
       "away": {
         "team_id": 110,
