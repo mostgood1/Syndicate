@@ -1074,6 +1074,36 @@ def _load_local_props_recommendations(*, processed_root: Path, date_str: str) ->
     if not out_path.exists() or not out_path.is_file() or _count_csv_rows_quick(out_path) <= 0:
         return []
 
+    def _coerce_top_play(row: dict[str, str]) -> dict[str, object]:
+        top_play = _structured_literal_or_none(row.get("top_play"))
+        if isinstance(top_play, dict) and top_play:
+            return top_play
+
+        ev_pct = _float_or_none(row.get("ev_pct") or row.get("score"))
+        ev_value = _float_or_none(row.get("ev"))
+        if ev_value is None and ev_pct is not None:
+            ev_value = float(ev_pct) / 100.0
+
+        market_value = str(row.get("market") or row.get("stat") or "").strip().lower()
+        side_value = str(row.get("side") or row.get("selection") or "").strip().upper()
+        return {
+            "market": market_value,
+            "stat": market_value,
+            "side": side_value,
+            "line": _float_or_none(row.get("line")),
+            "price": _float_or_none(row.get("price")),
+            "edge": _float_or_none(row.get("edge")),
+            "ev": ev_value,
+            "ev_pct": ev_pct,
+            "p_win": _float_or_none(row.get("p_win") or row.get("win_prob")),
+            "proj": _float_or_none(row.get("proj") or row.get("sim_mu") or row.get("sim_mu_adjusted")),
+            "book": str(row.get("book") or row.get("bookmaker") or "").strip() or None,
+            "display_pick": str(row.get("display_pick") or "").strip() or None,
+            "selection": str(row.get("selection") or "").strip() or None,
+            "basketball_summary": str(row.get("basketball_summary") or row.get("top_play_explain") or "").strip() or None,
+            "basketball_reasons": _structured_literal_or_none(row.get("top_play_reasons")) or [],
+        }
+
     rows_out: list[dict[str, object]] = []
     with out_path.open("r", encoding="utf-8", newline="") as handle:
         for row in csv.DictReader(handle):
@@ -1081,7 +1111,7 @@ def _load_local_props_recommendations(*, processed_root: Path, date_str: str) ->
                 continue
             parsed = dict(row)
             parsed["model"] = _structured_literal_or_none(row.get("model")) or {}
-            parsed["top_play"] = _structured_literal_or_none(row.get("top_play")) or {}
+            parsed["top_play"] = _coerce_top_play(row)
             parsed["top_play_reasons"] = _structured_literal_or_none(row.get("top_play_reasons")) or []
             parsed["top_play_explain"] = str(row.get("top_play_explain") or "").strip()
             rows_out.append(parsed)

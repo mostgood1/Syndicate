@@ -894,6 +894,43 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
 
         self.assertEqual(rows, source_rows)
 
+    def test_flat_props_rows_still_build_top_by_game_snapshot(self) -> None:
+        module = self._load_module()
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_root = Path(tmp_dir)
+            source_root = tmp_root / "source"
+            processed_source = source_root / "data" / "processed"
+            processed_root = tmp_root / "bundle" / "data" / "processed"
+            date_str = "2026-06-17"
+            processed_source.mkdir(parents=True, exist_ok=True)
+            processed_root.mkdir(parents=True, exist_ok=True)
+
+            (processed_root / f"game_cards_{date_str}.csv").write_text(
+                "date,game_id,home_team,visitor_team,commence_time,home_ml,away_ml,home_spread,away_spread,total,bookmaker,home_tri,away_tri\n"
+                "2026-06-17,0401,Chicago Sky,Minnesota Lynx,2026-06-17T23:00:00Z,-140,120,-4.5,4.5,164.5,oddsapi_consensus,CHI,MIN\n",
+                encoding="utf-8",
+            )
+            (processed_root / f"props_recommendations_{date_str}.csv").write_text(
+                "date,team,player,market,side,line,price,ev,ev_pct,book,top_play_explain,top_play_reasons\n"
+                "2026-06-17,CHI,Angel Reese,reb,OVER,10.5,-110,0.08,8.0,fanduel,model 11.3 vs line 10.5 (+0.8),['EV 8.0%','Regular price range (-150 to +150)']\n",
+                encoding="utf-8",
+            )
+
+            with patch.object(module, "_load_source_app", side_effect=AssertionError("source app should not load")):
+                props_path = module._export_cards_props_snapshot(source_root=source_root, date_str=date_str, processed_root=processed_root)
+                top_path = module._export_top_by_game_snapshot(source_root=source_root, date_str=date_str, processed_root=processed_root)
+
+            self.assertIsNotNone(props_path)
+            self.assertIsNotNone(top_path)
+            props_payload = json.loads((processed_root / f"cards_props_snapshot_{date_str}.json").read_text(encoding="utf-8"))
+            top_payload = json.loads((processed_root / f"props_recommendations_top_by_game_{date_str}.json").read_text(encoding="utf-8"))
+
+        self.assertEqual(props_payload["games"][0]["prop_recommendations"]["home"][0]["player"], "Angel Reese")
+        self.assertEqual(top_payload["data"][0]["team_tricode"], "CHI")
+        self.assertEqual(top_payload["data"][0]["top_play"]["market"], "reb")
+        self.assertEqual(top_payload["data"][0]["top_play"]["side"], "OVER")
+
     def test_generate_offline_live_lens_signals_emits_period_totals(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]
         script_path = repo_root / "vendor" / "wnba_betting_repo" / "tools" / "generate_offline_live_lens_signals.py"
