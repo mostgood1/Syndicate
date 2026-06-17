@@ -2,7 +2,7 @@
   "date": "2026-06-18",
   "season": 2026,
   "spring_mode": false,
-  "generated_at": "2026-06-17T13:47:30.529382",
+  "generated_at": "2026-06-17T15:23:02.914828",
   "summary": {
     "games": 9,
     "projected_teams": 18,
@@ -1187,13 +1187,13 @@
       "away_projected_ids": [
         802139,
         671056,
-        676475,
         691023,
-        663457,
+        676369,
+        676475,
         691026,
-        699625,
         691458,
-        701675
+        701675,
+        686780
       ],
       "home_projected_ids": [
         657041,
@@ -1211,24 +1211,24 @@
         "raw_ids": [
           802139,
           671056,
-          676475,
           691023,
-          663457,
+          676369,
+          676475,
           691026,
-          699625,
           691458,
-          701675
+          701675,
+          686780
         ],
         "ids": [
           802139,
           671056,
-          676475,
           691023,
-          663457,
+          676369,
+          676475,
           691026,
-          699625,
           691458,
-          701675
+          701675,
+          686780
         ],
         "missing_ids": [],
         "backfilled_ids": [],
@@ -1237,27 +1237,27 @@
         "raw_names": [
           "JJ Wetherholt",
           "Ivan Herrera",
-          "Alec Burleson",
           "Jordan Walker",
-          "Lars Nootbaar",
+          "Nelson Velazquez",
+          "Alec Burleson",
           "Masyn Winn",
-          "Jimmy Crooks",
           "Blaze Jordan",
-          "Nathan Church"
+          "Nathan Church",
+          "Pedro Pages"
         ],
         "matched_names": [
           "JJ Wetherholt",
           "Iv\u00e1n Herrera",
-          "Alec Burleson",
           "Jordan Walker",
-          "Lars Nootbaar",
+          "Nelson Vel\u00e1zquez",
+          "Alec Burleson",
           "Masyn Winn",
-          "Jimmy Crooks",
           "Blaze Jordan",
-          "Nathan Church"
+          "Nathan Church",
+          "Pedro Pag\u00e9s"
         ],
         "missing_name_labels": [],
-        "mapping_source": "projected_rotowire_default_vs_rhp"
+        "mapping_source": "projected_rotowire_default_vs_lhp"
       },
       "home_projected_validation": {
         "status": "ok",
@@ -1312,9 +1312,9 @@
         "missing_name_labels": [],
         "mapping_source": "projected_rotowire_default_vs_lhp"
       },
-      "away_source": "projected_rotowire_default_vs_rhp",
+      "away_source": "projected_rotowire_default_vs_lhp",
       "home_source": "projected_rotowire_default_vs_lhp",
-      "away_confidence": 0.58,
+      "away_confidence": 0.66,
       "home_confidence": 0.66,
       "away_comparison": {
         "status": "projected_only",

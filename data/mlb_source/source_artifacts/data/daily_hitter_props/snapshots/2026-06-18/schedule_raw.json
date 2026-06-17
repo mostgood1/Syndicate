@@ -1393,6 +1393,11 @@
           "ties": 0,
           "pct": ".392"
         },
+        "probablePitcher": {
+          "id": 702070,
+          "fullName": "Noah Cameron",
+          "link": "/api/v1/people/702070"
+        },
         "splitSquad": false,
         "seriesNumber": 25,
         "springLeague": {

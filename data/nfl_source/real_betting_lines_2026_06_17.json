@@ -120,8 +120,8 @@
     },
     "Atlanta Falcons @ Pittsburgh Steelers": {
       "moneyline": {
-        "home": -170,
-        "away": 142
+        "home": -175,
+        "away": 145
       },
       "total_runs": {
         "line": 42.5,
@@ -137,11 +137,11 @@
           "outcomes": [
             {
               "name": "Atlanta Falcons",
-              "price": 142
+              "price": 145
             },
             {
               "name": "Pittsburgh Steelers",
-              "price": -170
+              "price": -175
             }
           ]
         },
@@ -4427,5 +4427,5 @@
     }
   },
   "source": "odds_api",
-  "fetched_at": "2026-06-17T14:00:45.619674+00:00"
+  "fetched_at": "2026-06-17T15:30:19.424168+00:00"
 }

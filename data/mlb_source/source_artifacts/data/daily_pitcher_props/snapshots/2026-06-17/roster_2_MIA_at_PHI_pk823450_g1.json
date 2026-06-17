@@ -1815,16 +1815,16 @@
   },
   "weather": {
     "source": "statsapi_live_feed",
-    "condition": "",
-    "temperature_f": null,
-    "wind_speed_mph": null,
-    "wind_direction": "unknown",
-    "wind_raw": "",
+    "condition": "Partly Cloudy",
+    "temperature_f": 81.0,
+    "wind_speed_mph": 8.0,
+    "wind_direction": "out",
+    "wind_raw": "8 mph, Out To LF",
     "is_dome": null,
     "multipliers": {
-      "hr_mult": 1.0,
-      "inplay_hit_mult": 1.0,
-      "xb_share_mult": 1.0
+      "hr_mult": 1.033,
+      "inplay_hit_mult": 1.0165,
+      "xb_share_mult": 1.0088
     }
   },
   "park": {
@@ -1844,8 +1844,8 @@
   },
   "umpire": {
     "source": "statsapi_live_feed",
-    "home_plate_umpire_id": null,
-    "home_plate_umpire_name": "",
+    "home_plate_umpire_id": 665298,
+    "home_plate_umpire_name": "Dexter Kelley",
     "called_strike_mult": 1.0,
     "multipliers": {
       "called_strike_mult": 1.0

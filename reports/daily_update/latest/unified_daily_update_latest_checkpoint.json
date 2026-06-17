@@ -3,11 +3,11 @@
     "date":  "2026-06-17",
     "runMode":  "standard",
     "overallStatus":  "ok",
-    "generatedAt":  "2026-06-17T13:36:49.0136685+00:00",
-    "updatedAt":  "2026-06-17T14:01:16.7242898+00:00",
-    "runDir":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-06-17\\20260617_133648",
+    "generatedAt":  "2026-06-17T15:11:55.9109363+00:00",
+    "updatedAt":  "2026-06-17T15:31:05.6233420+00:00",
+    "runDir":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-06-17\\20260617_151155",
     "latestDir":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest",
-    "lastUpdatedAt":  "2026-06-17T14:01:16.7177635+00:00",
+    "lastUpdatedAt":  "2026-06-17T15:31:05.6175558+00:00",
     "currentStage":  "queued",
     "completedStages":  [
                             "source_update",
@@ -167,11 +167,11 @@
                                                "name":  "NCAAB source mirror export"
                                            }
                                        ],
-                       "latestManifestLoaded":  false,
-                       "latestEventSimExecutionPlanCount":  0,
-                       "latestArtifactUpdateCount":  1,
+                       "latestManifestLoaded":  true,
+                       "latestEventSimExecutionPlanCount":  21,
+                       "latestArtifactUpdateCount":  21,
                        "oddsHistoryTriggerPlanCount":  9,
-                       "simExecutionDecision":  null
+                       "simExecutionDecision":  true
                    },
     "trace":  {
                   "eventSimExecutionCount":  21,
@@ -179,9 +179,9 @@
                   "inputFingerprintCount":  3,
                   "artifactPathCount":  21,
                   "inputFingerprints":  [
-                                            "18c7525c7d5373bc751a608685923c3dda0756c48e1fd34a919641fafe26999e",
+                                            "4dd44cfddfe8bfa01f392c55a4b3f1364db42a56ba0f965dbfdd3da303ca066c",
                                             "04c5f51b9a83653b59fa69757209bde5fe1980791938c7c649ed44b11d8b8d53",
-                                            "582b694af97eff8e94b7d95373abc74fd155f08d59849d605d3af903909f3ae7"
+                                            "4a57d34024d5809c0516a43142be0e0352fe5316d550f250c63957b9528ce7dd"
                                         ],
                   "artifactPaths":  [
                                         "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_0_NYM_at_CIN_pk824503_g1.json",
@@ -206,7 +206,7 @@
                                         "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_POR_SEA.json",
                                         "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_bundle.json"
                                     ],
-                  "simExecutionDecision":  null
+                  "simExecutionDecision":  true
               },
     "replayContext":  {
                           "latestCheckpointLoaded":  true,
@@ -219,10 +219,10 @@
                                                                   "refresh_gate"
                                                               ],
                           "resumeEligible":  false,
-                          "resumedFromCheckpoint":  true
+                          "resumedFromCheckpoint":  false
                       },
     "runPlan":  {
-                    "simExecution":  null,
+                    "simExecution":  true,
                     "sourceUpdates":  true,
                     "refreshGate":  true,
                     "artifactGeneration":  false,

@@ -39,20 +39,20 @@
       "use_closer_in_9th_only": true,
       "pinch_hit_aggressiveness": 0.15
     },
-    "confirmed_lineup_ids": [],
-    "projected_lineup_ids": [
+    "confirmed_lineup_ids": [
       805808,
-      650402,
-      681481,
       693307,
       682985,
       679529,
+      681481,
       690993,
       663837,
-      656716
+      701678,
+      668670
     ],
-    "lineup_source": "projected_rotowire_default_vs_rhp",
-    "lineup_confidence": 0.66,
+    "projected_lineup_ids": [],
+    "lineup_source": "confirmed_feed_live",
+    "lineup_confidence": 1.0,
     "probable_pitcher": {
       "id": 663554,
       "source": "feed_gameData_probablePitchers",
@@ -148,64 +148,6 @@
         "vs_pitcher_history": {}
       },
       {
-        "id": 650402,
-        "name": "Gleyber Torres",
-        "pos": "2B",
-        "bat": "R",
-        "throw": "R",
-        "k_rate": 0.17096452424321276,
-        "bb_rate": 0.14517737878393616,
-        "hbp_rate": 0.010582010582010581,
-        "hr_rate": 0.022907450776303236,
-        "inplay_hit_rate": 0.32779581529581525,
-        "xb_hit_share": 0.13636363636363635,
-        "vs_pitch_type": {},
-        "vs_pitch_type_hr": {},
-        "platoon_mult_vs_lhp": {
-          "k": 1.0094855092683992,
-          "bb": 1.1925000000000001,
-          "hr": 0.9719490311640847,
-          "inplay": 0.8075
-        },
-        "platoon_mult_vs_rhp": {
-          "k": 0.9899230788743992,
-          "bb": 0.9268702246222784,
-          "hr": 0.9536990650394664,
-          "inplay": 1.0708132944478073
-        },
-        "statcast_quality_mult": {},
-        "vs_pitcher_history": {}
-      },
-      {
-        "id": 681481,
-        "name": "Kerry Carpenter",
-        "pos": "RF",
-        "bat": "L",
-        "throw": "R",
-        "k_rate": 0.3044239631336405,
-        "bb_rate": 0.0784331797235023,
-        "hbp_rate": 0.025806451612903226,
-        "hr_rate": 0.06006912442396313,
-        "inplay_hit_rate": 0.2596629213483146,
-        "xb_hit_share": 0.15625,
-        "vs_pitch_type": {},
-        "vs_pitch_type_hr": {},
-        "platoon_mult_vs_lhp": {
-          "k": 1.0059048883299566,
-          "bb": 0.8075,
-          "hr": 0.78,
-          "inplay": 1.0551801941027383
-        },
-        "platoon_mult_vs_rhp": {
-          "k": 1.0225428867482829,
-          "bb": 1.0919746445772165,
-          "hr": 1.030317347120699,
-          "inplay": 0.992448100811601
-        },
-        "statcast_quality_mult": {},
-        "vs_pitcher_history": {}
-      },
-      {
         "id": 693307,
         "name": "Dillon Dingler",
         "pos": "C",
@@ -293,6 +235,35 @@
         "vs_pitcher_history": {}
       },
       {
+        "id": 681481,
+        "name": "Kerry Carpenter",
+        "pos": "RF",
+        "bat": "L",
+        "throw": "R",
+        "k_rate": 0.3044239631336405,
+        "bb_rate": 0.0784331797235023,
+        "hbp_rate": 0.025806451612903226,
+        "hr_rate": 0.06006912442396313,
+        "inplay_hit_rate": 0.2596629213483146,
+        "xb_hit_share": 0.15625,
+        "vs_pitch_type": {},
+        "vs_pitch_type_hr": {},
+        "platoon_mult_vs_lhp": {
+          "k": 1.0059048883299566,
+          "bb": 0.8075,
+          "hr": 0.78,
+          "inplay": 1.0551801941027383
+        },
+        "platoon_mult_vs_rhp": {
+          "k": 1.0225428867482829,
+          "bb": 1.0919746445772165,
+          "hr": 1.030317347120699,
+          "inplay": 0.992448100811601
+        },
+        "statcast_quality_mult": {},
+        "vs_pitcher_history": {}
+      },
+      {
         "id": 690993,
         "name": "Colt Keith",
         "pos": "3B",
@@ -351,37 +322,6 @@
         "vs_pitcher_history": {}
       },
       {
-        "id": 656716,
-        "name": "Zach McKinstry",
-        "pos": "2B",
-        "bat": "L",
-        "throw": "R",
-        "k_rate": 0.17914337709606135,
-        "bb_rate": 0.12806447419732225,
-        "hbp_rate": 0.0,
-        "hr_rate": 0.013889249967502926,
-        "inplay_hit_rate": 0.19846846846846847,
-        "xb_hit_share": 0.16666666666666666,
-        "vs_pitch_type": {},
-        "vs_pitch_type_hr": {},
-        "platoon_mult_vs_lhp": {
-          "k": 1.1925000000000001,
-          "bb": 1.1925000000000001,
-          "hr": 0.78,
-          "inplay": 0.8075
-        },
-        "platoon_mult_vs_rhp": {
-          "k": 0.9616944212652226,
-          "bb": 0.8856953932696664,
-          "hr": 1.0238981234698514,
-          "inplay": 1.0536323105755878
-        },
-        "statcast_quality_mult": {},
-        "vs_pitcher_history": {}
-      }
-    ],
-    "bench": [
-      {
         "id": 701678,
         "name": "Hao-Yu  Lee",
         "pos": "2B",
@@ -411,35 +351,6 @@
         "vs_pitcher_history": {}
       },
       {
-        "id": 663330,
-        "name": "Jahmai Jones",
-        "pos": "DH",
-        "bat": "R",
-        "throw": "R",
-        "k_rate": 0.28384615384615386,
-        "bb_rate": 0.10230769230769232,
-        "hbp_rate": 0.0,
-        "hr_rate": 0.01888888888888889,
-        "inplay_hit_rate": 0.15,
-        "xb_hit_share": 0.18181818181818182,
-        "vs_pitch_type": {},
-        "vs_pitch_type_hr": {},
-        "platoon_mult_vs_lhp": {
-          "k": 0.9599129938667808,
-          "bb": 1.0866244558765332,
-          "hr": 1.2162538699690402,
-          "inplay": 1.152127659574468
-        },
-        "platoon_mult_vs_rhp": {
-          "k": 1.1925000000000001,
-          "bb": 0.8075,
-          "hr": 0.78,
-          "inplay": 0.8075
-        },
-        "statcast_quality_mult": {},
-        "vs_pitcher_history": {}
-      },
-      {
         "id": 668670,
         "name": "Jake Rogers",
         "pos": "C",
@@ -464,6 +375,66 @@
           "bb": 0.9232103825136613,
           "hr": 1.0178524590163935,
           "inplay": 0.8886353566681435
+        },
+        "statcast_quality_mult": {},
+        "vs_pitcher_history": {}
+      }
+    ],
+    "bench": [
+      {
+        "id": 650402,
+        "name": "Gleyber Torres",
+        "pos": "2B",
+        "bat": "R",
+        "throw": "R",
+        "k_rate": 0.17096452424321276,
+        "bb_rate": 0.14517737878393616,
+        "hbp_rate": 0.010582010582010581,
+        "hr_rate": 0.022907450776303236,
+        "inplay_hit_rate": 0.32779581529581525,
+        "xb_hit_share": 0.13636363636363635,
+        "vs_pitch_type": {},
+        "vs_pitch_type_hr": {},
+        "platoon_mult_vs_lhp": {
+          "k": 1.0094855092683992,
+          "bb": 1.1925000000000001,
+          "hr": 0.9719490311640847,
+          "inplay": 0.8075
+        },
+        "platoon_mult_vs_rhp": {
+          "k": 0.9899230788743992,
+          "bb": 0.9268702246222784,
+          "hr": 0.9536990650394664,
+          "inplay": 1.0708132944478073
+        },
+        "statcast_quality_mult": {},
+        "vs_pitcher_history": {}
+      },
+      {
+        "id": 663330,
+        "name": "Jahmai Jones",
+        "pos": "DH",
+        "bat": "R",
+        "throw": "R",
+        "k_rate": 0.28384615384615386,
+        "bb_rate": 0.10230769230769232,
+        "hbp_rate": 0.0,
+        "hr_rate": 0.01888888888888889,
+        "inplay_hit_rate": 0.15,
+        "xb_hit_share": 0.18181818181818182,
+        "vs_pitch_type": {},
+        "vs_pitch_type_hr": {},
+        "platoon_mult_vs_lhp": {
+          "k": 0.9599129938667808,
+          "bb": 1.0866244558765332,
+          "hr": 1.2162538699690402,
+          "inplay": 1.152127659574468
+        },
+        "platoon_mult_vs_rhp": {
+          "k": 1.1925000000000001,
+          "bb": 0.8075,
+          "hr": 0.78,
+          "inplay": 0.8075
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -522,6 +493,35 @@
           "bb": 1.0835702655602435,
           "hr": 0.78,
           "inplay": 0.9816838092498023
+        },
+        "statcast_quality_mult": {},
+        "vs_pitcher_history": {}
+      },
+      {
+        "id": 656716,
+        "name": "Zach McKinstry",
+        "pos": "2B",
+        "bat": "L",
+        "throw": "R",
+        "k_rate": 0.17914337709606135,
+        "bb_rate": 0.12806447419732225,
+        "hbp_rate": 0.0,
+        "hr_rate": 0.013889249967502926,
+        "inplay_hit_rate": 0.19846846846846847,
+        "xb_hit_share": 0.16666666666666666,
+        "vs_pitch_type": {},
+        "vs_pitch_type_hr": {},
+        "platoon_mult_vs_lhp": {
+          "k": 1.1925000000000001,
+          "bb": 1.1925000000000001,
+          "hr": 0.78,
+          "inplay": 0.8075
+        },
+        "platoon_mult_vs_rhp": {
+          "k": 0.9616944212652226,
+          "bb": 0.8856953932696664,
+          "hr": 1.0238981234698514,
+          "inplay": 1.0536323105755878
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -933,20 +933,20 @@
       "use_closer_in_9th_only": true,
       "pinch_hit_aggressiveness": 0.15
     },
-    "confirmed_lineup_ids": [],
-    "projected_lineup_ids": [
+    "confirmed_lineup_ids": [
       665161,
       670541,
       572233,
       670623,
       514888,
-      694388,
       701358,
+      694388,
       676694,
       543877
     ],
-    "lineup_source": "projected_rotowire_default_vs_rhp",
-    "lineup_confidence": 0.66,
+    "projected_lineup_ids": [],
+    "lineup_source": "confirmed_feed_live",
+    "lineup_confidence": 1.0,
     "probable_pitcher": {
       "id": 663567,
       "source": "feed_gameData_probablePitchers",
@@ -1158,35 +1158,6 @@
         "vs_pitcher_history": {}
       },
       {
-        "id": 694388,
-        "name": "Joey Loperfido",
-        "pos": "LF",
-        "bat": "L",
-        "throw": "R",
-        "k_rate": 0.275545048594694,
-        "bb_rate": 0.12408720777515103,
-        "hbp_rate": 0.012345679012345678,
-        "hr_rate": 0.0,
-        "inplay_hit_rate": 0.3277777777777778,
-        "xb_hit_share": 0.3125,
-        "vs_pitch_type": {},
-        "vs_pitch_type_hr": {},
-        "platoon_mult_vs_lhp": {
-          "k": 0.8075,
-          "bb": 0.8075,
-          "hr": 1.0,
-          "inplay": 0.8075
-        },
-        "platoon_mult_vs_rhp": {
-          "k": 1.028563435155635,
-          "bb": 1.0923719765857969,
-          "hr": 1.0,
-          "inplay": 1.1123550401427298
-        },
-        "statcast_quality_mult": {},
-        "vs_pitcher_history": {}
-      },
-      {
         "id": 701358,
         "name": "Cam Smith",
         "pos": "RF",
@@ -1211,6 +1182,35 @@
           "bb": 1.035359731417276,
           "hr": 0.9983381732250138,
           "inplay": 1.0185914725971066
+        },
+        "statcast_quality_mult": {},
+        "vs_pitcher_history": {}
+      },
+      {
+        "id": 694388,
+        "name": "Joey Loperfido",
+        "pos": "LF",
+        "bat": "L",
+        "throw": "R",
+        "k_rate": 0.275545048594694,
+        "bb_rate": 0.12408720777515103,
+        "hbp_rate": 0.012345679012345678,
+        "hr_rate": 0.0,
+        "inplay_hit_rate": 0.3277777777777778,
+        "xb_hit_share": 0.3125,
+        "vs_pitch_type": {},
+        "vs_pitch_type_hr": {},
+        "platoon_mult_vs_lhp": {
+          "k": 0.8075,
+          "bb": 0.8075,
+          "hr": 1.0,
+          "inplay": 0.8075
+        },
+        "platoon_mult_vs_rhp": {
+          "k": 1.028563435155635,
+          "bb": 1.0923719765857969,
+          "hr": 1.0,
+          "inplay": 1.1123550401427298
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -1779,16 +1779,16 @@
   },
   "weather": {
     "source": "statsapi_live_feed",
-    "condition": "",
-    "temperature_f": null,
-    "wind_speed_mph": null,
+    "condition": "Roof Closed",
+    "temperature_f": 72.0,
+    "wind_speed_mph": 0.0,
     "wind_direction": "unknown",
-    "wind_raw": "",
+    "wind_raw": "0 mph, None",
     "is_dome": null,
     "multipliers": {
-      "hr_mult": 1.0,
-      "inplay_hit_mult": 1.0,
-      "xb_share_mult": 1.0
+      "hr_mult": 1.006,
+      "inplay_hit_mult": 1.003,
+      "xb_share_mult": 1.0016
     }
   },
   "park": {
@@ -1808,8 +1808,8 @@
   },
   "umpire": {
     "source": "statsapi_live_feed",
-    "home_plate_umpire_id": null,
-    "home_plate_umpire_name": "",
+    "home_plate_umpire_id": 511890,
+    "home_plate_umpire_name": "Quinn Wolcott",
     "called_strike_mult": 1.0,
     "multipliers": {
       "called_strike_mult": 1.0

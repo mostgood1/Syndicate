@@ -39,20 +39,20 @@
       "use_closer_in_9th_only": true,
       "pinch_hit_aggressiveness": 0.15
     },
-    "confirmed_lineup_ids": [],
-    "projected_lineup_ids": [
+    "confirmed_lineup_ids": [
       695600,
       677951,
       695506,
-      672580,
+      657041,
       686681,
       521692,
-      670224,
-      657041,
+      670231,
+      679845,
       686555
     ],
-    "lineup_source": "projected_rotowire_default_vs_rhp",
-    "lineup_confidence": 0.66,
+    "projected_lineup_ids": [],
+    "lineup_source": "confirmed_feed_live",
+    "lineup_confidence": 1.0,
     "probable_pitcher": {
       "id": 679883,
       "source": "feed_gameData_probablePitchers",
@@ -206,30 +206,30 @@
         "vs_pitcher_history": {}
       },
       {
-        "id": 672580,
-        "name": "Maikel Garcia",
-        "pos": "3B",
+        "id": 657041,
+        "name": "Lane Thomas",
+        "pos": "CF",
         "bat": "R",
         "throw": "R",
-        "k_rate": 0.16213565970108879,
-        "bb_rate": 0.08139243930479474,
-        "hbp_rate": 0.0,
-        "hr_rate": 0.00913978494623656,
-        "inplay_hit_rate": 0.3146528292562392,
-        "xb_hit_share": 0.2647058823529412,
+        "k_rate": 0.2214690867838911,
+        "bb_rate": 0.1521979580260919,
+        "hbp_rate": 0.012195121951219513,
+        "hr_rate": 0.02252552467385139,
+        "inplay_hit_rate": 0.27235714285714285,
+        "xb_hit_share": 0.13333333333333333,
         "vs_pitch_type": {},
         "vs_pitch_type_hr": {},
         "platoon_mult_vs_lhp": {
-          "k": 0.8817372262773723,
-          "bb": 1.1925000000000001,
-          "hr": 1.275,
-          "inplay": 1.0894969105180292
+          "k": 0.946683314124728,
+          "bb": 1.0824000745364764,
+          "hr": 0.78,
+          "inplay": 1.0558221872541307
         },
         "platoon_mult_vs_rhp": {
-          "k": 0.9951783852227023,
-          "bb": 0.9326703146050078,
-          "hr": 0.78,
-          "inplay": 0.9581273901402946
+          "k": 1.041289659672295,
+          "bb": 0.9662449588052867,
+          "hr": 1.0313510799346493,
+          "inplay": 0.9346577498033045
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -293,95 +293,6 @@
         "vs_pitcher_history": {}
       },
       {
-        "id": 670224,
-        "name": "Kameron Misner",
-        "pos": "CF",
-        "bat": "L",
-        "throw": "L",
-        "k_rate": 0.23076923076923078,
-        "bb_rate": 0.07692307692307693,
-        "hbp_rate": 0.0,
-        "hr_rate": 0.0,
-        "inplay_hit_rate": 0.6666666666666666,
-        "xb_hit_share": 0.05,
-        "vs_pitch_type": {},
-        "vs_pitch_type_hr": {},
-        "platoon_mult_vs_lhp": {
-          "k": 0.8075,
-          "bb": 0.8075,
-          "hr": 1.0,
-          "inplay": 0.8625
-        },
-        "platoon_mult_vs_rhp": {
-          "k": 1.0999999999999999,
-          "bb": 1.1,
-          "hr": 1.0,
-          "inplay": 1.0392857142857144
-        },
-        "statcast_quality_mult": {},
-        "vs_pitcher_history": {}
-      },
-      {
-        "id": 657041,
-        "name": "Lane Thomas",
-        "pos": "CF",
-        "bat": "R",
-        "throw": "R",
-        "k_rate": 0.2214690867838911,
-        "bb_rate": 0.1521979580260919,
-        "hbp_rate": 0.012195121951219513,
-        "hr_rate": 0.02252552467385139,
-        "inplay_hit_rate": 0.27235714285714285,
-        "xb_hit_share": 0.13333333333333333,
-        "vs_pitch_type": {},
-        "vs_pitch_type_hr": {},
-        "platoon_mult_vs_lhp": {
-          "k": 0.946683314124728,
-          "bb": 1.0824000745364764,
-          "hr": 0.78,
-          "inplay": 1.0558221872541307
-        },
-        "platoon_mult_vs_rhp": {
-          "k": 1.041289659672295,
-          "bb": 0.9662449588052867,
-          "hr": 1.0313510799346493,
-          "inplay": 0.9346577498033045
-        },
-        "statcast_quality_mult": {},
-        "vs_pitcher_history": {}
-      },
-      {
-        "id": 686555,
-        "name": "Isaac Collins",
-        "pos": "LF",
-        "bat": "S",
-        "throw": "R",
-        "k_rate": 0.24487179487179486,
-        "bb_rate": 0.14123931623931624,
-        "hbp_rate": 0.021367521367521368,
-        "hr_rate": 0.010897435897435897,
-        "inplay_hit_rate": 0.2843350383631713,
-        "xb_hit_share": 0.19047619047619047,
-        "vs_pitch_type": {},
-        "vs_pitch_type_hr": {},
-        "platoon_mult_vs_lhp": {
-          "k": 1.0275617053103963,
-          "bb": 0.8075,
-          "hr": 1.1710084033613446,
-          "inplay": 0.9027173470998857
-        },
-        "platoon_mult_vs_rhp": {
-          "k": 1.0115183246073298,
-          "bb": 1.1385908269067562,
-          "hr": 1.0654949784791965,
-          "inplay": 1.0451808479355142
-        },
-        "statcast_quality_mult": {},
-        "vs_pitcher_history": {}
-      }
-    ],
-    "bench": [
-      {
         "id": 670231,
         "name": "John Rave",
         "pos": "RF",
@@ -425,6 +336,95 @@
           "bb": 0.9988,
           "hr": 1.275,
           "inplay": 0.8902379664683613
+        },
+        "statcast_quality_mult": {},
+        "vs_pitcher_history": {}
+      },
+      {
+        "id": 686555,
+        "name": "Isaac Collins",
+        "pos": "LF",
+        "bat": "S",
+        "throw": "R",
+        "k_rate": 0.24487179487179486,
+        "bb_rate": 0.14123931623931624,
+        "hbp_rate": 0.021367521367521368,
+        "hr_rate": 0.010897435897435897,
+        "inplay_hit_rate": 0.2843350383631713,
+        "xb_hit_share": 0.19047619047619047,
+        "vs_pitch_type": {},
+        "vs_pitch_type_hr": {},
+        "platoon_mult_vs_lhp": {
+          "k": 1.0275617053103963,
+          "bb": 0.8075,
+          "hr": 1.1710084033613446,
+          "inplay": 0.9027173470998857
+        },
+        "platoon_mult_vs_rhp": {
+          "k": 1.0115183246073298,
+          "bb": 1.1385908269067562,
+          "hr": 1.0654949784791965,
+          "inplay": 1.0451808479355142
+        },
+        "statcast_quality_mult": {},
+        "vs_pitcher_history": {}
+      }
+    ],
+    "bench": [
+      {
+        "id": 670224,
+        "name": "Kameron Misner",
+        "pos": "CF",
+        "bat": "L",
+        "throw": "L",
+        "k_rate": 0.23076923076923078,
+        "bb_rate": 0.07692307692307693,
+        "hbp_rate": 0.0,
+        "hr_rate": 0.0,
+        "inplay_hit_rate": 0.6666666666666666,
+        "xb_hit_share": 0.05,
+        "vs_pitch_type": {},
+        "vs_pitch_type_hr": {},
+        "platoon_mult_vs_lhp": {
+          "k": 0.8075,
+          "bb": 0.8075,
+          "hr": 1.0,
+          "inplay": 0.8625
+        },
+        "platoon_mult_vs_rhp": {
+          "k": 1.0999999999999999,
+          "bb": 1.1,
+          "hr": 1.0,
+          "inplay": 1.0392857142857144
+        },
+        "statcast_quality_mult": {},
+        "vs_pitcher_history": {}
+      },
+      {
+        "id": 672580,
+        "name": "Maikel Garcia",
+        "pos": "3B",
+        "bat": "R",
+        "throw": "R",
+        "k_rate": 0.16213565970108879,
+        "bb_rate": 0.08139243930479474,
+        "hbp_rate": 0.0,
+        "hr_rate": 0.00913978494623656,
+        "inplay_hit_rate": 0.3146528292562392,
+        "xb_hit_share": 0.2647058823529412,
+        "vs_pitch_type": {},
+        "vs_pitch_type_hr": {},
+        "platoon_mult_vs_lhp": {
+          "k": 0.8817372262773723,
+          "bb": 1.1925000000000001,
+          "hr": 1.275,
+          "inplay": 1.0894969105180292
+        },
+        "platoon_mult_vs_rhp": {
+          "k": 0.9951783852227023,
+          "bb": 0.9326703146050078,
+          "hr": 0.78,
+          "inplay": 0.9581273901402946
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}

@@ -39,20 +39,20 @@
       "use_closer_in_9th_only": true,
       "pinch_hit_aggressiveness": 0.15
     },
-    "confirmed_lineup_ids": [],
-    "projected_lineup_ids": [
+    "confirmed_lineup_ids": [
       689414,
       672640,
       669065,
       669364,
-      681715,
+      691594,
       683357,
       805300,
       691788,
-      691594
+      665923
     ],
-    "lineup_source": "projected_rotowire_default_vs_rhp",
-    "lineup_confidence": 0.66,
+    "projected_lineup_ids": [],
+    "lineup_source": "confirmed_feed_live",
+    "lineup_confidence": 1.0,
     "probable_pitcher": {
       "id": 645261,
       "source": "feed_gameData_probablePitchers",
@@ -241,30 +241,30 @@
         "vs_pitcher_history": {}
       },
       {
-        "id": 681715,
-        "name": "Heriberto Hern\u00e1ndez",
-        "pos": "LF",
+        "id": 691594,
+        "name": "Javier Sanoja",
+        "pos": "3B",
         "bat": "R",
         "throw": "R",
-        "k_rate": 0.248447974351501,
-        "bb_rate": 0.08206791023025356,
-        "hbp_rate": 0.00684931506849315,
-        "hr_rate": 0.0508889536578257,
-        "inplay_hit_rate": 0.2722979714000665,
-        "xb_hit_share": 0.06451612903225806,
+        "k_rate": 0.11002581755593804,
+        "bb_rate": 0.06346815834767643,
+        "hbp_rate": 0.0,
+        "hr_rate": 0.013812392426850258,
+        "inplay_hit_rate": 0.25527632950990614,
+        "xb_hit_share": 0.28205128205128205,
         "vs_pitch_type": {},
         "vs_pitch_type_hr": {},
         "platoon_mult_vs_lhp": {
-          "k": 0.9217813258894465,
-          "bb": 0.9993251514097371,
-          "hr": 0.9815334347360712,
-          "inplay": 0.8828241677716518
+          "k": 1.1229189855900845,
+          "bb": 0.949947848761408,
+          "hr": 1.275,
+          "inplay": 0.9629828574540801
         },
         "platoon_mult_vs_rhp": {
-          "k": 1.0229688138856445,
-          "bb": 1.0807545267951806,
-          "hr": 0.83145340610471,
-          "inplay": 1.037591597459697
+          "k": 0.9323429320269778,
+          "bb": 1.058123699078204,
+          "hr": 0.78,
+          "inplay": 1.062339537213607
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -357,30 +357,30 @@
         "vs_pitcher_history": {}
       },
       {
-        "id": 691594,
-        "name": "Javier Sanoja",
-        "pos": "3B",
+        "id": 665923,
+        "name": "Esteury Ruiz",
+        "pos": "RF",
         "bat": "R",
         "throw": "R",
-        "k_rate": 0.11002581755593804,
-        "bb_rate": 0.06346815834767643,
-        "hbp_rate": 0.0,
-        "hr_rate": 0.013812392426850258,
-        "inplay_hit_rate": 0.25527632950990614,
-        "xb_hit_share": 0.28205128205128205,
+        "k_rate": 0.291231343283582,
+        "bb_rate": 0.12094882729211087,
+        "hbp_rate": 0.029850746268656716,
+        "hr_rate": 0.04341684434968017,
+        "inplay_hit_rate": 0.26368421052631574,
+        "xb_hit_share": 0.45,
         "vs_pitch_type": {},
         "vs_pitch_type_hr": {},
         "platoon_mult_vs_lhp": {
-          "k": 1.1229189855900845,
-          "bb": 0.949947848761408,
-          "hr": 1.275,
-          "inplay": 0.9629828574540801
+          "k": 1.0270517474553351,
+          "bb": 1.0815802360315363,
+          "hr": 1.1537719118750427,
+          "inplay": 0.9989021956087826
         },
         "platoon_mult_vs_rhp": {
-          "k": 0.9323429320269778,
-          "bb": 1.058123699078204,
-          "hr": 0.78,
-          "inplay": 1.062339537213607
+          "k": 0.9982837717757436,
+          "bb": 0.8075,
+          "hr": 0.8586417552822828,
+          "inplay": 0.9989021956087826
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -446,30 +446,30 @@
         "vs_pitcher_history": {}
       },
       {
-        "id": 665923,
-        "name": "Esteury Ruiz",
-        "pos": "RF",
+        "id": 681715,
+        "name": "Heriberto Hern\u00e1ndez",
+        "pos": "LF",
         "bat": "R",
         "throw": "R",
-        "k_rate": 0.291231343283582,
-        "bb_rate": 0.12094882729211087,
-        "hbp_rate": 0.029850746268656716,
-        "hr_rate": 0.04341684434968017,
-        "inplay_hit_rate": 0.26368421052631574,
-        "xb_hit_share": 0.45,
+        "k_rate": 0.248447974351501,
+        "bb_rate": 0.08206791023025356,
+        "hbp_rate": 0.00684931506849315,
+        "hr_rate": 0.0508889536578257,
+        "inplay_hit_rate": 0.2722979714000665,
+        "xb_hit_share": 0.06451612903225806,
         "vs_pitch_type": {},
         "vs_pitch_type_hr": {},
         "platoon_mult_vs_lhp": {
-          "k": 1.0270517474553351,
-          "bb": 1.0815802360315363,
-          "hr": 1.1537719118750427,
-          "inplay": 0.9989021956087826
+          "k": 0.9217813258894465,
+          "bb": 0.9993251514097371,
+          "hr": 0.9815334347360712,
+          "inplay": 0.8828241677716518
         },
         "platoon_mult_vs_rhp": {
-          "k": 0.9982837717757436,
-          "bb": 0.8075,
-          "hr": 0.8586417552822828,
-          "inplay": 0.9989021956087826
+          "k": 1.0229688138856445,
+          "bb": 1.0807545267951806,
+          "hr": 0.83145340610471,
+          "inplay": 1.037591597459697
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -961,20 +961,20 @@
       "use_closer_in_9th_only": true,
       "pinch_hit_aggressiveness": 0.15
     },
-    "confirmed_lineup_ids": [],
-    "projected_lineup_ids": [
-      656941,
+    "confirmed_lineup_ids": [
       607208,
+      656941,
       547180,
       669016,
       664761,
       681082,
-      592663,
       687282,
-      702222
+      702222,
+      596117
     ],
-    "lineup_source": "projected_rotowire_default_vs_rhp",
-    "lineup_confidence": 0.66,
+    "projected_lineup_ids": [],
+    "lineup_source": "confirmed_feed_live",
+    "lineup_confidence": 1.0,
     "probable_pitcher": {
       "id": 691725,
       "source": "feed_gameData_probablePitchers",
@@ -1041,35 +1041,6 @@
     ],
     "lineup": [
       {
-        "id": 656941,
-        "name": "Kyle Schwarber",
-        "pos": "DH",
-        "bat": "L",
-        "throw": "R",
-        "k_rate": 0.3427951388888889,
-        "bb_rate": 0.14522569444444444,
-        "hbp_rate": 0.013071895424836602,
-        "hr_rate": 0.07135416666666666,
-        "inplay_hit_rate": 0.28435483870967737,
-        "xb_hit_share": 0.15625,
-        "vs_pitch_type": {},
-        "vs_pitch_type_hr": {},
-        "platoon_mult_vs_lhp": {
-          "k": 0.9162524105421042,
-          "bb": 0.9031702607016415,
-          "hr": 0.9770447314242936,
-          "inplay": 1.0361221402911704
-        },
-        "platoon_mult_vs_rhp": {
-          "k": 1.0442432683379759,
-          "bb": 1.0311060826004042,
-          "hr": 1.1025315722396014,
-          "inplay": 0.8846523736990701
-        },
-        "statcast_quality_mult": {},
-        "vs_pitcher_history": {}
-      },
-      {
         "id": 607208,
         "name": "Trea Turner",
         "pos": "SS",
@@ -1094,6 +1065,35 @@
           "bb": 0.8075,
           "hr": 1.275,
           "inplay": 1.0325630451270382
+        },
+        "statcast_quality_mult": {},
+        "vs_pitcher_history": {}
+      },
+      {
+        "id": 656941,
+        "name": "Kyle Schwarber",
+        "pos": "DH",
+        "bat": "L",
+        "throw": "R",
+        "k_rate": 0.3427951388888889,
+        "bb_rate": 0.14522569444444444,
+        "hbp_rate": 0.013071895424836602,
+        "hr_rate": 0.07135416666666666,
+        "inplay_hit_rate": 0.28435483870967737,
+        "xb_hit_share": 0.15625,
+        "vs_pitch_type": {},
+        "vs_pitch_type_hr": {},
+        "platoon_mult_vs_lhp": {
+          "k": 0.9162524105421042,
+          "bb": 0.9031702607016415,
+          "hr": 0.9770447314242936,
+          "inplay": 1.0361221402911704
+        },
+        "platoon_mult_vs_rhp": {
+          "k": 1.0442432683379759,
+          "bb": 1.0311060826004042,
+          "hr": 1.1025315722396014,
+          "inplay": 0.8846523736990701
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -1215,35 +1215,6 @@
         "vs_pitcher_history": {}
       },
       {
-        "id": 592663,
-        "name": "J.T. Realmuto",
-        "pos": "C",
-        "bat": "R",
-        "throw": "R",
-        "k_rate": 0.20227683615819209,
-        "bb_rate": 0.0822316384180791,
-        "hbp_rate": 0.02824858757062147,
-        "hr_rate": 0.028209039548022598,
-        "inplay_hit_rate": 0.22222782258064513,
-        "xb_hit_share": 0.12121212121212122,
-        "vs_pitch_type": {},
-        "vs_pitch_type_hr": {},
-        "platoon_mult_vs_lhp": {
-          "k": 0.8075,
-          "bb": 1.0316020193269906,
-          "hr": 0.78,
-          "inplay": 0.9999861394622112
-        },
-        "platoon_mult_vs_rhp": {
-          "k": 1.0519261893913534,
-          "bb": 0.9605666581878162,
-          "hr": 1.0453372889984909,
-          "inplay": 1.040610115672488
-        },
-        "statcast_quality_mult": {},
-        "vs_pitcher_history": {}
-      },
-      {
         "id": 687282,
         "name": "Gabriel Rincones Jr.",
         "pos": "RF",
@@ -1292,6 +1263,35 @@
           "bb": 1.0080617603503141,
           "hr": 1.2127341439369044,
           "inplay": 1.019345567684438
+        },
+        "statcast_quality_mult": {},
+        "vs_pitcher_history": {}
+      },
+      {
+        "id": 596117,
+        "name": "Garrett Stubbs",
+        "pos": "C",
+        "bat": "L",
+        "throw": "R",
+        "k_rate": 0.16666666666666666,
+        "bb_rate": 0.041666666666666664,
+        "hbp_rate": 0.08333333333333333,
+        "hr_rate": 0.0,
+        "inplay_hit_rate": 0.23157894736842102,
+        "xb_hit_share": 0.05,
+        "vs_pitch_type": {},
+        "vs_pitch_type_hr": {},
+        "platoon_mult_vs_lhp": {
+          "k": 0.8075,
+          "bb": 0.8075,
+          "hr": 1.0,
+          "inplay": 0.8075
+        },
+        "platoon_mult_vs_rhp": {
+          "k": 1.0239130434782608,
+          "bb": 1.0239130434782608,
+          "hr": 1.0,
+          "inplay": 1.04375
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -1357,30 +1357,30 @@
         "vs_pitcher_history": {}
       },
       {
-        "id": 596117,
-        "name": "Garrett Stubbs",
+        "id": 592663,
+        "name": "J.T. Realmuto",
         "pos": "C",
-        "bat": "L",
+        "bat": "R",
         "throw": "R",
-        "k_rate": 0.16666666666666666,
-        "bb_rate": 0.041666666666666664,
-        "hbp_rate": 0.08333333333333333,
-        "hr_rate": 0.0,
-        "inplay_hit_rate": 0.23157894736842102,
-        "xb_hit_share": 0.05,
+        "k_rate": 0.20227683615819209,
+        "bb_rate": 0.0822316384180791,
+        "hbp_rate": 0.02824858757062147,
+        "hr_rate": 0.028209039548022598,
+        "inplay_hit_rate": 0.22222782258064513,
+        "xb_hit_share": 0.12121212121212122,
         "vs_pitch_type": {},
         "vs_pitch_type_hr": {},
         "platoon_mult_vs_lhp": {
           "k": 0.8075,
-          "bb": 0.8075,
-          "hr": 1.0,
-          "inplay": 0.8075
+          "bb": 1.0316020193269906,
+          "hr": 0.78,
+          "inplay": 0.9999861394622112
         },
         "platoon_mult_vs_rhp": {
-          "k": 1.0239130434782608,
-          "bb": 1.0239130434782608,
-          "hr": 1.0,
-          "inplay": 1.04375
+          "k": 1.0519261893913534,
+          "bb": 0.9605666581878162,
+          "hr": 1.0453372889984909,
+          "inplay": 1.040610115672488
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -1815,16 +1815,16 @@
   },
   "weather": {
     "source": "statsapi_live_feed",
-    "condition": "",
-    "temperature_f": null,
-    "wind_speed_mph": null,
-    "wind_direction": "unknown",
-    "wind_raw": "",
+    "condition": "Partly Cloudy",
+    "temperature_f": 81.0,
+    "wind_speed_mph": 8.0,
+    "wind_direction": "out",
+    "wind_raw": "8 mph, Out To LF",
     "is_dome": null,
     "multipliers": {
-      "hr_mult": 1.0,
-      "inplay_hit_mult": 1.0,
-      "xb_share_mult": 1.0
+      "hr_mult": 1.033,
+      "inplay_hit_mult": 1.0165,
+      "xb_share_mult": 1.0088
     }
   },
   "park": {
@@ -1844,8 +1844,8 @@
   },
   "umpire": {
     "source": "statsapi_live_feed",
-    "home_plate_umpire_id": null,
-    "home_plate_umpire_name": "",
+    "home_plate_umpire_id": 665298,
+    "home_plate_umpire_name": "Dexter Kelley",
     "called_strike_mult": 1.0,
     "multipliers": {
       "called_strike_mult": 1.0
