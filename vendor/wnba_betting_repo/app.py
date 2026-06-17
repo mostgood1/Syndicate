@@ -17489,6 +17489,7 @@ def _apply_pregame_card_portfolio(games: list[dict[str, Any]]) -> dict[str, Any]
 
     selected: list[dict[str, Any]] = []
     matchup_counts: dict[str, int] = {}
+    matchup_game_counts: dict[str, int] = {}
     team_counts: dict[str, int] = {}
     market_family_counts: dict[str, int] = {}
     prop_market_counts: dict[str, int] = {}
@@ -17512,6 +17513,8 @@ def _apply_pregame_card_portfolio(games: list[dict[str, Any]]) -> dict[str, Any]
         kind = str(candidate.get("kind") or "").strip().lower()
         if matchup_key and int(matchup_counts.get(matchup_key, 0)) >= int(policy.get("max_per_matchup") or 0):
             return False
+        if kind == "game" and matchup_key and int(matchup_game_counts.get(matchup_key, 0)) >= 1:
+            return False
         if team_key and int(team_counts.get(team_key, 0)) >= int(policy.get("max_per_team") or 0):
             return False
         if market_family and int(market_family_counts.get(market_family, 0)) >= int(policy.get("max_per_market_family") or 0):
@@ -17530,6 +17533,8 @@ def _apply_pregame_card_portfolio(games: list[dict[str, Any]]) -> dict[str, Any]
         seen_identity.add(identity)
         if matchup_key:
             matchup_counts[matchup_key] = int(matchup_counts.get(matchup_key, 0) + 1)
+        if kind == "game" and matchup_key:
+            matchup_game_counts[matchup_key] = int(matchup_game_counts.get(matchup_key, 0) + 1)
         if team_key:
             team_counts[team_key] = int(team_counts.get(team_key, 0) + 1)
         if market_family:
