@@ -98,6 +98,7 @@ class IntelligenceStateTests(unittest.TestCase):
             "candidate_pool": {"candidates": [{"name": "Play 1"}, {"name": "Play 2"}]},
             "top_opportunities": [],
             "by_sport": {},
+            "board_contract": {"schema": "intelligence_board_v1", "lane_counts": {"live": 1, "pregame": 0}, "active_lanes": ["live"], "cards": []},
             "analysis": {"recommendations": [], "picks": [], "top_live_opportunities": [], "portfolio": {}, "parlays": []},
         }
 
@@ -107,9 +108,11 @@ class IntelligenceStateTests(unittest.TestCase):
             json={"question": "top edges today", "force_refresh": True},
         ):
             with patch("builtins.print") as mocked_print:
-                with patch("syndicate.blueprints.intelligence.read_latest_intelligence_state_response", return_value=dict(cached_response)) as mocked_read:
-                    with patch("syndicate.blueprints.intelligence.queue_intelligence_state_refresh") as mocked_queue:
-                        response = intelligence_query_api()
+                with patch("syndicate.blueprints.intelligence.read_latest_intelligence_board_snapshot_response", return_value=dict(cached_response)) as mocked_board_snapshot:
+                    with patch("syndicate.blueprints.intelligence.read_latest_intelligence_state_response", return_value=None) as mocked_read:
+                        with patch("syndicate.blueprints.intelligence.queue_intelligence_state_refresh") as mocked_queue:
+                            with patch("syndicate.blueprints.intelligence.build_intelligence_board_contract") as mocked_board_contract:
+                                response = intelligence_query_api()
 
         payload = response.get_json()
         self.assertIsNotNone(payload)
@@ -118,13 +121,15 @@ class IntelligenceStateTests(unittest.TestCase):
         self.assertIn("response", payload)
         self.assertEqual(payload["state_last_updated"], "2026-06-11T16:00:00Z")
         self.assertEqual(payload["candidate_count"], 2)
-        self.assertEqual(payload["debug_source"], "worker")
+        self.assertEqual(payload["debug_source"], "board_snapshot")
         self.assertEqual(response.headers.get("Cache-Control"), "no-cache, no-store, must-revalidate")
         self.assertEqual(response.headers.get("Pragma"), "no-cache")
         self.assertEqual(response.headers.get("Expires"), "0")
-        mocked_read.assert_called_once()
+        mocked_board_snapshot.assert_called_once()
+        mocked_read.assert_not_called()
         mocked_queue.assert_called_once()
         mocked_print.assert_called_once()
+        mocked_board_contract.assert_not_called()
         self.assertEqual(mocked_print.call_args.args[0], "[API READ]")
         self.assertEqual(mocked_print.call_args.args[1]["candidate_count"], 0)
         self.assertEqual(payload["response"]["analysis"]["recommendations"], [])
@@ -266,6 +271,43 @@ class IntelligenceStateTests(unittest.TestCase):
         self.assertEqual(response["analysis"]["recommendations"][0]["name"], "Play 1")
         self.assertEqual(response["analysis"]["picks"][0]["name"], "Play 1")
         self.assertEqual(response["analysis"]["top_live_opportunities"][0]["name"], "Play 1")
+        self.assertEqual(response["board_contract"]["schema"], "intelligence_board_v1")
+
+    def test_state_compute_persists_board_snapshot_artifact(self) -> None:
+        service = IntelligenceStateService()
+
+        candidate_pool = {
+            "selected_date": "2026-06-15",
+            "source_fingerprint": "fingerprint-1",
+            "candidate_count": 1,
+            "candidate_pools": {},
+            "global_pool": [{"name": "Play 1", "sport_slug": "mlb", "market": "Hits"}],
+            "candidates": [{"name": "Play 1", "sport_slug": "mlb", "market": "Hits"}],
+        }
+        analysis_result = {
+            "ok": True,
+            "headline": "The Syndicate brief",
+            "recommendations": [],
+            "picks": [],
+            "top_live_opportunities": [],
+            "portfolio": {},
+            "parlays": [],
+        }
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            temp_root = Path(tmp_dir)
+            state_path = temp_root / "query_state_cache.json"
+            board_snapshot_path = temp_root / "board_snapshot.json"
+            with patch.object(intelligence_state_module, "STATE_PATH", state_path), patch.object(intelligence_state_module, "BOARD_SNAPSHOT_PATH", board_snapshot_path):
+                with patch.object(service, "_source_state_fingerprint", return_value="fingerprint-1"):
+                    with patch.object(service, "_build_candidate_pool", return_value=dict(candidate_pool)):
+                        with patch("pipeline.intelligence_state.rank_global_recommendations", return_value=[{"name": "Play 1", "sport_slug": "mlb", "market": "Hits"}]):
+                            with patch("pipeline.intelligence_state.run_routed_intelligence_pipeline", return_value=dict(analysis_result)):
+                                response = service._compute_response({"question": "top edges today", "date": "2026-06-15"}, force_refresh=True)
+                self.assertTrue(board_snapshot_path.exists())
+                board_snapshot = json.loads(board_snapshot_path.read_text(encoding="utf-8"))
+                self.assertEqual(board_snapshot["board_contract"]["schema"], "intelligence_board_v1")
+                self.assertEqual(board_snapshot["response"]["board_contract"]["schema"], "intelligence_board_v1")
 
     def test_intelligence_home_renders_initial_board_shell(self) -> None:
         app = create_app()

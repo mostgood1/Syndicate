@@ -350,6 +350,7 @@ Phase 7 progress snapshot:
 - completed: live-lens interval/projection consistency
 - completed: Ask parity with the shared board inputs
 - completed: outcome and ledger tracking
+- in progress: worker-backed betting board snapshot artifact
 - remaining: UI polish, accessibility refinement, deeper learning, and policy control
 
 Concrete file targets:

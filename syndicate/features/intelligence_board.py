@@ -110,9 +110,60 @@ def _recommendation_card(item: Mapping[str, Any]) -> dict[str, Any]:
     return card
 
 
+def _recommendation_sources(payload: Mapping[str, Any] | None) -> list[Mapping[str, Any]]:
+    current = _copy_mapping(payload)
+    sources: list[Mapping[str, Any]] = []
+
+    direct_recommendations = current.get("recommendations")
+    if isinstance(direct_recommendations, list):
+        sources.extend(item for item in direct_recommendations if isinstance(item, Mapping))
+        if sources:
+            return sources
+
+    response = current.get("response") if isinstance(current.get("response"), Mapping) else None
+    if isinstance(response, Mapping):
+        response_recommendations = response.get("recommendations")
+        if isinstance(response_recommendations, list):
+            sources.extend(item for item in response_recommendations if isinstance(item, Mapping))
+
+    analysis = current.get("analysis") if isinstance(current.get("analysis"), Mapping) else None
+    if isinstance(analysis, Mapping):
+        analysis_recommendations = analysis.get("recommendations")
+        if isinstance(analysis_recommendations, list):
+            sources.extend(item for item in analysis_recommendations if isinstance(item, Mapping))
+        top_live_opportunities = analysis.get("top_live_opportunities")
+        if isinstance(top_live_opportunities, list):
+            sources.extend(item for item in top_live_opportunities if isinstance(item, Mapping))
+
+    top_opportunities = current.get("top_opportunities")
+    if isinstance(top_opportunities, list):
+        sources.extend(item for item in top_opportunities if isinstance(item, Mapping))
+
+    deduped: list[Mapping[str, Any]] = []
+    seen_keys: set[str] = set()
+    for item in sources:
+        key = "|".join(
+            part
+            for part in (
+                _safe_text(item.get("recommendation_id"), default=""),
+                _safe_text(item.get("candidate_id"), default=""),
+                _safe_text(item.get("prediction_id"), default=""),
+                _safe_text(item.get("name"), item.get("player_name"), item.get("selection"), default=""),
+                _safe_text(item.get("market"), item.get("market_label"), default=""),
+            )
+            if part
+        )
+        if key and key in seen_keys:
+            continue
+        if key:
+            seen_keys.add(key)
+        deduped.append(item)
+    return deduped
+
+
 def build_intelligence_board_contract(response: Mapping[str, Any] | None) -> dict[str, Any]:
     payload = _copy_mapping(response)
-    recommendations = payload.get("recommendations") if isinstance(payload.get("recommendations"), list) else []
+    recommendations = _recommendation_sources(payload)
     cards = [_recommendation_card(item) for item in recommendations if isinstance(item, Mapping)]
     lane_counts = {
         "live": sum(1 for card in cards if card.get("lane") == "live"),

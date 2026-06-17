@@ -118,6 +118,7 @@ Current implementation note:
 - the ops page now shows elapsed, remaining, and total budget on recent refresh history cards so long-running-job visibility stays consistent across active and historical runs
 - the queued refresh contract now validates required manifest and run-summary paths before claiming work, keeping the worker-owned handoff strict and durable
 - the admin full-refresh route now forces manifest-only handoff so the web request path no longer starts a local subprocess for refresh execution
+- the worker-backed betting board snapshot slice now publishes a dedicated `board_snapshot.json` artifact and normalizes nested worker payloads from analysis.recommendations, response.recommendations, and top_opportunities so the board contract does not look empty when the cached worker response is nested
 
 
 

@@ -114,6 +114,45 @@ class IntelligenceBoardContractTests(unittest.TestCase):
         self.assertEqual(contract["lane_counts"]["archived"], 1)
         self.assertEqual(contract["cards"][0]["lane"], "archived")
 
+    def test_build_intelligence_board_contract_reads_nested_worker_payloads(self) -> None:
+        contract = build_intelligence_board_contract(
+            {
+                "headline": "The Syndicate board",
+                "analysis": {
+                    "recommendations": [
+                        {
+                            "sport": "wnba",
+                            "team": "Las Vegas Aces",
+                            "name": "A'ja Wilson",
+                            "market": "points",
+                            "line": 24.5,
+                            "movement": {"delta": 0.4, "trend": "up"},
+                            "expected_value": 0.052,
+                            "is_live": True,
+                        }
+                    ]
+                },
+                "top_opportunities": [
+                    {
+                        "sport": "nba",
+                        "team": "Boston Celtics",
+                        "name": "Jayson Tatum",
+                        "market": "points",
+                        "line": 28.5,
+                        "movement": {"delta": 0.0, "trend": "flat"},
+                        "edge": 0.071,
+                        "is_live": False,
+                    }
+                ],
+            }
+        )
+
+        self.assertEqual(contract["recommendation_count"], 2)
+        self.assertEqual(contract["lane_counts"]["live"], 1)
+        self.assertEqual(contract["lane_counts"]["pregame"], 1)
+        self.assertEqual(contract["cards"][0]["team"], "Las Vegas Aces")
+        self.assertEqual(contract["cards"][1]["team"], "Boston Celtics")
+
     def test_run_intelligence_query_emits_board_contract(self) -> None:
         with patch("syndicate.features.intelligence.build_intelligence_overview", return_value=_sample_overview()):
             with patch("syndicate.features.intelligence._tracked_repo_files", return_value=set()):

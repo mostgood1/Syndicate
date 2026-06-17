@@ -12,6 +12,7 @@ from flask import redirect
 
 from pipeline.intelligence_state import get_intelligence_state_response
 from pipeline.intelligence_state import compute_intelligence_state_response
+from pipeline.intelligence_state import read_latest_intelligence_board_snapshot_response
 from pipeline.intelligence_state import read_latest_intelligence_state_response
 from pipeline.intelligence_state import intelligence_state_status
 from pipeline.intelligence_state import queue_intelligence_state_refresh
@@ -261,6 +262,9 @@ def _response_has_content(payload: dict[str, object] | None) -> bool:
 
 
 def _cached_intelligence_response_with_source(payload: dict[str, object]) -> tuple[dict[str, object] | None, str]:
+    board_snapshot_response = read_latest_intelligence_board_snapshot_response(payload, force_refresh=False)
+    if _is_board_response(board_snapshot_response):
+        return dict(board_snapshot_response or {}), "board_snapshot"
     cached_response = read_latest_intelligence_state_response(payload, force_refresh=False)
     if _is_board_response(cached_response):
         return dict(cached_response or {}), "worker"
@@ -716,7 +720,11 @@ def intelligence_query_api():
         response = dict(response)
         if "response" not in response:
             response["response"] = dict(response)
-        response["board_contract"] = build_intelligence_board_contract(response)
+        existing_board_contract = response.get("board_contract") if isinstance(response.get("board_contract"), dict) else None
+        if isinstance(existing_board_contract, dict) and str(existing_board_contract.get("schema") or "").strip() == "intelligence_board_v1":
+            response["board_contract"] = dict(existing_board_contract)
+        else:
+            response["board_contract"] = build_intelligence_board_contract(response)
         _attach_intelligence_response_aliases(response)
         LAST_RESULT = dict(response.get("response") or response.get("analysis") or {})
         debug_source = cached_source if cached_response is not None else "fallback"

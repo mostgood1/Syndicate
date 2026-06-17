@@ -18,6 +18,7 @@ from pipeline.intelligence_entrypoint import run_routed_intelligence_pipeline
 from syndicate.features.intelligence import build_intelligence_status
 from syndicate.features.intelligence import collect_all_recommendations
 from syndicate.features.intelligence import rank_global_recommendations
+from syndicate.features.intelligence_board import build_intelligence_board_contract
 from syndicate.features.shared.market_id import attach_market_id
 from syndicate.features.shared.odds_control_plane import load_odds_history_payload_for_sport
 from syndicate.features.shared.odds_control_plane import odds_history_roots_for_sport
@@ -31,6 +32,7 @@ from syndicate.features.shared.timezone import central_today_iso
 
 REPO_ROOT = repo_root_from(__file__)
 STATE_PATH = reports_root() / "intelligence" / "query_state_cache.json"
+BOARD_SNAPSHOT_PATH = reports_root() / "intelligence" / "board_snapshot.json"
 STATUS_CACHE_PATH = reports_root() / "intelligence" / "status_response_cache.json"
 logger = logging.getLogger(__name__)
 _INTELLIGENCE_EXECUTION_GUARD = threading.RLock()
@@ -875,6 +877,7 @@ class IntelligenceStateService:
             }
             if analysis:
                 response["response"] = analysis
+            response["board_contract"] = build_intelligence_board_contract(response)
             _log_stage_timing("response_building", (time.perf_counter() - response_build_started_at) * 1000.0)
             with self._condition:
                 snapshot = IntelligenceSnapshot(
@@ -950,6 +953,7 @@ class IntelligenceStateService:
         self._latest_key = str(payload.get("latest_key") or "").strip() or (next(reversed(self._snapshots)) if self._snapshots else None)
 
     def _persist_locked(self) -> None:
+        latest_snapshot = self._snapshots.get(self._latest_key or "") if self._latest_key else None
         payload = {
             "latest_key": self._latest_key,
             "updated_at": _utc_now(),
@@ -965,6 +969,16 @@ class IntelligenceStateService:
             },
         }
         write_json_file(STATE_PATH, payload)
+        if latest_snapshot is not None:
+            write_json_file(
+                BOARD_SNAPSHOT_PATH,
+                {
+                    "latest_key": latest_snapshot.key,
+                    "updated_at": _utc_now(),
+                    "response": latest_snapshot.response,
+                    "board_contract": latest_snapshot.response.get("board_contract") if isinstance(latest_snapshot.response, dict) else None,
+                },
+            )
 
 
 _INTELLIGENCE_STATE_SERVICE = IntelligenceStateService()
@@ -992,6 +1006,19 @@ def compute_intelligence_state_response(payload: dict[str, Any]) -> dict[str, An
 
 def read_latest_intelligence_state_response(payload: dict[str, Any] | None = None, *, force_refresh: bool = True) -> dict[str, Any] | None:
     return _INTELLIGENCE_STATE_SERVICE.read_latest_response(payload, force_refresh=force_refresh)
+
+
+def read_latest_intelligence_board_snapshot_response(payload: dict[str, Any] | None = None, *, force_refresh: bool = True) -> dict[str, Any] | None:
+    _ = payload
+    if force_refresh:
+        snapshot = read_json_file(BOARD_SNAPSHOT_PATH)
+        if isinstance(snapshot, dict):
+            response = snapshot.get("response")
+            if isinstance(response, dict):
+                return dict(response)
+            if all(key in snapshot for key in ("ok", "analysis", "top_opportunities")):
+                return dict(snapshot)
+    return None
 
 
 def intelligence_state_status(*, force_refresh: bool = True) -> dict[str, Any]:
