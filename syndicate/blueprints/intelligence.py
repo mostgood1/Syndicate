@@ -156,6 +156,7 @@ def _versioned_query_response(response_payload: dict[str, object]) -> dict[str, 
     return {
         "version": version,
         "timestamp": _server_timestamp(),
+        "response_hash": payload_hash,
         "response": response_payload,
     }
 

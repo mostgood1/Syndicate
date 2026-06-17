@@ -470,6 +470,7 @@ let lastVersion = null;
 let warmKickoffInFlight = false;
 let loadIntelligenceScheduled = false;
 let lastResponseTimestamp = null;
+let lastResponseHash = null;
 let hasRenderedIntelligence = false;
 let currentIntelligenceRequest = null;
 const initialIntelligenceResponseScript = document.getElementById("initial-intelligence-response");
@@ -1061,6 +1062,8 @@ function renderBoardMetaRow(item) {
 
 function normalizeIntelligenceResponse(response) {
   const analysis = response && typeof response.analysis === "object" && response.analysis ? response.analysis : (response && typeof response.response === "object" && response.response ? response.response : {});
+  const hasOwnTopOpportunities = Object.prototype.hasOwnProperty.call(response || {}, "top_opportunities");
+  const hasOwnRecommendations = Object.prototype.hasOwnProperty.call(response || {}, "recommendations");
   const recommendationHistory = response.recommendation_history && typeof response.recommendation_history === "object"
     ? response.recommendation_history
     : (analysis.recommendation_history && typeof analysis.recommendation_history === "object" ? analysis.recommendation_history : {});
@@ -1076,15 +1079,15 @@ function normalizeIntelligenceResponse(response) {
   const boardContract = response.board_contract && typeof response.board_contract === "object"
     ? response.board_contract
     : (analysis.board_contract && typeof analysis.board_contract === "object" ? analysis.board_contract : {});
-  const recommendations = Array.isArray(response.recommendations) && response.recommendations.length
+  const recommendations = Array.isArray(response.recommendations)
     ? response.recommendations
-    : (Array.isArray(analysis.recommendations) ? analysis.recommendations : (Array.isArray(analysis.picks) ? analysis.picks : []));
-  const topOpportunities = Array.isArray(response.top_opportunities) && response.top_opportunities.length
+    : (hasOwnRecommendations ? [] : (Array.isArray(analysis.recommendations) ? analysis.recommendations : (Array.isArray(analysis.picks) ? analysis.picks : [])));
+  const topOpportunities = Array.isArray(response.top_opportunities)
     ? response.top_opportunities
-    : (Array.isArray(analysis.top_opportunities) ? analysis.top_opportunities : recommendations);
+    : (hasOwnTopOpportunities ? [] : (Array.isArray(analysis.top_opportunities) ? analysis.top_opportunities : recommendations));
   const topLiveOpportunities = Array.isArray(response.top_live_opportunities) && response.top_live_opportunities.length
     ? response.top_live_opportunities
-    : (Array.isArray(analysis.top_live_opportunities) ? analysis.top_live_opportunities : recommendations.filter((item) => String(item.tag || item.timing || item.phase || "").trim().toUpperCase() === "LIVE"));
+    : (hasOwnTopOpportunities ? [] : (Array.isArray(analysis.top_live_opportunities) ? analysis.top_live_opportunities : recommendations.filter((item) => String(item.tag || item.timing || item.phase || "").trim().toUpperCase() === "LIVE")));
   const portfolio = response.portfolio && typeof response.portfolio === "object"
     ? response.portfolio
     : (analysis.portfolio && typeof analysis.portfolio === "object" ? analysis.portfolio : {});
@@ -2013,8 +2016,15 @@ async function loadIntelligence(options = {}) {
 
     const json = await res.json();
     const version = json.version ?? null;
+    const responseHash = String(json.response_hash || "").trim() || null;
 
-    if (version !== null && version === lastVersion) {
+    const hasFreshPayload = responseHash !== null
+      ? responseHash !== lastResponseHash
+      : version !== null
+        ? version !== lastVersion
+        : true;
+
+    if (!hasFreshPayload && !Boolean(options.forceRefresh)) {
       if (background) {
         setRefreshStatus(lastResponseTimestamp ? `Updated ${formatTimestamp(lastResponseTimestamp)}` : "Up to date", "idle");
       }
@@ -2022,6 +2032,7 @@ async function loadIntelligence(options = {}) {
     }
 
     lastVersion = version;
+    lastResponseHash = responseHash ?? lastResponseHash;
     lastResponseTimestamp = json.timestamp ?? lastResponseTimestamp;
 
     const response = unwrapVersionedIntelligenceResponse(json.response || {});
@@ -2034,11 +2045,7 @@ async function loadIntelligence(options = {}) {
     );
 
     if (!response || Object.keys(response).length === 0 || !hasOpportunityData) {
-      if (!hasRenderedIntelligence) {
-        renderEmptyState();
-      } else {
-        setRefreshStatus("No new intelligence yet", "idle");
-      }
+      renderEmptyState();
       kickOffWarmQuery();
       return;
     }
@@ -2075,6 +2082,7 @@ function scheduleIntelligencePolling() {
   const hasInitialResponse = Boolean(initialIntelligenceResponse && Object.keys(initialIntelligenceResponse).length > 0);
   if (initialIntelligenceResponse && Object.keys(initialIntelligenceResponse).length > 0) {
     lastVersion = initialIntelligenceResponse.version ?? lastVersion;
+    lastResponseHash = String(initialIntelligenceResponse.response_hash || "").trim() || lastResponseHash;
     lastResponseTimestamp = initialIntelligenceResponse.timestamp ?? lastResponseTimestamp;
     renderIntelligence(unwrapVersionedIntelligenceResponse(initialIntelligenceResponse.response || initialIntelligenceResponse));
   } else {
