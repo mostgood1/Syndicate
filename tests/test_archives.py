@@ -574,6 +574,25 @@ class DateArchiveHelperTests(unittest.TestCase):
             with patch("syndicate.features.mlb.sources._source_roots", return_value=[local_root, external_root]):
                 self.assertIsNone(raw_feed_live_path("2026-05-17", 123))
 
+    def test_mlb_daily_actual_by_game_falls_back_to_live_feed_for_today(self) -> None:
+        from syndicate.features.mlb.cards import _daily_actual_by_game
+
+        live_payload = {
+            "gameData": {"status": {"abstractGameState": "Live", "detailedState": "In Progress"}},
+            "liveData": {"boxscore": {"teams": {"away": {"players": {}}, "home": {"players": {}}}}},
+        }
+        with patch("syndicate.features.mlb.cards.central_today_iso", return_value="2026-06-17"), patch(
+            "syndicate.features.mlb.cards.raw_feed_live_path",
+            return_value=None,
+        ), patch(
+            "syndicate.features.mlb.cards._fetch_current_feed_live",
+            return_value=live_payload,
+        ) as fetch_mock:
+            actual = _daily_actual_by_game("2026-06-17", [824912])
+
+        self.assertEqual(actual.get(824912), live_payload)
+        fetch_mock.assert_called_once_with(824912)
+
     def test_mlb_hr_targets_context_backfills_from_daily_summary_when_artifact_is_sparse(self) -> None:
         from syndicate.features.mlb.hr_targets import build_hr_targets_page_context
 

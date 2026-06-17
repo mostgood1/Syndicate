@@ -1732,9 +1732,12 @@ def _daily_sim_by_game(selected_date: str, game_pks: list[int]) -> dict[int, dic
 
 def _daily_actual_by_game(selected_date: str, game_pks: list[int]) -> dict[int, dict[str, Any]]:
     out: dict[int, dict[str, Any]] = {}
+    today_iso = central_today_iso()
     for game_pk in game_pks:
         feed_path = raw_feed_live_path(selected_date, int(game_pk))
         payload = load_json_or_gz_file(feed_path)
+        if not isinstance(payload, dict) and selected_date == today_iso:
+            payload = _fetch_current_feed_live(int(game_pk))
         if isinstance(payload, dict):
             out[int(game_pk)] = payload
     return out
