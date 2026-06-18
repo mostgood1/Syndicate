@@ -5,6 +5,7 @@ import os
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 
 def _load_module():
@@ -28,7 +29,7 @@ class BootstrapDataRootTests(unittest.TestCase):
             expected_path = src_root / "nba_source" / "data" / "processed" / "game_cards_2026-05-28.csv"
             expected_path.write_text("header\nvalue\n", encoding="utf-8")
 
-            module._sync_tree(src_root, dst_root)
+            module._sync_tree(src_root, dst_root, {}, "nba_source")
 
             copied_path = dst_root / "nba_source" / "data" / "processed" / "game_cards_2026-05-28.csv"
             self.assertTrue(copied_path.exists())
@@ -47,7 +48,7 @@ class BootstrapDataRootTests(unittest.TestCase):
             source_file.write_text('{"games": 12}\n', encoding="utf-8")
             dest_file.write_text('{"games": 0}\n', encoding="utf-8")
 
-            module._sync_tree(src_root, dst_root)
+            module._sync_tree(src_root, dst_root, {}, "mlb_source")
 
             self.assertEqual(dest_file.read_text(encoding="utf-8"), '{"games": 12}\n')
 
@@ -67,7 +68,7 @@ class BootstrapDataRootTests(unittest.TestCase):
             os.utime(source_file, (stamp, stamp))
             os.utime(dest_file, (stamp, stamp))
 
-            module._sync_tree(src_root, dst_root)
+            module._sync_tree(src_root, dst_root, {}, "nhl_source")
 
             self.assertEqual(dest_file.read_text(encoding="utf-8"), "aaaa\n")
 
@@ -78,7 +79,7 @@ class BootstrapDataRootTests(unittest.TestCase):
             data_root = Path(temp_dir) / "data-root"
 
             pairs = module._bootstrap_root_pairs(repo_root, data_root)
-            relative_sources = [source.relative_to(repo_root).as_posix() for source, _ in pairs]
+            relative_sources = [source.relative_to(repo_root).as_posix() for source, _, _ in pairs]
 
             self.assertEqual(
                 relative_sources,
@@ -89,13 +90,61 @@ class BootstrapDataRootTests(unittest.TestCase):
                     "data/nba_source/manifests",
                     "data/nhl_source/source_artifacts",
                     "data/nhl_source/manifests",
+                    "data/nfl_source/source_artifacts",
+                    "data/nfl_source/manifests",
+                    "data/ncaaf_source/source_artifacts",
+                    "data/ncaaf_source/manifests",
+                    "data/ncaab_source/source_artifacts",
+                    "data/ncaab_source/manifests",
                     "data/wnba_source/source_artifacts",
                     "data/wnba_source/manifests",
+                    "reports/odds_control_plane",
                     "reports/intelligence",
                     "reports/daily_update/latest",
                     "reports/refresh_status/latest",
                 ],
             )
+
+    def test_bootstrap_wnba_today_artifacts_runs_when_missing(self) -> None:
+        module = _load_module()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            data_root = Path(temp_dir) / "data-root"
+            with patch.dict(os.environ, {"SYNDICATE_BOOTSTRAP_ON_START": "1"}, clear=False):
+                with patch.object(module.subprocess, "run") as run_mock:
+                    did_run = module._bootstrap_wnba_today_artifacts(Path(__file__).resolve().parents[1], data_root)
+
+            self.assertTrue(did_run)
+            run_mock.assert_called_once()
+            called_command = run_mock.call_args.args[0]
+            self.assertIn("--sports", called_command)
+            self.assertIn("wnba", called_command)
+            self.assertIn("--execution-mode", called_command)
+            self.assertIn("source", called_command)
+
+    def test_bootstrap_wnba_today_artifacts_skips_when_present(self) -> None:
+        module = _load_module()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            data_root = Path(temp_dir) / "data-root"
+            sentinel = module._wnba_today_props_path(data_root, "2026-06-18")
+            sentinel.parent.mkdir(parents=True, exist_ok=True)
+            sentinel.write_text("{}\n", encoding="utf-8")
+
+            with patch.dict(os.environ, {"SYNDICATE_BOOTSTRAP_ON_START": "1"}, clear=False):
+                with patch.object(module.subprocess, "run") as run_mock:
+                    did_run = module._bootstrap_wnba_today_artifacts(Path(__file__).resolve().parents[1], data_root)
+
+            self.assertFalse(did_run)
+            run_mock.assert_not_called()
+
+    def test_main_triggers_wnba_artifact_bootstrap(self) -> None:
+        module = _load_module()
+        with patch.dict(os.environ, {"SYNDICATE_BOOTSTRAP_ON_START": "1"}, clear=False):
+            with patch.object(module, "_sync_bootstrap_roots", return_value={}):
+                with patch.object(module, "_bootstrap_wnba_today_artifacts", return_value=True) as bootstrap_mock:
+                    exit_code = module.main()
+
+        self.assertEqual(exit_code, 0)
+        bootstrap_mock.assert_called_once()
 
 
 if __name__ == "__main__":

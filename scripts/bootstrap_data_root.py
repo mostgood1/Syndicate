@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import datetime as dt
 import logging
 import os
+import subprocess
 import shutil
+import sys
 from pathlib import Path
 from typing import Dict
 
@@ -78,6 +81,51 @@ def _sync_bootstrap_roots(repo_root: Path, data_root: Path) -> Dict[str, int]:
     return counters
 
 
+def _env_bool(name: str) -> bool:
+    return str(os.environ.get(name) or "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _wnba_today_props_path(data_root: Path, date_str: str) -> Path:
+    return data_root / "wnba_source" / "source_artifacts" / "data" / "processed" / f"props_recommendations_top_by_game_{date_str}.json"
+
+
+def _bootstrap_wnba_today_artifacts(repo_root: Path, data_root: Path) -> bool:
+    if not _env_bool("SYNDICATE_BOOTSTRAP_ON_START"):
+        return False
+
+    today = dt.datetime.now().strftime("%Y-%m-%d")
+    target_path = _wnba_today_props_path(data_root, today)
+    if target_path.exists():
+        return False
+
+    refresh_script = repo_root / "scripts" / "refresh_odds_sources.py"
+    if not refresh_script.exists():
+        logger.warning("WNBA bootstrap refresh skipped because %s is missing", refresh_script)
+        return False
+
+    logger.info("WNBA props artifact missing at %s; refreshing today's WNBA bundle", target_path)
+    subprocess.run(
+        [
+            sys.executable,
+            str(refresh_script),
+            "--date",
+            today,
+            "--sports",
+            "wnba",
+            "--phase",
+            "all",
+            "--execution-mode",
+            "source",
+            "--skip-mirror",
+            "--mode",
+            "fast",
+        ],
+        cwd=str(repo_root),
+        check=False,
+    )
+    return True
+
+
 def main() -> int:
     data_root = Path(str(os.environ.get("SYNDICATE_DATA_ROOT") or "").strip() or "data").expanduser().resolve()
     repo_root = Path(__file__).resolve().parents[1]
@@ -85,6 +133,7 @@ def main() -> int:
     # Merge the Render-critical published artifact roots into the mounted data root on startup.
     logger.info("Bootstrapping data root: repo=%s data_root=%s", repo_root, data_root)
     counters = _sync_bootstrap_roots(repo_root, data_root)
+    _bootstrap_wnba_today_artifacts(repo_root, data_root)
 
     # Log summary counts
     if counters:
