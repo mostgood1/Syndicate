@@ -1122,6 +1122,20 @@ function unwrapVersionedIntelligenceResponse(response) {
   return current && typeof current === "object" ? current : {};
 }
 
+function mergeVersionedIntelligenceResponse(response) {
+  const versionedResponse = response && typeof response === "object" ? response : {};
+  const baseResponse = unwrapVersionedIntelligenceResponse(versionedResponse.response || versionedResponse);
+  return {
+    ...baseResponse,
+    version: versionedResponse.version ?? baseResponse.version ?? null,
+    timestamp: versionedResponse.timestamp ?? baseResponse.timestamp ?? null,
+    response_hash: versionedResponse.response_hash ?? baseResponse.response_hash ?? null,
+    debug_source: versionedResponse.debug_source ?? baseResponse.debug_source ?? null,
+    state_last_updated: versionedResponse.state_last_updated ?? baseResponse.state_last_updated ?? null,
+    candidate_count: versionedResponse.candidate_count ?? baseResponse.candidate_count ?? null,
+  };
+}
+
 function hasLiveSignal(item) {
   if (!item || typeof item !== "object") {
     return false;
@@ -2033,7 +2047,7 @@ async function loadIntelligence(options = {}) {
     lastResponseHash = responseHash ?? lastResponseHash;
     lastResponseTimestamp = json.timestamp ?? lastResponseTimestamp;
 
-    const response = unwrapVersionedIntelligenceResponse(json.response || {});
+    const response = mergeVersionedIntelligenceResponse(json);
     const data = normalizeIntelligenceResponse(response);
     const hasOpportunityData = Boolean(
       (Array.isArray(data.topOpportunities) && data.topOpportunities.length) ||
@@ -2082,7 +2096,7 @@ function scheduleIntelligencePolling() {
     lastVersion = initialIntelligenceResponse.version ?? lastVersion;
     lastResponseHash = String(initialIntelligenceResponse.response_hash || "").trim() || lastResponseHash;
     lastResponseTimestamp = initialIntelligenceResponse.timestamp ?? lastResponseTimestamp;
-    renderIntelligence(unwrapVersionedIntelligenceResponse(initialIntelligenceResponse.response || initialIntelligenceResponse));
+    renderIntelligence(mergeVersionedIntelligenceResponse(initialIntelligenceResponse));
   } else {
     renderEmptyState();
     void loadIntelligence();
