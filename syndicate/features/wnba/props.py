@@ -4,6 +4,7 @@ from typing import Any
 
 from syndicate.features.shared.top_props_board import build_top_props_page_context
 from syndicate.features.wnba.sources import build_module_links
+from syndicate.features.wnba.sources import available_dates
 from syndicate.features.wnba.sources import format_moneyline
 from syndicate.features.wnba.sources import format_num
 from syndicate.features.wnba.sources import format_pct
@@ -63,6 +64,7 @@ def build_props_page_context(selected_date: str) -> dict[str, Any]:
         load_summary=load_json,
         build_cards=_cards_from_summary,
         build_module_links=build_module_links,
+        available_dates=available_dates(),
         empty_state={
             "eyebrow": "WNBA props",
             "title": "No stored WNBA props were available for this date",

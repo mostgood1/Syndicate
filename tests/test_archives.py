@@ -4390,6 +4390,45 @@ class HomeBoardTests(unittest.TestCase):
         self.assertEqual(context.get("source_title"), "WNBA top props by game")
         self.assertEqual((context.get("empty_state") or {}).get("eyebrow"), "WNBA props")
 
+    def test_wnba_props_uses_latest_stored_top_by_game_artifact(self) -> None:
+        fallback_payload = {
+            "data": [
+                {
+                    "player": "Angel Reese",
+                    "team_tricode": "CHI",
+                    "team": "CHI",
+                    "opponent": "MIN",
+                    "tier": "High",
+                    "top_play": {
+                        "market": "reb",
+                        "side": "OVER",
+                        "line": 10.5,
+                        "price": -110,
+                        "edge": 0.14,
+                        "ev_pct": 0.08,
+                        "book": "fanduel",
+                        "basketball_summary": "Stored fallback summary",
+                    },
+                }
+            ]
+        }
+
+        def _load_json(path):
+            if str(path).endswith("props_recommendations_top_by_game_2026-06-17.json"):
+                return fallback_payload
+            return None
+
+        with patch("syndicate.features.wnba.props.available_dates", return_value=["2026-06-17"]), patch(
+            "syndicate.features.wnba.props.load_json", side_effect=_load_json
+        ):
+            from syndicate.features.wnba.props import build_props_page_context as build_wnba_props_page_context
+
+            context = build_wnba_props_page_context("2026-06-18")
+
+        self.assertEqual(context.get("source_path").endswith("props_recommendations_top_by_game_2026-06-17.json"), True)
+        self.assertEqual(len(context.get("rank_cards") or []), 1)
+        self.assertIsNone(context.get("empty_state"))
+
     def test_wnba_props_page_uses_standalone_ladder_shell(self) -> None:
         response = self.client.get('/wnba/props?date=2026-05-20')
         html = response.get_data(as_text=True)
@@ -4563,6 +4602,52 @@ class HomeBoardTests(unittest.TestCase):
         self.assertFalse(context.get("using_sample_data"))
         self.assertEqual(context.get("source_title"), "MLB top props unavailable")
         self.assertEqual((context.get("empty_state") or {}).get("eyebrow"), "MLB top props")
+
+    def test_mlb_top_props_uses_latest_stored_daily_artifact(self) -> None:
+        fallback_payload = {
+            "groups": {
+                "pitcher": {
+                    "sections": [
+                        {
+                            "label": "Pitchers",
+                            "rows": [
+                                {
+                                    "playerName": "Nolan McLean",
+                                    "team": "NYM",
+                                    "selectionLabel": "Over",
+                                    "targetLabel": "16.5 Outs",
+                                    "matchup": "NYM at CIN",
+                                    "simProb": 0.83,
+                                    "rawEdge": 0.31,
+                                    "odds": -136,
+                                    "mean": 21.2,
+                                    "statLabel": "outs",
+                                    "line": 16.5,
+                                    "marketProb": 0.72,
+                                    "rank": 1,
+                                }
+                            ],
+                        }
+                    ]
+                }
+            }
+        }
+
+        def _load_json_file(path):
+            if str(path).endswith("daily_top_props_2026_06_17.json"):
+                return fallback_payload
+            return None
+
+        with patch("syndicate.features.mlb.top_props.available_daily_summary_dates", return_value=["2026-06-17"]), patch(
+            "syndicate.features.mlb.top_props.load_json_file", side_effect=_load_json_file
+        ):
+            from syndicate.features.mlb.top_props import build_top_props_page_context as build_mlb_top_props_page_context
+
+            context = build_mlb_top_props_page_context("2026-06-18", group="pitcher")
+
+        self.assertTrue((context.get("source_path") or "").endswith("daily_top_props_2026_06_17.json"))
+        self.assertEqual(len(context.get("rank_cards") or []), 1)
+        self.assertIsNone(context.get("empty_state"))
 
     def test_mlb_hub_context_exposes_top_props_lane_availability(self) -> None:
         summary = {

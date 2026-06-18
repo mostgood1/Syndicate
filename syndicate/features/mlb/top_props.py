@@ -5,8 +5,10 @@ from datetime import datetime, timedelta
 from typing import Any
 
 from syndicate.features.mlb.ladders_common import build_module_links
+from syndicate.features.mlb.sources import available_daily_summary_dates
 from syndicate.features.mlb.sources import daily_top_props_path
 from syndicate.features.mlb.sources import load_json_file
+from syndicate.features.shared.top_props_board import _resolve_top_props_source_path
 
 
 def _parse_iso_date(value: str) -> date:
@@ -88,7 +90,11 @@ def build_top_props_page_context(selected_date: str, *, group: str = "pitcher") 
 
     module_links = build_module_links(selected_date, "Top props")
 
-    summary_path = daily_top_props_path(selected_date)
+    summary_path = _resolve_top_props_source_path(
+        source_path=str(daily_top_props_path(selected_date)),
+        selected_date=selected_date,
+        available_dates=available_daily_summary_dates(),
+    )
     summary = load_json_file(summary_path)
     group_key = "hitter" if str(group or "pitcher").strip().lower() == "hitter" else "pitcher"
     group_label = "Hitter" if group_key == "hitter" else "Pitcher"
@@ -113,6 +119,7 @@ def build_top_props_page_context(selected_date: str, *, group: str = "pitcher") 
         "intro_title": f"MLB {group_label} Top Props",
         "intro_body": f"This module reuses the shared ranked-board layout for prebuilt {group_label.lower()} prop recommendations from the daily top props artifact.",
         "aria_label": f"{group_label} top props board",
+        "available_dates": available_daily_summary_dates(),
         "empty_state": {
             "eyebrow": "MLB top props",
             "title": f"No stored MLB {group_label.lower()} top props were available for this date",

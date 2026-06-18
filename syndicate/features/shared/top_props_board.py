@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from datetime import date
+from pathlib import Path
+import re
 from typing import Any
 
 from syndicate.features.shared.rank_board import build_rank_page_context
@@ -9,6 +12,62 @@ from syndicate.features.shared.rank_board import build_rank_page_context
 CardBuilder = Callable[[dict[str, Any], int], list[dict[str, Any]]]
 SummaryLoader = Callable[[str], dict[str, Any] | None]
 ModuleLinksBuilder = Callable[[str, str], list[dict[str, Any]]]
+
+
+_DATE_PATTERN = re.compile(r"(\d{4}[-_]\d{2}[-_]\d{2})")
+
+
+def _parse_iso_date(value: str) -> date | None:
+    try:
+        return date.fromisoformat(str(value).strip().replace("_", "-"))
+    except Exception:
+        return None
+
+
+def _resolve_top_props_source_path(*, source_path: str, selected_date: str, available_dates: list[str] | None) -> Path:
+    candidate_path = Path(source_path)
+    if not available_dates:
+        return candidate_path
+
+    dates = sorted({str(value).strip() for value in available_dates if str(value).strip()})
+    if not dates:
+        return candidate_path
+
+    requested_date = str(selected_date or "").strip()
+    if not requested_date:
+        return candidate_path
+
+    match = _DATE_PATTERN.search(candidate_path.name)
+    if not match:
+        return candidate_path
+
+    parsed_requested = _parse_iso_date(requested_date)
+    if parsed_requested is None:
+        return candidate_path
+
+    parsed_dates = [(parsed_date, value) for value in dates if (parsed_date := _parse_iso_date(value)) is not None]
+    if not parsed_dates:
+        return candidate_path
+    parsed_dates.sort(key=lambda item: item[0])
+
+    earliest_date = parsed_dates[0][0]
+    latest_date = parsed_dates[-1][0]
+    if parsed_requested < earliest_date:
+        return candidate_path
+
+    resolved_date = parsed_dates[-1][1] if parsed_requested >= latest_date else None
+    if resolved_date is None:
+        prior_dates = [value for parsed_value, value in parsed_dates if parsed_value <= parsed_requested]
+        if prior_dates:
+            resolved_date = prior_dates[-1]
+
+    if resolved_date is None:
+        return candidate_path
+
+    token = candidate_path.name[match.start():match.end()]
+    replacement_date = resolved_date.replace("-", "_") if "_" in token and "-" not in token else resolved_date
+    resolved_path = candidate_path.with_name(f"{candidate_path.name[:match.start()]}{replacement_date}{candidate_path.name[match.end():]}")
+    return resolved_path
 
 
 def build_top_props_page_context(
@@ -30,7 +89,12 @@ def build_top_props_page_context(
     empty_state: dict[str, Any] | None = None,
     limit: int = 12,
 ) -> dict[str, Any]:
-    summary = load_summary(source_path) or {}
+    resolved_source_path = _resolve_top_props_source_path(
+        source_path=source_path,
+        selected_date=selected_date,
+        available_dates=available_dates,
+    )
+    summary = load_summary(str(resolved_source_path)) or {}
     cards = build_cards(summary, limit)
 
     rows = summary.get("data") if isinstance(summary.get("data"), list) else []
@@ -46,7 +110,7 @@ def build_top_props_page_context(
         intro_title=intro_title,
         intro_body=intro_body,
         aria_label=aria_label,
-        source_path=source_path,
+        source_path=str(resolved_source_path),
         source_title=source_title,
         rank_cards=cards,
         using_sample_data=False,
