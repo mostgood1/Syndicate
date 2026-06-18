@@ -513,6 +513,8 @@ function intelligenceQueryPayload(options = {}) {
   );
   const payload = {
     question: hasCustomFilters ? "What are the best edges for this board?" : defaultIntelligenceQuestion,
+    mode: "recommendation",
+    timing: gameState === "all" ? "all" : gameState,
     background: Boolean(options.background),
     force_refresh: Boolean(options.forceRefresh),
   };

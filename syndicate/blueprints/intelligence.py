@@ -793,10 +793,10 @@ def _intelligence_page_payload(selected_date: str) -> dict[str, object]:
     return {
         "question": DEFAULT_QUESTION,
         "date": selected_date,
-        "mode": "live",
+        "mode": "recommendation",
         "sport": "all",
         "game_state": "all",
-        "timing": "",
+        "timing": "all",
         "limit": 5,
         "include_props": True,
         "include_games": True,
@@ -808,6 +808,8 @@ def _normalize_default_query_payload(payload: dict[str, object]) -> dict[str, ob
     normalized = dict(payload or {})
     if str(normalized.get("question") or "").strip() == DEFAULT_QUESTION:
         normalized["date"] = str(normalized.get("date") or normalized.get("selected_date") or _latest_available_intelligence_date()).strip() or _latest_available_intelligence_date()
+        normalized.setdefault("mode", "recommendation")
+        normalized.setdefault("timing", "all")
     return normalized
 
 
