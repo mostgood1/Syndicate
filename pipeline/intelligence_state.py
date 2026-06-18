@@ -86,6 +86,22 @@ def _utc_from_epoch(epoch_seconds: float) -> str | None:
     return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(epoch_seconds))
 
 
+def _selected_date_from_payload(payload: dict[str, Any] | None) -> str | None:
+    current = dict(payload or {})
+    return str(current.get("date") or current.get("selected_date") or "").strip() or None
+
+
+def _selected_date_from_response(response: dict[str, Any] | None) -> str | None:
+    current = dict(response or {})
+    nested = current.get("response") if isinstance(current.get("response"), dict) else {}
+    nested = dict(nested or {})
+    for key in ("selected_date", "date"):
+        value = str(nested.get(key) or current.get(key) or "").strip()
+        if value:
+            return value
+    return None
+
+
 def _intelligence_guard_is_busy() -> bool:
     return bool(getattr(_INTELLIGENCE_GUARD_OWNER, "depth", 0)) or _INTELLIGENCE_EXECUTION_GUARD._is_owned()  # type: ignore[attr-defined]
 
@@ -708,8 +724,6 @@ class IntelligenceStateService:
             snapshot = self._snapshots.get(key)
             if snapshot is not None and not self._is_stale(snapshot):
                 return dict(snapshot.response)
-            if self._latest_key and self._latest_key in self._snapshots:
-                return dict(self._snapshots[self._latest_key].response)
             return None
 
     def queue_refresh(self, payload: dict[str, Any]) -> str:
@@ -1060,14 +1074,18 @@ def read_latest_intelligence_state_response(payload: dict[str, Any] | None = Non
 
 
 def read_latest_intelligence_board_snapshot_response(payload: dict[str, Any] | None = None, *, force_refresh: bool = True) -> dict[str, Any] | None:
-    _ = payload
+    requested_date = _selected_date_from_payload(payload)
     _ = force_refresh
     snapshot = read_json_file(BOARD_SNAPSHOT_PATH)
     if isinstance(snapshot, dict):
         response = snapshot.get("response")
         if isinstance(response, dict):
+            if requested_date and _selected_date_from_response(response) not in {None, requested_date}:
+                return None
             return dict(response)
         if all(key in snapshot for key in ("ok", "analysis", "top_opportunities")):
+            if requested_date and _selected_date_from_response(snapshot) not in {None, requested_date}:
+                return None
             return dict(snapshot)
     return None
 

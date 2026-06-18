@@ -41,6 +41,52 @@ class IntelligenceStateTests(unittest.TestCase):
         self.assertEqual(response, {"ok": True, "response": {"recommendations": []}})
         mocked_enqueue.assert_not_called()
 
+    def test_read_latest_response_does_not_fall_back_to_other_dates(self) -> None:
+        service = IntelligenceStateService()
+        snapshot = IntelligenceSnapshot(
+            key=_payload_key({"question": "top edges today", "date": "2026-06-15"}),
+            payload={"question": "top edges today", "date": "2026-06-15"},
+            response={"ok": True, "response": {"selected_date": "2026-06-15", "recommendations": []}},
+            computed_at="2026-06-10T17:31:00Z",
+            source_fingerprint="fingerprint-1",
+        )
+        service._snapshots[snapshot.key] = snapshot
+        service._latest_key = snapshot.key
+
+        response = service.read_latest_response({"question": "top edges today", "date": "2026-06-17"})
+
+        self.assertIsNone(response)
+
+    def test_board_snapshot_reader_skips_mismatched_dates(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir, patch.dict(
+            os.environ,
+            {
+                "SYNDICATE_REPORTS_ROOT": str(Path(tmp_dir) / "reports"),
+            },
+            clear=False,
+        ):
+            fake_snapshot_path = Path(tmp_dir) / "reports" / "intelligence" / "board_snapshot.json"
+            with patch.object(intelligence_state_module, "BOARD_SNAPSHOT_PATH", fake_snapshot_path):
+                refresh_state_store.write_json_file(
+                    fake_snapshot_path,
+                    {
+                        "latest_key": "abc",
+                        "updated_at": "2026-06-10T17:31:00Z",
+                        "response": {
+                            "ok": True,
+                            "selected_date": "2026-06-15",
+                            "top_opportunities": [{"name": "Play 1"}],
+                            "analysis": {"recommendations": []},
+                        },
+                    },
+                )
+
+                response = intelligence_state_module.read_latest_intelligence_board_snapshot_response(
+                    {"question": "top edges today", "date": "2026-06-17"}
+                )
+
+        self.assertIsNone(response)
+
     def test_read_latest_response_syncs_shared_backend_state(self) -> None:
         service = IntelligenceStateService()
         cached_response = {"ok": True, "response": {"recommendations": [{"name": "Play 1"}]}}
