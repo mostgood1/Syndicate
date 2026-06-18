@@ -2097,11 +2097,21 @@ function scheduleIntelligencePolling() {
   loadIntelligenceScheduled = true;
   window.loadIntelligence = loadIntelligence;
   const hasInitialResponse = Boolean(initialIntelligenceResponse && Object.keys(initialIntelligenceResponse).length > 0);
+  const hasVersionedInitialResponse = Boolean(
+    initialIntelligenceResponse &&
+    typeof initialIntelligenceResponse === "object" &&
+    (initialIntelligenceResponse.version !== undefined ||
+      initialIntelligenceResponse.timestamp !== undefined ||
+      initialIntelligenceResponse.response_hash !== undefined)
+  );
   if (initialIntelligenceResponse && Object.keys(initialIntelligenceResponse).length > 0) {
     lastVersion = initialIntelligenceResponse.version ?? lastVersion;
     lastResponseHash = String(initialIntelligenceResponse.response_hash || "").trim() || lastResponseHash;
     lastResponseTimestamp = initialIntelligenceResponse.timestamp ?? lastResponseTimestamp;
     renderIntelligence(mergeVersionedIntelligenceResponse(initialIntelligenceResponse));
+    if (!hasVersionedInitialResponse) {
+      void loadIntelligence({ forceRefresh: true });
+    }
   } else {
     renderEmptyState();
     void loadIntelligence();
