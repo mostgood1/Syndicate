@@ -85,6 +85,17 @@ def _env_bool(name: str) -> bool:
     return str(os.environ.get(name) or "").strip().lower() in {"1", "true", "yes", "on"}
 
 
+def _prepend_pythonpath(repo_root: Path) -> dict[str, str]:
+    env = os.environ.copy()
+    repo_root_text = str(repo_root)
+    existing_pythonpath = str(env.get("PYTHONPATH") or "").strip()
+    if existing_pythonpath:
+        env["PYTHONPATH"] = repo_root_text + os.pathsep + existing_pythonpath
+    else:
+        env["PYTHONPATH"] = repo_root_text
+    return env
+
+
 def _wnba_today_props_path(data_root: Path, date_str: str) -> Path:
     return data_root / "wnba_source" / "source_artifacts" / "data" / "processed" / f"props_recommendations_top_by_game_{date_str}.json"
 
@@ -121,6 +132,7 @@ def _bootstrap_wnba_today_artifacts(repo_root: Path, data_root: Path) -> bool:
             "fast",
         ],
         cwd=str(repo_root),
+        env=_prepend_pythonpath(repo_root),
         check=False,
     )
     return True
