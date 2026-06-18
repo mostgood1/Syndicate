@@ -17,9 +17,10 @@ from flask import current_app
 from pipeline.intelligence_entrypoint import run_routed_intelligence_pipeline
 from syndicate.features.intelligence import build_intelligence_status
 from syndicate.features.intelligence import build_intelligence_overview
+from syndicate.features.intelligence import _build_board_dictionary
 from syndicate.features.intelligence import collect_candidates
 from syndicate.features.intelligence import collect_all_recommendations
-from syndicate.features.intelligence import _candidate_is_source_backed
+from syndicate.features.intelligence import _apply_candidate_tier_penalty
 from syndicate.features.intelligence import _query_preferences
 from syndicate.features.intelligence import rank_global_recommendations
 from syndicate.features.intelligence_board import build_intelligence_board_contract
@@ -245,7 +246,7 @@ class IntelligenceStateService:
         merged: list[dict[str, Any]] = []
         for sport_candidates in candidate_pools.values():
             merged.extend(dict(candidate) for candidate in sport_candidates if isinstance(candidate, dict))
-        return merged
+        return sorted(merged, key=lambda candidate: float(candidate.get("score") or 0.0), reverse=True)
 
     def _odds_history_roots_for_sport(self, sport_slug: str) -> list[Path]:
         return odds_history_roots_for_sport(sport_slug)
@@ -543,13 +544,14 @@ class IntelligenceStateService:
                 odds_history_by_sport,
             )
 
-        raw_candidates = [candidate for candidate in raw_candidates if isinstance(candidate, dict) and _candidate_is_source_backed(candidate)]
+        raw_candidates = [candidate for candidate in raw_candidates if isinstance(candidate, dict)]
         candidate_build_started_at = time.perf_counter()
         candidate_entries: list[dict[str, Any]] = []
         for candidate in raw_candidates:
             if not isinstance(candidate, dict):
                 continue
             candidate_entry = dict(candidate)
+            _apply_candidate_tier_penalty(candidate_entry)
             candidate_entry["candidate_id"] = self._candidate_id(candidate_entry)
             candidate_entry["raw_inputs"] = self._candidate_raw_inputs(candidate_entry)
             candidate_entry["precomputed_features"] = self._candidate_precomputed_features(candidate_entry)
@@ -877,7 +879,8 @@ class IntelligenceStateService:
             candidate_pool = self._build_candidate_pool(selected_date, source_fingerprint)
             candidates = [dict(candidate) for candidate in candidate_pool.get("candidates") if isinstance(candidate, dict)]
 
-            top_opportunities = _profile_stage("candidate_scoring", rank_global_recommendations, candidates, limit=limit_value)
+            ranked_candidates = _profile_stage("candidate_scoring", rank_global_recommendations, candidates, limit=None)
+            top_opportunities = ranked_candidates[: max(int(limit_value), 0)]
             by_sport: dict[str, list[dict[str, object]]] = {}
             for recommendation in top_opportunities:
                 sport_key = str(recommendation.get("sport") or recommendation.get("sport_slug") or "unknown").strip().lower() or "unknown"
@@ -914,7 +917,7 @@ class IntelligenceStateService:
                 "candidate_pool": candidate_pool,
             }
             response_last_updated = _utc_now()
-            response_candidate_count = len(top_opportunities) if isinstance(top_opportunities, list) and top_opportunities else len(candidates)
+            response_candidate_count = len(ranked_candidates) if isinstance(ranked_candidates, list) and ranked_candidates else len(candidates)
             response["state_last_updated"] = response_last_updated
             response["last_updated"] = response_last_updated
             response["candidate_count"] = response_candidate_count
@@ -923,7 +926,9 @@ class IntelligenceStateService:
                 analysis["last_updated"] = response_last_updated
                 analysis["candidate_count"] = response_candidate_count
                 response["response"] = analysis
-            response["board_contract"] = build_intelligence_board_contract(response)
+            board_payload = dict(response)
+            board_payload["board"] = _build_board_dictionary(ranked_candidates)
+            response["board_contract"] = build_intelligence_board_contract(board_payload)
             _log_stage_timing("response_building", (time.perf_counter() - response_build_started_at) * 1000.0)
             with self._condition:
                 snapshot = IntelligenceSnapshot(

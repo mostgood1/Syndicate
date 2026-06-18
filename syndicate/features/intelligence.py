@@ -1,3 +1,13 @@
+"""
+CENTRAL DECISION ENGINE RULES
+
+- All sports use the same candidate lifecycle
+- No candidate is dropped solely for missing source
+- Candidates must be normalized before scoring
+- Tier classification replaces hard filtering
+- Scoring must be centralized and sport-agnostic
+"""
+
 from __future__ import annotations
 
 from difflib import SequenceMatcher
@@ -4069,18 +4079,135 @@ def _candidate_matches_requested_markets(candidate: dict[str, Any], preferences:
     return bool(_candidate_market_focuses(candidate) & set(requested_markets))
 
 
-def _candidate_is_source_backed(candidate: dict[str, Any]) -> bool:
-    source_text = " ".join(
-        _safe_text(candidate.get(field), "")
-        for field in ("writeup", "detail", "summary", "state_note", "surface_title", "surface_key")
-    ).strip().lower()
-    if not source_text:
-        return False
-    if "fallback" in source_text:
+def _candidate_has_required_fields(candidate: dict[str, Any]) -> bool:
+    sport_slug = _safe_text(candidate.get("sport_slug"), _safe_text(candidate.get("sport"), "")).lower()
+    market = _safe_text(candidate.get("market"), _safe_text(candidate.get("market_key"), ""))
+    matchup = _safe_text(candidate.get("matchup"), _safe_text(candidate.get("event_id"), _safe_text(candidate.get("game_id"), "")))
+    subject = _safe_text(
+        candidate.get("name"),
+        _safe_text(
+            candidate.get("pick"),
+            _safe_text(candidate.get("selection"), _safe_text(candidate.get("player_name"), _safe_text(candidate.get("team"), ""))),
+        ),
+    )
+    if not sport_slug or not market or not matchup:
         return False
     if _safe_text(candidate.get("candidate_type"), "candidate") == "game":
-        return bool(source_text or candidate.get("game_pk") or candidate.get("event_id") or candidate.get("matchup"))
-    return True
+        return True
+    return bool(subject)
+
+
+def _candidate_has_usable_projection(candidate: dict[str, Any]) -> bool:
+    projection_fields = (
+        "projected",
+        "live_projection",
+        "expected_value",
+        "adjusted_edge",
+        "edge",
+        "model_probability",
+        "fair_probability",
+        "live_total",
+    )
+    for field in projection_fields:
+        value = candidate.get(field)
+        if isinstance(value, (int, float)) and not isinstance(value, bool):
+            return True
+        if field in {"projected", "live_projection", "live_total"} and _safe_text(value, "") not in {"", "-"}:
+            return True
+    return False
+
+
+def classify_candidate(candidate: dict[str, Any]) -> dict[str, Any] | None:
+    normalized = normalize_candidate(candidate)
+    if not _safe_text(normalized.get("selection"), ""):
+        return None
+    if not _safe_text(normalized.get("type"), ""):
+        return None
+    has_projection = normalized.get("projection") is not None and _safe_text(normalized.get("projection"), "") not in {"", "-"}
+    has_odds = normalized.get("odds") is not None and _safe_text(normalized.get("odds"), "") not in {"", "-"}
+    if not (has_projection or has_odds):
+        return None
+    source_strength = _numeric_hint(normalized.get("source_strength"))
+    tier = "tier_1" if has_projection and has_odds and source_strength is not None and float(source_strength) > 0.7 else "tier_2"
+    normalized["tier"] = tier
+    return normalized
+
+
+def _candidate_is_source_backed(candidate: dict[str, Any]) -> bool:
+    classified = classify_candidate(candidate)
+    return bool(classified and classified.get("tier") == "tier_1")
+
+
+def normalize_candidate(candidate: dict[str, Any]) -> dict[str, Any]:
+    normalized = dict(candidate) if isinstance(candidate, dict) else {}
+    sport = _safe_text(normalized.get("sport"), _safe_text(normalized.get("sport_slug"), "sport"))
+    sport_slug = _safe_text(normalized.get("sport_slug"), sport).lower()
+    candidate_type = _safe_text(normalized.get("type"), _safe_text(normalized.get("candidate_type"), ""))
+    if candidate_type not in {"game", "prop", "parlay"}:
+        candidate_type = _safe_text(normalized.get("candidate_type"), "prop").lower()
+    if candidate_type not in {"game", "prop", "parlay"}:
+        candidate_type = "prop"
+    selection = _safe_text(
+        normalized.get("selection"),
+        _safe_text(normalized.get("pick"), _safe_text(normalized.get("name"), "")),
+    ) or None
+    market = _safe_text(normalized.get("market"), _safe_text(normalized.get("market_key"), "")) or None
+    odds = normalized.get("odds")
+    if _safe_text(odds, "") in {"", "-"}:
+        odds = None
+    projection = normalized.get("projection")
+    if projection is None:
+        for field in ("projected", "live_projection", "live_total", "expected_value", "adjusted_edge", "edge", "model_probability", "fair_probability"):
+            value = normalized.get(field)
+            if isinstance(value, (int, float)) and not isinstance(value, bool):
+                projection = float(value)
+                break
+            if field in {"projected", "live_projection", "live_total"} and _safe_text(value, "") not in {"", "-"}:
+                try:
+                    projection = float(str(value).strip())
+                except Exception:
+                    projection = value
+                break
+    source = _safe_text(normalized.get("source"), "") or None
+    source_strength = _numeric_hint(normalized.get("source_strength"))
+    if source_strength is None:
+        source_strength = 0.5
+    normalized.update(
+        {
+            "sport": sport or sport_slug.upper(),
+            "sport_slug": sport_slug,
+            "type": candidate_type,
+            "candidate_type": normalized.get("candidate_type") or candidate_type,
+            "selection": selection,
+            "market": market,
+            "odds": odds,
+            "projection": projection if projection is not None else None,
+            "source": source,
+            "source_strength": max(0.0, min(1.0, float(source_strength))),
+            "is_live": bool(normalized.get("is_live")),
+        }
+    )
+    return normalized
+
+
+def is_valid_candidate(candidate: dict[str, Any]) -> bool:
+    return classify_candidate(candidate) is not None
+
+
+def _apply_candidate_tier_penalty(candidate: dict[str, Any]) -> dict[str, Any]:
+    classified = classify_candidate(candidate)
+    if classified is None:
+        return candidate
+    candidate.update(classified)
+    if candidate.get("tier") != "tier_2":
+        return candidate
+    score_value = _numeric_hint(candidate.get("score"))
+    if score_value is not None:
+        candidate["score"] = round(max(0.0, float(score_value) - 3.0), 4)
+    adjusted_score_value = _numeric_hint(candidate.get("adjusted_score"))
+    if adjusted_score_value is not None:
+        candidate["adjusted_score"] = round(max(0.0, float(adjusted_score_value) - 3.0), 4)
+    return candidate
 
 
 def _primary_query_candidates(
@@ -4088,8 +4215,7 @@ def _primary_query_candidates(
     preferences: dict[str, Any],
     odds_history_by_sport: dict[str, dict[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
-    candidates = collect_candidates(overview, preferences, odds_history_by_sport)
-    return [candidate for candidate in candidates if _candidate_is_source_backed(candidate)]
+    return collect_candidates(overview, preferences, odds_history_by_sport)
 
 
 def _collect_candidates(overview: list[dict[str, Any]], preferences: dict[str, Any]) -> list[dict[str, Any]]:
@@ -4103,6 +4229,11 @@ def _collect_candidates(overview: list[dict[str, Any]], preferences: dict[str, A
     )
     for sport in overview:
         if not isinstance(sport, dict) or not _sport_matches_preferences(sport, preferences):
+            continue
+        sport_slug = _safe_text(sport.get("slug"), "").lower()
+        sport_health = _safe_text(sport.get("data_health"), "").lower()
+        dashboard_games = sport.get("dashboard_games") if isinstance(sport.get("dashboard_games"), list) else []
+        if sport_slug == "nhl" and sport_health == "stale" and not dashboard_games:
             continue
         home_rails = sport.get("home_rails") if isinstance(sport.get("home_rails"), dict) else {}
         if preferences.get("include_props"):
@@ -4157,10 +4288,6 @@ def _collect_candidates(overview: list[dict[str, Any]], preferences: dict[str, A
     candidates = _enrich_candidates_with_odds_history(candidates, odds_history_by_sport)
 
     candidates = _filter_candidates_to_requested_markets(candidates, preferences.get("requested_markets") or [])
-    candidates = [
-        row for row in candidates if _american_odds_match(_american_odds_value(row.get("odds")), preferences)
-    ]
-    candidates = [row for row in candidates if _candidate_is_source_backed(row)]
 
     deduped: list[dict[str, Any]] = []
     seen: set[tuple[str, str, str, str, str]] = set()
@@ -4175,7 +4302,10 @@ def _collect_candidates(overview: list[dict[str, Any]], preferences: dict[str, A
         if identity in seen:
             continue
         seen.add(identity)
-        deduped.append(row)
+        classified_row = classify_candidate(row)
+        if classified_row is None:
+            continue
+        deduped.append(classified_row)
     return deduped
 
 
@@ -4235,16 +4365,6 @@ def _apply_advanced_context_to_candidates(
             candidate["volatility_score"] = round(float(edge_profile["volatility_score"]), 4)
             candidate["volatility_penalty"] = round(float(edge_profile["volatility_penalty"]), 4)
             candidate["adjusted_edge"] = round(float(edge_profile["adjusted_edge"]), 4)
-        candidate["score"] = (
-            float(candidate.get("score") or 0.0)
-            + _advanced_score_adjustment(readiness_summary)
-            + _market_score_adjustment(market_context)
-            + _market_specific_score_adjustment(candidate, preferences, market_context)
-            + _risk_profile_score_adjustment(candidate, preferences, market_context)
-            + float(candidate.get("advanced_signal_score") or 0.0)
-            + float(candidate.get("source_summary_score") or 0.0)
-        )
-        candidate["confidence"] = _candidate_confidence(candidate)
 
 
 def _candidate_betting_edge_components(candidate: dict[str, Any]) -> tuple[float, float, float] | None:
@@ -5749,7 +5869,9 @@ def collect_candidates(overview: list[dict[str, Any]], preferences: dict[str, An
     if odds_history_by_sport is None:
         odds_history_by_sport = _odds_history_payloads_by_sport(overview)
     candidates = _collect_candidates(overview, preferences)
-    return _enrich_candidates_with_odds_history(candidates, odds_history_by_sport)
+    normalized_candidates = [normalize_candidate(candidate) for candidate in _enrich_candidates_with_odds_history(candidates, odds_history_by_sport)]
+    classified_candidates = [classified for candidate in normalized_candidates if (classified := classify_candidate(candidate)) is not None]
+    return classified_candidates
 
 
 def score_candidate(
@@ -5758,12 +5880,30 @@ def score_candidate(
     preferences: dict[str, Any] | None = None,
     advanced_context: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
-    scored_candidate = dict(candidate)
+    scored_candidate = classify_candidate(candidate)
+    if scored_candidate is None:
+        return normalize_candidate(candidate)
     _apply_live_state_context_to_candidates([scored_candidate])
     advanced_by_sport = {
         _safe_text(scored_candidate.get("sport_slug"), "sport").lower(): [dict(item) for item in (advanced_context or []) if isinstance(item, dict)]
     }
     _apply_advanced_context_to_candidates([scored_candidate], advanced_by_sport, preferences or {})
+
+    edge_value = _numeric_hint(scored_candidate.get("edge"))
+    if edge_value is None:
+        edge_value = _numeric_hint(scored_candidate.get("adjusted_edge"))
+    if edge_value is None:
+        edge_profile = _candidate_betting_edge_profile(scored_candidate)
+        edge_value = _numeric_hint(edge_profile.get("edge")) if edge_profile is not None else None
+    if edge_value is None:
+        edge_value = 0.0
+
+    confidence_value = _numeric_hint(scored_candidate.get("source_strength"))
+    if confidence_value is None:
+        confidence_value = 0.5
+
+    tier_penalty = {"tier_1": 0.0, "tier_2": 0.2}.get(_safe_text(scored_candidate.get("tier"), "tier_2"), 0.2)
+    scored_candidate["score"] = round(float(edge_value) * float(confidence_value) - float(tier_penalty), 4)
     return scored_candidate
 
 
@@ -5779,6 +5919,8 @@ def _score_candidates(
             preferences=preferences,
             advanced_context=advanced_by_sport.get(_safe_text(candidate.get("sport_slug"), "sport").lower(), []),
         )
+        if not is_valid_candidate(scored_candidate):
+            continue
         if _candidate_is_final(scored_candidate) or bool(scored_candidate.get("state_invalid")):
             continue
         scored_candidates.append(scored_candidate)
@@ -5854,11 +5996,7 @@ def collect_all_recommendations(*, selected_date: str | None = None, force_refre
     candidates = _enrich_candidates_with_odds_history(candidates, odds_history_by_sport)
     candidates = _score_candidates(candidates, advanced_by_sport, preferences)
     filtered_candidates = filter_candidates(candidates, sport=_safe_text(preferences.get("sport"), "") or None)
-    ranked_recommendations = rank_candidates(
-        filtered_candidates,
-        sport=_safe_text(preferences.get("sport"), "") or None,
-        limit=None,
-    )
+    ranked_recommendations = rank_global_recommendations(filtered_candidates, limit=None)
     if not ranked_recommendations:
         ranked_recommendations = rank_global_recommendations(candidates, limit=None)
     if log_pipeline:
@@ -5874,17 +6012,44 @@ def collect_all_recommendations(*, selected_date: str | None = None, force_refre
 def rank_global_recommendations(recommendations: list[dict[str, Any]], *, limit: int | None = None) -> list[dict[str, Any]]:
     ranked = sorted(
         [dict(recommendation) for recommendation in recommendations if isinstance(recommendation, dict)],
-        key=lambda recommendation: (
-            float(recommendation.get("adjusted_score") or recommendation.get("score") or recommendation.get("rank_score") or 0.0),
-            float(recommendation.get("ev_current") or recommendation.get("expected_value") or recommendation.get("ev") or 0.0),
-            float(recommendation.get("ev_delta") or 0.0),
-            float(recommendation.get("confidence") or 0.0),
-        ),
+        key=lambda recommendation: float(recommendation.get("score") or 0.0),
         reverse=True,
     )
     if limit is None:
         return ranked
     return ranked[: max(int(limit), 0)]
+
+
+def _build_board_dictionary(recommendations: list[dict[str, Any]]) -> dict[str, Any]:
+    board: dict[str, Any] = {
+        "top_overall": [],
+        "by_sport": {},
+        "live": [],
+        "pregame": [],
+        "props": [],
+        "games": [],
+        "parlays": [],
+    }
+    by_sport = board["by_sport"]
+    for recommendation in recommendations:
+        if not isinstance(recommendation, dict):
+            continue
+        item = dict(recommendation)
+        board["top_overall"].append(item)
+        sport_name = _safe_text(item.get("sport"), _safe_text(item.get("sport_slug"), "unknown"))
+        by_sport.setdefault(sport_name, []).append(item)
+        if bool(item.get("is_live")):
+            board["live"].append(item)
+        else:
+            board["pregame"].append(item)
+        candidate_type = _safe_text(item.get("type"), _safe_text(item.get("candidate_type"), "")).lower()
+        if candidate_type == "prop":
+            board["props"].append(item)
+        elif candidate_type == "game":
+            board["games"].append(item)
+        elif candidate_type == "parlay":
+            board["parlays"].append(item)
+    return board
 
 
 def run_intelligence_query(
@@ -5959,12 +6124,7 @@ def run_intelligence_query(
     candidates = _enrich_candidates_with_odds_history(candidates, odds_history_by_sport)
     candidates = _score_candidates(candidates, advanced_by_sport, preferences)
     filtered_candidates = filter_candidates(candidates, sport=_safe_text(preferences.get("sport"), "") or None)
-    ranked_recommendations = rank_candidates(
-        filtered_candidates,
-        sport=_safe_text(preferences.get("sport"), "") or None,
-        policy=_safe_text(preferences.get("policy"), "") or None,
-        limit=None,
-    )
+    ranked_recommendations = rank_global_recommendations(filtered_candidates, limit=None)
     if not ranked_recommendations:
         ranked_recommendations = rank_global_recommendations(candidates, limit=None)
     recommendations = _greedy_low_correlation_selection(
@@ -6116,7 +6276,9 @@ def run_intelligence_query(
     final_response["risks_uncertainty"] = list(structured_response.get("risks_uncertainty") or [])
     final_response["recommended_interpretation"] = structured_response.get("recommended_interpretation")
     final_response["final_takeaway"] = structured_response.get("final_takeaway")
-    final_response["board_contract"] = build_intelligence_board_contract(final_response)
+    board_payload = dict(final_response)
+    board_payload["board"] = _build_board_dictionary(ranked_recommendations)
+    final_response["board_contract"] = build_intelligence_board_contract(board_payload)
     final_response["evaluation_bundle"] = build_intelligence_evaluation_bundle(
         query={
             "question": question,

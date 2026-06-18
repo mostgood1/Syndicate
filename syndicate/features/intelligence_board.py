@@ -114,6 +114,14 @@ def _recommendation_sources(payload: Mapping[str, Any] | None) -> list[Mapping[s
     current = _copy_mapping(payload)
     sources: list[Mapping[str, Any]] = []
 
+    board = current.get("board") if isinstance(current.get("board"), Mapping) else None
+    if isinstance(board, Mapping):
+        top_overall = board.get("top_overall")
+        if isinstance(top_overall, list):
+            sources.extend(item for item in top_overall if isinstance(item, Mapping))
+        if sources:
+            return sources
+
     direct_recommendations = current.get("recommendations")
     if isinstance(direct_recommendations, list):
         sources.extend(item for item in direct_recommendations if isinstance(item, Mapping))

@@ -11,6 +11,7 @@ from unittest.mock import patch
 from syndicate.app import create_app
 from syndicate.blueprints.intelligence import intelligence_bp
 from syndicate.blueprints.intelligence import intelligence_query_api
+from syndicate.blueprints.home import _game_bet_candidates_from_game
 from syndicate.features.intelligence import _advanced_signals_from_item
 from syndicate.features.intelligence import _advanced_input_rows_for_sport
 from syndicate.features.intelligence import _advanced_signals_from_item
@@ -19,6 +20,10 @@ from syndicate.features.intelligence import _candidate_advanced_signal_score
 from syndicate.features.intelligence import _basketball_source_summary_score
 from syndicate.features.intelligence import _candidate_market_fit
 from syndicate.features.intelligence import collect_candidates
+from syndicate.features.intelligence import classify_candidate
+from syndicate.features.intelligence import is_valid_candidate
+from syndicate.features.intelligence import normalize_candidate
+from syndicate.features.intelligence import score_candidate
 from syndicate.features.intelligence import _latest_matching_path
 from syndicate.features.intelligence import _parlay_matches_preferences
 from syndicate.features.intelligence import _parlay_rank_score
@@ -872,7 +877,7 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertTrue(preferences.get("include_props"))
         self.assertTrue(preferences.get("include_games"))
 
-    def test_collect_candidates_excludes_fallback_props(self) -> None:
+    def test_collect_candidates_preserves_valid_mlb_candidates_with_tiers(self) -> None:
         overview = [
             {
                 "slug": "mlb",
@@ -949,10 +954,127 @@ class IntelligenceBlueprintTests(unittest.TestCase):
 
         candidates = collect_candidates(overview, preferences)
 
-        sport_slugs = {str(candidate.get("sport_slug") or "").lower() for candidate in candidates}
-        self.assertIn("wnba", sport_slugs)
-        self.assertNotIn("mlb", sport_slugs)
-        self.assertTrue(all("fallback" not in str(candidate.get("detail") or candidate.get("summary") or "").lower() for candidate in candidates))
+        candidates_by_sport = {str(candidate.get("sport_slug") or "").lower(): candidate for candidate in candidates}
+        self.assertIn("wnba", candidates_by_sport)
+        self.assertIn("mlb", candidates_by_sport)
+        self.assertEqual(candidates_by_sport["wnba"].get("tier"), "tier_2")
+        self.assertEqual(candidates_by_sport["mlb"].get("tier"), "tier_2")
+        self.assertGreater(float(candidates_by_sport["mlb"].get("projected") or 0.0), 0.0)
+        self.assertTrue("fallback" in str(candidates_by_sport["mlb"].get("detail") or candidates_by_sport["mlb"].get("summary") or "").lower())
+
+    def test_score_candidate_applies_shared_formula(self) -> None:
+        candidate = {
+            "sport_slug": "mlb",
+            "candidate_type": "prop",
+            "pick": "Over 4.5",
+            "market": "outs recorded",
+            "projection": 13.1,
+            "odds": "+110",
+            "edge": 1.0,
+            "source_strength": 0.5,
+            "detail": "Daily top props fallback",
+        }
+
+        scored = score_candidate(candidate)
+
+        self.assertEqual(scored.get("tier"), "tier_2")
+        self.assertAlmostEqual(float(scored.get("score") or 0.0), 0.3, places=4)
+
+    def test_normalize_candidate_adds_required_baseline_fields(self) -> None:
+        candidate = {
+            "sport_slug": "mlb",
+            "candidate_type": "game",
+            "pick": "NYM ML",
+            "market": "Full game Total",
+            "detail": "12:05 PM",
+            "summary": "Luinder Avila vs Zack Littell",
+        }
+
+        normalized = normalize_candidate(candidate)
+
+        self.assertEqual(normalized.get("sport"), "mlb")
+        self.assertEqual(normalized.get("type"), "game")
+        self.assertEqual(normalized.get("selection"), "NYM ML")
+        self.assertEqual(normalized.get("market"), "Full game Total")
+        self.assertIsNone(normalized.get("odds"))
+        self.assertIsNone(normalized.get("projection"))
+        self.assertIsNone(normalized.get("source"))
+        self.assertEqual(float(normalized.get("source_strength") or 0.0), 0.5)
+        self.assertFalse(bool(normalized.get("is_live")))
+
+    def test_mlb_game_markets_total_fallback_emits_game_candidate(self) -> None:
+        sport = {"slug": "mlb", "name": "MLB", "hub_href": "/mlb"}
+        game = {
+            "gamePk": 822721,
+            "summary": "Luinder Avila vs Zack Littell | 1 official pick(s) | +1 playable",
+            "detail": "12:05 PM",
+            "gameMarkets": {"total": {"line": 8.1, "pick": None, "reason": "KC 45.3% | WSH 54.7% | Tie 0.0%"}},
+        }
+
+        candidates = _game_bet_candidates_from_game(sport, game, fallback_epoch=0.0)
+
+        self.assertEqual(len(candidates), 1)
+        self.assertEqual(candidates[0].get("market"), "Total")
+        self.assertNotEqual(candidates[0].get("projected"), "-")
+
+    def test_is_valid_candidate_requires_selection_type_and_value(self) -> None:
+        valid_candidate = normalize_candidate(
+            {
+                "sport_slug": "nhl",
+                "candidate_type": "prop",
+                "pick": "Over 2.5",
+                "market": "shots",
+                "odds": "+105",
+                "detail": "Stale slate fallback",
+            }
+        )
+        missing_selection = normalize_candidate(
+            {
+                "sport_slug": "nhl",
+                "candidate_type": "prop",
+                "market": "shots",
+                "odds": "+105",
+            }
+        )
+        missing_type = normalize_candidate(
+            {
+                "sport_slug": "nhl",
+                "pick": "Over 2.5",
+                "market": "shots",
+                "odds": "+105",
+            }
+        )
+        missing_value = normalize_candidate(
+            {
+                "sport_slug": "nhl",
+                "candidate_type": "prop",
+                "pick": "Over 2.5",
+                "market": "shots",
+            }
+        )
+
+        self.assertTrue(is_valid_candidate(valid_candidate))
+        self.assertFalse(is_valid_candidate(missing_selection))
+        self.assertEqual(missing_type.get("type"), "prop")
+        self.assertTrue(is_valid_candidate(missing_type))
+        self.assertFalse(is_valid_candidate(missing_value))
+
+    def test_classify_candidate_assigns_tier_one_when_source_strength_is_high(self) -> None:
+        candidate = {
+            "sport_slug": "mlb",
+            "candidate_type": "prop",
+            "pick": "Over 1.5",
+            "market": "hits",
+            "projection": 1.9,
+            "odds": "+115",
+            "source_strength": 0.85,
+        }
+
+        classified = normalize_candidate(candidate)
+        classified = classify_candidate(classified)
+
+        self.assertIsNotNone(classified)
+        self.assertEqual(classified.get("tier"), "tier_1")
 
     def test_run_intelligence_query_prefers_primary_candidates_over_legacy_fallback(self) -> None:
         with patch("syndicate.features.intelligence.build_intelligence_overview", return_value=_sample_overview_with_secondary_sport()):

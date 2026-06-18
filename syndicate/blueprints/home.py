@@ -1561,6 +1561,23 @@ def _game_bet_candidates_from_game(sport: dict[str, Any], game: dict[str, Any], 
             detail=_first_present_text(row.get("summary"), row.get("reason"), game.get("summary")),
             fallback_epoch=fallback_epoch,
         )
+    if not candidates:
+        game_markets = game.get("gameMarkets") if isinstance(game.get("gameMarkets"), dict) else {}
+        total_market = game_markets.get("total") if isinstance(game_markets.get("total"), dict) else {}
+        total_line = total_market.get("line") if isinstance(total_market.get("line"), (int, float, str)) else None
+        total_pick = _first_present_text(total_market.get("pick"), total_market.get("selection"), total_market.get("side"))
+        if total_line is not None:
+            _append_game_bet_candidate(
+                candidates,
+                sport=sport,
+                game=game,
+                market="Total",
+                pick=total_pick or f"Total { _prop_metric_text(total_line) or '-' }",
+                line=total_line,
+                projected=total_line,
+                detail=_first_present_text(total_market.get("reason"), game.get("summary"), game.get("detail")),
+                fallback_epoch=fallback_epoch,
+            )
     betting = game.get("betting") if isinstance(game.get("betting"), dict) else {}
     if betting:
         _append_game_bet_candidate(candidates, sport=sport, game=game, market="Moneyline", pick=f"Away ML", odds=betting.get("away_ml"), edge=betting.get("away_ml_ev"), confidence=betting.get("p_away_win"), detail=game.get("summary"), fallback_epoch=fallback_epoch)

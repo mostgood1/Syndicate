@@ -52,6 +52,55 @@ def _sample_overview() -> list[dict[str, object]]:
 
 
 class IntelligenceBoardContractTests(unittest.TestCase):
+    def test_build_intelligence_board_contract_prefers_structured_board_dictionary(self) -> None:
+        contract = build_intelligence_board_contract(
+            {
+                "headline": "The Syndicate board",
+                "board": {
+                    "top_overall": [
+                        {
+                            "sport": "nba",
+                            "team": "Boston Celtics",
+                            "name": "Jayson Tatum",
+                            "market": "points",
+                            "line": 28.5,
+                            "movement": {"delta": 0.5, "trend": "up"},
+                            "edge": 0.071,
+                            "is_live": True,
+                            "tier": "tier_1",
+                            "type": "prop",
+                        },
+                        {
+                            "sport": "mlb",
+                            "team": "New York Yankees",
+                            "name": "Aaron Judge",
+                            "market": "home_runs",
+                            "line": 1.5,
+                            "movement": {"delta": 0.0, "trend": "flat"},
+                            "score": 0.42,
+                            "is_live": False,
+                            "tier": "tier_2",
+                            "type": "prop",
+                        },
+                    ],
+                    "by_sport": {
+                        "nba": [{"name": "Jayson Tatum"}],
+                        "mlb": [{"name": "Aaron Judge"}],
+                    },
+                    "live": [{"name": "Jayson Tatum"}],
+                    "pregame": [{"name": "Aaron Judge"}],
+                    "props": [{"name": "Jayson Tatum"}, {"name": "Aaron Judge"}],
+                    "games": [],
+                    "parlays": [],
+                },
+                "recommendations": [],
+            }
+        )
+
+        self.assertEqual(contract["recommendation_count"], 2)
+        self.assertEqual([card["name"] for card in contract["cards"]], ["Jayson Tatum", "Aaron Judge"])
+        self.assertEqual(contract["cards"][1]["lane"], "pregame")
+
     def test_build_intelligence_board_contract_splits_live_and_pregame_cards(self) -> None:
         contract = build_intelligence_board_contract(
             {

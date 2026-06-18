@@ -262,15 +262,24 @@ class IntelligenceStateTests(unittest.TestCase):
             "parlays": [],
         }
 
-        with patch.object(service, "_build_candidate_pool", return_value=dict(candidate_pool)):
-            with patch("pipeline.intelligence_state.rank_global_recommendations", return_value=[{"name": "Play 1", "sport_slug": "mlb", "market": "Hits"}]):
-                with patch("pipeline.intelligence_state.run_routed_intelligence_pipeline", return_value=dict(analysis_result)):
-                    response = service._compute_response({"question": "top edges today", "date": "2026-06-15"}, force_refresh=True)
+        with patch.object(service, "_source_state_fingerprint", return_value="fingerprint-1"):
+            with patch.object(service, "_build_candidate_pool", return_value=dict(candidate_pool)):
+                with patch(
+                    "pipeline.intelligence_state.rank_global_recommendations",
+                    return_value=[
+                        {"name": "Play 1", "sport_slug": "mlb", "market": "Hits", "score": 91.0},
+                        {"name": "Play 2", "sport_slug": "nba", "market": "Points", "score": 89.0},
+                        {"name": "Play 3", "sport_slug": "wnba", "market": "Assists", "score": 87.0},
+                    ],
+                ):
+                    with patch("pipeline.intelligence_state.run_routed_intelligence_pipeline", return_value=dict(analysis_result)):
+                        response = service._compute_response({"question": "top edges today", "date": "2026-06-15", "limit": 1}, force_refresh=True)
 
         self.assertEqual(response["top_opportunities"][0]["name"], "Play 1")
         self.assertEqual(response["analysis"]["recommendations"][0]["name"], "Play 1")
         self.assertEqual(response["analysis"]["picks"][0]["name"], "Play 1")
         self.assertEqual(response["analysis"]["top_live_opportunities"][0]["name"], "Play 1")
+        self.assertEqual(response["board_contract"]["recommendation_count"], 3)
         self.assertEqual(response["board_contract"]["schema"], "intelligence_board_v1")
 
     def test_state_compute_persists_board_snapshot_artifact(self) -> None:
@@ -850,3 +859,17 @@ class IntelligenceStateTests(unittest.TestCase):
         self.assertEqual(pool["candidate_pools"]["mlb"]["last_updated"], "2026-06-10T10:00:00Z")
         self.assertEqual(pool["global_pool"][0]["name"], "MLB Play")
         self.assertEqual(pool["candidates"], pool["global_pool"])
+
+    def test_merge_candidate_pools_sorts_by_score_descending(self) -> None:
+        merged = IntelligenceStateService._merge_candidate_pools(
+            {
+                "nba": [
+                    {"name": "NBA Play", "sport_slug": "nba", "score": 89.0},
+                ],
+                "mlb": [
+                    {"name": "MLB Play", "sport_slug": "mlb", "score": 91.0},
+                ],
+            }
+        )
+
+        self.assertEqual([item["name"] for item in merged], ["MLB Play", "NBA Play"])
