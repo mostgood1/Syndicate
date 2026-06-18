@@ -529,7 +529,7 @@ def _response_candidate_count(response_payload: dict[str, object] | None) -> int
     current = dict(response_payload or {})
     candidate_pool = current.get("candidate_pool") if isinstance(current.get("candidate_pool"), dict) else {}
     candidates = candidate_pool.get("candidates") if isinstance(candidate_pool, dict) else current.get("candidates")
-    if isinstance(candidates, list):
+    if isinstance(candidates, list) and candidates:
         return len(candidates)
     top_opportunities = current.get("top_opportunities") if isinstance(current.get("top_opportunities"), list) else []
     if isinstance(top_opportunities, list) and top_opportunities:
