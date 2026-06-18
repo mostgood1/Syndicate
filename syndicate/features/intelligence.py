@@ -2295,7 +2295,8 @@ def build_intelligence_overview(*, selected_date: str | None = None, force_refre
                     sport,
                     effective_date,
                     force_refresh=force_refresh,
-                    preserve_requested_date=True,
+                    # Prefer the newest usable slate when the requested date has no surfaced rows.
+                    preserve_requested_date=False,
                 )
             )
         except Exception as exc:

@@ -28,6 +28,7 @@ from syndicate.features.intelligence import _latest_matching_path
 from syndicate.features.intelligence import _parlay_matches_preferences
 from syndicate.features.intelligence import _parlay_rank_score
 from syndicate.features.intelligence import _query_preferences
+from syndicate.features.intelligence import build_intelligence_overview
 from syndicate.features.intelligence import get_top_live_opportunities
 from syndicate.features.intelligence import run_intelligence_query
 
@@ -790,6 +791,25 @@ class IntelligenceBlueprintTests(unittest.TestCase):
             return_value={},
         )
         self._simulation_patcher.start()
+
+    def test_build_intelligence_overview_uses_latest_available_slate(self) -> None:
+        app = create_app()
+        app.config.update(TESTING=True)
+        app.config["SYNDICATE_SPORTS"] = [{"slug": "mlb", "name": "MLB"}]
+
+        with app.app_context():
+            with patch(
+                "syndicate.features.intelligence._build_sport_overview",
+                return_value={"slug": "mlb", "context_label": "2026-06-07"},
+            ) as mocked_build:
+                build_intelligence_overview(selected_date="2026-06-17", force_refresh=True)
+
+        mocked_build.assert_called_once_with(
+            {"slug": "mlb", "name": "MLB"},
+            "2026-06-17",
+            force_refresh=True,
+            preserve_requested_date=False,
+        )
 
     def tearDown(self) -> None:
         self._shared_recommendations_patcher.stop()
