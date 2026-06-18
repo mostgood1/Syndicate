@@ -1,4 +1,5 @@
 # Keep this file changing when we need to force a fresh Render deploy after data refresh fixes.
+# Force redeploy after WNBA 2026-06-18 artifact bundle.
 # Force redeploy after NHL source_artifacts path fix.
 # Force redeploy after MLB source_artifacts path fix.
 # Force redeploy after MLB live-lens rebuild fallback.
