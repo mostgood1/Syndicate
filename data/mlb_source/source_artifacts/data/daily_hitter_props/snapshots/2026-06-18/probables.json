@@ -2,7 +2,7 @@
   "date": "2026-06-18",
   "season": 2026,
   "spring_mode": false,
-  "generated_at": "2026-06-17T17:01:08.039394",
+  "generated_at": "2026-06-18T07:44:21.190841",
   "games": [
     {
       "idx": 0,
@@ -274,9 +274,9 @@
       "away_probable_id": 640455,
       "home_probable_id": 605400,
       "away_source": "feed_gameData_probablePitchers",
-      "home_source": "schedule_probablePitcher",
+      "home_source": "feed_gameData_probablePitchers",
       "away_confidence": 0.75,
-      "home_confidence": 0.8,
+      "home_confidence": 0.75,
       "away_validation": {
         "status": "ok",
         "selected_id": 640455,
@@ -299,7 +299,7 @@
         "status": "ok",
         "selected_id": 605400,
         "selected_name": "Aaron Nola",
-        "selected_source": "schedule_probablePitcher",
+        "selected_source": "feed_gameData_probablePitchers",
         "override_reason": "",
         "roster_team_ids": [
           143
@@ -319,9 +319,9 @@
         "away_schedule_name": "Sean Manaea",
         "home_schedule_name": "Aaron Nola",
         "away_feed_id": 640455,
-        "home_feed_id": null,
+        "home_feed_id": 605400,
         "away_feed_name": "Sean Manaea",
-        "home_feed_name": ""
+        "home_feed_name": "Aaron Nola"
       }
     },
     {
@@ -466,9 +466,9 @@
       "away_probable_id": 669461,
       "home_probable_id": 702070,
       "away_source": "feed_gameData_probablePitchers",
-      "home_source": "schedule_probablePitcher",
+      "home_source": "feed_gameData_probablePitchers",
       "away_confidence": 0.75,
-      "home_confidence": 0.8,
+      "home_confidence": 0.75,
       "away_validation": {
         "status": "ok",
         "selected_id": 669461,
@@ -491,7 +491,7 @@
         "status": "ok",
         "selected_id": 702070,
         "selected_name": "Noah Cameron",
-        "selected_source": "schedule_probablePitcher",
+        "selected_source": "feed_gameData_probablePitchers",
         "override_reason": "",
         "roster_team_ids": [
           118
@@ -511,9 +511,9 @@
         "away_schedule_name": "Matthew Liberatore",
         "home_schedule_name": "Noah Cameron",
         "away_feed_id": 669461,
-        "home_feed_id": null,
+        "home_feed_id": 702070,
         "away_feed_name": "Matthew Liberatore",
-        "home_feed_name": ""
+        "home_feed_name": "Noah Cameron"
       }
     },
     {
@@ -528,11 +528,11 @@
         "abbr": "ATH"
       },
       "away_probable_id": null,
-      "home_probable_id": null,
+      "home_probable_id": 695611,
       "away_source": "none",
-      "home_source": "none",
+      "home_source": "feed_gameData_probablePitchers",
       "away_confidence": 0.0,
-      "home_confidence": 0.0,
+      "home_confidence": 0.75,
       "away_validation": {
         "status": "none",
         "selected_id": null,
@@ -548,28 +548,32 @@
         "rejected_candidates": []
       },
       "home_validation": {
-        "status": "none",
-        "selected_id": null,
-        "selected_name": "",
-        "selected_source": "none",
+        "status": "ok",
+        "selected_id": 695611,
+        "selected_name": "Gage Jump",
+        "selected_source": "feed_gameData_probablePitchers",
         "override_reason": "",
-        "roster_team_ids": [],
-        "registry_team_ids": [],
-        "on_expected_team": false,
+        "roster_team_ids": [
+          133
+        ],
+        "registry_team_ids": [
+          133
+        ],
+        "on_expected_team": true,
         "on_opponent_team": false,
-        "on_expected_registry_team": false,
+        "on_expected_registry_team": true,
         "on_opponent_registry_team": false,
         "rejected_candidates": []
       },
       "raw": {
         "away_schedule_id": null,
-        "home_schedule_id": null,
+        "home_schedule_id": 695611,
         "away_schedule_name": "",
-        "home_schedule_name": "",
+        "home_schedule_name": "Gage Jump",
         "away_feed_id": null,
-        "home_feed_id": null,
+        "home_feed_id": 695611,
         "away_feed_name": "",
-        "home_feed_name": ""
+        "home_feed_name": "Gage Jump"
       }
     }
   ]

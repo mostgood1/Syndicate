@@ -1,7 +1,7 @@
 {
   "meta": {
     "season": 2026,
-    "generated_at": "2026-06-17T16:53:09.210061",
+    "generated_at": "2026-06-18T07:38:48.270441",
     "title": "MLB 2026 Betting Card Recap",
     "batch_dir": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/eval/batches/season_2026_ui_daily_live",
     "cards_dir": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/eval/seasons/2026/locked_cards_retuned",
@@ -47,13 +47,13 @@
       "hitter_rbis": 0
     },
     "partial": false,
-    "processed_reports": 3,
-    "available_reports": 3
+    "processed_reports": 4,
+    "available_reports": 4
   },
   "status": "complete",
   "summary": {
-    "cards": 3,
-    "cards_processed": 3,
+    "cards": 4,
+    "cards_processed": 4,
     "selected_counts": {
       "totals": 0,
       "ml": 0,
@@ -160,12 +160,12 @@
       }
     },
     "daily": {
-      "cards": 3,
+      "cards": 4,
       "cards_with_bets": 0,
-      "cards_without_bets": 3,
+      "cards_without_bets": 4,
       "positive_days": 0,
       "negative_days": 0,
-      "flat_days": 3,
+      "flat_days": 4,
       "mean_u": 0.0,
       "median_u": 0.0,
       "std_u": 0.0,
@@ -369,12 +369,12 @@
         }
       },
       "daily": {
-        "cards": 3,
+        "cards": 4,
         "cards_with_bets": 0,
-        "cards_without_bets": 3,
+        "cards_without_bets": 4,
         "positive_days": 0,
         "negative_days": 0,
-        "flat_days": 3,
+        "flat_days": 4,
         "mean_u": 0.0,
         "median_u": 0.0,
         "std_u": 0.0,
@@ -743,6 +743,125 @@
       "warnings": [
         "Missing game lines: data/market/oddsapi/oddsapi_game_lines_2026_06_16.json",
         "Missing hitter lines: data/market/oddsapi/oddsapi_hitter_props_2026_06_16.json"
+      ],
+      "profit_u": 0.0,
+      "roi": null
+    },
+    {
+      "date": "2026-06-17",
+      "month": "2026-06",
+      "card_path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/eval/seasons/2026/locked_cards_retuned/daily_summary_2026_06_17_locked_policy.json",
+      "report_path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/eval/batches/season_2026_ui_daily_live/sim_vs_actual_2026-06-17.json",
+      "payload_path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/eval/seasons/2026/betting_day_payloads_retuned/season_betting_day_2026_06_17.json",
+      "cap_profile": "nototals_p1_tbheavy11_r1_nohr",
+      "selected_counts": {
+        "totals": 0,
+        "ml": 0,
+        "pitcher_props": 0,
+        "hitter_props": 0,
+        "hitter_home_runs": 0,
+        "hitter_hits": 0,
+        "hitter_hits_runs_rbis": 0,
+        "hitter_total_bases": 0,
+        "hitter_runs": 0,
+        "hitter_rbis": 0,
+        "combined": 0
+      },
+      "results": {
+        "totals": {
+          "n": 0,
+          "wins": 0,
+          "losses": 0,
+          "stake_u": 0.0,
+          "profit_u": 0.0,
+          "roi": null
+        },
+        "ml": {
+          "n": 0,
+          "wins": 0,
+          "losses": 0,
+          "stake_u": 0.0,
+          "profit_u": 0.0,
+          "roi": null
+        },
+        "pitcher_props": {
+          "n": 0,
+          "wins": 0,
+          "losses": 0,
+          "stake_u": 0.0,
+          "profit_u": 0.0,
+          "roi": null
+        },
+        "hitter_home_runs": {
+          "n": 0,
+          "wins": 0,
+          "losses": 0,
+          "stake_u": 0.0,
+          "profit_u": 0.0,
+          "roi": null
+        },
+        "hitter_hits": {
+          "n": 0,
+          "wins": 0,
+          "losses": 0,
+          "stake_u": 0.0,
+          "profit_u": 0.0,
+          "roi": null
+        },
+        "hitter_hits_runs_rbis": {
+          "n": 0,
+          "wins": 0,
+          "losses": 0,
+          "stake_u": 0.0,
+          "profit_u": 0.0,
+          "roi": null
+        },
+        "hitter_total_bases": {
+          "n": 0,
+          "wins": 0,
+          "losses": 0,
+          "stake_u": 0.0,
+          "profit_u": 0.0,
+          "roi": null
+        },
+        "hitter_runs": {
+          "n": 0,
+          "wins": 0,
+          "losses": 0,
+          "stake_u": 0.0,
+          "profit_u": 0.0,
+          "roi": null
+        },
+        "hitter_rbis": {
+          "n": 0,
+          "wins": 0,
+          "losses": 0,
+          "stake_u": 0.0,
+          "profit_u": 0.0,
+          "roi": null
+        },
+        "hitter_props": {
+          "n": 0,
+          "wins": 0,
+          "losses": 0,
+          "stake_u": 0.0,
+          "profit_u": 0.0,
+          "roi": null
+        },
+        "combined": {
+          "n": 0,
+          "wins": 0,
+          "losses": 0,
+          "stake_u": 0.0,
+          "profit_u": 0.0,
+          "roi": null
+        }
+      },
+      "settled_n": 0,
+      "unresolved_n": 0,
+      "warnings": [
+        "Missing game lines: data/market/oddsapi/oddsapi_game_lines_2026_06_17.json",
+        "Missing hitter lines: data/market/oddsapi/oddsapi_hitter_props_2026_06_17.json"
       ],
       "profit_u": 0.0,
       "roi": null

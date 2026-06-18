@@ -2,7 +2,7 @@
   "date": "2026-06-18",
   "season": 2026,
   "spring_mode": false,
-  "generated_at": "2026-06-17T17:01:08.037376",
+  "generated_at": "2026-06-18T07:44:21.186792",
   "summary": {
     "games": 9,
     "projected_teams": 18,
@@ -1351,13 +1351,13 @@
       "away_projected_ids": [
         687263,
         545361,
-        685133,
         666176,
-        694384,
         672724,
+        694384,
         694203,
-        622268,
-        681351
+        663611,
+        681351,
+        642350
       ],
       "home_projected_ids": [
         701762,
@@ -1375,24 +1375,24 @@
         "raw_ids": [
           687263,
           545361,
-          685133,
           666176,
-          694384,
           672724,
+          694384,
           694203,
-          622268,
-          681351
+          663611,
+          681351,
+          642350
         ],
         "ids": [
           687263,
           545361,
-          685133,
           666176,
-          694384,
           672724,
+          694384,
           694203,
-          622268,
-          681351
+          663611,
+          681351,
+          642350
         ],
         "missing_ids": [],
         "backfilled_ids": [],
@@ -1401,27 +1401,27 @@
         "raw_names": [
           "Zach Neto",
           "Mike Trout",
-          "Wade Meckler",
           "Jo Adell",
-          "Nolan Schanuel",
           "Oswald Peraza",
+          "Nolan Schanuel",
           "Denzer Guzman",
-          "Donovan Walton",
-          "Logan O'Hoppe"
+          "Nick Madrigal",
+          "Logan O'Hoppe",
+          "Jose Siri"
         ],
         "matched_names": [
           "Zach Neto",
           "Mike Trout",
-          "Wade Meckler",
           "Jo Adell",
-          "Nolan Schanuel",
           "Oswald Peraza",
+          "Nolan Schanuel",
           "Denzer Guzman",
-          "Donovan Walton",
-          "Logan O'Hoppe"
+          "Nick Madrigal",
+          "Logan O'Hoppe",
+          "Jose Siri"
         ],
         "missing_name_labels": [],
-        "mapping_source": "projected_rotowire_default_vs_rhp"
+        "mapping_source": "projected_rotowire_default_vs_lhp"
       },
       "home_projected_validation": {
         "status": "ok",
@@ -1476,9 +1476,9 @@
         "missing_name_labels": [],
         "mapping_source": "projected_rotowire_default_vs_rhp"
       },
-      "away_source": "projected_rotowire_default_vs_rhp",
+      "away_source": "projected_rotowire_default_vs_lhp",
       "home_source": "projected_rotowire_default_vs_rhp",
-      "away_confidence": 0.58,
+      "away_confidence": 0.66,
       "home_confidence": 0.58,
       "away_comparison": {
         "status": "projected_only",

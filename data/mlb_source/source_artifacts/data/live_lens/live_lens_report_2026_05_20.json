@@ -1,0 +1,1754 @@
+{
+  "date": "2026-05-20",
+  "generatedAt": "2026-06-18T02:38:25-05:00",
+  "dataRoot": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data",
+  "liveLensDir": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\live_lens",
+  "optimizationRegime": {
+    "date": "2026-05-20",
+    "kind": "forward_tuned_live",
+    "label": "Forward tuned live",
+    "isLegacyComparison": false,
+    "isCleanBaseline": false,
+    "baselineStartDate": "2026-03-31",
+    "legacyWindowStartDate": "2026-03-25",
+    "recommendedUse": "post_retune_monitoring",
+    "forwardTuningStartDate": "2026-04-14"
+  },
+  "counts": {
+    "games": 15,
+    "live": 0,
+    "final": 15,
+    "pregame": 0,
+    "props": 0,
+    "archivedLiveProps": 0
+  },
+  "performance": {
+    "marketsRefreshed": false,
+    "marketRefreshMs": 0.0,
+    "totalMs": 4177.6,
+    "snapshotLoadMs": 5.8,
+    "simContextLoadMs": 1.5,
+    "propEvalMs": 3.1,
+    "gameLensMs": 0.7,
+    "gameCount": 15,
+    "liveGameCount": 0,
+    "feedFetchCount": 15,
+    "persistMs": 0.0
+  },
+  "games": [
+    {
+      "archivedLiveProps": [],
+      "gameLens": [],
+      "gameMarkets": {
+        "totals": null,
+        "ml": null
+      },
+      "markets": {
+        "moneyline": {},
+        "spread": {},
+        "total": {}
+      },
+      "gamePk": 823462,
+      "prop_groups": [],
+      "prop_lens": {},
+      "market_tiles": [],
+      "liveProps": [],
+      "matchup": {
+        "away": {
+          "id": 113,
+          "abbr": "CIN",
+          "name": "Cincinnati Reds",
+          "logo": "https://www.mlbstatic.com/team-logos/113.svg"
+        },
+        "home": {
+          "id": 143,
+          "abbr": "PHI",
+          "name": "Philadelphia Phillies",
+          "logo": "https://www.mlbstatic.com/team-logos/143.svg"
+        },
+        "score": {
+          "away": 9,
+          "home": 4
+        },
+        "liveText": ""
+      },
+      "predictions": {},
+      "props": [],
+      "simContextAvailable": false,
+      "snapshotAvailable": true,
+      "startTime": "12:05 PM",
+      "trackedProps": [],
+      "probable": {},
+      "actual_box_panel": {},
+      "first1BetSignal": {},
+      "card_variant": "mlb_main",
+      "away": {
+        "abbr": "CIN",
+        "name": "Cincinnati Reds"
+      },
+      "home": {
+        "abbr": "PHI",
+        "name": "Philadelphia Phillies"
+      },
+      "status": {
+        "abstract": "Final",
+        "detailed": "Final"
+      },
+      "detail": "12:05 PM",
+      "summary": "Live-lens snapshot loaded from artifact.",
+      "status_badge": "Final",
+      "hero_note": "0 live props | snapshot yes",
+      "metrics": [
+        {
+          "label": "Score",
+          "value": "9-4"
+        },
+        {
+          "label": "Full home",
+          "value": "-"
+        },
+        {
+          "label": "Live home",
+          "value": "-"
+        },
+        {
+          "label": "Open segments",
+          "value": "0"
+        },
+        {
+          "label": "Live props",
+          "value": "0"
+        },
+        {
+          "label": "Snapshot",
+          "value": "Yes"
+        }
+      ],
+      "panels": [
+        {
+          "eyebrow": "Live state",
+          "title": "12:05 PM",
+          "body": "Report snapshot generated at 2026-06-18T02:38:25-05:00. Current score is 9-4."
+        },
+        {
+          "eyebrow": "Segment looks",
+          "title": "Current segment board",
+          "body": "Segment-level reasons come directly from the live-lens report artifact.",
+          "items": []
+        },
+        {
+          "eyebrow": "Top live props",
+          "title": "Best in-game prop edges",
+          "body": "These props are the highest-ranked live looks available in the selected report snapshot.",
+          "items": [
+            "No live props were surfaced for this game in the selected report."
+          ]
+        }
+      ],
+      "href": "/mlb/game/823462?date=2026-05-20",
+      "href_label": "Open game detail",
+      "oddsRefreshedAt": "2026-06-18T07:38:25+00:00",
+      "odds_refreshed_at": "2026-06-18T07:38:25+00:00"
+    },
+    {
+      "archivedLiveProps": [],
+      "gameLens": [],
+      "gameMarkets": {
+        "totals": null,
+        "ml": null
+      },
+      "markets": {
+        "moneyline": {},
+        "spread": {},
+        "total": {}
+      },
+      "gamePk": 822977,
+      "prop_groups": [],
+      "prop_lens": {},
+      "market_tiles": [],
+      "liveProps": [],
+      "matchup": {
+        "away": {
+          "id": 110,
+          "abbr": "BAL",
+          "name": "Baltimore Orioles",
+          "logo": "https://www.mlbstatic.com/team-logos/110.svg"
+        },
+        "home": {
+          "id": 139,
+          "abbr": "TB",
+          "name": "Tampa Bay Rays",
+          "logo": "https://www.mlbstatic.com/team-logos/139.svg"
+        },
+        "score": {
+          "away": 3,
+          "home": 5
+        },
+        "liveText": ""
+      },
+      "predictions": {},
+      "props": [],
+      "simContextAvailable": false,
+      "snapshotAvailable": true,
+      "startTime": "12:10 PM",
+      "trackedProps": [],
+      "probable": {},
+      "actual_box_panel": {},
+      "first1BetSignal": {},
+      "card_variant": "mlb_main",
+      "away": {
+        "abbr": "BAL",
+        "name": "Baltimore Orioles"
+      },
+      "home": {
+        "abbr": "TB",
+        "name": "Tampa Bay Rays"
+      },
+      "status": {
+        "abstract": "Final",
+        "detailed": "Final"
+      },
+      "detail": "12:10 PM",
+      "summary": "Live-lens snapshot loaded from artifact.",
+      "status_badge": "Final",
+      "hero_note": "0 live props | snapshot yes",
+      "metrics": [
+        {
+          "label": "Score",
+          "value": "3-5"
+        },
+        {
+          "label": "Full home",
+          "value": "-"
+        },
+        {
+          "label": "Live home",
+          "value": "-"
+        },
+        {
+          "label": "Open segments",
+          "value": "0"
+        },
+        {
+          "label": "Live props",
+          "value": "0"
+        },
+        {
+          "label": "Snapshot",
+          "value": "Yes"
+        }
+      ],
+      "panels": [
+        {
+          "eyebrow": "Live state",
+          "title": "12:10 PM",
+          "body": "Report snapshot generated at 2026-06-18T02:38:25-05:00. Current score is 3-5."
+        },
+        {
+          "eyebrow": "Segment looks",
+          "title": "Current segment board",
+          "body": "Segment-level reasons come directly from the live-lens report artifact.",
+          "items": []
+        },
+        {
+          "eyebrow": "Top live props",
+          "title": "Best in-game prop edges",
+          "body": "These props are the highest-ranked live looks available in the selected report snapshot.",
+          "items": [
+            "No live props were surfaced for this game in the selected report."
+          ]
+        }
+      ],
+      "href": "/mlb/game/822977?date=2026-05-20",
+      "href_label": "Open game detail",
+      "oddsRefreshedAt": "2026-06-18T07:38:25+00:00",
+      "odds_refreshed_at": "2026-06-18T07:38:25+00:00"
+    },
+    {
+      "archivedLiveProps": [],
+      "gameLens": [],
+      "gameMarkets": {
+        "totals": null,
+        "ml": null
+      },
+      "markets": {
+        "moneyline": {},
+        "spread": {},
+        "total": {}
+      },
+      "gamePk": 823703,
+      "prop_groups": [],
+      "prop_lens": {},
+      "market_tiles": [],
+      "liveProps": [],
+      "matchup": {
+        "away": {
+          "id": 117,
+          "abbr": "HOU",
+          "name": "Houston Astros",
+          "logo": "https://www.mlbstatic.com/team-logos/117.svg"
+        },
+        "home": {
+          "id": 142,
+          "abbr": "MIN",
+          "name": "Minnesota Twins",
+          "logo": "https://www.mlbstatic.com/team-logos/142.svg"
+        },
+        "score": {
+          "away": 1,
+          "home": 4
+        },
+        "liveText": ""
+      },
+      "predictions": {},
+      "props": [],
+      "simContextAvailable": false,
+      "snapshotAvailable": true,
+      "startTime": "12:40 PM",
+      "trackedProps": [],
+      "probable": {},
+      "actual_box_panel": {},
+      "first1BetSignal": {},
+      "card_variant": "mlb_main",
+      "away": {
+        "abbr": "HOU",
+        "name": "Houston Astros"
+      },
+      "home": {
+        "abbr": "MIN",
+        "name": "Minnesota Twins"
+      },
+      "status": {
+        "abstract": "Final",
+        "detailed": "Final"
+      },
+      "detail": "12:40 PM",
+      "summary": "Live-lens snapshot loaded from artifact.",
+      "status_badge": "Final",
+      "hero_note": "0 live props | snapshot yes",
+      "metrics": [
+        {
+          "label": "Score",
+          "value": "1-4"
+        },
+        {
+          "label": "Full home",
+          "value": "-"
+        },
+        {
+          "label": "Live home",
+          "value": "-"
+        },
+        {
+          "label": "Open segments",
+          "value": "0"
+        },
+        {
+          "label": "Live props",
+          "value": "0"
+        },
+        {
+          "label": "Snapshot",
+          "value": "Yes"
+        }
+      ],
+      "panels": [
+        {
+          "eyebrow": "Live state",
+          "title": "12:40 PM",
+          "body": "Report snapshot generated at 2026-06-18T02:38:25-05:00. Current score is 1-4."
+        },
+        {
+          "eyebrow": "Segment looks",
+          "title": "Current segment board",
+          "body": "Segment-level reasons come directly from the live-lens report artifact.",
+          "items": []
+        },
+        {
+          "eyebrow": "Top live props",
+          "title": "Best in-game prop edges",
+          "body": "These props are the highest-ranked live looks available in the selected report snapshot.",
+          "items": [
+            "No live props were surfaced for this game in the selected report."
+          ]
+        }
+      ],
+      "href": "/mlb/game/823703?date=2026-05-20",
+      "href_label": "Open game detail",
+      "oddsRefreshedAt": "2026-06-18T07:38:25+00:00",
+      "odds_refreshed_at": "2026-06-18T07:38:25+00:00"
+    },
+    {
+      "archivedLiveProps": [],
+      "gameLens": [],
+      "gameMarkets": {
+        "totals": null,
+        "ml": null
+      },
+      "markets": {
+        "moneyline": {},
+        "spread": {},
+        "total": {}
+      },
+      "gamePk": 824355,
+      "prop_groups": [],
+      "prop_lens": {},
+      "market_tiles": [],
+      "liveProps": [],
+      "matchup": {
+        "away": {
+          "id": 140,
+          "abbr": "TEX",
+          "name": "Texas Rangers",
+          "logo": "https://www.mlbstatic.com/team-logos/140.svg"
+        },
+        "home": {
+          "id": 115,
+          "abbr": "COL",
+          "name": "Colorado Rockies",
+          "logo": "https://www.mlbstatic.com/team-logos/115.svg"
+        },
+        "score": {
+          "away": 5,
+          "home": 4
+        },
+        "liveText": ""
+      },
+      "predictions": {},
+      "props": [],
+      "simContextAvailable": false,
+      "snapshotAvailable": true,
+      "startTime": "2:10 PM",
+      "trackedProps": [],
+      "probable": {},
+      "actual_box_panel": {},
+      "first1BetSignal": {},
+      "card_variant": "mlb_main",
+      "away": {
+        "abbr": "TEX",
+        "name": "Texas Rangers"
+      },
+      "home": {
+        "abbr": "COL",
+        "name": "Colorado Rockies"
+      },
+      "status": {
+        "abstract": "Final",
+        "detailed": "Final"
+      },
+      "detail": "2:10 PM",
+      "summary": "Live-lens snapshot loaded from artifact.",
+      "status_badge": "Final",
+      "hero_note": "0 live props | snapshot yes",
+      "metrics": [
+        {
+          "label": "Score",
+          "value": "5-4"
+        },
+        {
+          "label": "Full home",
+          "value": "-"
+        },
+        {
+          "label": "Live home",
+          "value": "-"
+        },
+        {
+          "label": "Open segments",
+          "value": "0"
+        },
+        {
+          "label": "Live props",
+          "value": "0"
+        },
+        {
+          "label": "Snapshot",
+          "value": "Yes"
+        }
+      ],
+      "panels": [
+        {
+          "eyebrow": "Live state",
+          "title": "2:10 PM",
+          "body": "Report snapshot generated at 2026-06-18T02:38:25-05:00. Current score is 5-4."
+        },
+        {
+          "eyebrow": "Segment looks",
+          "title": "Current segment board",
+          "body": "Segment-level reasons come directly from the live-lens report artifact.",
+          "items": []
+        },
+        {
+          "eyebrow": "Top live props",
+          "title": "Best in-game prop edges",
+          "body": "These props are the highest-ranked live looks available in the selected report snapshot.",
+          "items": [
+            "No live props were surfaced for this game in the selected report."
+          ]
+        }
+      ],
+      "href": "/mlb/game/824355?date=2026-05-20",
+      "href_label": "Open game detail",
+      "oddsRefreshedAt": "2026-06-18T07:38:25+00:00",
+      "odds_refreshed_at": "2026-06-18T07:38:25+00:00"
+    },
+    {
+      "archivedLiveProps": [],
+      "gameLens": [],
+      "gameMarkets": {
+        "totals": null,
+        "ml": null
+      },
+      "markets": {
+        "moneyline": {},
+        "spread": {},
+        "total": {}
+      },
+      "gamePk": 825084,
+      "prop_groups": [],
+      "prop_lens": {},
+      "market_tiles": [],
+      "liveProps": [],
+      "matchup": {
+        "away": {
+          "id": 137,
+          "abbr": "SF",
+          "name": "San Francisco Giants",
+          "logo": "https://www.mlbstatic.com/team-logos/137.svg"
+        },
+        "home": {
+          "id": 109,
+          "abbr": "AZ",
+          "name": "Arizona Diamondbacks",
+          "logo": "https://www.mlbstatic.com/team-logos/109.svg"
+        },
+        "score": {
+          "away": 3,
+          "home": 6
+        },
+        "liveText": ""
+      },
+      "predictions": {},
+      "props": [],
+      "simContextAvailable": false,
+      "snapshotAvailable": true,
+      "startTime": "2:40 PM",
+      "trackedProps": [],
+      "probable": {},
+      "actual_box_panel": {},
+      "first1BetSignal": {},
+      "card_variant": "mlb_main",
+      "away": {
+        "abbr": "SF",
+        "name": "San Francisco Giants"
+      },
+      "home": {
+        "abbr": "AZ",
+        "name": "Arizona Diamondbacks"
+      },
+      "status": {
+        "abstract": "Final",
+        "detailed": "Final"
+      },
+      "detail": "2:40 PM",
+      "summary": "Live-lens snapshot loaded from artifact.",
+      "status_badge": "Final",
+      "hero_note": "0 live props | snapshot yes",
+      "metrics": [
+        {
+          "label": "Score",
+          "value": "3-6"
+        },
+        {
+          "label": "Full home",
+          "value": "-"
+        },
+        {
+          "label": "Live home",
+          "value": "-"
+        },
+        {
+          "label": "Open segments",
+          "value": "0"
+        },
+        {
+          "label": "Live props",
+          "value": "0"
+        },
+        {
+          "label": "Snapshot",
+          "value": "Yes"
+        }
+      ],
+      "panels": [
+        {
+          "eyebrow": "Live state",
+          "title": "2:40 PM",
+          "body": "Report snapshot generated at 2026-06-18T02:38:25-05:00. Current score is 3-6."
+        },
+        {
+          "eyebrow": "Segment looks",
+          "title": "Current segment board",
+          "body": "Segment-level reasons come directly from the live-lens report artifact.",
+          "items": []
+        },
+        {
+          "eyebrow": "Top live props",
+          "title": "Best in-game prop edges",
+          "body": "These props are the highest-ranked live looks available in the selected report snapshot.",
+          "items": [
+            "No live props were surfaced for this game in the selected report."
+          ]
+        }
+      ],
+      "href": "/mlb/game/825084?date=2026-05-20",
+      "href_label": "Open game detail",
+      "oddsRefreshedAt": "2026-06-18T07:38:25+00:00",
+      "odds_refreshed_at": "2026-06-18T07:38:25+00:00"
+    },
+    {
+      "archivedLiveProps": [],
+      "gameLens": [],
+      "gameMarkets": {
+        "totals": null,
+        "ml": null
+      },
+      "markets": {
+        "moneyline": {},
+        "spread": {},
+        "total": {}
+      },
+      "gamePk": 823134,
+      "prop_groups": [],
+      "prop_lens": {},
+      "market_tiles": [],
+      "liveProps": [],
+      "matchup": {
+        "away": {
+          "id": 145,
+          "abbr": "CWS",
+          "name": "Chicago White Sox",
+          "logo": "https://www.mlbstatic.com/team-logos/145.svg"
+        },
+        "home": {
+          "id": 136,
+          "abbr": "SEA",
+          "name": "Seattle Mariners",
+          "logo": "https://www.mlbstatic.com/team-logos/136.svg"
+        },
+        "score": {
+          "away": 4,
+          "home": 5
+        },
+        "liveText": ""
+      },
+      "predictions": {},
+      "props": [],
+      "simContextAvailable": false,
+      "snapshotAvailable": true,
+      "startTime": "3:10 PM",
+      "trackedProps": [],
+      "probable": {},
+      "actual_box_panel": {},
+      "first1BetSignal": {},
+      "card_variant": "mlb_main",
+      "away": {
+        "abbr": "CWS",
+        "name": "Chicago White Sox"
+      },
+      "home": {
+        "abbr": "SEA",
+        "name": "Seattle Mariners"
+      },
+      "status": {
+        "abstract": "Final",
+        "detailed": "Final"
+      },
+      "detail": "3:10 PM",
+      "summary": "Live-lens snapshot loaded from artifact.",
+      "status_badge": "Final",
+      "hero_note": "0 live props | snapshot yes",
+      "metrics": [
+        {
+          "label": "Score",
+          "value": "4-5"
+        },
+        {
+          "label": "Full home",
+          "value": "-"
+        },
+        {
+          "label": "Live home",
+          "value": "-"
+        },
+        {
+          "label": "Open segments",
+          "value": "0"
+        },
+        {
+          "label": "Live props",
+          "value": "0"
+        },
+        {
+          "label": "Snapshot",
+          "value": "Yes"
+        }
+      ],
+      "panels": [
+        {
+          "eyebrow": "Live state",
+          "title": "3:10 PM",
+          "body": "Report snapshot generated at 2026-06-18T02:38:25-05:00. Current score is 4-5."
+        },
+        {
+          "eyebrow": "Segment looks",
+          "title": "Current segment board",
+          "body": "Segment-level reasons come directly from the live-lens report artifact.",
+          "items": []
+        },
+        {
+          "eyebrow": "Top live props",
+          "title": "Best in-game prop edges",
+          "body": "These props are the highest-ranked live looks available in the selected report snapshot.",
+          "items": [
+            "No live props were surfaced for this game in the selected report."
+          ]
+        }
+      ],
+      "href": "/mlb/game/823134?date=2026-05-20",
+      "href_label": "Open game detail",
+      "oddsRefreshedAt": "2026-06-18T07:38:25+00:00",
+      "odds_refreshed_at": "2026-06-18T07:38:25+00:00"
+    },
+    {
+      "archivedLiveProps": [],
+      "gameLens": [],
+      "gameMarkets": {
+        "totals": null,
+        "ml": null
+      },
+      "markets": {
+        "moneyline": {},
+        "spread": {},
+        "total": {}
+      },
+      "gamePk": 823866,
+      "prop_groups": [],
+      "prop_lens": {},
+      "market_tiles": [],
+      "liveProps": [],
+      "matchup": {
+        "away": {
+          "id": 144,
+          "abbr": "ATL",
+          "name": "Atlanta Braves",
+          "logo": "https://www.mlbstatic.com/team-logos/144.svg"
+        },
+        "home": {
+          "id": 146,
+          "abbr": "MIA",
+          "name": "Miami Marlins",
+          "logo": "https://www.mlbstatic.com/team-logos/146.svg"
+        },
+        "score": {
+          "away": 9,
+          "home": 1
+        },
+        "liveText": ""
+      },
+      "predictions": {},
+      "props": [],
+      "simContextAvailable": false,
+      "snapshotAvailable": true,
+      "startTime": "5:40 PM",
+      "trackedProps": [],
+      "probable": {},
+      "actual_box_panel": {},
+      "first1BetSignal": {},
+      "card_variant": "mlb_main",
+      "away": {
+        "abbr": "ATL",
+        "name": "Atlanta Braves"
+      },
+      "home": {
+        "abbr": "MIA",
+        "name": "Miami Marlins"
+      },
+      "status": {
+        "abstract": "Final",
+        "detailed": "Final"
+      },
+      "detail": "5:40 PM",
+      "summary": "Live-lens snapshot loaded from artifact.",
+      "status_badge": "Final",
+      "hero_note": "0 live props | snapshot yes",
+      "metrics": [
+        {
+          "label": "Score",
+          "value": "9-1"
+        },
+        {
+          "label": "Full home",
+          "value": "-"
+        },
+        {
+          "label": "Live home",
+          "value": "-"
+        },
+        {
+          "label": "Open segments",
+          "value": "0"
+        },
+        {
+          "label": "Live props",
+          "value": "0"
+        },
+        {
+          "label": "Snapshot",
+          "value": "Yes"
+        }
+      ],
+      "panels": [
+        {
+          "eyebrow": "Live state",
+          "title": "5:40 PM",
+          "body": "Report snapshot generated at 2026-06-18T02:38:25-05:00. Current score is 9-1."
+        },
+        {
+          "eyebrow": "Segment looks",
+          "title": "Current segment board",
+          "body": "Segment-level reasons come directly from the live-lens report artifact.",
+          "items": []
+        },
+        {
+          "eyebrow": "Top live props",
+          "title": "Best in-game prop edges",
+          "body": "These props are the highest-ranked live looks available in the selected report snapshot.",
+          "items": [
+            "No live props were surfaced for this game in the selected report."
+          ]
+        }
+      ],
+      "href": "/mlb/game/823866?date=2026-05-20",
+      "href_label": "Open game detail",
+      "oddsRefreshedAt": "2026-06-18T07:38:25+00:00",
+      "odds_refreshed_at": "2026-06-18T07:38:25+00:00"
+    },
+    {
+      "archivedLiveProps": [],
+      "gameLens": [],
+      "gameMarkets": {
+        "totals": null,
+        "ml": null
+      },
+      "markets": {
+        "moneyline": {},
+        "spread": {},
+        "total": {}
+      },
+      "gamePk": 824273,
+      "prop_groups": [],
+      "prop_lens": {},
+      "market_tiles": [],
+      "liveProps": [],
+      "matchup": {
+        "away": {
+          "id": 114,
+          "abbr": "CLE",
+          "name": "Cleveland Guardians",
+          "logo": "https://www.mlbstatic.com/team-logos/114.svg"
+        },
+        "home": {
+          "id": 116,
+          "abbr": "DET",
+          "name": "Detroit Tigers",
+          "logo": "https://www.mlbstatic.com/team-logos/116.svg"
+        },
+        "score": {
+          "away": 3,
+          "home": 2
+        },
+        "liveText": ""
+      },
+      "predictions": {},
+      "props": [],
+      "simContextAvailable": false,
+      "snapshotAvailable": true,
+      "startTime": "5:40 PM",
+      "trackedProps": [],
+      "probable": {},
+      "actual_box_panel": {},
+      "first1BetSignal": {},
+      "card_variant": "mlb_main",
+      "away": {
+        "abbr": "CLE",
+        "name": "Cleveland Guardians"
+      },
+      "home": {
+        "abbr": "DET",
+        "name": "Detroit Tigers"
+      },
+      "status": {
+        "abstract": "Final",
+        "detailed": "Final"
+      },
+      "detail": "5:40 PM",
+      "summary": "Live-lens snapshot loaded from artifact.",
+      "status_badge": "Final",
+      "hero_note": "0 live props | snapshot yes",
+      "metrics": [
+        {
+          "label": "Score",
+          "value": "3-2"
+        },
+        {
+          "label": "Full home",
+          "value": "-"
+        },
+        {
+          "label": "Live home",
+          "value": "-"
+        },
+        {
+          "label": "Open segments",
+          "value": "0"
+        },
+        {
+          "label": "Live props",
+          "value": "0"
+        },
+        {
+          "label": "Snapshot",
+          "value": "Yes"
+        }
+      ],
+      "panels": [
+        {
+          "eyebrow": "Live state",
+          "title": "5:40 PM",
+          "body": "Report snapshot generated at 2026-06-18T02:38:25-05:00. Current score is 3-2."
+        },
+        {
+          "eyebrow": "Segment looks",
+          "title": "Current segment board",
+          "body": "Segment-level reasons come directly from the live-lens report artifact.",
+          "items": []
+        },
+        {
+          "eyebrow": "Top live props",
+          "title": "Best in-game prop edges",
+          "body": "These props are the highest-ranked live looks available in the selected report snapshot.",
+          "items": [
+            "No live props were surfaced for this game in the selected report."
+          ]
+        }
+      ],
+      "href": "/mlb/game/824273?date=2026-05-20",
+      "href_label": "Open game detail",
+      "oddsRefreshedAt": "2026-06-18T07:38:25+00:00",
+      "odds_refreshed_at": "2026-06-18T07:38:25+00:00"
+    },
+    {
+      "archivedLiveProps": [],
+      "gameLens": [],
+      "gameMarkets": {
+        "totals": null,
+        "ml": null
+      },
+      "markets": {
+        "moneyline": {},
+        "spread": {},
+        "total": {}
+      },
+      "gamePk": 822735,
+      "prop_groups": [],
+      "prop_lens": {},
+      "market_tiles": [],
+      "liveProps": [],
+      "matchup": {
+        "away": {
+          "id": 121,
+          "abbr": "NYM",
+          "name": "New York Mets",
+          "logo": "https://www.mlbstatic.com/team-logos/121.svg"
+        },
+        "home": {
+          "id": 120,
+          "abbr": "WSH",
+          "name": "Washington Nationals",
+          "logo": "https://www.mlbstatic.com/team-logos/120.svg"
+        },
+        "score": {
+          "away": 4,
+          "home": 8
+        },
+        "liveText": ""
+      },
+      "predictions": {},
+      "props": [],
+      "simContextAvailable": false,
+      "snapshotAvailable": true,
+      "startTime": "5:45 PM",
+      "trackedProps": [],
+      "probable": {},
+      "actual_box_panel": {},
+      "first1BetSignal": {},
+      "card_variant": "mlb_main",
+      "away": {
+        "abbr": "NYM",
+        "name": "New York Mets"
+      },
+      "home": {
+        "abbr": "WSH",
+        "name": "Washington Nationals"
+      },
+      "status": {
+        "abstract": "Final",
+        "detailed": "Final"
+      },
+      "detail": "5:45 PM",
+      "summary": "Live-lens snapshot loaded from artifact.",
+      "status_badge": "Final",
+      "hero_note": "0 live props | snapshot yes",
+      "metrics": [
+        {
+          "label": "Score",
+          "value": "4-8"
+        },
+        {
+          "label": "Full home",
+          "value": "-"
+        },
+        {
+          "label": "Live home",
+          "value": "-"
+        },
+        {
+          "label": "Open segments",
+          "value": "0"
+        },
+        {
+          "label": "Live props",
+          "value": "0"
+        },
+        {
+          "label": "Snapshot",
+          "value": "Yes"
+        }
+      ],
+      "panels": [
+        {
+          "eyebrow": "Live state",
+          "title": "5:45 PM",
+          "body": "Report snapshot generated at 2026-06-18T02:38:25-05:00. Current score is 4-8."
+        },
+        {
+          "eyebrow": "Segment looks",
+          "title": "Current segment board",
+          "body": "Segment-level reasons come directly from the live-lens report artifact.",
+          "items": []
+        },
+        {
+          "eyebrow": "Top live props",
+          "title": "Best in-game prop edges",
+          "body": "These props are the highest-ranked live looks available in the selected report snapshot.",
+          "items": [
+            "No live props were surfaced for this game in the selected report."
+          ]
+        }
+      ],
+      "href": "/mlb/game/822735?date=2026-05-20",
+      "href_label": "Open game detail",
+      "oddsRefreshedAt": "2026-06-18T07:38:25+00:00",
+      "odds_refreshed_at": "2026-06-18T07:38:25+00:00"
+    },
+    {
+      "archivedLiveProps": [],
+      "gameLens": [],
+      "gameMarkets": {
+        "totals": null,
+        "ml": null
+      },
+      "markets": {
+        "moneyline": {},
+        "spread": {},
+        "total": {}
+      },
+      "gamePk": 823547,
+      "prop_groups": [],
+      "prop_lens": {},
+      "market_tiles": [],
+      "liveProps": [],
+      "matchup": {
+        "away": {
+          "id": 141,
+          "abbr": "TOR",
+          "name": "Toronto Blue Jays",
+          "logo": "https://www.mlbstatic.com/team-logos/141.svg"
+        },
+        "home": {
+          "id": 147,
+          "abbr": "NYY",
+          "name": "New York Yankees",
+          "logo": "https://www.mlbstatic.com/team-logos/147.svg"
+        },
+        "score": {
+          "away": 2,
+          "home": 1
+        },
+        "liveText": ""
+      },
+      "predictions": {},
+      "props": [],
+      "simContextAvailable": false,
+      "snapshotAvailable": true,
+      "startTime": "6:05 PM",
+      "trackedProps": [],
+      "probable": {},
+      "actual_box_panel": {},
+      "first1BetSignal": {},
+      "card_variant": "mlb_main",
+      "away": {
+        "abbr": "TOR",
+        "name": "Toronto Blue Jays"
+      },
+      "home": {
+        "abbr": "NYY",
+        "name": "New York Yankees"
+      },
+      "status": {
+        "abstract": "Final",
+        "detailed": "Final"
+      },
+      "detail": "6:05 PM",
+      "summary": "Live-lens snapshot loaded from artifact.",
+      "status_badge": "Final",
+      "hero_note": "0 live props | snapshot yes",
+      "metrics": [
+        {
+          "label": "Score",
+          "value": "2-1"
+        },
+        {
+          "label": "Full home",
+          "value": "-"
+        },
+        {
+          "label": "Live home",
+          "value": "-"
+        },
+        {
+          "label": "Open segments",
+          "value": "0"
+        },
+        {
+          "label": "Live props",
+          "value": "0"
+        },
+        {
+          "label": "Snapshot",
+          "value": "Yes"
+        }
+      ],
+      "panels": [
+        {
+          "eyebrow": "Live state",
+          "title": "6:05 PM",
+          "body": "Report snapshot generated at 2026-06-18T02:38:25-05:00. Current score is 2-1."
+        },
+        {
+          "eyebrow": "Segment looks",
+          "title": "Current segment board",
+          "body": "Segment-level reasons come directly from the live-lens report artifact.",
+          "items": []
+        },
+        {
+          "eyebrow": "Top live props",
+          "title": "Best in-game prop edges",
+          "body": "These props are the highest-ranked live looks available in the selected report snapshot.",
+          "items": [
+            "No live props were surfaced for this game in the selected report."
+          ]
+        }
+      ],
+      "href": "/mlb/game/823547?date=2026-05-20",
+      "href_label": "Open game detail",
+      "oddsRefreshedAt": "2026-06-18T07:38:25+00:00",
+      "odds_refreshed_at": "2026-06-18T07:38:25+00:00"
+    },
+    {
+      "archivedLiveProps": [],
+      "gameLens": [],
+      "gameMarkets": {
+        "totals": null,
+        "ml": null
+      },
+      "markets": {
+        "moneyline": {},
+        "spread": {},
+        "total": {}
+      },
+      "gamePk": 824111,
+      "prop_groups": [],
+      "prop_lens": {},
+      "market_tiles": [],
+      "liveProps": [],
+      "matchup": {
+        "away": {
+          "id": 111,
+          "abbr": "BOS",
+          "name": "Boston Red Sox",
+          "logo": "https://www.mlbstatic.com/team-logos/111.svg"
+        },
+        "home": {
+          "id": 118,
+          "abbr": "KC",
+          "name": "Kansas City Royals",
+          "logo": "https://www.mlbstatic.com/team-logos/118.svg"
+        },
+        "score": {
+          "away": 4,
+          "home": 3
+        },
+        "liveText": ""
+      },
+      "predictions": {},
+      "props": [],
+      "simContextAvailable": false,
+      "snapshotAvailable": true,
+      "startTime": "6:40 PM",
+      "trackedProps": [],
+      "probable": {},
+      "actual_box_panel": {},
+      "first1BetSignal": {},
+      "card_variant": "mlb_main",
+      "away": {
+        "abbr": "BOS",
+        "name": "Boston Red Sox"
+      },
+      "home": {
+        "abbr": "KC",
+        "name": "Kansas City Royals"
+      },
+      "status": {
+        "abstract": "Final",
+        "detailed": "Final"
+      },
+      "detail": "6:40 PM",
+      "summary": "Live-lens snapshot loaded from artifact.",
+      "status_badge": "Final",
+      "hero_note": "0 live props | snapshot yes",
+      "metrics": [
+        {
+          "label": "Score",
+          "value": "4-3"
+        },
+        {
+          "label": "Full home",
+          "value": "-"
+        },
+        {
+          "label": "Live home",
+          "value": "-"
+        },
+        {
+          "label": "Open segments",
+          "value": "0"
+        },
+        {
+          "label": "Live props",
+          "value": "0"
+        },
+        {
+          "label": "Snapshot",
+          "value": "Yes"
+        }
+      ],
+      "panels": [
+        {
+          "eyebrow": "Live state",
+          "title": "6:40 PM",
+          "body": "Report snapshot generated at 2026-06-18T02:38:25-05:00. Current score is 4-3."
+        },
+        {
+          "eyebrow": "Segment looks",
+          "title": "Current segment board",
+          "body": "Segment-level reasons come directly from the live-lens report artifact.",
+          "items": []
+        },
+        {
+          "eyebrow": "Top live props",
+          "title": "Best in-game prop edges",
+          "body": "These props are the highest-ranked live looks available in the selected report snapshot.",
+          "items": [
+            "No live props were surfaced for this game in the selected report."
+          ]
+        }
+      ],
+      "href": "/mlb/game/824111?date=2026-05-20",
+      "href_label": "Open game detail",
+      "oddsRefreshedAt": "2026-06-18T07:38:25+00:00",
+      "odds_refreshed_at": "2026-06-18T07:38:25+00:00"
+    },
+    {
+      "archivedLiveProps": [],
+      "gameLens": [],
+      "gameMarkets": {
+        "totals": null,
+        "ml": null
+      },
+      "markets": {
+        "moneyline": {},
+        "spread": {},
+        "total": {}
+      },
+      "gamePk": 824678,
+      "prop_groups": [],
+      "prop_lens": {},
+      "market_tiles": [],
+      "liveProps": [],
+      "matchup": {
+        "away": {
+          "id": 158,
+          "abbr": "MIL",
+          "name": "Milwaukee Brewers",
+          "logo": "https://www.mlbstatic.com/team-logos/158.svg"
+        },
+        "home": {
+          "id": 112,
+          "abbr": "CHC",
+          "name": "Chicago Cubs",
+          "logo": "https://www.mlbstatic.com/team-logos/112.svg"
+        },
+        "score": {
+          "away": 5,
+          "home": 0
+        },
+        "liveText": ""
+      },
+      "predictions": {},
+      "props": [],
+      "simContextAvailable": false,
+      "snapshotAvailable": true,
+      "startTime": "6:40 PM",
+      "trackedProps": [],
+      "probable": {},
+      "actual_box_panel": {},
+      "first1BetSignal": {},
+      "card_variant": "mlb_main",
+      "away": {
+        "abbr": "MIL",
+        "name": "Milwaukee Brewers"
+      },
+      "home": {
+        "abbr": "CHC",
+        "name": "Chicago Cubs"
+      },
+      "status": {
+        "abstract": "Final",
+        "detailed": "Final"
+      },
+      "detail": "6:40 PM",
+      "summary": "Live-lens snapshot loaded from artifact.",
+      "status_badge": "Final",
+      "hero_note": "0 live props | snapshot yes",
+      "metrics": [
+        {
+          "label": "Score",
+          "value": "5-0"
+        },
+        {
+          "label": "Full home",
+          "value": "-"
+        },
+        {
+          "label": "Live home",
+          "value": "-"
+        },
+        {
+          "label": "Open segments",
+          "value": "0"
+        },
+        {
+          "label": "Live props",
+          "value": "0"
+        },
+        {
+          "label": "Snapshot",
+          "value": "Yes"
+        }
+      ],
+      "panels": [
+        {
+          "eyebrow": "Live state",
+          "title": "6:40 PM",
+          "body": "Report snapshot generated at 2026-06-18T02:38:25-05:00. Current score is 5-0."
+        },
+        {
+          "eyebrow": "Segment looks",
+          "title": "Current segment board",
+          "body": "Segment-level reasons come directly from the live-lens report artifact.",
+          "items": []
+        },
+        {
+          "eyebrow": "Top live props",
+          "title": "Best in-game prop edges",
+          "body": "These props are the highest-ranked live looks available in the selected report snapshot.",
+          "items": [
+            "No live props were surfaced for this game in the selected report."
+          ]
+        }
+      ],
+      "href": "/mlb/game/824678?date=2026-05-20",
+      "href_label": "Open game detail",
+      "oddsRefreshedAt": "2026-06-18T07:38:25+00:00",
+      "odds_refreshed_at": "2026-06-18T07:38:25+00:00"
+    },
+    {
+      "archivedLiveProps": [],
+      "gameLens": [],
+      "gameMarkets": {
+        "totals": null,
+        "ml": null
+      },
+      "markets": {
+        "moneyline": {},
+        "spread": {},
+        "total": {}
+      },
+      "gamePk": 823057,
+      "prop_groups": [],
+      "prop_lens": {},
+      "market_tiles": [],
+      "liveProps": [],
+      "matchup": {
+        "away": {
+          "id": 134,
+          "abbr": "PIT",
+          "name": "Pittsburgh Pirates",
+          "logo": "https://www.mlbstatic.com/team-logos/134.svg"
+        },
+        "home": {
+          "id": 138,
+          "abbr": "STL",
+          "name": "St. Louis Cardinals",
+          "logo": "https://www.mlbstatic.com/team-logos/138.svg"
+        },
+        "score": {
+          "away": 7,
+          "home": 0
+        },
+        "liveText": ""
+      },
+      "predictions": {},
+      "props": [],
+      "simContextAvailable": false,
+      "snapshotAvailable": true,
+      "startTime": "6:45 PM",
+      "trackedProps": [],
+      "probable": {},
+      "actual_box_panel": {},
+      "first1BetSignal": {},
+      "card_variant": "mlb_main",
+      "away": {
+        "abbr": "PIT",
+        "name": "Pittsburgh Pirates"
+      },
+      "home": {
+        "abbr": "STL",
+        "name": "St. Louis Cardinals"
+      },
+      "status": {
+        "abstract": "Final",
+        "detailed": "Final"
+      },
+      "detail": "6:45 PM",
+      "summary": "Live-lens snapshot loaded from artifact.",
+      "status_badge": "Final",
+      "hero_note": "0 live props | snapshot yes",
+      "metrics": [
+        {
+          "label": "Score",
+          "value": "7-0"
+        },
+        {
+          "label": "Full home",
+          "value": "-"
+        },
+        {
+          "label": "Live home",
+          "value": "-"
+        },
+        {
+          "label": "Open segments",
+          "value": "0"
+        },
+        {
+          "label": "Live props",
+          "value": "0"
+        },
+        {
+          "label": "Snapshot",
+          "value": "Yes"
+        }
+      ],
+      "panels": [
+        {
+          "eyebrow": "Live state",
+          "title": "6:45 PM",
+          "body": "Report snapshot generated at 2026-06-18T02:38:25-05:00. Current score is 7-0."
+        },
+        {
+          "eyebrow": "Segment looks",
+          "title": "Current segment board",
+          "body": "Segment-level reasons come directly from the live-lens report artifact.",
+          "items": []
+        },
+        {
+          "eyebrow": "Top live props",
+          "title": "Best in-game prop edges",
+          "body": "These props are the highest-ranked live looks available in the selected report snapshot.",
+          "items": [
+            "No live props were surfaced for this game in the selected report."
+          ]
+        }
+      ],
+      "href": "/mlb/game/823057?date=2026-05-20",
+      "href_label": "Open game detail",
+      "oddsRefreshedAt": "2026-06-18T07:38:25+00:00",
+      "odds_refreshed_at": "2026-06-18T07:38:25+00:00"
+    },
+    {
+      "archivedLiveProps": [],
+      "gameLens": [],
+      "gameMarkets": {
+        "totals": null,
+        "ml": null
+      },
+      "markets": {
+        "moneyline": {},
+        "spread": {},
+        "total": {}
+      },
+      "gamePk": 823299,
+      "prop_groups": [],
+      "prop_lens": {},
+      "market_tiles": [],
+      "liveProps": [],
+      "matchup": {
+        "away": {
+          "id": 119,
+          "abbr": "LAD",
+          "name": "Los Angeles Dodgers",
+          "logo": "https://www.mlbstatic.com/team-logos/119.svg"
+        },
+        "home": {
+          "id": 135,
+          "abbr": "SD",
+          "name": "San Diego Padres",
+          "logo": "https://www.mlbstatic.com/team-logos/135.svg"
+        },
+        "score": {
+          "away": 4,
+          "home": 0
+        },
+        "liveText": ""
+      },
+      "predictions": {},
+      "props": [],
+      "simContextAvailable": false,
+      "snapshotAvailable": true,
+      "startTime": "7:40 PM",
+      "trackedProps": [],
+      "probable": {},
+      "actual_box_panel": {},
+      "first1BetSignal": {},
+      "card_variant": "mlb_main",
+      "away": {
+        "abbr": "LAD",
+        "name": "Los Angeles Dodgers"
+      },
+      "home": {
+        "abbr": "SD",
+        "name": "San Diego Padres"
+      },
+      "status": {
+        "abstract": "Final",
+        "detailed": "Final"
+      },
+      "detail": "7:40 PM",
+      "summary": "Live-lens snapshot loaded from artifact.",
+      "status_badge": "Final",
+      "hero_note": "0 live props | snapshot yes",
+      "metrics": [
+        {
+          "label": "Score",
+          "value": "4-0"
+        },
+        {
+          "label": "Full home",
+          "value": "-"
+        },
+        {
+          "label": "Live home",
+          "value": "-"
+        },
+        {
+          "label": "Open segments",
+          "value": "0"
+        },
+        {
+          "label": "Live props",
+          "value": "0"
+        },
+        {
+          "label": "Snapshot",
+          "value": "Yes"
+        }
+      ],
+      "panels": [
+        {
+          "eyebrow": "Live state",
+          "title": "7:40 PM",
+          "body": "Report snapshot generated at 2026-06-18T02:38:25-05:00. Current score is 4-0."
+        },
+        {
+          "eyebrow": "Segment looks",
+          "title": "Current segment board",
+          "body": "Segment-level reasons come directly from the live-lens report artifact.",
+          "items": []
+        },
+        {
+          "eyebrow": "Top live props",
+          "title": "Best in-game prop edges",
+          "body": "These props are the highest-ranked live looks available in the selected report snapshot.",
+          "items": [
+            "No live props were surfaced for this game in the selected report."
+          ]
+        }
+      ],
+      "href": "/mlb/game/823299?date=2026-05-20",
+      "href_label": "Open game detail",
+      "oddsRefreshedAt": "2026-06-18T07:38:25+00:00",
+      "odds_refreshed_at": "2026-06-18T07:38:25+00:00"
+    },
+    {
+      "archivedLiveProps": [],
+      "gameLens": [],
+      "gameMarkets": {
+        "totals": null,
+        "ml": null
+      },
+      "markets": {
+        "moneyline": {},
+        "spread": {},
+        "total": {}
+      },
+      "gamePk": 824032,
+      "prop_groups": [],
+      "prop_lens": {},
+      "market_tiles": [],
+      "liveProps": [],
+      "matchup": {
+        "away": {
+          "id": 133,
+          "abbr": "ATH",
+          "name": "Athletics",
+          "logo": "https://www.mlbstatic.com/team-logos/133.svg"
+        },
+        "home": {
+          "id": 108,
+          "abbr": "LAA",
+          "name": "Los Angeles Angels",
+          "logo": "https://www.mlbstatic.com/team-logos/108.svg"
+        },
+        "score": {
+          "away": 6,
+          "home": 5
+        },
+        "liveText": ""
+      },
+      "predictions": {},
+      "props": [],
+      "simContextAvailable": false,
+      "snapshotAvailable": true,
+      "startTime": "8:38 PM",
+      "trackedProps": [],
+      "probable": {},
+      "actual_box_panel": {},
+      "first1BetSignal": {},
+      "card_variant": "mlb_main",
+      "away": {
+        "abbr": "ATH",
+        "name": "Athletics"
+      },
+      "home": {
+        "abbr": "LAA",
+        "name": "Los Angeles Angels"
+      },
+      "status": {
+        "abstract": "Final",
+        "detailed": "Final"
+      },
+      "detail": "8:38 PM",
+      "summary": "Live-lens snapshot loaded from artifact.",
+      "status_badge": "Final",
+      "hero_note": "0 live props | snapshot yes",
+      "metrics": [
+        {
+          "label": "Score",
+          "value": "6-5"
+        },
+        {
+          "label": "Full home",
+          "value": "-"
+        },
+        {
+          "label": "Live home",
+          "value": "-"
+        },
+        {
+          "label": "Open segments",
+          "value": "0"
+        },
+        {
+          "label": "Live props",
+          "value": "0"
+        },
+        {
+          "label": "Snapshot",
+          "value": "Yes"
+        }
+      ],
+      "panels": [
+        {
+          "eyebrow": "Live state",
+          "title": "8:38 PM",
+          "body": "Report snapshot generated at 2026-06-18T02:38:25-05:00. Current score is 6-5."
+        },
+        {
+          "eyebrow": "Segment looks",
+          "title": "Current segment board",
+          "body": "Segment-level reasons come directly from the live-lens report artifact.",
+          "items": []
+        },
+        {
+          "eyebrow": "Top live props",
+          "title": "Best in-game prop edges",
+          "body": "These props are the highest-ranked live looks available in the selected report snapshot.",
+          "items": [
+            "No live props were surfaced for this game in the selected report."
+          ]
+        }
+      ],
+      "href": "/mlb/game/824032?date=2026-05-20",
+      "href_label": "Open game detail",
+      "oddsRefreshedAt": "2026-06-18T07:38:25+00:00",
+      "odds_refreshed_at": "2026-06-18T07:38:25+00:00"
+    }
+  ],
+  "oddsRefreshedAt": "2026-06-18T07:38:25+00:00",
+  "odds_refreshed_at": "2026-06-18T07:38:25+00:00",
+  "source_title": "MLB live-lens report artifact",
+  "source_path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\live_lens\\live_lens_report_2026_05_20.json"
+}

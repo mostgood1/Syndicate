@@ -556,7 +556,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.5083333333333333,
         "platoon_mult_vs_lhb": {},
         "platoon_mult_vs_rhb": {},
         "statcast_quality_mult": {},
@@ -633,7 +633,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.94,
+        "availability_mult": 0.815,
         "platoon_mult_vs_lhb": {
           "k": 0.8407150646518149,
           "bb": 1.1694492254733218,
@@ -1545,7 +1545,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 27,
-        "availability_mult": 1.0,
+        "availability_mult": 0.6416666666666666,
         "platoon_mult_vs_lhb": {
           "k": 1.0830009847365831,
           "bb": 0.8624889708831314,
@@ -1631,7 +1631,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.625,
         "platoon_mult_vs_lhb": {
           "k": 1.152132270372146,
           "bb": 1.1735582779382592,
@@ -1764,7 +1764,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.8583333333333334,
         "platoon_mult_vs_lhb": {
           "k": 1.1092827026625176,
           "bb": 0.9861092452779494,

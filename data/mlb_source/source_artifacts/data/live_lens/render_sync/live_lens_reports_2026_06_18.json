@@ -1,0 +1,3047 @@
+{
+  "ok": true,
+  "date": "2026-06-18",
+  "optimizationRegime": {
+    "date": "2026-06-18",
+    "kind": "forward_tuned_live",
+    "label": "Forward tuned live",
+    "isLegacyComparison": false,
+    "isCleanBaseline": false,
+    "baselineStartDate": "2026-03-31",
+    "legacyWindowStartDate": "2026-03-25",
+    "recommendedUse": "post_retune_monitoring",
+    "forwardTuningStartDate": "2026-04-14"
+  },
+  "logPath": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/live_lens/live_lens_2026_06_18.jsonl",
+  "propObservationLogPath": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/live_lens/prop_registry/live_prop_observations_2026_06_18.jsonl",
+  "registryPath": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/live_lens/prop_registry/live_prop_registry_2026_06_18.json",
+  "registryLogPath": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/live_lens/prop_registry/live_prop_registry_2026_06_18.jsonl",
+  "reportPath": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/live_lens/live_lens_report_2026_06_18.json",
+  "dailyRecapPath": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/live_lens/recaps/live_lens_daily_recap_2026_06_18.json",
+  "entries": 1,
+  "latestEntry": {
+    "recordedAt": "2026-06-18T07:38:10+00:00",
+    "date": "2026-06-18",
+    "generatedAt": "2026-06-18T02:38:10-05:00",
+    "oddsRefreshedAt": null,
+    "counts": {
+      "games": 9,
+      "live": 0,
+      "final": 0,
+      "pregame": 9,
+      "props": 0,
+      "archivedLiveProps": 0
+    },
+    "performance": {
+      "marketsRefreshed": false,
+      "marketRefreshMs": 0.0,
+      "totalMs": 538.9,
+      "snapshotLoadMs": 1.1,
+      "simContextLoadMs": 0.8,
+      "propEvalMs": 0.1,
+      "gameLensMs": 1.1,
+      "gameCount": 9,
+      "liveGameCount": 0,
+      "feedFetchCount": 9,
+      "persistMs": 0.0
+    },
+    "games": [
+      {
+        "gamePk": 824748,
+        "status": "Preview",
+        "score": {
+          "away": 0,
+          "home": 0
+        },
+        "liveText": "Trey Yesavage vs Sonny Gray",
+        "propCount": 0,
+        "topProps": []
+      },
+      {
+        "gamePk": 823772,
+        "status": "Preview",
+        "score": {
+          "away": 0,
+          "home": 0
+        },
+        "liveText": "Parker Messick vs Shane Drohan",
+        "propCount": 0,
+        "topProps": []
+      },
+      {
+        "gamePk": 822889,
+        "status": "Preview",
+        "score": {
+          "away": 0,
+          "home": 0
+        },
+        "liveText": "Joe Ryan vs Jack Leiter",
+        "propCount": 0,
+        "topProps": []
+      },
+      {
+        "gamePk": 823125,
+        "status": "Preview",
+        "score": {
+          "away": 0,
+          "home": 0
+        },
+        "liveText": "Shane Baz vs Bryan Woo",
+        "propCount": 0,
+        "topProps": []
+      },
+      {
+        "gamePk": 823448,
+        "status": "Preview",
+        "score": {
+          "away": 0,
+          "home": 0
+        },
+        "liveText": "Sean Manaea vs Aaron Nola",
+        "propCount": 0,
+        "topProps": []
+      },
+      {
+        "gamePk": 823533,
+        "status": "Preview",
+        "score": {
+          "away": 0,
+          "home": 0
+        },
+        "liveText": "Sean Burke vs Ryan Weathers",
+        "propCount": 0,
+        "topProps": []
+      },
+      {
+        "gamePk": 824911,
+        "status": "Preview",
+        "score": {
+          "away": 0,
+          "home": 0
+        },
+        "liveText": "Landen Roupp vs Mart\u00edn P\u00e9rez",
+        "propCount": 0,
+        "topProps": []
+      },
+      {
+        "gamePk": 824098,
+        "status": "Preview",
+        "score": {
+          "away": 0,
+          "home": 0
+        },
+        "liveText": "Matthew Liberatore vs Noah Cameron",
+        "propCount": 0,
+        "topProps": []
+      },
+      {
+        "gamePk": 824989,
+        "status": "Preview",
+        "score": {
+          "away": 0,
+          "home": 0
+        },
+        "liveText": "Jos\u00e9 Soriano vs Jeffrey Springs",
+        "propCount": 0,
+        "topProps": []
+      }
+    ]
+  },
+  "latestReport": {
+    "date": "2026-06-18",
+    "generatedAt": "2026-06-18T02:48:33-05:00",
+    "dataRoot": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data",
+    "liveLensDir": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/live_lens",
+    "optimizationRegime": {
+      "date": "2026-06-18",
+      "kind": "forward_tuned_live",
+      "label": "Forward tuned live",
+      "isLegacyComparison": false,
+      "isCleanBaseline": false,
+      "baselineStartDate": "2026-03-31",
+      "legacyWindowStartDate": "2026-03-25",
+      "recommendedUse": "post_retune_monitoring",
+      "forwardTuningStartDate": "2026-04-14"
+    },
+    "counts": {
+      "games": 9,
+      "live": 0,
+      "final": 0,
+      "pregame": 9,
+      "props": 0,
+      "archivedLiveProps": 0
+    },
+    "performance": {
+      "marketsRefreshed": false,
+      "marketRefreshMs": 0.0,
+      "totalMs": 538.9,
+      "snapshotLoadMs": 1.1,
+      "simContextLoadMs": 0.8,
+      "propEvalMs": 0.1,
+      "gameLensMs": 1.1,
+      "gameCount": 9,
+      "liveGameCount": 0,
+      "feedFetchCount": 9,
+      "persistMs": 0.0
+    },
+    "games": [
+      {
+        "gamePk": 824748,
+        "status": {
+          "abstract": "Preview",
+          "detailed": "Scheduled"
+        },
+        "startTime": "12:35 PM",
+        "matchup": {
+          "away": {
+            "abbr": "TOR",
+            "id": 141,
+            "logo": "https://www.mlbstatic.com/team-logos/141.svg",
+            "name": "Toronto Blue Jays"
+          },
+          "home": {
+            "abbr": "BOS",
+            "id": 111,
+            "logo": "https://www.mlbstatic.com/team-logos/111.svg",
+            "name": "Boston Red Sox"
+          },
+          "score": {
+            "away": 0,
+            "home": 0
+          },
+          "liveText": "Trey Yesavage vs Sonny Gray"
+        },
+        "predictions": {
+          "first1": {
+            "away_runs_mean": 0.402,
+            "home_runs_mean": 0.476,
+            "away_win_prob": 0.181,
+            "home_win_prob": 0.213,
+            "tie_prob": 0.606
+          },
+          "first3": {
+            "away_runs_mean": 1.332,
+            "home_runs_mean": 1.321,
+            "away_win_prob": 0.369,
+            "home_win_prob": 0.336,
+            "tie_prob": 0.295
+          },
+          "first5": {
+            "away_runs_mean": 2.199,
+            "home_runs_mean": 2.111,
+            "away_win_prob": 0.428,
+            "home_win_prob": 0.384,
+            "tie_prob": 0.188
+          },
+          "full": {
+            "away_runs_mean": 4.112,
+            "home_runs_mean": 4.018,
+            "away_win_prob": 0.492,
+            "home_win_prob": 0.508,
+            "tie_prob": 0.0
+          }
+        },
+        "gameMarkets": {
+          "totals": null,
+          "ml": null
+        },
+        "gameLens": [
+          {
+            "key": "first1",
+            "label": "F1",
+            "closed": false,
+            "badge": "No bet",
+            "score": "TOR 0 - BOS 0",
+            "subtitle": "TOR 0.4 - BOS 0.48 | Total 0.88",
+            "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
+            "projection": {
+              "total": 0.88,
+              "homeMargin": 0.07
+            },
+            "markets": {
+              "total": {
+                "pick": null,
+                "line": 0.88,
+                "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              },
+              "spread": {
+                "pick": null,
+                "homeLine": 0.07,
+                "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              },
+              "moneyline": {
+                "pick": null,
+                "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              }
+            }
+          },
+          {
+            "key": "first3",
+            "label": "F3",
+            "closed": false,
+            "badge": "No bet",
+            "score": "TOR 0 - BOS 0",
+            "subtitle": "TOR 1.33 - BOS 1.32 | Total 2.65",
+            "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
+            "projection": {
+              "total": 2.65,
+              "homeMargin": -0.01
+            },
+            "markets": {
+              "total": {
+                "pick": null,
+                "line": 2.65,
+                "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              },
+              "spread": {
+                "pick": null,
+                "homeLine": -0.01,
+                "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              },
+              "moneyline": {
+                "pick": null,
+                "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              }
+            }
+          },
+          {
+            "key": "first5",
+            "label": "F5",
+            "closed": false,
+            "badge": "No bet",
+            "score": "TOR 0 - BOS 0",
+            "subtitle": "TOR 2.2 - BOS 2.11 | Total 4.31",
+            "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
+            "projection": {
+              "total": 4.31,
+              "homeMargin": -0.09
+            },
+            "markets": {
+              "total": {
+                "pick": null,
+                "line": 4.31,
+                "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              },
+              "spread": {
+                "pick": null,
+                "homeLine": -0.09,
+                "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              },
+              "moneyline": {
+                "pick": null,
+                "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              }
+            }
+          },
+          {
+            "key": "first5",
+            "label": "Full game",
+            "closed": false,
+            "badge": "No bet",
+            "score": "TOR 0 - BOS 0",
+            "subtitle": "TOR 4.11 - BOS 4.02 | Total 8.13",
+            "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
+            "projection": {
+              "total": 8.13,
+              "homeMargin": -0.09
+            },
+            "markets": {
+              "total": {
+                "pick": null,
+                "line": 8.13,
+                "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              },
+              "spread": {
+                "pick": null,
+                "homeLine": -0.09,
+                "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              },
+              "moneyline": {
+                "pick": null,
+                "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              }
+            }
+          },
+          {
+            "key": "first1",
+            "label": "First 1",
+            "closed": false,
+            "badge": "",
+            "score": "TOR 18.1% | BOS 21.3% | Tie 60.6%",
+            "subtitle": "TOR 18.1% | BOS 21.3% | Tie 60.6%",
+            "reason": "TOR 18.1% | BOS 21.3% | Tie 60.6%",
+            "projection": {
+              "total": 18.1,
+              "homeMargin": 21.3
+            },
+            "markets": {
+              "total": {
+                "pick": null,
+                "line": 18.1,
+                "reason": "TOR 18.1% | BOS 21.3% | Tie 60.6%"
+              },
+              "spread": {},
+              "moneyline": {}
+            }
+          },
+          {
+            "key": "first3",
+            "label": "First 3",
+            "closed": false,
+            "badge": "",
+            "score": "TOR 36.9% | BOS 33.6% | Tie 29.5%",
+            "subtitle": "TOR 36.9% | BOS 33.6% | Tie 29.5%",
+            "reason": "TOR 36.9% | BOS 33.6% | Tie 29.5%",
+            "projection": {
+              "total": 36.9,
+              "homeMargin": 33.6
+            },
+            "markets": {
+              "total": {
+                "pick": null,
+                "line": 36.9,
+                "reason": "TOR 36.9% | BOS 33.6% | Tie 29.5%"
+              },
+              "spread": {},
+              "moneyline": {}
+            }
+          },
+          {
+            "key": "first5",
+            "label": "First 5",
+            "closed": false,
+            "badge": "",
+            "score": "TOR 42.8% | BOS 38.4% | Tie 18.8%",
+            "subtitle": "TOR 42.8% | BOS 38.4% | Tie 18.8%",
+            "reason": "TOR 42.8% | BOS 38.4% | Tie 18.8%",
+            "projection": {
+              "total": 42.8,
+              "homeMargin": 38.4
+            },
+            "markets": {
+              "total": {
+                "pick": null,
+                "line": 42.8,
+                "reason": "TOR 42.8% | BOS 38.4% | Tie 18.8%"
+              },
+              "spread": {},
+              "moneyline": {}
+            }
+          },
+          {
+            "key": "full",
+            "label": "Full game",
+            "closed": false,
+            "badge": "",
+            "score": "TOR 49.2% | BOS 50.8% | Tie 0.0%",
+            "subtitle": "TOR 49.2% | BOS 50.8% | Tie 0.0%",
+            "reason": "TOR 49.2% | BOS 50.8% | Tie 0.0%",
+            "projection": {
+              "total": 49.2,
+              "homeMargin": 50.8
+            },
+            "markets": {
+              "total": {
+                "pick": null,
+                "line": 49.2,
+                "reason": "TOR 49.2% | BOS 50.8% | Tie 0.0%"
+              },
+              "spread": {},
+              "moneyline": {}
+            }
+          }
+        ],
+        "props": [],
+        "liveProps": [],
+        "archivedLiveProps": [],
+        "trackedProps": [],
+        "simContextAvailable": false,
+        "snapshotAvailable": true,
+        "market_tiles": [
+          {
+            "label": "Game total",
+            "title": "No total play",
+            "sub": "Off card"
+          },
+          {
+            "label": "Moneyline",
+            "title": "No ML play",
+            "sub": "Off card"
+          },
+          {
+            "label": "Pitcher props",
+            "title": "No locked pitcher prop",
+            "sub": "Off card"
+          },
+          {
+            "label": "Hitter props",
+            "title": "No locked hitter prop",
+            "sub": "Off card"
+          }
+        ],
+        "probable": {
+          "away": {
+            "id": null,
+            "fullName": "Trey Yesavage"
+          },
+          "home": {
+            "id": null,
+            "fullName": "Sonny Gray"
+          }
+        },
+        "markets": {}
+      },
+      {
+        "gamePk": 823772,
+        "status": {
+          "abstract": "Preview",
+          "detailed": "Scheduled"
+        },
+        "startTime": "1:10 PM",
+        "matchup": {
+          "away": {
+            "abbr": "CLE",
+            "id": 114,
+            "logo": "https://www.mlbstatic.com/team-logos/114.svg",
+            "name": "Cleveland Guardians"
+          },
+          "home": {
+            "abbr": "MIL",
+            "id": 158,
+            "logo": "https://www.mlbstatic.com/team-logos/158.svg",
+            "name": "Milwaukee Brewers"
+          },
+          "score": {
+            "away": 0,
+            "home": 0
+          },
+          "liveText": "Parker Messick vs Shane Drohan"
+        },
+        "predictions": {
+          "first1": {
+            "away_runs_mean": 0.491,
+            "home_runs_mean": 0.574,
+            "away_win_prob": 0.213,
+            "home_win_prob": 0.236,
+            "tie_prob": 0.551
+          },
+          "first3": {
+            "away_runs_mean": 1.405,
+            "home_runs_mean": 1.429,
+            "away_win_prob": 0.384,
+            "home_win_prob": 0.351,
+            "tie_prob": 0.265
+          },
+          "first5": {
+            "away_runs_mean": 2.369,
+            "home_runs_mean": 2.333,
+            "away_win_prob": 0.434,
+            "home_win_prob": 0.394,
+            "tie_prob": 0.172
+          },
+          "full": {
+            "away_runs_mean": 4.384,
+            "home_runs_mean": 4.222,
+            "away_win_prob": 0.528,
+            "home_win_prob": 0.472,
+            "tie_prob": 0.0
+          }
+        },
+        "gameMarkets": {
+          "totals": null,
+          "ml": null
+        },
+        "gameLens": [
+          {
+            "key": "first1",
+            "label": "F1",
+            "closed": false,
+            "badge": "No bet",
+            "score": "CLE 0 - MIL 0",
+            "subtitle": "CLE 0.49 - MIL 0.57 | Total 1.06",
+            "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
+            "projection": {
+              "total": 1.06,
+              "homeMargin": 0.08
+            },
+            "markets": {
+              "total": {
+                "pick": null,
+                "line": 1.06,
+                "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              },
+              "spread": {
+                "pick": null,
+                "homeLine": 0.08,
+                "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              },
+              "moneyline": {
+                "pick": null,
+                "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              }
+            }
+          },
+          {
+            "key": "first3",
+            "label": "F3",
+            "closed": false,
+            "badge": "No bet",
+            "score": "CLE 0 - MIL 0",
+            "subtitle": "CLE 1.41 - MIL 1.43 | Total 2.83",
+            "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
+            "projection": {
+              "total": 2.83,
+              "homeMargin": 0.02
+            },
+            "markets": {
+              "total": {
+                "pick": null,
+                "line": 2.83,
+                "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              },
+              "spread": {
+                "pick": null,
+                "homeLine": 0.02,
+                "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              },
+              "moneyline": {
+                "pick": null,
+                "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              }
+            }
+          },
+          {
+            "key": "first5",
+            "label": "F5",
+            "closed": false,
+            "badge": "No bet",
+            "score": "CLE 0 - MIL 0",
+            "subtitle": "CLE 2.37 - MIL 2.33 | Total 4.7",
+            "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
+            "projection": {
+              "total": 4.7,
+              "homeMargin": -0.04
+            },
+            "markets": {
+              "total": {
+                "pick": null,
+                "line": 4.7,
+                "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              },
+              "spread": {
+                "pick": null,
+                "homeLine": -0.04,
+                "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              },
+              "moneyline": {
+                "pick": null,
+                "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              }
+            }
+          },
+          {
+            "key": "first5",
+            "label": "Full game",
+            "closed": false,
+            "badge": "No bet",
+            "score": "CLE 0 - MIL 0",
+            "subtitle": "CLE 4.38 - MIL 4.22 | Total 8.61",
+            "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
+            "projection": {
+              "total": 8.61,
+              "homeMargin": -0.16
+            },
+            "markets": {
+              "total": {
+                "pick": null,
+                "line": 8.61,
+                "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              },
+              "spread": {
+                "pick": null,
+                "homeLine": -0.16,
+                "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              },
+              "moneyline": {
+                "pick": null,
+                "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              }
+            }
+          },
+          {
+            "key": "first1",
+            "label": "First 1",
+            "closed": false,
+            "badge": "",
+            "score": "CLE 21.3% | MIL 23.6% | Tie 55.1%",
+            "subtitle": "CLE 21.3% | MIL 23.6% | Tie 55.1%",
+            "reason": "CLE 21.3% | MIL 23.6% | Tie 55.1%",
+            "projection": {
+              "total": 21.3,
+              "homeMargin": 23.6
+            },
+            "markets": {
+              "total": {
+                "pick": null,
+                "line": 21.3,
+                "reason": "CLE 21.3% | MIL 23.6% | Tie 55.1%"
+              },
+              "spread": {},
+              "moneyline": {}
+            }
+          },
+          {
+            "key": "first3",
+            "label": "First 3",
+            "closed": false,
+            "badge": "",
+            "score": "CLE 38.4% | MIL 35.1% | Tie 26.5%",
+            "subtitle": "CLE 38.4% | MIL 35.1% | Tie 26.5%",
+            "reason": "CLE 38.4% | MIL 35.1% | Tie 26.5%",
+            "projection": {
+              "total": 38.4,
+              "homeMargin": 35.1
+            },
+            "markets": {
+              "total": {
+                "pick": null,
+                "line": 38.4,
+                "reason": "CLE 38.4% | MIL 35.1% | Tie 26.5%"
+              },
+              "spread": {},
+              "moneyline": {}
+            }
+          },
+          {
+            "key": "first5",
+            "label": "First 5",
+            "closed": false,
+            "badge": "",
+            "score": "CLE 43.4% | MIL 39.4% | Tie 17.2%",
+            "subtitle": "CLE 43.4% | MIL 39.4% | Tie 17.2%",
+            "reason": "CLE 43.4% | MIL 39.4% | Tie 17.2%",
+            "projection": {
+              "total": 43.4,
+              "homeMargin": 39.4
+            },
+            "markets": {
+              "total": {
+                "pick": null,
+                "line": 43.4,
+                "reason": "CLE 43.4% | MIL 39.4% | Tie 17.2%"
+              },
+              "spread": {},
+              "moneyline": {}
+            }
+          },
+          {
+            "key": "full",
+            "label": "Full game",
+            "closed": false,
+            "badge": "",
+            "score": "CLE 52.8% | MIL 47.2% | Tie 0.0%",
+            "subtitle": "CLE 52.8% | MIL 47.2% | Tie 0.0%",
+            "reason": "CLE 52.8% | MIL 47.2% | Tie 0.0%",
+            "projection": {
+              "total": 52.8,
+              "homeMargin": 47.2
+            },
+            "markets": {
+              "total": {
+                "pick": null,
+                "line": 52.8,
+                "reason": "CLE 52.8% | MIL 47.2% | Tie 0.0%"
+              },
+              "spread": {},
+              "moneyline": {}
+            }
+          }
+        ],
+        "props": [],
+        "liveProps": [],
+        "archivedLiveProps": [],
+        "trackedProps": [],
+        "simContextAvailable": false,
+        "snapshotAvailable": true,
+        "market_tiles": [
+          {
+            "label": "Game total",
+            "title": "No total play",
+            "sub": "Off card"
+          },
+          {
+            "label": "Moneyline",
+            "title": "No ML play",
+            "sub": "Off card"
+          },
+          {
+            "label": "Pitcher props",
+            "title": "No locked pitcher prop",
+            "sub": "Off card"
+          },
+          {
+            "label": "Hitter props",
+            "title": "No locked hitter prop",
+            "sub": "Off card"
+          }
+        ],
+        "probable": {
+          "away": {
+            "id": null,
+            "fullName": "Parker Messick"
+          },
+          "home": {
+            "id": null,
+            "fullName": "Shane Drohan"
+          }
+        },
+        "markets": {}
+      },
+      {
+        "gamePk": 822889,
+        "status": {
+          "abstract": "Preview",
+          "detailed": "Scheduled"
+        },
+        "startTime": "1:35 PM",
+        "matchup": {
+          "away": {
+            "abbr": "MIN",
+            "id": 142,
+            "logo": "https://www.mlbstatic.com/team-logos/142.svg",
+            "name": "Minnesota Twins"
+          },
+          "home": {
+            "abbr": "TEX",
+            "id": 140,
+            "logo": "https://www.mlbstatic.com/team-logos/140.svg",
+            "name": "Texas Rangers"
+          },
+          "score": {
+            "away": 0,
+            "home": 0
+          },
+          "liveText": "Joe Ryan vs Jack Leiter"
+        },
+        "predictions": {
+          "first1": {
+            "away_runs_mean": 0.485,
+            "home_runs_mean": 0.426,
+            "away_win_prob": 0.223,
+            "home_win_prob": 0.19,
+            "tie_prob": 0.587
+          },
+          "first3": {
+            "away_runs_mean": 1.506,
+            "home_runs_mean": 1.347,
+            "away_win_prob": 0.389,
+            "home_win_prob": 0.345,
+            "tie_prob": 0.266
+          },
+          "first5": {
+            "away_runs_mean": 2.487,
+            "home_runs_mean": 2.293,
+            "away_win_prob": 0.439,
+            "home_win_prob": 0.404,
+            "tie_prob": 0.157
+          },
+          "full": {
+            "away_runs_mean": 4.597,
+            "home_runs_mean": 4.18,
+            "away_win_prob": 0.511,
+            "home_win_prob": 0.489,
+            "tie_prob": 0.0
+          }
+        },
+        "gameMarkets": {
+          "totals": null,
+          "ml": null
+        },
+        "gameLens": [
+          {
+            "key": "first1",
+            "label": "F1",
+            "closed": false,
+            "badge": "No bet",
+            "score": "MIN 0 - TEX 0",
+            "subtitle": "MIN 0.48 - TEX 0.43 | Total 0.91",
+            "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
+            "projection": {
+              "total": 0.91,
+              "homeMargin": -0.06
+            },
+            "markets": {
+              "total": {
+                "pick": null,
+                "line": 0.91,
+                "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              },
+              "spread": {
+                "pick": null,
+                "homeLine": -0.06,
+                "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              },
+              "moneyline": {
+                "pick": null,
+                "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              }
+            }
+          },
+          {
+            "key": "first3",
+            "label": "F3",
+            "closed": false,
+            "badge": "No bet",
+            "score": "MIN 0 - TEX 0",
+            "subtitle": "MIN 1.51 - TEX 1.35 | Total 2.85",
+            "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
+            "projection": {
+              "total": 2.85,
+              "homeMargin": -0.16
+            },
+            "markets": {
+              "total": {
+                "pick": null,
+                "line": 2.85,
+                "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              },
+              "spread": {
+                "pick": null,
+                "homeLine": -0.16,
+                "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              },
+              "moneyline": {
+                "pick": null,
+                "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              }
+            }
+          },
+          {
+            "key": "first5",
+            "label": "F5",
+            "closed": false,
+            "badge": "No bet",
+            "score": "MIN 0 - TEX 0",
+            "subtitle": "MIN 2.49 - TEX 2.29 | Total 4.78",
+            "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
+            "projection": {
+              "total": 4.78,
+              "homeMargin": -0.19
+            },
+            "markets": {
+              "total": {
+                "pick": null,
+                "line": 4.78,
+                "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              },
+              "spread": {
+                "pick": null,
+                "homeLine": -0.19,
+                "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              },
+              "moneyline": {
+                "pick": null,
+                "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              }
+            }
+          },
+          {
+            "key": "first5",
+            "label": "Full game",
+            "closed": false,
+            "badge": "No bet",
+            "score": "MIN 0 - TEX 0",
+            "subtitle": "MIN 4.6 - TEX 4.18 | Total 8.78",
+            "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
+            "projection": {
+              "total": 8.78,
+              "homeMargin": -0.42
+            },
+            "markets": {
+              "total": {
+                "pick": null,
+                "line": 8.78,
+                "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              },
+              "spread": {
+                "pick": null,
+                "homeLine": -0.42,
+                "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              },
+              "moneyline": {
+                "pick": null,
+                "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              }
+            }
+          },
+          {
+            "key": "first1",
+            "label": "First 1",
+            "closed": false,
+            "badge": "",
+            "score": "MIN 22.3% | TEX 19.0% | Tie 58.7%",
+            "subtitle": "MIN 22.3% | TEX 19.0% | Tie 58.7%",
+            "reason": "MIN 22.3% | TEX 19.0% | Tie 58.7%",
+            "projection": {
+              "total": 22.3,
+              "homeMargin": 19.0
+            },
+            "markets": {
+              "total": {
+                "pick": null,
+                "line": 22.3,
+                "reason": "MIN 22.3% | TEX 19.0% | Tie 58.7%"
+              },
+              "spread": {},
+              "moneyline": {}
+            }
+          },
+          {
+            "key": "first3",
+            "label": "First 3",
+            "closed": false,
+            "badge": "",
+            "score": "MIN 38.9% | TEX 34.5% | Tie 26.6%",
+            "subtitle": "MIN 38.9% | TEX 34.5% | Tie 26.6%",
+            "reason": "MIN 38.9% | TEX 34.5% | Tie 26.6%",
+            "projection": {
+              "total": 38.9,
+              "homeMargin": 34.5
+            },
+            "markets": {
+              "total": {
+                "pick": null,
+                "line": 38.9,
+                "reason": "MIN 38.9% | TEX 34.5% | Tie 26.6%"
+              },
+              "spread": {},
+              "moneyline": {}
+            }
+          },
+          {
+            "key": "first5",
+            "label": "First 5",
+            "closed": false,
+            "badge": "",
+            "score": "MIN 43.9% | TEX 40.4% | Tie 15.7%",
+            "subtitle": "MIN 43.9% | TEX 40.4% | Tie 15.7%",
+            "reason": "MIN 43.9% | TEX 40.4% | Tie 15.7%",
+            "projection": {
+              "total": 43.9,
+              "homeMargin": 40.4
+            },
+            "markets": {
+              "total": {
+                "pick": null,
+                "line": 43.9,
+                "reason": "MIN 43.9% | TEX 40.4% | Tie 15.7%"
+              },
+              "spread": {},
+              "moneyline": {}
+            }
+          },
+          {
+            "key": "full",
+            "label": "Full game",
+            "closed": false,
+            "badge": "",
+            "score": "MIN 51.1% | TEX 48.9% | Tie 0.0%",
+            "subtitle": "MIN 51.1% | TEX 48.9% | Tie 0.0%",
+            "reason": "MIN 51.1% | TEX 48.9% | Tie 0.0%",
+            "projection": {
+              "total": 51.1,
+              "homeMargin": 48.9
+            },
+            "markets": {
+              "total": {
+                "pick": null,
+                "line": 51.1,
+                "reason": "MIN 51.1% | TEX 48.9% | Tie 0.0%"
+              },
+              "spread": {},
+              "moneyline": {}
+            }
+          }
+        ],
+        "props": [],
+        "liveProps": [],
+        "archivedLiveProps": [],
+        "trackedProps": [],
+        "simContextAvailable": false,
+        "snapshotAvailable": true,
+        "market_tiles": [
+          {
+            "label": "Game total",
+            "title": "No total play",
+            "sub": "Off card"
+          },
+          {
+            "label": "Moneyline",
+            "title": "No ML play",
+            "sub": "Off card"
+          },
+          {
+            "label": "Pitcher props",
+            "title": "No locked pitcher prop",
+            "sub": "Off card"
+          },
+          {
+            "label": "Hitter props",
+            "title": "No locked hitter prop",
+            "sub": "Off card"
+          }
+        ],
+        "probable": {
+          "away": {
+            "id": null,
+            "fullName": "Joe Ryan"
+          },
+          "home": {
+            "id": null,
+            "fullName": "Jack Leiter"
+          }
+        },
+        "markets": {}
+      },
+      {
+        "gamePk": 823125,
+        "status": {
+          "abstract": "Preview",
+          "detailed": "Scheduled"
+        },
+        "startTime": "3:10 PM",
+        "matchup": {
+          "away": {
+            "abbr": "BAL",
+            "id": 110,
+            "logo": "https://www.mlbstatic.com/team-logos/110.svg",
+            "name": "Baltimore Orioles"
+          },
+          "home": {
+            "abbr": "SEA",
+            "id": 136,
+            "logo": "https://www.mlbstatic.com/team-logos/136.svg",
+            "name": "Seattle Mariners"
+          },
+          "score": {
+            "away": 0,
+            "home": 0
+          },
+          "liveText": "Shane Baz vs Bryan Woo"
+        },
+        "predictions": {
+          "first1": {
+            "away_runs_mean": 0.326,
+            "home_runs_mean": 0.421,
+            "away_win_prob": 0.168,
+            "home_win_prob": 0.195,
+            "tie_prob": 0.637
+          },
+          "first3": {
+            "away_runs_mean": 1.013,
+            "home_runs_mean": 1.3,
+            "away_win_prob": 0.301,
+            "home_win_prob": 0.371,
+            "tie_prob": 0.328
+          },
+          "first5": {
+            "away_runs_mean": 1.745,
+            "home_runs_mean": 2.083,
+            "away_win_prob": 0.358,
+            "home_win_prob": 0.446,
+            "tie_prob": 0.196
+          },
+          "full": {
+            "away_runs_mean": 3.544,
+            "home_runs_mean": 3.655,
+            "away_win_prob": 0.459,
+            "home_win_prob": 0.541,
+            "tie_prob": 0.0
+          }
+        },
+        "gameMarkets": {
+          "totals": null,
+          "ml": null
+        },
+        "gameLens": [
+          {
+            "key": "first1",
+            "label": "F1",
+            "closed": false,
+            "badge": "No bet",
+            "score": "BAL 0 - SEA 0",
+            "subtitle": "BAL 0.33 - SEA 0.42 | Total 0.75",
+            "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
+            "projection": {
+              "total": 0.75,
+              "homeMargin": 0.09
+            },
+            "markets": {
+              "total": {
+                "pick": null,
+                "line": 0.75,
+                "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              },
+              "spread": {
+                "pick": null,
+                "homeLine": 0.09,
+                "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              },
+              "moneyline": {
+                "pick": null,
+                "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              }
+            }
+          },
+          {
+            "key": "first3",
+            "label": "F3",
+            "closed": false,
+            "badge": "No bet",
+            "score": "BAL 0 - SEA 0",
+            "subtitle": "BAL 1.01 - SEA 1.3 | Total 2.31",
+            "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
+            "projection": {
+              "total": 2.31,
+              "homeMargin": 0.29
+            },
+            "markets": {
+              "total": {
+                "pick": null,
+                "line": 2.31,
+                "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              },
+              "spread": {
+                "pick": null,
+                "homeLine": 0.29,
+                "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              },
+              "moneyline": {
+                "pick": null,
+                "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              }
+            }
+          },
+          {
+            "key": "first5",
+            "label": "F5",
+            "closed": false,
+            "badge": "No bet",
+            "score": "BAL 0 - SEA 0",
+            "subtitle": "BAL 1.75 - SEA 2.08 | Total 3.83",
+            "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
+            "projection": {
+              "total": 3.83,
+              "homeMargin": 0.34
+            },
+            "markets": {
+              "total": {
+                "pick": null,
+                "line": 3.83,
+                "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              },
+              "spread": {
+                "pick": null,
+                "homeLine": 0.34,
+                "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              },
+              "moneyline": {
+                "pick": null,
+                "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              }
+            }
+          },
+          {
+            "key": "first5",
+            "label": "Full game",
+            "closed": false,
+            "badge": "No bet",
+            "score": "BAL 0 - SEA 0",
+            "subtitle": "BAL 3.54 - SEA 3.65 | Total 7.2",
+            "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
+            "projection": {
+              "total": 7.2,
+              "homeMargin": 0.11
+            },
+            "markets": {
+              "total": {
+                "pick": null,
+                "line": 7.2,
+                "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              },
+              "spread": {
+                "pick": null,
+                "homeLine": 0.11,
+                "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              },
+              "moneyline": {
+                "pick": null,
+                "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              }
+            }
+          },
+          {
+            "key": "first1",
+            "label": "First 1",
+            "closed": false,
+            "badge": "",
+            "score": "BAL 16.8% | SEA 19.5% | Tie 63.7%",
+            "subtitle": "BAL 16.8% | SEA 19.5% | Tie 63.7%",
+            "reason": "BAL 16.8% | SEA 19.5% | Tie 63.7%",
+            "projection": {
+              "total": 16.8,
+              "homeMargin": 19.5
+            },
+            "markets": {
+              "total": {
+                "pick": null,
+                "line": 16.8,
+                "reason": "BAL 16.8% | SEA 19.5% | Tie 63.7%"
+              },
+              "spread": {},
+              "moneyline": {}
+            }
+          },
+          {
+            "key": "first3",
+            "label": "First 3",
+            "closed": false,
+            "badge": "",
+            "score": "BAL 30.1% | SEA 37.1% | Tie 32.8%",
+            "subtitle": "BAL 30.1% | SEA 37.1% | Tie 32.8%",
+            "reason": "BAL 30.1% | SEA 37.1% | Tie 32.8%",
+            "projection": {
+              "total": 30.1,
+              "homeMargin": 37.1
+            },
+            "markets": {
+              "total": {
+                "pick": null,
+                "line": 30.1,
+                "reason": "BAL 30.1% | SEA 37.1% | Tie 32.8%"
+              },
+              "spread": {},
+              "moneyline": {}
+            }
+          },
+          {
+            "key": "first5",
+            "label": "First 5",
+            "closed": false,
+            "badge": "",
+            "score": "BAL 35.8% | SEA 44.6% | Tie 19.6%",
+            "subtitle": "BAL 35.8% | SEA 44.6% | Tie 19.6%",
+            "reason": "BAL 35.8% | SEA 44.6% | Tie 19.6%",
+            "projection": {
+              "total": 35.8,
+              "homeMargin": 44.6
+            },
+            "markets": {
+              "total": {
+                "pick": null,
+                "line": 35.8,
+                "reason": "BAL 35.8% | SEA 44.6% | Tie 19.6%"
+              },
+              "spread": {},
+              "moneyline": {}
+            }
+          },
+          {
+            "key": "full",
+            "label": "Full game",
+            "closed": false,
+            "badge": "",
+            "score": "BAL 45.9% | SEA 54.1% | Tie 0.0%",
+            "subtitle": "BAL 45.9% | SEA 54.1% | Tie 0.0%",
+            "reason": "BAL 45.9% | SEA 54.1% | Tie 0.0%",
+            "projection": {
+              "total": 45.9,
+              "homeMargin": 54.1
+            },
+            "markets": {
+              "total": {
+                "pick": null,
+                "line": 45.9,
+                "reason": "BAL 45.9% | SEA 54.1% | Tie 0.0%"
+              },
+              "spread": {},
+              "moneyline": {}
+            }
+          }
+        ],
+        "props": [],
+        "liveProps": [],
+        "archivedLiveProps": [],
+        "trackedProps": [],
+        "simContextAvailable": false,
+        "snapshotAvailable": true,
+        "market_tiles": [
+          {
+            "label": "Game total",
+            "title": "No total play",
+            "sub": "Off card"
+          },
+          {
+            "label": "Moneyline",
+            "title": "No ML play",
+            "sub": "Off card"
+          },
+          {
+            "label": "Pitcher props",
+            "title": "No locked pitcher prop",
+            "sub": "Off card"
+          },
+          {
+            "label": "Hitter props",
+            "title": "No locked hitter prop",
+            "sub": "Off card"
+          }
+        ],
+        "probable": {
+          "away": {
+            "id": null,
+            "fullName": "Shane Baz"
+          },
+          "home": {
+            "id": null,
+            "fullName": "Bryan Woo"
+          }
+        },
+        "first1BetSignal": {
+          "label": "F1 NRFI",
+          "tone": "nrfi",
+          "summary": "0-run sim 62.5% | F1 mean 0.75",
+          "detail": "Season filter qualified: simulated scoreless first inning 62.5% with only 0.75 expected runs in the opening frame.",
+          "nrfiProb": 0.625,
+          "yrfiProb": 0.375,
+          "meanTotalRuns": 0.747,
+          "maxSideLeadProb": 0.195
+        },
+        "markets": {}
+      },
+      {
+        "gamePk": 823448,
+        "status": {
+          "abstract": "Preview",
+          "detailed": "Scheduled"
+        },
+        "startTime": "5:40 PM",
+        "matchup": {
+          "away": {
+            "abbr": "NYM",
+            "id": 121,
+            "logo": "https://www.mlbstatic.com/team-logos/121.svg",
+            "name": "New York Mets"
+          },
+          "home": {
+            "abbr": "PHI",
+            "id": 143,
+            "logo": "https://www.mlbstatic.com/team-logos/143.svg",
+            "name": "Philadelphia Phillies"
+          },
+          "score": {
+            "away": 0,
+            "home": 0
+          },
+          "liveText": "Sean Manaea vs Aaron Nola"
+        },
+        "predictions": {
+          "first1": {
+            "away_runs_mean": 0.547,
+            "home_runs_mean": 0.543,
+            "away_win_prob": 0.231,
+            "home_win_prob": 0.223,
+            "tie_prob": 0.546
+          },
+          "first3": {
+            "away_runs_mean": 1.687,
+            "home_runs_mean": 1.519,
+            "away_win_prob": 0.402,
+            "home_win_prob": 0.367,
+            "tie_prob": 0.231
+          },
+          "first5": {
+            "away_runs_mean": 2.693,
+            "home_runs_mean": 2.529,
+            "away_win_prob": 0.44,
+            "home_win_prob": 0.414,
+            "tie_prob": 0.146
+          },
+          "full": {
+            "away_runs_mean": 5.017,
+            "home_runs_mean": 4.332,
+            "away_win_prob": 0.558,
+            "home_win_prob": 0.442,
+            "tie_prob": 0.0
+          }
+        },
+        "gameMarkets": {
+          "totals": null,
+          "ml": null
+        },
+        "gameLens": [
+          {
+            "key": "first1",
+            "label": "F1",
+            "closed": false,
+            "badge": "No bet",
+            "score": "NYM 0 - PHI 0",
+            "subtitle": "NYM 0.55 - PHI 0.54 | Total 1.09",
+            "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
+            "projection": {
+              "total": 1.09,
+              "homeMargin": -0.0
+            },
+            "markets": {
+              "total": {
+                "pick": null,
+                "line": 1.09,
+                "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              },
+              "spread": {
+                "pick": null,
+                "homeLine": -0.0,
+                "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              },
+              "moneyline": {
+                "pick": null,
+                "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              }
+            }
+          },
+          {
+            "key": "first3",
+            "label": "F3",
+            "closed": false,
+            "badge": "No bet",
+            "score": "NYM 0 - PHI 0",
+            "subtitle": "NYM 1.69 - PHI 1.52 | Total 3.21",
+            "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
+            "projection": {
+              "total": 3.21,
+              "homeMargin": -0.17
+            },
+            "markets": {
+              "total": {
+                "pick": null,
+                "line": 3.21,
+                "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              },
+              "spread": {
+                "pick": null,
+                "homeLine": -0.17,
+                "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              },
+              "moneyline": {
+                "pick": null,
+                "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              }
+            }
+          },
+          {
+            "key": "first5",
+            "label": "F5",
+            "closed": false,
+            "badge": "No bet",
+            "score": "NYM 0 - PHI 0",
+            "subtitle": "NYM 2.69 - PHI 2.53 | Total 5.22",
+            "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
+            "projection": {
+              "total": 5.22,
+              "homeMargin": -0.16
+            },
+            "markets": {
+              "total": {
+                "pick": null,
+                "line": 5.22,
+                "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              },
+              "spread": {
+                "pick": null,
+                "homeLine": -0.16,
+                "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              },
+              "moneyline": {
+                "pick": null,
+                "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              }
+            }
+          },
+          {
+            "key": "first5",
+            "label": "Full game",
+            "closed": false,
+            "badge": "No bet",
+            "score": "NYM 0 - PHI 0",
+            "subtitle": "NYM 5.02 - PHI 4.33 | Total 9.35",
+            "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
+            "projection": {
+              "total": 9.35,
+              "homeMargin": -0.69
+            },
+            "markets": {
+              "total": {
+                "pick": null,
+                "line": 9.35,
+                "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              },
+              "spread": {
+                "pick": null,
+                "homeLine": -0.69,
+                "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              },
+              "moneyline": {
+                "pick": null,
+                "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              }
+            }
+          },
+          {
+            "key": "first1",
+            "label": "First 1",
+            "closed": false,
+            "badge": "",
+            "score": "NYM 23.1% | PHI 22.3% | Tie 54.6%",
+            "subtitle": "NYM 23.1% | PHI 22.3% | Tie 54.6%",
+            "reason": "NYM 23.1% | PHI 22.3% | Tie 54.6%",
+            "projection": {
+              "total": 23.1,
+              "homeMargin": 22.3
+            },
+            "markets": {
+              "total": {
+                "pick": null,
+                "line": 23.1,
+                "reason": "NYM 23.1% | PHI 22.3% | Tie 54.6%"
+              },
+              "spread": {},
+              "moneyline": {}
+            }
+          },
+          {
+            "key": "first3",
+            "label": "First 3",
+            "closed": false,
+            "badge": "",
+            "score": "NYM 40.2% | PHI 36.7% | Tie 23.1%",
+            "subtitle": "NYM 40.2% | PHI 36.7% | Tie 23.1%",
+            "reason": "NYM 40.2% | PHI 36.7% | Tie 23.1%",
+            "projection": {
+              "total": 40.2,
+              "homeMargin": 36.7
+            },
+            "markets": {
+              "total": {
+                "pick": null,
+                "line": 40.2,
+                "reason": "NYM 40.2% | PHI 36.7% | Tie 23.1%"
+              },
+              "spread": {},
+              "moneyline": {}
+            }
+          },
+          {
+            "key": "first5",
+            "label": "First 5",
+            "closed": false,
+            "badge": "",
+            "score": "NYM 44.0% | PHI 41.4% | Tie 14.6%",
+            "subtitle": "NYM 44.0% | PHI 41.4% | Tie 14.6%",
+            "reason": "NYM 44.0% | PHI 41.4% | Tie 14.6%",
+            "projection": {
+              "total": 44.0,
+              "homeMargin": 41.4
+            },
+            "markets": {
+              "total": {
+                "pick": null,
+                "line": 44.0,
+                "reason": "NYM 44.0% | PHI 41.4% | Tie 14.6%"
+              },
+              "spread": {},
+              "moneyline": {}
+            }
+          },
+          {
+            "key": "full",
+            "label": "Full game",
+            "closed": false,
+            "badge": "",
+            "score": "NYM 55.8% | PHI 44.2% | Tie 0.0%",
+            "subtitle": "NYM 55.8% | PHI 44.2% | Tie 0.0%",
+            "reason": "NYM 55.8% | PHI 44.2% | Tie 0.0%",
+            "projection": {
+              "total": 55.8,
+              "homeMargin": 44.2
+            },
+            "markets": {
+              "total": {
+                "pick": null,
+                "line": 55.8,
+                "reason": "NYM 55.8% | PHI 44.2% | Tie 0.0%"
+              },
+              "spread": {},
+              "moneyline": {}
+            }
+          }
+        ],
+        "props": [],
+        "liveProps": [],
+        "archivedLiveProps": [],
+        "trackedProps": [],
+        "simContextAvailable": false,
+        "snapshotAvailable": true,
+        "market_tiles": [
+          {
+            "label": "Game total",
+            "title": "No total play",
+            "sub": "Off card"
+          },
+          {
+            "label": "Moneyline",
+            "title": "No ML play",
+            "sub": "Off card"
+          },
+          {
+            "label": "Pitcher props",
+            "title": "No locked pitcher prop",
+            "sub": "Off card"
+          },
+          {
+            "label": "Hitter props",
+            "title": "No locked hitter prop",
+            "sub": "Off card"
+          }
+        ],
+        "probable": {
+          "away": {
+            "id": null,
+            "fullName": "Sean Manaea"
+          },
+          "home": {
+            "id": null,
+            "fullName": "Aaron Nola"
+          }
+        },
+        "markets": {}
+      },
+      {
+        "gamePk": 823533,
+        "status": {
+          "abstract": "Preview",
+          "detailed": "Scheduled"
+        },
+        "startTime": "6:05 PM",
+        "matchup": {
+          "away": {
+            "abbr": "CWS",
+            "id": 145,
+            "logo": "https://www.mlbstatic.com/team-logos/145.svg",
+            "name": "Chicago White Sox"
+          },
+          "home": {
+            "abbr": "NYY",
+            "id": 147,
+            "logo": "https://www.mlbstatic.com/team-logos/147.svg",
+            "name": "New York Yankees"
+          },
+          "score": {
+            "away": 0,
+            "home": 0
+          },
+          "liveText": "Sean Burke vs Ryan Weathers"
+        },
+        "predictions": {
+          "first1": {
+            "away_runs_mean": 0.53,
+            "home_runs_mean": 0.496,
+            "away_win_prob": 0.241,
+            "home_win_prob": 0.197,
+            "tie_prob": 0.562
+          },
+          "first3": {
+            "away_runs_mean": 1.563,
+            "home_runs_mean": 1.36,
+            "away_win_prob": 0.416,
+            "home_win_prob": 0.339,
+            "tie_prob": 0.245
+          },
+          "first5": {
+            "away_runs_mean": 2.62,
+            "home_runs_mean": 2.375,
+            "away_win_prob": 0.456,
+            "home_win_prob": 0.384,
+            "tie_prob": 0.16
+          },
+          "full": {
+            "away_runs_mean": 4.596,
+            "home_runs_mean": 4.075,
+            "away_win_prob": 0.565,
+            "home_win_prob": 0.435,
+            "tie_prob": 0.0
+          }
+        },
+        "gameMarkets": {
+          "totals": null,
+          "ml": null
+        },
+        "gameLens": [
+          {
+            "key": "first1",
+            "label": "F1",
+            "closed": false,
+            "badge": "No bet",
+            "score": "CWS 0 - NYY 0",
+            "subtitle": "CWS 0.53 - NYY 0.5 | Total 1.03",
+            "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
+            "projection": {
+              "total": 1.03,
+              "homeMargin": -0.03
+            },
+            "markets": {
+              "total": {
+                "pick": null,
+                "line": 1.03,
+                "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              },
+              "spread": {
+                "pick": null,
+                "homeLine": -0.03,
+                "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              },
+              "moneyline": {
+                "pick": null,
+                "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              }
+            }
+          },
+          {
+            "key": "first3",
+            "label": "F3",
+            "closed": false,
+            "badge": "No bet",
+            "score": "CWS 0 - NYY 0",
+            "subtitle": "CWS 1.56 - NYY 1.36 | Total 2.92",
+            "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
+            "projection": {
+              "total": 2.92,
+              "homeMargin": -0.2
+            },
+            "markets": {
+              "total": {
+                "pick": null,
+                "line": 2.92,
+                "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              },
+              "spread": {
+                "pick": null,
+                "homeLine": -0.2,
+                "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              },
+              "moneyline": {
+                "pick": null,
+                "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              }
+            }
+          },
+          {
+            "key": "first5",
+            "label": "F5",
+            "closed": false,
+            "badge": "No bet",
+            "score": "CWS 0 - NYY 0",
+            "subtitle": "CWS 2.62 - NYY 2.38 | Total 5",
+            "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
+            "projection": {
+              "total": 5.0,
+              "homeMargin": -0.25
+            },
+            "markets": {
+              "total": {
+                "pick": null,
+                "line": 5.0,
+                "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              },
+              "spread": {
+                "pick": null,
+                "homeLine": -0.25,
+                "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              },
+              "moneyline": {
+                "pick": null,
+                "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              }
+            }
+          },
+          {
+            "key": "first5",
+            "label": "Full game",
+            "closed": false,
+            "badge": "No bet",
+            "score": "CWS 0 - NYY 0",
+            "subtitle": "CWS 4.6 - NYY 4.08 | Total 8.67",
+            "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
+            "projection": {
+              "total": 8.67,
+              "homeMargin": -0.52
+            },
+            "markets": {
+              "total": {
+                "pick": null,
+                "line": 8.67,
+                "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              },
+              "spread": {
+                "pick": null,
+                "homeLine": -0.52,
+                "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              },
+              "moneyline": {
+                "pick": null,
+                "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              }
+            }
+          },
+          {
+            "key": "first1",
+            "label": "First 1",
+            "closed": false,
+            "badge": "",
+            "score": "CWS 24.1% | NYY 19.7% | Tie 56.2%",
+            "subtitle": "CWS 24.1% | NYY 19.7% | Tie 56.2%",
+            "reason": "CWS 24.1% | NYY 19.7% | Tie 56.2%",
+            "projection": {
+              "total": 24.1,
+              "homeMargin": 19.7
+            },
+            "markets": {
+              "total": {
+                "pick": null,
+                "line": 24.1,
+                "reason": "CWS 24.1% | NYY 19.7% | Tie 56.2%"
+              },
+              "spread": {},
+              "moneyline": {}
+            }
+          },
+          {
+            "key": "first3",
+            "label": "First 3",
+            "closed": false,
+            "badge": "",
+            "score": "CWS 41.6% | NYY 33.9% | Tie 24.5%",
+            "subtitle": "CWS 41.6% | NYY 33.9% | Tie 24.5%",
+            "reason": "CWS 41.6% | NYY 33.9% | Tie 24.5%",
+            "projection": {
+              "total": 41.6,
+              "homeMargin": 33.9
+            },
+            "markets": {
+              "total": {
+                "pick": null,
+                "line": 41.6,
+                "reason": "CWS 41.6% | NYY 33.9% | Tie 24.5%"
+              },
+              "spread": {},
+              "moneyline": {}
+            }
+          },
+          {
+            "key": "first5",
+            "label": "First 5",
+            "closed": false,
+            "badge": "",
+            "score": "CWS 45.6% | NYY 38.4% | Tie 16.0%",
+            "subtitle": "CWS 45.6% | NYY 38.4% | Tie 16.0%",
+            "reason": "CWS 45.6% | NYY 38.4% | Tie 16.0%",
+            "projection": {
+              "total": 45.6,
+              "homeMargin": 38.4
+            },
+            "markets": {
+              "total": {
+                "pick": null,
+                "line": 45.6,
+                "reason": "CWS 45.6% | NYY 38.4% | Tie 16.0%"
+              },
+              "spread": {},
+              "moneyline": {}
+            }
+          },
+          {
+            "key": "full",
+            "label": "Full game",
+            "closed": false,
+            "badge": "",
+            "score": "CWS 56.5% | NYY 43.5% | Tie 0.0%",
+            "subtitle": "CWS 56.5% | NYY 43.5% | Tie 0.0%",
+            "reason": "CWS 56.5% | NYY 43.5% | Tie 0.0%",
+            "projection": {
+              "total": 56.5,
+              "homeMargin": 43.5
+            },
+            "markets": {
+              "total": {
+                "pick": null,
+                "line": 56.5,
+                "reason": "CWS 56.5% | NYY 43.5% | Tie 0.0%"
+              },
+              "spread": {},
+              "moneyline": {}
+            }
+          }
+        ],
+        "props": [],
+        "liveProps": [],
+        "archivedLiveProps": [],
+        "trackedProps": [],
+        "simContextAvailable": false,
+        "snapshotAvailable": true,
+        "market_tiles": [
+          {
+            "label": "Game total",
+            "title": "No total play",
+            "sub": "Off card"
+          },
+          {
+            "label": "Moneyline",
+            "title": "No ML play",
+            "sub": "Off card"
+          },
+          {
+            "label": "Pitcher props",
+            "title": "No locked pitcher prop",
+            "sub": "Off card"
+          },
+          {
+            "label": "Hitter props",
+            "title": "No locked hitter prop",
+            "sub": "Off card"
+          }
+        ],
+        "probable": {
+          "away": {
+            "id": null,
+            "fullName": "Sean Burke"
+          },
+          "home": {
+            "id": null,
+            "fullName": "Ryan Weathers"
+          }
+        },
+        "markets": {}
+      },
+      {
+        "gamePk": 824911,
+        "status": {
+          "abstract": "Preview",
+          "detailed": "Scheduled"
+        },
+        "startTime": "6:15 PM",
+        "matchup": {
+          "away": {
+            "abbr": "SF",
+            "id": 137,
+            "logo": "https://www.mlbstatic.com/team-logos/137.svg",
+            "name": "San Francisco Giants"
+          },
+          "home": {
+            "abbr": "ATL",
+            "id": 144,
+            "logo": "https://www.mlbstatic.com/team-logos/144.svg",
+            "name": "Atlanta Braves"
+          },
+          "score": {
+            "away": 0,
+            "home": 0
+          },
+          "liveText": "Landen Roupp vs Mart\u00edn P\u00e9rez"
+        },
+        "predictions": {
+          "first1": {
+            "away_runs_mean": 0.374,
+            "home_runs_mean": 0.422,
+            "away_win_prob": 0.176,
+            "home_win_prob": 0.195,
+            "tie_prob": 0.629
+          },
+          "first3": {
+            "away_runs_mean": 1.209,
+            "home_runs_mean": 1.101,
+            "away_win_prob": 0.366,
+            "home_win_prob": 0.322,
+            "tie_prob": 0.312
+          },
+          "first5": {
+            "away_runs_mean": 2.068,
+            "home_runs_mean": 1.935,
+            "away_win_prob": 0.435,
+            "home_win_prob": 0.384,
+            "tie_prob": 0.181
+          },
+          "full": {
+            "away_runs_mean": 3.971,
+            "home_runs_mean": 3.219,
+            "away_win_prob": 0.552,
+            "home_win_prob": 0.448,
+            "tie_prob": 0.0
+          }
+        },
+        "gameMarkets": {
+          "totals": null,
+          "ml": null
+        },
+        "gameLens": [
+          {
+            "key": "first1",
+            "label": "F1",
+            "closed": false,
+            "badge": "No bet",
+            "score": "SF 0 - ATL 0",
+            "subtitle": "SF 0.37 - ATL 0.42 | Total 0.8",
+            "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
+            "projection": {
+              "total": 0.8,
+              "homeMargin": 0.05
+            },
+            "markets": {
+              "total": {
+                "pick": null,
+                "line": 0.8,
+                "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              },
+              "spread": {
+                "pick": null,
+                "homeLine": 0.05,
+                "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              },
+              "moneyline": {
+                "pick": null,
+                "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              }
+            }
+          },
+          {
+            "key": "first3",
+            "label": "F3",
+            "closed": false,
+            "badge": "No bet",
+            "score": "SF 0 - ATL 0",
+            "subtitle": "SF 1.21 - ATL 1.1 | Total 2.31",
+            "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
+            "projection": {
+              "total": 2.31,
+              "homeMargin": -0.11
+            },
+            "markets": {
+              "total": {
+                "pick": null,
+                "line": 2.31,
+                "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              },
+              "spread": {
+                "pick": null,
+                "homeLine": -0.11,
+                "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              },
+              "moneyline": {
+                "pick": null,
+                "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              }
+            }
+          },
+          {
+            "key": "first5",
+            "label": "F5",
+            "closed": false,
+            "badge": "No bet",
+            "score": "SF 0 - ATL 0",
+            "subtitle": "SF 2.07 - ATL 1.94 | Total 4",
+            "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
+            "projection": {
+              "total": 4.0,
+              "homeMargin": -0.13
+            },
+            "markets": {
+              "total": {
+                "pick": null,
+                "line": 4.0,
+                "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              },
+              "spread": {
+                "pick": null,
+                "homeLine": -0.13,
+                "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              },
+              "moneyline": {
+                "pick": null,
+                "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              }
+            }
+          },
+          {
+            "key": "first5",
+            "label": "Full game",
+            "closed": false,
+            "badge": "No bet",
+            "score": "SF 0 - ATL 0",
+            "subtitle": "SF 3.97 - ATL 3.22 | Total 7.19",
+            "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
+            "projection": {
+              "total": 7.19,
+              "homeMargin": -0.75
+            },
+            "markets": {
+              "total": {
+                "pick": null,
+                "line": 7.19,
+                "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              },
+              "spread": {
+                "pick": null,
+                "homeLine": -0.75,
+                "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              },
+              "moneyline": {
+                "pick": null,
+                "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              }
+            }
+          },
+          {
+            "key": "first1",
+            "label": "First 1",
+            "closed": false,
+            "badge": "",
+            "score": "SF 17.6% | ATL 19.5% | Tie 62.9%",
+            "subtitle": "SF 17.6% | ATL 19.5% | Tie 62.9%",
+            "reason": "SF 17.6% | ATL 19.5% | Tie 62.9%",
+            "projection": {
+              "total": 17.6,
+              "homeMargin": 19.5
+            },
+            "markets": {
+              "total": {
+                "pick": null,
+                "line": 17.6,
+                "reason": "SF 17.6% | ATL 19.5% | Tie 62.9%"
+              },
+              "spread": {},
+              "moneyline": {}
+            }
+          },
+          {
+            "key": "first3",
+            "label": "First 3",
+            "closed": false,
+            "badge": "",
+            "score": "SF 36.6% | ATL 32.2% | Tie 31.2%",
+            "subtitle": "SF 36.6% | ATL 32.2% | Tie 31.2%",
+            "reason": "SF 36.6% | ATL 32.2% | Tie 31.2%",
+            "projection": {
+              "total": 36.6,
+              "homeMargin": 32.2
+            },
+            "markets": {
+              "total": {
+                "pick": null,
+                "line": 36.6,
+                "reason": "SF 36.6% | ATL 32.2% | Tie 31.2%"
+              },
+              "spread": {},
+              "moneyline": {}
+            }
+          },
+          {
+            "key": "first5",
+            "label": "First 5",
+            "closed": false,
+            "badge": "",
+            "score": "SF 43.5% | ATL 38.4% | Tie 18.1%",
+            "subtitle": "SF 43.5% | ATL 38.4% | Tie 18.1%",
+            "reason": "SF 43.5% | ATL 38.4% | Tie 18.1%",
+            "projection": {
+              "total": 43.5,
+              "homeMargin": 38.4
+            },
+            "markets": {
+              "total": {
+                "pick": null,
+                "line": 43.5,
+                "reason": "SF 43.5% | ATL 38.4% | Tie 18.1%"
+              },
+              "spread": {},
+              "moneyline": {}
+            }
+          },
+          {
+            "key": "full",
+            "label": "Full game",
+            "closed": false,
+            "badge": "",
+            "score": "SF 55.2% | ATL 44.8% | Tie 0.0%",
+            "subtitle": "SF 55.2% | ATL 44.8% | Tie 0.0%",
+            "reason": "SF 55.2% | ATL 44.8% | Tie 0.0%",
+            "projection": {
+              "total": 55.2,
+              "homeMargin": 44.8
+            },
+            "markets": {
+              "total": {
+                "pick": null,
+                "line": 55.2,
+                "reason": "SF 55.2% | ATL 44.8% | Tie 0.0%"
+              },
+              "spread": {},
+              "moneyline": {}
+            }
+          }
+        ],
+        "props": [],
+        "liveProps": [],
+        "archivedLiveProps": [],
+        "trackedProps": [],
+        "simContextAvailable": false,
+        "snapshotAvailable": true,
+        "market_tiles": [
+          {
+            "label": "Game total",
+            "title": "No total play",
+            "sub": "Off card"
+          },
+          {
+            "label": "Moneyline",
+            "title": "No ML play",
+            "sub": "Off card"
+          },
+          {
+            "label": "Pitcher props",
+            "title": "No locked pitcher prop",
+            "sub": "Off card"
+          },
+          {
+            "label": "Hitter props",
+            "title": "No locked hitter prop",
+            "sub": "Off card"
+          }
+        ],
+        "probable": {
+          "away": {
+            "id": null,
+            "fullName": "Landen Roupp"
+          },
+          "home": {
+            "id": null,
+            "fullName": "Mart\u00edn P\u00e9rez"
+          }
+        },
+        "first1BetSignal": {
+          "label": "F1 NRFI",
+          "tone": "nrfi",
+          "summary": "0-run sim 60.8% | F1 mean 0.80",
+          "detail": "Season filter qualified: simulated scoreless first inning 60.8% with only 0.80 expected runs in the opening frame.",
+          "nrfiProb": 0.608,
+          "yrfiProb": 0.392,
+          "meanTotalRuns": 0.796,
+          "maxSideLeadProb": 0.195
+        },
+        "markets": {}
+      },
+      {
+        "gamePk": 824098,
+        "status": {
+          "abstract": "Preview",
+          "detailed": "Scheduled"
+        },
+        "startTime": "6:40 PM",
+        "matchup": {
+          "away": {
+            "abbr": "STL",
+            "id": 138,
+            "logo": "https://www.mlbstatic.com/team-logos/138.svg",
+            "name": "St. Louis Cardinals"
+          },
+          "home": {
+            "abbr": "KC",
+            "id": 118,
+            "logo": "https://www.mlbstatic.com/team-logos/118.svg",
+            "name": "Kansas City Royals"
+          },
+          "score": {
+            "away": 0,
+            "home": 0
+          },
+          "liveText": "Matthew Liberatore vs Noah Cameron"
+        },
+        "predictions": {
+          "first1": {
+            "away_runs_mean": 0.531,
+            "home_runs_mean": 0.563,
+            "away_win_prob": 0.218,
+            "home_win_prob": 0.215,
+            "tie_prob": 0.567
+          },
+          "first3": {
+            "away_runs_mean": 1.617,
+            "home_runs_mean": 1.693,
+            "away_win_prob": 0.365,
+            "home_win_prob": 0.39,
+            "tie_prob": 0.245
+          },
+          "first5": {
+            "away_runs_mean": 2.701,
+            "home_runs_mean": 2.877,
+            "away_win_prob": 0.401,
+            "home_win_prob": 0.459,
+            "tie_prob": 0.14
+          },
+          "full": {
+            "away_runs_mean": 4.925,
+            "home_runs_mean": 5.227,
+            "away_win_prob": 0.47,
+            "home_win_prob": 0.53,
+            "tie_prob": 0.0
+          }
+        },
+        "gameMarkets": {
+          "totals": null,
+          "ml": null
+        },
+        "gameLens": [
+          {
+            "key": "first1",
+            "label": "F1",
+            "closed": false,
+            "badge": "No bet",
+            "score": "STL 0 - KC 0",
+            "subtitle": "STL 0.53 - KC 0.56 | Total 1.09",
+            "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
+            "projection": {
+              "total": 1.09,
+              "homeMargin": 0.03
+            },
+            "markets": {
+              "total": {
+                "pick": null,
+                "line": 1.09,
+                "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              },
+              "spread": {
+                "pick": null,
+                "homeLine": 0.03,
+                "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              },
+              "moneyline": {
+                "pick": null,
+                "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              }
+            }
+          },
+          {
+            "key": "first3",
+            "label": "F3",
+            "closed": false,
+            "badge": "No bet",
+            "score": "STL 0 - KC 0",
+            "subtitle": "STL 1.62 - KC 1.69 | Total 3.31",
+            "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
+            "projection": {
+              "total": 3.31,
+              "homeMargin": 0.08
+            },
+            "markets": {
+              "total": {
+                "pick": null,
+                "line": 3.31,
+                "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              },
+              "spread": {
+                "pick": null,
+                "homeLine": 0.08,
+                "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              },
+              "moneyline": {
+                "pick": null,
+                "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              }
+            }
+          },
+          {
+            "key": "first5",
+            "label": "F5",
+            "closed": false,
+            "badge": "No bet",
+            "score": "STL 0 - KC 0",
+            "subtitle": "STL 2.7 - KC 2.88 | Total 5.58",
+            "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
+            "projection": {
+              "total": 5.58,
+              "homeMargin": 0.18
+            },
+            "markets": {
+              "total": {
+                "pick": null,
+                "line": 5.58,
+                "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              },
+              "spread": {
+                "pick": null,
+                "homeLine": 0.18,
+                "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              },
+              "moneyline": {
+                "pick": null,
+                "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              }
+            }
+          },
+          {
+            "key": "first5",
+            "label": "Full game",
+            "closed": false,
+            "badge": "No bet",
+            "score": "STL 0 - KC 0",
+            "subtitle": "STL 4.92 - KC 5.23 | Total 10.15",
+            "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
+            "projection": {
+              "total": 10.15,
+              "homeMargin": 0.3
+            },
+            "markets": {
+              "total": {
+                "pick": null,
+                "line": 10.15,
+                "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              },
+              "spread": {
+                "pick": null,
+                "homeLine": 0.3,
+                "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              },
+              "moneyline": {
+                "pick": null,
+                "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              }
+            }
+          },
+          {
+            "key": "first1",
+            "label": "First 1",
+            "closed": false,
+            "badge": "",
+            "score": "STL 21.8% | KC 21.5% | Tie 56.7%",
+            "subtitle": "STL 21.8% | KC 21.5% | Tie 56.7%",
+            "reason": "STL 21.8% | KC 21.5% | Tie 56.7%",
+            "projection": {
+              "total": 21.8,
+              "homeMargin": 21.5
+            },
+            "markets": {
+              "total": {
+                "pick": null,
+                "line": 21.8,
+                "reason": "STL 21.8% | KC 21.5% | Tie 56.7%"
+              },
+              "spread": {},
+              "moneyline": {}
+            }
+          },
+          {
+            "key": "first3",
+            "label": "First 3",
+            "closed": false,
+            "badge": "",
+            "score": "STL 36.5% | KC 39.0% | Tie 24.5%",
+            "subtitle": "STL 36.5% | KC 39.0% | Tie 24.5%",
+            "reason": "STL 36.5% | KC 39.0% | Tie 24.5%",
+            "projection": {
+              "total": 36.5,
+              "homeMargin": 39.0
+            },
+            "markets": {
+              "total": {
+                "pick": null,
+                "line": 36.5,
+                "reason": "STL 36.5% | KC 39.0% | Tie 24.5%"
+              },
+              "spread": {},
+              "moneyline": {}
+            }
+          },
+          {
+            "key": "first5",
+            "label": "First 5",
+            "closed": false,
+            "badge": "",
+            "score": "STL 40.1% | KC 45.9% | Tie 14.0%",
+            "subtitle": "STL 40.1% | KC 45.9% | Tie 14.0%",
+            "reason": "STL 40.1% | KC 45.9% | Tie 14.0%",
+            "projection": {
+              "total": 40.1,
+              "homeMargin": 45.9
+            },
+            "markets": {
+              "total": {
+                "pick": null,
+                "line": 40.1,
+                "reason": "STL 40.1% | KC 45.9% | Tie 14.0%"
+              },
+              "spread": {},
+              "moneyline": {}
+            }
+          },
+          {
+            "key": "full",
+            "label": "Full game",
+            "closed": false,
+            "badge": "",
+            "score": "STL 47.0% | KC 53.0% | Tie 0.0%",
+            "subtitle": "STL 47.0% | KC 53.0% | Tie 0.0%",
+            "reason": "STL 47.0% | KC 53.0% | Tie 0.0%",
+            "projection": {
+              "total": 47.0,
+              "homeMargin": 53.0
+            },
+            "markets": {
+              "total": {
+                "pick": null,
+                "line": 47.0,
+                "reason": "STL 47.0% | KC 53.0% | Tie 0.0%"
+              },
+              "spread": {},
+              "moneyline": {}
+            }
+          }
+        ],
+        "props": [],
+        "liveProps": [],
+        "archivedLiveProps": [],
+        "trackedProps": [],
+        "simContextAvailable": false,
+        "snapshotAvailable": true,
+        "market_tiles": [
+          {
+            "label": "Game total",
+            "title": "No total play",
+            "sub": "Off card"
+          },
+          {
+            "label": "Moneyline",
+            "title": "No ML play",
+            "sub": "Off card"
+          },
+          {
+            "label": "Pitcher props",
+            "title": "No locked pitcher prop",
+            "sub": "Off card"
+          },
+          {
+            "label": "Hitter props",
+            "title": "No locked hitter prop",
+            "sub": "Off card"
+          }
+        ],
+        "probable": {
+          "away": {
+            "id": null,
+            "fullName": "Matthew Liberatore"
+          },
+          "home": {
+            "id": null,
+            "fullName": "Noah Cameron"
+          }
+        },
+        "markets": {}
+      },
+      {
+        "gamePk": 824989,
+        "status": {
+          "abstract": "Preview",
+          "detailed": "Scheduled"
+        },
+        "startTime": "8:40 PM",
+        "matchup": {
+          "away": {
+            "abbr": "LAA",
+            "id": 108,
+            "logo": "https://www.mlbstatic.com/team-logos/108.svg",
+            "name": "Los Angeles Angels"
+          },
+          "home": {
+            "abbr": "ATH",
+            "id": 133,
+            "logo": "https://www.mlbstatic.com/team-logos/133.svg",
+            "name": "Athletics"
+          },
+          "score": {
+            "away": 0,
+            "home": 0
+          },
+          "liveText": "Jos\u00e9 Soriano vs Jeffrey Springs"
+        },
+        "predictions": {
+          "first1": {
+            "away_runs_mean": 0.564,
+            "home_runs_mean": 0.505,
+            "away_win_prob": 0.233,
+            "home_win_prob": 0.2,
+            "tie_prob": 0.567
+          },
+          "first3": {
+            "away_runs_mean": 1.669,
+            "home_runs_mean": 1.479,
+            "away_win_prob": 0.411,
+            "home_win_prob": 0.346,
+            "tie_prob": 0.243
+          },
+          "first5": {
+            "away_runs_mean": 2.814,
+            "home_runs_mean": 2.498,
+            "away_win_prob": 0.454,
+            "home_win_prob": 0.393,
+            "tie_prob": 0.153
+          },
+          "full": {
+            "away_runs_mean": 5.025,
+            "home_runs_mean": 4.345,
+            "away_win_prob": 0.535,
+            "home_win_prob": 0.465,
+            "tie_prob": 0.0
+          }
+        },
+        "gameMarkets": {
+          "totals": null,
+          "ml": null
+        },
+        "gameLens": [
+          {
+            "key": "first1",
+            "label": "F1",
+            "closed": false,
+            "badge": "No bet",
+            "score": "LAA 0 - ATH 0",
+            "subtitle": "LAA 0.56 - ATH 0.51 | Total 1.07",
+            "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
+            "projection": {
+              "total": 1.07,
+              "homeMargin": -0.06
+            },
+            "markets": {
+              "total": {
+                "pick": null,
+                "line": 1.07,
+                "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              },
+              "spread": {
+                "pick": null,
+                "homeLine": -0.06,
+                "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              },
+              "moneyline": {
+                "pick": null,
+                "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              }
+            }
+          },
+          {
+            "key": "first3",
+            "label": "F3",
+            "closed": false,
+            "badge": "No bet",
+            "score": "LAA 0 - ATH 0",
+            "subtitle": "LAA 1.67 - ATH 1.48 | Total 3.15",
+            "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
+            "projection": {
+              "total": 3.15,
+              "homeMargin": -0.19
+            },
+            "markets": {
+              "total": {
+                "pick": null,
+                "line": 3.15,
+                "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              },
+              "spread": {
+                "pick": null,
+                "homeLine": -0.19,
+                "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              },
+              "moneyline": {
+                "pick": null,
+                "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              }
+            }
+          },
+          {
+            "key": "first5",
+            "label": "F5",
+            "closed": false,
+            "badge": "No bet",
+            "score": "LAA 0 - ATH 0",
+            "subtitle": "LAA 2.81 - ATH 2.5 | Total 5.31",
+            "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
+            "projection": {
+              "total": 5.31,
+              "homeMargin": -0.32
+            },
+            "markets": {
+              "total": {
+                "pick": null,
+                "line": 5.31,
+                "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              },
+              "spread": {
+                "pick": null,
+                "homeLine": -0.32,
+                "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              },
+              "moneyline": {
+                "pick": null,
+                "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              }
+            }
+          },
+          {
+            "key": "first5",
+            "label": "Full game",
+            "closed": false,
+            "badge": "No bet",
+            "score": "LAA 0 - ATH 0",
+            "subtitle": "LAA 5.03 - ATH 4.34 | Total 9.37",
+            "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
+            "projection": {
+              "total": 9.37,
+              "homeMargin": -0.68
+            },
+            "markets": {
+              "total": {
+                "pick": null,
+                "line": 9.37,
+                "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              },
+              "spread": {
+                "pick": null,
+                "homeLine": -0.68,
+                "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              },
+              "moneyline": {
+                "pick": null,
+                "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              }
+            }
+          },
+          {
+            "key": "first1",
+            "label": "First 1",
+            "closed": false,
+            "badge": "",
+            "score": "LAA 23.3% | ATH 20.0% | Tie 56.7%",
+            "subtitle": "LAA 23.3% | ATH 20.0% | Tie 56.7%",
+            "reason": "LAA 23.3% | ATH 20.0% | Tie 56.7%",
+            "projection": {
+              "total": 23.3,
+              "homeMargin": 20.0
+            },
+            "markets": {
+              "total": {
+                "pick": null,
+                "line": 23.3,
+                "reason": "LAA 23.3% | ATH 20.0% | Tie 56.7%"
+              },
+              "spread": {},
+              "moneyline": {}
+            }
+          },
+          {
+            "key": "first3",
+            "label": "First 3",
+            "closed": false,
+            "badge": "",
+            "score": "LAA 41.1% | ATH 34.6% | Tie 24.3%",
+            "subtitle": "LAA 41.1% | ATH 34.6% | Tie 24.3%",
+            "reason": "LAA 41.1% | ATH 34.6% | Tie 24.3%",
+            "projection": {
+              "total": 41.1,
+              "homeMargin": 34.6
+            },
+            "markets": {
+              "total": {
+                "pick": null,
+                "line": 41.1,
+                "reason": "LAA 41.1% | ATH 34.6% | Tie 24.3%"
+              },
+              "spread": {},
+              "moneyline": {}
+            }
+          },
+          {
+            "key": "first5",
+            "label": "First 5",
+            "closed": false,
+            "badge": "",
+            "score": "LAA 45.4% | ATH 39.3% | Tie 15.3%",
+            "subtitle": "LAA 45.4% | ATH 39.3% | Tie 15.3%",
+            "reason": "LAA 45.4% | ATH 39.3% | Tie 15.3%",
+            "projection": {
+              "total": 45.4,
+              "homeMargin": 39.3
+            },
+            "markets": {
+              "total": {
+                "pick": null,
+                "line": 45.4,
+                "reason": "LAA 45.4% | ATH 39.3% | Tie 15.3%"
+              },
+              "spread": {},
+              "moneyline": {}
+            }
+          },
+          {
+            "key": "full",
+            "label": "Full game",
+            "closed": false,
+            "badge": "",
+            "score": "LAA 53.5% | ATH 46.5% | Tie 0.0%",
+            "subtitle": "LAA 53.5% | ATH 46.5% | Tie 0.0%",
+            "reason": "LAA 53.5% | ATH 46.5% | Tie 0.0%",
+            "projection": {
+              "total": 53.5,
+              "homeMargin": 46.5
+            },
+            "markets": {
+              "total": {
+                "pick": null,
+                "line": 53.5,
+                "reason": "LAA 53.5% | ATH 46.5% | Tie 0.0%"
+              },
+              "spread": {},
+              "moneyline": {}
+            }
+          }
+        ],
+        "props": [],
+        "liveProps": [],
+        "archivedLiveProps": [],
+        "trackedProps": [],
+        "simContextAvailable": false,
+        "snapshotAvailable": true,
+        "market_tiles": [
+          {
+            "label": "Game total",
+            "title": "No total play",
+            "sub": "Off card"
+          },
+          {
+            "label": "Moneyline",
+            "title": "No ML play",
+            "sub": "Off card"
+          },
+          {
+            "label": "Pitcher props",
+            "title": "No locked pitcher prop",
+            "sub": "Off card"
+          },
+          {
+            "label": "Hitter props",
+            "title": "No locked hitter prop",
+            "sub": "Off card"
+          }
+        ],
+        "probable": {
+          "away": {
+            "id": null,
+            "fullName": "Jos\u00e9 Soriano"
+          },
+          "home": {
+            "id": null,
+            "fullName": "Jeffrey Springs"
+          }
+        },
+        "markets": {}
+      }
+    ],
+    "source_title": "MLB daily summary artifact"
+  },
+  "registrySummary": {
+    "date": "2026-06-18",
+    "updatedAt": null,
+    "totalEntries": 0,
+    "uniqueGames": 0,
+    "uniqueOwners": 0,
+    "settledEntries": 0,
+    "resultCounts": {
+      "win": 0,
+      "loss": 0,
+      "push": 0,
+      "pending": 0
+    },
+    "byProp": {},
+    "bySelection": {},
+    "topStable": [],
+    "topEdges": []
+  },
+  "summary": {
+    "counts": {
+      "games": 9,
+      "live": 0,
+      "final": 0,
+      "pregame": 9,
+      "props": 0,
+      "archivedLiveProps": 0
+    },
+    "performance": {
+      "marketsRefreshed": false,
+      "marketRefreshMs": 0.0,
+      "totalMs": 538.9,
+      "snapshotLoadMs": 1.1,
+      "simContextLoadMs": 0.8,
+      "propEvalMs": 0.1,
+      "gameLensMs": 1.1,
+      "gameCount": 9,
+      "liveGameCount": 0,
+      "feedFetchCount": 9,
+      "persistMs": 0.0
+    },
+    "topStable": [],
+    "topEdges": []
+  },
+  "firstObservationArchive": [],
+  "rawArtifacts": {
+    "total_bytes": 89581,
+    "total_bytes_text": "87.48 KB",
+    "files": {
+      "log": {
+        "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/live_lens/live_lens_2026_06_18.jsonl",
+        "exists": true,
+        "bytes": 1839,
+        "bytes_text": "1.80 KB",
+        "modified_at": "2026-06-18T02:38:10-05:00"
+      },
+      "observation_log": {
+        "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/live_lens/prop_registry/live_prop_observations_2026_06_18.jsonl",
+        "exists": false,
+        "bytes": 0,
+        "bytes_text": "0 B"
+      },
+      "registry": {
+        "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/live_lens/prop_registry/live_prop_registry_2026_06_18.json",
+        "exists": false,
+        "bytes": 0,
+        "bytes_text": "0 B"
+      },
+      "registry_log": {
+        "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/live_lens/prop_registry/live_prop_registry_2026_06_18.jsonl",
+        "exists": false,
+        "bytes": 0,
+        "bytes_text": "0 B"
+      },
+      "report": {
+        "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/live_lens/live_lens_report_2026_06_18.json",
+        "exists": true,
+        "bytes": 87742,
+        "bytes_text": "85.69 KB",
+        "modified_at": "2026-06-18T02:38:10-05:00"
+      }
+    }
+  }
+}

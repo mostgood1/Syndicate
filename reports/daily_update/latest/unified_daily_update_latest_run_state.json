@@ -1,13 +1,13 @@
 ﻿{
     "scope":  "daily_update",
-    "date":  "2026-06-17",
+    "date":  "2026-06-18",
     "runMode":  "standard",
     "overallStatus":  "ok",
-    "generatedAt":  "2026-06-17T16:53:02.3010411+00:00",
-    "updatedAt":  "2026-06-17T17:04:09.8256903+00:00",
-    "runManifestPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-06-17\\20260617_165301\\unified_daily_update_run.json",
+    "generatedAt":  "2026-06-18T07:38:40.1963232+00:00",
+    "updatedAt":  "2026-06-18T08:03:35.6886686+00:00",
+    "runManifestPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-06-18\\20260618_073839\\unified_daily_update_run.json",
     "latestManifestPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest.json",
-    "runCheckpointPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-06-17\\20260617_165301\\unified_daily_update_checkpoint.json",
+    "runCheckpointPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-06-18\\20260618_073839\\unified_daily_update_checkpoint.json",
     "latestCheckpointPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest_checkpoint.json",
     "currentStage":  "queued",
     "completedStages":  [
@@ -15,7 +15,7 @@
                             "refresh_gate"
                         ],
     "failedStage":  null,
-    "lastUpdatedAt":  "2026-06-17T17:04:09.8236813+00:00",
+    "lastUpdatedAt":  "2026-06-18T08:03:35.6877529+00:00",
     "replayContext":  {
                           "latestCheckpointLoaded":  true,
                           "latestCheckpointPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest_checkpoint.json",
@@ -139,8 +139,8 @@
                      "inputFingerprintCount":  3,
                      "artifactPathCount":  21,
                      "inputFingerprints":  [
-                                               "d23462a18b2da8d3a147973739d91cc607442a1219a28cc44adf8f426bdc3c32",
-                                               "04c5f51b9a83653b59fa69757209bde5fe1980791938c7c649ed44b11d8b8d53",
+                                               "e9b5fe4b003642748a9d77571bc9725163d8f667e6243d2d7e5689bd42767b81",
+                                               "273bb599414ea4ae1424dde32f327726ccd6fca9e0860fb7b0859d33fe560422",
                                                "4a57d34024d5809c0516a43142be0e0352fe5316d550f250c63957b9528ce7dd"
                                            ],
                      "artifactPaths":  [
