@@ -1026,12 +1026,22 @@ def intelligence_status_api():
     except Exception as exc:
         return _api_error_response(exc)
     page_payload = _intelligence_page_payload(selected_date)
-    state_snapshot = read_latest_intelligence_state_response(page_payload, force_refresh=True)
-    if _render_hosted_request() and (state_snapshot is None or not _response_has_content(state_snapshot) or _response_needs_refresh(page_payload, state_snapshot)):
-        computed_state = compute_intelligence_state_response(dict(page_payload))
-        if isinstance(computed_state, dict):
-            state_snapshot = computed_state
-    debug_source = "worker" if isinstance(state_snapshot, dict) else "fallback"
+    if _render_hosted_request():
+        state_snapshot, debug_source = _cached_intelligence_response_with_source(page_payload)
+        if state_snapshot is None or not _response_has_content(state_snapshot) or _response_needs_refresh(page_payload, state_snapshot):
+            computed_state = compute_intelligence_state_response(dict(page_payload))
+            if isinstance(computed_state, dict):
+                state_snapshot = computed_state
+                debug_source = "render_compute"
+        if not isinstance(state_snapshot, dict):
+            state_snapshot = read_latest_intelligence_state_response(page_payload, force_refresh=True)
+            if isinstance(state_snapshot, dict):
+                debug_source = "worker"
+        if not debug_source:
+            debug_source = "worker" if isinstance(state_snapshot, dict) else "fallback"
+    else:
+        state_snapshot = read_latest_intelligence_state_response(page_payload, force_refresh=True)
+        debug_source = "worker" if isinstance(state_snapshot, dict) else "fallback"
     response_payload = {"ok": True, "status": status}
     if isinstance(status, dict):
         for key, value in status.items():

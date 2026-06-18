@@ -702,6 +702,11 @@ class IntelligenceStateTests(unittest.TestCase):
             "last_updated": "2026-06-11T16:05:00Z",
             "candidate_pool": {"candidates": [{"name": "Play 1"}]},
         }
+        board_response = {
+            "ok": True,
+            "last_updated": "2026-06-11T16:05:00Z",
+            "candidate_pool": {"candidates": [{"name": "Play 1"}]},
+        }
 
         with app.test_request_context("/api/intelligence/status?date=2026-06-10", method="GET"):
             with patch("syndicate.blueprints.intelligence.build_intelligence_status", return_value={"ok": True, "threadAlive": True}):
@@ -773,13 +778,13 @@ class IntelligenceStateTests(unittest.TestCase):
         with app.test_request_context("/api/intelligence/status?date=2026-06-10", method="GET"):
             with patch.dict(os.environ, {"RENDER": "true"}, clear=False):
                 with patch("syndicate.blueprints.intelligence.build_intelligence_status", return_value={"ok": True, "threadAlive": True}):
-                    with patch("syndicate.blueprints.intelligence.read_latest_intelligence_state_response", return_value=dict(empty_state)):
+                    with patch("syndicate.blueprints.intelligence._cached_intelligence_response_with_source", return_value=(dict(empty_state), "worker")):
                         with patch("syndicate.blueprints.intelligence.compute_intelligence_state_response", return_value=dict(computed_state)) as mocked_compute:
                             response = intelligence_status_api()
 
         payload = response.get_json()
         self.assertIsNotNone(payload)
-        self.assertEqual(payload["debug_source"], "worker")
+        self.assertEqual(payload["debug_source"], "render_compute")
         self.assertEqual(payload["candidate_count"], 1)
         mocked_compute.assert_called_once()
         self.assertEqual(response.headers.get("Cache-Control"), "no-cache, no-store, must-revalidate")
