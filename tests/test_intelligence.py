@@ -1528,6 +1528,69 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertGreater(len(result.get("recommendations") or []), 0)
         self.assertTrue((result.get("structured_response") or {}).get("summary"))
 
+    def test_intelligence_query_api_normalizes_top_opportunities_for_ui_contract(self) -> None:
+        computed_response = {
+            "ok": True,
+            "top_opportunities": [
+                {
+                    "selection": "Over 7.5",
+                    "market": "Hits",
+                    "score": 1.2,
+                    "normalized_edge": 0.33,
+                    "sport": "MLB",
+                }
+            ],
+            "by_sport": {"mlb": [{"selection": "Over 7.5", "market": "Hits", "score": 1.2}]},
+            "analysis": {
+                "recommendations": [{"selection": "Over 7.5", "market": "Hits", "score": 1.2}],
+                "top_live_opportunities": [],
+                "portfolio": {},
+                "parlays": [],
+            },
+            "response": {
+                "top_opportunities": [
+                    {
+                        "selection": "Over 7.5",
+                        "market": "Hits",
+                        "score": 1.2,
+                        "normalized_edge": 0.33,
+                        "sport": "MLB",
+                    }
+                ],
+                "analysis": {
+                    "recommendations": [{"selection": "Over 7.5", "market": "Hits", "score": 1.2}],
+                    "top_live_opportunities": [],
+                    "portfolio": {},
+                    "parlays": [],
+                },
+            },
+        }
+
+        with patch("syndicate.blueprints.intelligence._cached_intelligence_response_with_source", return_value=(dict(computed_response), "render_compute")):
+            with patch("syndicate.blueprints.intelligence.queue_intelligence_state_refresh"):
+                response = self.client.post(
+                    "/api/intelligence/query",
+                    json={
+                        "question": "What are the best edges for this board?",
+                        "date": "2026-06-18",
+                        "force_refresh": True,
+                    },
+                )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json()
+        result = payload.get("response") or {}
+        top_opportunities = result.get("top_opportunities") or []
+        self.assertGreater(len(top_opportunities), 0)
+        first = top_opportunities[0]
+        self.assertEqual(first.get("name"), "Over 7.5")
+        self.assertEqual(first.get("pick"), "Over 7.5")
+        self.assertEqual(first.get("market"), "Hits")
+        self.assertEqual(first.get("score"), 1.2)
+        self.assertEqual(first.get("edge"), 0.33)
+        self.assertEqual(first.get("sport_slug"), "mlb")
+        self.assertNotIn("undefined", json.dumps(first))
+
     def test_intelligence_query_api_resolves_preview_date_and_preserves_contract(self) -> None:
         advanced_rows = [
             {

@@ -102,6 +102,33 @@ def _read_cached_query_response(cache_key: str) -> dict[str, Any] | None:
 
 
 def _attach_intelligence_response_aliases(response: dict[str, Any]) -> dict[str, Any]:
+    def _normalize_opportunity_item(item: Any) -> dict[str, Any]:
+        payload = dict(item) if isinstance(item, dict) else {}
+        selection = payload.get("selection") or payload.get("pick") or payload.get("name") or payload.get("label")
+        market = payload.get("market") or payload.get("market_label") or payload.get("market_key")
+        sport_slug = payload.get("sport_slug") or payload.get("sport")
+        edge = payload.get("edge")
+        if edge in {None, ""}:
+            edge = payload.get("normalized_edge")
+        score = payload.get("score")
+        if score in {None, ""}:
+            score = payload.get("adjusted_score") or payload.get("expected_value") or payload.get("ev_current") or 0.0
+        payload["selection"] = selection
+        payload["name"] = selection
+        payload["pick"] = selection
+        payload["market"] = market
+        payload["score"] = score
+        payload["sport_slug"] = str(sport_slug or "").strip().lower() or None
+        payload["edge"] = edge
+        if payload.get("normalized_edge") in {None, ""} and edge not in {None, ""}:
+            payload["normalized_edge"] = edge
+        return payload
+
+    def _normalize_opportunity_list(key: str) -> None:
+        items = response.get(key)
+        if isinstance(items, list):
+            response[key] = [_normalize_opportunity_item(item) for item in items if isinstance(item, dict)]
+
     response["boardContract"] = dict(response.get("board_contract") or {})
     response["evaluationBundle"] = dict(response.get("evaluation_bundle") or {})
     response["policyControl"] = dict(response.get("policy_control") or {})
@@ -109,6 +136,16 @@ def _attach_intelligence_response_aliases(response: dict[str, Any]) -> dict[str,
     response["portfolioTracking"] = dict(response.get("portfolio_tracking") or {})
     response["portfolioEvents"] = dict(response.get("portfolio_events") or {})
     response["portfolioEventRecords"] = list(response.get("portfolio_event_records") or [])
+    _normalize_opportunity_list("top_opportunities")
+    _normalize_opportunity_list("recommendations")
+    _normalize_opportunity_list("top_live_opportunities")
+
+    nested_response = response.get("response")
+    if isinstance(nested_response, dict):
+        for key in ("top_opportunities", "recommendations", "top_live_opportunities"):
+            nested_items = nested_response.get(key)
+            if isinstance(nested_items, list):
+                nested_response[key] = [_normalize_opportunity_item(item) for item in nested_items if isinstance(item, dict)]
     return response
 
 
