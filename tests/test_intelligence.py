@@ -954,6 +954,37 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertNotIn("mlb", sport_slugs)
         self.assertTrue(all("fallback" not in str(candidate.get("detail") or candidate.get("summary") or "").lower() for candidate in candidates))
 
+    def test_run_intelligence_query_prefers_primary_candidates_over_legacy_fallback(self) -> None:
+        with patch("syndicate.features.intelligence.build_intelligence_overview", return_value=_sample_overview_with_secondary_sport()):
+            with patch("syndicate.features.intelligence._tracked_repo_files", return_value=set()):
+                with patch("syndicate.features.intelligence._advanced_input_rows_for_sport", return_value=[]):
+                    with patch(
+                        "syndicate.features.intelligence.collect_all_recommendations",
+                        return_value=[
+                            {
+                                "candidate_type": "prop",
+                                "sport_slug": "mlb",
+                                "sport": "MLB",
+                                "matchup": "NYY at BOS",
+                                "market": "outs recorded",
+                                "pick": "Over 8+ Outs Recorded",
+                                "name": "Tobias Myers Outs Recorded",
+                                "detail": "Over 8+ Outs Recorded | Daily top props fallback",
+                                "writeup": "Daily top props fallback",
+                                "surface_title": "Top Live Props",
+                                "confidence": "55%",
+                                "score": 10.0,
+                            }
+                        ],
+                    ) as mocked_fallback:
+                        result = run_intelligence_query("top edges today", selected_date="2026-06-04", force_refresh=True)
+
+        recommendations = result.get("recommendations") or []
+        self.assertTrue(recommendations)
+        self.assertNotIn("mlb", {str(item.get("sport_slug") or item.get("sport") or "").lower() for item in recommendations})
+        self.assertFalse(any("fallback" in str(item.get("detail") or item.get("summary") or "").lower() for item in recommendations))
+        mocked_fallback.assert_not_called()
+
     def test_run_intelligence_query_uses_question_date_when_date_not_passed(self) -> None:
         with patch("syndicate.features.intelligence.build_intelligence_overview", return_value=_sample_mlb_market_overview()) as build_overview:
             with patch("syndicate.features.intelligence._tracked_repo_files", return_value=set()):

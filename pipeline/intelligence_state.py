@@ -16,7 +16,11 @@ from flask import current_app
 
 from pipeline.intelligence_entrypoint import run_routed_intelligence_pipeline
 from syndicate.features.intelligence import build_intelligence_status
+from syndicate.features.intelligence import build_intelligence_overview
+from syndicate.features.intelligence import collect_candidates
 from syndicate.features.intelligence import collect_all_recommendations
+from syndicate.features.intelligence import _candidate_is_source_backed
+from syndicate.features.intelligence import _query_preferences
 from syndicate.features.intelligence import rank_global_recommendations
 from syndicate.features.intelligence_board import build_intelligence_board_contract
 from syndicate.features.shared.market_id import attach_market_id
@@ -503,9 +507,49 @@ class IntelligenceStateService:
 
         if self._app is not None:
             with self._app.app_context():
-                raw_candidates = _profile_stage("simulation_aggregation", collect_all_recommendations, selected_date=selected_date, force_refresh=True, log_pipeline=False)
+                overview = _profile_stage("data_ingestion", build_intelligence_overview, selected_date=selected_date, force_refresh=True)
+                preferences = _query_preferences(
+                    "top edges today",
+                    mode="recommendation",
+                    sport="all",
+                    timing="all",
+                    include_props=True,
+                    include_games=True,
+                )
+                odds_history_by_sport = self._odds_history_payloads_by_sport(overview)
+                raw_candidates = _profile_stage(
+                    "simulation_aggregation",
+                    collect_candidates,
+                    overview,
+                    preferences,
+                    odds_history_by_sport,
+                )
         else:
-            raw_candidates = _profile_stage("simulation_aggregation", collect_all_recommendations, selected_date=selected_date, force_refresh=True, log_pipeline=False)
+            overview = _profile_stage("data_ingestion", build_intelligence_overview, selected_date=selected_date, force_refresh=True)
+            preferences = _query_preferences(
+                "top edges today",
+                mode="recommendation",
+                sport="all",
+                timing="all",
+                include_props=True,
+                include_games=True,
+            )
+            odds_history_by_sport = self._odds_history_payloads_by_sport(overview)
+            raw_candidates = _profile_stage(
+                "simulation_aggregation",
+                collect_candidates,
+                overview,
+                preferences,
+                odds_history_by_sport,
+            )
+
+        raw_candidates = [candidate for candidate in raw_candidates if isinstance(candidate, dict) and _candidate_is_source_backed(candidate)]
+        if not raw_candidates:
+            if self._app is not None:
+                with self._app.app_context():
+                    raw_candidates = _profile_stage("simulation_aggregation", collect_all_recommendations, selected_date=selected_date, force_refresh=True, log_pipeline=False)
+            else:
+                raw_candidates = _profile_stage("simulation_aggregation", collect_all_recommendations, selected_date=selected_date, force_refresh=True, log_pipeline=False)
         candidate_build_started_at = time.perf_counter()
         candidate_entries: list[dict[str, Any]] = []
         for candidate in raw_candidates:

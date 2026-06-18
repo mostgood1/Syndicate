@@ -4083,6 +4083,15 @@ def _candidate_is_source_backed(candidate: dict[str, Any]) -> bool:
     return True
 
 
+def _primary_query_candidates(
+    overview: list[dict[str, Any]],
+    preferences: dict[str, Any],
+    odds_history_by_sport: dict[str, dict[str, Any]] | None = None,
+) -> list[dict[str, Any]]:
+    candidates = collect_candidates(overview, preferences, odds_history_by_sport)
+    return [candidate for candidate in candidates if _candidate_is_source_backed(candidate)]
+
+
 def _collect_candidates(overview: list[dict[str, Any]], preferences: dict[str, Any]) -> list[dict[str, Any]]:
     candidates: list[dict[str, Any]] = []
     question_text = _safe_text(preferences.get("question"), "").lower()
@@ -5841,7 +5850,7 @@ def collect_all_recommendations(*, selected_date: str | None = None, force_refre
         for sport_row in overview
         if isinstance(sport_row, dict)
     }
-    candidates = collect_candidates(overview, preferences, odds_history_by_sport)
+    candidates = _primary_query_candidates(overview, preferences, odds_history_by_sport)
     if _query_needs_mlb_home_run_candidates(preferences) and not _has_mlb_home_run_candidates(candidates):
         for sport_row in overview:
             if not isinstance(sport_row, dict):
@@ -5961,10 +5970,10 @@ def run_intelligence_query(
             cached_response = None
         if cached_response is not None:
             return cached_response
-    shared_recommendations = collect_all_recommendations(selected_date=effective_date, force_refresh=force_refresh, log_pipeline=False)
-    candidates = [dict(recommendation) for recommendation in shared_recommendations]
+    candidates = _primary_query_candidates(overview, preferences, odds_history_by_sport)
     if not candidates:
-        candidates = collect_candidates(overview, preferences, odds_history_by_sport)
+        shared_recommendations = collect_all_recommendations(selected_date=effective_date, force_refresh=force_refresh, log_pipeline=False)
+        candidates = [dict(recommendation) for recommendation in shared_recommendations if isinstance(recommendation, dict)]
     resolved_requested_subjects = _resolved_requested_subjects(question, candidates)
     if resolved_requested_subjects != (preferences.get("requested_subjects") or []):
         preferences = {**preferences, "requested_subjects": resolved_requested_subjects}
