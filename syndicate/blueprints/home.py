@@ -2845,10 +2845,8 @@ def _pregame_prop_rows_from_betting_card(
     week: int | None = None,
     limit: int = 18,
 ) -> list[dict[str, Any]]:
-    # For MLB, use recommendations from locked policy
     if slug == "mlb":
-        fallback_href = f"/mlb/cards?date={context_label}"
-        return _pregame_prop_rows_from_mlb_recommendations(context_label, limit=limit, fallback_href=fallback_href)
+        return []
     
     # For other sports, use rank_cards from betting card
     cards, route_path, resolved_date = _betting_card_rank_cards(slug, context_label=context_label, season=season, week=week)
@@ -3318,9 +3316,7 @@ def _load_home_live_prop_items(
                 if isinstance(game.get("liveProps"), list) or isinstance(game.get("archivedLiveProps"), list)
             ]
             live_rows = _prop_rows_from_mlb_live_games(prop_backed_games)
-            if live_rows:
-                return live_rows
-            return _load_mlb_home_top_prop_items(context_label)
+            return live_rows
         if not _home_games_have_live_action(home_games):
             return []
         if slug == "nhl":

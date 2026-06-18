@@ -5851,32 +5851,6 @@ def collect_all_recommendations(*, selected_date: str | None = None, force_refre
         if isinstance(sport_row, dict)
     }
     candidates = _primary_query_candidates(overview, preferences, odds_history_by_sport)
-    if _query_needs_mlb_home_run_candidates(preferences) and not _has_mlb_home_run_candidates(candidates):
-        for sport_row in overview:
-            if not isinstance(sport_row, dict):
-                continue
-            if _safe_text(sport_row.get("slug"), "").lower() != "mlb":
-                continue
-            candidates.extend(_mlb_home_run_candidates_from_artifact(sport_row))
-            break
-    for sport_row in overview:
-        if not isinstance(sport_row, dict):
-            continue
-        extra_subject_candidates = _mlb_subject_prop_candidates_from_artifact(
-            sport_row,
-            question="top edges today",
-            preferences=preferences,
-        )
-        for candidate in extra_subject_candidates:
-            candidate_subject = _candidate_subject_key(candidate)
-            candidate_market = _candidate_market_key(candidate)
-            if any(
-                _candidate_subject_key(existing) == candidate_subject
-                and _candidate_market_key(existing) == candidate_market
-                for existing in candidates
-            ):
-                continue
-            candidates.append(candidate)
     candidates = _enrich_candidates_with_odds_history(candidates, odds_history_by_sport)
     candidates = _score_candidates(candidates, advanced_by_sport, preferences)
     filtered_candidates = filter_candidates(candidates, sport=_safe_text(preferences.get("sport"), "") or None)
@@ -5971,9 +5945,6 @@ def run_intelligence_query(
         if cached_response is not None:
             return cached_response
     candidates = _primary_query_candidates(overview, preferences, odds_history_by_sport)
-    if not candidates:
-        shared_recommendations = collect_all_recommendations(selected_date=effective_date, force_refresh=force_refresh, log_pipeline=False)
-        candidates = [dict(recommendation) for recommendation in shared_recommendations if isinstance(recommendation, dict)]
     resolved_requested_subjects = _resolved_requested_subjects(question, candidates)
     if resolved_requested_subjects != (preferences.get("requested_subjects") or []):
         preferences = {**preferences, "requested_subjects": resolved_requested_subjects}

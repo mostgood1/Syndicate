@@ -544,12 +544,6 @@ class IntelligenceStateService:
             )
 
         raw_candidates = [candidate for candidate in raw_candidates if isinstance(candidate, dict) and _candidate_is_source_backed(candidate)]
-        if not raw_candidates:
-            if self._app is not None:
-                with self._app.app_context():
-                    raw_candidates = _profile_stage("simulation_aggregation", collect_all_recommendations, selected_date=selected_date, force_refresh=True, log_pipeline=False)
-            else:
-                raw_candidates = _profile_stage("simulation_aggregation", collect_all_recommendations, selected_date=selected_date, force_refresh=True, log_pipeline=False)
         candidate_build_started_at = time.perf_counter()
         candidate_entries: list[dict[str, Any]] = []
         for candidate in raw_candidates:
