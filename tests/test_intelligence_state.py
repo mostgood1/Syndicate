@@ -448,6 +448,36 @@ class IntelligenceStateTests(unittest.TestCase):
         mocked_state_response.assert_called_once_with(expected_payload, force_refresh=True)
         mocked_queue.assert_called_once()
 
+    def test_intelligence_home_computes_render_fallback_when_cache_is_missing(self) -> None:
+        app = create_app()
+        app.testing = True
+
+        computed_response = {
+            "ok": True,
+            "selected_date": "2026-06-17",
+            "top_opportunities": [{"name": "Play 1"}],
+            "by_sport": {"mlb": [{"name": "Play 1"}]},
+            "analysis": {
+                "recommendations": [{"name": "Play 1"}],
+                "picks": [{"name": "Play 1"}],
+                "top_live_opportunities": [],
+                "portfolio": {},
+                "parlays": [],
+            },
+        }
+
+        with app.test_client() as client:
+            with patch.dict(os.environ, {"RENDER": "true"}, clear=False):
+                with patch("syndicate.blueprints.intelligence._cached_intelligence_response_with_source", return_value=(None, "fallback")):
+                    with patch("syndicate.blueprints.intelligence.compute_intelligence_state_response", return_value=dict(computed_response)) as mocked_compute:
+                        with patch("syndicate.blueprints.intelligence.queue_intelligence_state_refresh") as mocked_queue:
+                            response = client.get("/intelligence?date=2026-06-17")
+
+        self.assertEqual(response.status_code, 200)
+        mocked_compute.assert_called_once()
+        mocked_queue.assert_not_called()
+        self.assertIn("Play 1", response.get_data(as_text=True))
+
     def test_intelligence_home_suppresses_live_snapshot_missing_hydration(self) -> None:
         app = create_app()
         app.testing = True
@@ -707,6 +737,33 @@ class IntelligenceStateTests(unittest.TestCase):
         self.assertIsNotNone(payload)
         self.assertEqual(payload["debug_source"], "worker")
         mocked_state_response.assert_called_once_with(expected_payload, force_refresh=True)
+        self.assertEqual(response.headers.get("Cache-Control"), "no-cache, no-store, must-revalidate")
+        self.assertEqual(response.headers.get("Pragma"), "no-cache")
+        self.assertEqual(response.headers.get("Expires"), "0")
+
+    def test_status_endpoint_computes_render_fallback_when_state_cache_is_missing(self) -> None:
+        app = Flask(__name__)
+        app.register_blueprint(intelligence_bp)
+
+        computed_state = {
+            "ok": True,
+            "top_opportunities": [{"name": "Play 1"}],
+            "candidate_pool": {"candidates": [{"name": "Play 1"}]},
+            "analysis": {"recommendations": [{"name": "Play 1"}], "picks": [], "top_live_opportunities": [], "portfolio": {}, "parlays": []},
+        }
+
+        with app.test_request_context("/api/intelligence/status?date=2026-06-10", method="GET"):
+            with patch.dict(os.environ, {"RENDER": "true"}, clear=False):
+                with patch("syndicate.blueprints.intelligence.build_intelligence_status", return_value={"ok": True, "threadAlive": True}):
+                    with patch("syndicate.blueprints.intelligence.read_latest_intelligence_state_response", return_value=None):
+                        with patch("syndicate.blueprints.intelligence.compute_intelligence_state_response", return_value=dict(computed_state)) as mocked_compute:
+                            response = intelligence_status_api()
+
+        payload = response.get_json()
+        self.assertIsNotNone(payload)
+        self.assertEqual(payload["debug_source"], "worker")
+        self.assertEqual(payload["candidate_count"], 1)
+        mocked_compute.assert_called_once()
         self.assertEqual(response.headers.get("Cache-Control"), "no-cache, no-store, must-revalidate")
         self.assertEqual(response.headers.get("Pragma"), "no-cache")
         self.assertEqual(response.headers.get("Expires"), "0")
