@@ -440,6 +440,9 @@ def _cached_intelligence_response_with_source(payload: dict[str, object], *, for
     cached_response = read_latest_intelligence_state_response(payload, force_refresh=force_refresh)
     if _is_board_response(cached_response) and not _response_needs_refresh(payload, cached_response):
         return _hydrate_board_response_payload(cached_response), "worker"
+    computed_response = compute_intelligence_state_response(dict(payload))
+    if _is_board_response(computed_response):
+        return _hydrate_board_response_payload(computed_response), "render_compute"
     return None, "fallback"
 
 

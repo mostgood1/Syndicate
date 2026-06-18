@@ -16,6 +16,7 @@ from pipeline.intelligence_state import IntelligenceSnapshot
 from pipeline.intelligence_state import IntelligenceStateService
 from pipeline.intelligence_state import _payload_key
 from syndicate.app import create_app
+import syndicate.blueprints.intelligence as intelligence_module
 from syndicate.blueprints.intelligence import intelligence_bp
 from syndicate.blueprints.intelligence import intelligence_portfolio_event_api
 from syndicate.blueprints.intelligence import intelligence_status_api
@@ -363,6 +364,70 @@ class IntelligenceStateTests(unittest.TestCase):
                 board_snapshot = json.loads(board_snapshot_path.read_text(encoding="utf-8"))
                 self.assertEqual(board_snapshot["board_contract"]["schema"], "intelligence_board_v1")
                 self.assertEqual(board_snapshot["response"]["board_contract"]["schema"], "intelligence_board_v1")
+
+    def test_state_compute_promotes_candidate_pool_when_ranking_returns_empty(self) -> None:
+        service = IntelligenceStateService()
+
+        candidate_pool = {
+            "selected_date": "2026-06-15",
+            "source_fingerprint": "fingerprint-1",
+            "candidate_count": 1,
+            "candidate_pools": {},
+            "global_pool": [{"name": "Play 1", "sport_slug": "mlb", "market": "Hits", "score": 91.0}],
+            "candidates": [{"name": "Play 1", "sport_slug": "mlb", "market": "Hits", "score": 91.0}],
+        }
+        analysis_result = {
+            "ok": True,
+            "headline": "The Syndicate brief",
+            "recommendations": [],
+            "picks": [],
+            "top_live_opportunities": [],
+            "portfolio": {},
+            "parlays": [],
+        }
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            temp_root = Path(tmp_dir)
+            state_path = temp_root / "query_state_cache.json"
+            board_snapshot_path = temp_root / "board_snapshot.json"
+            with patch.object(intelligence_state_module, "STATE_PATH", state_path), patch.object(intelligence_state_module, "BOARD_SNAPSHOT_PATH", board_snapshot_path):
+                with patch.object(service, "_source_state_fingerprint", return_value="fingerprint-1"):
+                    with patch.object(service, "_build_candidate_pool", return_value=dict(candidate_pool)):
+                        with patch("pipeline.intelligence_state.rank_global_recommendations", return_value=[]):
+                            with patch("pipeline.intelligence_state.run_routed_intelligence_pipeline", return_value=dict(analysis_result)):
+                                response = service._compute_response({"question": "top edges today", "date": "2026-06-15"}, force_refresh=True)
+
+                self.assertGreater(response["candidate_count"], 0)
+                self.assertGreater(len(response["top_opportunities"]), 0)
+                self.assertEqual(response["top_opportunities"][0]["name"], "Play 1")
+                self.assertEqual(response["analysis"]["recommendations"][0]["name"], "Play 1")
+                self.assertTrue(state_path.exists())
+                self.assertTrue(board_snapshot_path.exists())
+                reloaded = intelligence_state_module.read_latest_intelligence_state_response({"question": "top edges today", "date": "2026-06-15"}, force_refresh=True)
+                self.assertIsInstance(reloaded, dict)
+                self.assertGreater(int(reloaded.get("candidate_count") or 0), 0)
+                self.assertGreater(len(reloaded.get("top_opportunities") or []), 0)
+
+    def test_cached_intelligence_response_uses_render_compute_when_cache_is_empty(self) -> None:
+        payload = {"question": "top edges today", "date": "2026-06-15"}
+        computed_response = {
+            "ok": True,
+            "top_opportunities": [{"name": "Play 1", "sport_slug": "mlb", "market": "Hits"}],
+            "by_sport": {"mlb": [{"name": "Play 1", "sport_slug": "mlb", "market": "Hits"}]},
+            "analysis": {"recommendations": [{"name": "Play 1", "sport_slug": "mlb", "market": "Hits"}]},
+            "response": {"analysis": {"recommendations": [{"name": "Play 1", "sport_slug": "mlb", "market": "Hits"}]}},
+        }
+
+        with patch("syndicate.blueprints.intelligence.read_latest_intelligence_board_snapshot_response", return_value=None):
+            with patch("syndicate.blueprints.intelligence.read_latest_intelligence_state_response", return_value=None):
+                with patch("syndicate.blueprints.intelligence.compute_intelligence_state_response", return_value=dict(computed_response)) as mocked_compute:
+                    cached_response, source = intelligence_module._cached_intelligence_response_with_source(payload)
+
+        self.assertEqual(source, "render_compute")
+        self.assertIsInstance(cached_response, dict)
+        self.assertGreater(len(cached_response.get("top_opportunities") or []), 0)
+        self.assertEqual(cached_response.get("top_opportunities", [])[0]["name"], "Play 1")
+        mocked_compute.assert_called_once()
 
     def test_intelligence_home_renders_initial_board_shell(self) -> None:
         app = create_app()

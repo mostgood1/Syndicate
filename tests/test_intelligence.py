@@ -792,7 +792,7 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         )
         self._simulation_patcher.start()
 
-    def test_build_intelligence_overview_uses_latest_available_slate(self) -> None:
+    def test_build_intelligence_overview_preserves_requested_date(self) -> None:
         app = create_app()
         app.config.update(TESTING=True)
         app.config["SYNDICATE_SPORTS"] = [{"slug": "mlb", "name": "MLB"}]
@@ -808,7 +808,7 @@ class IntelligenceBlueprintTests(unittest.TestCase):
             {"slug": "mlb", "name": "MLB"},
             "2026-06-17",
             force_refresh=True,
-            preserve_requested_date=False,
+            preserve_requested_date=True,
         )
 
     def tearDown(self) -> None:
@@ -903,6 +903,7 @@ class IntelligenceBlueprintTests(unittest.TestCase):
                 "slug": "mlb",
                 "name": "MLB",
                 "context_label": "2026-06-04",
+                "active_today": True,
                 "data_health": "healthy",
                 "data_warnings": [],
                 "home_rails": {
@@ -935,6 +936,7 @@ class IntelligenceBlueprintTests(unittest.TestCase):
                 "slug": "wnba",
                 "name": "WNBA",
                 "context_label": "2026-06-04",
+                "active_today": True,
                 "data_health": "healthy",
                 "data_warnings": [],
                 "home_rails": {
@@ -999,6 +1001,45 @@ class IntelligenceBlueprintTests(unittest.TestCase):
 
         self.assertEqual(scored.get("tier"), "tier_2")
         self.assertAlmostEqual(float(scored.get("score") or 0.0), 0.3, places=4)
+
+    def test_score_candidate_sets_scoring_mode_by_available_inputs(self) -> None:
+        candidates = [
+            {
+                "sport_slug": "mlb",
+                "candidate_type": "prop",
+                "pick": "Over 4.5",
+                "market": "outs recorded",
+                "projection": 13.1,
+                "odds": "+110",
+                "edge": 0.08,
+                "model_probability": 0.58,
+                "implied_probability": 0.50,
+                "source_strength": 0.5,
+            },
+            {
+                "sport_slug": "mlb",
+                "candidate_type": "prop",
+                "pick": "Over 4.5",
+                "market": "outs recorded",
+                "projection": 13.1,
+                "odds": "+110",
+                "edge": 0.08,
+                "source_strength": 0.5,
+            },
+            {
+                "sport_slug": "mlb",
+                "candidate_type": "prop",
+                "pick": "Over 4.5",
+                "market": "outs recorded",
+                "projection": 13.1,
+                "odds": "+110",
+                "source_strength": 0.5,
+            },
+        ]
+
+        scored = [score_candidate(candidate) for candidate in candidates]
+
+        self.assertEqual([candidate.get("scoring_mode") for candidate in scored], ["full", "partial", "minimal"])
 
     def test_normalize_candidate_adds_required_baseline_fields(self) -> None:
         candidate = {

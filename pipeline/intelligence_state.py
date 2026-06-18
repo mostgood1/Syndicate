@@ -935,6 +935,8 @@ class IntelligenceStateService:
             candidates = [self._serialize_candidate(candidate) for candidate in candidate_pool.get("candidates") if isinstance(candidate, Mapping)]
 
             ranked_candidates = _profile_stage("candidate_scoring", rank_global_recommendations, candidates, limit=None)
+            if not ranked_candidates and candidates:
+                ranked_candidates = [dict(candidate) for candidate in candidates]
             top_opportunities = ranked_candidates[: max(int(limit_value), 0)]
             by_sport: dict[str, list[dict[str, object]]] = {}
             for recommendation in top_opportunities:

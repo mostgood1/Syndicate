@@ -2286,6 +2286,7 @@ def _query_preferences(
 def build_intelligence_overview(*, selected_date: str | None = None, force_refresh: bool = False) -> list[dict[str, Any]]:
     effective_date = _effective_date(selected_date)
     sports = current_app.config.get("SYNDICATE_SPORTS", [])
+    preserve_requested_date = selected_date is not None
     overview: list[dict[str, Any]] = []
     for sport in sports:
         if not isinstance(sport, dict):
@@ -2296,8 +2297,7 @@ def build_intelligence_overview(*, selected_date: str | None = None, force_refre
                     sport,
                     effective_date,
                     force_refresh=force_refresh,
-                    # Prefer the newest usable slate when the requested date has no surfaced rows.
-                    preserve_requested_date=False,
+                    preserve_requested_date=preserve_requested_date,
                 )
             )
         except Exception as exc:
@@ -5903,6 +5903,18 @@ def score_candidate(
     scored_candidate = classify_candidate(candidate)
     if scored_candidate is None:
         return normalize_candidate(candidate)
+
+    has_edge = _numeric_hint(scored_candidate.get("edge")) is not None or _numeric_hint(scored_candidate.get("adjusted_edge")) is not None
+    has_model_probability = _numeric_hint(scored_candidate.get("model_probability")) is not None
+    has_implied_probability = _numeric_hint(scored_candidate.get("implied_probability")) is not None
+    has_odds = _safe_text(scored_candidate.get("odds"), "") not in {"", "-"}
+    if has_edge and has_model_probability and has_implied_probability:
+        scored_candidate["scoring_mode"] = "full"
+    elif has_edge and has_odds:
+        scored_candidate["scoring_mode"] = "partial"
+    else:
+        scored_candidate["scoring_mode"] = "minimal"
+
     _apply_live_state_context_to_candidates([scored_candidate])
     advanced_by_sport = {
         _safe_text(scored_candidate.get("sport_slug"), "sport").lower(): [dict(item) for item in (advanced_context or []) if isinstance(item, dict)]
@@ -5915,6 +5927,7 @@ def score_candidate(
     if edge_value is None:
         edge_profile = _candidate_betting_edge_profile(scored_candidate)
         edge_value = _numeric_hint(edge_profile.get("edge")) if edge_profile is not None else None
+
     if edge_value is None:
         edge_value = 0.0
 
