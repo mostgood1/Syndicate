@@ -1,8 +1,8 @@
 {
   "date": "2026-06-18",
-  "generatedAt": "2026-06-18T03:03:24-05:00",
-  "dataRoot": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data",
-  "liveLensDir": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\live_lens",
+  "generatedAt": "2026-06-18T14:47:30-05:00",
+  "dataRoot": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\source_artifacts\\data",
+  "liveLensDir": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\live_lens",
   "optimizationRegime": {
     "date": "2026-06-18",
     "kind": "forward_tuned_live",
@@ -16,22 +16,22 @@
   },
   "counts": {
     "games": 9,
-    "live": 0,
-    "final": 0,
-    "pregame": 9,
+    "live": 4,
+    "final": 1,
+    "pregame": 4,
     "props": 0,
     "archivedLiveProps": 0
   },
   "performance": {
     "marketsRefreshed": false,
     "marketRefreshMs": 0.0,
-    "totalMs": 63.2,
-    "snapshotLoadMs": 0.9,
-    "simContextLoadMs": 0.5,
-    "propEvalMs": 0.1,
+    "totalMs": 2220.9,
+    "snapshotLoadMs": 2.0,
+    "simContextLoadMs": 1.0,
+    "propEvalMs": 0.3,
     "gameLensMs": 0.9,
     "gameCount": 9,
-    "liveGameCount": 0,
+    "liveGameCount": 3,
     "feedFetchCount": 9,
     "persistMs": 0.0
   },
@@ -482,12 +482,12 @@
         "name": "Boston Red Sox"
       },
       "status": {
-        "abstract": "Preview",
-        "detailed": "Scheduled"
+        "abstract": "Live",
+        "detailed": "In Progress"
       },
       "detail": "12:35 PM",
       "summary": "Trey Yesavage vs Sonny Gray | 2 official pick(s) | +3 playable",
-      "status_badge": "Preview",
+      "status_badge": "Live",
       "hero_note": "0 live props | snapshot yes",
       "metrics": [
         {
@@ -519,7 +519,7 @@
         {
           "eyebrow": "Live state",
           "title": "Trey Yesavage vs Sonny Gray | 2 official pick(s) | +3 playable",
-          "body": "Report snapshot generated at 2026-06-18T03:03:24-05:00. Current score is 0-0."
+          "body": "Report snapshot generated at 2026-06-18T14:47:30-05:00. Current score is 0-0."
         },
         {
           "eyebrow": "Segment looks",
@@ -543,8 +543,8 @@
       ],
       "href": "/mlb/game/824748?date=2026-06-18",
       "href_label": "Open game detail",
-      "oddsRefreshedAt": "2026-06-18T08:03:25+00:00",
-      "odds_refreshed_at": "2026-06-18T08:03:25+00:00"
+      "oddsRefreshedAt": "2026-06-18T14:47:31-05:00",
+      "odds_refreshed_at": "2026-06-18T14:47:31-05:00"
     },
     {
       "archivedLiveProps": [],
@@ -925,6 +925,35 @@
               "detail": "Parker Messick Over 16.5 Outs | Odds -110 | Edge 39.9%",
               "hitProb": 0.88
             }
+          ],
+          "miniLadderBadges": [
+            {
+              "label": "O up to 17",
+              "stat": "outs",
+              "target": 17,
+              "targets": [
+                17
+              ],
+              "tone": "strong",
+              "detail": "Live projection 17.4. Current 15.0. Starter still active in live game state. Supported ladders: 17 Last supported rung: 17",
+              "hitProb": 0.88,
+              "source": "live",
+              "actual": 15.0
+            },
+            {
+              "label": "H up to 6",
+              "stat": "hits_allowed",
+              "target": 6,
+              "targets": [
+                5,
+                6
+              ],
+              "tone": "strong",
+              "detail": "Live projection 5.1. Current 4.0. Starter still active in live game state. Supported ladders: 5/6 Last supported rung: 6",
+              "hitProb": 0.644,
+              "source": "live",
+              "actual": 4.0
+            }
           ]
         },
         "home": {
@@ -992,12 +1021,12 @@
         "name": "Milwaukee Brewers"
       },
       "status": {
-        "abstract": "Preview",
-        "detailed": "Scheduled"
+        "abstract": "Live",
+        "detailed": "In Progress"
       },
       "detail": "1:10 PM",
       "summary": "Parker Messick vs Shane Drohan | 2 official pick(s) | +2 playable",
-      "status_badge": "Preview",
+      "status_badge": "Live",
       "hero_note": "0 live props | snapshot yes",
       "metrics": [
         {
@@ -1029,7 +1058,7 @@
         {
           "eyebrow": "Live state",
           "title": "Parker Messick vs Shane Drohan | 2 official pick(s) | +2 playable",
-          "body": "Report snapshot generated at 2026-06-18T03:03:24-05:00. Current score is 0-0."
+          "body": "Report snapshot generated at 2026-06-18T14:47:30-05:00. Current score is 0-0."
         },
         {
           "eyebrow": "Segment looks",
@@ -1053,8 +1082,8 @@
       ],
       "href": "/mlb/game/823772?date=2026-06-18",
       "href_label": "Open game detail",
-      "oddsRefreshedAt": "2026-06-18T08:03:25+00:00",
-      "odds_refreshed_at": "2026-06-18T08:03:25+00:00"
+      "oddsRefreshedAt": "2026-06-18T14:47:31-05:00",
+      "odds_refreshed_at": "2026-06-18T14:47:31-05:00"
     },
     {
       "archivedLiveProps": [],
@@ -1413,6 +1442,21 @@
               "detail": "Supported ladders: 5/6/7/8/9 Last supported rung: 9 Supported ladders: 5 Last supported rung: 5",
               "hitProb": 0.273
             }
+          ],
+          "miniLadderBadges": [
+            {
+              "label": "H up to 5",
+              "stat": "hits_allowed",
+              "target": 5,
+              "targets": [
+                5
+              ],
+              "tone": "strong",
+              "detail": "Live projection 5.3. Current 2.0. Starter still active in live game state. Supported ladders: 5 Last supported rung: 5",
+              "hitProb": 0.811,
+              "source": "live",
+              "actual": 2.0
+            }
           ]
         },
         "home": {
@@ -1480,12 +1524,12 @@
         "name": "Texas Rangers"
       },
       "status": {
-        "abstract": "Preview",
-        "detailed": "Scheduled"
+        "abstract": "Live",
+        "detailed": "In Progress"
       },
       "detail": "1:35 PM",
       "summary": "Joe Ryan vs Jack Leiter | 1 official pick(s)",
-      "status_badge": "Preview",
+      "status_badge": "Live",
       "hero_note": "0 live props | snapshot yes",
       "metrics": [
         {
@@ -1517,7 +1561,7 @@
         {
           "eyebrow": "Live state",
           "title": "Joe Ryan vs Jack Leiter | 1 official pick(s)",
-          "body": "Report snapshot generated at 2026-06-18T03:03:24-05:00. Current score is 0-0."
+          "body": "Report snapshot generated at 2026-06-18T14:47:30-05:00. Current score is 0-0."
         },
         {
           "eyebrow": "Segment looks",
@@ -1541,8 +1585,8 @@
       ],
       "href": "/mlb/game/822889?date=2026-06-18",
       "href_label": "Open game detail",
-      "oddsRefreshedAt": "2026-06-18T08:03:25+00:00",
-      "odds_refreshed_at": "2026-06-18T08:03:25+00:00"
+      "oddsRefreshedAt": "2026-06-18T14:47:31-05:00",
+      "odds_refreshed_at": "2026-06-18T14:47:31-05:00"
     },
     {
       "archivedLiveProps": [],
@@ -1879,6 +1923,34 @@
               "detail": "Supported ladders: 6/7 Last supported rung: 7 Supported ladders: 6 Last supported rung: 6",
               "hitProb": 0.297
             }
+          ],
+          "miniLadderBadges": [
+            {
+              "label": "K up to 6",
+              "stat": "strikeouts",
+              "target": 6,
+              "targets": [
+                6
+              ],
+              "tone": "strong",
+              "detail": "Live projection 5.5. Current 0.0. Starter still active in live game state. Supported ladders: 6 Last supported rung: 6",
+              "hitProb": 0.493,
+              "source": "live",
+              "actual": 0.0
+            },
+            {
+              "label": "O up to 18",
+              "stat": "outs",
+              "target": 18,
+              "targets": [
+                18
+              ],
+              "tone": "strong",
+              "detail": "Live projection 20.9. Current 0.0. Starter still active in live game state. Supported ladders: 18 Last supported rung: 18",
+              "hitProb": 0.843,
+              "source": "live",
+              "actual": 0.0
+            }
           ]
         },
         "home": {
@@ -1931,6 +2003,34 @@
               "detail": "Supported ladders: 5/6/7/8 Last supported rung: 8 Supported ladders: 5 Last supported rung: 5",
               "hitProb": 0.277
             }
+          ],
+          "miniLadderBadges": [
+            {
+              "label": "O up to 19",
+              "stat": "outs",
+              "target": 19,
+              "targets": [
+                19
+              ],
+              "tone": "strong",
+              "detail": "Live projection 21.3. Current 0.0. Starter still active in live game state. Supported ladders: 19 Last supported rung: 19",
+              "hitProb": 0.747,
+              "source": "live",
+              "actual": 0.0
+            },
+            {
+              "label": "H up to 5",
+              "stat": "hits_allowed",
+              "target": 5,
+              "targets": [
+                5
+              ],
+              "tone": "strong",
+              "detail": "Live projection 6.2. Current 0.0. Starter still active in live game state. Supported ladders: 5 Last supported rung: 5",
+              "hitProb": 0.726,
+              "source": "live",
+              "actual": 0.0
+            }
           ]
         }
       },
@@ -1955,12 +2055,12 @@
         "name": "Seattle Mariners"
       },
       "status": {
-        "abstract": "Preview",
-        "detailed": "Scheduled"
+        "abstract": "Live",
+        "detailed": "Warmup"
       },
       "detail": "3:10 PM",
       "summary": "Shane Baz vs Bryan Woo | 3 official pick(s) | +3 playable",
-      "status_badge": "Preview",
+      "status_badge": "Live",
       "hero_note": "0 live props | snapshot yes",
       "metrics": [
         {
@@ -1992,7 +2092,7 @@
         {
           "eyebrow": "Live state",
           "title": "Shane Baz vs Bryan Woo | 3 official pick(s) | +3 playable",
-          "body": "Report snapshot generated at 2026-06-18T03:03:24-05:00. Current score is 0-0."
+          "body": "Report snapshot generated at 2026-06-18T14:47:30-05:00. Current score is 0-0."
         },
         {
           "eyebrow": "Segment looks",
@@ -2016,8 +2116,8 @@
       ],
       "href": "/mlb/game/823125?date=2026-06-18",
       "href_label": "Open game detail",
-      "oddsRefreshedAt": "2026-06-18T08:03:25+00:00",
-      "odds_refreshed_at": "2026-06-18T08:03:25+00:00"
+      "oddsRefreshedAt": "2026-06-18T14:47:31-05:00",
+      "odds_refreshed_at": "2026-06-18T14:47:31-05:00"
     },
     {
       "archivedLiveProps": [],
@@ -2480,7 +2580,7 @@
         {
           "eyebrow": "Live state",
           "title": "Sean Manaea vs Aaron Nola | 1 official pick(s) | +1 playable",
-          "body": "Report snapshot generated at 2026-06-18T03:03:24-05:00. Current score is 0-0."
+          "body": "Report snapshot generated at 2026-06-18T14:47:30-05:00. Current score is 0-0."
         },
         {
           "eyebrow": "Segment looks",
@@ -2504,8 +2604,8 @@
       ],
       "href": "/mlb/game/823448?date=2026-06-18",
       "href_label": "Open game detail",
-      "oddsRefreshedAt": "2026-06-18T08:03:25+00:00",
-      "odds_refreshed_at": "2026-06-18T08:03:25+00:00"
+      "oddsRefreshedAt": "2026-06-18T14:47:31-05:00",
+      "odds_refreshed_at": "2026-06-18T14:47:31-05:00"
     },
     {
       "archivedLiveProps": [],
@@ -2992,7 +3092,7 @@
         {
           "eyebrow": "Live state",
           "title": "Sean Burke vs Ryan Weathers | +2 playable",
-          "body": "Report snapshot generated at 2026-06-18T03:03:24-05:00. Current score is 0-0."
+          "body": "Report snapshot generated at 2026-06-18T14:47:30-05:00. Current score is 0-0."
         },
         {
           "eyebrow": "Segment looks",
@@ -3016,483 +3116,8 @@
       ],
       "href": "/mlb/game/823533?date=2026-06-18",
       "href_label": "Open game detail",
-      "oddsRefreshedAt": "2026-06-18T08:03:25+00:00",
-      "odds_refreshed_at": "2026-06-18T08:03:25+00:00"
-    },
-    {
-      "archivedLiveProps": [],
-      "gameLens": [
-        {
-          "key": "first1",
-          "label": "F1",
-          "closed": false,
-          "badge": "No bet",
-          "score": "SF 0 - ATL 0",
-          "subtitle": "SF 0.37 - ATL 0.42 | Total 0.8",
-          "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
-          "projection": {
-            "total": 0.8,
-            "homeMargin": 0.05
-          },
-          "markets": {
-            "moneyline": {
-              "pick": null,
-              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
-            },
-            "spread": {
-              "pick": null,
-              "homeLine": 0.05,
-              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
-            },
-            "total": {
-              "pick": null,
-              "line": 0.8,
-              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
-            }
-          }
-        },
-        {
-          "key": "first3",
-          "label": "F3",
-          "closed": false,
-          "badge": "No bet",
-          "score": "SF 0 - ATL 0",
-          "subtitle": "SF 1.21 - ATL 1.1 | Total 2.31",
-          "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
-          "projection": {
-            "total": 2.31,
-            "homeMargin": -0.11
-          },
-          "markets": {
-            "moneyline": {
-              "pick": null,
-              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
-            },
-            "spread": {
-              "pick": null,
-              "homeLine": -0.11,
-              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
-            },
-            "total": {
-              "pick": null,
-              "line": 2.31,
-              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
-            }
-          }
-        },
-        {
-          "key": "first5",
-          "label": "F5",
-          "closed": false,
-          "badge": "No bet",
-          "score": "SF 0 - ATL 0",
-          "subtitle": "SF 2.06 - ATL 1.94 | Total 4.01",
-          "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
-          "projection": {
-            "total": 4.01,
-            "homeMargin": -0.12
-          },
-          "markets": {
-            "moneyline": {
-              "pick": null,
-              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
-            },
-            "spread": {
-              "pick": null,
-              "homeLine": -0.12,
-              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
-            },
-            "total": {
-              "pick": null,
-              "line": 4.01,
-              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
-            }
-          }
-        },
-        {
-          "key": "first5",
-          "label": "Full game",
-          "closed": false,
-          "badge": "No bet",
-          "score": "SF 0 - ATL 0",
-          "subtitle": "SF 3.8 - ATL 3.49 | Total 7.29",
-          "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
-          "projection": {
-            "total": 7.29,
-            "homeMargin": -0.31
-          },
-          "markets": {
-            "moneyline": {
-              "pick": null,
-              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
-            },
-            "spread": {
-              "pick": null,
-              "homeLine": -0.31,
-              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
-            },
-            "total": {
-              "pick": null,
-              "line": 7.29,
-              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
-            }
-          }
-        },
-        {
-          "key": "first1",
-          "label": "First 1",
-          "closed": false,
-          "badge": "",
-          "score": "SF 17.6% | ATL 19.5% | Tie 62.9%",
-          "subtitle": "SF 17.6% | ATL 19.5% | Tie 62.9%",
-          "reason": "SF 17.6% | ATL 19.5% | Tie 62.9%",
-          "projection": {
-            "total": 17.6,
-            "homeMargin": 19.5
-          },
-          "markets": {
-            "moneyline": {},
-            "spread": {},
-            "total": {
-              "pick": null,
-              "line": 17.6,
-              "reason": "SF 17.6% | ATL 19.5% | Tie 62.9%"
-            }
-          }
-        },
-        {
-          "key": "first3",
-          "label": "First 3",
-          "closed": false,
-          "badge": "",
-          "score": "SF 36.6% | ATL 32.2% | Tie 31.2%",
-          "subtitle": "SF 36.6% | ATL 32.2% | Tie 31.2%",
-          "reason": "SF 36.6% | ATL 32.2% | Tie 31.2%",
-          "projection": {
-            "total": 36.6,
-            "homeMargin": 32.2
-          },
-          "markets": {
-            "moneyline": {},
-            "spread": {},
-            "total": {
-              "pick": null,
-              "line": 36.6,
-              "reason": "SF 36.6% | ATL 32.2% | Tie 31.2%"
-            }
-          }
-        },
-        {
-          "key": "first5",
-          "label": "First 5",
-          "closed": false,
-          "badge": "",
-          "score": "SF 43.5% | ATL 38.4% | Tie 18.1%",
-          "subtitle": "SF 43.5% | ATL 38.4% | Tie 18.1%",
-          "reason": "SF 43.5% | ATL 38.4% | Tie 18.1%",
-          "projection": {
-            "total": 43.5,
-            "homeMargin": 38.4
-          },
-          "markets": {
-            "moneyline": {},
-            "spread": {},
-            "total": {
-              "pick": null,
-              "line": 43.5,
-              "reason": "SF 43.5% | ATL 38.4% | Tie 18.1%"
-            }
-          }
-        },
-        {
-          "key": "full",
-          "label": "Full game",
-          "closed": false,
-          "badge": "",
-          "score": "SF 52.6% | ATL 47.4% | Tie 0.0%",
-          "subtitle": "SF 52.6% | ATL 47.4% | Tie 0.0%",
-          "reason": "SF 52.6% | ATL 47.4% | Tie 0.0%",
-          "projection": {
-            "total": 52.6,
-            "homeMargin": 47.4
-          },
-          "markets": {
-            "moneyline": {},
-            "spread": {},
-            "total": {
-              "pick": null,
-              "line": 52.6,
-              "reason": "SF 52.6% | ATL 47.4% | Tie 0.0%"
-            }
-          }
-        }
-      ],
-      "gameMarkets": {
-        "moneyline": {},
-        "spread": {},
-        "total": {
-          "pick": null,
-          "line": 52.6,
-          "reason": "SF 52.6% | ATL 47.4% | Tie 0.0%"
-        }
-      },
-      "markets": {
-        "moneyline": {},
-        "spread": {},
-        "total": {
-          "pick": null,
-          "line": 52.6,
-          "reason": "SF 52.6% | ATL 47.4% | Tie 0.0%"
-        }
-      },
-      "gamePk": 824911,
-      "prop_groups": [],
-      "prop_lens": {},
-      "market_tiles": [
-        {
-          "label": "Game total",
-          "title": "No total play",
-          "sub": "Off card"
-        },
-        {
-          "label": "Moneyline",
-          "title": "No ML play",
-          "sub": "Off card"
-        },
-        {
-          "label": "Pitcher props",
-          "title": "No locked pitcher prop",
-          "sub": "Off card"
-        },
-        {
-          "label": "Hitter props",
-          "title": "No locked hitter prop",
-          "sub": "Off card"
-        }
-      ],
-      "liveProps": [],
-      "matchup": {
-        "away": {
-          "abbr": "SF",
-          "id": 137,
-          "logo": "https://www.mlbstatic.com/team-logos/137.svg",
-          "name": "San Francisco Giants"
-        },
-        "home": {
-          "abbr": "ATL",
-          "id": 144,
-          "logo": "https://www.mlbstatic.com/team-logos/144.svg",
-          "name": "Atlanta Braves"
-        },
-        "score": {
-          "away": 0,
-          "home": 0
-        },
-        "liveText": "Landen Roupp vs Mart\u00edn P\u00e9rez"
-      },
-      "predictions": {
-        "first1": {
-          "away_runs_mean": 0.374,
-          "home_runs_mean": 0.422,
-          "away_win_prob": 0.176,
-          "home_win_prob": 0.195,
-          "tie_prob": 0.629
-        },
-        "first3": {
-          "away_runs_mean": 1.209,
-          "home_runs_mean": 1.101,
-          "away_win_prob": 0.366,
-          "home_win_prob": 0.322,
-          "tie_prob": 0.312
-        },
-        "first5": {
-          "away_runs_mean": 2.068,
-          "home_runs_mean": 1.935,
-          "away_win_prob": 0.435,
-          "home_win_prob": 0.384,
-          "tie_prob": 0.181
-        },
-        "full": {
-          "away_runs_mean": 3.971,
-          "home_runs_mean": 3.219,
-          "away_win_prob": 0.552,
-          "home_win_prob": 0.448,
-          "tie_prob": 0.0
-        }
-      },
-      "props": [],
-      "simContextAvailable": false,
-      "snapshotAvailable": true,
-      "startTime": "6:15 PM",
-      "trackedProps": [],
-      "probable": {
-        "away": {
-          "id": null,
-          "fullName": "Landen Roupp",
-          "ladderBadges": [
-            {
-              "label": "K up to 6",
-              "stat": "strikeouts",
-              "target": 6,
-              "targets": [
-                6
-              ],
-              "tone": "solid",
-              "detail": "Supported ladders: 6/7 Last supported rung: 7 Supported ladders: 6 Last supported rung: 6",
-              "hitProb": 0.319
-            }
-          ],
-          "pregameLadderBadges": [
-            {
-              "label": "K up to 6",
-              "stat": "strikeouts",
-              "target": 6,
-              "targets": [
-                6
-              ],
-              "tone": "solid",
-              "detail": "Supported ladders: 6/7 Last supported rung: 7 Supported ladders: 6 Last supported rung: 6",
-              "hitProb": 0.319
-            }
-          ]
-        },
-        "home": {
-          "id": null,
-          "fullName": "Mart\u00edn P\u00e9rez",
-          "ladderBadges": [
-            {
-              "label": "K up to 5",
-              "stat": "strikeouts",
-              "target": 5,
-              "targets": [
-                5
-              ],
-              "tone": "solid",
-              "detail": "Supported ladders: 5/6/7 Last supported rung: 7 Supported ladders: 5 Last supported rung: 5",
-              "hitProb": 0.297
-            },
-            {
-              "label": "H up to 6",
-              "stat": "hits_allowed",
-              "target": 6,
-              "targets": [
-                6
-              ],
-              "tone": "soft",
-              "detail": "Supported ladders: 6/7/8/9 Last supported rung: 9 Supported ladders: 6 Last supported rung: 6",
-              "hitProb": 0.217
-            }
-          ],
-          "pregameLadderBadges": [
-            {
-              "label": "K up to 5",
-              "stat": "strikeouts",
-              "target": 5,
-              "targets": [
-                5
-              ],
-              "tone": "solid",
-              "detail": "Supported ladders: 5/6/7 Last supported rung: 7 Supported ladders: 5 Last supported rung: 5",
-              "hitProb": 0.297
-            },
-            {
-              "label": "H up to 6",
-              "stat": "hits_allowed",
-              "target": 6,
-              "targets": [
-                6
-              ],
-              "tone": "soft",
-              "detail": "Supported ladders: 6/7/8/9 Last supported rung: 9 Supported ladders: 6 Last supported rung: 6",
-              "hitProb": 0.217
-            }
-          ]
-        }
-      },
-      "actual_box_panel": {},
-      "first1BetSignal": {
-        "label": "F1 NRFI",
-        "tone": "nrfi",
-        "summary": "0-run sim 60.8% | F1 mean 0.80",
-        "detail": "Season filter qualified: simulated scoreless first inning 60.8% with only 0.80 expected runs in the opening frame.",
-        "nrfiProb": 0.608,
-        "yrfiProb": 0.392,
-        "meanTotalRuns": 0.796,
-        "maxSideLeadProb": 0.195
-      },
-      "card_variant": "mlb_main",
-      "away": {
-        "abbr": "SF",
-        "name": "San Francisco Giants"
-      },
-      "home": {
-        "abbr": "ATL",
-        "name": "Atlanta Braves"
-      },
-      "status": {
-        "abstract": "Preview",
-        "detailed": "Scheduled"
-      },
-      "detail": "6:15 PM",
-      "summary": "Landen Roupp vs Mart\u00edn P\u00e9rez",
-      "status_badge": "Preview",
-      "hero_note": "0 live props | snapshot yes",
-      "metrics": [
-        {
-          "label": "Score",
-          "value": "0-0"
-        },
-        {
-          "label": "Full home",
-          "value": "-"
-        },
-        {
-          "label": "Live home",
-          "value": "-"
-        },
-        {
-          "label": "Open segments",
-          "value": "8"
-        },
-        {
-          "label": "Live props",
-          "value": "0"
-        },
-        {
-          "label": "Snapshot",
-          "value": "Yes"
-        }
-      ],
-      "panels": [
-        {
-          "eyebrow": "Live state",
-          "title": "Landen Roupp vs Mart\u00edn P\u00e9rez",
-          "body": "Report snapshot generated at 2026-06-18T03:03:24-05:00. Current score is 0-0."
-        },
-        {
-          "eyebrow": "Segment looks",
-          "title": "Current segment board",
-          "body": "SF 52.6% | ATL 47.4% | Tie 0.0%",
-          "items": [
-            "Full game: projected total 52.6, home margin +47.4",
-            "F5: projected total 4.01, home margin -0.12",
-            "F3: projected total 2.31, home margin -0.11",
-            "F1: projected total 0.8, home margin +0.05"
-          ]
-        },
-        {
-          "eyebrow": "Top live props",
-          "title": "Best in-game prop edges",
-          "body": "These props are the highest-ranked live looks available in the selected report snapshot.",
-          "items": [
-            "No live props were surfaced for this game in the selected report."
-          ]
-        }
-      ],
-      "href": "/mlb/game/824911?date=2026-06-18",
-      "href_label": "Open game detail",
-      "oddsRefreshedAt": "2026-06-18T08:03:25+00:00",
-      "odds_refreshed_at": "2026-06-18T08:03:25+00:00"
+      "oddsRefreshedAt": "2026-06-18T14:47:31-05:00",
+      "odds_refreshed_at": "2026-06-18T14:47:31-05:00"
     },
     {
       "archivedLiveProps": [],
@@ -3999,7 +3624,7 @@
         {
           "eyebrow": "Live state",
           "title": "Matthew Liberatore vs Noah Cameron | 4 official pick(s) | +5 playable",
-          "body": "Report snapshot generated at 2026-06-18T03:03:24-05:00. Current score is 0-0."
+          "body": "Report snapshot generated at 2026-06-18T14:47:30-05:00. Current score is 0-0."
         },
         {
           "eyebrow": "Segment looks",
@@ -4023,8 +3648,8 @@
       ],
       "href": "/mlb/game/824098?date=2026-06-18",
       "href_label": "Open game detail",
-      "oddsRefreshedAt": "2026-06-18T08:03:25+00:00",
-      "odds_refreshed_at": "2026-06-18T08:03:25+00:00"
+      "oddsRefreshedAt": "2026-06-18T14:47:31-05:00",
+      "odds_refreshed_at": "2026-06-18T14:47:31-05:00"
     },
     {
       "archivedLiveProps": [],
@@ -4391,7 +4016,7 @@
         {
           "eyebrow": "Live state",
           "title": "Jos\u00e9 Soriano vs Jeffrey Springs",
-          "body": "Report snapshot generated at 2026-06-18T03:03:24-05:00. Current score is 0-0."
+          "body": "Report snapshot generated at 2026-06-18T14:47:30-05:00. Current score is 0-0."
         },
         {
           "eyebrow": "Segment looks",
@@ -4415,12 +4040,487 @@
       ],
       "href": "/mlb/game/824989?date=2026-06-18",
       "href_label": "Open game detail",
-      "oddsRefreshedAt": "2026-06-18T08:03:25+00:00",
-      "odds_refreshed_at": "2026-06-18T08:03:25+00:00"
+      "oddsRefreshedAt": "2026-06-18T14:47:31-05:00",
+      "odds_refreshed_at": "2026-06-18T14:47:31-05:00"
+    },
+    {
+      "archivedLiveProps": [],
+      "gameLens": [
+        {
+          "key": "first1",
+          "label": "F1",
+          "closed": false,
+          "badge": "No bet",
+          "score": "SF 0 - ATL 0",
+          "subtitle": "SF 0.37 - ATL 0.42 | Total 0.8",
+          "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
+          "projection": {
+            "total": 0.8,
+            "homeMargin": 0.05
+          },
+          "markets": {
+            "moneyline": {
+              "pick": null,
+              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+            },
+            "spread": {
+              "pick": null,
+              "homeLine": 0.05,
+              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+            },
+            "total": {
+              "pick": null,
+              "line": 0.8,
+              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+            }
+          }
+        },
+        {
+          "key": "first3",
+          "label": "F3",
+          "closed": false,
+          "badge": "No bet",
+          "score": "SF 0 - ATL 0",
+          "subtitle": "SF 1.21 - ATL 1.1 | Total 2.31",
+          "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
+          "projection": {
+            "total": 2.31,
+            "homeMargin": -0.11
+          },
+          "markets": {
+            "moneyline": {
+              "pick": null,
+              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+            },
+            "spread": {
+              "pick": null,
+              "homeLine": -0.11,
+              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+            },
+            "total": {
+              "pick": null,
+              "line": 2.31,
+              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+            }
+          }
+        },
+        {
+          "key": "first5",
+          "label": "F5",
+          "closed": false,
+          "badge": "No bet",
+          "score": "SF 0 - ATL 0",
+          "subtitle": "SF 2.06 - ATL 1.94 | Total 4.01",
+          "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
+          "projection": {
+            "total": 4.01,
+            "homeMargin": -0.12
+          },
+          "markets": {
+            "moneyline": {
+              "pick": null,
+              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+            },
+            "spread": {
+              "pick": null,
+              "homeLine": -0.12,
+              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+            },
+            "total": {
+              "pick": null,
+              "line": 4.01,
+              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+            }
+          }
+        },
+        {
+          "key": "first5",
+          "label": "Full game",
+          "closed": false,
+          "badge": "No bet",
+          "score": "SF 0 - ATL 0",
+          "subtitle": "SF 3.8 - ATL 3.49 | Total 7.29",
+          "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
+          "projection": {
+            "total": 7.29,
+            "homeMargin": -0.31
+          },
+          "markets": {
+            "moneyline": {
+              "pick": null,
+              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+            },
+            "spread": {
+              "pick": null,
+              "homeLine": -0.31,
+              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+            },
+            "total": {
+              "pick": null,
+              "line": 7.29,
+              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+            }
+          }
+        },
+        {
+          "key": "first1",
+          "label": "First 1",
+          "closed": false,
+          "badge": "",
+          "score": "SF 17.6% | ATL 19.5% | Tie 62.9%",
+          "subtitle": "SF 17.6% | ATL 19.5% | Tie 62.9%",
+          "reason": "SF 17.6% | ATL 19.5% | Tie 62.9%",
+          "projection": {
+            "total": 17.6,
+            "homeMargin": 19.5
+          },
+          "markets": {
+            "moneyline": {},
+            "spread": {},
+            "total": {
+              "pick": null,
+              "line": 17.6,
+              "reason": "SF 17.6% | ATL 19.5% | Tie 62.9%"
+            }
+          }
+        },
+        {
+          "key": "first3",
+          "label": "First 3",
+          "closed": false,
+          "badge": "",
+          "score": "SF 36.6% | ATL 32.2% | Tie 31.2%",
+          "subtitle": "SF 36.6% | ATL 32.2% | Tie 31.2%",
+          "reason": "SF 36.6% | ATL 32.2% | Tie 31.2%",
+          "projection": {
+            "total": 36.6,
+            "homeMargin": 32.2
+          },
+          "markets": {
+            "moneyline": {},
+            "spread": {},
+            "total": {
+              "pick": null,
+              "line": 36.6,
+              "reason": "SF 36.6% | ATL 32.2% | Tie 31.2%"
+            }
+          }
+        },
+        {
+          "key": "first5",
+          "label": "First 5",
+          "closed": false,
+          "badge": "",
+          "score": "SF 43.5% | ATL 38.4% | Tie 18.1%",
+          "subtitle": "SF 43.5% | ATL 38.4% | Tie 18.1%",
+          "reason": "SF 43.5% | ATL 38.4% | Tie 18.1%",
+          "projection": {
+            "total": 43.5,
+            "homeMargin": 38.4
+          },
+          "markets": {
+            "moneyline": {},
+            "spread": {},
+            "total": {
+              "pick": null,
+              "line": 43.5,
+              "reason": "SF 43.5% | ATL 38.4% | Tie 18.1%"
+            }
+          }
+        },
+        {
+          "key": "full",
+          "label": "Full game",
+          "closed": false,
+          "badge": "",
+          "score": "SF 52.6% | ATL 47.4% | Tie 0.0%",
+          "subtitle": "SF 52.6% | ATL 47.4% | Tie 0.0%",
+          "reason": "SF 52.6% | ATL 47.4% | Tie 0.0%",
+          "projection": {
+            "total": 52.6,
+            "homeMargin": 47.4
+          },
+          "markets": {
+            "moneyline": {},
+            "spread": {},
+            "total": {
+              "pick": null,
+              "line": 52.6,
+              "reason": "SF 52.6% | ATL 47.4% | Tie 0.0%"
+            }
+          }
+        }
+      ],
+      "gameMarkets": {
+        "moneyline": {},
+        "spread": {},
+        "total": {
+          "pick": null,
+          "line": 52.6,
+          "reason": "SF 52.6% | ATL 47.4% | Tie 0.0%"
+        }
+      },
+      "markets": {
+        "moneyline": {},
+        "spread": {},
+        "total": {
+          "pick": null,
+          "line": 52.6,
+          "reason": "SF 52.6% | ATL 47.4% | Tie 0.0%"
+        }
+      },
+      "gamePk": 824911,
+      "prop_groups": [],
+      "prop_lens": {},
+      "market_tiles": [
+        {
+          "label": "Game total",
+          "title": "No total play",
+          "sub": "Off card"
+        },
+        {
+          "label": "Moneyline",
+          "title": "No ML play",
+          "sub": "Off card"
+        },
+        {
+          "label": "Pitcher props",
+          "title": "No locked pitcher prop",
+          "sub": "Off card"
+        },
+        {
+          "label": "Hitter props",
+          "title": "No locked hitter prop",
+          "sub": "Off card"
+        }
+      ],
+      "liveProps": [],
+      "matchup": {
+        "away": {
+          "abbr": "SF",
+          "id": 137,
+          "logo": "https://www.mlbstatic.com/team-logos/137.svg",
+          "name": "San Francisco Giants"
+        },
+        "home": {
+          "abbr": "ATL",
+          "id": 144,
+          "logo": "https://www.mlbstatic.com/team-logos/144.svg",
+          "name": "Atlanta Braves"
+        },
+        "score": {
+          "away": 0,
+          "home": 0
+        },
+        "liveText": "Landen Roupp vs Mart\u00edn P\u00e9rez"
+      },
+      "predictions": {
+        "first1": {
+          "away_runs_mean": 0.374,
+          "home_runs_mean": 0.422,
+          "away_win_prob": 0.176,
+          "home_win_prob": 0.195,
+          "tie_prob": 0.629
+        },
+        "first3": {
+          "away_runs_mean": 1.209,
+          "home_runs_mean": 1.101,
+          "away_win_prob": 0.366,
+          "home_win_prob": 0.322,
+          "tie_prob": 0.312
+        },
+        "first5": {
+          "away_runs_mean": 2.068,
+          "home_runs_mean": 1.935,
+          "away_win_prob": 0.435,
+          "home_win_prob": 0.384,
+          "tie_prob": 0.181
+        },
+        "full": {
+          "away_runs_mean": 3.971,
+          "home_runs_mean": 3.219,
+          "away_win_prob": 0.552,
+          "home_win_prob": 0.448,
+          "tie_prob": 0.0
+        }
+      },
+      "props": [],
+      "simContextAvailable": false,
+      "snapshotAvailable": true,
+      "startTime": "6:15 PM",
+      "trackedProps": [],
+      "probable": {
+        "away": {
+          "id": null,
+          "fullName": "Landen Roupp",
+          "ladderBadges": [
+            {
+              "label": "K up to 6",
+              "stat": "strikeouts",
+              "target": 6,
+              "targets": [
+                6
+              ],
+              "tone": "solid",
+              "detail": "Supported ladders: 6/7 Last supported rung: 7 Supported ladders: 6 Last supported rung: 6",
+              "hitProb": 0.319
+            }
+          ],
+          "pregameLadderBadges": [
+            {
+              "label": "K up to 6",
+              "stat": "strikeouts",
+              "target": 6,
+              "targets": [
+                6
+              ],
+              "tone": "solid",
+              "detail": "Supported ladders: 6/7 Last supported rung: 7 Supported ladders: 6 Last supported rung: 6",
+              "hitProb": 0.319
+            }
+          ]
+        },
+        "home": {
+          "id": null,
+          "fullName": "Mart\u00edn P\u00e9rez",
+          "ladderBadges": [
+            {
+              "label": "K up to 5",
+              "stat": "strikeouts",
+              "target": 5,
+              "targets": [
+                5
+              ],
+              "tone": "solid",
+              "detail": "Supported ladders: 5/6/7 Last supported rung: 7 Supported ladders: 5 Last supported rung: 5",
+              "hitProb": 0.297
+            },
+            {
+              "label": "H up to 6",
+              "stat": "hits_allowed",
+              "target": 6,
+              "targets": [
+                6
+              ],
+              "tone": "soft",
+              "detail": "Supported ladders: 6/7/8/9 Last supported rung: 9 Supported ladders: 6 Last supported rung: 6",
+              "hitProb": 0.217
+            }
+          ],
+          "pregameLadderBadges": [
+            {
+              "label": "K up to 5",
+              "stat": "strikeouts",
+              "target": 5,
+              "targets": [
+                5
+              ],
+              "tone": "solid",
+              "detail": "Supported ladders: 5/6/7 Last supported rung: 7 Supported ladders: 5 Last supported rung: 5",
+              "hitProb": 0.297
+            },
+            {
+              "label": "H up to 6",
+              "stat": "hits_allowed",
+              "target": 6,
+              "targets": [
+                6
+              ],
+              "tone": "soft",
+              "detail": "Supported ladders: 6/7/8/9 Last supported rung: 9 Supported ladders: 6 Last supported rung: 6",
+              "hitProb": 0.217
+            }
+          ]
+        }
+      },
+      "actual_box_panel": {},
+      "first1BetSignal": {
+        "label": "F1 NRFI",
+        "tone": "nrfi",
+        "summary": "0-run sim 60.8% | F1 mean 0.80",
+        "detail": "Season filter qualified: simulated scoreless first inning 60.8% with only 0.80 expected runs in the opening frame.",
+        "nrfiProb": 0.608,
+        "yrfiProb": 0.392,
+        "meanTotalRuns": 0.796,
+        "maxSideLeadProb": 0.195
+      },
+      "card_variant": "mlb_main",
+      "away": {
+        "abbr": "SF",
+        "name": "San Francisco Giants"
+      },
+      "home": {
+        "abbr": "ATL",
+        "name": "Atlanta Braves"
+      },
+      "status": {
+        "abstract": "Final",
+        "detailed": "Postponed"
+      },
+      "detail": "6:15 PM",
+      "summary": "Landen Roupp vs Mart\u00edn P\u00e9rez",
+      "status_badge": "Final",
+      "hero_note": "0 live props | snapshot yes",
+      "metrics": [
+        {
+          "label": "Score",
+          "value": "0-0"
+        },
+        {
+          "label": "Full home",
+          "value": "-"
+        },
+        {
+          "label": "Live home",
+          "value": "-"
+        },
+        {
+          "label": "Open segments",
+          "value": "8"
+        },
+        {
+          "label": "Live props",
+          "value": "0"
+        },
+        {
+          "label": "Snapshot",
+          "value": "Yes"
+        }
+      ],
+      "panels": [
+        {
+          "eyebrow": "Live state",
+          "title": "Landen Roupp vs Mart\u00edn P\u00e9rez",
+          "body": "Report snapshot generated at 2026-06-18T14:47:30-05:00. Current score is 0-0."
+        },
+        {
+          "eyebrow": "Segment looks",
+          "title": "Current segment board",
+          "body": "SF 52.6% | ATL 47.4% | Tie 0.0%",
+          "items": [
+            "Full game: projected total 52.6, home margin +47.4",
+            "F5: projected total 4.01, home margin -0.12",
+            "F3: projected total 2.31, home margin -0.11",
+            "F1: projected total 0.8, home margin +0.05"
+          ]
+        },
+        {
+          "eyebrow": "Top live props",
+          "title": "Best in-game prop edges",
+          "body": "These props are the highest-ranked live looks available in the selected report snapshot.",
+          "items": [
+            "No live props were surfaced for this game in the selected report."
+          ]
+        }
+      ],
+      "href": "/mlb/game/824911?date=2026-06-18",
+      "href_label": "Open game detail",
+      "oddsRefreshedAt": "2026-06-18T14:47:31-05:00",
+      "odds_refreshed_at": "2026-06-18T14:47:31-05:00"
     }
   ],
   "source_title": "MLB daily summary artifact",
-  "oddsRefreshedAt": "2026-06-18T08:03:25+00:00",
-  "odds_refreshed_at": "2026-06-18T08:03:25+00:00",
-  "source_path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\live_lens\\live_lens_report_2026_06_18.json"
+  "oddsRefreshedAt": "2026-06-18T14:47:31-05:00",
+  "odds_refreshed_at": "2026-06-18T14:47:31-05:00",
+  "source_path": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\live_lens\\live_lens_report_2026_06_18.json"
 }

@@ -83,6 +83,40 @@ from syndicate.features.wnba.cards import build_live_player_boxscore_payload as 
 from syndicate.features.wnba.sources import processed_path as wnba_processed_path
 from syndicate.features.wnba.sources import live_snapshot_path as wnba_live_snapshot_path
 from syndicate.features.wnba.sources import available_dates as wnba_available_dates
+from syndicate.features.intelligence_audit import _scored_candidates
+
+
+class IntelligenceAuditScoringTests(unittest.TestCase):
+    def test_scored_candidates_support_full_partial_and_minimal_modes(self) -> None:
+        candidates = [
+            {
+                "prediction_id": "full",
+                "edge": 0.08,
+                "implied_probability": 0.47,
+                "model_probability": 0.55,
+                "odds": 110,
+            },
+            {
+                "prediction_id": "partial",
+                "edge": 0.05,
+                "odds": 120,
+            },
+            {
+                "prediction_id": "minimal",
+                "odds": -105,
+            },
+        ]
+
+        scored = _scored_candidates(candidates)
+
+        self.assertEqual([candidate["scoring_mode"] for candidate in scored], ["full", "partial", "minimal"])
+        self.assertEqual(scored[0]["score_inputs_missing"], [])
+        self.assertEqual(scored[1]["score_inputs_missing"], ["model_probability", "implied_probability"])
+        self.assertEqual(scored[2]["score_inputs_missing"], ["edge", "model_probability", "implied_probability"])
+        self.assertAlmostEqual(scored[1]["implied_probability"], 0.4545, places=4)
+        self.assertAlmostEqual(scored[1]["model_probability"], 0.5045, places=4)
+        self.assertAlmostEqual(scored[2]["implied_probability"], 0.5122, places=4)
+        self.assertAlmostEqual(scored[2]["model_probability"], 0.5122, places=4)
 
 
 class NhlCardsPayloadTests(unittest.TestCase):

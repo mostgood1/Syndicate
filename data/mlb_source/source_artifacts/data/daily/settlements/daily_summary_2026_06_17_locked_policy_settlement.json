@@ -1,5 +1,5 @@
 {
-  "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+  "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
   "date": "2026-06-17",
   "cap_profile": "nototals_p1_tbheavy11_r1_nohr",
   "selected_counts": {
@@ -257,7 +257,7 @@
   "all_unresolved_recommendations": [],
   "_settled_rows": [
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 824503,
       "market": "ml",
@@ -275,7 +275,7 @@
       "recommendation_tier": "official"
     },
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 824992,
       "market": "pitcher_props",
@@ -293,7 +293,7 @@
       "recommendation_tier": "official"
     },
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 824503,
       "market": "hitter_hits",
@@ -311,7 +311,7 @@
       "recommendation_tier": "official"
     },
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 823774,
       "market": "hitter_hits",
@@ -329,7 +329,7 @@
       "recommendation_tier": "official"
     },
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 823774,
       "market": "hitter_hits",
@@ -347,7 +347,7 @@
       "recommendation_tier": "official"
     },
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 823774,
       "market": "hitter_hits",
@@ -365,7 +365,7 @@
       "recommendation_tier": "official"
     },
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 824668,
       "market": "hitter_total_bases",
@@ -383,7 +383,7 @@
       "recommendation_tier": "official"
     },
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 822721,
       "market": "hitter_total_bases",
@@ -401,7 +401,7 @@
       "recommendation_tier": "official"
     },
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 824992,
       "market": "hitter_total_bases",
@@ -419,7 +419,7 @@
       "recommendation_tier": "official"
     },
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 825072,
       "market": "hitter_total_bases",
@@ -437,7 +437,7 @@
       "recommendation_tier": "official"
     },
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 823940,
       "market": "hitter_total_bases",
@@ -455,7 +455,7 @@
       "recommendation_tier": "official"
     },
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 824992,
       "market": "hitter_total_bases",
@@ -473,7 +473,7 @@
       "recommendation_tier": "official"
     },
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 824913,
       "market": "hitter_runs",
@@ -493,7 +493,7 @@
   ],
   "_playable_settled_rows": [
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 824178,
       "market": "pitcher_props",
@@ -511,7 +511,7 @@
       "recommendation_tier": "candidate"
     },
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 823940,
       "market": "pitcher_props",
@@ -529,7 +529,7 @@
       "recommendation_tier": "candidate"
     },
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 824503,
       "market": "pitcher_props",
@@ -547,7 +547,7 @@
       "recommendation_tier": "candidate"
     },
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 823536,
       "market": "pitcher_props",
@@ -565,7 +565,7 @@
       "recommendation_tier": "candidate"
     },
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 823044,
       "market": "pitcher_props",
@@ -583,7 +583,7 @@
       "recommendation_tier": "candidate"
     },
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 823774,
       "market": "pitcher_props",
@@ -601,7 +601,7 @@
       "recommendation_tier": "candidate"
     },
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 824992,
       "market": "pitcher_props",
@@ -619,7 +619,7 @@
       "recommendation_tier": "candidate"
     },
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 825072,
       "market": "pitcher_props",
@@ -637,7 +637,7 @@
       "recommendation_tier": "candidate"
     },
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 823044,
       "market": "pitcher_props",
@@ -655,7 +655,7 @@
       "recommendation_tier": "candidate"
     },
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 823450,
       "market": "pitcher_props",
@@ -673,7 +673,7 @@
       "recommendation_tier": "candidate"
     },
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 822721,
       "market": "pitcher_props",
@@ -691,7 +691,7 @@
       "recommendation_tier": "candidate"
     },
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 823774,
       "market": "pitcher_props",
@@ -709,7 +709,7 @@
       "recommendation_tier": "candidate"
     },
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 824913,
       "market": "pitcher_props",
@@ -727,7 +727,7 @@
       "recommendation_tier": "candidate"
     },
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 824503,
       "market": "pitcher_props",
@@ -745,7 +745,7 @@
       "recommendation_tier": "candidate"
     },
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 824668,
       "market": "pitcher_props",
@@ -763,7 +763,7 @@
       "recommendation_tier": "candidate"
     },
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 823940,
       "market": "pitcher_props",
@@ -781,7 +781,7 @@
       "recommendation_tier": "candidate"
     },
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 823450,
       "market": "pitcher_props",
@@ -799,7 +799,7 @@
       "recommendation_tier": "candidate"
     },
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 823536,
       "market": "pitcher_props",
@@ -817,7 +817,7 @@
       "recommendation_tier": "candidate"
     },
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 823774,
       "market": "pitcher_props",
@@ -835,7 +835,7 @@
       "recommendation_tier": "candidate"
     },
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 824503,
       "market": "hitter_hits",
@@ -853,7 +853,7 @@
       "recommendation_tier": "candidate"
     },
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 824503,
       "market": "hitter_hits",
@@ -871,7 +871,7 @@
       "recommendation_tier": "candidate"
     },
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 824178,
       "market": "hitter_hits",
@@ -889,7 +889,7 @@
       "recommendation_tier": "candidate"
     },
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 825072,
       "market": "hitter_hits",
@@ -907,7 +907,7 @@
       "recommendation_tier": "candidate"
     },
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 823127,
       "market": "hitter_hits",
@@ -925,7 +925,7 @@
       "recommendation_tier": "candidate"
     },
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 823127,
       "market": "hitter_hits",
@@ -943,7 +943,7 @@
       "recommendation_tier": "candidate"
     },
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 823536,
       "market": "hitter_hits",
@@ -961,7 +961,7 @@
       "recommendation_tier": "candidate"
     },
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 824178,
       "market": "hitter_hits",
@@ -979,7 +979,7 @@
       "recommendation_tier": "candidate"
     },
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 823940,
       "market": "hitter_hits",
@@ -997,7 +997,7 @@
       "recommendation_tier": "candidate"
     },
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 823536,
       "market": "hitter_hits",
@@ -1015,7 +1015,7 @@
       "recommendation_tier": "candidate"
     },
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 823940,
       "market": "hitter_hits",
@@ -1033,7 +1033,7 @@
       "recommendation_tier": "candidate"
     },
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 823940,
       "market": "hitter_hits",
@@ -1051,7 +1051,7 @@
       "recommendation_tier": "candidate"
     },
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 823044,
       "market": "hitter_total_bases",
@@ -1069,7 +1069,7 @@
       "recommendation_tier": "candidate"
     },
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 824912,
       "market": "hitter_total_bases",
@@ -1087,7 +1087,7 @@
       "recommendation_tier": "candidate"
     },
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 823127,
       "market": "hitter_total_bases",
@@ -1105,7 +1105,7 @@
       "recommendation_tier": "candidate"
     },
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 824668,
       "market": "hitter_runs",
@@ -1123,7 +1123,7 @@
       "recommendation_tier": "candidate"
     },
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 825072,
       "market": "hitter_runs",
@@ -1141,7 +1141,7 @@
       "recommendation_tier": "candidate"
     },
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 824912,
       "market": "hitter_runs",
@@ -1159,7 +1159,7 @@
       "recommendation_tier": "candidate"
     },
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 824668,
       "market": "hitter_runs",
@@ -1177,7 +1177,7 @@
       "recommendation_tier": "candidate"
     },
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 823044,
       "market": "hitter_rbis",
@@ -1195,7 +1195,7 @@
       "recommendation_tier": "candidate"
     },
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 824503,
       "market": "hitter_rbis",
@@ -1215,7 +1215,7 @@
   ],
   "_shadow_settled_rows": [
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 823127,
       "market": "pitcher_props",
@@ -1233,7 +1233,7 @@
       "recommendation_tier": "shadow"
     },
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 824992,
       "market": "pitcher_props",
@@ -1251,7 +1251,7 @@
       "recommendation_tier": "shadow"
     },
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 823450,
       "market": "pitcher_props",
@@ -1269,7 +1269,7 @@
       "recommendation_tier": "shadow"
     },
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 823127,
       "market": "pitcher_props",
@@ -1287,7 +1287,7 @@
       "recommendation_tier": "shadow"
     },
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 823940,
       "market": "pitcher_props",
@@ -1305,7 +1305,7 @@
       "recommendation_tier": "shadow"
     },
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 823044,
       "market": "pitcher_props",
@@ -1323,7 +1323,7 @@
       "recommendation_tier": "shadow"
     },
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 824746,
       "market": "pitcher_props",
@@ -1341,7 +1341,7 @@
       "recommendation_tier": "shadow"
     },
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 823774,
       "market": "pitcher_props",
@@ -1361,7 +1361,7 @@
   ],
   "_all_settled_rows": [
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 824503,
       "market": "ml",
@@ -1379,7 +1379,7 @@
       "recommendation_tier": "official"
     },
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 824992,
       "market": "pitcher_props",
@@ -1397,7 +1397,7 @@
       "recommendation_tier": "official"
     },
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 824503,
       "market": "hitter_hits",
@@ -1415,7 +1415,7 @@
       "recommendation_tier": "official"
     },
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 823774,
       "market": "hitter_hits",
@@ -1433,7 +1433,7 @@
       "recommendation_tier": "official"
     },
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 823774,
       "market": "hitter_hits",
@@ -1451,7 +1451,7 @@
       "recommendation_tier": "official"
     },
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 823774,
       "market": "hitter_hits",
@@ -1469,7 +1469,7 @@
       "recommendation_tier": "official"
     },
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 824668,
       "market": "hitter_total_bases",
@@ -1487,7 +1487,7 @@
       "recommendation_tier": "official"
     },
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 822721,
       "market": "hitter_total_bases",
@@ -1505,7 +1505,7 @@
       "recommendation_tier": "official"
     },
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 824992,
       "market": "hitter_total_bases",
@@ -1523,7 +1523,7 @@
       "recommendation_tier": "official"
     },
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 825072,
       "market": "hitter_total_bases",
@@ -1541,7 +1541,7 @@
       "recommendation_tier": "official"
     },
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 823940,
       "market": "hitter_total_bases",
@@ -1559,7 +1559,7 @@
       "recommendation_tier": "official"
     },
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 824992,
       "market": "hitter_total_bases",
@@ -1577,7 +1577,7 @@
       "recommendation_tier": "official"
     },
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 824913,
       "market": "hitter_runs",
@@ -1595,7 +1595,7 @@
       "recommendation_tier": "official"
     },
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 824178,
       "market": "pitcher_props",
@@ -1613,7 +1613,7 @@
       "recommendation_tier": "candidate"
     },
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 823940,
       "market": "pitcher_props",
@@ -1631,7 +1631,7 @@
       "recommendation_tier": "candidate"
     },
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 824503,
       "market": "pitcher_props",
@@ -1649,7 +1649,7 @@
       "recommendation_tier": "candidate"
     },
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 823536,
       "market": "pitcher_props",
@@ -1667,7 +1667,7 @@
       "recommendation_tier": "candidate"
     },
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 823044,
       "market": "pitcher_props",
@@ -1685,7 +1685,7 @@
       "recommendation_tier": "candidate"
     },
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 823774,
       "market": "pitcher_props",
@@ -1703,7 +1703,7 @@
       "recommendation_tier": "candidate"
     },
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 824992,
       "market": "pitcher_props",
@@ -1721,7 +1721,7 @@
       "recommendation_tier": "candidate"
     },
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 825072,
       "market": "pitcher_props",
@@ -1739,7 +1739,7 @@
       "recommendation_tier": "candidate"
     },
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 823044,
       "market": "pitcher_props",
@@ -1757,7 +1757,7 @@
       "recommendation_tier": "candidate"
     },
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 823450,
       "market": "pitcher_props",
@@ -1775,7 +1775,7 @@
       "recommendation_tier": "candidate"
     },
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 822721,
       "market": "pitcher_props",
@@ -1793,7 +1793,7 @@
       "recommendation_tier": "candidate"
     },
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 823774,
       "market": "pitcher_props",
@@ -1811,7 +1811,7 @@
       "recommendation_tier": "candidate"
     },
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 824913,
       "market": "pitcher_props",
@@ -1829,7 +1829,7 @@
       "recommendation_tier": "candidate"
     },
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 824503,
       "market": "pitcher_props",
@@ -1847,7 +1847,7 @@
       "recommendation_tier": "candidate"
     },
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 824668,
       "market": "pitcher_props",
@@ -1865,7 +1865,7 @@
       "recommendation_tier": "candidate"
     },
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 823940,
       "market": "pitcher_props",
@@ -1883,7 +1883,7 @@
       "recommendation_tier": "candidate"
     },
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 823450,
       "market": "pitcher_props",
@@ -1901,7 +1901,7 @@
       "recommendation_tier": "candidate"
     },
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 823536,
       "market": "pitcher_props",
@@ -1919,7 +1919,7 @@
       "recommendation_tier": "candidate"
     },
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 823774,
       "market": "pitcher_props",
@@ -1937,7 +1937,7 @@
       "recommendation_tier": "candidate"
     },
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 824503,
       "market": "hitter_hits",
@@ -1955,7 +1955,7 @@
       "recommendation_tier": "candidate"
     },
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 824503,
       "market": "hitter_hits",
@@ -1973,7 +1973,7 @@
       "recommendation_tier": "candidate"
     },
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 824178,
       "market": "hitter_hits",
@@ -1991,7 +1991,7 @@
       "recommendation_tier": "candidate"
     },
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 825072,
       "market": "hitter_hits",
@@ -2009,7 +2009,7 @@
       "recommendation_tier": "candidate"
     },
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 823127,
       "market": "hitter_hits",
@@ -2027,7 +2027,7 @@
       "recommendation_tier": "candidate"
     },
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 823127,
       "market": "hitter_hits",
@@ -2045,7 +2045,7 @@
       "recommendation_tier": "candidate"
     },
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 823536,
       "market": "hitter_hits",
@@ -2063,7 +2063,7 @@
       "recommendation_tier": "candidate"
     },
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 824178,
       "market": "hitter_hits",
@@ -2081,7 +2081,7 @@
       "recommendation_tier": "candidate"
     },
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 823940,
       "market": "hitter_hits",
@@ -2099,7 +2099,7 @@
       "recommendation_tier": "candidate"
     },
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 823536,
       "market": "hitter_hits",
@@ -2117,7 +2117,7 @@
       "recommendation_tier": "candidate"
     },
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 823940,
       "market": "hitter_hits",
@@ -2135,7 +2135,7 @@
       "recommendation_tier": "candidate"
     },
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 823940,
       "market": "hitter_hits",
@@ -2153,7 +2153,7 @@
       "recommendation_tier": "candidate"
     },
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 823044,
       "market": "hitter_total_bases",
@@ -2171,7 +2171,7 @@
       "recommendation_tier": "candidate"
     },
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 824912,
       "market": "hitter_total_bases",
@@ -2189,7 +2189,7 @@
       "recommendation_tier": "candidate"
     },
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 823127,
       "market": "hitter_total_bases",
@@ -2207,7 +2207,7 @@
       "recommendation_tier": "candidate"
     },
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 824668,
       "market": "hitter_runs",
@@ -2225,7 +2225,7 @@
       "recommendation_tier": "candidate"
     },
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 825072,
       "market": "hitter_runs",
@@ -2243,7 +2243,7 @@
       "recommendation_tier": "candidate"
     },
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 824912,
       "market": "hitter_runs",
@@ -2261,7 +2261,7 @@
       "recommendation_tier": "candidate"
     },
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 824668,
       "market": "hitter_runs",
@@ -2279,7 +2279,7 @@
       "recommendation_tier": "candidate"
     },
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 823044,
       "market": "hitter_rbis",
@@ -2297,7 +2297,7 @@
       "recommendation_tier": "candidate"
     },
     {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
       "date": "2026-06-17",
       "game_pk": 824503,
       "market": "hitter_rbis",

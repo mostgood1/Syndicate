@@ -21,7 +21,6 @@
         672569,
         680570,
         686799,
-        687093,
         690829
       ],
       "injured": [
@@ -172,21 +171,6 @@
             "name": "Catcher",
             "type": "Catcher",
             "abbreviation": "C"
-          },
-          "roster_type_source": "40Man"
-        },
-        {
-          "player_id": 687093,
-          "full_name": "Vaughn Grissom",
-          "status": {
-            "code": "D10",
-            "description": "Injured 10-Day"
-          },
-          "position": {
-            "code": "4",
-            "name": "Second Base",
-            "type": "Infielder",
-            "abbreviation": "2B"
           },
           "roster_type_source": "40Man"
         },
@@ -734,6 +718,7 @@
         657006,
         687863,
         690990,
+        694037,
         702303
       ],
       "injured": [
@@ -743,6 +728,21 @@
           "status": {
             "code": "D60",
             "description": "Injured 60-Day"
+          },
+          "position": {
+            "code": "1",
+            "name": "Pitcher",
+            "type": "Pitcher",
+            "abbreviation": "P"
+          },
+          "roster_type_source": "40Man"
+        },
+        {
+          "player_id": 694037,
+          "full_name": "Daniel Palencia",
+          "status": {
+            "code": "D15",
+            "description": "Injured 15-Day"
           },
           "position": {
             "code": "1",
@@ -1006,7 +1006,8 @@
       "injured_ids": [
         608070,
         681870,
-        682657
+        682657,
+        800050
       ],
       "injured": [
         {
@@ -1021,6 +1022,21 @@
             "name": "Outfielder",
             "type": "Outfielder",
             "abbreviation": "LF"
+          },
+          "roster_type_source": "40Man"
+        },
+        {
+          "player_id": 800050,
+          "full_name": "Chase DeLauter",
+          "status": {
+            "code": "D10",
+            "description": "Injured 10-Day"
+          },
+          "position": {
+            "code": "9",
+            "name": "Outfielder",
+            "type": "Outfielder",
+            "abbreviation": "RF"
           },
           "roster_type_source": "40Man"
         },
@@ -1065,7 +1081,6 @@
       "injured_ids": [
         500779,
         592178,
-        623474,
         666160,
         685299,
         685326,
@@ -1097,21 +1112,6 @@
           "status": {
             "code": "D60",
             "description": "Injured 60-Day"
-          },
-          "position": {
-            "code": "1",
-            "name": "Pitcher",
-            "type": "Pitcher",
-            "abbreviation": "P"
-          },
-          "roster_type_source": "40Man"
-        },
-        {
-          "player_id": 623474,
-          "full_name": "Jimmy Herget",
-          "status": {
-            "code": "D15",
-            "description": "Injured 15-Day"
           },
           "position": {
             "code": "1",
@@ -1253,8 +1253,8 @@
         434378,
         572143,
         595879,
+        650402,
         656427,
-        663554,
         676428,
         678009,
         681857,
@@ -1309,17 +1309,17 @@
           "roster_type_source": "40Man"
         },
         {
-          "player_id": 663554,
-          "full_name": "Casey Mize",
+          "player_id": 650402,
+          "full_name": "Gleyber Torres",
           "status": {
-            "code": "D15",
-            "description": "Injured 15-Day"
+            "code": "D10",
+            "description": "Injured 10-Day"
           },
           "position": {
-            "code": "1",
-            "name": "Pitcher",
-            "type": "Pitcher",
-            "abbreviation": "P"
+            "code": "4",
+            "name": "Second Base",
+            "type": "Infielder",
+            "abbreviation": "2B"
           },
           "roster_type_source": "40Man"
         },
@@ -1446,8 +1446,6 @@
         669699,
         669713,
         669854,
-        673237,
-        686613,
         687888
       ],
       "injured": [
@@ -1542,21 +1540,6 @@
           "roster_type_source": "40Man"
         },
         {
-          "player_id": 686613,
-          "full_name": "Hunter Brown",
-          "status": {
-            "code": "D60",
-            "description": "Injured 60-Day"
-          },
-          "position": {
-            "code": "1",
-            "name": "Pitcher",
-            "type": "Pitcher",
-            "abbreviation": "P"
-          },
-          "roster_type_source": "40Man"
-        },
-        {
           "player_id": 664774,
           "full_name": "LaMonte Wade Jr.",
           "status": {
@@ -1615,21 +1598,6 @@
             "abbreviation": "P"
           },
           "roster_type_source": "40Man"
-        },
-        {
-          "player_id": 673237,
-          "full_name": "Yainer Diaz",
-          "status": {
-            "code": "D10",
-            "description": "Injured 10-Day"
-          },
-          "position": {
-            "code": "2",
-            "name": "Catcher",
-            "type": "Catcher",
-            "abbreviation": "C"
-          },
-          "roster_type_source": "40Man"
         }
       ]
     },
@@ -1686,8 +1654,8 @@
           "player_id": 666142,
           "full_name": "Cole Ragans",
           "status": {
-            "code": "D15",
-            "description": "Injured 15-Day"
+            "code": "D60",
+            "description": "Injured 60-Day"
           },
           "position": {
             "code": "1",
@@ -2342,27 +2310,11 @@
       "injured_ids": [
         621139,
         622663,
-        650644,
         667670,
         672016,
         680684
       ],
       "injured": [
-        {
-          "player_id": 650644,
-          "full_name": "Aaron Civale",
-          "status": {
-            "code": "D15",
-            "description": "Injured 15-Day"
-          },
-          "position": {
-            "code": "1",
-            "name": "Pitcher",
-            "type": "Pitcher",
-            "abbreviation": "P"
-          },
-          "roster_type_source": "40Man"
-        },
         {
           "player_id": 667670,
           "full_name": "Brent Rooker",
@@ -2850,7 +2802,6 @@
       "injured_ids": [
         592858,
         641816,
-        657424,
         664056,
         666711,
         666931,
@@ -2970,21 +2921,6 @@
         {
           "player_id": 676775,
           "full_name": "Keaton Winn",
-          "status": {
-            "code": "D15",
-            "description": "Injured 15-Day"
-          },
-          "position": {
-            "code": "1",
-            "name": "Pitcher",
-            "type": "Pitcher",
-            "abbreviation": "P"
-          },
-          "roster_type_source": "40Man"
-        },
-        {
-          "player_id": 657424,
-          "full_name": "Matt Gage",
           "status": {
             "code": "D15",
             "description": "Injured 15-Day"
@@ -3436,6 +3372,7 @@
         "abbreviation": "TOR"
       },
       "injured_ids": [
+        453286,
         554340,
         573009,
         621244,
@@ -3581,6 +3518,21 @@
             "name": "Second Base",
             "type": "Infielder",
             "abbreviation": "2B"
+          },
+          "roster_type_source": "40Man"
+        },
+        {
+          "player_id": 453286,
+          "full_name": "Max Scherzer",
+          "status": {
+            "code": "D15",
+            "description": "Injured 15-Day"
+          },
+          "position": {
+            "code": "1",
+            "name": "Pitcher",
+            "type": "Pitcher",
+            "abbreviation": "P"
           },
           "roster_type_source": "40Man"
         },
@@ -3957,8 +3909,8 @@
           "player_id": 675911,
           "full_name": "Spencer Strider",
           "status": {
-            "code": "D15",
-            "description": "Injured 15-Day"
+            "code": "D60",
+            "description": "Injured 60-Day"
           },
           "position": {
             "code": "1",
@@ -3997,6 +3949,7 @@
         669720,
         672860,
         673929,
+        677592,
         678024,
         681066,
         681460,
@@ -4049,6 +4002,21 @@
             "name": "Pitcher",
             "type": "Pitcher",
             "abbreviation": "P"
+          },
+          "roster_type_source": "40Man"
+        },
+        {
+          "player_id": 677592,
+          "full_name": "Everson Pereira",
+          "status": {
+            "code": "D7",
+            "description": "Injured 7-Day"
+          },
+          "position": {
+            "code": "9",
+            "name": "Outfielder",
+            "type": "Outfielder",
+            "abbreviation": "RF"
           },
           "roster_type_source": "40Man"
         },
@@ -4801,22 +4769,6 @@
     },
     {
       "team_id": 108,
-      "player_id": 687093,
-      "full_name": "Vaughn Grissom",
-      "status": {
-        "code": "D10",
-        "description": "Injured 10-Day"
-      },
-      "position": {
-        "code": "4",
-        "name": "Second Base",
-        "type": "Infielder",
-        "abbreviation": "2B"
-      },
-      "roster_type_source": "40Man"
-    },
-    {
-      "team_id": 108,
       "player_id": 660162,
       "full_name": "Yo\u00e1n Moncada",
       "status": {
@@ -5329,6 +5281,22 @@
     },
     {
       "team_id": 112,
+      "player_id": 694037,
+      "full_name": "Daniel Palencia",
+      "status": {
+        "code": "D15",
+        "description": "Injured 15-Day"
+      },
+      "position": {
+        "code": "1",
+        "name": "Pitcher",
+        "type": "Pitcher",
+        "abbreviation": "P"
+      },
+      "roster_type_source": "40Man"
+    },
+    {
+      "team_id": 112,
       "player_id": 640451,
       "full_name": "Hunter Harvey",
       "status": {
@@ -5585,6 +5553,22 @@
     },
     {
       "team_id": 114,
+      "player_id": 800050,
+      "full_name": "Chase DeLauter",
+      "status": {
+        "code": "D10",
+        "description": "Injured 10-Day"
+      },
+      "position": {
+        "code": "9",
+        "name": "Outfielder",
+        "type": "Outfielder",
+        "abbreviation": "RF"
+      },
+      "roster_type_source": "40Man"
+    },
+    {
+      "team_id": 114,
       "player_id": 681870,
       "full_name": "Erik Sabrowski",
       "status": {
@@ -5638,22 +5622,6 @@
       "status": {
         "code": "D60",
         "description": "Injured 60-Day"
-      },
-      "position": {
-        "code": "1",
-        "name": "Pitcher",
-        "type": "Pitcher",
-        "abbreviation": "P"
-      },
-      "roster_type_source": "40Man"
-    },
-    {
-      "team_id": 115,
-      "player_id": 623474,
-      "full_name": "Jimmy Herget",
-      "status": {
-        "code": "D15",
-        "description": "Injured 15-Day"
       },
       "position": {
         "code": "1",
@@ -5841,17 +5809,17 @@
     },
     {
       "team_id": 116,
-      "player_id": 663554,
-      "full_name": "Casey Mize",
+      "player_id": 650402,
+      "full_name": "Gleyber Torres",
       "status": {
-        "code": "D15",
-        "description": "Injured 15-Day"
+        "code": "D10",
+        "description": "Injured 10-Day"
       },
       "position": {
-        "code": "1",
-        "name": "Pitcher",
-        "type": "Pitcher",
-        "abbreviation": "P"
+        "code": "4",
+        "name": "Second Base",
+        "type": "Infielder",
+        "abbreviation": "2B"
       },
       "roster_type_source": "40Man"
     },
@@ -6065,22 +6033,6 @@
     },
     {
       "team_id": 117,
-      "player_id": 686613,
-      "full_name": "Hunter Brown",
-      "status": {
-        "code": "D60",
-        "description": "Injured 60-Day"
-      },
-      "position": {
-        "code": "1",
-        "name": "Pitcher",
-        "type": "Pitcher",
-        "abbreviation": "P"
-      },
-      "roster_type_source": "40Man"
-    },
-    {
-      "team_id": 117,
       "player_id": 664774,
       "full_name": "LaMonte Wade Jr.",
       "status": {
@@ -6144,22 +6096,6 @@
       "roster_type_source": "40Man"
     },
     {
-      "team_id": 117,
-      "player_id": 673237,
-      "full_name": "Yainer Diaz",
-      "status": {
-        "code": "D10",
-        "description": "Injured 10-Day"
-      },
-      "position": {
-        "code": "2",
-        "name": "Catcher",
-        "type": "Catcher",
-        "abbreviation": "C"
-      },
-      "roster_type_source": "40Man"
-    },
-    {
       "team_id": 118,
       "player_id": 679525,
       "full_name": "Alec Marsh",
@@ -6196,8 +6132,8 @@
       "player_id": 666142,
       "full_name": "Cole Ragans",
       "status": {
-        "code": "D15",
-        "description": "Injured 15-Day"
+        "code": "D60",
+        "description": "Injured 60-Day"
       },
       "position": {
         "code": "1",
@@ -6817,22 +6753,6 @@
     },
     {
       "team_id": 133,
-      "player_id": 650644,
-      "full_name": "Aaron Civale",
-      "status": {
-        "code": "D15",
-        "description": "Injured 15-Day"
-      },
-      "position": {
-        "code": "1",
-        "name": "Pitcher",
-        "type": "Pitcher",
-        "abbreviation": "P"
-      },
-      "roster_type_source": "40Man"
-    },
-    {
-      "team_id": 133,
       "player_id": 667670,
       "full_name": "Brent Rooker",
       "status": {
@@ -7409,22 +7329,6 @@
     },
     {
       "team_id": 137,
-      "player_id": 657424,
-      "full_name": "Matt Gage",
-      "status": {
-        "code": "D15",
-        "description": "Injured 15-Day"
-      },
-      "position": {
-        "code": "1",
-        "name": "Pitcher",
-        "type": "Pitcher",
-        "abbreviation": "P"
-      },
-      "roster_type_source": "40Man"
-    },
-    {
-      "team_id": 137,
       "player_id": 678495,
       "full_name": "Randy Rodr\u00edguez",
       "status": {
@@ -7969,6 +7873,22 @@
     },
     {
       "team_id": 141,
+      "player_id": 453286,
+      "full_name": "Max Scherzer",
+      "status": {
+        "code": "D15",
+        "description": "Injured 15-Day"
+      },
+      "position": {
+        "code": "1",
+        "name": "Pitcher",
+        "type": "Pitcher",
+        "abbreviation": "P"
+      },
+      "roster_type_source": "40Man"
+    },
+    {
+      "team_id": 141,
       "player_id": 669456,
       "full_name": "Shane Bieber",
       "status": {
@@ -8308,8 +8228,8 @@
       "player_id": 675911,
       "full_name": "Spencer Strider",
       "status": {
-        "code": "D15",
-        "description": "Injured 15-Day"
+        "code": "D60",
+        "description": "Injured 60-Day"
       },
       "position": {
         "code": "1",
@@ -8380,6 +8300,22 @@
         "name": "Pitcher",
         "type": "Pitcher",
         "abbreviation": "P"
+      },
+      "roster_type_source": "40Man"
+    },
+    {
+      "team_id": 145,
+      "player_id": 677592,
+      "full_name": "Everson Pereira",
+      "status": {
+        "code": "D7",
+        "description": "Injured 7-Day"
+      },
+      "position": {
+        "code": "9",
+        "name": "Outfielder",
+        "type": "Outfielder",
+        "abbreviation": "RF"
       },
       "roster_type_source": "40Man"
     },

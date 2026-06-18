@@ -308,11 +308,46 @@ if ($DryRun) {
     return
 }
 
+function Sync-SportSourceArtifacts {
+    param(
+        [string]$Sport,
+        [string]$RepoRootPath
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Sport) -or [string]::IsNullOrWhiteSpace($RepoRootPath)) {
+        return
+    }
+
+    $sportSlug = $Sport.Trim().ToLowerInvariant()
+    $sourceDataRoot = Join-Path $RepoRootPath ("data\{0}_source\data" -f $sportSlug)
+    $artifactDataRoot = Join-Path $RepoRootPath ("data\{0}_source\source_artifacts\data" -f $sportSlug)
+
+    if (-not (Test-Path $sourceDataRoot)) {
+        return
+    }
+
+    New-Item -ItemType Directory -Path $artifactDataRoot -Force | Out-Null
+
+    $copiedCount = 0
+    foreach ($item in Get-ChildItem -LiteralPath $sourceDataRoot -Force -ErrorAction SilentlyContinue) {
+        Copy-Item -Path $item.FullName -Destination $artifactDataRoot -Recurse -Force
+        $copiedCount += 1
+    }
+
+    Write-Host ("    synced source_artifacts for {0}: {1} top-level item(s)" -f $sportSlug, $copiedCount) -ForegroundColor DarkGray
+}
+
 Push-Location $repoRoot
 try {
     & $dailyArgs[0] $dailyArgs[1..($dailyArgs.Length - 1)]
     if ($LASTEXITCODE -ne 0) {
         throw "In-season daily update failed with exit code $LASTEXITCODE"
+    }
+
+    foreach ($sport in @('mlb', 'nba', 'wnba', 'nhl', 'nfl', 'ncaaf', 'ncaab')) {
+        if ($activeSports[$sport.ToUpperInvariant()]) {
+            Sync-SportSourceArtifacts -Sport $sport -RepoRootPath $repoRoot
+        }
     }
 }
 finally {

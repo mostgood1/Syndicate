@@ -5,7 +5,7 @@ import json
 import os
 import time
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, Mapping
 
 from flask import Blueprint, jsonify, render_template, request
 from flask import redirect
@@ -230,15 +230,15 @@ def _status_candidate_count_from_response(payload: dict[str, object] | None) -> 
             return candidate_count
         candidates = candidate_pool.get("candidates")
         if isinstance(candidates, list):
-            return len([candidate for candidate in candidates if isinstance(candidate, dict)])
+            return len([candidate for candidate in candidates if isinstance(candidate, Mapping)])
 
     candidates = current.get("candidates")
     if isinstance(candidates, list):
-        return len([candidate for candidate in candidates if isinstance(candidate, dict)])
+        return len([candidate for candidate in candidates if isinstance(candidate, Mapping)])
 
     top_opportunities = current.get("top_opportunities")
     if isinstance(top_opportunities, list):
-        return len([opportunity for opportunity in top_opportunities if isinstance(opportunity, dict)])
+        return len([opportunity for opportunity in top_opportunities if isinstance(opportunity, Mapping)])
 
     analysis = current.get("analysis") if isinstance(current.get("analysis"), dict) else None
     if isinstance(analysis, dict):

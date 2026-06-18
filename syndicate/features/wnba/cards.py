@@ -150,6 +150,29 @@ def _nearest_available_cards_date(selected_date: str) -> str | None:
     return dated_values[-1][1]
 
 
+def _resolved_source_cards_date(selected_date: str, *, allow_stored_date_fallback: bool = False) -> str:
+    requested_date = str(selected_date or "").strip() or parse_iso_date(selected_date).isoformat()
+    resolved_date = requested_date
+    bundle = _artifact_bundle(resolved_date)
+    if bundle["rows"]:
+        return resolved_date
+    if not (allow_stored_date_fallback or resolved_date == central_today_iso()):
+        return resolved_date
+    fallback_date = None
+    dates = available_dates()
+    if resolved_date == central_today_iso():
+        earlier_dates = [value for value in dates if value and value != resolved_date and value < resolved_date]
+        if earlier_dates:
+            fallback_date = earlier_dates[-1]
+    if fallback_date is None:
+        fallback_date = _nearest_available_cards_date(resolved_date)
+        if fallback_date == resolved_date and resolved_date in dates:
+            prior_dates = [value for value in dates if value and value < resolved_date]
+            if prior_dates:
+                fallback_date = prior_dates[-1]
+    return fallback_date if fallback_date else resolved_date
+
+
 def _safe_float(value: Any) -> float | None:
     try:
         return float(value)
@@ -860,24 +883,8 @@ def _source_game_from_row(
 
 def build_source_cards_payload(selected_date: str, *, allow_stored_date_fallback: bool = False) -> dict[str, Any]:
     requested_date = str(selected_date or "").strip() or parse_iso_date(selected_date).isoformat()
-    resolved_date = requested_date
+    resolved_date = _resolved_source_cards_date(selected_date, allow_stored_date_fallback=allow_stored_date_fallback)
     bundle = _artifact_bundle(resolved_date)
-    if not bundle["rows"] and (allow_stored_date_fallback or resolved_date == central_today_iso()):
-        fallback_date = None
-        dates = available_dates()
-        if resolved_date == central_today_iso():
-            earlier_dates = [value for value in dates if value and value != resolved_date and value < resolved_date]
-            if earlier_dates:
-                fallback_date = earlier_dates[-1]
-        if fallback_date is None:
-            fallback_date = _nearest_available_cards_date(resolved_date)
-            if fallback_date == resolved_date and resolved_date in dates:
-                prior_dates = [value for value in dates if value and value < resolved_date]
-                if prior_dates:
-                    fallback_date = prior_dates[-1]
-        if fallback_date and fallback_date != resolved_date:
-            resolved_date = fallback_date
-            bundle = _artifact_bundle(resolved_date)
     rows = bundle["rows"]
     rec_index = bundle["recommendations"]
     sim_index = bundle["sim"]
@@ -904,13 +911,14 @@ def build_source_cards_payload(selected_date: str, *, allow_stored_date_fallback
 
 
 def build_source_cards_sim_detail_payload(selected_date: str, away_tri: str, home_tri: str) -> dict[str, Any]:
+    resolved_date = _resolved_source_cards_date(selected_date, allow_stored_date_fallback=True)
     away_key = _canonical_wnba_tri(str(away_tri or "").strip().upper())
     home_key = _canonical_wnba_tri(str(home_tri or "").strip().upper())
-    bundle = _artifact_bundle(selected_date)
+    bundle = _artifact_bundle(resolved_date)
     sim_detail = bundle.get("sim", {}).get((away_key, home_key)) if isinstance(bundle.get("sim"), dict) else None
     if isinstance(sim_detail, dict):
         return {
-            "date": selected_date,
+            "date": resolved_date,
             "requested_date": selected_date,
             "players_included": True,
             "games": [
@@ -940,7 +948,7 @@ def build_source_cards_sim_detail_payload(selected_date: str, away_tri: str, hom
     should_try_remote = _remote_source_fallback_enabled() or bool(_remote_source_base_url())
     if should_try_remote and away_key and home_key:
         params = {"away": away_key, "home": home_key}
-        date_value = str(selected_date or "").strip()
+        date_value = resolved_date
         if date_value:
             params["date"] = date_value
         query = urllib_parse.urlencode(params)
@@ -959,10 +967,10 @@ def build_source_cards_sim_detail_payload(selected_date: str, away_tri: str, hom
         if remote_games:
             out = dict(remote_payload)
             out.setdefault("requested_date", selected_date)
-            out.setdefault("date", selected_date)
+            out.setdefault("date", resolved_date)
             return out
 
-    fallback = build_source_cards_payload(selected_date)
+    fallback = build_source_cards_payload(selected_date, allow_stored_date_fallback=True)
     game = next(
         (
             item
@@ -974,7 +982,7 @@ def build_source_cards_sim_detail_payload(selected_date: str, away_tri: str, hom
         None,
     )
     return {
-        "date": selected_date,
+        "date": resolved_date,
         "requested_date": selected_date,
         "players_included": False,
         "games": [dict(game)] if isinstance(game, dict) else [],
@@ -982,7 +990,8 @@ def build_source_cards_sim_detail_payload(selected_date: str, away_tri: str, hom
 
 
 def build_source_cards_props_strip_payload(selected_date: str, *, limit: int = 24, per_game_limit: int = 8) -> dict[str, Any]:
-    bundle = _artifact_bundle(selected_date)
+    resolved_date = _resolved_source_cards_date(selected_date, allow_stored_date_fallback=True)
+    bundle = _artifact_bundle(resolved_date)
     items: list[dict[str, Any]] = []
     for key, game in (bundle.get("props") or {}).items():
         if not isinstance(key, tuple) or not isinstance(game, dict):
@@ -1052,7 +1061,8 @@ def build_source_cards_props_strip_payload(selected_date: str, *, limit: int = 2
     return {
         "ok": True,
         "mode": "pregame",
-        "date": selected_date,
+        "date": resolved_date,
+        "requested_date": selected_date,
         "title": "Pregame prop movement",
         "subtitle": "Top same-day prop cards from the saved cards props snapshot.",
         "items": selected_items,

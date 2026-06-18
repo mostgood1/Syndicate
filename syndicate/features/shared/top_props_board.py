@@ -94,7 +94,7 @@ def build_top_props_page_context(
         selected_date=selected_date,
         available_dates=available_dates,
     )
-    summary = load_summary(str(resolved_source_path)) or {}
+    summary = load_summary(resolved_source_path) or {}
     cards = build_cards(summary, limit)
 
     rows = summary.get("data") if isinstance(summary.get("data"), list) else []

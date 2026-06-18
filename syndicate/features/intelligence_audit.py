@@ -1,5 +1,3 @@
-from syndicate.features.shared.refresh_state_store import reports_root
-
 from __future__ import annotations
 
 import argparse
@@ -12,6 +10,7 @@ from typing import Any, Iterable, Mapping
 
 from syndicate.features.bankroll_manager import build_portfolio as _build_portfolio
 from syndicate.features.bankroll_manager import compute_bet_size as _compute_bet_size
+from syndicate.features.bankroll_manager import _implied_probability_from_odds
 from syndicate.features.correlation_engine import compute_correlation as _compute_correlation
 from syndicate.features.intelligence_parlay_runtime import build_parlay_payload as _build_parlay_payload
 from syndicate.features.intelligence_parlay_runtime import build_parlays as _build_parlays
@@ -19,6 +18,7 @@ from syndicate.features.intelligence_parlay_runtime import build_round_robin_par
 from syndicate.features.intelligence_parlay_runtime import parlay_rank_score as _parlay_rank_score
 from syndicate.features.shared.intelligence_evaluation import DEFAULT_LEDGER_PATH as DEFAULT_EVALUATION_LEDGER_PATH
 from syndicate.features.simulation_engine import SimulationEngine
+from syndicate.features.shared.refresh_state_store import reports_root
 
 
 _SIMULATION_ENGINE = SimulationEngine()
@@ -960,14 +960,65 @@ def _simulation_candidate_annotations(candidates: list[dict[str, Any]]) -> None:
         candidate.setdefault("risks", list(candidate.get("risks") or []))
 
 
+def _scoring_tier(candidate: Mapping[str, Any]) -> tuple[str, list[str]]:
+    score_inputs_missing: list[str] = []
+
+    original_edge = _safe_float(candidate.get("edge"))
+    original_model_probability = _normalize_probability(candidate.get("model_probability"))
+    original_implied_probability = _normalize_probability(candidate.get("implied_probability"))
+    odds = candidate.get("odds")
+    odds_implied_probability = _implied_probability_from_odds(odds)
+
+    if odds_implied_probability is None and odds is not None:
+        score_inputs_missing.append("odds")
+    if original_edge is None:
+        score_inputs_missing.append("edge")
+    if original_model_probability is None:
+        score_inputs_missing.append("model_probability")
+    if original_implied_probability is None:
+        score_inputs_missing.append("implied_probability")
+
+    if original_edge is not None and original_model_probability is not None and original_implied_probability is not None:
+        return "full", score_inputs_missing
+    if original_edge is not None:
+        return "partial", score_inputs_missing
+    return "minimal", score_inputs_missing
+
+
+def _apply_scoring_fallbacks(candidate: Mapping[str, Any]) -> dict[str, Any]:
+    scored_candidate = dict(candidate)
+    scoring_mode, score_inputs_missing = _scoring_tier(scored_candidate)
+
+    edge = _safe_float(scored_candidate.get("edge"))
+    implied_probability = _normalize_probability(scored_candidate.get("implied_probability"))
+    if implied_probability is None:
+        implied_probability = _implied_probability_from_odds(scored_candidate.get("odds"))
+    if implied_probability is None:
+        implied_probability = 0.5
+
+    model_probability = _normalize_probability(scored_candidate.get("model_probability"))
+    if model_probability is None and edge is not None:
+        model_probability = _clamp(implied_probability + edge, 0.0, 1.0)
+    if model_probability is None:
+        model_probability = implied_probability
+
+    if edge is None:
+        edge = model_probability - implied_probability
+
+    scored_candidate.update(
+        {
+            "edge": round(edge, 4),
+            "implied_probability": round(implied_probability, 4),
+            "model_probability": round(model_probability, 4),
+            "score_inputs_missing": score_inputs_missing,
+            "scoring_mode": scoring_mode,
+        }
+    )
+    return scored_candidate
+
+
 def _scored_candidates(candidates: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    return [
-        candidate
-        for candidate in candidates
-        if _safe_float(candidate.get("edge")) is not None
-        and _normalize_probability(candidate.get("implied_probability")) is not None
-        and _normalize_probability(candidate.get("model_probability")) is not None
-    ]
+    return [_apply_scoring_fallbacks(candidate) for candidate in candidates]
 
 
 def run_full_audit(test_date: str | None = None) -> dict[str, Any]:

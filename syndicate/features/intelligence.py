@@ -24,7 +24,7 @@ from pathlib import Path
 import re
 import subprocess
 from statistics import NormalDist
-from typing import Any
+from typing import Any, Mapping
 
 from flask import current_app
 
@@ -57,6 +57,7 @@ from syndicate.features.simulation_engine import SimulationEngine
 from syndicate.features.prediction_ledger import _signal_weight
 from syndicate.features.shared.intelligence_evaluation import adjust_confidence
 from syndicate.features.shared.intelligence_evaluation import build_reliability_profile
+from syndicate.features.shared.intelligence_contracts import UniversalCandidate
 from syndicate.features.shared.recommendation_engine import filter_candidates as _shared_filter_candidates
 from syndicate.features.shared.recommendation_engine import rank_recommendations as _shared_rank_recommendations
 from syndicate.features.shared.ops_refresh import load_latest_refresh_status
@@ -1331,7 +1332,7 @@ def _analysis_focus_from_resolved_candidates(
     ):
         return None
 
-    valid_candidates = [candidate for candidate in candidates if isinstance(candidate, dict)]
+    valid_candidates = [candidate for candidate in candidates if isinstance(candidate, Mapping)]
     if not valid_candidates:
         return None
 
@@ -1790,7 +1791,7 @@ def _comparison_analysis_views(candidates: list[dict[str, Any]], preferences: di
     chart_rows: list[dict[str, Any]] = []
     for index, subject_key in enumerate(requested_subjects[:6], start=1):
         candidate = next((item for item in candidates if _candidate_subject_key(item) == subject_key), None)
-        if not isinstance(candidate, dict):
+        if not isinstance(candidate, Mapping):
             continue
         row = _candidate_analysis_row(candidate, index)
         row["subject"] = " ".join(part.capitalize() for part in subject_key.split())
@@ -2658,7 +2659,7 @@ def _candidate_odds_history_context(candidate: dict[str, Any], odds_history: dic
 def _enrich_candidates_with_odds_history(candidates: list[dict[str, Any]], odds_history_by_sport: dict[str, dict[str, Any]] | None) -> list[dict[str, Any]]:
     enriched: list[dict[str, Any]] = []
     for candidate in candidates:
-        if not isinstance(candidate, dict):
+        if not isinstance(candidate, Mapping):
             continue
         payload = dict(candidate)
         payload = _attach_market_data(payload)
@@ -3274,6 +3275,21 @@ def _sport_matches_preferences(sport: dict[str, Any], preferences: dict[str, Any
     return _safe_text(sport.get("slug"), "").lower() in requested_sports
 
 
+def _requested_date_requires_active_sports(preferences: dict[str, Any]) -> bool:
+    requested_date = _safe_text(
+        preferences.get("requested_date")
+        or preferences.get("selected_date")
+        or preferences.get("date"),
+        "",
+    ).strip()
+    if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", requested_date):
+        return False
+    try:
+        return date.fromisoformat(requested_date) >= date.fromisoformat(central_today_iso())
+    except Exception:
+        return False
+
+
 def _prop_candidate_from_item(sport: dict[str, Any], item: dict[str, Any], *, surface_key: str, surface_title: str) -> dict[str, Any]:
     row = _build_prop_dashboard_row(sport, item, default_surface=surface_title)
     projected_value = _numeric_hint(row.get("projected"))
@@ -3528,7 +3544,7 @@ def _mlb_market_prop_candidates_from_artifact(sport: dict[str, Any], preferences
             selected_date=selected_date,
             pitcher_market_rows=pitcher_market_rows,
         )
-        if not isinstance(candidate, dict):
+        if not isinstance(candidate, Mapping):
             continue
         market_key = _candidate_market_key(candidate)
         if market_key not in requested_markets:
@@ -3593,7 +3609,7 @@ def _mlb_subject_prop_candidates_from_artifact(
             selected_date=selected_date,
             pitcher_market_rows=pitcher_market_rows,
         )
-        if isinstance(candidate, dict):
+        if isinstance(candidate, Mapping):
             candidates.append(candidate)
     return candidates
 
@@ -3712,7 +3728,7 @@ def _mlb_candidate_live_state(candidate: dict[str, Any], actual_payload: dict[st
 def _apply_live_state_context_to_candidates(candidates: list[dict[str, Any]]) -> None:
     mlb_actual_cache: dict[int, dict[str, Any] | None] = {}
     for candidate in candidates:
-        if not isinstance(candidate, dict):
+        if not isinstance(candidate, Mapping):
             continue
         sport_slug = _safe_text(candidate.get("sport_slug"), "").lower()
         if sport_slug != "mlb":
@@ -3893,7 +3909,7 @@ def _resolved_requested_subjects(question: str, candidates: list[dict[str, Any]]
         return best_position
 
     for candidate in candidates:
-        if not isinstance(candidate, dict):
+        if not isinstance(candidate, Mapping):
             continue
         subject_key = _candidate_subject_key(candidate)
         if not subject_key or subject_key in seen:
@@ -4140,7 +4156,7 @@ def _candidate_is_source_backed(candidate: dict[str, Any]) -> bool:
 
 
 def normalize_candidate(candidate: dict[str, Any]) -> dict[str, Any]:
-    normalized = dict(candidate) if isinstance(candidate, dict) else {}
+    normalized = dict(candidate) if isinstance(candidate, Mapping) else {}
     sport = _safe_text(normalized.get("sport"), _safe_text(normalized.get("sport_slug"), "sport"))
     sport_slug = _safe_text(normalized.get("sport_slug"), sport).lower()
     candidate_type = _safe_text(normalized.get("type"), _safe_text(normalized.get("candidate_type"), ""))
@@ -4222,6 +4238,7 @@ def _primary_query_candidates(
 def _collect_candidates(overview: list[dict[str, Any]], preferences: dict[str, Any]) -> list[dict[str, Any]]:
     candidates: list[dict[str, Any]] = []
     question_text = _safe_text(preferences.get("question"), "").lower()
+    require_active_sports = _requested_date_requires_active_sports(preferences)
     wants_mlb_hr_targets = preferences.get("analysis_focus") == "mlb_home_runs" or "home_runs" in {
         str(item).strip().lower() for item in (preferences.get("requested_markets") or []) if str(item).strip()
     }
@@ -4230,6 +4247,8 @@ def _collect_candidates(overview: list[dict[str, Any]], preferences: dict[str, A
     )
     for sport in overview:
         if not isinstance(sport, dict) or not _sport_matches_preferences(sport, preferences):
+            continue
+        if require_active_sports and not bool(sport.get("active_today")):
             continue
         sport_slug = _safe_text(sport.get("slug"), "").lower()
         sport_health = _safe_text(sport.get("data_health"), "").lower()
@@ -5831,9 +5850,9 @@ def _log_candidate_pipeline(
     final_picks: list[dict[str, Any]],
     pipeline_name: str,
 ) -> None:
-    candidate_ids = [_candidate_log_id(candidate) for candidate in candidates if isinstance(candidate, dict)]
-    filtered_ids = {_candidate_log_id(candidate) for candidate in filtered_candidates if isinstance(candidate, dict)}
-    final_ids = {_candidate_log_id(candidate) for candidate in final_picks if isinstance(candidate, dict)}
+    candidate_ids = [_candidate_log_id(candidate) for candidate in candidates if isinstance(candidate, Mapping)]
+    filtered_ids = {_candidate_log_id(candidate) for candidate in filtered_candidates if isinstance(candidate, Mapping)}
+    final_ids = {_candidate_log_id(candidate) for candidate in final_picks if isinstance(candidate, Mapping)}
     _log_json_event(
         logging.INFO,
         "intelligence_candidate_pipeline_summary",
@@ -5845,7 +5864,7 @@ def _log_candidate_pipeline(
     if not logger.isEnabledFor(logging.DEBUG):
         return
     for candidate in candidates:
-        if not isinstance(candidate, dict):
+        if not isinstance(candidate, Mapping):
             continue
         candidate_id = _candidate_log_id(candidate)
         selected = candidate_id in final_ids
@@ -5872,7 +5891,7 @@ def collect_candidates(overview: list[dict[str, Any]], preferences: dict[str, An
     candidates = _collect_candidates(overview, preferences)
     normalized_candidates = [normalize_candidate(candidate) for candidate in _enrich_candidates_with_odds_history(candidates, odds_history_by_sport)]
     classified_candidates = [classified for candidate in normalized_candidates if (classified := classify_candidate(candidate)) is not None]
-    return classified_candidates
+    return [candidate for candidate in (UniversalCandidate.from_raw(classified) for classified in classified_candidates) if candidate is not None]
 
 
 def score_candidate(
@@ -5969,7 +5988,7 @@ def rank_candidates(
     )
     if ranking_key is None:
         return ranked_candidates
-    custom_ranked = sorted([dict(candidate) for candidate in candidates if isinstance(candidate, dict)], key=ranking_key, reverse=True)
+    custom_ranked = sorted([dict(candidate) for candidate in candidates if isinstance(candidate, Mapping)], key=ranking_key, reverse=True)
     if limit is not None:
         return custom_ranked[: max(0, int(limit))]
     return custom_ranked

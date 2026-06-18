@@ -9,7 +9,7 @@ import time
 from collections import OrderedDict
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Mapping
 
 from flask import Flask
 from flask import current_app
@@ -261,7 +261,9 @@ class IntelligenceStateService:
     def _merge_candidate_pools(candidate_pools: dict[str, list[dict[str, Any]]]) -> list[dict[str, Any]]:
         merged: list[dict[str, Any]] = []
         for sport_candidates in candidate_pools.values():
-            merged.extend(dict(candidate) for candidate in sport_candidates if isinstance(candidate, dict))
+            for candidate in sport_candidates:
+                if isinstance(candidate, Mapping):
+                    merged.append(dict(candidate))
         return sorted(merged, key=lambda candidate: float(candidate.get("score") or 0.0), reverse=True)
 
     def _odds_history_roots_for_sport(self, sport_slug: str) -> list[Path]:
@@ -287,6 +289,19 @@ class IntelligenceStateService:
             if isinstance(value, dict) and isinstance(value.get("history"), list):
                 states[str(key)] = value
         return states
+
+    def _odds_history_payloads_by_sport(self, overview: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+        payloads: dict[str, dict[str, Any]] = {}
+        for sport in overview:
+            if not isinstance(sport, dict):
+                continue
+            slug = str(sport.get("slug") or "").strip().lower()
+            if not slug or slug in payloads:
+                continue
+            payload = self._load_odds_history_payload_for_sport(slug)
+            if isinstance(payload, dict):
+                payloads[slug] = payload
+        return payloads
 
     def _source_state_fingerprint_from_status(self, status: dict[str, Any], selected_date: str | None) -> str:
         refresh_status = status.get("refresh_status") if isinstance(status.get("refresh_status"), dict) else {}
@@ -515,6 +530,18 @@ class IntelligenceStateService:
             "implied_probability": candidate.get("implied_probability"),
         }
 
+    def _serialize_candidate(self, candidate: Any) -> dict[str, Any]:
+        if hasattr(candidate, "to_dict"):
+            try:
+                payload = candidate.to_dict()
+                if isinstance(payload, Mapping):
+                    return dict(payload)
+            except Exception:
+                pass
+        if isinstance(candidate, Mapping):
+            return dict(candidate)
+        return {}
+
     def _build_candidate_pool(self, selected_date: str | None, source_fingerprint: str) -> dict[str, Any]:
         cache_key = self._candidate_pool_key(selected_date, source_fingerprint)
         with self._condition:
@@ -560,13 +587,13 @@ class IntelligenceStateService:
                 odds_history_by_sport,
             )
 
-        raw_candidates = [candidate for candidate in raw_candidates if isinstance(candidate, dict)]
+        raw_candidates = [candidate for candidate in raw_candidates if isinstance(candidate, Mapping)]
         candidate_build_started_at = time.perf_counter()
         candidate_entries: list[dict[str, Any]] = []
         for candidate in raw_candidates:
-            if not isinstance(candidate, dict):
+            candidate_entry = self._serialize_candidate(candidate)
+            if not candidate_entry:
                 continue
-            candidate_entry = dict(candidate)
             _apply_candidate_tier_penalty(candidate_entry)
             candidate_entry["candidate_id"] = self._candidate_id(candidate_entry)
             candidate_entry["raw_inputs"] = self._candidate_raw_inputs(candidate_entry)
@@ -905,7 +932,7 @@ class IntelligenceStateService:
                 self._last_run_started_at = time.time()
 
             candidate_pool = self._build_candidate_pool(selected_date, source_fingerprint)
-            candidates = [dict(candidate) for candidate in candidate_pool.get("candidates") if isinstance(candidate, dict)]
+            candidates = [self._serialize_candidate(candidate) for candidate in candidate_pool.get("candidates") if isinstance(candidate, Mapping)]
 
             ranked_candidates = _profile_stage("candidate_scoring", rank_global_recommendations, candidates, limit=None)
             top_opportunities = ranked_candidates[: max(int(limit_value), 0)]
@@ -929,13 +956,13 @@ class IntelligenceStateService:
 
             analysis_recommendations = analysis.get("recommendations") if isinstance(analysis.get("recommendations"), list) else []
             if not any(isinstance(item, dict) for item in analysis_recommendations):
-                fallback_recommendations = [dict(item) for item in top_opportunities if isinstance(item, dict)]
+                fallback_recommendations = [self._serialize_candidate(item) for item in top_opportunities if isinstance(item, Mapping)]
                 if fallback_recommendations:
                     analysis["recommendations"] = fallback_recommendations
                     if not isinstance(analysis.get("picks"), list) or not analysis.get("picks"):
-                        analysis["picks"] = [dict(item) for item in fallback_recommendations]
+                        analysis["picks"] = [self._serialize_candidate(item) for item in fallback_recommendations]
                     if not isinstance(analysis.get("top_live_opportunities"), list) or not analysis.get("top_live_opportunities"):
-                        analysis["top_live_opportunities"] = [dict(item) for item in fallback_recommendations]
+                        analysis["top_live_opportunities"] = [self._serialize_candidate(item) for item in fallback_recommendations]
 
             response: dict[str, Any] = {
                 "ok": True,
