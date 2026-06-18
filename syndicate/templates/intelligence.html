@@ -1125,14 +1125,19 @@ function unwrapVersionedIntelligenceResponse(response) {
 function mergeVersionedIntelligenceResponse(response) {
   const versionedResponse = response && typeof response === "object" ? response : {};
   const baseResponse = unwrapVersionedIntelligenceResponse(versionedResponse.response || versionedResponse);
+  const surfacedCount = Array.isArray(baseResponse.top_opportunities)
+    ? baseResponse.top_opportunities.length
+    : Array.isArray(baseResponse.recommendations)
+      ? baseResponse.recommendations.length
+      : null;
   return {
     ...baseResponse,
     version: versionedResponse.version ?? baseResponse.version ?? null,
     timestamp: versionedResponse.timestamp ?? baseResponse.timestamp ?? null,
     response_hash: versionedResponse.response_hash ?? baseResponse.response_hash ?? null,
     debug_source: versionedResponse.debug_source ?? baseResponse.debug_source ?? null,
-    state_last_updated: versionedResponse.state_last_updated ?? baseResponse.state_last_updated ?? null,
-    candidate_count: versionedResponse.candidate_count ?? baseResponse.candidate_count ?? null,
+    state_last_updated: versionedResponse.state_last_updated ?? versionedResponse.timestamp ?? baseResponse.state_last_updated ?? null,
+    candidate_count: versionedResponse.candidate_count ?? surfacedCount ?? baseResponse.candidate_count ?? null,
   };
 }
 

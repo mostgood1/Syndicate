@@ -531,6 +531,12 @@ def _response_candidate_count(response_payload: dict[str, object] | None) -> int
     candidates = candidate_pool.get("candidates") if isinstance(candidate_pool, dict) else current.get("candidates")
     if isinstance(candidates, list):
         return len(candidates)
+    top_opportunities = current.get("top_opportunities") if isinstance(current.get("top_opportunities"), list) else []
+    if isinstance(top_opportunities, list) and top_opportunities:
+        return len(top_opportunities)
+    recommendations = current.get("recommendations") if isinstance(current.get("recommendations"), list) else []
+    if isinstance(recommendations, list) and recommendations:
+        return len(recommendations)
     return 0
 
 
