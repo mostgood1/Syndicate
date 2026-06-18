@@ -420,6 +420,34 @@ class IntelligenceStateTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         mocked_queue.assert_called_once()
 
+    def test_intelligence_home_forces_state_reload_before_cache_selection(self) -> None:
+        app = create_app()
+        app.testing = True
+
+        expected_payload = {
+            "question": "top edges today",
+            "date": "2026-06-17",
+            "mode": "recommendation",
+            "sport": "all",
+            "game_state": "all",
+            "timing": "all",
+            "limit": 5,
+            "include_props": True,
+            "include_games": True,
+            "force_refresh": True,
+        }
+
+        with app.test_client() as client:
+            with patch("syndicate.blueprints.intelligence.read_latest_intelligence_board_snapshot_response", return_value=None) as mocked_board_snapshot:
+                with patch("syndicate.blueprints.intelligence.read_latest_intelligence_state_response", return_value=None) as mocked_state_response:
+                    with patch("syndicate.blueprints.intelligence.queue_intelligence_state_refresh") as mocked_queue:
+                        response = client.get("/intelligence?date=2026-06-17")
+
+        self.assertEqual(response.status_code, 200)
+        mocked_board_snapshot.assert_called_once_with(expected_payload, force_refresh=True)
+        mocked_state_response.assert_called_once_with(expected_payload, force_refresh=True)
+        mocked_queue.assert_called_once()
+
     def test_intelligence_home_suppresses_live_snapshot_missing_hydration(self) -> None:
         app = create_app()
         app.testing = True
@@ -643,6 +671,42 @@ class IntelligenceStateTests(unittest.TestCase):
         self.assertEqual(payload["state_last_updated"], "2026-06-11T16:05:00Z")
         self.assertEqual(payload["candidate_count"], 1)
         self.assertEqual(payload["debug_source"], "worker")
+        self.assertEqual(response.headers.get("Cache-Control"), "no-cache, no-store, must-revalidate")
+        self.assertEqual(response.headers.get("Pragma"), "no-cache")
+        self.assertEqual(response.headers.get("Expires"), "0")
+
+    def test_status_endpoint_forces_state_snapshot_reload(self) -> None:
+        app = Flask(__name__)
+        app.register_blueprint(intelligence_bp)
+
+        state_response = {
+            "ok": True,
+            "last_updated": "2026-06-11T16:05:00Z",
+            "candidate_pool": {"candidates": [{"name": "Play 1"}]},
+        }
+
+        expected_payload = {
+            "question": "top edges today",
+            "date": "2026-06-10",
+            "mode": "recommendation",
+            "sport": "all",
+            "game_state": "all",
+            "timing": "all",
+            "limit": 5,
+            "include_props": True,
+            "include_games": True,
+            "force_refresh": True,
+        }
+
+        with app.test_request_context("/api/intelligence/status?date=2026-06-10", method="GET"):
+            with patch("syndicate.blueprints.intelligence.build_intelligence_status", return_value={"ok": True, "threadAlive": True}):
+                with patch("syndicate.blueprints.intelligence.read_latest_intelligence_state_response", return_value=dict(state_response)) as mocked_state_response:
+                    response = intelligence_status_api()
+
+        payload = response.get_json()
+        self.assertIsNotNone(payload)
+        self.assertEqual(payload["debug_source"], "worker")
+        mocked_state_response.assert_called_once_with(expected_payload, force_refresh=True)
         self.assertEqual(response.headers.get("Cache-Control"), "no-cache, no-store, must-revalidate")
         self.assertEqual(response.headers.get("Pragma"), "no-cache")
         self.assertEqual(response.headers.get("Expires"), "0")

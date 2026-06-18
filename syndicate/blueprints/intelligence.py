@@ -447,11 +447,11 @@ def _response_needs_refresh(request_payload: dict[str, object], response_payload
     return _board_response_needs_refresh(request_payload, response_payload)
 
 
-def _cached_intelligence_response_with_source(payload: dict[str, object]) -> tuple[dict[str, object] | None, str]:
-    board_snapshot_response = read_latest_intelligence_board_snapshot_response(payload, force_refresh=False)
+def _cached_intelligence_response_with_source(payload: dict[str, object], *, force_refresh: bool = True) -> tuple[dict[str, object] | None, str]:
+    board_snapshot_response = read_latest_intelligence_board_snapshot_response(payload, force_refresh=force_refresh)
     if _is_board_response(board_snapshot_response) and not _response_needs_refresh(payload, board_snapshot_response):
         return _hydrate_board_response_payload(board_snapshot_response), "board_snapshot"
-    cached_response = read_latest_intelligence_state_response(payload, force_refresh=False)
+    cached_response = read_latest_intelligence_state_response(payload, force_refresh=force_refresh)
     if _is_board_response(cached_response) and not _response_needs_refresh(payload, cached_response):
         return _hydrate_board_response_payload(cached_response), "worker"
     return None, "fallback"
@@ -620,7 +620,7 @@ def _load_status_response_cache_state() -> dict[str, object] | None:
 
 def _status_source_fingerprint(selected_date: str) -> str:
     try:
-        worker_state = intelligence_state_status(force_refresh=False)
+        worker_state = intelligence_state_status(force_refresh=True)
     except Exception:
         worker_state = {}
     if isinstance(worker_state, dict):
@@ -1081,7 +1081,7 @@ def intelligence_status_api():
         _log_api_state_read(status if isinstance(status, dict) else {})
     except Exception as exc:
         return _api_error_response(exc)
-    state_snapshot = read_latest_intelligence_state_response(_intelligence_page_payload(selected_date), force_refresh=False)
+    state_snapshot = read_latest_intelligence_state_response(_intelligence_page_payload(selected_date), force_refresh=True)
     debug_source = "worker" if isinstance(state_snapshot, dict) else "fallback"
     response_payload = {"ok": True, "status": status}
     if isinstance(status, dict):
