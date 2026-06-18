@@ -3303,7 +3303,7 @@ def _load_home_live_prop_items(
         if slug == "mlb":
             from syndicate.features.mlb.live_lens import build_live_lens_page_context
 
-            live_games = list(build_live_lens_page_context(context_label).get("games") or [])
+            live_games = list(build_live_lens_page_context(context_label, persist=True).get("games") or [])
             live_games = [game for game in live_games if isinstance(game, dict)]
             if not live_games:
                 return []
