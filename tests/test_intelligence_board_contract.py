@@ -6,6 +6,7 @@ from unittest.mock import patch
 from syndicate.features.intelligence_board import build_intelligence_board_contract
 from syndicate.features.intelligence import collect_all_recommendations
 from syndicate.features.intelligence import run_intelligence_query
+from syndicate.blueprints.intelligence import _hydrate_board_response_payload
 
 
 def _sample_overview() -> list[dict[str, object]]:
@@ -152,6 +153,39 @@ class IntelligenceBoardContractTests(unittest.TestCase):
         self.assertEqual(contract["lane_counts"]["pregame"], 1)
         self.assertEqual(contract["cards"][0]["team"], "Las Vegas Aces")
         self.assertEqual(contract["cards"][1]["team"], "Boston Celtics")
+
+    def test_hydrate_board_response_payload_promotes_nested_recommendations(self) -> None:
+        payload = _hydrate_board_response_payload(
+            {
+                "headline": "The Syndicate brief",
+                "top_opportunities": [],
+                "board_contract": {"schema": "intelligence_board_v1", "lane_counts": {"live": 0, "pregame": 5, "archived": 0}},
+                "response": {
+                    "headline": "The Syndicate brief",
+                    "recommendations": [
+                        {
+                            "sport": "mlb",
+                            "team": "Tampa Bay Rays",
+                            "name": "Tobias Myers",
+                            "market": "outs recorded",
+                            "line": 7.5,
+                            "is_live": False,
+                        }
+                    ],
+                    "parlays": [
+                        {
+                            "legs": [],
+                            "combined_edge": 0.08,
+                        }
+                    ],
+                },
+            }
+        )
+
+        self.assertEqual(len(payload.get("top_opportunities") or []), 1)
+        self.assertEqual((payload.get("top_opportunities") or [])[0].get("name"), "Tobias Myers")
+        self.assertEqual(len(payload.get("recommendations") or []), 1)
+        self.assertEqual(len(payload.get("parlays") or []), 1)
 
     def test_run_intelligence_query_emits_board_contract(self) -> None:
         with patch("syndicate.features.intelligence.build_intelligence_overview", return_value=_sample_overview()):

@@ -450,16 +450,79 @@ def _response_needs_refresh(request_payload: dict[str, object], response_payload
 def _cached_intelligence_response_with_source(payload: dict[str, object]) -> tuple[dict[str, object] | None, str]:
     board_snapshot_response = read_latest_intelligence_board_snapshot_response(payload, force_refresh=False)
     if _is_board_response(board_snapshot_response) and not _response_needs_refresh(payload, board_snapshot_response):
-        return dict(board_snapshot_response or {}), "board_snapshot"
+        return _hydrate_board_response_payload(board_snapshot_response), "board_snapshot"
     cached_response = read_latest_intelligence_state_response(payload, force_refresh=False)
     if _is_board_response(cached_response) and not _response_needs_refresh(payload, cached_response):
-        return dict(cached_response or {}), "worker"
+        return _hydrate_board_response_payload(cached_response), "worker"
     return None, "fallback"
 
 
 def _cached_intelligence_response(payload: dict[str, object]) -> dict[str, object] | None:
     cached_response, _ = _cached_intelligence_response_with_source(payload)
     return cached_response
+
+
+def _hydrate_board_response_payload(response_payload: dict[str, object] | None) -> dict[str, object]:
+    current = dict(response_payload or {})
+    nested = current.get("response") if isinstance(current.get("response"), dict) else {}
+    nested = dict(nested or {})
+
+    if not nested:
+        return current
+
+    def _copy_items(key: str) -> list[dict[str, object]]:
+        items = nested.get(key) if isinstance(nested.get(key), list) else []
+        return [dict(item) for item in items if isinstance(item, dict)]
+
+    if not isinstance(current.get("top_opportunities"), list) or not current.get("top_opportunities"):
+        nested_top = _copy_items("top_opportunities")
+        nested_recommendations = _copy_items("recommendations")
+        if nested_top:
+            current["top_opportunities"] = nested_top
+        elif nested_recommendations:
+            current["top_opportunities"] = nested_recommendations
+
+    if not isinstance(current.get("recommendations"), list) or not current.get("recommendations"):
+        nested_recommendations = _copy_items("recommendations")
+        if nested_recommendations:
+            current["recommendations"] = nested_recommendations
+
+    if not isinstance(current.get("top_live_opportunities"), list) or not current.get("top_live_opportunities"):
+        nested_live = _copy_items("top_live_opportunities")
+        if nested_live:
+            current["top_live_opportunities"] = nested_live
+
+    if not isinstance(current.get("parlays"), list) or not current.get("parlays"):
+        nested_parlays = _copy_items("parlays")
+        if nested_parlays:
+            current["parlays"] = nested_parlays
+
+    if not isinstance(current.get("portfolio"), dict) or not current.get("portfolio"):
+        nested_portfolio = nested.get("portfolio") if isinstance(nested.get("portfolio"), dict) else {}
+        if nested_portfolio:
+            current["portfolio"] = dict(nested_portfolio)
+
+    if not isinstance(current.get("recommendation_history"), dict) or not current.get("recommendation_history"):
+        nested_history = nested.get("recommendation_history") if isinstance(nested.get("recommendation_history"), dict) else {}
+        if nested_history:
+            current["recommendation_history"] = dict(nested_history)
+
+    if not isinstance(current.get("portfolio_tracking"), dict) or not current.get("portfolio_tracking"):
+        nested_tracking = nested.get("portfolio_tracking") if isinstance(nested.get("portfolio_tracking"), dict) else {}
+        if nested_tracking:
+            current["portfolio_tracking"] = dict(nested_tracking)
+
+    if not isinstance(current.get("portfolio_events"), dict) or not current.get("portfolio_events"):
+        nested_events = nested.get("portfolio_events") if isinstance(nested.get("portfolio_events"), dict) else {}
+        if nested_events:
+            current["portfolio_events"] = dict(nested_events)
+
+    if not isinstance(current.get("portfolio_event_records"), list) or not current.get("portfolio_event_records"):
+        nested_records = nested.get("portfolio_event_records") if isinstance(nested.get("portfolio_event_records"), list) else []
+        if nested_records:
+            current["portfolio_event_records"] = [dict(item) for item in nested_records if isinstance(item, dict)]
+
+    return current
 
 
 def _response_candidate_count(response_payload: dict[str, object] | None) -> int:
@@ -886,6 +949,8 @@ def intelligence_query_api():
                     "analysis": None,
                 }
             response_payload = _unwrap_response_payload(cached_response)
+
+        response_payload = _hydrate_board_response_payload(response_payload)
 
         if _response_needs_refresh(cache_payload, response_payload) and not bool(payload.get("background")):
             queue_intelligence_state_refresh(dict(payload))
