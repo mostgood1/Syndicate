@@ -18,6 +18,7 @@ from syndicate.features.intelligence import _build_parlays
 from syndicate.features.intelligence import _candidate_advanced_signal_score
 from syndicate.features.intelligence import _basketball_source_summary_score
 from syndicate.features.intelligence import _candidate_market_fit
+from syndicate.features.intelligence import collect_candidates
 from syndicate.features.intelligence import _latest_matching_path
 from syndicate.features.intelligence import _parlay_matches_preferences
 from syndicate.features.intelligence import _parlay_rank_score
@@ -859,6 +860,99 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertTrue(preferences.get("include_props"))
         self.assertFalse(preferences.get("include_games"))
         self.assertEqual(preferences.get("limit"), 7)
+
+    def test_query_preferences_keeps_mixed_timing_for_all_state_boards(self) -> None:
+        preferences = _query_preferences(
+            "What are the best edges for this board?",
+            timing="all",
+        )
+
+        self.assertFalse(preferences.get("live_only"))
+        self.assertFalse(preferences.get("pregame_only"))
+        self.assertTrue(preferences.get("include_props"))
+        self.assertTrue(preferences.get("include_games"))
+
+    def test_collect_candidates_excludes_fallback_props(self) -> None:
+        overview = [
+            {
+                "slug": "mlb",
+                "name": "MLB",
+                "context_label": "2026-06-04",
+                "data_health": "healthy",
+                "data_warnings": [],
+                "home_rails": {
+                    "pregame": {
+                        "title": "Pregame props",
+                        "items": [
+                            {
+                                "name": "Fallback MLB Prop",
+                                "market": "Hitter Total Bases",
+                                "pick": "Over 1.5",
+                                "matchup": "NYY at BOS",
+                                "projected": 1.9,
+                                "line": 1.5,
+                                "odds": "+115",
+                                "confidence": "58%",
+                                "edge": "+3.2%",
+                                "writeup": "Daily top props fallback",
+                                "detail": "Over 1.5 Hitter Total Bases | Daily top props fallback",
+                                "summary": "Daily top props fallback",
+                                "href": "/mlb/cards?date=2026-06-04",
+                            }
+                        ],
+                    },
+                    "live": {"title": "Top Live Props", "items": []},
+                    "compact": {"items": []},
+                },
+                "dashboard_games": [],
+            },
+            {
+                "slug": "wnba",
+                "name": "WNBA",
+                "context_label": "2026-06-04",
+                "data_health": "healthy",
+                "data_warnings": [],
+                "home_rails": {
+                    "pregame": {
+                        "title": "Pregame props",
+                        "items": [
+                            {
+                                "name": "A'ja Wilson Over 24.5",
+                                "market": "PTS",
+                                "pick": "Over 24.5",
+                                "matchup": "LVA at SEA",
+                                "projected": 28.1,
+                                "line": 24.5,
+                                "odds": "+102",
+                                "confidence": "63%",
+                                "edge": "+5.4%",
+                                "writeup": "Projection is clearing the number with stable volume.",
+                                "href": "/wnba/prop-ladders?date=2026-06-04",
+                            }
+                        ],
+                    },
+                    "live": {"title": "Top Live Props", "items": []},
+                    "compact": {"items": []},
+                },
+                "dashboard_games": [],
+            },
+        ]
+
+        preferences = _query_preferences(
+            "top edges today",
+            mode="recommendation",
+            sport="all",
+            timing="all",
+            include_props=True,
+            include_games=True,
+        )
+
+        candidates = collect_candidates(overview, preferences)
+
+        sport_slugs = {str(candidate.get("sport_slug") or "").lower() for candidate in candidates}
+        self.assertIn("wnba", sport_slugs)
+        self.assertNotIn("mlb", sport_slugs)
+        self.assertTrue(all("fallback" not in str(candidate.get("detail") or candidate.get("summary") or "").lower() for candidate in candidates))
 
     def test_run_intelligence_query_uses_question_date_when_date_not_passed(self) -> None:
         with patch("syndicate.features.intelligence.build_intelligence_overview", return_value=_sample_mlb_market_overview()) as build_overview:

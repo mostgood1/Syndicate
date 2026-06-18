@@ -4069,6 +4069,20 @@ def _candidate_matches_requested_markets(candidate: dict[str, Any], preferences:
     return bool(_candidate_market_focuses(candidate) & set(requested_markets))
 
 
+def _candidate_is_source_backed(candidate: dict[str, Any]) -> bool:
+    source_text = " ".join(
+        _safe_text(candidate.get(field), "")
+        for field in ("writeup", "detail", "summary", "state_note", "surface_title", "surface_key")
+    ).strip().lower()
+    if not source_text:
+        return False
+    if "fallback" in source_text:
+        return False
+    if _safe_text(candidate.get("candidate_type"), "candidate") == "game":
+        return bool(source_text or candidate.get("game_pk") or candidate.get("event_id") or candidate.get("matchup"))
+    return True
+
+
 def _collect_candidates(overview: list[dict[str, Any]], preferences: dict[str, Any]) -> list[dict[str, Any]]:
     candidates: list[dict[str, Any]] = []
     question_text = _safe_text(preferences.get("question"), "").lower()
@@ -4137,6 +4151,7 @@ def _collect_candidates(overview: list[dict[str, Any]], preferences: dict[str, A
     candidates = [
         row for row in candidates if _american_odds_match(_american_odds_value(row.get("odds")), preferences)
     ]
+    candidates = [row for row in candidates if _candidate_is_source_backed(row)]
 
     deduped: list[dict[str, Any]] = []
     seen: set[tuple[str, str, str, str, str]] = set()
@@ -5817,7 +5832,7 @@ def collect_all_recommendations(*, selected_date: str | None = None, force_refre
         "top edges today",
         mode="recommendation",
         sport="all",
-        timing="live",
+        timing="all",
         include_props=True,
         include_games=True,
     )
