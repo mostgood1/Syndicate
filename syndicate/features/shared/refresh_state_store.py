@@ -97,6 +97,8 @@ def reports_root() -> Path:
     if override:
         return Path(override).expanduser().resolve()
     if _strict_hosted_storage_enabled():
+        if str(os.environ.get("RENDER") or "").strip().lower() in {"1", "true", "yes", "on"}:
+            return REPORTS_ROOT
         raise RuntimeError("SYNDICATE_REPORTS_ROOT or SYNDICATE_STATE_ROOT must be set when hosted storage is required.")
     return REPORTS_ROOT
 

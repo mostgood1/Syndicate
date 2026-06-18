@@ -33,9 +33,12 @@ def preferred_source_roots(
         local_mirror = (repo_root / "data" / local_dir_name).resolve()
         candidates.append(local_mirror)
     elif not candidates:
-        raise RuntimeError(
-            f"SYNDICATE_DATA_ROOT must be set when strict hosted storage is enabled for {local_dir_name}."
-        )
+        if str(os.environ.get("RENDER") or "").strip().lower() in {"1", "true", "yes", "on"}:
+            candidates.append((repo_root / "data" / local_dir_name).resolve())
+        else:
+            raise RuntimeError(
+                f"SYNDICATE_DATA_ROOT must be set when strict hosted storage is enabled for {local_dir_name}."
+            )
 
     deduped: list[Path] = []
     seen: set[Path] = set()
@@ -81,8 +84,13 @@ def preferred_artifact_roots(
         _append_root(local_mirror / "source_artifacts")
         _append_root(local_mirror)
     elif not candidates:
-        raise RuntimeError(
-            f"SYNDICATE_DATA_ROOT must be set when strict hosted storage is enabled for {local_dir_name}."
-        )
+        if str(os.environ.get("RENDER") or "").strip().lower() in {"1", "true", "yes", "on"}:
+            local_mirror = (repo_root / "data" / local_dir_name).resolve()
+            _append_root(local_mirror / "source_artifacts")
+            _append_root(local_mirror)
+        else:
+            raise RuntimeError(
+                f"SYNDICATE_DATA_ROOT must be set when strict hosted storage is enabled for {local_dir_name}."
+            )
 
     return candidates

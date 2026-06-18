@@ -60,6 +60,17 @@ class RefreshStateStoreTests(unittest.TestCase):
                 with self.assertRaises(RuntimeError):
                     preferred_artifact_roots(probe_file, env_var="SYNDICATE_ARTIFACT_ROOT_NBA", local_dir_name="nba_source")
 
+    def test_render_hosted_reports_root_falls_back_to_repo_reports(self) -> None:
+        with patch.dict(
+            os.environ,
+            {
+                "RENDER": "1",
+                "SYNDICATE_REQUIRE_HOSTED_STORAGE": "true",
+            },
+            clear=False,
+        ):
+            self.assertEqual(refresh_state_store.reports_root(), refresh_state_store.REPORTS_ROOT)
+
     def test_keyvalue_backend_round_trips_json_and_text_by_path(self) -> None:
         fake_client = _FakeKeyValueClient()
         with TemporaryDirectory() as tmp_dir, patch.dict(

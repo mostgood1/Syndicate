@@ -217,6 +217,38 @@ def _response_has_content(payload: dict[str, object] | None) -> bool:
     return False
 
 
+def _status_candidate_count_from_response(payload: dict[str, object] | None) -> int:
+    current = dict(payload or {})
+    board_candidate_count = current.get("candidate_count")
+    if isinstance(board_candidate_count, int) and board_candidate_count >= 0:
+        return board_candidate_count
+
+    candidate_pool = current.get("candidate_pool") if isinstance(current.get("candidate_pool"), dict) else None
+    if isinstance(candidate_pool, dict):
+        candidate_count = candidate_pool.get("candidate_count")
+        if isinstance(candidate_count, int) and candidate_count >= 0:
+            return candidate_count
+        candidates = candidate_pool.get("candidates")
+        if isinstance(candidates, list):
+            return len([candidate for candidate in candidates if isinstance(candidate, dict)])
+
+    candidates = current.get("candidates")
+    if isinstance(candidates, list):
+        return len([candidate for candidate in candidates if isinstance(candidate, dict)])
+
+    top_opportunities = current.get("top_opportunities")
+    if isinstance(top_opportunities, list):
+        return len([opportunity for opportunity in top_opportunities if isinstance(opportunity, dict)])
+
+    analysis = current.get("analysis") if isinstance(current.get("analysis"), dict) else None
+    if isinstance(analysis, dict):
+        recommendations = analysis.get("recommendations")
+        if isinstance(recommendations, list):
+            return len([recommendation for recommendation in recommendations if isinstance(recommendation, dict)])
+
+    return 0
+
+
 def _response_contains_unhydrated_live_items(payload: dict[str, object] | None) -> bool:
     current = dict(payload or {})
     sources: list[dict[str, object]] = []
@@ -1023,25 +1055,36 @@ def intelligence_status_api():
         force_refresh = str(request.args.get("refresh") or request.args.get("force_refresh") or "").strip().lower() in {"1", "true", "yes", "on"}
         status = _cached_intelligence_status(selected_date, force_refresh=force_refresh)
         _log_api_state_read(status if isinstance(status, dict) else {})
+        state_snapshot: dict[str, Any] | None = None
+        debug_source = "worker"
+        if _render_hosted_request():
+            cached_board_response, board_source = _cached_intelligence_response_with_source(selected_date=selected_date, question=DEFAULT_QUESTION)
+            if _response_has_content(cached_board_response):
+                status["candidate_count"] = _status_candidate_count_from_response(cached_board_response)
+                status["debug_source"] = board_source
     except Exception as exc:
         return _api_error_response(exc)
     page_payload = _intelligence_page_payload(selected_date)
-    if _render_hosted_request():
-        state_snapshot, debug_source = _cached_intelligence_response_with_source(page_payload)
-        if state_snapshot is None or not _response_has_content(state_snapshot) or _response_needs_refresh(page_payload, state_snapshot):
-            computed_state = compute_intelligence_state_response(dict(page_payload))
-            if isinstance(computed_state, dict):
-                state_snapshot = computed_state
-                debug_source = "render_compute"
-        if not isinstance(state_snapshot, dict):
+    if state_snapshot is None:
+        if _render_hosted_request():
+            state_snapshot, debug_source = _cached_intelligence_response_with_source(page_payload)
+            if state_snapshot is None or not _response_has_content(state_snapshot) or _response_needs_refresh(page_payload, state_snapshot):
+                computed_state = compute_intelligence_state_response(dict(page_payload))
+                if isinstance(computed_state, dict):
+                    state_snapshot = computed_state
+                    debug_source = "render_compute"
+            if not isinstance(state_snapshot, dict):
+                state_snapshot = read_latest_intelligence_state_response(page_payload, force_refresh=True)
+                if isinstance(state_snapshot, dict):
+                    debug_source = "worker"
+            if not debug_source:
+                debug_source = "worker" if isinstance(state_snapshot, dict) else "fallback"
+        else:
             state_snapshot = read_latest_intelligence_state_response(page_payload, force_refresh=True)
-            if isinstance(state_snapshot, dict):
-                debug_source = "worker"
-        if not debug_source:
             debug_source = "worker" if isinstance(state_snapshot, dict) else "fallback"
-    else:
-        state_snapshot = read_latest_intelligence_state_response(page_payload, force_refresh=True)
-        debug_source = "worker" if isinstance(state_snapshot, dict) else "fallback"
+    if isinstance(state_snapshot, dict) and _response_has_content(state_snapshot):
+        status["candidate_count"] = _status_candidate_count_from_response(state_snapshot)
+        status["debug_source"] = debug_source
     response_payload = {"ok": True, "status": status}
     if isinstance(status, dict):
         for key, value in status.items():

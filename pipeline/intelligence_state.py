@@ -719,11 +719,25 @@ class IntelligenceStateService:
     def read_latest_response(self, payload: dict[str, Any] | None = None, *, force_refresh: bool = True) -> dict[str, Any] | None:
         normalized_payload = self._normalize_payload(payload or self._default_payload())
         key = _payload_key(normalized_payload)
+        requested_date = _selected_date_from_payload(normalized_payload)
         with self._lock:
+            snapshot = self._snapshots.get(key)
+            if snapshot is not None:
+                return dict(snapshot.response)
+            latest_snapshot = self._snapshots.get(self._latest_key or "") if self._latest_key else None
+            if latest_snapshot is not None:
+                latest_date = _selected_date_from_payload(latest_snapshot.payload)
+                if requested_date is None or latest_date is None or latest_date == requested_date:
+                    return dict(latest_snapshot.response)
             self._sync_persisted_state_locked(force=force_refresh)
             snapshot = self._snapshots.get(key)
-            if snapshot is not None and not self._is_stale(snapshot):
+            if snapshot is not None:
                 return dict(snapshot.response)
+            latest_snapshot = self._snapshots.get(self._latest_key or "") if self._latest_key else None
+            if latest_snapshot is not None:
+                latest_date = _selected_date_from_payload(latest_snapshot.payload)
+                if requested_date is None or latest_date is None or latest_date == requested_date:
+                    return dict(latest_snapshot.response)
             return None
 
     def queue_refresh(self, payload: dict[str, Any]) -> str:
