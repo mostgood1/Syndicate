@@ -471,6 +471,7 @@ let warmKickoffInFlight = false;
 let loadIntelligenceScheduled = false;
 let lastResponseTimestamp = null;
 let lastResponseHash = null;
+let lastWorkerStateUpdated = null;
 let hasRenderedIntelligence = false;
 let currentIntelligenceRequest = null;
 const initialIntelligenceResponseScript = document.getElementById("initial-intelligence-response");
@@ -1124,20 +1125,38 @@ function unwrapVersionedIntelligenceResponse(response) {
 
 function mergeVersionedIntelligenceResponse(response) {
   const versionedResponse = response && typeof response === "object" ? response : {};
-  const baseResponse = unwrapVersionedIntelligenceResponse(versionedResponse.response || versionedResponse);
-  const surfacedCount = Array.isArray(baseResponse.top_opportunities)
-    ? baseResponse.top_opportunities.length
-    : Array.isArray(baseResponse.recommendations)
-      ? baseResponse.recommendations.length
-      : null;
+  const boardResponse = versionedResponse.response && typeof versionedResponse.response === "object" ? versionedResponse.response : {};
+  const baseResponse = unwrapVersionedIntelligenceResponse(boardResponse.response || boardResponse);
+  const surfacedCount = Array.isArray(versionedResponse.top_opportunities)
+    ? versionedResponse.top_opportunities.length
+    : Array.isArray(versionedResponse.recommendations)
+      ? versionedResponse.recommendations.length
+      : Array.isArray(boardResponse.top_opportunities)
+        ? boardResponse.top_opportunities.length
+        : Array.isArray(boardResponse.recommendations)
+          ? boardResponse.recommendations.length
+          : Array.isArray(baseResponse.top_opportunities)
+            ? baseResponse.top_opportunities.length
+            : Array.isArray(baseResponse.recommendations)
+              ? baseResponse.recommendations.length
+              : null;
+  const stateLastUpdated = versionedResponse.state_last_updated
+    ?? versionedResponse.timestamp
+    ?? boardResponse.state_last_updated
+    ?? boardResponse.updated_at
+    ?? baseResponse.state_last_updated
+    ?? baseResponse.updated_at
+    ?? null;
   return {
+    ...versionedResponse,
+    ...boardResponse,
     ...baseResponse,
     version: versionedResponse.version ?? baseResponse.version ?? null,
     timestamp: versionedResponse.timestamp ?? baseResponse.timestamp ?? null,
     response_hash: versionedResponse.response_hash ?? baseResponse.response_hash ?? null,
     debug_source: versionedResponse.debug_source ?? baseResponse.debug_source ?? null,
-    state_last_updated: versionedResponse.state_last_updated ?? versionedResponse.timestamp ?? baseResponse.state_last_updated ?? null,
-    candidate_count: versionedResponse.candidate_count ?? surfacedCount ?? baseResponse.candidate_count ?? null,
+    state_last_updated: stateLastUpdated,
+    candidate_count: versionedResponse.candidate_count ?? surfacedCount ?? boardResponse.candidate_count ?? baseResponse.candidate_count ?? null,
   };
 }
 
@@ -2034,14 +2053,16 @@ async function loadIntelligence(options = {}) {
     const json = await res.json();
     const version = json.version ?? null;
     const responseHash = String(json.response_hash || "").trim() || null;
+    const workerStateUpdated = String(json.state_last_updated || json.response?.state_last_updated || json.response?.updated_at || json.timestamp || "").trim() || null;
 
     const hasFreshPayload = responseHash !== null
       ? responseHash !== lastResponseHash
       : version !== null
         ? version !== lastVersion
         : true;
+    const workerStateChanged = Boolean(workerStateUpdated && workerStateUpdated !== lastWorkerStateUpdated);
 
-    if (!hasFreshPayload && !Boolean(options.forceRefresh)) {
+    if (!hasFreshPayload && !workerStateChanged && !Boolean(options.forceRefresh)) {
       if (background) {
         setRefreshStatus(lastResponseTimestamp ? `Updated ${formatTimestamp(lastResponseTimestamp)}` : "Up to date", "idle");
       }
@@ -2051,6 +2072,9 @@ async function loadIntelligence(options = {}) {
     lastVersion = version;
     lastResponseHash = responseHash ?? lastResponseHash;
     lastResponseTimestamp = json.timestamp ?? lastResponseTimestamp;
+    if (workerStateUpdated) {
+      lastWorkerStateUpdated = workerStateUpdated;
+    }
 
     const response = mergeVersionedIntelligenceResponse(json);
     const data = normalizeIntelligenceResponse(response);
@@ -2108,6 +2132,7 @@ function scheduleIntelligencePolling() {
     lastVersion = initialIntelligenceResponse.version ?? lastVersion;
     lastResponseHash = String(initialIntelligenceResponse.response_hash || "").trim() || lastResponseHash;
     lastResponseTimestamp = initialIntelligenceResponse.timestamp ?? lastResponseTimestamp;
+    lastWorkerStateUpdated = String(initialIntelligenceResponse.state_last_updated || initialIntelligenceResponse.response?.state_last_updated || initialIntelligenceResponse.response?.updated_at || "").trim() || lastWorkerStateUpdated;
     renderIntelligence(mergeVersionedIntelligenceResponse(initialIntelligenceResponse));
     if (!hasVersionedInitialResponse) {
       void loadIntelligence({ forceRefresh: true });

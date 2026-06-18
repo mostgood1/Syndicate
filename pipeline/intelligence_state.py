@@ -875,7 +875,15 @@ class IntelligenceStateService:
                 "analysis": analysis,
                 "candidate_pool": candidate_pool,
             }
+            response_last_updated = _utc_now()
+            response_candidate_count = len(top_opportunities) if isinstance(top_opportunities, list) and top_opportunities else len(candidates)
+            response["state_last_updated"] = response_last_updated
+            response["last_updated"] = response_last_updated
+            response["candidate_count"] = response_candidate_count
             if analysis:
+                analysis["state_last_updated"] = response_last_updated
+                analysis["last_updated"] = response_last_updated
+                analysis["candidate_count"] = response_candidate_count
                 response["response"] = analysis
             response["board_contract"] = build_intelligence_board_contract(response)
             _log_stage_timing("response_building", (time.perf_counter() - response_build_started_at) * 1000.0)
