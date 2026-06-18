@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import time
 from datetime import datetime, timezone
 from typing import Any
@@ -89,6 +90,11 @@ def _no_cache_response(response):
     response.headers["Pragma"] = "no-cache"
     response.headers["Expires"] = "0"
     return response
+
+
+def _render_hosted_request() -> bool:
+    raw_value = str(os.environ.get("RENDER") or os.environ.get("SYNDICATE_REQUIRE_HOSTED_STORAGE") or "").strip().lower()
+    return raw_value in {"1", "true", "yes", "on"}
 
 
 def _query_bool(value: object) -> bool:
@@ -785,8 +791,12 @@ def intelligence_home():
     initial_response: dict[str, Any] = {}
     try:
         cached_response, _ = _cached_intelligence_response_with_source(payload)
-        if cached_response is not None and not _response_needs_refresh(payload, cached_response):
+        if cached_response is not None and _response_has_content(cached_response) and not _response_needs_refresh(payload, cached_response):
             initial_response = dict(cached_response)
+        elif _render_hosted_request():
+            computed_response = compute_intelligence_state_response(dict(payload))
+            if isinstance(computed_response, dict) and _is_board_response(computed_response):
+                initial_response = _hydrate_board_response_payload(computed_response)
         else:
             queue_intelligence_state_refresh(dict(payload))
     except Exception:
@@ -1015,7 +1025,12 @@ def intelligence_status_api():
         _log_api_state_read(status if isinstance(status, dict) else {})
     except Exception as exc:
         return _api_error_response(exc)
-    state_snapshot = read_latest_intelligence_state_response(_intelligence_page_payload(selected_date), force_refresh=True)
+    page_payload = _intelligence_page_payload(selected_date)
+    state_snapshot = read_latest_intelligence_state_response(page_payload, force_refresh=True)
+    if _render_hosted_request() and (state_snapshot is None or not _response_has_content(state_snapshot) or _response_needs_refresh(page_payload, state_snapshot)):
+        computed_state = compute_intelligence_state_response(dict(page_payload))
+        if isinstance(computed_state, dict):
+            state_snapshot = computed_state
     debug_source = "worker" if isinstance(state_snapshot, dict) else "fallback"
     response_payload = {"ok": True, "status": status}
     if isinstance(status, dict):
