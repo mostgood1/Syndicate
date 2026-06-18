@@ -467,7 +467,6 @@
 {% block extra_scripts %}
 <script>
 let lastVersion = null;
-let warmKickoffInFlight = false;
 let loadIntelligenceScheduled = false;
 let lastResponseTimestamp = null;
 let lastResponseHash = null;
@@ -2000,22 +1999,6 @@ function renderIntelligence(response) {
   setRefreshStatus(lastResponseTimestamp ? `Updated ${formatTimestamp(lastResponseTimestamp)}` : "Updated", "idle");
 }
 
-function kickOffWarmQuery() {
-  if (warmKickoffInFlight) {
-    return;
-  }
-  warmKickoffInFlight = true;
-  setRefreshStatus("Refreshing odds/opportunities…", "refreshing");
-  void fetch("/api/intelligence/query/warm", {
-    method: "POST",
-    headers: {"Content-Type": "application/json"},
-    cache: "no-store",
-    body: JSON.stringify(intelligenceQueryPayload({ background: true, forceRefresh: false })),
-  }).catch(() => {}).finally(() => {
-    warmKickoffInFlight = false;
-  });
-}
-
 async function loadIntelligence(options = {}) {
   const background = Boolean(options.background);
   if (currentIntelligenceRequest) {
@@ -2089,7 +2072,6 @@ async function loadIntelligence(options = {}) {
 
     if (!response || Object.keys(response).length === 0 || !hasOpportunityData) {
       renderEmptyState();
-      kickOffWarmQuery();
       return;
     }
 
@@ -2144,7 +2126,6 @@ function scheduleIntelligencePolling() {
     void loadIntelligence();
   }
   window.setInterval(() => {
-    kickOffWarmQuery();
     void loadIntelligence({ background: true });
   }, 30000);
   window.addEventListener("focus", () => {

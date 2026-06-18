@@ -2,10 +2,8 @@ from __future__ import annotations
 
 import hashlib
 import json
-import threading
 import time
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Any
 
 from flask import Blueprint, jsonify, render_template, request
@@ -34,13 +32,7 @@ from syndicate.features.shared.ops_refresh import load_latest_refresh_status
 intelligence_bp = Blueprint("syndicate_intelligence", __name__)
 
 DEFAULT_QUESTION = "top edges today"
-_QUERY_RESPONSE_VERSION_PATH = Path(__file__).resolve().parents[2] / "reports" / "intelligence" / "query_response_version.json"
-_QUERY_RESPONSE_CACHE_PATH = Path(__file__).resolve().parents[2] / "reports" / "intelligence" / "query_response_cache.json"
-_STATUS_RESPONSE_CACHE_PATH = Path(__file__).resolve().parents[2] / "reports" / "intelligence" / "status_response_cache.json"
-_QUERY_RESPONSE_VERSION_LOCK = threading.Lock()
-_QUERY_RESPONSE_VERSION_STATE: dict[str, object] | None = None
 
-# ✅ GLOBAL CACHE
 LAST_RESULT = {
     "recommendations": [],
     "portfolio": {},
@@ -111,58 +103,14 @@ def _response_hash(payload: dict[str, object]) -> str:
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
-def _load_response_version_state() -> dict[str, object]:
-    global _QUERY_RESPONSE_VERSION_STATE
-    if _QUERY_RESPONSE_VERSION_STATE is not None:
-        return dict(_QUERY_RESPONSE_VERSION_STATE)
-    try:
-        if _QUERY_RESPONSE_VERSION_PATH.exists():
-            payload = json.loads(_QUERY_RESPONSE_VERSION_PATH.read_text(encoding="utf-8"))
-            if isinstance(payload, dict):
-                _QUERY_RESPONSE_VERSION_STATE = {
-                    "version": int(payload.get("version") or 0),
-                    "hash": str(payload.get("hash") or ""),
-                }
-            else:
-                _QUERY_RESPONSE_VERSION_STATE = {"version": 0, "hash": ""}
-        else:
-            _QUERY_RESPONSE_VERSION_STATE = {"version": 0, "hash": ""}
-    except Exception:
-        _QUERY_RESPONSE_VERSION_STATE = {"version": 0, "hash": ""}
-    return dict(_QUERY_RESPONSE_VERSION_STATE)
-
-
-def _store_response_version_state(state: dict[str, object]) -> None:
-    global _QUERY_RESPONSE_VERSION_STATE
-    _QUERY_RESPONSE_VERSION_STATE = {"version": int(state.get("version") or 0), "hash": str(state.get("hash") or "")}
-    try:
-        _QUERY_RESPONSE_VERSION_PATH.parent.mkdir(parents=True, exist_ok=True)
-        _QUERY_RESPONSE_VERSION_PATH.write_text(json.dumps(_QUERY_RESPONSE_VERSION_STATE, sort_keys=True), encoding="utf-8")
-    except Exception:
-        pass
-
-
 def _versioned_query_response(response_payload: dict[str, object]) -> dict[str, object]:
-    payload_for_hash = dict(response_payload)
-    payload_hash = _response_hash(payload_for_hash)
-    with _QUERY_RESPONSE_VERSION_LOCK:
-        state = _load_response_version_state()
-        version = int(state.get("version") or 0)
-        if payload_hash != str(state.get("hash") or ""):
-            version += 1
-            _store_response_version_state({"version": version, "hash": payload_hash})
-        else:
-            version = int(state.get("version") or version)
+    payload_hash = _response_hash(dict(response_payload))
     return {
-        "version": version,
+        "version": payload_hash,
         "timestamp": _server_timestamp(),
         "response_hash": payload_hash,
         "response": response_payload,
     }
-
-
-def _load_response_cache_state() -> dict[str, object] | None:
-    return None
 
 
 def _unwrap_response_payload(payload: dict[str, object] | None) -> dict[str, object]:
@@ -630,10 +578,6 @@ def _status_source_fingerprint(selected_date: str) -> str:
     return _response_hash({"selected_date": str(selected_date or "").strip()})
 
 
-def _store_status_response_cache_state(selected_date: str, status: dict[str, object], *, source_fingerprint: str) -> None:
-    return None
-
-
 def _cached_intelligence_status(selected_date: str, *, force_refresh: bool = False, cache_ttl_seconds: int = 60) -> dict[str, object]:
     return build_intelligence_status(selected_date=selected_date)
 
@@ -994,20 +938,10 @@ def intelligence_query_api():
         debug_source = cached_source if cached_response is not None else "fallback"
         versioned_response = _versioned_query_response(response)
         versioned_response.update(_debug_state_fields(response, source=debug_source))
-        if user_profile is None:
-            _store_response_cache_state(versioned_response)
         return _no_cache_response(jsonify(versioned_response))
     except Exception as exc:
         print("[QUERY ERROR]", exc)
         return {"error": str(exc), "fallback": True}, 200
-
-
-@intelligence_bp.post("/api/intelligence/query/warm")
-def intelligence_query_warm_api():
-    payload = request.get_json(silent=True) or {}
-    payload = _normalize_default_query_payload(payload)
-    queue_intelligence_state_refresh(dict(payload))
-    return jsonify({"ok": True, "queued": True})
 
 
 @intelligence_bp.post("/api/intelligence/portfolio-event")

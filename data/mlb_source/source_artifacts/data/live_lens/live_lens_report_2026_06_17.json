@@ -1,6 +1,6 @@
 {
   "date": "2026-06-17",
-  "generatedAt": "2026-06-17T21:34:23-05:00",
+  "generatedAt": "2026-06-17T21:48:14-05:00",
   "dataRoot": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\source_artifacts\\data",
   "liveLensDir": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\live_lens",
   "optimizationRegime": {
@@ -25,536 +25,17 @@
   "performance": {
     "marketsRefreshed": false,
     "marketRefreshMs": 0.0,
-    "totalMs": 4005.1,
-    "snapshotLoadMs": 4.0,
-    "simContextLoadMs": 1.5,
-    "propEvalMs": 3.1,
+    "totalMs": 1170.4,
+    "snapshotLoadMs": 3.4,
+    "simContextLoadMs": 1.4,
+    "propEvalMs": 3.8,
     "gameLensMs": 0.8,
     "gameCount": 15,
-    "liveGameCount": 3,
+    "liveGameCount": 2,
     "feedFetchCount": 15,
     "persistMs": 0.0
   },
   "games": [
-    {
-      "archivedLiveProps": [],
-      "gameLens": [
-        {
-          "key": "first1",
-          "label": "F1",
-          "closed": false,
-          "badge": "No bet",
-          "score": "COL 0 - CHC 0",
-          "subtitle": "COL 0.36 - CHC 0.33 | Total 0.7",
-          "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
-          "projection": {
-            "total": 0.7,
-            "homeMargin": -0.03
-          },
-          "markets": {
-            "moneyline": {
-              "pick": null,
-              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
-            },
-            "spread": {
-              "pick": null,
-              "homeLine": -0.03,
-              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
-            },
-            "total": {
-              "pick": null,
-              "line": 0.7,
-              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
-            }
-          }
-        },
-        {
-          "key": "first3",
-          "label": "F3",
-          "closed": false,
-          "badge": "No bet",
-          "score": "COL 0 - CHC 0",
-          "subtitle": "COL 1.05 - CHC 1.01 | Total 2.06",
-          "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
-          "projection": {
-            "total": 2.06,
-            "homeMargin": -0.04
-          },
-          "markets": {
-            "moneyline": {
-              "pick": null,
-              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
-            },
-            "spread": {
-              "pick": null,
-              "homeLine": -0.04,
-              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
-            },
-            "total": {
-              "pick": null,
-              "line": 2.06,
-              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
-            }
-          }
-        },
-        {
-          "key": "first5",
-          "label": "F5",
-          "closed": false,
-          "badge": "No bet",
-          "score": "COL 0 - CHC 0",
-          "subtitle": "COL 1.84 - CHC 1.72 | Total 3.56",
-          "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
-          "projection": {
-            "total": 3.56,
-            "homeMargin": -0.12
-          },
-          "markets": {
-            "moneyline": {
-              "pick": null,
-              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
-            },
-            "spread": {
-              "pick": null,
-              "homeLine": -0.12,
-              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
-            },
-            "total": {
-              "pick": null,
-              "line": 3.56,
-              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
-            }
-          }
-        },
-        {
-          "key": "first5",
-          "label": "Full game",
-          "closed": false,
-          "badge": "No bet",
-          "score": "COL 0 - CHC 0",
-          "subtitle": "COL 3.64 - CHC 3.32 | Total 6.96",
-          "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
-          "projection": {
-            "total": 6.96,
-            "homeMargin": -0.32
-          },
-          "markets": {
-            "moneyline": {
-              "pick": null,
-              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
-            },
-            "spread": {
-              "pick": null,
-              "homeLine": -0.32,
-              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
-            },
-            "total": {
-              "pick": null,
-              "line": 6.96,
-              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
-            }
-          }
-        },
-        {
-          "key": "first1",
-          "label": "First 1",
-          "closed": false,
-          "badge": "",
-          "score": "COL 19.2% | CHC 17.3% | Tie 63.5%",
-          "subtitle": "COL 19.2% | CHC 17.3% | Tie 63.5%",
-          "reason": "COL 19.2% | CHC 17.3% | Tie 63.5%",
-          "projection": {
-            "total": 19.2,
-            "homeMargin": 17.3
-          },
-          "markets": {
-            "moneyline": {},
-            "spread": {},
-            "total": {
-              "pick": null,
-              "line": 19.2,
-              "reason": "COL 19.2% | CHC 17.3% | Tie 63.5%"
-            }
-          }
-        },
-        {
-          "key": "first3",
-          "label": "First 3",
-          "closed": false,
-          "badge": "",
-          "score": "COL 33.1% | CHC 32.7% | Tie 34.2%",
-          "subtitle": "COL 33.1% | CHC 32.7% | Tie 34.2%",
-          "reason": "COL 33.1% | CHC 32.7% | Tie 34.2%",
-          "projection": {
-            "total": 33.1,
-            "homeMargin": 32.7
-          },
-          "markets": {
-            "moneyline": {},
-            "spread": {},
-            "total": {
-              "pick": null,
-              "line": 33.1,
-              "reason": "COL 33.1% | CHC 32.7% | Tie 34.2%"
-            }
-          }
-        },
-        {
-          "key": "first5",
-          "label": "First 5",
-          "closed": false,
-          "badge": "",
-          "score": "COL 41.7% | CHC 37.4% | Tie 20.9%",
-          "subtitle": "COL 41.7% | CHC 37.4% | Tie 20.9%",
-          "reason": "COL 41.7% | CHC 37.4% | Tie 20.9%",
-          "projection": {
-            "total": 41.7,
-            "homeMargin": 37.4
-          },
-          "markets": {
-            "moneyline": {},
-            "spread": {},
-            "total": {
-              "pick": null,
-              "line": 41.7,
-              "reason": "COL 41.7% | CHC 37.4% | Tie 20.9%"
-            }
-          }
-        },
-        {
-          "key": "full",
-          "label": "Full game",
-          "closed": false,
-          "badge": "",
-          "score": "COL 51.2% | CHC 48.8% | Tie 0.0%",
-          "subtitle": "COL 51.2% | CHC 48.8% | Tie 0.0%",
-          "reason": "COL 51.2% | CHC 48.8% | Tie 0.0%",
-          "projection": {
-            "total": 51.2,
-            "homeMargin": 48.8
-          },
-          "markets": {
-            "moneyline": {},
-            "spread": {},
-            "total": {
-              "pick": null,
-              "line": 51.2,
-              "reason": "COL 51.2% | CHC 48.8% | Tie 0.0%"
-            }
-          }
-        }
-      ],
-      "gameMarkets": {
-        "moneyline": {},
-        "spread": {},
-        "total": {
-          "pick": null,
-          "line": 51.2,
-          "reason": "COL 51.2% | CHC 48.8% | Tie 0.0%"
-        }
-      },
-      "markets": {
-        "moneyline": {},
-        "spread": {},
-        "total": {
-          "pick": null,
-          "line": 51.2,
-          "reason": "COL 51.2% | CHC 48.8% | Tie 0.0%"
-        }
-      },
-      "gamePk": 824668,
-      "prop_groups": [],
-      "prop_lens": {},
-      "market_tiles": [
-        {
-          "label": "Game total",
-          "title": "No total play",
-          "sub": "Off card"
-        },
-        {
-          "label": "Moneyline",
-          "title": "No ML play",
-          "sub": "Off card"
-        },
-        {
-          "label": "Pitcher props",
-          "title": "Sean Sullivan Over 3.5 Strikeouts",
-          "sub": "Playable only | -125"
-        },
-        {
-          "label": "Hitter props",
-          "title": "Nico Hoerner Under 1.5 Batter Total Bases",
-          "sub": "-120"
-        }
-      ],
-      "liveProps": [],
-      "matchup": {
-        "away": {
-          "abbr": "COL",
-          "id": 115,
-          "logo": "https://www.mlbstatic.com/team-logos/115.svg",
-          "name": "Colorado Rockies"
-        },
-        "home": {
-          "abbr": "CHC",
-          "id": 112,
-          "logo": "https://www.mlbstatic.com/team-logos/112.svg",
-          "name": "Chicago Cubs"
-        },
-        "score": {
-          "away": 0,
-          "home": 0
-        },
-        "liveText": "Sean Sullivan vs Javier Assad | 1 official pick(s) | +3 playable"
-      },
-      "predictions": {
-        "first1": {
-          "away_runs_mean": 0.35,
-          "home_runs_mean": 0.348,
-          "away_win_prob": 0.178,
-          "home_win_prob": 0.165,
-          "tie_prob": 0.657
-        },
-        "first3": {
-          "away_runs_mean": 1.064,
-          "home_runs_mean": 1.065,
-          "away_win_prob": 0.329,
-          "home_win_prob": 0.32,
-          "tie_prob": 0.351
-        },
-        "first5": {
-          "away_runs_mean": 1.721,
-          "home_runs_mean": 1.765,
-          "away_win_prob": 0.382,
-          "home_win_prob": 0.387,
-          "tie_prob": 0.231
-        },
-        "full": {
-          "away_runs_mean": 3.411,
-          "home_runs_mean": 3.454,
-          "away_win_prob": 0.474,
-          "home_win_prob": 0.526,
-          "tie_prob": 0.0
-        }
-      },
-      "props": [],
-      "simContextAvailable": false,
-      "snapshotAvailable": true,
-      "startTime": "7:05 PM",
-      "trackedProps": [],
-      "probable": {
-        "away": {
-          "id": 807743,
-          "fullName": "Sean Sullivan",
-          "ladderBadges": [
-            {
-              "label": "K up to 4",
-              "stat": "strikeouts",
-              "target": 4,
-              "targets": [
-                4
-              ],
-              "tone": "solid",
-              "detail": "Supported ladders: 4/5/6 Last supported rung: 6 Supported ladders: 4 Last supported rung: 4",
-              "hitProb": 0.321
-            },
-            {
-              "label": "H up to 5",
-              "stat": "hits_allowed",
-              "target": 5,
-              "targets": [
-                5
-              ],
-              "tone": "solid",
-              "detail": "Supported ladders: 5/6/7 Last supported rung: 7 Supported ladders: 5 Last supported rung: 5",
-              "hitProb": 0.298
-            }
-          ],
-          "pregameLadderBadges": [
-            {
-              "label": "K up to 4",
-              "stat": "strikeouts",
-              "target": 4,
-              "targets": [
-                4
-              ],
-              "tone": "solid",
-              "detail": "Supported ladders: 4/5/6 Last supported rung: 6 Supported ladders: 4 Last supported rung: 4",
-              "hitProb": 0.321
-            },
-            {
-              "label": "H up to 5",
-              "stat": "hits_allowed",
-              "target": 5,
-              "targets": [
-                5
-              ],
-              "tone": "solid",
-              "detail": "Supported ladders: 5/6/7 Last supported rung: 7 Supported ladders: 5 Last supported rung: 5",
-              "hitProb": 0.298
-            }
-          ]
-        },
-        "home": {
-          "id": null,
-          "fullName": "Javier Assad",
-          "ladderBadges": [
-            {
-              "label": "K up to 5",
-              "stat": "strikeouts",
-              "target": 5,
-              "targets": [
-                5
-              ],
-              "tone": "soft",
-              "detail": "Supported ladders: 5/6/7 Last supported rung: 7 Supported ladders: 5 Last supported rung: 5",
-              "hitProb": 0.247
-            },
-            {
-              "label": "H up to 6",
-              "stat": "hits_allowed",
-              "target": 6,
-              "targets": [
-                6
-              ],
-              "tone": "solid",
-              "detail": "Supported ladders: 6/7/8 Last supported rung: 8 Supported ladders: 6 Last supported rung: 6",
-              "hitProb": 0.286
-            },
-            {
-              "label": "BB up to 2",
-              "stat": "walks_allowed",
-              "target": 2,
-              "targets": [
-                2
-              ],
-              "tone": "soft",
-              "detail": "Supported ladders: 2/3 Last supported rung: 3 Supported ladders: 2 Last supported rung: 2",
-              "hitProb": 0.205
-            }
-          ],
-          "pregameLadderBadges": [
-            {
-              "label": "K up to 5",
-              "stat": "strikeouts",
-              "target": 5,
-              "targets": [
-                5
-              ],
-              "tone": "soft",
-              "detail": "Supported ladders: 5/6/7 Last supported rung: 7 Supported ladders: 5 Last supported rung: 5",
-              "hitProb": 0.247
-            },
-            {
-              "label": "H up to 6",
-              "stat": "hits_allowed",
-              "target": 6,
-              "targets": [
-                6
-              ],
-              "tone": "solid",
-              "detail": "Supported ladders: 6/7/8 Last supported rung: 8 Supported ladders: 6 Last supported rung: 6",
-              "hitProb": 0.286
-            },
-            {
-              "label": "BB up to 2",
-              "stat": "walks_allowed",
-              "target": 2,
-              "targets": [
-                2
-              ],
-              "tone": "soft",
-              "detail": "Supported ladders: 2/3 Last supported rung: 3 Supported ladders: 2 Last supported rung: 2",
-              "hitProb": 0.205
-            }
-          ]
-        }
-      },
-      "actual_box_panel": {},
-      "first1BetSignal": {
-        "label": "F1 NRFI",
-        "tone": "nrfi",
-        "summary": "0-run sim 64.0% | F1 mean 0.70",
-        "detail": "Season filter qualified: simulated scoreless first inning 64.0% with only 0.70 expected runs in the opening frame.",
-        "nrfiProb": 0.64,
-        "yrfiProb": 0.36,
-        "meanTotalRuns": 0.698,
-        "maxSideLeadProb": 0.178
-      },
-      "card_variant": "mlb_main",
-      "away": {
-        "abbr": "COL",
-        "name": "Colorado Rockies"
-      },
-      "home": {
-        "abbr": "CHC",
-        "name": "Chicago Cubs"
-      },
-      "status": {
-        "abstract": "Live",
-        "detailed": "In Progress"
-      },
-      "detail": "7:05 PM",
-      "summary": "Sean Sullivan vs Javier Assad | 1 official pick(s) | +3 playable",
-      "status_badge": "Live",
-      "hero_note": "0 live props | snapshot yes",
-      "metrics": [
-        {
-          "label": "Score",
-          "value": "0-0"
-        },
-        {
-          "label": "Full home",
-          "value": "-"
-        },
-        {
-          "label": "Live home",
-          "value": "-"
-        },
-        {
-          "label": "Open segments",
-          "value": "8"
-        },
-        {
-          "label": "Live props",
-          "value": "0"
-        },
-        {
-          "label": "Snapshot",
-          "value": "Yes"
-        }
-      ],
-      "panels": [
-        {
-          "eyebrow": "Live state",
-          "title": "Sean Sullivan vs Javier Assad | 1 official pick(s) | +3 playable",
-          "body": "Report snapshot generated at 2026-06-17T21:34:23-05:00. Current score is 0-0."
-        },
-        {
-          "eyebrow": "Segment looks",
-          "title": "Current segment board",
-          "body": "COL 51.2% | CHC 48.8% | Tie 0.0%",
-          "items": [
-            "Full game: projected total 51.2, home margin +48.8",
-            "F5: projected total 3.56, home margin -0.12",
-            "F3: projected total 2.06, home margin -0.04",
-            "F1: projected total 0.7, home margin -0.03"
-          ]
-        },
-        {
-          "eyebrow": "Top live props",
-          "title": "Best in-game prop edges",
-          "body": "These props are the highest-ranked live looks available in the selected report snapshot.",
-          "items": [
-            "No live props were surfaced for this game in the selected report."
-          ]
-        }
-      ],
-      "href": "/mlb/game/824668?date=2026-06-17",
-      "href_label": "Open game detail",
-      "oddsRefreshedAt": "2026-06-17T21:34:26-05:00",
-      "odds_refreshed_at": "2026-06-17T21:34:26-05:00"
-    },
     {
       "archivedLiveProps": [],
       "gameLens": [
@@ -937,6 +418,19 @@
           ],
           "miniLadderBadges": [
             {
+              "label": "O up to 17",
+              "stat": "outs",
+              "target": 17,
+              "targets": [
+                17
+              ],
+              "tone": "strong",
+              "detail": "Live projection 16.1. Current 12.0. Starter still active in live game state. Supported ladders: 17 Last supported rung: 17",
+              "hitProb": 0.832,
+              "source": "live",
+              "actual": 12.0
+            },
+            {
               "label": "H up to 5",
               "stat": "hits_allowed",
               "target": 5,
@@ -944,10 +438,10 @@
                 5
               ],
               "tone": "strong",
-              "detail": "Live projection 4.8. Current 1.0. Starter still active in live game state. Supported ladders: 5 Last supported rung: 5",
+              "detail": "Live projection 5.2. Current 3.0. Starter still active in live game state. Supported ladders: 5 Last supported rung: 5",
               "hitProb": 0.824,
               "source": "live",
-              "actual": 1.0
+              "actual": 3.0
             }
           ]
         },
@@ -1026,6 +520,19 @@
           ],
           "miniLadderBadges": [
             {
+              "label": "K up to 6",
+              "stat": "strikeouts",
+              "target": 6,
+              "targets": [
+                6
+              ],
+              "tone": "strong",
+              "detail": "Live projection 5.2. Current 5.0. Starter still active in live game state. Supported ladders: 6 Last supported rung: 6",
+              "hitProb": 0.458,
+              "source": "live",
+              "actual": 5.0
+            },
+            {
               "label": "O up to 18",
               "stat": "outs",
               "target": 18,
@@ -1033,10 +540,10 @@
                 18
               ],
               "tone": "strong",
-              "detail": "Live projection 17.3. Current 12.0. Starter still active in live game state. Supported ladders: 18 Last supported rung: 18",
+              "detail": "Live projection 17.5. Current 14.0. Starter still active in live game state. Supported ladders: 18 Last supported rung: 18",
               "hitProb": 0.806,
               "source": "live",
-              "actual": 12.0
+              "actual": 14.0
             },
             {
               "label": "H up to 6",
@@ -1047,23 +554,10 @@
                 6
               ],
               "tone": "strong",
-              "detail": "Live projection 6.1. Current 4.0. Starter still active in live game state. Supported ladders: 5/6 Last supported rung: 6",
+              "detail": "Live projection 5.8. Current 4.0. Starter still active in live game state. Supported ladders: 5/6 Last supported rung: 6",
               "hitProb": 0.733,
               "source": "live",
               "actual": 4.0
-            },
-            {
-              "label": "BB up to 2",
-              "stat": "walks_allowed",
-              "target": 2,
-              "targets": [
-                2
-              ],
-              "tone": "strong",
-              "detail": "Live projection 1.2. Current 0.0. Starter still active in live game state. Supported ladders: 2 Last supported rung: 2",
-              "hitProb": 0.583,
-              "source": "live",
-              "actual": 0.0
             }
           ]
         }
@@ -1117,7 +611,7 @@
         {
           "eyebrow": "Live state",
           "title": "Kyle Bradish vs George Kirby | +3 playable",
-          "body": "Report snapshot generated at 2026-06-17T21:34:23-05:00. Current score is 0-0."
+          "body": "Report snapshot generated at 2026-06-17T21:48:14-05:00. Current score is 0-0."
         },
         {
           "eyebrow": "Segment looks",
@@ -1141,8 +635,8 @@
       ],
       "href": "/mlb/game/823127?date=2026-06-17",
       "href_label": "Open game detail",
-      "oddsRefreshedAt": "2026-06-17T21:34:26-05:00",
-      "odds_refreshed_at": "2026-06-17T21:34:26-05:00"
+      "oddsRefreshedAt": "2026-06-17T21:48:17-05:00",
+      "odds_refreshed_at": "2026-06-17T21:48:17-05:00"
     },
     {
       "archivedLiveProps": [],
@@ -1533,23 +1027,10 @@
                 17
               ],
               "tone": "strong",
-              "detail": "Live projection 16.4. Current 7.0. Starter still active in live game state. Supported ladders: 17 Last supported rung: 17",
+              "detail": "Live projection 16.4. Current 9.0. Starter still active in live game state. Supported ladders: 17 Last supported rung: 17",
               "hitProb": 0.853,
               "source": "live",
-              "actual": 7.0
-            },
-            {
-              "label": "H up to 6",
-              "stat": "hits_allowed",
-              "target": 6,
-              "targets": [
-                6
-              ],
-              "tone": "strong",
-              "detail": "Live projection 5.0. Current 0.0. Starter still active in live game state. Supported ladders: 6 Last supported rung: 6",
-              "hitProb": 0.695,
-              "source": "live",
-              "actual": 0.0
+              "actual": 9.0
             }
           ]
         },
@@ -1625,34 +1106,6 @@
               "detail": "Supported ladders: 6/7/8/9/10/11 Last supported rung: 11 Supported ladders: 6 Last supported rung: 6",
               "hitProb": 0.201
             }
-          ],
-          "miniLadderBadges": [
-            {
-              "label": "K up to 4",
-              "stat": "strikeouts",
-              "target": 4,
-              "targets": [
-                4
-              ],
-              "tone": "strong",
-              "detail": "Live projection 4.4. Current 2.0. Starter still active in live game state. Supported ladders: 4 Last supported rung: 4",
-              "hitProb": 0.822,
-              "source": "live",
-              "actual": 2.0
-            },
-            {
-              "label": "O up to 15",
-              "stat": "outs",
-              "target": 15,
-              "targets": [
-                15
-              ],
-              "tone": "strong",
-              "detail": "Live projection 16.7. Current 9.0. Starter still active in live game state. Supported ladders: 15 Last supported rung: 15",
-              "hitProb": 0.967,
-              "source": "live",
-              "actual": 9.0
-            }
           ]
         }
       },
@@ -1712,7 +1165,7 @@
         {
           "eyebrow": "Live state",
           "title": "Braxton Ashcraft vs Aaron Civale | 3 official pick(s) | +1 playable",
-          "body": "Report snapshot generated at 2026-06-17T21:34:23-05:00. Current score is 0-0."
+          "body": "Report snapshot generated at 2026-06-17T21:48:14-05:00. Current score is 0-0."
         },
         {
           "eyebrow": "Segment looks",
@@ -1736,8 +1189,8 @@
       ],
       "href": "/mlb/game/824992?date=2026-06-17",
       "href_label": "Open game detail",
-      "oddsRefreshedAt": "2026-06-17T21:34:26-05:00",
-      "odds_refreshed_at": "2026-06-17T21:34:26-05:00"
+      "oddsRefreshedAt": "2026-06-17T21:48:17-05:00",
+      "odds_refreshed_at": "2026-06-17T21:48:17-05:00"
     },
     {
       "archivedLiveProps": [],
@@ -2292,7 +1745,7 @@
         {
           "eyebrow": "Live state",
           "title": "Nolan McLean vs Nick Lodolo | 2 official pick(s) | +5 playable",
-          "body": "Report snapshot generated at 2026-06-17T21:34:23-05:00. Current score is 0-0."
+          "body": "Report snapshot generated at 2026-06-17T21:48:14-05:00. Current score is 0-0."
         },
         {
           "eyebrow": "Segment looks",
@@ -2316,8 +1769,8 @@
       ],
       "href": "/mlb/game/824503?date=2026-06-17",
       "href_label": "Open game detail",
-      "oddsRefreshedAt": "2026-06-17T21:34:26-05:00",
-      "odds_refreshed_at": "2026-06-17T21:34:26-05:00"
+      "oddsRefreshedAt": "2026-06-17T21:48:17-05:00",
+      "odds_refreshed_at": "2026-06-17T21:48:17-05:00"
     },
     {
       "archivedLiveProps": [],
@@ -2754,7 +2207,7 @@
         {
           "eyebrow": "Live state",
           "title": "Luinder Avila vs Zack Littell | 1 official pick(s) | +1 playable",
-          "body": "Report snapshot generated at 2026-06-17T21:34:23-05:00. Current score is 0-0."
+          "body": "Report snapshot generated at 2026-06-17T21:48:14-05:00. Current score is 0-0."
         },
         {
           "eyebrow": "Segment looks",
@@ -2778,8 +2231,8 @@
       ],
       "href": "/mlb/game/822721?date=2026-06-17",
       "href_label": "Open game detail",
-      "oddsRefreshedAt": "2026-06-17T21:34:26-05:00",
-      "odds_refreshed_at": "2026-06-17T21:34:26-05:00"
+      "oddsRefreshedAt": "2026-06-17T21:48:17-05:00",
+      "odds_refreshed_at": "2026-06-17T21:48:17-05:00"
     },
     {
       "archivedLiveProps": [],
@@ -3310,7 +2763,7 @@
         {
           "eyebrow": "Live state",
           "title": "Sandy Alcantara vs Andrew Painter | +2 playable",
-          "body": "Report snapshot generated at 2026-06-17T21:34:23-05:00. Current score is 0-0."
+          "body": "Report snapshot generated at 2026-06-17T21:48:14-05:00. Current score is 0-0."
         },
         {
           "eyebrow": "Segment looks",
@@ -3334,8 +2787,8 @@
       ],
       "href": "/mlb/game/823450?date=2026-06-17",
       "href_label": "Open game detail",
-      "oddsRefreshedAt": "2026-06-17T21:34:26-05:00",
-      "odds_refreshed_at": "2026-06-17T21:34:26-05:00"
+      "oddsRefreshedAt": "2026-06-17T21:48:17-05:00",
+      "odds_refreshed_at": "2026-06-17T21:48:17-05:00"
     },
     {
       "archivedLiveProps": [],
@@ -3702,7 +3155,7 @@
         {
           "eyebrow": "Live state",
           "title": "Adrian Houser vs Grant Holmes | +2 playable",
-          "body": "Report snapshot generated at 2026-06-17T21:34:23-05:00. Current score is 3-2."
+          "body": "Report snapshot generated at 2026-06-17T21:48:14-05:00. Current score is 3-2."
         },
         {
           "eyebrow": "Segment looks",
@@ -3726,8 +3179,8 @@
       ],
       "href": "/mlb/game/824912?date=2026-06-17",
       "href_label": "Open game detail",
-      "oddsRefreshedAt": "2026-06-17T21:34:26-05:00",
-      "odds_refreshed_at": "2026-06-17T21:34:26-05:00"
+      "oddsRefreshedAt": "2026-06-17T21:48:17-05:00",
+      "odds_refreshed_at": "2026-06-17T21:48:17-05:00"
     },
     {
       "archivedLiveProps": [],
@@ -4368,7 +3821,7 @@
         {
           "eyebrow": "Live state",
           "title": "Casey Mize vs Peter Lambert | +3 playable",
-          "body": "Report snapshot generated at 2026-06-17T21:34:23-05:00. Current score is 0-0."
+          "body": "Report snapshot generated at 2026-06-17T21:48:14-05:00. Current score is 0-0."
         },
         {
           "eyebrow": "Segment looks",
@@ -4392,8 +3845,8 @@
       ],
       "href": "/mlb/game/824178?date=2026-06-17",
       "href_label": "Open game detail",
-      "oddsRefreshedAt": "2026-06-17T21:34:26-05:00",
-      "odds_refreshed_at": "2026-06-17T21:34:26-05:00"
+      "oddsRefreshedAt": "2026-06-17T21:48:17-05:00",
+      "odds_refreshed_at": "2026-06-17T21:48:17-05:00"
     },
     {
       "archivedLiveProps": [],
@@ -4914,7 +4367,7 @@
         {
           "eyebrow": "Live state",
           "title": "Bradgley Rodriguez vs Kyle Leahy | +4 playable",
-          "body": "Report snapshot generated at 2026-06-17T21:34:23-05:00. Current score is 0-0."
+          "body": "Report snapshot generated at 2026-06-17T21:48:14-05:00. Current score is 0-0."
         },
         {
           "eyebrow": "Segment looks",
@@ -4938,8 +4391,8 @@
       ],
       "href": "/mlb/game/823044?date=2026-06-17",
       "href_label": "Open game detail",
-      "oddsRefreshedAt": "2026-06-17T21:34:26-05:00",
-      "odds_refreshed_at": "2026-06-17T21:34:26-05:00"
+      "oddsRefreshedAt": "2026-06-17T21:48:17-05:00",
+      "odds_refreshed_at": "2026-06-17T21:48:17-05:00"
     },
     {
       "archivedLiveProps": [],
@@ -5586,7 +5039,7 @@
         {
           "eyebrow": "Live state",
           "title": "Shane McClanahan vs Shohei Ohtani | 1 official pick(s) | +5 playable",
-          "body": "Report snapshot generated at 2026-06-17T21:34:23-05:00. Current score is 0-0."
+          "body": "Report snapshot generated at 2026-06-17T21:48:14-05:00. Current score is 0-0."
         },
         {
           "eyebrow": "Segment looks",
@@ -5610,8 +5063,8 @@
       ],
       "href": "/mlb/game/823940?date=2026-06-17",
       "href_label": "Open game detail",
-      "oddsRefreshedAt": "2026-06-17T21:34:26-05:00",
-      "odds_refreshed_at": "2026-06-17T21:34:26-05:00"
+      "oddsRefreshedAt": "2026-06-17T21:48:17-05:00",
+      "odds_refreshed_at": "2026-06-17T21:48:17-05:00"
     },
     {
       "archivedLiveProps": [],
@@ -6141,7 +5594,7 @@
         {
           "eyebrow": "Live state",
           "title": "Sam Aldegheri vs Eduardo Rodriguez | 1 official pick(s) | +3 playable",
-          "body": "Report snapshot generated at 2026-06-17T21:34:23-05:00. Current score is 0-0."
+          "body": "Report snapshot generated at 2026-06-17T21:48:14-05:00. Current score is 0-0."
         },
         {
           "eyebrow": "Segment looks",
@@ -6165,8 +5618,8 @@
       ],
       "href": "/mlb/game/825072?date=2026-06-17",
       "href_label": "Open game detail",
-      "oddsRefreshedAt": "2026-06-17T21:34:26-05:00",
-      "odds_refreshed_at": "2026-06-17T21:34:26-05:00"
+      "oddsRefreshedAt": "2026-06-17T21:48:17-05:00",
+      "odds_refreshed_at": "2026-06-17T21:48:17-05:00"
     },
     {
       "archivedLiveProps": [],
@@ -6697,7 +6150,7 @@
         {
           "eyebrow": "Live state",
           "title": "Max Scherzer vs Jake Bennett",
-          "body": "Report snapshot generated at 2026-06-17T21:34:23-05:00. Current score is 0-0."
+          "body": "Report snapshot generated at 2026-06-17T21:48:14-05:00. Current score is 0-0."
         },
         {
           "eyebrow": "Segment looks",
@@ -6721,8 +6174,8 @@
       ],
       "href": "/mlb/game/824746?date=2026-06-17",
       "href_label": "Open game detail",
-      "oddsRefreshedAt": "2026-06-17T21:34:26-05:00",
-      "odds_refreshed_at": "2026-06-17T21:34:26-05:00"
+      "oddsRefreshedAt": "2026-06-17T21:48:17-05:00",
+      "odds_refreshed_at": "2026-06-17T21:48:17-05:00"
     },
     {
       "archivedLiveProps": [],
@@ -7253,7 +6706,7 @@
         {
           "eyebrow": "Live state",
           "title": "Anthony Kay vs Carlos Rod\u00f3n | +4 playable",
-          "body": "Report snapshot generated at 2026-06-17T21:34:23-05:00. Current score is 0-0."
+          "body": "Report snapshot generated at 2026-06-17T21:48:14-05:00. Current score is 0-0."
         },
         {
           "eyebrow": "Segment looks",
@@ -7277,8 +6730,8 @@
       ],
       "href": "/mlb/game/823536?date=2026-06-17",
       "href_label": "Open game detail",
-      "oddsRefreshedAt": "2026-06-17T21:34:26-05:00",
-      "odds_refreshed_at": "2026-06-17T21:34:26-05:00"
+      "oddsRefreshedAt": "2026-06-17T21:48:17-05:00",
+      "odds_refreshed_at": "2026-06-17T21:48:17-05:00"
     },
     {
       "archivedLiveProps": [],
@@ -7693,7 +7146,7 @@
         {
           "eyebrow": "Live state",
           "title": "Robbie Ray vs JR Ritchie | 1 official pick(s) | +1 playable",
-          "body": "Report snapshot generated at 2026-06-17T21:34:23-05:00. Current score is 0-0."
+          "body": "Report snapshot generated at 2026-06-17T21:48:14-05:00. Current score is 0-0."
         },
         {
           "eyebrow": "Segment looks",
@@ -7717,8 +7170,8 @@
       ],
       "href": "/mlb/game/824913?date=2026-06-17",
       "href_label": "Open game detail",
-      "oddsRefreshedAt": "2026-06-17T21:34:26-05:00",
-      "odds_refreshed_at": "2026-06-17T21:34:26-05:00"
+      "oddsRefreshedAt": "2026-06-17T21:48:17-05:00",
+      "odds_refreshed_at": "2026-06-17T21:48:17-05:00"
     },
     {
       "archivedLiveProps": [],
@@ -8278,7 +7731,7 @@
         {
           "eyebrow": "Live state",
           "title": "Gavin Williams vs Brandon Sproat | 3 official pick(s) | +3 playable",
-          "body": "Report snapshot generated at 2026-06-17T21:34:23-05:00. Current score is 0-0."
+          "body": "Report snapshot generated at 2026-06-17T21:48:14-05:00. Current score is 0-0."
         },
         {
           "eyebrow": "Segment looks",
@@ -8302,12 +7755,531 @@
       ],
       "href": "/mlb/game/823774?date=2026-06-17",
       "href_label": "Open game detail",
-      "oddsRefreshedAt": "2026-06-17T21:34:26-05:00",
-      "odds_refreshed_at": "2026-06-17T21:34:26-05:00"
+      "oddsRefreshedAt": "2026-06-17T21:48:17-05:00",
+      "odds_refreshed_at": "2026-06-17T21:48:17-05:00"
+    },
+    {
+      "archivedLiveProps": [],
+      "gameLens": [
+        {
+          "key": "first1",
+          "label": "F1",
+          "closed": false,
+          "badge": "No bet",
+          "score": "COL 0 - CHC 0",
+          "subtitle": "COL 0.36 - CHC 0.33 | Total 0.7",
+          "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
+          "projection": {
+            "total": 0.7,
+            "homeMargin": -0.03
+          },
+          "markets": {
+            "moneyline": {
+              "pick": null,
+              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+            },
+            "spread": {
+              "pick": null,
+              "homeLine": -0.03,
+              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+            },
+            "total": {
+              "pick": null,
+              "line": 0.7,
+              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+            }
+          }
+        },
+        {
+          "key": "first3",
+          "label": "F3",
+          "closed": false,
+          "badge": "No bet",
+          "score": "COL 0 - CHC 0",
+          "subtitle": "COL 1.05 - CHC 1.01 | Total 2.06",
+          "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
+          "projection": {
+            "total": 2.06,
+            "homeMargin": -0.04
+          },
+          "markets": {
+            "moneyline": {
+              "pick": null,
+              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+            },
+            "spread": {
+              "pick": null,
+              "homeLine": -0.04,
+              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+            },
+            "total": {
+              "pick": null,
+              "line": 2.06,
+              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+            }
+          }
+        },
+        {
+          "key": "first5",
+          "label": "F5",
+          "closed": false,
+          "badge": "No bet",
+          "score": "COL 0 - CHC 0",
+          "subtitle": "COL 1.84 - CHC 1.72 | Total 3.56",
+          "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
+          "projection": {
+            "total": 3.56,
+            "homeMargin": -0.12
+          },
+          "markets": {
+            "moneyline": {
+              "pick": null,
+              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+            },
+            "spread": {
+              "pick": null,
+              "homeLine": -0.12,
+              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+            },
+            "total": {
+              "pick": null,
+              "line": 3.56,
+              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+            }
+          }
+        },
+        {
+          "key": "first5",
+          "label": "Full game",
+          "closed": false,
+          "badge": "No bet",
+          "score": "COL 0 - CHC 0",
+          "subtitle": "COL 3.64 - CHC 3.32 | Total 6.96",
+          "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
+          "projection": {
+            "total": 6.96,
+            "homeMargin": -0.32
+          },
+          "markets": {
+            "moneyline": {
+              "pick": null,
+              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+            },
+            "spread": {
+              "pick": null,
+              "homeLine": -0.32,
+              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+            },
+            "total": {
+              "pick": null,
+              "line": 6.96,
+              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+            }
+          }
+        },
+        {
+          "key": "first1",
+          "label": "First 1",
+          "closed": false,
+          "badge": "",
+          "score": "COL 19.2% | CHC 17.3% | Tie 63.5%",
+          "subtitle": "COL 19.2% | CHC 17.3% | Tie 63.5%",
+          "reason": "COL 19.2% | CHC 17.3% | Tie 63.5%",
+          "projection": {
+            "total": 19.2,
+            "homeMargin": 17.3
+          },
+          "markets": {
+            "moneyline": {},
+            "spread": {},
+            "total": {
+              "pick": null,
+              "line": 19.2,
+              "reason": "COL 19.2% | CHC 17.3% | Tie 63.5%"
+            }
+          }
+        },
+        {
+          "key": "first3",
+          "label": "First 3",
+          "closed": false,
+          "badge": "",
+          "score": "COL 33.1% | CHC 32.7% | Tie 34.2%",
+          "subtitle": "COL 33.1% | CHC 32.7% | Tie 34.2%",
+          "reason": "COL 33.1% | CHC 32.7% | Tie 34.2%",
+          "projection": {
+            "total": 33.1,
+            "homeMargin": 32.7
+          },
+          "markets": {
+            "moneyline": {},
+            "spread": {},
+            "total": {
+              "pick": null,
+              "line": 33.1,
+              "reason": "COL 33.1% | CHC 32.7% | Tie 34.2%"
+            }
+          }
+        },
+        {
+          "key": "first5",
+          "label": "First 5",
+          "closed": false,
+          "badge": "",
+          "score": "COL 41.7% | CHC 37.4% | Tie 20.9%",
+          "subtitle": "COL 41.7% | CHC 37.4% | Tie 20.9%",
+          "reason": "COL 41.7% | CHC 37.4% | Tie 20.9%",
+          "projection": {
+            "total": 41.7,
+            "homeMargin": 37.4
+          },
+          "markets": {
+            "moneyline": {},
+            "spread": {},
+            "total": {
+              "pick": null,
+              "line": 41.7,
+              "reason": "COL 41.7% | CHC 37.4% | Tie 20.9%"
+            }
+          }
+        },
+        {
+          "key": "full",
+          "label": "Full game",
+          "closed": false,
+          "badge": "",
+          "score": "COL 51.2% | CHC 48.8% | Tie 0.0%",
+          "subtitle": "COL 51.2% | CHC 48.8% | Tie 0.0%",
+          "reason": "COL 51.2% | CHC 48.8% | Tie 0.0%",
+          "projection": {
+            "total": 51.2,
+            "homeMargin": 48.8
+          },
+          "markets": {
+            "moneyline": {},
+            "spread": {},
+            "total": {
+              "pick": null,
+              "line": 51.2,
+              "reason": "COL 51.2% | CHC 48.8% | Tie 0.0%"
+            }
+          }
+        }
+      ],
+      "gameMarkets": {
+        "moneyline": {},
+        "spread": {},
+        "total": {
+          "pick": null,
+          "line": 51.2,
+          "reason": "COL 51.2% | CHC 48.8% | Tie 0.0%"
+        }
+      },
+      "markets": {
+        "moneyline": {},
+        "spread": {},
+        "total": {
+          "pick": null,
+          "line": 51.2,
+          "reason": "COL 51.2% | CHC 48.8% | Tie 0.0%"
+        }
+      },
+      "gamePk": 824668,
+      "prop_groups": [],
+      "prop_lens": {},
+      "market_tiles": [
+        {
+          "label": "Game total",
+          "title": "No total play",
+          "sub": "Off card"
+        },
+        {
+          "label": "Moneyline",
+          "title": "No ML play",
+          "sub": "Off card"
+        },
+        {
+          "label": "Pitcher props",
+          "title": "Sean Sullivan Over 3.5 Strikeouts",
+          "sub": "Playable only | -125"
+        },
+        {
+          "label": "Hitter props",
+          "title": "Nico Hoerner Under 1.5 Batter Total Bases",
+          "sub": "-120"
+        }
+      ],
+      "liveProps": [],
+      "matchup": {
+        "away": {
+          "abbr": "COL",
+          "id": 115,
+          "logo": "https://www.mlbstatic.com/team-logos/115.svg",
+          "name": "Colorado Rockies"
+        },
+        "home": {
+          "abbr": "CHC",
+          "id": 112,
+          "logo": "https://www.mlbstatic.com/team-logos/112.svg",
+          "name": "Chicago Cubs"
+        },
+        "score": {
+          "away": 0,
+          "home": 0
+        },
+        "liveText": "Sean Sullivan vs Javier Assad | 1 official pick(s) | +3 playable"
+      },
+      "predictions": {
+        "first1": {
+          "away_runs_mean": 0.35,
+          "home_runs_mean": 0.348,
+          "away_win_prob": 0.178,
+          "home_win_prob": 0.165,
+          "tie_prob": 0.657
+        },
+        "first3": {
+          "away_runs_mean": 1.064,
+          "home_runs_mean": 1.065,
+          "away_win_prob": 0.329,
+          "home_win_prob": 0.32,
+          "tie_prob": 0.351
+        },
+        "first5": {
+          "away_runs_mean": 1.721,
+          "home_runs_mean": 1.765,
+          "away_win_prob": 0.382,
+          "home_win_prob": 0.387,
+          "tie_prob": 0.231
+        },
+        "full": {
+          "away_runs_mean": 3.411,
+          "home_runs_mean": 3.454,
+          "away_win_prob": 0.474,
+          "home_win_prob": 0.526,
+          "tie_prob": 0.0
+        }
+      },
+      "props": [],
+      "simContextAvailable": false,
+      "snapshotAvailable": true,
+      "startTime": "7:05 PM",
+      "trackedProps": [],
+      "probable": {
+        "away": {
+          "id": 807743,
+          "fullName": "Sean Sullivan",
+          "ladderBadges": [
+            {
+              "label": "K up to 4",
+              "stat": "strikeouts",
+              "target": 4,
+              "targets": [
+                4
+              ],
+              "tone": "solid",
+              "detail": "Supported ladders: 4/5/6 Last supported rung: 6 Supported ladders: 4 Last supported rung: 4",
+              "hitProb": 0.321
+            },
+            {
+              "label": "H up to 5",
+              "stat": "hits_allowed",
+              "target": 5,
+              "targets": [
+                5
+              ],
+              "tone": "solid",
+              "detail": "Supported ladders: 5/6/7 Last supported rung: 7 Supported ladders: 5 Last supported rung: 5",
+              "hitProb": 0.298
+            }
+          ],
+          "pregameLadderBadges": [
+            {
+              "label": "K up to 4",
+              "stat": "strikeouts",
+              "target": 4,
+              "targets": [
+                4
+              ],
+              "tone": "solid",
+              "detail": "Supported ladders: 4/5/6 Last supported rung: 6 Supported ladders: 4 Last supported rung: 4",
+              "hitProb": 0.321
+            },
+            {
+              "label": "H up to 5",
+              "stat": "hits_allowed",
+              "target": 5,
+              "targets": [
+                5
+              ],
+              "tone": "solid",
+              "detail": "Supported ladders: 5/6/7 Last supported rung: 7 Supported ladders: 5 Last supported rung: 5",
+              "hitProb": 0.298
+            }
+          ]
+        },
+        "home": {
+          "id": null,
+          "fullName": "Javier Assad",
+          "ladderBadges": [
+            {
+              "label": "K up to 5",
+              "stat": "strikeouts",
+              "target": 5,
+              "targets": [
+                5
+              ],
+              "tone": "soft",
+              "detail": "Supported ladders: 5/6/7 Last supported rung: 7 Supported ladders: 5 Last supported rung: 5",
+              "hitProb": 0.247
+            },
+            {
+              "label": "H up to 6",
+              "stat": "hits_allowed",
+              "target": 6,
+              "targets": [
+                6
+              ],
+              "tone": "solid",
+              "detail": "Supported ladders: 6/7/8 Last supported rung: 8 Supported ladders: 6 Last supported rung: 6",
+              "hitProb": 0.286
+            },
+            {
+              "label": "BB up to 2",
+              "stat": "walks_allowed",
+              "target": 2,
+              "targets": [
+                2
+              ],
+              "tone": "soft",
+              "detail": "Supported ladders: 2/3 Last supported rung: 3 Supported ladders: 2 Last supported rung: 2",
+              "hitProb": 0.205
+            }
+          ],
+          "pregameLadderBadges": [
+            {
+              "label": "K up to 5",
+              "stat": "strikeouts",
+              "target": 5,
+              "targets": [
+                5
+              ],
+              "tone": "soft",
+              "detail": "Supported ladders: 5/6/7 Last supported rung: 7 Supported ladders: 5 Last supported rung: 5",
+              "hitProb": 0.247
+            },
+            {
+              "label": "H up to 6",
+              "stat": "hits_allowed",
+              "target": 6,
+              "targets": [
+                6
+              ],
+              "tone": "solid",
+              "detail": "Supported ladders: 6/7/8 Last supported rung: 8 Supported ladders: 6 Last supported rung: 6",
+              "hitProb": 0.286
+            },
+            {
+              "label": "BB up to 2",
+              "stat": "walks_allowed",
+              "target": 2,
+              "targets": [
+                2
+              ],
+              "tone": "soft",
+              "detail": "Supported ladders: 2/3 Last supported rung: 3 Supported ladders: 2 Last supported rung: 2",
+              "hitProb": 0.205
+            }
+          ]
+        }
+      },
+      "actual_box_panel": {},
+      "first1BetSignal": {
+        "label": "F1 NRFI",
+        "tone": "nrfi",
+        "summary": "0-run sim 64.0% | F1 mean 0.70",
+        "detail": "Season filter qualified: simulated scoreless first inning 64.0% with only 0.70 expected runs in the opening frame.",
+        "nrfiProb": 0.64,
+        "yrfiProb": 0.36,
+        "meanTotalRuns": 0.698,
+        "maxSideLeadProb": 0.178
+      },
+      "card_variant": "mlb_main",
+      "away": {
+        "abbr": "COL",
+        "name": "Colorado Rockies"
+      },
+      "home": {
+        "abbr": "CHC",
+        "name": "Chicago Cubs"
+      },
+      "status": {
+        "abstract": "Live",
+        "detailed": "In Progress"
+      },
+      "detail": "7:05 PM",
+      "summary": "Sean Sullivan vs Javier Assad | 1 official pick(s) | +3 playable",
+      "status_badge": "Live",
+      "hero_note": "0 live props | snapshot yes",
+      "metrics": [
+        {
+          "label": "Score",
+          "value": "0-0"
+        },
+        {
+          "label": "Full home",
+          "value": "-"
+        },
+        {
+          "label": "Live home",
+          "value": "-"
+        },
+        {
+          "label": "Open segments",
+          "value": "8"
+        },
+        {
+          "label": "Live props",
+          "value": "0"
+        },
+        {
+          "label": "Snapshot",
+          "value": "Yes"
+        }
+      ],
+      "panels": [
+        {
+          "eyebrow": "Live state",
+          "title": "Sean Sullivan vs Javier Assad | 1 official pick(s) | +3 playable",
+          "body": "Report snapshot generated at 2026-06-17T21:48:14-05:00. Current score is 0-0."
+        },
+        {
+          "eyebrow": "Segment looks",
+          "title": "Current segment board",
+          "body": "COL 51.2% | CHC 48.8% | Tie 0.0%",
+          "items": [
+            "Full game: projected total 51.2, home margin +48.8",
+            "F5: projected total 3.56, home margin -0.12",
+            "F3: projected total 2.06, home margin -0.04",
+            "F1: projected total 0.7, home margin -0.03"
+          ]
+        },
+        {
+          "eyebrow": "Top live props",
+          "title": "Best in-game prop edges",
+          "body": "These props are the highest-ranked live looks available in the selected report snapshot.",
+          "items": [
+            "No live props were surfaced for this game in the selected report."
+          ]
+        }
+      ],
+      "href": "/mlb/game/824668?date=2026-06-17",
+      "href_label": "Open game detail",
+      "oddsRefreshedAt": "2026-06-17T21:48:17-05:00",
+      "odds_refreshed_at": "2026-06-17T21:48:17-05:00"
     }
   ],
   "source_title": "MLB daily summary artifact",
-  "oddsRefreshedAt": "2026-06-17T21:34:26-05:00",
-  "odds_refreshed_at": "2026-06-17T21:34:26-05:00",
+  "oddsRefreshedAt": "2026-06-17T21:48:17-05:00",
+  "odds_refreshed_at": "2026-06-17T21:48:17-05:00",
   "source_path": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\live_lens\\live_lens_report_2026_06_17.json"
 }
