@@ -20,7 +20,7 @@ services:
     plan: standard
     autoDeploy: true
     buildCommand: pip install -r requirements.txt
-    startCommand: bash -lc "python3 scripts/bootstrap_data_root.py || true; exec gunicorn wsgi:application --bind 0.0.0.0:$PORT --workers ${WEB_CONCURRENCY:-3} --threads ${GUNICORN_THREADS:-2} --timeout ${GUNICORN_TIMEOUT:-120} --graceful-timeout ${GUNICORN_GRACEFUL_TIMEOUT:-30} --keep-alive ${GUNICORN_KEEPALIVE:-5}"
+    startCommand: bash -lc "python3 scripts/bootstrap_data_root.py || true; exec gunicorn wsgi:application --bind 0.0.0.0:$PORT --workers ${WEB_CONCURRENCY:-1} --threads ${GUNICORN_THREADS:-1} --timeout ${GUNICORN_TIMEOUT:-60} --graceful-timeout ${GUNICORN_GRACEFUL_TIMEOUT:-30} --keep-alive ${GUNICORN_KEEPALIVE:-5}"
     healthCheckPath: /healthz
     disk:
       name: syndicate-data
@@ -77,9 +77,9 @@ services:
       - key: WEB_CONCURRENCY
         value: "1"
       - key: GUNICORN_THREADS
-        value: "2"
+        value: "1"
       - key: GUNICORN_TIMEOUT
-        value: "120"
+        value: "60"
       - key: GUNICORN_GRACEFUL_TIMEOUT
         value: "30"
       - key: GUNICORN_KEEPALIVE
