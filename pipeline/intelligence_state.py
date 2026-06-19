@@ -25,6 +25,7 @@ from syndicate.features.intelligence import _apply_candidate_tier_penalty
 from syndicate.features.intelligence import _query_preferences
 from syndicate.features.intelligence import rank_global_recommendations
 from syndicate.features.intelligence_board import build_intelligence_board_contract
+from syndicate.features.intelligence.signals.normalization import _numeric_hint
 from syndicate.features.shared.market_id import attach_market_id
 from syndicate.features.shared.odds_control_plane import load_odds_history_payload_for_sport
 from syndicate.features.shared.odds_control_plane import odds_history_roots_for_sport
@@ -265,7 +266,7 @@ class IntelligenceStateService:
             for candidate in sport_candidates:
                 if isinstance(candidate, Mapping):
                     merged.append(dict(candidate))
-        return sorted(merged, key=lambda candidate: float(candidate.get("score") or 0.0), reverse=True)
+        return sorted(merged, key=lambda candidate: _numeric_hint(candidate.get("score")) or 0.0, reverse=True)
 
     @staticmethod
     def _candidate_numeric_value(candidate: dict[str, Any], *keys: str) -> float | None:

@@ -7,7 +7,9 @@ from unittest.mock import patch
 
 from pipeline.formatter import format_intelligence_query_response
 from pipeline.intelligence_pipeline import run_intelligence_pipeline
+from pipeline.intelligence_pipeline import _preview_candidate_score
 from pipeline.intelligence_pipeline import _enrich_context
+from pipeline.intelligence_state import IntelligenceStateService
 from pipeline.evidence_builder import build_evidence_records
 from pipeline.intelligence_models import Evidence
 from pipeline.intelligence_models import IntelligenceResult
@@ -87,6 +89,20 @@ class IntelligencePipelineTests(unittest.TestCase):
             include_games=False,
             force_refresh=True,
         )
+
+    def test_preview_candidate_score_accepts_percent_string_scores(self) -> None:
+        candidate = {"score": "55.6%", "candidate_type": "prop", "name": "Player A"}
+
+        self.assertAlmostEqual(_preview_candidate_score(candidate, "Other"), 3.556)
+
+    def test_rank_fallback_candidates_accept_percent_string_scores(self) -> None:
+        candidates = [
+            {"name": "Low", "score": "12.5%"},
+            {"name": "High", "score": "55.6%"},
+        ]
+
+        ranked = IntelligenceStateService._rank_fallback_candidates(candidates)
+        self.assertEqual([item["name"] for item in ranked], ["High", "Low"])
 
     def test_pipeline_includes_odds_control_plane_evidence_when_available(self) -> None:
         fake_request = SimpleNamespace(

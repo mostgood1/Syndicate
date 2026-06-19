@@ -41,6 +41,7 @@ from router.query_router import QueryRouter
 from syndicate.features.intelligence import run_intelligence_query
 from syndicate.features.shared.intelligence_evaluation import build_intelligence_evaluation_bundle
 from syndicate.features.shared.odds_control_plane import load_odds_control_plane_snapshot
+from syndicate.features.intelligence.signals.normalization import _numeric_hint
 
 
 logger = logging.getLogger(__name__)
@@ -543,7 +544,7 @@ def _normalize_preview_text(value: Any) -> str:
 
 
 def _preview_candidate_score(candidate: Mapping[str, Any], preview_subject: str) -> float:
-    score = float(candidate.get("score") or 0.0) / 100.0
+    score = (_numeric_hint(candidate.get("score")) or 0.0) / 100.0
     candidate_type = str(candidate.get("candidate_type") or "").strip().lower()
     if candidate_type == "game":
         score += 8.0
