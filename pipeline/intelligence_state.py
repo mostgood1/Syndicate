@@ -606,12 +606,60 @@ class IntelligenceStateService:
             try:
                 payload = candidate.to_dict()
                 if isinstance(payload, Mapping):
-                    return dict(payload)
+                    candidate_payload = dict(payload)
+                else:
+                    candidate_payload = {}
             except Exception:
-                pass
-        if isinstance(candidate, Mapping):
-            return dict(candidate)
-        return {}
+                candidate_payload = {}
+        elif isinstance(candidate, Mapping):
+            candidate_payload = dict(candidate)
+        else:
+            return {}
+
+        if not candidate_payload:
+            return {}
+
+        sport_slug = str(candidate_payload.get("sport_slug") or candidate_payload.get("sport") or candidate_payload.get("league") or "").strip().lower()
+        if sport_slug:
+            candidate_payload.setdefault("sport_slug", sport_slug)
+            candidate_payload.setdefault("sport", sport_slug)
+
+        candidate_type = str(candidate_payload.get("candidate_type") or candidate_payload.get("type") or candidate_payload.get("kind") or "").strip().lower()
+        if candidate_type:
+            candidate_payload.setdefault("candidate_type", candidate_type)
+
+        market = str(candidate_payload.get("market") or candidate_payload.get("market_type") or candidate_payload.get("market_name") or candidate_payload.get("prop") or candidate_payload.get("label") or "").strip()
+        if market:
+            candidate_payload.setdefault("market", market)
+            candidate_payload.setdefault("market_type", market)
+
+        selection = str(candidate_payload.get("selection") or candidate_payload.get("pick") or candidate_payload.get("side") or candidate_payload.get("choice") or "").strip()
+        if selection:
+            candidate_payload.setdefault("selection", selection)
+
+        entity = str(candidate_payload.get("entity") or candidate_payload.get("player_name") or candidate_payload.get("player") or candidate_payload.get("team") or candidate_payload.get("subject") or candidate_payload.get("name") or "").strip()
+        if entity:
+            candidate_payload.setdefault("entity", entity)
+            candidate_payload.setdefault("player_name", candidate_payload.get("player_name") or candidate_payload.get("player") or entity)
+            candidate_payload.setdefault("name", candidate_payload.get("name") or entity)
+
+        odds = candidate_payload.get("odds") or candidate_payload.get("odds_current") or candidate_payload.get("odds_display")
+        if odds is not None and str(odds).strip():
+            candidate_payload.setdefault("odds", odds)
+
+        line = candidate_payload.get("line") or candidate_payload.get("market_line") or candidate_payload.get("prop_line")
+        if line is not None and str(line).strip():
+            candidate_payload.setdefault("line", line)
+
+        subject_key = str(candidate_payload.get("subject_key") or candidate_payload.get("player_name") or candidate_payload.get("name") or candidate_payload.get("entity") or "").strip().lower()
+        if subject_key:
+            candidate_payload.setdefault("subject_key", subject_key)
+
+        market_key = str(candidate_payload.get("market_key") or candidate_payload.get("market") or candidate_payload.get("selection") or "").strip().lower()
+        if market_key:
+            candidate_payload.setdefault("market_key", market_key)
+
+        return candidate_payload
 
     def _build_candidate_pool(self, selected_date: str | None, source_fingerprint: str) -> dict[str, Any]:
         cache_key = self._candidate_pool_key(selected_date, source_fingerprint)

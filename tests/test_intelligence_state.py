@@ -416,6 +416,69 @@ class IntelligenceStateTests(unittest.TestCase):
                 self.assertEqual(int(reloaded.get("candidate_count") or 0), 3)
                 self.assertEqual([item["name"] for item in (reloaded.get("top_opportunities") or [])], ["Play B", "Play A", "Play C"])
 
+    def test_state_compute_normalizes_wnba_alias_candidates_before_ranking(self) -> None:
+        service = IntelligenceStateService()
+
+        candidate_pool = {
+            "selected_date": "2026-06-15",
+            "source_fingerprint": "fingerprint-wnba-1",
+            "candidate_count": 1,
+            "candidate_pools": {},
+            "global_pool": [
+                {
+                    "sport": "WNBA",
+                    "candidate_type": "prop",
+                    "player": "Player A",
+                    "market_type": "Assists",
+                    "pick": "Over 7.5",
+                    "odds_current": "55.6%",
+                    "score": "55.6%",
+                    "updated_at": "2026-06-15T20:00:00Z",
+                }
+            ],
+            "candidates": [
+                {
+                    "sport": "WNBA",
+                    "candidate_type": "prop",
+                    "player": "Player A",
+                    "market_type": "Assists",
+                    "pick": "Over 7.5",
+                    "odds_current": "55.6%",
+                    "score": "55.6%",
+                    "updated_at": "2026-06-15T20:00:00Z",
+                }
+            ],
+        }
+        analysis_result = {
+            "ok": True,
+            "headline": "The Syndicate brief",
+            "recommendations": [],
+            "picks": [],
+            "top_live_opportunities": [],
+            "portfolio": {},
+            "parlays": [],
+        }
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            temp_root = Path(tmp_dir)
+            state_path = temp_root / "query_state_cache.json"
+            board_snapshot_path = temp_root / "board_snapshot.json"
+            with patch.object(intelligence_state_module, "STATE_PATH", state_path), patch.object(intelligence_state_module, "BOARD_SNAPSHOT_PATH", board_snapshot_path):
+                with patch.object(service, "_source_state_fingerprint", return_value="fingerprint-wnba-1"):
+                    with patch.object(service, "_build_candidate_pool", return_value=dict(candidate_pool)):
+                        with patch("pipeline.intelligence_state.rank_global_recommendations", return_value=[]):
+                            with patch("pipeline.intelligence_state.run_routed_intelligence_pipeline", return_value=dict(analysis_result)):
+                                response = service._compute_response({"question": "top edges today", "date": "2026-06-15"}, force_refresh=True)
+
+            self.assertEqual(response["candidate_count"], 1)
+            self.assertEqual(len(response["top_opportunities"]), 1)
+            self.assertEqual(response["top_opportunities"][0]["sport_slug"], "wnba")
+            self.assertEqual(response["top_opportunities"][0]["entity"], "Player A")
+            self.assertEqual(response["top_opportunities"][0]["market"], "Assists")
+            self.assertEqual(response["analysis"]["recommendations"][0]["sport_slug"], "wnba")
+            self.assertTrue(state_path.exists())
+            self.assertTrue(board_snapshot_path.exists())
+
     def test_cached_intelligence_response_uses_render_compute_when_cache_is_empty(self) -> None:
         payload = {"question": "top edges today", "date": "2026-06-15"}
         computed_response = {
