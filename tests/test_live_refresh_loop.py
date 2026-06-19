@@ -88,11 +88,11 @@ class LiveRefreshLoopTests(unittest.TestCase):
 
         self.assertFalse(started)
 
-    def test_create_app_attempts_to_start_shared_live_refresh_loop(self) -> None:
-        with patch("syndicate.app.start_live_refresh_background_loop") as mocked_start:
+    def test_create_app_does_not_start_shared_live_refresh_loop(self) -> None:
+        with patch("syndicate.features.shared.live_refresh_loop.start_live_refresh_background_loop") as mocked_start:
             create_app()
 
-        mocked_start.assert_called_once()
+        mocked_start.assert_not_called()
 
 
 if __name__ == "__main__":

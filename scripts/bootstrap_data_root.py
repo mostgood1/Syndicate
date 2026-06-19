@@ -132,9 +132,18 @@ def _bootstrap_wnba_today_artifacts(repo_root: Path, data_root: Path) -> bool:
     return True
 
 
+def _intelligence_latest_state_path(data_root: Path) -> Path:
+    return data_root / "reports" / "intelligence" / "latest_state.json"
+
+
 def main() -> int:
     data_root = Path(str(os.environ.get("SYNDICATE_DATA_ROOT") or "").strip() or "data").expanduser().resolve()
     repo_root = Path(__file__).resolve().parents[1]
+
+    intelligence_latest_state_path = _intelligence_latest_state_path(data_root)
+    if intelligence_latest_state_path.exists():
+        logger.info("Bootstrap skipped because intelligence state already exists at %s", intelligence_latest_state_path)
+        return 0
 
     # Merge the Render-critical published artifact roots into the mounted data root on startup.
     logger.info("Bootstrapping data root: repo=%s data_root=%s", repo_root, data_root)

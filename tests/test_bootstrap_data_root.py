@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import datetime
 import os
 import tempfile
 import unittest
@@ -145,7 +146,8 @@ class BootstrapDataRootTests(unittest.TestCase):
         module = _load_module()
         with tempfile.TemporaryDirectory() as temp_dir:
             data_root = Path(temp_dir) / "data-root"
-            sentinel = module._wnba_today_props_path(data_root, "2026-06-18")
+            today = datetime.datetime.now().strftime("%Y-%m-%d")
+            sentinel = module._wnba_today_props_path(data_root, today)
             sentinel.parent.mkdir(parents=True, exist_ok=True)
             sentinel.write_text("{}\n", encoding="utf-8")
 
@@ -158,13 +160,33 @@ class BootstrapDataRootTests(unittest.TestCase):
 
     def test_main_triggers_wnba_artifact_bootstrap(self) -> None:
         module = _load_module()
-        with patch.dict(os.environ, {"SYNDICATE_BOOTSTRAP_ON_START": "1"}, clear=False):
-            with patch.object(module, "_sync_bootstrap_roots", return_value={}):
-                with patch.object(module, "_bootstrap_wnba_today_artifacts", return_value=True) as bootstrap_mock:
-                    exit_code = module.main()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            data_root = Path(temp_dir) / "data-root"
+            with patch.dict(os.environ, {"SYNDICATE_BOOTSTRAP_ON_START": "1", "SYNDICATE_BOOTSTRAP_WNBA_TODAY": "1", "SYNDICATE_DATA_ROOT": str(data_root)}, clear=False):
+                with patch.object(module, "_sync_bootstrap_roots", return_value={}) as sync_mock:
+                    with patch.object(module, "_bootstrap_wnba_today_artifacts", return_value=True) as bootstrap_mock:
+                        exit_code = module.main()
 
         self.assertEqual(exit_code, 0)
+        sync_mock.assert_called_once()
         bootstrap_mock.assert_called_once()
+
+    def test_main_skips_bootstrap_when_intelligence_state_exists(self) -> None:
+        module = _load_module()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            data_root = Path(temp_dir) / "data-root"
+            sentinel = module._intelligence_latest_state_path(data_root)
+            sentinel.parent.mkdir(parents=True, exist_ok=True)
+            sentinel.write_text("{}\n", encoding="utf-8")
+
+            with patch.dict(os.environ, {"SYNDICATE_DATA_ROOT": str(data_root)}, clear=False):
+                with patch.object(module, "_sync_bootstrap_roots") as sync_mock:
+                    with patch.object(module, "_bootstrap_wnba_today_artifacts") as wnba_mock:
+                        exit_code = module.main()
+
+        self.assertEqual(exit_code, 0)
+        sync_mock.assert_not_called()
+        wnba_mock.assert_not_called()
 
 
 if __name__ == "__main__":
