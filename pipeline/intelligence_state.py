@@ -8,6 +8,7 @@ import threading
 import time
 from collections import OrderedDict
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -265,6 +266,75 @@ class IntelligenceStateService:
                 if isinstance(candidate, Mapping):
                     merged.append(dict(candidate))
         return sorted(merged, key=lambda candidate: float(candidate.get("score") or 0.0), reverse=True)
+
+    @staticmethod
+    def _candidate_numeric_value(candidate: dict[str, Any], *keys: str) -> float | None:
+        for key in keys:
+            value = candidate.get(key)
+            if value is None or isinstance(value, bool):
+                continue
+            if isinstance(value, (int, float)):
+                return float(value)
+            text = str(value).strip()
+            if not text:
+                continue
+            try:
+                return float(text.replace("%", ""))
+            except Exception:
+                continue
+        return None
+
+    @staticmethod
+    def _candidate_timestamp_value(candidate: dict[str, Any]) -> float | None:
+        for key in ("updated_epoch", "timestamp_epoch"):
+            value = candidate.get(key)
+            if isinstance(value, (int, float)):
+                return float(value)
+            try:
+                text = str(value or "").strip()
+                if text:
+                    return float(text)
+            except Exception:
+                pass
+        for key in ("updated_at", "last_updated", "last_updated_at", "timestamp", "generated_at", "created_at"):
+            text = str(candidate.get(key) or "").strip()
+            if not text:
+                continue
+            normalized = text.replace("Z", "+00:00")
+            try:
+                return datetime.fromisoformat(normalized).timestamp()
+            except Exception:
+                continue
+        return None
+
+    @classmethod
+    def _rank_fallback_candidates(cls, candidates: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        def sort_key(candidate: dict[str, Any]) -> tuple[float, float, float, float]:
+            score = cls._candidate_numeric_value(
+                candidate,
+                "score",
+                "adjusted_score",
+                "source_summary_score",
+                "ev_current",
+                "expected_value",
+                "normalized_edge",
+                "edge",
+            )
+            confidence = cls._candidate_numeric_value(
+                candidate,
+                "confidence",
+                "model_probability",
+                "implied_probability",
+            )
+            timestamp = cls._candidate_timestamp_value(candidate)
+            return (
+                1.0 if score is not None else 0.0,
+                float(score or 0.0),
+                float(confidence or 0.0),
+                float(timestamp or 0.0),
+            )
+
+        return sorted((dict(candidate) for candidate in candidates if isinstance(candidate, Mapping)), key=sort_key, reverse=True)
 
     def _odds_history_roots_for_sport(self, sport_slug: str) -> list[Path]:
         return odds_history_roots_for_sport(sport_slug)
@@ -935,9 +1005,14 @@ class IntelligenceStateService:
             candidates = [self._serialize_candidate(candidate) for candidate in candidate_pool.get("candidates") if isinstance(candidate, Mapping)]
 
             ranked_candidates = _profile_stage("candidate_scoring", rank_global_recommendations, candidates, limit=None)
-            if not ranked_candidates and candidates:
-                ranked_candidates = [dict(candidate) for candidate in candidates]
-            top_opportunities = ranked_candidates[: max(int(limit_value), 0)]
+            if ranked_candidates:
+                top_candidates = [dict(candidate) for candidate in ranked_candidates if isinstance(candidate, Mapping)]
+            elif candidates:
+                top_candidates = self._rank_fallback_candidates(candidates)
+            else:
+                top_candidates = []
+            opportunity_limit = max(int(limit_value), 1) if top_candidates else max(int(limit_value), 0)
+            top_opportunities = top_candidates[:opportunity_limit]
             by_sport: dict[str, list[dict[str, object]]] = {}
             for recommendation in top_opportunities:
                 sport_key = str(recommendation.get("sport") or recommendation.get("sport_slug") or "unknown").strip().lower() or "unknown"
@@ -974,7 +1049,7 @@ class IntelligenceStateService:
                 "candidate_pool": candidate_pool,
             }
             response_last_updated = _utc_now()
-            response_candidate_count = len(ranked_candidates) if isinstance(ranked_candidates, list) and ranked_candidates else len(candidates)
+            response_candidate_count = len(candidates)
             response["state_last_updated"] = response_last_updated
             response["last_updated"] = response_last_updated
             response["candidate_count"] = response_candidate_count

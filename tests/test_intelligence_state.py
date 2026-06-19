@@ -371,10 +371,18 @@ class IntelligenceStateTests(unittest.TestCase):
         candidate_pool = {
             "selected_date": "2026-06-15",
             "source_fingerprint": "fingerprint-1",
-            "candidate_count": 1,
+            "candidate_count": 3,
             "candidate_pools": {},
-            "global_pool": [{"name": "Play 1", "sport_slug": "mlb", "market": "Hits", "score": 91.0}],
-            "candidates": [{"name": "Play 1", "sport_slug": "mlb", "market": "Hits", "score": 91.0}],
+            "global_pool": [
+                {"name": "Play B", "sport_slug": "mlb", "market": "Hits", "score": 4.5, "confidence": 0.2, "updated_at": "2026-06-15T20:00:00Z"},
+                {"name": "Play A", "sport_slug": "mlb", "market": "Hits", "confidence": 0.9, "updated_at": "2026-06-15T18:00:00Z"},
+                {"name": "Play C", "sport_slug": "mlb", "market": "Hits", "updated_at": "2026-06-15T22:00:00Z"},
+            ],
+            "candidates": [
+                {"name": "Play B", "sport_slug": "mlb", "market": "Hits", "score": 4.5, "confidence": 0.2, "updated_at": "2026-06-15T20:00:00Z"},
+                {"name": "Play A", "sport_slug": "mlb", "market": "Hits", "confidence": 0.9, "updated_at": "2026-06-15T18:00:00Z"},
+                {"name": "Play C", "sport_slug": "mlb", "market": "Hits", "updated_at": "2026-06-15T22:00:00Z"},
+            ],
         }
         analysis_result = {
             "ok": True,
@@ -398,15 +406,15 @@ class IntelligenceStateTests(unittest.TestCase):
                                 response = service._compute_response({"question": "top edges today", "date": "2026-06-15"}, force_refresh=True)
 
                 self.assertGreater(response["candidate_count"], 0)
-                self.assertGreater(len(response["top_opportunities"]), 0)
-                self.assertEqual(response["top_opportunities"][0]["name"], "Play 1")
-                self.assertEqual(response["analysis"]["recommendations"][0]["name"], "Play 1")
+                self.assertEqual(response["candidate_count"], 3)
+                self.assertEqual([item["name"] for item in response["top_opportunities"]], ["Play B", "Play A", "Play C"])
+                self.assertEqual(response["analysis"]["recommendations"][0]["name"], "Play B")
                 self.assertTrue(state_path.exists())
                 self.assertTrue(board_snapshot_path.exists())
                 reloaded = intelligence_state_module.read_latest_intelligence_state_response({"question": "top edges today", "date": "2026-06-15"}, force_refresh=True)
                 self.assertIsInstance(reloaded, dict)
-                self.assertGreater(int(reloaded.get("candidate_count") or 0), 0)
-                self.assertGreater(len(reloaded.get("top_opportunities") or []), 0)
+                self.assertEqual(int(reloaded.get("candidate_count") or 0), 3)
+                self.assertEqual([item["name"] for item in (reloaded.get("top_opportunities") or [])], ["Play B", "Play A", "Play C"])
 
     def test_cached_intelligence_response_uses_render_compute_when_cache_is_empty(self) -> None:
         payload = {"question": "top edges today", "date": "2026-06-15"}
