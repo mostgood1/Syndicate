@@ -390,7 +390,20 @@ def api_game_detail(game_pk: str):
 @wnba_bp.get("/api/cards")
 def api_cards():
     selected_date = _selected_date()
-    context = build_cards_page_context(selected_date, allow_stored_date_fallback=False)
+    try:
+        context = build_cards_page_context(selected_date, allow_stored_date_fallback=False)
+    except Exception:
+        context = build_source_cards_payload(selected_date, allow_stored_date_fallback=True)
+        context = {
+            **context,
+            "source_title": "WNBA source cards fallback",
+            "empty_state": {
+                "eyebrow": "WNBA cards",
+                "title": "WNBA source cards fallback",
+                "body": "The shared WNBA board could not build the dense game-card payload, so this route is showing the stored source cards payload instead.",
+                "list_items": ["Reload after the next WNBA refresh cycle."] if not context.get("games") else [],
+            },
+        }
     return jsonify(build_game_board_api_payload(context))
 
 
