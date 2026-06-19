@@ -1516,7 +1516,7 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         board_contract = {"schema": "intelligence_board_v1", "cards": [{"name": "Jayson Tatum Over 28.5"}]}
 
         with patch("syndicate.blueprints.intelligence.queue_intelligence_state_refresh") as queue_mock:
-            with patch("syndicate.blueprints.intelligence.read_latest_intelligence_state_response", return_value=state_response) as state_mock:
+            with patch("syndicate.blueprints.intelligence.read_intelligence_state", return_value=state_response) as state_mock:
                 with patch("syndicate.blueprints.intelligence.run_intelligence_query", return_value=dict(live_result)) as query_mock:
                     with patch("syndicate.blueprints.intelligence.build_intelligence_board_contract", return_value=dict(board_contract)):
                         response = self.client.post(

@@ -4,6 +4,7 @@ import hashlib
 import json
 import logging
 import os
+import tempfile
 import threading
 import time
 from collections import OrderedDict
@@ -41,6 +42,7 @@ REPO_ROOT = repo_root_from(__file__)
 STATE_PATH = reports_root() / "intelligence" / "query_state_cache.json"
 BOARD_SNAPSHOT_PATH = reports_root() / "intelligence" / "board_snapshot.json"
 STATUS_CACHE_PATH = reports_root() / "intelligence" / "status_response_cache.json"
+INTELLIGENCE_STATE_PATH = Path(tempfile.gettempdir()) / "intelligence_state.json"
 logger = logging.getLogger(__name__)
 _INTELLIGENCE_EXECUTION_GUARD = threading.RLock()
 _INTELLIGENCE_LAST_RUN_STARTED_AT: float = 0.0
@@ -102,6 +104,61 @@ def _selected_date_from_response(response: dict[str, Any] | None) -> str | None:
         if value:
             return value
     return None
+
+
+def _intelligence_state_candidate_count(state: dict[str, Any] | None) -> int:
+    current = dict(state or {})
+    opportunities = current.get("top_opportunities")
+    if isinstance(opportunities, list):
+        return len([item for item in opportunities if isinstance(item, Mapping)])
+    return 0
+
+
+def _normalize_intelligence_state_payload(state: dict[str, Any] | None) -> dict[str, Any] | None:
+    current = dict(state or {})
+    if not current:
+        return None
+    candidate_count = _intelligence_state_candidate_count(current)
+    current["candidate_count"] = candidate_count
+    nested_response = current.get("response") if isinstance(current.get("response"), dict) else None
+    if isinstance(nested_response, dict):
+        nested_response = dict(nested_response)
+        nested_response["candidate_count"] = candidate_count
+        current["response"] = nested_response
+    return current
+
+
+def _is_intelligence_state_payload_valid(state: dict[str, Any] | None) -> bool:
+    current = dict(state or {})
+    if not current:
+        return False
+    if any(key in current for key in ("top_opportunities", "by_sport", "analysis", "portfolio", "parlays")):
+        return True
+    nested_response = current.get("response") if isinstance(current.get("response"), dict) else None
+    if isinstance(nested_response, dict) and any(key in nested_response for key in ("top_opportunities", "by_sport", "analysis", "portfolio", "parlays")):
+        return True
+    return False
+
+
+def read_intelligence_state() -> dict[str, Any] | None:
+    print("[INTELLIGENCE STATE READ]", {"path": str(INTELLIGENCE_STATE_PATH)})
+    payload = read_json_file(INTELLIGENCE_STATE_PATH)
+    normalized = _normalize_intelligence_state_payload(payload if isinstance(payload, dict) else None)
+    if not _is_intelligence_state_payload_valid(normalized):
+        print("[INTELLIGENCE STATE READ]", {"path": str(INTELLIGENCE_STATE_PATH), "valid": False, "candidate_count": 0})
+        return None
+    print("[INTELLIGENCE STATE READ]", {"path": str(INTELLIGENCE_STATE_PATH), "valid": True, "candidate_count": int(normalized.get("candidate_count") or 0)})
+    return normalized
+
+
+def write_intelligence_state(state: dict[str, Any]) -> dict[str, Any] | None:
+    normalized = _normalize_intelligence_state_payload(state)
+    if not _is_intelligence_state_payload_valid(normalized):
+        print("[INTELLIGENCE STATE WRITE]", {"path": str(INTELLIGENCE_STATE_PATH), "written": False, "candidate_count": 0})
+        return None
+    write_json_file(INTELLIGENCE_STATE_PATH, normalized)
+    print("[INTELLIGENCE STATE WRITE]", {"path": str(INTELLIGENCE_STATE_PATH), "written": True, "candidate_count": int(normalized.get("candidate_count") or 0)})
+    return normalized
 
 
 def _intelligence_guard_is_busy() -> bool:

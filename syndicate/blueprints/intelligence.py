@@ -13,8 +13,10 @@ from flask import redirect
 from pipeline.intelligence_state import get_intelligence_state_response
 from pipeline.intelligence_state import compute_intelligence_state_response
 from pipeline.intelligence_state import read_latest_intelligence_board_snapshot_response
+from pipeline.intelligence_state import read_intelligence_state
 from pipeline.intelligence_state import read_latest_intelligence_state_response
 from pipeline.intelligence_state import intelligence_state_status
+from pipeline.intelligence_state import write_intelligence_state
 from pipeline.intelligence_state import queue_intelligence_state_refresh
 from syndicate.features.intelligence import build_intelligence_status
 from syndicate.features.intelligence import _market_focus_labels
@@ -848,102 +850,17 @@ def intelligence_query_api():
             response.status_code = 400
             return _no_cache_response(response)
         user_profile = _normalize_user_profile(payload)
-        want_refresh = bool(payload.get("force_refresh")) or bool(payload.get("background"))
-        explicit_override = _query_bool(payload.get("override_compute")) or _query_bool(payload.get("direct_compute"))
-
-        response_payload: dict[str, object] | None = None
         selected_date = str(payload.get("date") or payload.get("selected_date") or "").strip() or None
-        cache_payload = dict(payload)
-        if selected_date:
-            cache_payload["date"] = selected_date
-        cached_response, cached_source = _cached_intelligence_response_with_source(cache_payload)
-        _log_api_state_read(cached_response if isinstance(cached_response, dict) else {})
-        cached_is_fresh = cached_response is not None and not _response_needs_refresh(cache_payload, cached_response)
-        if question == DEFAULT_QUESTION and cached_is_fresh:
-            response_payload = dict(cached_response)
-            if want_refresh or not _response_has_content(response_payload):
-                queue_intelligence_state_refresh(dict(payload))
-        elif question == DEFAULT_QUESTION:
-            if want_refresh and not bool(payload.get("background")):
-                queue_intelligence_state_refresh(dict(payload))
-            if cached_is_fresh:
-                response_payload = _unwrap_response_payload(cached_response)
-            else:
-                response_payload = _unwrap_response_payload(_empty_default_intelligence_response())
-                queue_intelligence_state_refresh(dict(payload))
-            if not _response_has_content(response_payload):
-                queue_intelligence_state_refresh(dict(payload))
-        else:
-            if cached_is_fresh:
-                response_payload = dict(cached_response)
-                if want_refresh or not _response_has_content(response_payload):
-                    queue_intelligence_state_refresh(dict(payload))
-            else:
-                queue_intelligence_state_refresh(dict(payload))
-                board_result = get_intelligence_state_response(
-                    payload,
-                    refresh=True,
-                    wait=False,
-                    force_refresh=False,
-                )
-                if isinstance(board_result, dict):
-                    response_payload = _unwrap_response_payload(board_result)
-                elif explicit_override:
-                    board_result = run_intelligence_query(
-                        question,
-                        selected_date=selected_date,
-                        mode=str(payload.get("mode") or "").strip() or None,
-                        sport=str(payload.get("sport") or "").strip() or None,
-                        game_state=str(payload.get("game_state") or "").strip() or None,
-                        limit=payload.get("limit"),
-                        timing=str(payload.get("timing") or "").strip() or None,
-                        include_props=payload.get("include_props"),
-                        include_games=payload.get("include_games"),
-                        policy=str(payload.get("policy") or "").strip() or None,
-                        force_refresh=bool(payload.get("force_refresh")) if payload.get("force_refresh") is not None else False,
-                    )
-                    if isinstance(board_result, dict):
-                        response_payload = dict(board_result)
-
-        if not isinstance(response_payload, dict) or not response_payload:
-            if question == DEFAULT_QUESTION:
-                if (want_refresh or not _response_has_content(cached_response)) and not bool(payload.get("background")):
-                    queue_intelligence_state_refresh(dict(payload))
-                cached_response = _cached_intelligence_response(dict(payload))
-                if cached_response is None:
-                    cached_response = {
-                        "ok": True,
-                        "top_opportunities": [],
-                        "by_sport": {},
-                        "analysis": None,
-                    }
-                response_payload = _unwrap_response_payload(cached_response)
-            elif want_refresh and not bool(payload.get("background")):
-                queue_intelligence_state_refresh(dict(payload))
-                cached_response = get_intelligence_state_response(payload, refresh=False, wait=False)
-            else:
-                cached_response = get_intelligence_state_response(payload, refresh=False, wait=False)
-            if not _is_board_response(cached_response) or cached_response.get("ok") is False:
-                queue_intelligence_state_refresh(dict(payload))
-                cached_response = {
-                    "ok": True,
-                    "top_opportunities": [],
-                    "by_sport": {},
-                    "analysis": None,
-                }
-            if cached_response is None:
-                cached_response = {
-                    "ok": True,
-                    "top_opportunities": [],
-                    "by_sport": {},
-                    "analysis": None,
-                }
-            response_payload = _unwrap_response_payload(cached_response)
-
-        response_payload = _hydrate_board_response_payload(response_payload)
-
-        if _response_needs_refresh(cache_payload, response_payload) and not bool(payload.get("background")):
-            queue_intelligence_state_refresh(dict(payload))
+        state_payload = read_intelligence_state()
+        debug_source = "worker"
+        if not isinstance(state_payload, dict) or not _response_has_content(state_payload):
+            computed_state = compute_intelligence_state_response(dict(payload))
+            if not isinstance(computed_state, dict):
+                computed_state = {}
+            state_payload = dict(computed_state)
+            write_intelligence_state(state_payload)
+            debug_source = "render_compute"
+        response_payload: dict[str, object] = _hydrate_board_response_payload(dict(state_payload))
 
         board_headline = _board_headline_for_question(question, response_payload)
         parsed_request = _parsed_request_for_question(question, payload)
@@ -973,7 +890,6 @@ def intelligence_query_api():
             response["board_contract"] = build_intelligence_board_contract(response)
         _attach_intelligence_response_aliases(response)
         LAST_RESULT = dict(response.get("response") or response.get("analysis") or {})
-        debug_source = cached_source if cached_response is not None else "fallback"
         versioned_response = _versioned_query_response(response)
         versioned_response.update(_debug_state_fields(response, source=debug_source))
         return _no_cache_response(jsonify(versioned_response))
