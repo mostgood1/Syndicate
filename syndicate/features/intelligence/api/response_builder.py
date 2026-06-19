@@ -9,10 +9,22 @@ from syndicate.features.intelligence.models import Pick
 from syndicate.features.intelligence.models import Portfolio
 from syndicate.features.intelligence.scoring.edge import get_top_live_opportunities
 from syndicate.features.intelligence.signals.normalization import _numeric_hint
-from syndicate.features.intelligence.signals.normalization import _safe_text
+from syndicate.features.intelligence.signals.normalization import _safe_text as _base_safe_text
 
 
 MAX_CORRELATION_THRESHOLD = 0.65
+
+
+def _safe_text(*values: Any, default: str = "") -> str:
+    if not values:
+        return default
+    if len(values) == 1:
+        return _base_safe_text(values[0], default)
+    for value in values:
+        text = _base_safe_text(value, "")
+        if text:
+            return text
+    return default
 
 
 def _has_live_signal(candidate: dict[str, Any]) -> bool:

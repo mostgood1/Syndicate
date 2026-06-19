@@ -34,6 +34,7 @@ from syndicate.features.intelligence import _query_preferences
 from syndicate.features.intelligence import build_intelligence_overview
 from syndicate.features.intelligence import get_top_live_opportunities
 from syndicate.features.intelligence import run_intelligence_query
+from syndicate.features.intelligence.api.response_builder import _recommendation_state
 
 
 def _sample_overview() -> list[dict[str, object]]:
@@ -1336,6 +1337,52 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertEqual(len(opportunities), 1)
         self.assertEqual(opportunities[0].get("display_name"), "Carlos Rodon")
         self.assertEqual(opportunities[0].get("selection"), "Over")
+
+    def test_recommendation_state_accepts_fallback_fields_without_error(self) -> None:
+        candidate = {
+            "status_context": "",
+            "settlement_status": "",
+            "settlement_state": "Resolved",
+            "settlement_label": "",
+            "settlement": {"status": "", "status_label": ""},
+            "actual": "",
+            "actual_value": "",
+            "actual_so_far": "",
+            "current_actual": "",
+            "live_actual": "",
+        }
+
+        self.assertEqual(_recommendation_state(candidate), "final")
+
+    def test_get_top_live_opportunities_accepts_fallback_fields_without_error(self) -> None:
+        recommendations = [
+            {
+                "status_context": "Live",
+                "selection": "",
+                "pick": "",
+                "name": "A'ja Wilson Over 24.5",
+                "sport": "WNBA",
+                "sport_slug": "wnba",
+                "market": "PTS",
+                "market_key": "",
+                "player_name": "A'ja Wilson",
+                "matchup": "LVA at SEA",
+                "candidate_type": "player_prop",
+                "actual": "",
+                "actual_value": "",
+                "actual_so_far": "27",
+                "current_actual": "",
+                "live_actual": "",
+                "ev_current": 0.12,
+                "line_movement_impact": 0.03,
+                "confidence": 0.61,
+                "edge": 0.08,
+            }
+        ]
+
+        top_live = get_top_live_opportunities(recommendations, limit=5)
+        self.assertEqual(len(top_live), 1)
+        self.assertEqual(top_live[0]["display_name"], "A'ja Wilson")
 
     def test_intelligence_query_api_returns_player_analysis_payload(self) -> None:
         advanced_rows = [
