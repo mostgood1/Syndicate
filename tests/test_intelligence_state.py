@@ -479,26 +479,16 @@ class IntelligenceStateTests(unittest.TestCase):
             self.assertTrue(state_path.exists())
             self.assertTrue(board_snapshot_path.exists())
 
-    def test_cached_intelligence_response_uses_render_compute_when_cache_is_empty(self) -> None:
+    def test_cached_intelligence_response_stays_on_fallback_when_cache_is_empty(self) -> None:
         payload = {"question": "top edges today", "date": "2026-06-15"}
-        computed_response = {
-            "ok": True,
-            "top_opportunities": [{"name": "Play 1", "sport_slug": "mlb", "market": "Hits"}],
-            "by_sport": {"mlb": [{"name": "Play 1", "sport_slug": "mlb", "market": "Hits"}]},
-            "analysis": {"recommendations": [{"name": "Play 1", "sport_slug": "mlb", "market": "Hits"}]},
-            "response": {"analysis": {"recommendations": [{"name": "Play 1", "sport_slug": "mlb", "market": "Hits"}]}},
-        }
-
         with patch("syndicate.blueprints.intelligence.read_latest_intelligence_board_snapshot_response", return_value=None):
             with patch("syndicate.blueprints.intelligence.read_latest_intelligence_state_response", return_value=None):
-                with patch("syndicate.blueprints.intelligence.compute_intelligence_state_response", return_value=dict(computed_response)) as mocked_compute:
+                with patch("syndicate.blueprints.intelligence.compute_intelligence_state_response") as mocked_compute:
                     cached_response, source = intelligence_module._cached_intelligence_response_with_source(payload)
 
-        self.assertEqual(source, "render_compute")
-        self.assertIsInstance(cached_response, dict)
-        self.assertGreater(len(cached_response.get("top_opportunities") or []), 0)
-        self.assertEqual(cached_response.get("top_opportunities", [])[0]["name"], "Play 1")
-        mocked_compute.assert_called_once()
+        self.assertEqual(source, "fallback")
+        self.assertIsNone(cached_response)
+        mocked_compute.assert_not_called()
 
     def test_intelligence_home_renders_initial_board_shell(self) -> None:
         app = create_app()

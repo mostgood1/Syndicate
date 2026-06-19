@@ -440,9 +440,6 @@ def _cached_intelligence_response_with_source(payload: dict[str, object], *, for
     cached_response = read_latest_intelligence_state_response(payload, force_refresh=force_refresh)
     if _is_board_response(cached_response) and not _response_needs_refresh(payload, cached_response):
         return _hydrate_board_response_payload(cached_response), "worker"
-    computed_response = compute_intelligence_state_response(dict(payload))
-    if _is_board_response(computed_response):
-        return _hydrate_board_response_payload(computed_response), "render_compute"
     return None, "fallback"
 
 
@@ -828,10 +825,6 @@ def intelligence_home():
         cached_response, _ = _cached_intelligence_response_with_source(payload)
         if cached_response is not None and _response_has_content(cached_response) and not _response_needs_refresh(payload, cached_response):
             initial_response = dict(cached_response)
-        elif _render_hosted_request():
-            computed_response = compute_intelligence_state_response(dict(payload))
-            if isinstance(computed_response, dict) and _is_board_response(computed_response):
-                initial_response = _hydrate_board_response_payload(computed_response)
         else:
             queue_intelligence_state_refresh(dict(payload))
     except Exception:

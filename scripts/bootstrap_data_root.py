@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import datetime as dt
+import filecmp
 import logging
 import os
 import subprocess
@@ -37,6 +38,13 @@ BOOTSTRAP_ROOTS = (
 
 
 def _copy_file_if_needed(src: Path, dst: Path) -> None:
+    if dst.exists() and dst.is_file():
+        try:
+            if filecmp.cmp(src, dst, shallow=False):
+                logger.debug("skipped unchanged file %s", src)
+                return
+        except Exception:
+            pass
     shutil.copy2(src, dst)
     logger.debug("copied %s -> %s", src, dst)
 

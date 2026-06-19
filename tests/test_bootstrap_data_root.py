@@ -72,6 +72,26 @@ class BootstrapDataRootTests(unittest.TestCase):
 
             self.assertEqual(dest_file.read_text(encoding="utf-8"), "aaaa\n")
 
+    def test_sync_tree_skips_unchanged_files(self) -> None:
+        module = _load_module()
+        with tempfile.TemporaryDirectory() as src_dir, tempfile.TemporaryDirectory() as dst_dir:
+            src_root = Path(src_dir)
+            dst_root = Path(dst_dir)
+            relative_path = Path("wnba_source") / "data" / "processed" / "props_recommendations_top_by_game_2026-06-18.json"
+            source_file = src_root / relative_path
+            dest_file = dst_root / relative_path
+            source_file.parent.mkdir(parents=True, exist_ok=True)
+            dest_file.parent.mkdir(parents=True, exist_ok=True)
+            source_file.write_text("{\"ok\": true}\n", encoding="utf-8")
+            dest_file.write_text("{\"ok\": true}\n", encoding="utf-8")
+
+            with patch.object(module.filecmp, "cmp", return_value=True):
+                with patch.object(module.shutil, "copy2") as copy_mock:
+                    module._sync_tree(src_root, dst_root, {}, "wnba_source")
+
+            self.assertEqual(dest_file.read_text(encoding="utf-8"), '{"ok": true}\n')
+            copy_mock.assert_not_called()
+
     def test_bootstrap_roots_include_render_critical_paths(self) -> None:
         module = _load_module()
         with tempfile.TemporaryDirectory() as temp_dir:
