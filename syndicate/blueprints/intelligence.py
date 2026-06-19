@@ -1061,7 +1061,9 @@ def intelligence_status_api():
         state_snapshot: dict[str, Any] | None = None
         debug_source = "worker"
         if _render_hosted_request():
-            cached_board_response, board_source = _cached_intelligence_response_with_source(selected_date=selected_date, question=DEFAULT_QUESTION)
+            cached_board_response, board_source = _cached_intelligence_response_with_source(
+                _intelligence_page_payload(selected_date)
+            )
             if _response_has_content(cached_board_response):
                 status["candidate_count"] = _status_candidate_count_from_response(cached_board_response)
                 status["debug_source"] = board_source

@@ -4206,6 +4206,15 @@ def _build_sport_overview(
         data_warnings.append("No game rows surfaced")
     if props_count <= 0:
         data_warnings.append("No prop rows surfaced")
+    if active_today and slug == "wnba" and (games_count <= 0 or props_count <= 0):
+        current_app.logger.warning(
+            "WNBA overview source missing for %s: games=%s pregame=%s live=%s dashboard_games=%s",
+            context_label,
+            games_count,
+            len(pregame_prop_items),
+            len(live_prop_items),
+            len(home_games),
+        )
     overview["data_warnings"] = data_warnings
     overview["data_health"] = "healthy" if not data_warnings else ("stale" if active_today and games_count <= 0 else "partial")
     _HOME_OVERVIEW_CACHE[cache_key] = (time.monotonic(), overview)

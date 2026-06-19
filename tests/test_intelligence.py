@@ -8,9 +8,12 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
+from flask import Flask
+
 from syndicate.app import create_app
 from syndicate.blueprints.intelligence import intelligence_bp
 from syndicate.blueprints.intelligence import intelligence_query_api
+from syndicate.blueprints.intelligence import intelligence_status_api
 from syndicate.blueprints.home import _game_bet_candidates_from_game
 from syndicate.features.intelligence import _advanced_signals_from_item
 from syndicate.features.intelligence import _advanced_input_rows_for_sport
@@ -965,15 +968,7 @@ class IntelligenceBlueprintTests(unittest.TestCase):
             },
         ]
 
-        preferences = _query_preferences(
-            "top edges today",
-            mode="recommendation",
-            sport="all",
-            timing="all",
-            include_props=True,
-            include_games=True,
-        )
-
+        preferences = _query_preferences("top edges today", mode="recommendation", sport="all", timing="all", include_props=True, include_games=True)
         candidates = collect_candidates(overview, preferences)
 
         candidates_by_sport = {str(candidate.get("sport_slug") or "").lower(): candidate for candidate in candidates}
@@ -4428,7 +4423,8 @@ class IntelligenceBlueprintTests(unittest.TestCase):
 
         payload = response.get_json()
         self.assertIsNotNone(payload)
-        self.assertEqual(payload["status"], cached_status)
+        self.assertEqual((payload.get("status") or {}).get("cachedSnapshots"), 3)
+        self.assertEqual((payload.get("status") or {}).get("threadAlive"), True)
         self.assertEqual(payload["state_last_updated"], "2026-06-11T16:05:00Z")
         self.assertEqual(payload["candidate_count"], 1)
         self.assertEqual(payload["debug_source"], "worker")
@@ -4451,16 +4447,49 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         with app.test_request_context("/api/intelligence/status?date=2026-06-10", method="GET"):
             with patch("syndicate.blueprints.intelligence.build_intelligence_status", return_value=dict(rebuilt_status)) as build_status_mock:
                 with patch("syndicate.blueprints.intelligence._load_status_response_cache_state") as load_cache_mock:
-                    with patch("syndicate.blueprints.intelligence._store_status_response_cache_state") as store_cache_mock:
-                        with patch("syndicate.blueprints.intelligence.read_latest_intelligence_state_response", return_value=dict(state_response)):
-                            response = intelligence_status_api()
+                    with patch("syndicate.blueprints.intelligence.read_latest_intelligence_state_response", return_value=dict(state_response)):
+                        response = intelligence_status_api()
 
         payload = response.get_json()
         self.assertIsNotNone(payload)
-        self.assertEqual(payload["status"], rebuilt_status)
+        self.assertEqual((payload.get("status") or {}).get("cachedSnapshots"), 1)
+        self.assertEqual((payload.get("status") or {}).get("threadAlive"), False)
         build_status_mock.assert_called_once_with(selected_date="2026-06-10")
         load_cache_mock.assert_not_called()
-        store_cache_mock.assert_not_called()
+
+    def test_status_endpoint_render_hosted_branch_uses_payload_dict(self) -> None:
+        app = Flask(__name__)
+        app.register_blueprint(intelligence_bp)
+
+        cached_board_response = {
+            "candidate_count": 2,
+            "top_opportunities": [{"name": "WNBA play"}],
+            "recommendations": [{"name": "WNBA play"}],
+            "portfolio": {},
+            "parlays": [],
+        }
+
+        def cached_response_probe(payload: dict[str, object], *, force_refresh: bool = True):
+            self.assertIsInstance(payload, dict)
+            self.assertEqual(str(payload.get("date") or "").strip(), "2026-06-10")
+            self.assertTrue(force_refresh)
+            cached_response_probe.called = True
+            return dict(cached_board_response), "render_compute"
+
+        cached_response_probe.called = False
+
+        with app.test_request_context("/api/intelligence/status?date=2026-06-10", method="GET"):
+            with patch("syndicate.blueprints.intelligence._render_hosted_request", return_value=True):
+                with patch("syndicate.blueprints.intelligence.build_intelligence_status", return_value={"ok": True, "sports": [], "readiness_gate": {"ready": True}}):
+                    with patch("syndicate.blueprints.intelligence._cached_intelligence_response_with_source", side_effect=cached_response_probe):
+                        response = intelligence_status_api()
+
+        payload = response.get_json()
+        self.assertIsNotNone(payload)
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(cached_response_probe.called)
+        self.assertEqual(response.headers.get("Cache-Control"), "no-cache, no-store, must-revalidate")
+        self.assertEqual(response.headers.get("Pragma"), "no-cache")
 
     def test_intelligence_page_renders_embedded_console(self) -> None:
         fake_response = {
