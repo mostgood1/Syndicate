@@ -16,20 +16,6 @@ logger = logging.getLogger("bootstrap_data_root")
 logger.setLevel(logging.INFO)
 
 BOOTSTRAP_ROOTS = (
-    Path("data/mlb_source/source_artifacts"),
-    Path("data/mlb_source/manifests"),
-    Path("data/nba_source/source_artifacts"),
-    Path("data/nba_source/manifests"),
-    Path("data/nhl_source/source_artifacts"),
-    Path("data/nhl_source/manifests"),
-    Path("data/nfl_source/source_artifacts"),
-    Path("data/nfl_source/manifests"),
-    Path("data/ncaaf_source/source_artifacts"),
-    Path("data/ncaaf_source/manifests"),
-    Path("data/ncaab_source/source_artifacts"),
-    Path("data/ncaab_source/manifests"),
-    Path("data/wnba_source/source_artifacts"),
-    Path("data/wnba_source/manifests"),
     Path("reports/odds_control_plane"),
     Path("reports/intelligence"),
     Path("reports/daily_update/latest"),
@@ -153,7 +139,8 @@ def main() -> int:
     # Merge the Render-critical published artifact roots into the mounted data root on startup.
     logger.info("Bootstrapping data root: repo=%s data_root=%s", repo_root, data_root)
     counters = _sync_bootstrap_roots(repo_root, data_root)
-    _bootstrap_wnba_today_artifacts(repo_root, data_root)
+    if _env_bool("SYNDICATE_BOOTSTRAP_WNBA_TODAY"):
+        _bootstrap_wnba_today_artifacts(repo_root, data_root)
 
     # Log summary counts
     if counters:
