@@ -9,6 +9,22 @@ def _safe_text(value: Any, fallback: str = "-") -> str:
     return text or fallback
 
 
+def _safe_float(value: Any) -> float | None:
+    if value is None:
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    if isinstance(value, str):
+        text = value.strip().replace("%", "")
+        if not text:
+            return None
+        try:
+            return float(text)
+        except Exception:
+            return None
+    return None
+
+
 def _numeric_hint(value: Any) -> float | None:
     text = str(value or "").strip()
     if not text or text == "-":
@@ -16,10 +32,7 @@ def _numeric_hint(value: Any) -> float | None:
     match = re.search(r"([+-]?\d+(?:\.\d+)?)", text)
     if not match:
         return None
-    try:
-        return float(match.group(1))
-    except Exception:
-        return None
+    return _safe_float(match.group(1))
 
 
 def _pct_hint(value: Any) -> float | None:
@@ -28,4 +41,4 @@ def _pct_hint(value: Any) -> float | None:
         return None
     if abs(number) <= 1.0:
         number *= 100.0
-    return float(number)
+    return number

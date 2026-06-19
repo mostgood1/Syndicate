@@ -9,6 +9,7 @@ from syndicate.features.intelligence.models import Pick
 from syndicate.features.intelligence.models import Portfolio
 from syndicate.features.intelligence.scoring.edge import get_top_live_opportunities
 from syndicate.features.intelligence.signals.normalization import _numeric_hint
+from syndicate.features.intelligence.signals.normalization import _safe_float
 from syndicate.features.intelligence.signals.normalization import _safe_text as _base_safe_text
 
 
@@ -267,12 +268,9 @@ def _frontend_portfolio(recommendations: list[dict[str, Any]]) -> dict[str, Any]
 
     def _number(*values: Any, default: float = 0.0) -> float:
         for value in values:
-            try:
-                if value is None:
-                    continue
-                return float(value)
-            except (TypeError, ValueError):
-                continue
+            numeric_value = _safe_float(value)
+            if numeric_value is not None:
+                return numeric_value
         return default
 
     risk_level = _safe_text(risk_profile.get("level") or portfolio.get("risk_level"), "low")
@@ -350,8 +348,8 @@ def build_response(*, recommendations: list[dict[str, Any]], parlays: list[dict[
     )
     pick_payloads = [Pick.model_validate(_frontend_pick(candidate)).model_dump() for candidate in ordered_recommendations]
     recommendation_payloads = [_frontend_recommendation(candidate) for candidate in ordered_recommendations]
-    movement_deltas = [float(item.get("edge_delta")) for item in pick_payloads if item.get("edge_delta") is not None]
-    movement_edge_delta = round(sum(movement_deltas) / float(len(movement_deltas)), 4) if movement_deltas else None
+    movement_deltas = [value for value in (_safe_float(item.get("edge_delta")) for item in pick_payloads) if value is not None]
+    movement_edge_delta = round(sum(movement_deltas) / len(movement_deltas), 4) if movement_deltas else None
     if movement_edge_delta is None:
         movement_trend = "flat"
     elif movement_edge_delta > 0.01:

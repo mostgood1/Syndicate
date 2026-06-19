@@ -4,6 +4,7 @@ import re
 from typing import Any
 
 from syndicate.features.intelligence.signals.normalization import _numeric_hint
+from syndicate.features.intelligence.signals.normalization import _safe_float
 from syndicate.features.intelligence.signals.normalization import _safe_text as _base_safe_text
 
 
@@ -194,10 +195,10 @@ def get_top_live_opportunities(
 
     candidates.sort(
         key=lambda item: (
-            float(item.get("ev_current") or 0.0),
-            float(item.get("ev_delta") or 0.0),
-            float(item.get("adjusted_score") or 0.0),
-            float(item.get("confidence") or 0.0),
+            _safe_float(item.get("ev_current")) or 0.0,
+            _safe_float(item.get("ev_delta")) or 0.0,
+            _safe_float(item.get("adjusted_score")) or 0.0,
+            _safe_float(item.get("confidence")) or 0.0,
         ),
         reverse=True,
     )
