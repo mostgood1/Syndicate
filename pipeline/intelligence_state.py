@@ -4,7 +4,6 @@ import hashlib
 import json
 import logging
 import os
-import tempfile
 import threading
 import time
 from collections import OrderedDict
@@ -42,7 +41,8 @@ REPO_ROOT = repo_root_from(__file__)
 STATE_PATH = reports_root() / "intelligence" / "query_state_cache.json"
 BOARD_SNAPSHOT_PATH = reports_root() / "intelligence" / "board_snapshot.json"
 STATUS_CACHE_PATH = reports_root() / "intelligence" / "status_response_cache.json"
-INTELLIGENCE_STATE_PATH = Path(tempfile.gettempdir()) / "intelligence_state.json"
+INTELLIGENCE_STATE_PATH = reports_root() / "intelligence" / "intelligence_state.json"
+INTELLIGENCE_HISTORY_PATH = reports_root() / "intelligence" / "intelligence_state_history.jsonl"
 logger = logging.getLogger(__name__)
 _INTELLIGENCE_EXECUTION_GUARD = threading.RLock()
 _INTELLIGENCE_LAST_RUN_STARTED_AT: float = 0.0
@@ -128,6 +128,35 @@ def _normalize_intelligence_state_payload(state: dict[str, Any] | None) -> dict[
     return current
 
 
+def _intelligence_state_daily_suffix() -> str:
+    return central_today_iso().replace("-", "_")
+
+
+def _intelligence_state_daily_paths() -> dict[str, Path]:
+    suffix = _intelligence_state_daily_suffix()
+    base_dir = reports_root() / "intelligence"
+    return {
+        "state": base_dir / f"intelligence_state_{suffix}.json",
+        "history": base_dir / f"intelligence_state_history_{suffix}.jsonl",
+        "board_snapshot": base_dir / f"board_snapshot_{suffix}.json",
+    }
+
+
+def _intelligence_state_history_entry(state: dict[str, Any]) -> dict[str, Any]:
+    response = state.get("response") if isinstance(state.get("response"), dict) else {}
+    top_opportunities = response.get("top_opportunities") if isinstance(response, dict) and isinstance(response.get("top_opportunities"), list) else state.get("top_opportunities")
+    opportunity_names = [str(item.get("name") or item.get("selection") or item.get("pick") or "").strip() for item in top_opportunities or [] if isinstance(item, Mapping)]
+    opportunity_names = [name for name in opportunity_names if name]
+    return {
+        "updated_at": _utc_now(),
+        "last_updated": str(state.get("last_updated") or response.get("last_updated") or "").strip() or None,
+        "selected_date": str(state.get("selected_date") or response.get("selected_date") or response.get("date") or "").strip() or None,
+        "candidate_count": _intelligence_state_candidate_count(state),
+        "top_opportunity_names": opportunity_names,
+        "board_contract_schema": str((response.get("board_contract") or state.get("board_contract") or {}).get("schema") or "").strip() or None if isinstance((response.get("board_contract") or state.get("board_contract") or {}), dict) else None,
+    }
+
+
 def _is_intelligence_state_payload_valid(state: dict[str, Any] | None) -> bool:
     current = dict(state or {})
     if not current:
@@ -156,7 +185,25 @@ def write_intelligence_state(state: dict[str, Any]) -> dict[str, Any] | None:
     if not _is_intelligence_state_payload_valid(normalized):
         print("[INTELLIGENCE STATE WRITE]", {"path": str(INTELLIGENCE_STATE_PATH), "written": False, "candidate_count": 0})
         return None
+    daily_paths = _intelligence_state_daily_paths()
+    board_snapshot_payload = {
+        "updated_at": _utc_now(),
+        "response": dict(normalized),
+        "board_contract": normalized.get("board_contract") if isinstance(normalized.get("board_contract"), dict) else None,
+    }
     write_json_file(INTELLIGENCE_STATE_PATH, normalized)
+    write_json_file(daily_paths["state"], normalized)
+    history_entry = _intelligence_state_history_entry(normalized)
+    INTELLIGENCE_HISTORY_PATH.parent.mkdir(parents=True, exist_ok=True)
+    with INTELLIGENCE_HISTORY_PATH.open("a", encoding="utf-8") as history_file:
+        history_file.write(json.dumps(history_entry, sort_keys=True, ensure_ascii=False, default=str))
+        history_file.write("\n")
+    daily_paths["history"].parent.mkdir(parents=True, exist_ok=True)
+    with daily_paths["history"].open("a", encoding="utf-8") as history_file:
+        history_file.write(json.dumps(history_entry, sort_keys=True, ensure_ascii=False, default=str))
+        history_file.write("\n")
+    write_json_file(BOARD_SNAPSHOT_PATH, board_snapshot_payload)
+    write_json_file(daily_paths["board_snapshot"], board_snapshot_payload)
     print("[INTELLIGENCE STATE WRITE]", {"path": str(INTELLIGENCE_STATE_PATH), "written": True, "candidate_count": int(normalized.get("candidate_count") or 0)})
     return normalized
 

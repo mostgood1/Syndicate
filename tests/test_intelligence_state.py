@@ -285,7 +285,13 @@ class IntelligenceStateTests(unittest.TestCase):
 
     def test_intelligence_state_roundtrip_persists_to_tmp_file(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
-            state_path = Path(tmp_dir) / "intelligence_state.json"
+            reports_root = Path(tmp_dir) / "reports"
+            state_path = reports_root / "intelligence" / "intelligence_state.json"
+            board_snapshot_path = reports_root / "intelligence" / "board_snapshot.json"
+            history_path = reports_root / "intelligence" / "intelligence_state_history.jsonl"
+            daily_state_path = reports_root / "intelligence" / "intelligence_state_2026_06_18.json"
+            daily_board_snapshot_path = reports_root / "intelligence" / "board_snapshot_2026_06_18.json"
+            daily_history_path = reports_root / "intelligence" / "intelligence_state_history_2026_06_18.jsonl"
             state_payload = {
                 "ok": True,
                 "top_opportunities": [{"name": "Play 1"}, {"name": "Play 2"}],
@@ -293,16 +299,25 @@ class IntelligenceStateTests(unittest.TestCase):
                 "analysis": {"recommendations": [{"name": "Play 1"}], "picks": [], "top_live_opportunities": [], "portfolio": {}, "parlays": []},
             }
 
-            with patch.object(intelligence_state_module, "INTELLIGENCE_STATE_PATH", state_path):
-                with patch("builtins.print") as mocked_print:
-                    written = intelligence_state_module.write_intelligence_state(dict(state_payload))
-                    loaded = intelligence_state_module.read_intelligence_state()
-                    self.assertTrue(state_path.exists())
+            with patch.object(intelligence_state_module, "reports_root", return_value=reports_root):
+                with patch.object(intelligence_state_module, "central_today_iso", return_value="2026-06-18"):
+                    with patch.object(intelligence_state_module, "INTELLIGENCE_STATE_PATH", state_path), patch.object(intelligence_state_module, "BOARD_SNAPSHOT_PATH", board_snapshot_path), patch.object(intelligence_state_module, "INTELLIGENCE_HISTORY_PATH", history_path):
+                        with patch("builtins.print") as mocked_print:
+                            written = intelligence_state_module.write_intelligence_state(dict(state_payload))
+                            loaded = intelligence_state_module.read_intelligence_state()
+                            self.assertTrue(state_path.exists())
+                            self.assertTrue(board_snapshot_path.exists())
+                            self.assertTrue(history_path.exists())
+                            self.assertTrue(daily_state_path.exists())
+                            self.assertTrue(daily_board_snapshot_path.exists())
+                            self.assertTrue(daily_history_path.exists())
 
             self.assertIsInstance(written, dict)
             self.assertIsInstance(loaded, dict)
             self.assertEqual(int(loaded.get("candidate_count") or 0), 2)
             self.assertEqual(int(written.get("candidate_count") or 0), 2)
+            self.assertEqual(history_path.read_text(encoding="utf-8").strip().count("\n") + 1, 1)
+            self.assertEqual(daily_history_path.read_text(encoding="utf-8").strip().count("\n") + 1, 1)
             self.assertGreaterEqual(mocked_print.call_count, 2)
 
     def test_state_compute_backfills_empty_engine_recommendations_from_top_opportunities(self) -> None:

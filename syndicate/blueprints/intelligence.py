@@ -13,6 +13,7 @@ from flask import redirect
 from pipeline.intelligence_state import get_intelligence_state_response
 from pipeline.intelligence_state import compute_intelligence_state_response
 from pipeline.intelligence_state import read_latest_intelligence_board_snapshot_response
+from pipeline.intelligence_state import read_intelligence_state
 from pipeline.intelligence_state import read_latest_intelligence_state_response
 from pipeline.intelligence_state import intelligence_state_status
 from pipeline.intelligence_state import write_intelligence_state
@@ -850,18 +851,21 @@ def intelligence_query_api():
     user_profile = _normalize_user_profile(payload)
     selected_date = str(payload.get("date") or payload.get("selected_date") or "").strip() or None
 
-    print("COMPUTE RUN")
-    state_payload = compute_intelligence_state_response(dict(payload))
-    candidate_count = len((state_payload or {}).get("top_opportunities") or []) if isinstance(state_payload, dict) else 0
-    if not isinstance(state_payload, dict):
-        state_payload = {}
-    state_payload["candidate_count"] = candidate_count
-    written_state = write_intelligence_state(state_payload)
-    print(f"STATE WRITTEN: {candidate_count}")
-    if isinstance(written_state, dict):
-        state_payload = dict(written_state)
+    state_payload = read_intelligence_state()
+    debug_source = "persisted_state"
+    if not isinstance(state_payload, dict) or not _response_has_content(state_payload):
+        print("COMPUTE RUN")
+        state_payload = compute_intelligence_state_response(dict(payload))
+        candidate_count = len((state_payload or {}).get("top_opportunities") or []) if isinstance(state_payload, dict) else 0
+        if not isinstance(state_payload, dict):
+            state_payload = {}
+        state_payload["candidate_count"] = candidate_count
+        written_state = write_intelligence_state(state_payload)
+        print(f"STATE WRITTEN: {candidate_count}")
+        if isinstance(written_state, dict):
+            state_payload = dict(written_state)
+        debug_source = "render_compute"
 
-    debug_source = "render_compute"
     response_payload: dict[str, object] = _hydrate_board_response_payload(dict(state_payload))
 
     board_headline = _board_headline_for_question(question, response_payload)

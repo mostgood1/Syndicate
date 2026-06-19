@@ -1,6 +1,6 @@
 {
-  "latest_key": "d173103ea7df1f6c0bd53a3bb4866d645e18a816984b2e198cbeddf1872a19e8",
-  "updated_at": "2026-06-19T02:40:07Z",
+  "latest_key": "8d4313c66718af04bcf8f00f6448034e592efd123cba17a25fb17c04e2b60193",
+  "updated_at": "2026-06-19T03:15:33Z",
   "response": {
     "ok": true,
     "top_opportunities": [],
@@ -19,12 +19,12 @@
       "evidence": [],
       "supporting_evidence": [],
       "evaluation_record": {},
-      "query_type": "player_analysis",
+      "query_type": "explanation",
       "preferences": {},
       "parsed_request": {},
       "analysis_views": {},
       "structured_response": {
-        "intent": "player_analysis",
+        "intent": "explanation",
         "summary": "No summary was returned, so the board should be read through the returned recommendations and evidence.",
         "clear_summary": "No summary was returned, so the board should be read through the returned recommendations and evidence.",
         "deep_analysis": [
@@ -34,35 +34,36 @@
           "is_vague": true,
           "confidence": "low",
           "detected_signals": [
-            "mode=pregame",
-            "intent=player_analysis"
+            "mode=explanation",
+            "intent=explanation"
           ],
           "detected_sports": [],
           "multi_sport": false,
           "assumptions": [
             "I assumed you want the strongest board-wide read because no specific sport or market was named.",
-            "I treated the request as a player analysis prompt so the engine could answer instead of waiting for more input."
+            "I treated the request as a explanation prompt so the engine could answer instead of waiting for more input."
           ],
           "clarifying_questions": [
             "Which sport should I narrow this to?",
-            "Do you want props, game plays, or both?"
+            "Do you want props, game plays, or both?",
+            "Should I focus on live, pregame, or both?"
           ],
           "reasoning": "The request was handled as a general explanation because the prompt did not pin down a narrower market frame. Because the prompt was vague, the pipeline also made best-effort assumptions and preserved clarifying questions for follow-up.",
           "recommendation_count": 0,
           "reasoning_step_count": 0
         },
         "routing_context": {
-          "question": "Analyze Jayson Tatum tonight",
-          "query_type": "player_analysis",
-          "mode": "pregame",
-          "selected_date": "2026-06-13",
+          "question": "top edges today",
+          "query_type": "explanation",
+          "mode": "explanation",
+          "selected_date": "2026-06-18",
           "preview_subject": null,
-          "player_subject": "Jayson Tatum",
+          "player_subject": null,
           "sport": null,
           "game_state": null,
           "limit": null,
-          "include_props": true,
-          "include_games": true
+          "include_props": null,
+          "include_games": null
         },
         "odds_control_plane": {},
         "key_insights": [],
@@ -70,48 +71,25 @@
         "risks_uncertainty": [],
         "recommended_interpretation": "Best takeaway: use the returned evidence and risks to interpret the board directionally, since no single standout candidate was returned.",
         "final_takeaway": "Best takeaway: use the returned evidence and risks to interpret the board directionally, since no single standout candidate was returned.",
-        "reasoning_steps": [],
-        "player_analysis": {
-          "player": "Jayson Tatum",
-          "matchup": null,
-          "player_outlook": {
-            "summary": "Top player outlook built from the current board.",
-            "selected_player_play": null,
-            "selected_game": null
-          },
-          "matchup_analysis": {
-            "summary": "Matchup analysis built from the current board.",
-            "plays": []
-          },
-          "prop_recap": {
-            "summary": "Top prop recap built from the current board.",
-            "plays": []
-          },
-          "top_single_plays": [],
-          "same_game_parlays": [],
-          "risks": [
-            "The analysis is anchored to Jayson Tatum, so lineup, usage, or foul trouble changes can move the read quickly."
-          ],
-          "final_recommendation": "No clear player edge surfaced."
-        }
+        "reasoning_steps": []
       },
       "reasoning_steps": [],
       "board_notes": [],
       "readiness_gate": {},
-      "state_last_updated": "2026-06-19T02:40:07Z",
-      "last_updated": "2026-06-19T02:40:07Z",
+      "state_last_updated": "2026-06-19T03:15:33Z",
+      "last_updated": "2026-06-19T03:15:33Z",
       "candidate_count": 0
     },
     "candidate_pool": {
-      "selected_date": "2026-06-13",
-      "source_fingerprint": "4979400f6f07a91684eb121be90f038eafea7dfd623741639d6341ed151cb1cf",
+      "selected_date": "2026-06-18",
+      "source_fingerprint": "59dbdd210cb7da01d38c3bac0e1e45b1689ba6dfae95443be029a8d549982746",
       "candidate_count": 0,
       "candidate_pools": {},
       "global_pool": [],
       "candidates": []
     },
-    "state_last_updated": "2026-06-19T02:40:07Z",
-    "last_updated": "2026-06-19T02:40:07Z",
+    "state_last_updated": "2026-06-19T03:15:33Z",
+    "last_updated": "2026-06-19T03:15:33Z",
     "candidate_count": 0,
     "response": {
       "recommendations": [],
@@ -127,12 +105,12 @@
       "evidence": [],
       "supporting_evidence": [],
       "evaluation_record": {},
-      "query_type": "player_analysis",
+      "query_type": "explanation",
       "preferences": {},
       "parsed_request": {},
       "analysis_views": {},
       "structured_response": {
-        "intent": "player_analysis",
+        "intent": "explanation",
         "summary": "No summary was returned, so the board should be read through the returned recommendations and evidence.",
         "clear_summary": "No summary was returned, so the board should be read through the returned recommendations and evidence.",
         "deep_analysis": [
@@ -142,35 +120,36 @@
           "is_vague": true,
           "confidence": "low",
           "detected_signals": [
-            "mode=pregame",
-            "intent=player_analysis"
+            "mode=explanation",
+            "intent=explanation"
           ],
           "detected_sports": [],
           "multi_sport": false,
           "assumptions": [
             "I assumed you want the strongest board-wide read because no specific sport or market was named.",
-            "I treated the request as a player analysis prompt so the engine could answer instead of waiting for more input."
+            "I treated the request as a explanation prompt so the engine could answer instead of waiting for more input."
           ],
           "clarifying_questions": [
             "Which sport should I narrow this to?",
-            "Do you want props, game plays, or both?"
+            "Do you want props, game plays, or both?",
+            "Should I focus on live, pregame, or both?"
           ],
           "reasoning": "The request was handled as a general explanation because the prompt did not pin down a narrower market frame. Because the prompt was vague, the pipeline also made best-effort assumptions and preserved clarifying questions for follow-up.",
           "recommendation_count": 0,
           "reasoning_step_count": 0
         },
         "routing_context": {
-          "question": "Analyze Jayson Tatum tonight",
-          "query_type": "player_analysis",
-          "mode": "pregame",
-          "selected_date": "2026-06-13",
+          "question": "top edges today",
+          "query_type": "explanation",
+          "mode": "explanation",
+          "selected_date": "2026-06-18",
           "preview_subject": null,
-          "player_subject": "Jayson Tatum",
+          "player_subject": null,
           "sport": null,
           "game_state": null,
           "limit": null,
-          "include_props": true,
-          "include_games": true
+          "include_props": null,
+          "include_games": null
         },
         "odds_control_plane": {},
         "key_insights": [],
@@ -178,36 +157,13 @@
         "risks_uncertainty": [],
         "recommended_interpretation": "Best takeaway: use the returned evidence and risks to interpret the board directionally, since no single standout candidate was returned.",
         "final_takeaway": "Best takeaway: use the returned evidence and risks to interpret the board directionally, since no single standout candidate was returned.",
-        "reasoning_steps": [],
-        "player_analysis": {
-          "player": "Jayson Tatum",
-          "matchup": null,
-          "player_outlook": {
-            "summary": "Top player outlook built from the current board.",
-            "selected_player_play": null,
-            "selected_game": null
-          },
-          "matchup_analysis": {
-            "summary": "Matchup analysis built from the current board.",
-            "plays": []
-          },
-          "prop_recap": {
-            "summary": "Top prop recap built from the current board.",
-            "plays": []
-          },
-          "top_single_plays": [],
-          "same_game_parlays": [],
-          "risks": [
-            "The analysis is anchored to Jayson Tatum, so lineup, usage, or foul trouble changes can move the read quickly."
-          ],
-          "final_recommendation": "No clear player edge surfaced."
-        }
+        "reasoning_steps": []
       },
       "reasoning_steps": [],
       "board_notes": [],
       "readiness_gate": {},
-      "state_last_updated": "2026-06-19T02:40:07Z",
-      "last_updated": "2026-06-19T02:40:07Z",
+      "state_last_updated": "2026-06-19T03:15:33Z",
+      "last_updated": "2026-06-19T03:15:33Z",
       "candidate_count": 0
     },
     "board_contract": {
