@@ -13,7 +13,6 @@ from flask import redirect
 from pipeline.intelligence_state import get_intelligence_state_response
 from pipeline.intelligence_state import compute_intelligence_state_response
 from pipeline.intelligence_state import read_latest_intelligence_board_snapshot_response
-from pipeline.intelligence_state import read_intelligence_state
 from pipeline.intelligence_state import read_latest_intelligence_state_response
 from pipeline.intelligence_state import intelligence_state_status
 from pipeline.intelligence_state import write_intelligence_state
@@ -840,62 +839,62 @@ def intelligence_home():
 
 @intelligence_bp.post("/api/intelligence/query")
 def intelligence_query_api():
-    try:
-        global LAST_RESULT
-        payload = request.get_json(silent=True) or {}
-        payload = _normalize_default_query_payload(payload)
-        question = str(payload.get("question") or "").strip()
-        if not question:
-            response = jsonify({"ok": False, "error": "question is required."})
-            response.status_code = 400
-            return _no_cache_response(response)
-        user_profile = _normalize_user_profile(payload)
-        selected_date = str(payload.get("date") or payload.get("selected_date") or "").strip() or None
-        state_payload = read_intelligence_state()
-        debug_source = "worker"
-        if not isinstance(state_payload, dict) or not _response_has_content(state_payload):
-            computed_state = compute_intelligence_state_response(dict(payload))
-            if not isinstance(computed_state, dict):
-                computed_state = {}
-            state_payload = dict(computed_state)
-            write_intelligence_state(state_payload)
-            debug_source = "render_compute"
-        response_payload: dict[str, object] = _hydrate_board_response_payload(dict(state_payload))
+    global LAST_RESULT
+    payload = request.get_json(silent=True) or {}
+    payload = _normalize_default_query_payload(payload)
+    question = str(payload.get("question") or "").strip()
+    if not question:
+        response = jsonify({"ok": False, "error": "question is required."})
+        response.status_code = 400
+        return _no_cache_response(response)
+    user_profile = _normalize_user_profile(payload)
+    selected_date = str(payload.get("date") or payload.get("selected_date") or "").strip() or None
 
-        board_headline = _board_headline_for_question(question, response_payload)
-        parsed_request = _parsed_request_for_question(question, payload)
-        if board_headline:
-            response_payload = dict(response_payload)
-            response_payload["headline"] = board_headline
+    print("COMPUTE RUN")
+    state_payload = compute_intelligence_state_response(dict(payload))
+    candidate_count = len((state_payload or {}).get("top_opportunities") or []) if isinstance(state_payload, dict) else 0
+    if not isinstance(state_payload, dict):
+        state_payload = {}
+    state_payload["candidate_count"] = candidate_count
+    written_state = write_intelligence_state(state_payload)
+    print(f"STATE WRITTEN: {candidate_count}")
+    if isinstance(written_state, dict):
+        state_payload = dict(written_state)
+
+    debug_source = "render_compute"
+    response_payload: dict[str, object] = _hydrate_board_response_payload(dict(state_payload))
+
+    board_headline = _board_headline_for_question(question, response_payload)
+    parsed_request = _parsed_request_for_question(question, payload)
+    if board_headline:
+        response_payload = dict(response_payload)
+        response_payload["headline"] = board_headline
+        if parsed_request:
+            response_payload["parsed_request"] = dict(parsed_request)
+        nested_response = response_payload.get("response")
+        if isinstance(nested_response, dict):
+            nested_response = dict(nested_response)
+            nested_response.setdefault("headline", board_headline)
             if parsed_request:
-                response_payload["parsed_request"] = dict(parsed_request)
-            nested_response = response_payload.get("response")
-            if isinstance(nested_response, dict):
-                nested_response = dict(nested_response)
-                nested_response.setdefault("headline", board_headline)
-                if parsed_request:
-                    nested_response["parsed_request"] = dict(parsed_request)
-                response_payload["response"] = nested_response
-        if "response" not in response_payload:
-            response_payload["response"] = dict(response_payload)
+                nested_response["parsed_request"] = dict(parsed_request)
+            response_payload["response"] = nested_response
+    if "response" not in response_payload:
+        response_payload["response"] = dict(response_payload)
 
-        response = _apply_user_profile_to_response(dict(response_payload), user_profile)
-        response = dict(response)
-        if "response" not in response:
-            response["response"] = dict(response)
-        existing_board_contract = response.get("board_contract") if isinstance(response.get("board_contract"), dict) else None
-        if isinstance(existing_board_contract, dict) and str(existing_board_contract.get("schema") or "").strip() == "intelligence_board_v1":
-            response["board_contract"] = dict(existing_board_contract)
-        else:
-            response["board_contract"] = build_intelligence_board_contract(response)
-        _attach_intelligence_response_aliases(response)
-        LAST_RESULT = dict(response.get("response") or response.get("analysis") or {})
-        versioned_response = _versioned_query_response(response)
-        versioned_response.update(_debug_state_fields(response, source=debug_source))
-        return _no_cache_response(jsonify(versioned_response))
-    except Exception as exc:
-        print("[QUERY ERROR]", exc)
-        return {"error": str(exc), "fallback": True}, 200
+    response = _apply_user_profile_to_response(dict(response_payload), user_profile)
+    response = dict(response)
+    if "response" not in response:
+        response["response"] = dict(response)
+    existing_board_contract = response.get("board_contract") if isinstance(response.get("board_contract"), dict) else None
+    if isinstance(existing_board_contract, dict) and str(existing_board_contract.get("schema") or "").strip() == "intelligence_board_v1":
+        response["board_contract"] = dict(existing_board_contract)
+    else:
+        response["board_contract"] = build_intelligence_board_contract(response)
+    _attach_intelligence_response_aliases(response)
+    LAST_RESULT = dict(response.get("response") or response.get("analysis") or {})
+    versioned_response = _versioned_query_response(response)
+    versioned_response.update(_debug_state_fields(response, source=debug_source))
+    return _no_cache_response(jsonify(versioned_response))
 
 
 @intelligence_bp.post("/api/intelligence/portfolio-event")
