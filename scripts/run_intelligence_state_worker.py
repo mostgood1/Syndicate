@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import math
 import sys
 import time
@@ -37,27 +38,37 @@ def _timestamp() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
+def _run_tick() -> None:
+    state = None
+    try:
+        print(f"{_timestamp()} INTELLIGENCE WORKER RUN")
+        state = compute_intelligence_state_response(
+            {
+                "question": "top edges today",
+                "mode": "recommendation",
+                "timing": "all",
+                "sport": "all",
+            }
+        )
+        if _is_valid_intelligence_state(state):
+            write_latest_intelligence_state(state)
+            candidate_count = state.get("candidate_count", 0)
+            print(f"{_timestamp()} INTELLIGENCE STATE WRITTEN: {candidate_count}")
+        else:
+            print("INVALID INTELLIGENCE STATE")
+    except Exception as exc:
+        print(f"INTELLIGENCE STATE ERROR: {exc}")
+
+
 def main() -> int:
+    parser = argparse.ArgumentParser(description="Refresh the intelligence state snapshot on a fixed interval.")
+    parser.add_argument("--run-once", action="store_true")
+    args = parser.parse_args()
+
     while True:
-        state = None
-        try:
-            print(f"{_timestamp()} INTELLIGENCE WORKER RUN")
-            state = compute_intelligence_state_response(
-                {
-                    "question": "top edges today",
-                    "mode": "recommendation",
-                    "timing": "all",
-                    "sport": "all",
-                }
-            )
-            if _is_valid_intelligence_state(state):
-                write_latest_intelligence_state(state)
-                candidate_count = state.get("candidate_count", 0)
-                print(f"{_timestamp()} INTELLIGENCE STATE WRITTEN: {candidate_count}")
-            else:
-                print("INVALID INTELLIGENCE STATE")
-        except Exception as exc:
-            print(f"INTELLIGENCE STATE ERROR: {exc}")
+        _run_tick()
+        if args.run_once:
+            break
         time.sleep(30)
 
 

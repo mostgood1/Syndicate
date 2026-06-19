@@ -250,53 +250,14 @@ services:
         value: "30"
 
   - type: worker
-    name: intelligence-worker
+    name: compute-orchestrator-worker
     env: python
     plan: standard
     autoDeploy: true
     buildCommand: pip install -r requirements.txt
-    startCommand: python scripts/run_intelligence_state_worker.py
+    startCommand: python scripts/run_orchestrator_worker.py
     disk:
-      name: syndicate-data-intelligence-worker
-      mountPath: /opt/render/project/data
-      sizeGB: 50
-    envVars: *shared_render_env_vars
-
-  - type: worker
-    name: mlb-live-lens-worker
-    env: python
-    plan: standard
-    autoDeploy: true
-    buildCommand: pip install -r requirements.txt
-    startCommand: python scripts/run_mlb_live_lens_worker.py
-    disk:
-      name: syndicate-data-mlb-live-lens-worker
-      mountPath: /opt/render/project/data
-      sizeGB: 50
-    envVars: *shared_render_env_vars
-
-  - type: worker
-    name: nba-live-lens-worker
-    env: python
-    plan: standard
-    autoDeploy: true
-    buildCommand: pip install -r requirements.txt
-    startCommand: python scripts/run_nba_live_lens_worker.py
-    disk:
-      name: syndicate-data-nba-live-lens-worker
-      mountPath: /opt/render/project/data
-      sizeGB: 50
-    envVars: *shared_render_env_vars
-
-  - type: worker
-    name: wnba-live-lens-worker
-    env: python
-    plan: standard
-    autoDeploy: true
-    buildCommand: pip install -r requirements.txt
-    startCommand: python scripts/run_wnba_live_lens_worker.py
-    disk:
-      name: syndicate-data-wnba-live-lens-worker
+      name: syndicate-data-compute-orchestrator-worker
       mountPath: /opt/render/project/data
       sizeGB: 50
     envVars: *shared_render_env_vars
