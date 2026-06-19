@@ -3778,6 +3778,17 @@ def _load_home_games(slug: str, *, context_label: str, season: int | None = None
             from syndicate.features.wnba.cards import build_cards_page_context
 
             payload = build_cards_page_context(context_label, allow_stored_date_fallback=False)
+            source_title = _safe_text(payload.get("source_title"), "")
+            source_path = _safe_text(payload.get("source_path"), "")
+            current_app.logger.info(
+                "WNBA cards payload for %s: source_title=%s source_path=%s games=%s requested_date=%s date=%s",
+                context_label,
+                source_title or "<empty>",
+                source_path or "<empty>",
+                len(payload.get("games") or []) if isinstance(payload.get("games"), list) else 0,
+                _safe_text(payload.get("requested_date"), ""),
+                _safe_text(payload.get("date"), ""),
+            )
             if str(payload.get("requested_date") or context_label).strip() == str(context_label).strip() and str(payload.get("date") or context_label).strip() != str(context_label).strip():
                 return _wnba_live_state_games(context_label) if is_active_today else []
             games = list(payload.get("games") or [])
