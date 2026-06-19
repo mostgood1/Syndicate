@@ -1632,7 +1632,7 @@
         "throw": "R",
         "role": "SU",
         "leverage_skill": 0.7,
-        "stamina_pitches": 22,
+        "stamina_pitches": 25,
         "availability_mult": 0.9733333333333334,
         "platoon_mult_vs_lhb": {
           "k": 1.1637014194581108,

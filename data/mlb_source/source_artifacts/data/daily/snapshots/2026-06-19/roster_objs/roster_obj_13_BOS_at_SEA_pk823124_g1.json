@@ -38,10 +38,10 @@
         663728,
         647304,
         608701,
+        641598,
         702284,
         645302,
-        806068,
-        690944
+        806068
       ],
       "away_lineup_source": "projected_rotowire_default_vs_rhp",
       "home_lineup_source": "projected_rotowire_default_vs_lhp"
@@ -1657,7 +1657,7 @@
           "arsenal_sample_size": 312,
           "stamina_pitches": 25,
           "role": "CL",
-          "availability_mult": 1.0,
+          "availability_mult": 0.8333333333333334,
           "platoon_mult_vs_lhb": {
             "k": 1.1232258293670527,
             "bb": 1.0881818181818181,
@@ -2004,7 +2004,7 @@
           "arsenal_sample_size": 235,
           "stamina_pitches": 25,
           "role": "MR",
-          "availability_mult": 1.0,
+          "availability_mult": 0.875,
           "platoon_mult_vs_lhb": {
             "k": 1.0409458941178142,
             "bb": 0.8075,
@@ -3089,6 +3089,82 @@
         },
         {
           "player": {
+            "mlbam_id": 641598,
+            "full_name": "Mitch Garver",
+            "primary_position": "C",
+            "bat_side": "R",
+            "throw_side": "R"
+          },
+          "k_rate": 0.3042056074766355,
+          "bb_rate": 0.1457610146862483,
+          "hbp_rate": 0.0,
+          "hr_rate": 0.03097463284379172,
+          "inplay_hit_rate": 0.26182758620689656,
+          "xb_hit_share": 0.1111111111111111,
+          "triple_share_of_xb": 0.02,
+          "sb_attempt_rate": 0.0,
+          "sb_success_rate": 0.72,
+          "vs_pitch_type": {},
+          "vs_pitch_type_hr": {},
+          "platoon_mult_vs_lhp": {
+            "k": 0.8430408067855473,
+            "bb": 1.0241977877559962,
+            "hr": 0.83601011994003,
+            "inplay": 1.174351376267615
+          },
+          "platoon_mult_vs_rhp": {
+            "k": 1.1020611417491375,
+            "bb": 1.068573729198497,
+            "hr": 1.0321791972866026,
+            "inplay": 0.8121756881338075
+          },
+          "venue_mult_home": {
+            "k": 1.0491661180601273,
+            "bb": 1.0420311426608657,
+            "hr": 0.86,
+            "inplay": 0.8775000000000001
+          },
+          "venue_mult_away": {
+            "k": 0.9475528364849833,
+            "bb": 1.0225985644686244,
+            "hr": 1.175,
+            "inplay": 1.0824803805362524
+          },
+          "vs_venue_hr_mult": {
+            "136": 0.86
+          },
+          "vs_venue_k_mult": {
+            "136": 1.0491661180601273
+          },
+          "vs_venue_bb_mult": {
+            "136": 1.0420311426608657
+          },
+          "vs_venue_inplay_mult": {
+            "136": 0.8775000000000001
+          },
+          "vs_venue_history": {
+            "136": {
+              "pa": 49.0,
+              "k_mult": 1.140474623028935,
+              "bb_mult": 1.1200889790310447,
+              "hr_mult": 0.6,
+              "inplay_mult": 0.65
+            }
+          },
+          "statcast_quality_mult": {},
+          "vs_pitcher_hr_mult": {},
+          "vs_pitcher_k_mult": {},
+          "vs_pitcher_bb_mult": {},
+          "vs_pitcher_inplay_mult": {},
+          "vs_pitcher_history": {},
+          "bb_gb_rate": 0.44,
+          "bb_fb_rate": 0.25,
+          "bb_ld_rate": 0.2,
+          "bb_pu_rate": 0.11,
+          "bb_inplay_n": 0
+        },
+        {
+          "player": {
             "mlbam_id": 702284,
             "full_name": "Cole Young",
             "primary_position": "2B",
@@ -3446,46 +3522,6 @@
           "bb_ld_rate": 0.2,
           "bb_pu_rate": 0.11,
           "bb_inplay_n": 0
-        },
-        {
-          "player": {
-            "mlbam_id": 690944,
-            "full_name": "Curtis Washington Jr.",
-            "primary_position": "CF",
-            "bat_side": "R",
-            "throw_side": "R"
-          },
-          "k_rate": 0.22,
-          "bb_rate": 0.08,
-          "hbp_rate": 0.008,
-          "hr_rate": 0.03,
-          "inplay_hit_rate": 0.0,
-          "xb_hit_share": 0.22,
-          "triple_share_of_xb": 0.12,
-          "sb_attempt_rate": 0.0,
-          "sb_success_rate": 0.72,
-          "vs_pitch_type": {},
-          "vs_pitch_type_hr": {},
-          "platoon_mult_vs_lhp": {},
-          "platoon_mult_vs_rhp": {},
-          "venue_mult_home": {},
-          "venue_mult_away": {},
-          "vs_venue_hr_mult": {},
-          "vs_venue_k_mult": {},
-          "vs_venue_bb_mult": {},
-          "vs_venue_inplay_mult": {},
-          "vs_venue_history": {},
-          "statcast_quality_mult": {},
-          "vs_pitcher_hr_mult": {},
-          "vs_pitcher_k_mult": {},
-          "vs_pitcher_bb_mult": {},
-          "vs_pitcher_inplay_mult": {},
-          "vs_pitcher_history": {},
-          "bb_gb_rate": 0.44,
-          "bb_fb_rate": 0.25,
-          "bb_ld_rate": 0.2,
-          "bb_pu_rate": 0.11,
-          "bb_inplay_n": 0
         }
       ],
       "pitcher": {
@@ -3611,6 +3647,46 @@
         "leverage_skill": 0.5
       },
       "bench": [
+        {
+          "player": {
+            "mlbam_id": 690944,
+            "full_name": "Curtis Washington Jr.",
+            "primary_position": "CF",
+            "bat_side": "R",
+            "throw_side": "R"
+          },
+          "k_rate": 0.22,
+          "bb_rate": 0.08,
+          "hbp_rate": 0.008,
+          "hr_rate": 0.03,
+          "inplay_hit_rate": 0.0,
+          "xb_hit_share": 0.22,
+          "triple_share_of_xb": 0.12,
+          "sb_attempt_rate": 0.0,
+          "sb_success_rate": 0.72,
+          "vs_pitch_type": {},
+          "vs_pitch_type_hr": {},
+          "platoon_mult_vs_lhp": {},
+          "platoon_mult_vs_rhp": {},
+          "venue_mult_home": {},
+          "venue_mult_away": {},
+          "vs_venue_hr_mult": {},
+          "vs_venue_k_mult": {},
+          "vs_venue_bb_mult": {},
+          "vs_venue_inplay_mult": {},
+          "vs_venue_history": {},
+          "statcast_quality_mult": {},
+          "vs_pitcher_hr_mult": {},
+          "vs_pitcher_k_mult": {},
+          "vs_pitcher_bb_mult": {},
+          "vs_pitcher_inplay_mult": {},
+          "vs_pitcher_history": {},
+          "bb_gb_rate": 0.44,
+          "bb_fb_rate": 0.25,
+          "bb_ld_rate": 0.2,
+          "bb_pu_rate": 0.11,
+          "bb_inplay_n": 0
+        },
         {
           "player": {
             "mlbam_id": 686527,
@@ -3861,82 +3937,6 @@
           "bb_ld_rate": 0.2,
           "bb_pu_rate": 0.11,
           "bb_inplay_n": 0
-        },
-        {
-          "player": {
-            "mlbam_id": 641598,
-            "full_name": "Mitch Garver",
-            "primary_position": "C",
-            "bat_side": "R",
-            "throw_side": "R"
-          },
-          "k_rate": 0.3042056074766355,
-          "bb_rate": 0.1457610146862483,
-          "hbp_rate": 0.0,
-          "hr_rate": 0.03097463284379172,
-          "inplay_hit_rate": 0.26182758620689656,
-          "xb_hit_share": 0.1111111111111111,
-          "triple_share_of_xb": 0.02,
-          "sb_attempt_rate": 0.0,
-          "sb_success_rate": 0.72,
-          "vs_pitch_type": {},
-          "vs_pitch_type_hr": {},
-          "platoon_mult_vs_lhp": {
-            "k": 0.8430408067855473,
-            "bb": 1.0241977877559962,
-            "hr": 0.83601011994003,
-            "inplay": 1.174351376267615
-          },
-          "platoon_mult_vs_rhp": {
-            "k": 1.1020611417491375,
-            "bb": 1.068573729198497,
-            "hr": 1.0321791972866026,
-            "inplay": 0.8121756881338075
-          },
-          "venue_mult_home": {
-            "k": 1.0491661180601273,
-            "bb": 1.0420311426608657,
-            "hr": 0.86,
-            "inplay": 0.8775000000000001
-          },
-          "venue_mult_away": {
-            "k": 0.9475528364849833,
-            "bb": 1.0225985644686244,
-            "hr": 1.175,
-            "inplay": 1.0824803805362524
-          },
-          "vs_venue_hr_mult": {
-            "136": 0.86
-          },
-          "vs_venue_k_mult": {
-            "136": 1.0491661180601273
-          },
-          "vs_venue_bb_mult": {
-            "136": 1.0420311426608657
-          },
-          "vs_venue_inplay_mult": {
-            "136": 0.8775000000000001
-          },
-          "vs_venue_history": {
-            "136": {
-              "pa": 49.0,
-              "k_mult": 1.140474623028935,
-              "bb_mult": 1.1200889790310447,
-              "hr_mult": 0.6,
-              "inplay_mult": 0.65
-            }
-          },
-          "statcast_quality_mult": {},
-          "vs_pitcher_hr_mult": {},
-          "vs_pitcher_k_mult": {},
-          "vs_pitcher_bb_mult": {},
-          "vs_pitcher_inplay_mult": {},
-          "vs_pitcher_history": {},
-          "bb_gb_rate": 0.44,
-          "bb_fb_rate": 0.25,
-          "bb_ld_rate": 0.2,
-          "bb_pu_rate": 0.11,
-          "bb_inplay_n": 0
         }
       ],
       "bullpen": [
@@ -4058,7 +4058,7 @@
           "arsenal_sample_size": 441,
           "stamina_pitches": 25,
           "role": "CL",
-          "availability_mult": 0.9433333333333334,
+          "availability_mult": 0.7683333333333333,
           "platoon_mult_vs_lhb": {
             "k": 0.9180507506268448,
             "bb": 1.1769954245043213,
@@ -4144,7 +4144,7 @@
           "arsenal_sample_size": 515,
           "stamina_pitches": 25,
           "role": "MR",
-          "availability_mult": 0.97,
+          "availability_mult": 0.8783333333333333,
           "platoon_mult_vs_lhb": {
             "k": 1.0567675402258754,
             "bb": 1.1925000000000001,

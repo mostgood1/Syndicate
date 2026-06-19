@@ -1,0 +1,70 @@
+{
+  "date": "2026-06-02",
+  "season": 2026,
+  "generated_at": "2026-06-01T09:44:08.122026",
+  "tool": "tools/daily_update_multi_profile.py",
+  "locked": true,
+  "source_profile": "game_recos",
+  "source_sim_dir": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-02",
+  "thresholds": {
+    "nrfi_min_prob": 0.55,
+    "nrfi_max_mean_runs": 0.8,
+    "yrfi_max_nrfi_prob": 0.5,
+    "yrfi_min_mean_runs": 0.95,
+    "yrfi_min_side_lead_prob": 0.24
+  },
+  "counts": {
+    "rows": 2,
+    "games": 2
+  },
+  "signals": [
+    {
+      "game_pk": 824675,
+      "date": "2026-06-02",
+      "away": "Athletics",
+      "home": "Chicago Cubs",
+      "away_abbr": "ATH",
+      "home_abbr": "CHC",
+      "away_team_id": 133,
+      "home_team_id": 112,
+      "starter_names": {
+        "away": "Gage Jump",
+        "home": "Jameson Taillon"
+      },
+      "signal": {
+        "label": "F1 YRFI",
+        "tone": "yrfi",
+        "summary": "F1 mean 1.29 | side lead 26.8%",
+        "detail": "Season filter qualified: only 48.3% simulated NRFI, 1.29 expected first-inning runs, and one side reaches a 26.8% chance to be ahead after one.",
+        "nrfiProb": 0.483,
+        "yrfiProb": 0.517,
+        "meanTotalRuns": 1.29,
+        "maxSideLeadProb": 0.268
+      }
+    },
+    {
+      "game_pk": 823700,
+      "date": "2026-06-02",
+      "away": "Chicago White Sox",
+      "home": "Minnesota Twins",
+      "away_abbr": "CWS",
+      "home_abbr": "MIN",
+      "away_team_id": 145,
+      "home_team_id": 142,
+      "starter_names": {
+        "away": "Davis Martin",
+        "home": "Connor Prielipp"
+      },
+      "signal": {
+        "label": "F1 NRFI",
+        "tone": "nrfi",
+        "summary": "0-run sim 59.9% | F1 mean 0.80",
+        "detail": "Season filter qualified: simulated scoreless first inning 59.9% with only 0.80 expected runs in the opening frame.",
+        "nrfiProb": 0.599,
+        "yrfiProb": 0.401,
+        "meanTotalRuns": 0.8,
+        "maxSideLeadProb": 0.199
+      }
+    }
+  ]
+}

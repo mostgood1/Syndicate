@@ -42,30 +42,30 @@
     "confirmed_lineup_ids": [],
     "projected_lineup_ids": [
       687263,
-      545361,
       666176,
       672724,
-      694384,
+      687093,
       694203,
       663611,
       681351,
-      642350
+      642350,
+      695681
     ],
     "lineup_source": "projected_rotowire_default_vs_lhp",
     "lineup_confidence": 0.66,
     "probable_pitcher": {
-      "id": null,
-      "source": "none",
-      "confidence": 0.0,
-      "raw_schedule_id": null,
-      "raw_feed_id": null
+      "id": 667755,
+      "source": "feed_gameData_probablePitchers",
+      "confidence": 0.75,
+      "raw_schedule_id": 667755,
+      "raw_feed_id": 667755
     },
     "starter": {
       "id": 667755,
       "name": "Jos\u00e9 Soriano",
       "role": "SP",
-      "selection_source": "heuristic",
-      "requested_id": null
+      "selection_source": "probable",
+      "requested_id": 667755
     },
     "bullpen": [
       {
@@ -154,35 +154,6 @@
         "vs_pitcher_history": {}
       },
       {
-        "id": 545361,
-        "name": "Mike Trout",
-        "pos": "CF",
-        "bat": "R",
-        "throw": "R",
-        "k_rate": 0.25964166268514094,
-        "bb_rate": 0.1969684663162924,
-        "hbp_rate": 0.009316770186335404,
-        "hr_rate": 0.04421165790731008,
-        "inplay_hit_rate": 0.2415360501567398,
-        "xb_hit_share": 0.19298245614035087,
-        "vs_pitch_type": {},
-        "vs_pitch_type_hr": {},
-        "platoon_mult_vs_lhp": {
-          "k": 1.013093496373364,
-          "bb": 1.0508800931093865,
-          "hr": 0.9224110548660001,
-          "inplay": 1.0609273357496718
-        },
-        "platoon_mult_vs_rhp": {
-          "k": 0.9643207498718891,
-          "bb": 1.001570397741659,
-          "hr": 1.0643287791673086,
-          "inplay": 0.9807509526574385
-        },
-        "statcast_quality_mult": {},
-        "vs_pitcher_history": {}
-      },
-      {
         "id": 666176,
         "name": "Jo Adell",
         "pos": "RF",
@@ -241,30 +212,30 @@
         "vs_pitcher_history": {}
       },
       {
-        "id": 694384,
-        "name": "Nolan Schanuel",
-        "pos": "1B",
-        "bat": "L",
+        "id": 687093,
+        "name": "Vaughn Grissom",
+        "pos": "2B",
+        "bat": "R",
         "throw": "R",
-        "k_rate": 0.16242839240959542,
-        "bb_rate": 0.07189402076620122,
-        "hbp_rate": 0.021929824561403508,
-        "hr_rate": 0.017973505191550304,
-        "inplay_hit_rate": 0.2895945945945946,
-        "xb_hit_share": 0.22641509433962265,
+        "k_rate": 0.10644691691795777,
+        "bb_rate": 0.08839035042112925,
+        "hbp_rate": 0.018404907975460124,
+        "hr_rate": 0.025943641468233337,
+        "inplay_hit_rate": 0.23359375,
+        "xb_hit_share": 0.29411764705882354,
         "vs_pitch_type": {},
         "vs_pitch_type_hr": {},
         "platoon_mult_vs_lhp": {
-          "k": 1.1053756478410928,
-          "bb": 0.9435580259606734,
-          "hr": 0.9435580259606734,
-          "inplay": 0.8475083831620528
+          "k": 0.9127069789277701,
+          "bb": 1.1925000000000001,
+          "hr": 0.78,
+          "inplay": 0.9830977472076734
         },
         "platoon_mult_vs_rhp": {
-          "k": 0.9599559508803682,
-          "bb": 1.0030228483655739,
-          "hr": 1.0030228483655739,
-          "inplay": 1.0481753447407969
+          "k": 1.0420400060239003,
+          "bb": 0.9037165705938867,
+          "hr": 1.275,
+          "inplay": 1.0150836120401339
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -384,6 +355,30 @@
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
+      },
+      {
+        "id": 695681,
+        "name": "Christian Moore",
+        "pos": "2B",
+        "bat": "R",
+        "throw": "R",
+        "k_rate": 0.75,
+        "bb_rate": 0.0,
+        "hbp_rate": 0.0,
+        "hr_rate": 0.0,
+        "inplay_hit_rate": 1.0,
+        "xb_hit_share": 0.05,
+        "vs_pitch_type": {},
+        "vs_pitch_type_hr": {},
+        "platoon_mult_vs_lhp": {
+          "k": 1.0,
+          "bb": 1.0,
+          "hr": 1.0,
+          "inplay": 1.0
+        },
+        "platoon_mult_vs_rhp": {},
+        "statcast_quality_mult": {},
+        "vs_pitcher_history": {}
       }
     ],
     "bench": [
@@ -441,6 +436,64 @@
           "bb": 0.8075,
           "hr": 1.0,
           "inplay": 1.0
+        },
+        "statcast_quality_mult": {},
+        "vs_pitcher_history": {}
+      },
+      {
+        "id": 545361,
+        "name": "Mike Trout",
+        "pos": "CF",
+        "bat": "R",
+        "throw": "R",
+        "k_rate": 0.25964166268514094,
+        "bb_rate": 0.1969684663162924,
+        "hbp_rate": 0.009316770186335404,
+        "hr_rate": 0.04421165790731008,
+        "inplay_hit_rate": 0.2415360501567398,
+        "xb_hit_share": 0.19298245614035087,
+        "vs_pitch_type": {},
+        "vs_pitch_type_hr": {},
+        "platoon_mult_vs_lhp": {
+          "k": 1.013093496373364,
+          "bb": 1.0508800931093865,
+          "hr": 0.9224110548660001,
+          "inplay": 1.0609273357496718
+        },
+        "platoon_mult_vs_rhp": {
+          "k": 0.9643207498718891,
+          "bb": 1.001570397741659,
+          "hr": 1.0643287791673086,
+          "inplay": 0.9807509526574385
+        },
+        "statcast_quality_mult": {},
+        "vs_pitcher_history": {}
+      },
+      {
+        "id": 694384,
+        "name": "Nolan Schanuel",
+        "pos": "1B",
+        "bat": "L",
+        "throw": "R",
+        "k_rate": 0.16242839240959542,
+        "bb_rate": 0.07189402076620122,
+        "hbp_rate": 0.021929824561403508,
+        "hr_rate": 0.017973505191550304,
+        "inplay_hit_rate": 0.2895945945945946,
+        "xb_hit_share": 0.22641509433962265,
+        "vs_pitch_type": {},
+        "vs_pitch_type_hr": {},
+        "platoon_mult_vs_lhp": {
+          "k": 1.1053756478410928,
+          "bb": 0.9435580259606734,
+          "hr": 0.9435580259606734,
+          "inplay": 0.8475083831620528
+        },
+        "platoon_mult_vs_rhp": {
+          "k": 0.9599559508803682,
+          "bb": 1.0030228483655739,
+          "hr": 1.0030228483655739,
+          "inplay": 1.0481753447407969
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -761,7 +814,7 @@
         "role": "CL",
         "leverage_skill": 0.85,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.825,
         "platoon_mult_vs_lhb": {
           "k": 1.0305461078355065,
           "bb": 1.025452716297787,
@@ -888,7 +941,7 @@
         "role": "SU",
         "leverage_skill": 0.7,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.7666666666666666,
         "platoon_mult_vs_lhb": {
           "k": 1.0511314794187796,
           "bb": 1.0706185915302624,
@@ -944,17 +997,17 @@
     "confirmed_lineup_ids": [],
     "projected_lineup_ids": [
       701762,
-      691016,
       669127,
-      666126,
+      691016,
       805779,
+      666126,
       680869,
       671732,
       703607,
       643446
     ],
     "lineup_source": "projected_rotowire_default_vs_rhp",
-    "lineup_confidence": 0.58,
+    "lineup_confidence": 0.66,
     "probable_pitcher": {
       "id": 605488,
       "source": "feed_gameData_probablePitchers",
@@ -1056,35 +1109,6 @@
         "vs_pitcher_history": {}
       },
       {
-        "id": 691016,
-        "name": "Tyler Soderstrom",
-        "pos": "LF",
-        "bat": "L",
-        "throw": "R",
-        "k_rate": 0.17032342657342656,
-        "bb_rate": 0.1308066933066933,
-        "hbp_rate": 0.0034965034965034965,
-        "hr_rate": 0.05173576423576424,
-        "inplay_hit_rate": 0.24733281793583298,
-        "xb_hit_share": 0.35,
-        "vs_pitch_type": {},
-        "vs_pitch_type_hr": {},
-        "platoon_mult_vs_lhp": {
-          "k": 1.1925000000000001,
-          "bb": 0.8075,
-          "hr": 1.26776490465846,
-          "inplay": 0.8860243745853424
-        },
-        "platoon_mult_vs_rhp": {
-          "k": 0.9157428791377983,
-          "bb": 1.0362291169451074,
-          "hr": 0.78,
-          "inplay": 1.0209562418556715
-        },
-        "statcast_quality_mult": {},
-        "vs_pitcher_history": {}
-      },
-      {
         "id": 669127,
         "name": "Shea Langeliers",
         "pos": "C",
@@ -1114,30 +1138,30 @@
         "vs_pitcher_history": {}
       },
       {
-        "id": 666126,
-        "name": "Carlos Cortes",
-        "pos": "RF",
+        "id": 691016,
+        "name": "Tyler Soderstrom",
+        "pos": "LF",
         "bat": "L",
-        "throw": "S",
-        "k_rate": 0.08287081339712919,
-        "bb_rate": 0.10758373205741627,
-        "hbp_rate": 0.015789473684210527,
-        "hr_rate": 0.030251196172248807,
-        "inplay_hit_rate": 0.27469092193571176,
-        "xb_hit_share": 0.2,
+        "throw": "R",
+        "k_rate": 0.17032342657342656,
+        "bb_rate": 0.1308066933066933,
+        "hbp_rate": 0.0034965034965034965,
+        "hr_rate": 0.05173576423576424,
+        "inplay_hit_rate": 0.24733281793583298,
+        "xb_hit_share": 0.35,
         "vs_pitch_type": {},
         "vs_pitch_type_hr": {},
         "platoon_mult_vs_lhp": {
           "k": 1.1925000000000001,
           "bb": 0.8075,
-          "hr": 0.78,
-          "inplay": 1.1925000000000001
+          "hr": 1.26776490465846,
+          "inplay": 0.8860243745853424
         },
         "platoon_mult_vs_rhp": {
-          "k": 0.9690821474189427,
-          "bb": 1.049766697351307,
-          "hr": 1.0594223211859746,
-          "inplay": 0.9999138339326773
+          "k": 0.9157428791377983,
+          "bb": 1.0362291169451074,
+          "hr": 0.78,
+          "inplay": 1.0209562418556715
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -1167,6 +1191,35 @@
           "bb": 0.9735271901938569,
           "hr": 1.2189055831549471,
           "inplay": 0.9930868367752249
+        },
+        "statcast_quality_mult": {},
+        "vs_pitcher_history": {}
+      },
+      {
+        "id": 666126,
+        "name": "Carlos Cortes",
+        "pos": "RF",
+        "bat": "L",
+        "throw": "S",
+        "k_rate": 0.08287081339712919,
+        "bb_rate": 0.10758373205741627,
+        "hbp_rate": 0.015789473684210527,
+        "hr_rate": 0.030251196172248807,
+        "inplay_hit_rate": 0.27469092193571176,
+        "xb_hit_share": 0.2,
+        "vs_pitch_type": {},
+        "vs_pitch_type_hr": {},
+        "platoon_mult_vs_lhp": {
+          "k": 1.1925000000000001,
+          "bb": 0.8075,
+          "hr": 0.78,
+          "inplay": 1.1925000000000001
+        },
+        "platoon_mult_vs_rhp": {
+          "k": 0.9690821474189427,
+          "bb": 1.049766697351307,
+          "hr": 1.0594223211859746,
+          "inplay": 0.9999138339326773
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -1501,7 +1554,7 @@
         "role": "CL",
         "leverage_skill": 0.85,
         "stamina_pitches": 25,
-        "availability_mult": 0.9166666666666666,
+        "availability_mult": 0.7083333333333333,
         "platoon_mult_vs_lhb": {
           "k": 1.027269752431676,
           "bb": 0.9475348517053319,
@@ -1720,7 +1773,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 27,
-        "availability_mult": 1.0,
+        "availability_mult": 0.75,
         "platoon_mult_vs_lhb": {
           "k": 0.9788461538461538,
           "bb": 0.8075,

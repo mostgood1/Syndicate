@@ -45,10 +45,10 @@
       671277,
       678554,
       682928,
-      695734,
       686611,
-      660688,
+      695734,
       696285,
+      660688,
       683083
     ],
     "lineup_source": "projected_rotowire_default_vs_rhp",
@@ -229,35 +229,6 @@
         "vs_pitcher_history": {}
       },
       {
-        "id": 695734,
-        "name": "Daylen Lile",
-        "pos": "LF",
-        "bat": "L",
-        "throw": "R",
-        "k_rate": 0.16569187271316113,
-        "bb_rate": 0.07320656392061203,
-        "hbp_rate": 0.006430868167202572,
-        "hr_rate": 0.024451158665040468,
-        "inplay_hit_rate": 0.286491195891416,
-        "xb_hit_share": 0.25675675675675674,
-        "vs_pitch_type": {},
-        "vs_pitch_type_hr": {},
-        "platoon_mult_vs_lhp": {
-          "k": 1.040118128165807,
-          "bb": 1.1178211115318273,
-          "hr": 0.78,
-          "inplay": 1.070236538646219
-        },
-        "platoon_mult_vs_rhp": {
-          "k": 1.0207590493006389,
-          "bb": 0.9599312786017912,
-          "hr": 1.2642559841513543,
-          "inplay": 0.9673059240205846
-        },
-        "statcast_quality_mult": {},
-        "vs_pitcher_history": {}
-      },
-      {
         "id": 686611,
         "name": "Dylan Crews",
         "pos": "RF",
@@ -287,30 +258,30 @@
         "vs_pitcher_history": {}
       },
       {
-        "id": 660688,
-        "name": "Keibert Ruiz",
-        "pos": "C",
-        "bat": "S",
+        "id": 695734,
+        "name": "Daylen Lile",
+        "pos": "LF",
+        "bat": "L",
         "throw": "R",
-        "k_rate": 0.12088926174496645,
-        "bb_rate": 0.029068791946308722,
-        "hbp_rate": 0.006711409395973154,
-        "hr_rate": 0.04047818791946308,
-        "inplay_hit_rate": 0.27762857142857145,
-        "xb_hit_share": 0.35,
+        "k_rate": 0.16569187271316113,
+        "bb_rate": 0.07320656392061203,
+        "hbp_rate": 0.006430868167202572,
+        "hr_rate": 0.024451158665040468,
+        "inplay_hit_rate": 0.286491195891416,
+        "xb_hit_share": 0.25675675675675674,
         "vs_pitch_type": {},
         "vs_pitch_type_hr": {},
         "platoon_mult_vs_lhp": {
-          "k": 1.124017528979361,
-          "bb": 0.8075,
-          "hr": 0.9532431395125696,
-          "inplay": 1.1821323901186176
+          "k": 1.040118128165807,
+          "bb": 1.1178211115318273,
+          "hr": 0.78,
+          "inplay": 1.070236538646219
         },
         "platoon_mult_vs_rhp": {
-          "k": 0.9767979108075532,
-          "bb": 1.1925000000000001,
-          "hr": 1.0221079901827106,
-          "inplay": 0.8763049360184356
+          "k": 1.0207590493006389,
+          "bb": 0.9599312786017912,
+          "hr": 1.2642559841513543,
+          "inplay": 0.9673059240205846
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -340,6 +311,35 @@
           "bb": 0.9018271100865738,
           "hr": 1.1510769878597986,
           "inplay": 0.958434286519228
+        },
+        "statcast_quality_mult": {},
+        "vs_pitcher_history": {}
+      },
+      {
+        "id": 660688,
+        "name": "Keibert Ruiz",
+        "pos": "C",
+        "bat": "S",
+        "throw": "R",
+        "k_rate": 0.12088926174496645,
+        "bb_rate": 0.029068791946308722,
+        "hbp_rate": 0.006711409395973154,
+        "hr_rate": 0.04047818791946308,
+        "inplay_hit_rate": 0.27762857142857145,
+        "xb_hit_share": 0.35,
+        "vs_pitch_type": {},
+        "vs_pitch_type_hr": {},
+        "platoon_mult_vs_lhp": {
+          "k": 1.124017528979361,
+          "bb": 0.8075,
+          "hr": 0.9532431395125696,
+          "inplay": 1.1821323901186176
+        },
+        "platoon_mult_vs_rhp": {
+          "k": 0.9767979108075532,
+          "bb": 1.1925000000000001,
+          "hr": 1.0221079901827106,
+          "inplay": 0.8763049360184356
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -859,8 +859,8 @@
       666018,
       656775,
       691406,
-      802415,
       680700,
+      802415,
       683748,
       676439,
       670764
@@ -1049,35 +1049,6 @@
         "vs_pitcher_history": {}
       },
       {
-        "id": 802415,
-        "name": "Chandler Simpson",
-        "pos": "LF",
-        "bat": "L",
-        "throw": "R",
-        "k_rate": 0.11936925434116445,
-        "bb_rate": 0.05479656111678583,
-        "hbp_rate": 0.0,
-        "hr_rate": 0.0,
-        "inplay_hit_rate": 0.27362833025586913,
-        "xb_hit_share": 0.12121212121212122,
-        "vs_pitch_type": {},
-        "vs_pitch_type_hr": {},
-        "platoon_mult_vs_lhp": {
-          "k": 1.02594395122473,
-          "bb": 0.8075,
-          "hr": 1.0,
-          "inplay": 0.911762680908079
-        },
-        "platoon_mult_vs_rhp": {
-          "k": 0.9390697239450221,
-          "bb": 1.0668066388241038,
-          "hr": 1.0,
-          "inplay": 1.111015191856571
-        },
-        "statcast_quality_mult": {},
-        "vs_pitcher_history": {}
-      },
-      {
         "id": 680700,
         "name": "Richie Palacios",
         "pos": "2B",
@@ -1102,6 +1073,35 @@
           "bb": 1.0357510268641938,
           "hr": 1.2109776304888151,
           "inplay": 1.0043189206125407
+        },
+        "statcast_quality_mult": {},
+        "vs_pitcher_history": {}
+      },
+      {
+        "id": 802415,
+        "name": "Chandler Simpson",
+        "pos": "LF",
+        "bat": "L",
+        "throw": "R",
+        "k_rate": 0.11936925434116445,
+        "bb_rate": 0.05479656111678583,
+        "hbp_rate": 0.0,
+        "hr_rate": 0.0,
+        "inplay_hit_rate": 0.27362833025586913,
+        "xb_hit_share": 0.12121212121212122,
+        "vs_pitch_type": {},
+        "vs_pitch_type_hr": {},
+        "platoon_mult_vs_lhp": {
+          "k": 1.02594395122473,
+          "bb": 0.8075,
+          "hr": 1.0,
+          "inplay": 0.911762680908079
+        },
+        "platoon_mult_vs_rhp": {
+          "k": 0.9390697239450221,
+          "bb": 1.0668066388241038,
+          "hr": 1.0,
+          "inplay": 1.111015191856571
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}

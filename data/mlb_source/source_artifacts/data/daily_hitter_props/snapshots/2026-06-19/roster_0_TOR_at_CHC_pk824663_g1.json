@@ -52,20 +52,20 @@
       665926
     ],
     "lineup_source": "projected_rotowire_default_vs_rhp",
-    "lineup_confidence": 0.58,
+    "lineup_confidence": 0.66,
     "probable_pitcher": {
-      "id": null,
-      "source": "none",
-      "confidence": 0.0,
-      "raw_schedule_id": null,
-      "raw_feed_id": null
+      "id": 592332,
+      "source": "feed_gameData_probablePitchers",
+      "confidence": 0.75,
+      "raw_schedule_id": 592332,
+      "raw_feed_id": 592332
     },
     "starter": {
       "id": 592332,
       "name": "Kevin Gausman",
       "role": "SP",
-      "selection_source": "heuristic",
-      "requested_id": null
+      "selection_source": "probable",
+      "requested_id": 592332
     },
     "bullpen": [
       {
@@ -666,7 +666,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.9466666666666667,
+        "availability_mult": 0.8300000000000001,
         "platoon_mult_vs_lhb": {
           "k": 0.9758964143426294,
           "bb": 1.1484126984126983,
@@ -810,25 +810,25 @@
       608324,
       664023,
       673548,
-      694208,
+      807713,
       608348,
       621020
     ],
     "lineup_source": "projected_rotowire_default_vs_rhp",
-    "lineup_confidence": 0.58,
+    "lineup_confidence": 0.66,
     "probable_pitcher": {
-      "id": null,
-      "source": "none",
-      "confidence": 0.0,
-      "raw_schedule_id": null,
-      "raw_feed_id": null
+      "id": 676962,
+      "source": "feed_gameData_probablePitchers",
+      "confidence": 0.75,
+      "raw_schedule_id": 676962,
+      "raw_feed_id": 676962
     },
     "starter": {
-      "id": 684007,
-      "name": "Shota Imanaga",
+      "id": 676962,
+      "name": "Ben Brown",
       "role": "SP",
-      "selection_source": "heuristic",
-      "requested_id": null
+      "selection_source": "probable",
+      "requested_id": 676962
     },
     "bullpen": [
       {
@@ -880,8 +880,8 @@
         "lev": 0.5
       },
       {
-        "id": 676962,
-        "name": "Ben Brown",
+        "id": 665871,
+        "name": "Javier Assad",
         "role": "LR",
         "lev": 0.35
       }
@@ -1062,30 +1062,30 @@
         "vs_pitcher_history": {}
       },
       {
-        "id": 694208,
-        "name": "Mois\u00e9s Ballesteros",
-        "pos": "DH",
-        "bat": "L",
+        "id": 807713,
+        "name": "Matt Shaw",
+        "pos": "RF",
+        "bat": "R",
         "throw": "R",
-        "k_rate": 0.2201973684210526,
-        "bb_rate": 0.08703216374269004,
-        "hbp_rate": 0.0,
-        "hr_rate": 0.02982456140350877,
-        "inplay_hit_rate": 0.2642857142857143,
-        "xb_hit_share": 0.16666666666666666,
+        "k_rate": 0.16999158249158247,
+        "bb_rate": 0.05404040404040404,
+        "hbp_rate": 0.018518518518518517,
+        "hr_rate": 0.02361111111111111,
+        "inplay_hit_rate": 0.23703703703703702,
+        "xb_hit_share": 0.25,
         "vs_pitch_type": {},
         "vs_pitch_type_hr": {},
         "platoon_mult_vs_lhp": {
-          "k": 1.0744397968329849,
-          "bb": 1.1925000000000001,
-          "hr": 0.78,
-          "inplay": 0.8662162162162163
+          "k": 0.9794379796979451,
+          "bb": 1.0051401869158878,
+          "hr": 0.8735294117647059,
+          "inplay": 1.1857088414634147
         },
         "platoon_mult_vs_rhp": {
-          "k": 0.9710049838606498,
-          "bb": 1.031549334820099,
-          "hr": 1.128816311800794,
-          "inplay": 0.9793978188715031
+          "k": 1.0604630793162888,
+          "bb": 1.0260888732146007,
+          "hr": 1.275,
+          "inplay": 0.9140625
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -1151,35 +1151,6 @@
     ],
     "bench": [
       {
-        "id": 807713,
-        "name": "Matt Shaw",
-        "pos": "RF",
-        "bat": "R",
-        "throw": "R",
-        "k_rate": 0.16999158249158247,
-        "bb_rate": 0.05404040404040404,
-        "hbp_rate": 0.018518518518518517,
-        "hr_rate": 0.02361111111111111,
-        "inplay_hit_rate": 0.23703703703703702,
-        "xb_hit_share": 0.25,
-        "vs_pitch_type": {},
-        "vs_pitch_type_hr": {},
-        "platoon_mult_vs_lhp": {
-          "k": 0.9794379796979451,
-          "bb": 1.0051401869158878,
-          "hr": 0.8735294117647059,
-          "inplay": 1.1857088414634147
-        },
-        "platoon_mult_vs_rhp": {
-          "k": 1.0604630793162888,
-          "bb": 1.0260888732146007,
-          "hr": 1.275,
-          "inplay": 0.9140625
-        },
-        "statcast_quality_mult": {},
-        "vs_pitcher_history": {}
-      },
-      {
         "id": 624424,
         "name": "Michael Conforto",
         "pos": "DH",
@@ -1238,6 +1209,35 @@
         "vs_pitcher_history": {}
       },
       {
+        "id": 694208,
+        "name": "Mois\u00e9s Ballesteros",
+        "pos": "DH",
+        "bat": "L",
+        "throw": "R",
+        "k_rate": 0.2201973684210526,
+        "bb_rate": 0.08703216374269004,
+        "hbp_rate": 0.0,
+        "hr_rate": 0.02982456140350877,
+        "inplay_hit_rate": 0.2642857142857143,
+        "xb_hit_share": 0.16666666666666666,
+        "vs_pitch_type": {},
+        "vs_pitch_type_hr": {},
+        "platoon_mult_vs_lhp": {
+          "k": 1.0744397968329849,
+          "bb": 1.1925000000000001,
+          "hr": 0.78,
+          "inplay": 0.8662162162162163
+        },
+        "platoon_mult_vs_rhp": {
+          "k": 0.9710049838606498,
+          "bb": 1.031549334820099,
+          "hr": 1.128816311800794,
+          "inplay": 0.9793978188715031
+        },
+        "statcast_quality_mult": {},
+        "vs_pitcher_history": {}
+      },
+      {
         "id": 699393,
         "name": "Pedro Ram\u00edrez",
         "pos": "2B",
@@ -1268,44 +1268,43 @@
       }
     ],
     "starter_profile": {
-      "id": 684007,
-      "name": "Shota Imanaga",
-      "throw": "L",
+      "id": 676962,
+      "name": "Ben Brown",
+      "throw": "R",
       "role": "SP",
       "leverage_skill": 0.5,
-      "stamina_pitches": 93,
+      "stamina_pitches": 94,
       "availability_mult": 1.0,
       "platoon_mult_vs_lhb": {
-        "k": 1.1310620445656232,
-        "bb": 1.0984858251689895,
-        "hr": 0.95337643456986,
-        "inplay": 1.0445327635482085
+        "k": 1.0222873869630464,
+        "bb": 1.1925000000000001,
+        "hr": 0.78,
+        "inplay": 1.094481727689677
       },
       "platoon_mult_vs_rhb": {
-        "k": 0.9700875392437055,
-        "bb": 0.9732417816814165,
-        "hr": 0.9373893718410318,
-        "inplay": 0.9710080465837384
+        "k": 0.9640181257449908,
+        "bb": 0.8075,
+        "hr": 1.275,
+        "inplay": 0.8889085817291748
       },
       "statcast_quality_mult": {},
       "arsenal_source": "statsapi_pitchArsenal",
-      "arsenal_sample_size": 1262,
+      "arsenal_sample_size": 932,
       "statcast_splits_found": false,
       "statcast_splits_source": "",
       "statcast_splits_n_pitches": 0,
       "statcast_splits_start_date": "",
       "statcast_splits_end_date": "",
-      "k_rate": 0.24055045871559633,
-      "bb_rate": 0.06315858453473133,
-      "hbp_rate": 0.009174311926605505,
-      "hr_rate": 0.05811817387505461,
-      "inplay_hit_rate": 0.2979123354123354,
+      "k_rate": 0.2529093693176381,
+      "bb_rate": 0.07808881232653841,
+      "hbp_rate": 0.00823045267489712,
+      "hr_rate": 0.0034979423868312758,
+      "inplay_hit_rate": 0.25704786262331014,
       "arsenal": {
-        "FF": 0.42709983974960375,
-        "OTHER": 0.13312202680507132,
-        "CU": 0.024564183410459593,
-        "SI": 0.0729001582503962,
-        "FS": 0.3423137917844689
+        "FF": 0.3701716737017167,
+        "CH": 0.0622317606223176,
+        "SI": 0.2113733921137339,
+        "KC": 0.3562231735622317
       },
       "pitch_type_whiff_mult": {},
       "pitch_type_inplay_mult": {},
@@ -1660,43 +1659,46 @@
         "pitch_type_hr_mult": {}
       },
       {
-        "id": 676962,
-        "name": "Ben Brown",
+        "id": 665871,
+        "name": "Javier Assad",
         "throw": "R",
         "role": "LR",
         "leverage_skill": 0.35,
-        "stamina_pitches": 37,
-        "availability_mult": 1.0,
+        "stamina_pitches": 36,
+        "availability_mult": 0.54,
         "platoon_mult_vs_lhb": {
-          "k": 1.0222873869630464,
+          "k": 1.0889562109566113,
           "bb": 1.1925000000000001,
-          "hr": 0.78,
-          "inplay": 1.094481727689677
+          "hr": 1.275,
+          "inplay": 1.0904670743090081
         },
         "platoon_mult_vs_rhb": {
-          "k": 0.9640181257449908,
+          "k": 0.876570766187935,
           "bb": 0.8075,
-          "hr": 1.275,
-          "inplay": 0.8889085817291748
+          "hr": 0.78,
+          "inplay": 0.9231666022562064
         },
         "statcast_quality_mult": {},
         "arsenal_source": "statsapi_pitchArsenal",
-        "arsenal_sample_size": 932,
+        "arsenal_sample_size": 575,
         "statcast_splits_found": false,
         "statcast_splits_source": "",
         "statcast_splits_n_pitches": 0,
         "statcast_splits_start_date": "",
         "statcast_splits_end_date": "",
-        "k_rate": 0.2529093693176381,
-        "bb_rate": 0.07808881232653841,
-        "hbp_rate": 0.00823045267489712,
-        "hr_rate": 0.0034979423868312758,
-        "inplay_hit_rate": 0.25704786262331014,
+        "k_rate": 0.1634390243902439,
+        "bb_rate": 0.06014634146341463,
+        "hbp_rate": 0.006666666666666667,
+        "hr_rate": 0.024495934959349597,
+        "inplay_hit_rate": 0.2561179087875417,
         "arsenal": {
-          "FF": 0.3701716737017167,
-          "CH": 0.0622317606223176,
-          "SI": 0.2113733921137339,
-          "KC": 0.3562231735622317
+          "FF": 0.1582608734817392,
+          "OTHER": 0.06608695645391303,
+          "CU": 0.07304348160695659,
+          "CH": 0.08173913179826088,
+          "SI": 0.40521738891478254,
+          "SL": 0.05043478410956524,
+          "FC": 0.16521738363478242
         },
         "pitch_type_whiff_mult": {},
         "pitch_type_inplay_mult": {},

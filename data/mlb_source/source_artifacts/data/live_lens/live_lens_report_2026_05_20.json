@@ -1,6 +1,6 @@
 {
   "date": "2026-05-20",
-  "generatedAt": "2026-06-18T02:38:25-05:00",
+  "generatedAt": "2026-06-19T06:05:28-05:00",
   "dataRoot": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data",
   "liveLensDir": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\live_lens",
   "optimizationRegime": {
@@ -25,11 +25,11 @@
   "performance": {
     "marketsRefreshed": false,
     "marketRefreshMs": 0.0,
-    "totalMs": 4177.6,
+    "totalMs": 4289.6,
     "snapshotLoadMs": 5.8,
-    "simContextLoadMs": 1.5,
-    "propEvalMs": 3.1,
-    "gameLensMs": 0.7,
+    "simContextLoadMs": 1.7,
+    "propEvalMs": 3.8,
+    "gameLensMs": 0.6,
     "gameCount": 15,
     "liveGameCount": 0,
     "feedFetchCount": 15,
@@ -128,7 +128,7 @@
         {
           "eyebrow": "Live state",
           "title": "12:05 PM",
-          "body": "Report snapshot generated at 2026-06-18T02:38:25-05:00. Current score is 9-4."
+          "body": "Report snapshot generated at 2026-06-19T06:05:28-05:00. Current score is 9-4."
         },
         {
           "eyebrow": "Segment looks",
@@ -147,8 +147,8 @@
       ],
       "href": "/mlb/game/823462?date=2026-05-20",
       "href_label": "Open game detail",
-      "oddsRefreshedAt": "2026-06-18T07:38:25+00:00",
-      "odds_refreshed_at": "2026-06-18T07:38:25+00:00"
+      "oddsRefreshedAt": "2026-06-19T11:05:28+00:00",
+      "odds_refreshed_at": "2026-06-19T11:05:28+00:00"
     },
     {
       "archivedLiveProps": [],
@@ -242,7 +242,7 @@
         {
           "eyebrow": "Live state",
           "title": "12:10 PM",
-          "body": "Report snapshot generated at 2026-06-18T02:38:25-05:00. Current score is 3-5."
+          "body": "Report snapshot generated at 2026-06-19T06:05:28-05:00. Current score is 3-5."
         },
         {
           "eyebrow": "Segment looks",
@@ -261,8 +261,8 @@
       ],
       "href": "/mlb/game/822977?date=2026-05-20",
       "href_label": "Open game detail",
-      "oddsRefreshedAt": "2026-06-18T07:38:25+00:00",
-      "odds_refreshed_at": "2026-06-18T07:38:25+00:00"
+      "oddsRefreshedAt": "2026-06-19T11:05:28+00:00",
+      "odds_refreshed_at": "2026-06-19T11:05:28+00:00"
     },
     {
       "archivedLiveProps": [],
@@ -356,7 +356,7 @@
         {
           "eyebrow": "Live state",
           "title": "12:40 PM",
-          "body": "Report snapshot generated at 2026-06-18T02:38:25-05:00. Current score is 1-4."
+          "body": "Report snapshot generated at 2026-06-19T06:05:28-05:00. Current score is 1-4."
         },
         {
           "eyebrow": "Segment looks",
@@ -375,8 +375,8 @@
       ],
       "href": "/mlb/game/823703?date=2026-05-20",
       "href_label": "Open game detail",
-      "oddsRefreshedAt": "2026-06-18T07:38:25+00:00",
-      "odds_refreshed_at": "2026-06-18T07:38:25+00:00"
+      "oddsRefreshedAt": "2026-06-19T11:05:28+00:00",
+      "odds_refreshed_at": "2026-06-19T11:05:28+00:00"
     },
     {
       "archivedLiveProps": [],
@@ -470,7 +470,7 @@
         {
           "eyebrow": "Live state",
           "title": "2:10 PM",
-          "body": "Report snapshot generated at 2026-06-18T02:38:25-05:00. Current score is 5-4."
+          "body": "Report snapshot generated at 2026-06-19T06:05:28-05:00. Current score is 5-4."
         },
         {
           "eyebrow": "Segment looks",
@@ -489,8 +489,8 @@
       ],
       "href": "/mlb/game/824355?date=2026-05-20",
       "href_label": "Open game detail",
-      "oddsRefreshedAt": "2026-06-18T07:38:25+00:00",
-      "odds_refreshed_at": "2026-06-18T07:38:25+00:00"
+      "oddsRefreshedAt": "2026-06-19T11:05:28+00:00",
+      "odds_refreshed_at": "2026-06-19T11:05:28+00:00"
     },
     {
       "archivedLiveProps": [],
@@ -584,7 +584,7 @@
         {
           "eyebrow": "Live state",
           "title": "2:40 PM",
-          "body": "Report snapshot generated at 2026-06-18T02:38:25-05:00. Current score is 3-6."
+          "body": "Report snapshot generated at 2026-06-19T06:05:28-05:00. Current score is 3-6."
         },
         {
           "eyebrow": "Segment looks",
@@ -603,8 +603,8 @@
       ],
       "href": "/mlb/game/825084?date=2026-05-20",
       "href_label": "Open game detail",
-      "oddsRefreshedAt": "2026-06-18T07:38:25+00:00",
-      "odds_refreshed_at": "2026-06-18T07:38:25+00:00"
+      "oddsRefreshedAt": "2026-06-19T11:05:28+00:00",
+      "odds_refreshed_at": "2026-06-19T11:05:28+00:00"
     },
     {
       "archivedLiveProps": [],
@@ -698,7 +698,7 @@
         {
           "eyebrow": "Live state",
           "title": "3:10 PM",
-          "body": "Report snapshot generated at 2026-06-18T02:38:25-05:00. Current score is 4-5."
+          "body": "Report snapshot generated at 2026-06-19T06:05:28-05:00. Current score is 4-5."
         },
         {
           "eyebrow": "Segment looks",
@@ -717,8 +717,8 @@
       ],
       "href": "/mlb/game/823134?date=2026-05-20",
       "href_label": "Open game detail",
-      "oddsRefreshedAt": "2026-06-18T07:38:25+00:00",
-      "odds_refreshed_at": "2026-06-18T07:38:25+00:00"
+      "oddsRefreshedAt": "2026-06-19T11:05:28+00:00",
+      "odds_refreshed_at": "2026-06-19T11:05:28+00:00"
     },
     {
       "archivedLiveProps": [],
@@ -812,7 +812,7 @@
         {
           "eyebrow": "Live state",
           "title": "5:40 PM",
-          "body": "Report snapshot generated at 2026-06-18T02:38:25-05:00. Current score is 9-1."
+          "body": "Report snapshot generated at 2026-06-19T06:05:28-05:00. Current score is 9-1."
         },
         {
           "eyebrow": "Segment looks",
@@ -831,8 +831,8 @@
       ],
       "href": "/mlb/game/823866?date=2026-05-20",
       "href_label": "Open game detail",
-      "oddsRefreshedAt": "2026-06-18T07:38:25+00:00",
-      "odds_refreshed_at": "2026-06-18T07:38:25+00:00"
+      "oddsRefreshedAt": "2026-06-19T11:05:28+00:00",
+      "odds_refreshed_at": "2026-06-19T11:05:28+00:00"
     },
     {
       "archivedLiveProps": [],
@@ -926,7 +926,7 @@
         {
           "eyebrow": "Live state",
           "title": "5:40 PM",
-          "body": "Report snapshot generated at 2026-06-18T02:38:25-05:00. Current score is 3-2."
+          "body": "Report snapshot generated at 2026-06-19T06:05:28-05:00. Current score is 3-2."
         },
         {
           "eyebrow": "Segment looks",
@@ -945,8 +945,8 @@
       ],
       "href": "/mlb/game/824273?date=2026-05-20",
       "href_label": "Open game detail",
-      "oddsRefreshedAt": "2026-06-18T07:38:25+00:00",
-      "odds_refreshed_at": "2026-06-18T07:38:25+00:00"
+      "oddsRefreshedAt": "2026-06-19T11:05:28+00:00",
+      "odds_refreshed_at": "2026-06-19T11:05:28+00:00"
     },
     {
       "archivedLiveProps": [],
@@ -1040,7 +1040,7 @@
         {
           "eyebrow": "Live state",
           "title": "5:45 PM",
-          "body": "Report snapshot generated at 2026-06-18T02:38:25-05:00. Current score is 4-8."
+          "body": "Report snapshot generated at 2026-06-19T06:05:28-05:00. Current score is 4-8."
         },
         {
           "eyebrow": "Segment looks",
@@ -1059,8 +1059,8 @@
       ],
       "href": "/mlb/game/822735?date=2026-05-20",
       "href_label": "Open game detail",
-      "oddsRefreshedAt": "2026-06-18T07:38:25+00:00",
-      "odds_refreshed_at": "2026-06-18T07:38:25+00:00"
+      "oddsRefreshedAt": "2026-06-19T11:05:28+00:00",
+      "odds_refreshed_at": "2026-06-19T11:05:28+00:00"
     },
     {
       "archivedLiveProps": [],
@@ -1154,7 +1154,7 @@
         {
           "eyebrow": "Live state",
           "title": "6:05 PM",
-          "body": "Report snapshot generated at 2026-06-18T02:38:25-05:00. Current score is 2-1."
+          "body": "Report snapshot generated at 2026-06-19T06:05:28-05:00. Current score is 2-1."
         },
         {
           "eyebrow": "Segment looks",
@@ -1173,8 +1173,8 @@
       ],
       "href": "/mlb/game/823547?date=2026-05-20",
       "href_label": "Open game detail",
-      "oddsRefreshedAt": "2026-06-18T07:38:25+00:00",
-      "odds_refreshed_at": "2026-06-18T07:38:25+00:00"
+      "oddsRefreshedAt": "2026-06-19T11:05:28+00:00",
+      "odds_refreshed_at": "2026-06-19T11:05:28+00:00"
     },
     {
       "archivedLiveProps": [],
@@ -1268,7 +1268,7 @@
         {
           "eyebrow": "Live state",
           "title": "6:40 PM",
-          "body": "Report snapshot generated at 2026-06-18T02:38:25-05:00. Current score is 4-3."
+          "body": "Report snapshot generated at 2026-06-19T06:05:28-05:00. Current score is 4-3."
         },
         {
           "eyebrow": "Segment looks",
@@ -1287,8 +1287,8 @@
       ],
       "href": "/mlb/game/824111?date=2026-05-20",
       "href_label": "Open game detail",
-      "oddsRefreshedAt": "2026-06-18T07:38:25+00:00",
-      "odds_refreshed_at": "2026-06-18T07:38:25+00:00"
+      "oddsRefreshedAt": "2026-06-19T11:05:28+00:00",
+      "odds_refreshed_at": "2026-06-19T11:05:28+00:00"
     },
     {
       "archivedLiveProps": [],
@@ -1382,7 +1382,7 @@
         {
           "eyebrow": "Live state",
           "title": "6:40 PM",
-          "body": "Report snapshot generated at 2026-06-18T02:38:25-05:00. Current score is 5-0."
+          "body": "Report snapshot generated at 2026-06-19T06:05:28-05:00. Current score is 5-0."
         },
         {
           "eyebrow": "Segment looks",
@@ -1401,8 +1401,8 @@
       ],
       "href": "/mlb/game/824678?date=2026-05-20",
       "href_label": "Open game detail",
-      "oddsRefreshedAt": "2026-06-18T07:38:25+00:00",
-      "odds_refreshed_at": "2026-06-18T07:38:25+00:00"
+      "oddsRefreshedAt": "2026-06-19T11:05:28+00:00",
+      "odds_refreshed_at": "2026-06-19T11:05:28+00:00"
     },
     {
       "archivedLiveProps": [],
@@ -1496,7 +1496,7 @@
         {
           "eyebrow": "Live state",
           "title": "6:45 PM",
-          "body": "Report snapshot generated at 2026-06-18T02:38:25-05:00. Current score is 7-0."
+          "body": "Report snapshot generated at 2026-06-19T06:05:28-05:00. Current score is 7-0."
         },
         {
           "eyebrow": "Segment looks",
@@ -1515,8 +1515,8 @@
       ],
       "href": "/mlb/game/823057?date=2026-05-20",
       "href_label": "Open game detail",
-      "oddsRefreshedAt": "2026-06-18T07:38:25+00:00",
-      "odds_refreshed_at": "2026-06-18T07:38:25+00:00"
+      "oddsRefreshedAt": "2026-06-19T11:05:28+00:00",
+      "odds_refreshed_at": "2026-06-19T11:05:28+00:00"
     },
     {
       "archivedLiveProps": [],
@@ -1610,7 +1610,7 @@
         {
           "eyebrow": "Live state",
           "title": "7:40 PM",
-          "body": "Report snapshot generated at 2026-06-18T02:38:25-05:00. Current score is 4-0."
+          "body": "Report snapshot generated at 2026-06-19T06:05:28-05:00. Current score is 4-0."
         },
         {
           "eyebrow": "Segment looks",
@@ -1629,8 +1629,8 @@
       ],
       "href": "/mlb/game/823299?date=2026-05-20",
       "href_label": "Open game detail",
-      "oddsRefreshedAt": "2026-06-18T07:38:25+00:00",
-      "odds_refreshed_at": "2026-06-18T07:38:25+00:00"
+      "oddsRefreshedAt": "2026-06-19T11:05:28+00:00",
+      "odds_refreshed_at": "2026-06-19T11:05:28+00:00"
     },
     {
       "archivedLiveProps": [],
@@ -1724,7 +1724,7 @@
         {
           "eyebrow": "Live state",
           "title": "8:38 PM",
-          "body": "Report snapshot generated at 2026-06-18T02:38:25-05:00. Current score is 6-5."
+          "body": "Report snapshot generated at 2026-06-19T06:05:28-05:00. Current score is 6-5."
         },
         {
           "eyebrow": "Segment looks",
@@ -1743,12 +1743,12 @@
       ],
       "href": "/mlb/game/824032?date=2026-05-20",
       "href_label": "Open game detail",
-      "oddsRefreshedAt": "2026-06-18T07:38:25+00:00",
-      "odds_refreshed_at": "2026-06-18T07:38:25+00:00"
+      "oddsRefreshedAt": "2026-06-19T11:05:28+00:00",
+      "odds_refreshed_at": "2026-06-19T11:05:28+00:00"
     }
   ],
-  "oddsRefreshedAt": "2026-06-18T07:38:25+00:00",
-  "odds_refreshed_at": "2026-06-18T07:38:25+00:00",
+  "oddsRefreshedAt": "2026-06-19T11:05:28+00:00",
+  "odds_refreshed_at": "2026-06-19T11:05:28+00:00",
   "source_title": "MLB live-lens report artifact",
   "source_path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\live_lens\\live_lens_report_2026_05_20.json"
 }

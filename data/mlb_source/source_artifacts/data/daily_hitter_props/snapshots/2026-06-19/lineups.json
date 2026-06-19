@@ -2,11 +2,11 @@
   "date": "2026-06-19",
   "season": 2026,
   "spring_mode": false,
-  "generated_at": "2026-06-18T07:47:53.654543",
+  "generated_at": "2026-06-19T11:45:17.049635",
   "summary": {
     "games": 14,
     "projected_teams": 28,
-    "adjusted_teams": 4,
+    "adjusted_teams": 0,
     "partial_teams": 0,
     "fallback_pool_teams": 0,
     "confirmed_teams": 0,
@@ -48,7 +48,7 @@
         608324,
         664023,
         673548,
-        694208,
+        807713,
         608348,
         621020
       ],
@@ -114,7 +114,7 @@
           608324,
           664023,
           673548,
-          694208,
+          807713,
           608348,
           621020
         ],
@@ -125,7 +125,7 @@
           608324,
           664023,
           673548,
-          694208,
+          807713,
           608348,
           621020
         ],
@@ -140,7 +140,7 @@
           "Alex Bregman",
           "Ian Happ",
           "Seiya Suzuki",
-          "Moises Ballesteros",
+          "Matt Shaw",
           "Carson Kelly",
           "Dansby Swanson"
         ],
@@ -151,7 +151,7 @@
           "Alex Bregman",
           "Ian Happ",
           "Seiya Suzuki",
-          "Mois\u00e9s Ballesteros",
+          "Matt Shaw",
           "Carson Kelly",
           "Dansby Swanson"
         ],
@@ -160,8 +160,8 @@
       },
       "away_source": "projected_rotowire_default_vs_rhp",
       "home_source": "projected_rotowire_default_vs_rhp",
-      "away_confidence": 0.58,
-      "home_confidence": 0.58,
+      "away_confidence": 0.66,
+      "home_confidence": 0.66,
       "away_comparison": {
         "status": "projected_only",
         "is_true_mismatch": false,
@@ -199,22 +199,22 @@
         545341,
         678246,
         695657,
-        677592,
-        695731,
         700337,
+        695731,
         682668,
+        678577,
         803011
       ],
       "home_projected_ids": [
         805808,
-        681481,
         693307,
         682985,
         679529,
+        681481,
         690993,
-        663837,
         656716,
-        701678
+        701678,
+        681546
       ],
       "away_projected_validation": {
         "status": "ok",
@@ -223,10 +223,10 @@
           545341,
           678246,
           695657,
-          677592,
-          695731,
           700337,
+          695731,
           682668,
+          678577,
           803011
         ],
         "ids": [
@@ -234,10 +234,10 @@
           545341,
           678246,
           695657,
-          677592,
-          695731,
           700337,
+          695731,
           682668,
+          678577,
           803011
         ],
         "missing_ids": [],
@@ -249,10 +249,10 @@
           "Randal Grichuk",
           "Miguel Vargas",
           "Colson Montgomery",
-          "Everson Pereira",
-          "Braden Montgomery",
           "Edgar Quero",
+          "Braden Montgomery",
           "Luisangel Acuna",
+          "Junior Perez",
           "Sam Antonacci"
         ],
         "matched_names": [
@@ -260,74 +260,72 @@
           "Randal Grichuk",
           "Miguel Vargas",
           "Colson Montgomery",
-          "Everson Pereira",
-          "Braden Montgomery",
           "Edgar Quero",
+          "Braden Montgomery",
           "Luisangel Acu\u00f1a",
+          "Junior Perez",
           "Sam Antonacci"
         ],
         "missing_name_labels": [],
         "mapping_source": "projected_rotowire_default_vs_lhp"
       },
       "home_projected_validation": {
-        "status": "adjusted",
+        "status": "ok",
         "raw_ids": [
           805808,
-          681481,
           693307,
           682985,
           679529,
+          681481,
           690993,
-          663837,
-          656716
+          656716,
+          701678,
+          681546
         ],
         "ids": [
           805808,
-          681481,
           693307,
           682985,
           679529,
+          681481,
           690993,
-          663837,
           656716,
-          701678
+          701678,
+          681546
         ],
         "missing_ids": [],
-        "backfilled_ids": [
-          701678
-        ],
+        "backfilled_ids": [],
         "pool_source": "active+40Man",
         "pool_size": 18,
         "raw_names": [
           "Kevin McGonigle",
-          "Gleyber Torres",
-          "Kerry Carpenter",
           "Dillon Dingler",
           "Riley Greene",
           "Spencer Torkelson",
+          "Kerry Carpenter",
           "Colt Keith",
-          "Matt Vierling",
-          "Zach McKinstry"
+          "Zach McKinstry",
+          "Hao-Yu Lee",
+          "James Outman"
         ],
         "matched_names": [
           "Kevin McGonigle",
-          "Kerry Carpenter",
           "Dillon Dingler",
           "Riley Greene",
           "Spencer Torkelson",
+          "Kerry Carpenter",
           "Colt Keith",
-          "Matt Vierling",
-          "Zach McKinstry"
+          "Zach McKinstry",
+          "Hao-Yu  Lee",
+          "James Outman"
         ],
-        "missing_name_labels": [
-          "Gleyber Torres"
-        ],
+        "missing_name_labels": [],
         "mapping_source": "projected_rotowire_default_vs_rhp"
       },
       "away_source": "projected_rotowire_default_vs_lhp",
       "home_source": "projected_rotowire_default_vs_rhp",
       "away_confidence": 0.66,
-      "home_confidence": 0.48000000000000004,
+      "home_confidence": 0.66,
       "away_comparison": {
         "status": "projected_only",
         "is_true_mismatch": false,
@@ -490,7 +488,7 @@
       },
       "away_source": "projected_rotowire_default_vs_rhp",
       "home_source": "projected_rotowire_default_vs_rhp",
-      "away_confidence": 0.58,
+      "away_confidence": 0.66,
       "home_confidence": 0.66,
       "away_comparison": {
         "status": "projected_only",
@@ -529,10 +527,10 @@
         671277,
         678554,
         682928,
-        695734,
         686611,
-        660688,
+        695734,
         696285,
+        660688,
         683083
       ],
       "home_projected_ids": [
@@ -540,8 +538,8 @@
         666018,
         656775,
         691406,
-        802415,
         680700,
+        802415,
         683748,
         676439,
         670764
@@ -553,10 +551,10 @@
           671277,
           678554,
           682928,
-          695734,
           686611,
-          660688,
+          695734,
           696285,
+          660688,
           683083
         ],
         "ids": [
@@ -564,10 +562,10 @@
           671277,
           678554,
           682928,
-          695734,
           686611,
-          660688,
+          695734,
           696285,
+          660688,
           683083
         ],
         "missing_ids": [],
@@ -579,10 +577,10 @@
           "Luis Garcia",
           "Curtis Mead",
           "CJ Abrams",
-          "Daylen Lile",
           "Dylan Crews",
-          "Keibert Ruiz",
+          "Daylen Lile",
           "Jacob Young",
+          "Keibert Ruiz",
           "Nasim Nunez"
         ],
         "matched_names": [
@@ -590,10 +588,10 @@
           "Luis Garc\u00eda Jr.",
           "Curtis Mead",
           "CJ Abrams",
-          "Daylen Lile",
           "Dylan Crews",
-          "Keibert Ruiz",
+          "Daylen Lile",
           "Jacob Young",
+          "Keibert Ruiz",
           "Nasim Nu\u00f1ez"
         ],
         "missing_name_labels": [],
@@ -606,8 +604,8 @@
           666018,
           656775,
           691406,
-          802415,
           680700,
+          802415,
           683748,
           676439,
           670764
@@ -617,8 +615,8 @@
           666018,
           656775,
           691406,
-          802415,
           680700,
+          802415,
           683748,
           676439,
           670764
@@ -632,8 +630,8 @@
           "Jonathan Aranda",
           "Cedric Mullins",
           "Junior Caminero",
-          "Chandler Simpson",
           "Richie Palacios",
+          "Chandler Simpson",
           "Victor Mesa",
           "Hunter Feduccia",
           "Taylor Walls"
@@ -643,8 +641,8 @@
           "Jonathan Aranda",
           "Cedric Mullins",
           "Junior Caminero",
-          "Chandler Simpson",
           "Richie Palacios",
+          "Chandler Simpson",
           "Victor Mesa Jr.",
           "Hunter Feduccia",
           "Taylor Walls"
@@ -819,7 +817,7 @@
       "away_source": "projected_rotowire_default_vs_rhp",
       "home_source": "projected_rotowire_default_vs_rhp",
       "away_confidence": 0.58,
-      "home_confidence": 0.58,
+      "home_confidence": 0.66,
       "away_comparison": {
         "status": "projected_only",
         "is_true_mismatch": false,
@@ -853,137 +851,137 @@
       "away_confirmed_ids": [],
       "home_confirmed_ids": [],
       "away_projected_ids": [
-        592885,
         694192,
         668930,
         661388,
-        641343,
+        683734,
+        596142,
         669003,
-        686217,
-        666152,
-        806198
+        663368,
+        806198,
+        687401
       ],
       "home_projected_ids": [
-        643289,
-        645277,
-        621566,
-        663586,
-        642201,
+        686948,
         671739,
-        622761,
-        673490,
-        506702
+        621566,
+        645277,
+        642086,
+        663586,
+        643289,
+        573262,
+        642201
       ],
       "away_projected_validation": {
         "status": "ok",
         "raw_ids": [
-          592885,
           694192,
           668930,
           661388,
-          641343,
+          683734,
+          596142,
           669003,
-          686217,
-          666152,
-          806198
+          663368,
+          806198,
+          687401
         ],
         "ids": [
-          592885,
           694192,
           668930,
           661388,
-          641343,
+          683734,
+          596142,
           669003,
-          686217,
-          666152,
-          806198
+          663368,
+          806198,
+          687401
         ],
         "missing_ids": [],
         "backfilled_ids": [],
         "pool_source": "active+40Man",
         "pool_size": 17,
         "raw_names": [
-          "Christian Yelich",
           "Jackson Chourio",
           "Brice Turang",
           "William Contreras",
-          "Jake Bauers",
+          "Andrew Vaughn",
+          "Gary Sanchez",
           "Garrett Mitchell",
-          "Sal Frelick",
-          "David Hamilton",
-          "Cooper Pratt"
+          "Blake Perkins",
+          "Cooper Pratt",
+          "Joey Ortiz"
         ],
         "matched_names": [
-          "Christian Yelich",
           "Jackson Chourio",
           "Brice Turang",
           "William Contreras",
-          "Jake Bauers",
+          "Andrew Vaughn",
+          "Gary S\u00e1nchez",
           "Garrett Mitchell",
-          "Sal Frelick",
-          "David Hamilton",
-          "Cooper Pratt"
+          "Blake Perkins",
+          "Cooper Pratt",
+          "Joey Ortiz"
         ],
         "missing_name_labels": [],
-        "mapping_source": "projected_rotowire_default_vs_rhp"
+        "mapping_source": "projected_rotowire_default_vs_lhp"
       },
       "home_projected_validation": {
         "status": "ok",
         "raw_ids": [
-          643289,
-          645277,
-          621566,
-          663586,
-          642201,
+          686948,
           671739,
-          622761,
-          673490,
-          506702
+          621566,
+          645277,
+          642086,
+          663586,
+          643289,
+          573262,
+          642201
         ],
         "ids": [
-          643289,
-          645277,
-          621566,
-          663586,
-          642201,
+          686948,
           671739,
-          622761,
-          673490,
-          506702
+          621566,
+          645277,
+          642086,
+          663586,
+          643289,
+          573262,
+          642201
         ],
         "missing_ids": [],
         "backfilled_ids": [],
         "pool_source": "active+40Man",
         "pool_size": 18,
         "raw_names": [
-          "Mauricio Dubon",
-          "Ozzie Albies",
-          "Matt Olson",
-          "Austin Riley",
-          "Eli White",
+          "Drake Baldwin",
           "Michael Harris",
-          "Jorge Mateo",
-          "Ha-Seong Kim",
-          "Sandy Leon"
+          "Matt Olson",
+          "Ozzie Albies",
+          "Dominic Smith",
+          "Austin Riley",
+          "Mauricio Dubon",
+          "Mike Yastrzemski",
+          "Eli White"
         ],
         "matched_names": [
-          "Mauricio Dub\u00f3n",
-          "Ozzie Albies",
-          "Matt Olson",
-          "Austin Riley",
-          "Eli White",
+          "Drake Baldwin",
           "Michael Harris II",
-          "Jorge Mateo",
-          "Ha-Seong Kim",
-          "Sandy Le\u00f3n"
+          "Matt Olson",
+          "Ozzie Albies",
+          "Dominic Smith",
+          "Austin Riley",
+          "Mauricio Dub\u00f3n",
+          "Mike Yastrzemski",
+          "Eli White"
         ],
         "missing_name_labels": [],
-        "mapping_source": "projected_rotowire_default_vs_lhp"
+        "mapping_source": "projected_rotowire_default_vs_rhp"
       },
-      "away_source": "projected_rotowire_default_vs_rhp",
-      "home_source": "projected_rotowire_default_vs_lhp",
-      "away_confidence": 0.58,
-      "home_confidence": 0.56,
+      "away_source": "projected_rotowire_default_vs_lhp",
+      "home_source": "projected_rotowire_default_vs_rhp",
+      "away_confidence": 0.66,
+      "home_confidence": 0.66,
       "away_comparison": {
         "status": "projected_only",
         "is_true_mismatch": false,
@@ -1018,13 +1016,13 @@
       "home_confirmed_ids": [],
       "away_projected_ids": [
         665487,
+        669392,
         701538,
         592518,
-        593428,
         657757,
-        669392,
+        593428,
+        664034,
         695238,
-        687749,
         660710
       ],
       "home_projected_ids": [
@@ -1034,32 +1032,32 @@
         694671,
         677649,
         669394,
+        669701,
         543309,
-        670032,
         696030
       ],
       "away_projected_validation": {
         "status": "ok",
         "raw_ids": [
           665487,
+          669392,
           701538,
           592518,
-          593428,
           657757,
-          669392,
+          593428,
+          664034,
           695238,
-          687749,
           660710
         ],
         "ids": [
           665487,
+          669392,
           701538,
           592518,
-          593428,
           657757,
-          669392,
+          593428,
+          664034,
           695238,
-          687749,
           660710
         ],
         "missing_ids": [],
@@ -1068,31 +1066,31 @@
         "pool_size": 14,
         "raw_names": [
           "Fernando Tatis",
+          "Samad Taylor",
           "Jackson Merrill",
           "Manny Machado",
-          "Xander Bogaerts",
           "Gavin Sheets",
-          "Samad Taylor",
+          "Xander Bogaerts",
+          "Ty France",
           "Will Wagner",
-          "Jase Bowen",
           "Rodolfo Duran"
         ],
         "matched_names": [
           "Fernando Tatis Jr.",
+          "Samad Taylor",
           "Jackson Merrill",
           "Manny Machado",
-          "Xander Bogaerts",
           "Gavin Sheets",
-          "Samad Taylor",
+          "Xander Bogaerts",
+          "Ty France",
           "Will Wagner",
-          "Jase Bowen",
           "Rodolfo Dur\u00e1n"
         ],
         "missing_name_labels": [],
         "mapping_source": "projected_rotowire_default_vs_rhp"
       },
       "home_projected_validation": {
-        "status": "adjusted",
+        "status": "ok",
         "raw_ids": [
           592626,
           673962,
@@ -1100,8 +1098,9 @@
           694671,
           677649,
           669394,
+          669701,
           543309,
-          670032
+          696030
         ],
         "ids": [
           592626,
@@ -1110,26 +1109,24 @@
           694671,
           677649,
           669394,
+          669701,
           543309,
-          670032,
           696030
         ],
         "missing_ids": [],
-        "backfilled_ids": [
-          696030
-        ],
+        "backfilled_ids": [],
         "pool_source": "active+40Man",
         "pool_size": 14,
         "raw_names": [
           "Joc Pederson",
-          "Corey Seager",
           "Josh Jung",
           "Brandon Nimmo",
           "Wyatt Langford",
           "Ezequiel Duran",
           "Jake Burger",
+          "Josh Smith",
           "Kyle Higashioka",
-          "Nicky Lopez"
+          "Alejandro Osuna"
         ],
         "matched_names": [
           "Joc Pederson",
@@ -1138,18 +1135,17 @@
           "Wyatt Langford",
           "Ezequiel Duran",
           "Jake Burger",
+          "Josh Smith",
           "Kyle Higashioka",
-          "Nicky Lopez"
+          "Alejandro Osuna"
         ],
-        "missing_name_labels": [
-          "Corey Seager"
-        ],
+        "missing_name_labels": [],
         "mapping_source": "projected_rotowire_default_vs_rhp"
       },
       "away_source": "projected_rotowire_default_vs_rhp",
       "home_source": "projected_rotowire_default_vs_rhp",
-      "away_confidence": 0.58,
-      "home_confidence": 0.48000000000000004,
+      "away_confidence": 0.66,
+      "home_confidence": 0.66,
       "away_comparison": {
         "status": "projected_only",
         "is_true_mismatch": false,
@@ -1184,14 +1180,14 @@
       "home_confirmed_ids": [],
       "away_projected_ids": [
         683953,
-        656555,
-        681807,
-        656413,
-        672356,
-        680757,
-        595978,
+        700932,
         677587,
-        682177
+        656555,
+        682177,
+        680757,
+        672356,
+        696135,
+        672275
       ],
       "home_projected_ids": [
         665161,
@@ -1199,65 +1195,63 @@
         572233,
         670623,
         514888,
-        694388,
         701358,
-        676694,
-        543877
+        694388,
+        673237,
+        676694
       ],
       "away_projected_validation": {
-        "status": "adjusted",
+        "status": "ok",
         "raw_ids": [
           683953,
+          700932,
+          677587,
           656555,
-          681807,
-          656413,
-          672356,
+          682177,
           680757,
-          595978,
-          677587
+          672356,
+          696135,
+          672275
         ],
         "ids": [
           683953,
-          656555,
-          681807,
-          656413,
-          672356,
-          680757,
-          595978,
+          700932,
           677587,
-          682177
+          656555,
+          682177,
+          680757,
+          672356,
+          696135,
+          672275
         ],
         "missing_ids": [],
-        "backfilled_ids": [
-          682177
-        ],
+        "backfilled_ids": [],
         "pool_source": "active+40Man",
         "pool_size": 17,
         "raw_names": [
-          "Angel Martinez",
           "Travis Bazzana",
+          "Kyle Manzardo",
+          "Brayan Rocchio",
           "Rhys Hoskins",
-          "David Fry",
-          "Stuart Fairchild",
-          "Gabriel Arias",
+          "Daniel Schneemann",
           "Steven Kwan",
-          "Austin Hedges",
-          "Brayan Rocchio"
+          "Gabriel Arias",
+          "Kahlil Watson",
+          "Patrick Bailey"
         ],
         "matched_names": [
           "Travis Bazzana",
+          "Kyle Manzardo",
+          "Brayan Rocchio",
           "Rhys Hoskins",
-          "David Fry",
-          "Stuart Fairchild",
-          "Gabriel Arias",
+          "Daniel Schneemann",
           "Steven Kwan",
-          "Austin Hedges",
-          "Brayan Rocchio"
+          "Gabriel Arias",
+          "Kahlil Watson",
+          "Patrick Bailey"
         ],
-        "missing_name_labels": [
-          "Angel Martinez"
-        ],
-        "mapping_source": "projected_rotowire_default_vs_lhp"
+        "missing_name_labels": [],
+        "mapping_source": "projected_rotowire_default_vs_rhp"
       },
       "home_projected_validation": {
         "status": "ok",
@@ -1267,10 +1261,10 @@
           572233,
           670623,
           514888,
-          694388,
           701358,
-          676694,
-          543877
+          694388,
+          673237,
+          676694
         ],
         "ids": [
           665161,
@@ -1278,10 +1272,10 @@
           572233,
           670623,
           514888,
-          694388,
           701358,
-          676694,
-          543877
+          694388,
+          673237,
+          676694
         ],
         "missing_ids": [],
         "backfilled_ids": [],
@@ -1293,10 +1287,10 @@
           "Christian Walker",
           "Isaac Paredes",
           "Jose Altuve",
-          "Joey Loperfido",
           "Cam Smith",
-          "Jake Meyers",
-          "Christian Vazquez"
+          "Joey Loperfido",
+          "Yainer Diaz",
+          "Jake Meyers"
         ],
         "matched_names": [
           "Jeremy Pe\u00f1a",
@@ -1304,17 +1298,17 @@
           "Christian Walker",
           "Isaac Paredes",
           "Jose Altuve",
-          "Joey Loperfido",
           "Cam Smith",
-          "Jake Meyers",
-          "Christian V\u00e1zquez"
+          "Joey Loperfido",
+          "Yainer Diaz",
+          "Jake Meyers"
         ],
         "missing_name_labels": [],
         "mapping_source": "projected_rotowire_default_vs_rhp"
       },
-      "away_source": "projected_rotowire_default_vs_lhp",
+      "away_source": "projected_rotowire_default_vs_rhp",
       "home_source": "projected_rotowire_default_vs_rhp",
-      "away_confidence": 0.48000000000000004,
+      "away_confidence": 0.66,
       "home_confidence": 0.66,
       "away_comparison": {
         "status": "projected_only",
@@ -1678,21 +1672,21 @@
       "home_confirmed_ids": [],
       "away_projected_ids": [
         687263,
-        545361,
         666176,
         672724,
-        694384,
+        687093,
         694203,
         663611,
         681351,
-        642350
+        642350,
+        695681
       ],
       "home_projected_ids": [
         701762,
-        691016,
         669127,
-        666126,
+        691016,
         805779,
+        666126,
         680869,
         671732,
         703607,
@@ -1702,25 +1696,25 @@
         "status": "ok",
         "raw_ids": [
           687263,
-          545361,
           666176,
           672724,
-          694384,
+          687093,
           694203,
           663611,
           681351,
-          642350
+          642350,
+          695681
         ],
         "ids": [
           687263,
-          545361,
           666176,
           672724,
-          694384,
+          687093,
           694203,
           663611,
           681351,
-          642350
+          642350,
+          695681
         ],
         "missing_ids": [],
         "backfilled_ids": [],
@@ -1728,25 +1722,25 @@
         "pool_size": 19,
         "raw_names": [
           "Zach Neto",
-          "Mike Trout",
           "Jo Adell",
           "Oswald Peraza",
-          "Nolan Schanuel",
+          "Vaughn Grissom",
           "Denzer Guzman",
           "Nick Madrigal",
           "Logan O'Hoppe",
-          "Jose Siri"
+          "Jose Siri",
+          "Christian Moore"
         ],
         "matched_names": [
           "Zach Neto",
-          "Mike Trout",
           "Jo Adell",
           "Oswald Peraza",
-          "Nolan Schanuel",
+          "Vaughn Grissom",
           "Denzer Guzman",
           "Nick Madrigal",
           "Logan O'Hoppe",
-          "Jose Siri"
+          "Jose Siri",
+          "Christian Moore"
         ],
         "missing_name_labels": [],
         "mapping_source": "projected_rotowire_default_vs_lhp"
@@ -1755,10 +1749,10 @@
         "status": "ok",
         "raw_ids": [
           701762,
-          691016,
           669127,
-          666126,
+          691016,
           805779,
+          666126,
           680869,
           671732,
           703607,
@@ -1766,10 +1760,10 @@
         ],
         "ids": [
           701762,
-          691016,
           669127,
-          666126,
+          691016,
           805779,
+          666126,
           680869,
           671732,
           703607,
@@ -1781,10 +1775,10 @@
         "pool_size": 15,
         "raw_names": [
           "Nick Kurtz",
-          "Tyler Soderstrom",
           "Shea Langeliers",
-          "Carlos Cortes",
+          "Tyler Soderstrom",
           "Jacob Wilson",
+          "Carlos Cortes",
           "Zack Gelof",
           "Lawrence Butler",
           "Henry Bolte",
@@ -1792,10 +1786,10 @@
         ],
         "matched_names": [
           "Nick Kurtz",
-          "Tyler Soderstrom",
           "Shea Langeliers",
-          "Carlos Cortes",
+          "Tyler Soderstrom",
           "Jacob Wilson",
+          "Carlos Cortes",
           "Zack Gelof",
           "Lawrence Butler",
           "Henry Bolte",
@@ -1807,7 +1801,7 @@
       "away_source": "projected_rotowire_default_vs_lhp",
       "home_source": "projected_rotowire_default_vs_rhp",
       "away_confidence": 0.66,
-      "home_confidence": 0.58,
+      "home_confidence": 0.66,
       "away_comparison": {
         "status": "projected_only",
         "is_true_mismatch": false,
@@ -1853,14 +1847,14 @@
       ],
       "home_projected_ids": [
         606466,
+        672695,
         682998,
         672515,
-        571448,
-        656976,
         666971,
-        672695,
-        694371,
-        691783
+        571448,
+        545121,
+        691783,
+        694410
       ],
       "away_projected_validation": {
         "status": "ok",
@@ -1919,25 +1913,25 @@
         "status": "ok",
         "raw_ids": [
           606466,
+          672695,
           682998,
           672515,
-          571448,
-          656976,
           666971,
-          672695,
-          694371,
-          691783
+          571448,
+          545121,
+          691783,
+          694410
         ],
         "ids": [
           606466,
+          672695,
           682998,
           672515,
-          571448,
-          656976,
           666971,
-          672695,
-          694371,
-          691783
+          571448,
+          545121,
+          691783,
+          694410
         ],
         "missing_ids": [],
         "backfilled_ids": [],
@@ -1945,33 +1939,33 @@
         "pool_size": 17,
         "raw_names": [
           "Ketel Marte",
+          "Geraldo Perdomo",
           "Corbin Carroll",
           "Gabriel Moreno",
-          "Nolan Arenado",
-          "Pavin Smith",
           "Lourdes Gurriel",
-          "Geraldo Perdomo",
-          "Tommy Troy",
-          "Jordan Lawlar"
+          "Nolan Arenado",
+          "Ildemaro Vargas",
+          "Jordan Lawlar",
+          "LuJames Groover"
         ],
         "matched_names": [
           "Ketel Marte",
+          "Geraldo Perdomo",
           "Corbin Carroll",
           "Gabriel Moreno",
-          "Nolan Arenado",
-          "Pavin Smith",
           "Lourdes Gurriel Jr.",
-          "Geraldo Perdomo",
-          "Tommy Troy",
-          "Jordan Lawlar"
+          "Nolan Arenado",
+          "Ildemaro Vargas",
+          "Jordan Lawlar",
+          "LuJames Groover"
         ],
         "missing_name_labels": [],
-        "mapping_source": "projected_rotowire_default_vs_rhp"
+        "mapping_source": "projected_rotowire_default_vs_lhp"
       },
       "away_source": "projected_rotowire_default_vs_rhp",
-      "home_source": "projected_rotowire_default_vs_rhp",
+      "home_source": "projected_rotowire_default_vs_lhp",
       "away_confidence": 0.66,
-      "home_confidence": 0.58,
+      "home_confidence": 0.66,
       "away_comparison": {
         "status": "projected_only",
         "is_true_mismatch": false,
@@ -2010,10 +2004,10 @@
         668939,
         624413,
         694212,
-        691723,
-        681297,
         665750,
-        702616
+        681297,
+        702616,
+        677942
       ],
       "home_projected_ids": [
         660271,
@@ -2024,7 +2018,7 @@
         663656,
         669899,
         687221,
-        690976
+        669242
       ],
       "away_projected_validation": {
         "status": "ok",
@@ -2034,10 +2028,10 @@
           668939,
           624413,
           694212,
-          691723,
-          681297,
           665750,
-          702616
+          681297,
+          702616,
+          677942
         ],
         "ids": [
           621493,
@@ -2045,10 +2039,10 @@
           668939,
           624413,
           694212,
-          691723,
-          681297,
           665750,
-          702616
+          681297,
+          702616,
+          677942
         ],
         "missing_ids": [],
         "backfilled_ids": [],
@@ -2060,10 +2054,10 @@
           "Adley Rutschman",
           "Pete Alonso",
           "Samuel Basallo",
-          "Coby Mayo",
-          "Colton Cowser",
           "Leody Taveras",
-          "Jackson Holliday"
+          "Colton Cowser",
+          "Jackson Holliday",
+          "Blaze Alexander"
         ],
         "matched_names": [
           "Taylor Ward",
@@ -2071,10 +2065,10 @@
           "Adley Rutschman",
           "Pete Alonso",
           "Samuel Basallo",
-          "Coby Mayo",
-          "Colton Cowser",
           "Leody Taveras",
-          "Jackson Holliday"
+          "Colton Cowser",
+          "Jackson Holliday",
+          "Blaze Alexander"
         ],
         "missing_name_labels": [],
         "mapping_source": "projected_rotowire_default_vs_rhp"
@@ -2090,7 +2084,7 @@
           663656,
           669899,
           687221,
-          690976
+          669242
         ],
         "ids": [
           660271,
@@ -2101,7 +2095,7 @@
           663656,
           669899,
           687221,
-          690976
+          669242
         ],
         "missing_ids": [],
         "backfilled_ids": [],
@@ -2116,7 +2110,7 @@
           "Kyle Tucker",
           "Ryan Ward",
           "Dalton Rushing",
-          "Alex Freeland"
+          "Tommy Edman"
         ],
         "matched_names": [
           "Shohei Ohtani",
@@ -2127,7 +2121,7 @@
           "Kyle Tucker",
           "Ryan Ward",
           "Dalton Rushing",
-          "Alex Freeland"
+          "Tommy Edman"
         ],
         "missing_name_labels": [],
         "mapping_source": "projected_rotowire_default_vs_rhp"
@@ -2135,7 +2129,7 @@
       "away_source": "projected_rotowire_default_vs_rhp",
       "home_source": "projected_rotowire_default_vs_rhp",
       "away_confidence": 0.66,
-      "home_confidence": 0.58,
+      "home_confidence": 0.66,
       "away_comparison": {
         "status": "projected_only",
         "is_true_mismatch": false,
@@ -2185,10 +2179,10 @@
         663728,
         647304,
         608701,
+        641598,
         702284,
         645302,
-        806068,
-        690944
+        806068
       ],
       "away_projected_validation": {
         "status": "ok",
@@ -2244,13 +2238,14 @@
         "mapping_source": "projected_rotowire_default_vs_rhp"
       },
       "home_projected_validation": {
-        "status": "adjusted",
+        "status": "ok",
         "raw_ids": [
           641487,
           677594,
           663728,
           647304,
           608701,
+          641598,
           702284,
           645302,
           806068
@@ -2261,24 +2256,22 @@
           663728,
           647304,
           608701,
+          641598,
           702284,
           645302,
-          806068,
-          690944
+          806068
         ],
         "missing_ids": [],
-        "backfilled_ids": [
-          690944
-        ],
+        "backfilled_ids": [],
         "pool_source": "active+40Man",
         "pool_size": 19,
         "raw_names": [
           "J.P. Crawford",
           "Julio Rodriguez",
-          "Randy Arozarena",
           "Cal Raleigh",
           "Josh Naylor",
           "Rob Refsnyder",
+          "Mitch Garver",
           "Cole Young",
           "Victor Robles",
           "Colt Emerson"
@@ -2289,19 +2282,18 @@
           "Cal Raleigh",
           "Josh Naylor",
           "Rob Refsnyder",
+          "Mitch Garver",
           "Cole Young",
           "Victor Robles",
           "Colt Emerson"
         ],
-        "missing_name_labels": [
-          "Randy Arozarena"
-        ],
+        "missing_name_labels": [],
         "mapping_source": "projected_rotowire_default_vs_lhp"
       },
       "away_source": "projected_rotowire_default_vs_rhp",
       "home_source": "projected_rotowire_default_vs_lhp",
       "away_confidence": 0.66,
-      "home_confidence": 0.48000000000000004,
+      "home_confidence": 0.66,
       "away_comparison": {
         "status": "projected_only",
         "is_true_mismatch": false,

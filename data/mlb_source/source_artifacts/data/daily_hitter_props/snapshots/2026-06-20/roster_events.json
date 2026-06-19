@@ -1,0 +1,955 @@
+{
+  "schema_version": 1,
+  "date": "2026-06-20",
+  "generated_at": "2026-06-19T11:46:45.433742",
+  "include_baseline": false,
+  "teams": {
+    "108": {
+      "team_id": 108,
+      "team_abbr": "LAA",
+      "roster_types": {
+        "40Man": {
+          "prev_date": "2026-06-19",
+          "n_players": 47,
+          "n_added": 0,
+          "n_removed": 0
+        },
+        "active": {
+          "prev_date": "2026-06-19",
+          "n_players": 26,
+          "n_added": 4,
+          "n_removed": 4,
+          "added": [
+            {
+              "full_name": "Christian Moore",
+              "player_id": 695681,
+              "position": "2B",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Ryan Johnson",
+              "player_id": 696270,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Tyler Heineman",
+              "player_id": 623168,
+              "position": "C",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Vaughn Grissom",
+              "player_id": 687093,
+              "position": "2B",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            }
+          ],
+          "removed": [
+            {
+              "full_name": "Brett Kerry",
+              "player_id": 695049,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Logan Porter",
+              "player_id": 682515,
+              "position": "C",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Mike Trout",
+              "player_id": 545361,
+              "position": "CF",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Trey Mancini",
+              "player_id": 641820,
+              "position": "1B",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            }
+          ],
+          "added_ids": [
+            623168,
+            687093,
+            695681,
+            696270
+          ],
+          "removed_ids": [
+            545361,
+            641820,
+            682515,
+            695049
+          ]
+        }
+      }
+    },
+    "109": {
+      "team_id": 109,
+      "team_abbr": "AZ",
+      "roster_types": {
+        "40Man": {
+          "prev_date": "2026-06-19",
+          "n_players": 47,
+          "n_added": 0,
+          "n_removed": 0
+        },
+        "active": {
+          "prev_date": "2026-06-19",
+          "n_players": 26,
+          "n_added": 0,
+          "n_removed": 0
+        }
+      }
+    },
+    "110": {
+      "team_id": 110,
+      "team_abbr": "BAL",
+      "roster_types": {
+        "40Man": {
+          "prev_date": "2026-06-19",
+          "n_players": 47,
+          "n_added": 0,
+          "n_removed": 0
+        },
+        "active": {
+          "prev_date": "2026-06-19",
+          "n_players": 26,
+          "n_added": 0,
+          "n_removed": 0
+        }
+      }
+    },
+    "111": {
+      "team_id": 111,
+      "team_abbr": "BOS",
+      "roster_types": {
+        "40Man": {
+          "prev_date": "2026-06-19",
+          "n_players": 48,
+          "n_added": 0,
+          "n_removed": 0
+        },
+        "active": {
+          "prev_date": "2026-06-19",
+          "n_players": 26,
+          "n_added": 0,
+          "n_removed": 0
+        }
+      }
+    },
+    "112": {
+      "team_id": 112,
+      "team_abbr": "CHC",
+      "roster_types": {
+        "40Man": {
+          "prev_date": "2026-06-19",
+          "n_players": 47,
+          "n_added": 0,
+          "n_removed": 0
+        },
+        "active": {
+          "prev_date": "2026-06-19",
+          "n_players": 26,
+          "n_added": 0,
+          "n_removed": 0
+        }
+      }
+    },
+    "113": {
+      "team_id": 113,
+      "team_abbr": "CIN",
+      "roster_types": {
+        "40Man": {
+          "prev_date": "2026-06-19",
+          "n_players": 42,
+          "n_added": 1,
+          "n_removed": 1,
+          "added": [
+            {
+              "full_name": "Will Banfield",
+              "player_id": 677943,
+              "position": "C",
+              "status": {
+                "code": "RM",
+                "description": "Reassigned to Minors"
+              }
+            }
+          ],
+          "removed": [
+            {
+              "full_name": "P.J. Higgins",
+              "player_id": 664731,
+              "position": "C",
+              "status": {
+                "code": "RM",
+                "description": "Reassigned to Minors"
+              }
+            }
+          ],
+          "added_ids": [
+            677943
+          ],
+          "removed_ids": [
+            664731
+          ]
+        },
+        "active": {
+          "prev_date": "2026-06-19",
+          "n_players": 26,
+          "n_added": 0,
+          "n_removed": 0
+        }
+      }
+    },
+    "114": {
+      "team_id": 114,
+      "team_abbr": "CLE",
+      "roster_types": {
+        "40Man": {
+          "prev_date": "2026-06-19",
+          "n_players": 40,
+          "n_added": 0,
+          "n_removed": 0
+        },
+        "active": {
+          "prev_date": "2026-06-19",
+          "n_players": 26,
+          "n_added": 0,
+          "n_removed": 0
+        }
+      }
+    },
+    "115": {
+      "team_id": 115,
+      "team_abbr": "COL",
+      "roster_types": {
+        "40Man": {
+          "prev_date": "2026-06-19",
+          "n_players": 46,
+          "n_added": 0,
+          "n_removed": 0
+        },
+        "active": {
+          "prev_date": "2026-06-19",
+          "n_players": 26,
+          "n_added": 1,
+          "n_removed": 1,
+          "added": [
+            {
+              "full_name": "Jimmy Herget",
+              "player_id": 623474,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            }
+          ],
+          "removed": [
+            {
+              "full_name": "Seth Halvorsen",
+              "player_id": 678020,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            }
+          ],
+          "added_ids": [
+            623474
+          ],
+          "removed_ids": [
+            678020
+          ]
+        }
+      }
+    },
+    "116": {
+      "team_id": 116,
+      "team_abbr": "DET",
+      "roster_types": {
+        "40Man": {
+          "prev_date": "2026-06-19",
+          "n_players": 48,
+          "n_added": 0,
+          "n_removed": 0
+        },
+        "active": {
+          "prev_date": "2026-06-19",
+          "n_players": 26,
+          "n_added": 1,
+          "n_removed": 1,
+          "added": [
+            {
+              "full_name": "Casey Mize",
+              "player_id": 663554,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            }
+          ],
+          "removed": [
+            {
+              "full_name": "Gleyber Torres",
+              "player_id": 650402,
+              "position": "2B",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            }
+          ],
+          "added_ids": [
+            663554
+          ],
+          "removed_ids": [
+            650402
+          ]
+        }
+      }
+    },
+    "117": {
+      "team_id": 117,
+      "team_abbr": "HOU",
+      "roster_types": {
+        "40Man": {
+          "prev_date": "2026-06-19",
+          "n_players": 45,
+          "n_added": 0,
+          "n_removed": 0
+        },
+        "active": {
+          "prev_date": "2026-06-19",
+          "n_players": 26,
+          "n_added": 0,
+          "n_removed": 0
+        }
+      }
+    },
+    "118": {
+      "team_id": 118,
+      "team_abbr": "KC",
+      "roster_types": {
+        "40Man": {
+          "prev_date": "2026-06-19",
+          "n_players": 45,
+          "n_added": 0,
+          "n_removed": 0
+        },
+        "active": {
+          "prev_date": "2026-06-19",
+          "n_players": 26,
+          "n_added": 0,
+          "n_removed": 0
+        }
+      }
+    },
+    "119": {
+      "team_id": 119,
+      "team_abbr": "LAD",
+      "roster_types": {
+        "40Man": {
+          "prev_date": "2026-06-19",
+          "n_players": 50,
+          "n_added": 0,
+          "n_removed": 0
+        },
+        "active": {
+          "prev_date": "2026-06-19",
+          "n_players": 26,
+          "n_added": 0,
+          "n_removed": 0
+        }
+      }
+    },
+    "120": {
+      "team_id": 120,
+      "team_abbr": "WSH",
+      "roster_types": {
+        "40Man": {
+          "prev_date": "2026-06-19",
+          "n_players": 45,
+          "n_added": 0,
+          "n_removed": 0
+        },
+        "active": {
+          "prev_date": "2026-06-19",
+          "n_players": 26,
+          "n_added": 0,
+          "n_removed": 0
+        }
+      }
+    },
+    "121": {
+      "team_id": 121,
+      "team_abbr": "NYM",
+      "roster_types": {
+        "40Man": {
+          "prev_date": "2026-06-19",
+          "n_players": 46,
+          "n_added": 0,
+          "n_removed": 0
+        },
+        "active": {
+          "prev_date": "2026-06-19",
+          "n_players": 26,
+          "n_added": 0,
+          "n_removed": 0
+        }
+      }
+    },
+    "133": {
+      "team_id": 133,
+      "team_abbr": "ATH",
+      "roster_types": {
+        "40Man": {
+          "prev_date": "2026-06-19",
+          "n_players": 42,
+          "n_added": 0,
+          "n_removed": 0
+        },
+        "active": {
+          "prev_date": "2026-06-19",
+          "n_players": 26,
+          "n_added": 1,
+          "n_removed": 1,
+          "added": [
+            {
+              "full_name": "Aaron Civale",
+              "player_id": 650644,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            }
+          ],
+          "removed": [
+            {
+              "full_name": "Luis Morales",
+              "player_id": 806960,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            }
+          ],
+          "added_ids": [
+            650644
+          ],
+          "removed_ids": [
+            806960
+          ]
+        }
+      }
+    },
+    "134": {
+      "team_id": 134,
+      "team_abbr": "PIT",
+      "roster_types": {
+        "40Man": {
+          "prev_date": "2026-06-19",
+          "n_players": 41,
+          "n_added": 1,
+          "n_removed": 1,
+          "added": [
+            {
+              "full_name": "Hunter Stratton",
+              "player_id": 676702,
+              "position": "P",
+              "status": {
+                "code": "RM",
+                "description": "Reassigned to Minors"
+              }
+            }
+          ],
+          "removed": [
+            {
+              "full_name": "Joey Bart",
+              "player_id": 663698,
+              "position": "C",
+              "status": {
+                "code": "D10",
+                "description": "Injured 10-Day"
+              }
+            }
+          ],
+          "added_ids": [
+            676702
+          ],
+          "removed_ids": [
+            663698
+          ]
+        },
+        "active": {
+          "prev_date": "2026-06-19",
+          "n_players": 26,
+          "n_added": 0,
+          "n_removed": 0
+        }
+      }
+    },
+    "135": {
+      "team_id": 135,
+      "team_abbr": "SD",
+      "roster_types": {
+        "40Man": {
+          "prev_date": "2026-06-19",
+          "n_players": 44,
+          "n_added": 0,
+          "n_removed": 0
+        },
+        "active": {
+          "prev_date": "2026-06-19",
+          "n_players": 25,
+          "n_added": 0,
+          "n_removed": 0
+        }
+      }
+    },
+    "136": {
+      "team_id": 136,
+      "team_abbr": "SEA",
+      "roster_types": {
+        "40Man": {
+          "prev_date": "2026-06-19",
+          "n_players": 43,
+          "n_added": 0,
+          "n_removed": 0
+        },
+        "active": {
+          "prev_date": "2026-06-19",
+          "n_players": 26,
+          "n_added": 1,
+          "n_removed": 1,
+          "added": [
+            {
+              "full_name": "Connor Joe",
+              "player_id": 656582,
+              "position": "RF",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            }
+          ],
+          "removed": [
+            {
+              "full_name": "Curtis Washington Jr.",
+              "player_id": 690944,
+              "position": "CF",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            }
+          ],
+          "added_ids": [
+            656582
+          ],
+          "removed_ids": [
+            690944
+          ]
+        }
+      }
+    },
+    "137": {
+      "team_id": 137,
+      "team_abbr": "SF",
+      "roster_types": {
+        "40Man": {
+          "prev_date": "2026-06-19",
+          "n_players": 47,
+          "n_added": 0,
+          "n_removed": 0
+        },
+        "active": {
+          "prev_date": "2026-06-19",
+          "n_players": 26,
+          "n_added": 0,
+          "n_removed": 0
+        }
+      }
+    },
+    "138": {
+      "team_id": 138,
+      "team_abbr": "STL",
+      "roster_types": {
+        "40Man": {
+          "prev_date": "2026-06-19",
+          "n_players": 41,
+          "n_added": 0,
+          "n_removed": 0
+        },
+        "active": {
+          "prev_date": "2026-06-19",
+          "n_players": 26,
+          "n_added": 1,
+          "n_removed": 0,
+          "added": [
+            {
+              "full_name": "Max Rajcic",
+              "player_id": 691008,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            }
+          ],
+          "removed": [],
+          "added_ids": [
+            691008
+          ],
+          "removed_ids": []
+        }
+      }
+    },
+    "139": {
+      "team_id": 139,
+      "team_abbr": "TB",
+      "roster_types": {
+        "40Man": {
+          "prev_date": "2026-06-19",
+          "n_players": 47,
+          "n_added": 0,
+          "n_removed": 0
+        },
+        "active": {
+          "prev_date": "2026-06-19",
+          "n_players": 26,
+          "n_added": 0,
+          "n_removed": 0
+        }
+      }
+    },
+    "140": {
+      "team_id": 140,
+      "team_abbr": "TEX",
+      "roster_types": {
+        "40Man": {
+          "prev_date": "2026-06-19",
+          "n_players": 44,
+          "n_added": 0,
+          "n_removed": 0
+        },
+        "active": {
+          "prev_date": "2026-06-19",
+          "n_players": 26,
+          "n_added": 0,
+          "n_removed": 0
+        }
+      }
+    },
+    "141": {
+      "team_id": 141,
+      "team_abbr": "TOR",
+      "roster_types": {
+        "40Man": {
+          "prev_date": "2026-06-19",
+          "n_players": 46,
+          "n_added": 0,
+          "n_removed": 0
+        },
+        "active": {
+          "prev_date": "2026-06-19",
+          "n_players": 26,
+          "n_added": 0,
+          "n_removed": 0
+        }
+      }
+    },
+    "142": {
+      "team_id": 142,
+      "team_abbr": "MIN",
+      "roster_types": {
+        "40Man": {
+          "prev_date": "2026-06-19",
+          "n_players": 43,
+          "n_added": 0,
+          "n_removed": 0
+        },
+        "active": {
+          "prev_date": "2026-06-19",
+          "n_players": 26,
+          "n_added": 0,
+          "n_removed": 0
+        }
+      }
+    },
+    "143": {
+      "team_id": 143,
+      "team_abbr": "PHI",
+      "roster_types": {
+        "40Man": {
+          "prev_date": "2026-06-19",
+          "n_players": 41,
+          "n_added": 1,
+          "n_removed": 0,
+          "added": [
+            {
+              "full_name": "Bryse Wilson",
+              "player_id": 669060,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            }
+          ],
+          "removed": [],
+          "added_ids": [
+            669060
+          ],
+          "removed_ids": []
+        },
+        "active": {
+          "prev_date": "2026-06-19",
+          "n_players": 26,
+          "n_added": 2,
+          "n_removed": 1,
+          "added": [
+            {
+              "full_name": "Bryse Wilson",
+              "player_id": 669060,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Seth Johnson",
+              "player_id": 686751,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            }
+          ],
+          "removed": [
+            {
+              "full_name": "Tanner Banks",
+              "player_id": 621383,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            }
+          ],
+          "added_ids": [
+            669060,
+            686751
+          ],
+          "removed_ids": [
+            621383
+          ]
+        }
+      }
+    },
+    "144": {
+      "team_id": 144,
+      "team_abbr": "ATL",
+      "roster_types": {
+        "40Man": {
+          "prev_date": "2026-06-19",
+          "n_players": 47,
+          "n_added": 1,
+          "n_removed": 1,
+          "added": [
+            {
+              "full_name": "Joey Bart",
+              "player_id": 663698,
+              "position": "C",
+              "status": {
+                "code": "NYR",
+                "description": "Not Yet Reported"
+              }
+            }
+          ],
+          "removed": [
+            {
+              "full_name": "Sandy Le\u00f3n",
+              "player_id": 506702,
+              "position": "C",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            }
+          ],
+          "added_ids": [
+            663698
+          ],
+          "removed_ids": [
+            506702
+          ]
+        },
+        "active": {
+          "prev_date": "2026-06-19",
+          "n_players": 25,
+          "n_added": 0,
+          "n_removed": 1,
+          "added": [],
+          "removed": [
+            {
+              "full_name": "Sandy Le\u00f3n",
+              "player_id": 506702,
+              "position": "C",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            }
+          ],
+          "added_ids": [],
+          "removed_ids": [
+            506702
+          ]
+        }
+      }
+    },
+    "145": {
+      "team_id": 145,
+      "team_abbr": "CWS",
+      "roster_types": {
+        "40Man": {
+          "prev_date": "2026-06-19",
+          "n_players": 48,
+          "n_added": 0,
+          "n_removed": 0
+        },
+        "active": {
+          "prev_date": "2026-06-19",
+          "n_players": 26,
+          "n_added": 1,
+          "n_removed": 1,
+          "added": [
+            {
+              "full_name": "Junior Perez",
+              "player_id": 678577,
+              "position": "CF",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            }
+          ],
+          "removed": [
+            {
+              "full_name": "Everson Pereira",
+              "player_id": 677592,
+              "position": "RF",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            }
+          ],
+          "added_ids": [
+            678577
+          ],
+          "removed_ids": [
+            677592
+          ]
+        }
+      }
+    },
+    "146": {
+      "team_id": 146,
+      "team_abbr": "MIA",
+      "roster_types": {
+        "40Man": {
+          "prev_date": "2026-06-19",
+          "n_players": 45,
+          "n_added": 0,
+          "n_removed": 0
+        },
+        "active": {
+          "prev_date": "2026-06-19",
+          "n_players": 26,
+          "n_added": 0,
+          "n_removed": 0
+        }
+      }
+    },
+    "147": {
+      "team_id": 147,
+      "team_abbr": "NYY",
+      "roster_types": {
+        "40Man": {
+          "prev_date": "2026-06-19",
+          "n_players": 41,
+          "n_added": 0,
+          "n_removed": 0
+        },
+        "active": {
+          "prev_date": "2026-06-19",
+          "n_players": 26,
+          "n_added": 0,
+          "n_removed": 0
+        }
+      }
+    },
+    "158": {
+      "team_id": 158,
+      "team_abbr": "MIL",
+      "roster_types": {
+        "40Man": {
+          "prev_date": "2026-06-19",
+          "n_players": 42,
+          "n_added": 0,
+          "n_removed": 0
+        },
+        "active": {
+          "prev_date": "2026-06-19",
+          "n_players": 26,
+          "n_added": 0,
+          "n_removed": 0
+        }
+      }
+    }
+  },
+  "moves_between_teams": [
+    {
+      "player_id": 663698,
+      "full_name": "Joey Bart",
+      "from_team_id": 134,
+      "to_team_id": 144,
+      "roster_type": "40Man"
+    }
+  ]
+}

@@ -1,0 +1,71 @@
+{
+  "date": "2026-05-29",
+  "mode": "live",
+  "retrieved_at": "2026-05-30T05:32:42.557530",
+  "games": [
+    {
+      "event_id": "bc8152dee5f6a9c85e452cc78f0747e4",
+      "commence_time": "2026-05-30T02:11:00Z",
+      "home_team": "Seattle Mariners",
+      "away_team": "Arizona Diamondbacks",
+      "bookmaker": "fanduel",
+      "markets": {
+        "h2h": {
+          "home_odds": "-215",
+          "away_odds": "+164"
+        },
+        "spreads": {
+          "home_line": -1.5,
+          "home_odds": "+450",
+          "away_line": 1.5,
+          "away_odds": "-800"
+        },
+        "totals": {
+          "line": 13.5,
+          "over_odds": "+116",
+          "under_odds": "-154"
+        }
+      }
+    }
+  ],
+  "meta": {
+    "markets": [
+      "h2h",
+      "spreads",
+      "totals",
+      "h2h_1st_1_innings",
+      "h2h_3_way_1st_1_innings",
+      "spreads_1st_1_innings",
+      "alternate_spreads_1st_1_innings",
+      "totals_1st_1_innings",
+      "alternate_totals_1st_1_innings",
+      "h2h_1st_3_innings",
+      "h2h_3_way_1st_3_innings",
+      "spreads_1st_3_innings",
+      "alternate_spreads_1st_3_innings",
+      "totals_1st_3_innings",
+      "alternate_totals_1st_3_innings",
+      "h2h_1st_5_innings",
+      "h2h_3_way_1st_5_innings",
+      "spreads_1st_5_innings",
+      "alternate_spreads_1st_5_innings",
+      "totals_1st_5_innings",
+      "alternate_totals_1st_5_innings",
+      "h2h_1st_7_innings",
+      "h2h_3_way_1st_7_innings",
+      "spreads_1st_7_innings",
+      "alternate_spreads_1st_7_innings",
+      "totals_1st_7_innings",
+      "alternate_totals_1st_7_innings"
+    ],
+    "regions": "us",
+    "bookmakers": null,
+    "counts": {
+      "events_matched": 1,
+      "games": 1,
+      "h2h_games": 1,
+      "totals_games": 1,
+      "spreads_games": 1
+    }
+  }
+}

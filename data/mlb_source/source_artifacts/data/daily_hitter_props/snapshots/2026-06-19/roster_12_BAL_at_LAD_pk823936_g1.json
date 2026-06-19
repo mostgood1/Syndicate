@@ -46,26 +46,26 @@
       668939,
       624413,
       694212,
-      691723,
-      681297,
       665750,
-      702616
+      681297,
+      702616,
+      677942
     ],
     "lineup_source": "projected_rotowire_default_vs_rhp",
     "lineup_confidence": 0.66,
     "probable_pitcher": {
-      "id": null,
-      "source": "none",
-      "confidence": 0.0,
-      "raw_schedule_id": null,
-      "raw_feed_id": null
+      "id": 694346,
+      "source": "feed_gameData_probablePitchers",
+      "confidence": 0.75,
+      "raw_schedule_id": 694346,
+      "raw_feed_id": 694346
     },
     "starter": {
-      "id": 669358,
-      "name": "Shane Baz",
+      "id": 694346,
+      "name": "Trey Gibson",
       "role": "SP",
-      "selection_source": "heuristic",
-      "requested_id": null
+      "selection_source": "probable",
+      "requested_id": 694346
     },
     "bullpen": [
       {
@@ -264,30 +264,30 @@
         "vs_pitcher_history": {}
       },
       {
-        "id": 691723,
-        "name": "Coby Mayo",
-        "pos": "3B",
-        "bat": "R",
+        "id": 665750,
+        "name": "Leody Taveras",
+        "pos": "CF",
+        "bat": "S",
         "throw": "R",
-        "k_rate": 0.3373666217756138,
-        "bb_rate": 0.0634673158603543,
-        "hbp_rate": 0.01015228426395939,
-        "hr_rate": 0.051077385268828344,
-        "inplay_hit_rate": 0.21567460317460316,
-        "xb_hit_share": 0.2,
+        "k_rate": 0.21232718894009214,
+        "bb_rate": 0.09812788018433179,
+        "hbp_rate": 0.004608294930875576,
+        "hr_rate": 0.00783410138248848,
+        "inplay_hit_rate": 0.30257176041148165,
+        "xb_hit_share": 0.25,
         "vs_pitch_type": {},
         "vs_pitch_type_hr": {},
         "platoon_mult_vs_lhp": {
-          "k": 0.8575684763250015,
-          "bb": 1.0689912674447073,
-          "hr": 1.275,
-          "inplay": 1.1210889459158475
+          "k": 1.1489811298004462,
+          "bb": 1.1617372729348074,
+          "hr": 0.78,
+          "inplay": 0.9761909640849217
         },
         "platoon_mult_vs_rhp": {
-          "k": 1.0281113139361724,
-          "bb": 1.0646012584557378,
-          "hr": 0.78,
-          "inplay": 0.9664836444516903
+          "k": 0.9377916440586002,
+          "bb": 0.9959348400352217,
+          "hr": 1.275,
+          "inplay": 1.0336813863494128
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -322,35 +322,6 @@
         "vs_pitcher_history": {}
       },
       {
-        "id": 665750,
-        "name": "Leody Taveras",
-        "pos": "CF",
-        "bat": "S",
-        "throw": "R",
-        "k_rate": 0.21232718894009214,
-        "bb_rate": 0.09812788018433179,
-        "hbp_rate": 0.004608294930875576,
-        "hr_rate": 0.00783410138248848,
-        "inplay_hit_rate": 0.30257176041148165,
-        "xb_hit_share": 0.25,
-        "vs_pitch_type": {},
-        "vs_pitch_type_hr": {},
-        "platoon_mult_vs_lhp": {
-          "k": 1.1489811298004462,
-          "bb": 1.1617372729348074,
-          "hr": 0.78,
-          "inplay": 0.9761909640849217
-        },
-        "platoon_mult_vs_rhp": {
-          "k": 0.9377916440586002,
-          "bb": 0.9959348400352217,
-          "hr": 1.275,
-          "inplay": 1.0336813863494128
-        },
-        "statcast_quality_mult": {},
-        "vs_pitcher_history": {}
-      },
-      {
         "id": 702616,
         "name": "Jackson Holliday",
         "pos": "2B",
@@ -378,9 +349,7 @@
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
-      }
-    ],
-    "bench": [
+      },
       {
         "id": 677942,
         "name": "Blaze Alexander",
@@ -406,6 +375,37 @@
           "bb": 0.8695270785659801,
           "hr": 0.8008771929824561,
           "inplay": 1.0280566801619435
+        },
+        "statcast_quality_mult": {},
+        "vs_pitcher_history": {}
+      }
+    ],
+    "bench": [
+      {
+        "id": 691723,
+        "name": "Coby Mayo",
+        "pos": "3B",
+        "bat": "R",
+        "throw": "R",
+        "k_rate": 0.3373666217756138,
+        "bb_rate": 0.0634673158603543,
+        "hbp_rate": 0.01015228426395939,
+        "hr_rate": 0.051077385268828344,
+        "inplay_hit_rate": 0.21567460317460316,
+        "xb_hit_share": 0.2,
+        "vs_pitch_type": {},
+        "vs_pitch_type_hr": {},
+        "platoon_mult_vs_lhp": {
+          "k": 0.8575684763250015,
+          "bb": 1.0689912674447073,
+          "hr": 1.275,
+          "inplay": 1.1210889459158475
+        },
+        "platoon_mult_vs_rhp": {
+          "k": 1.0281113139361724,
+          "bb": 1.0646012584557378,
+          "hr": 0.78,
+          "inplay": 0.9664836444516903
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -499,44 +499,45 @@
       }
     ],
     "starter_profile": {
-      "id": 669358,
-      "name": "Shane Baz",
+      "id": 694346,
+      "name": "Trey Gibson",
       "throw": "R",
       "role": "SP",
       "leverage_skill": 0.5,
-      "stamina_pitches": 96,
+      "stamina_pitches": 95,
       "availability_mult": 1.0,
       "platoon_mult_vs_lhb": {
-        "k": 1.031865126006925,
-        "bb": 1.1096787712953626,
-        "hr": 0.9349701840060339,
-        "inplay": 1.0726813911126865
+        "k": 0.9887755102040816,
+        "bb": 0.8644427001569859,
+        "hr": 0.9887755102040816,
+        "inplay": 1.078520843392886
       },
       "platoon_mult_vs_rhb": {
-        "k": 0.9601439867233736,
-        "bb": 0.8645632302832359,
-        "hr": 1.1204956906392147,
-        "inplay": 0.9341977536968815
+        "k": 1.0117021276595743,
+        "bb": 1.1413256955810147,
+        "hr": 1.0117021276595746,
+        "inplay": 0.9093036932486473
       },
       "statcast_quality_mult": {},
       "arsenal_source": "statsapi_pitchArsenal",
-      "arsenal_sample_size": 1345,
+      "arsenal_sample_size": 378,
       "statcast_splits_found": false,
       "statcast_splits_source": "",
       "statcast_splits_n_pitches": 0,
       "statcast_splits_start_date": "",
       "statcast_splits_end_date": "",
-      "k_rate": 0.18812954158069434,
-      "bb_rate": 0.08904010047546425,
-      "hbp_rate": 0.008450704225352112,
-      "hr_rate": 0.02202117161568135,
-      "inplay_hit_rate": 0.3172332015810277,
+      "k_rate": 0.125,
+      "bb_rate": 0.13541666666666666,
+      "hbp_rate": 0.010416666666666666,
+      "hr_rate": 0.041666666666666664,
+      "inplay_hit_rate": 0.2993661971830986,
       "arsenal": {
-        "FF": 0.3353159929246096,
-        "CH": 0.07732341965977696,
-        "SI": 0.07583642966631972,
-        "KC": 0.3330854985344238,
-        "FC": 0.1784386592148699
+        "FF": 0.1375661304126984,
+        "OTHER": 0.01587301704761905,
+        "CU": 0.150793660452381,
+        "SI": 0.3121693009365079,
+        "SL": 0.1666666705,
+        "FC": 0.21693122065079368
       },
       "pitch_type_whiff_mult": {},
       "pitch_type_inplay_mult": {},
@@ -680,7 +681,7 @@
         "role": "SU",
         "leverage_skill": 0.7,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.9166666666666666,
         "platoon_mult_vs_lhb": {
           "k": 1.090933433117243,
           "bb": 1.182274721003831,
@@ -915,10 +916,10 @@
       663656,
       669899,
       687221,
-      690976
+      669242
     ],
     "lineup_source": "projected_rotowire_default_vs_rhp",
-    "lineup_confidence": 0.58,
+    "lineup_confidence": 0.66,
     "probable_pitcher": {
       "id": 808963,
       "source": "feed_gameData_probablePitchers",
@@ -1217,30 +1218,30 @@
         "vs_pitcher_history": {}
       },
       {
-        "id": 690976,
-        "name": "Alex Freeland",
+        "id": 669242,
+        "name": "Tommy Edman",
         "pos": "2B",
         "bat": "S",
         "throw": "R",
-        "k_rate": 0.2580087209302325,
-        "bb_rate": 0.11124273255813952,
-        "hbp_rate": 0.00625,
-        "hr_rate": 0.019425872093023256,
-        "inplay_hit_rate": 0.2909444444444444,
-        "xb_hit_share": 0.1875,
+        "k_rate": 0.0,
+        "bb_rate": 0.25,
+        "hbp_rate": 0.0,
+        "hr_rate": 0.0,
+        "inplay_hit_rate": 0.0,
+        "xb_hit_share": 0.22,
         "vs_pitch_type": {},
         "vs_pitch_type_hr": {},
         "platoon_mult_vs_lhp": {
-          "k": 1.1925000000000001,
-          "bb": 0.8075,
-          "hr": 0.78,
-          "inplay": 0.8280790528928776
+          "k": 1.0,
+          "bb": 1.1833333333333333,
+          "hr": 1.0,
+          "inplay": 1.0
         },
         "platoon_mult_vs_rhp": {
-          "k": 0.9754216981229386,
-          "bb": 1.0070865580232555,
-          "hr": 1.0481568422882976,
-          "inplay": 1.0171185793393165
+          "k": 1.0,
+          "bb": 0.8075,
+          "hr": 1.0,
+          "inplay": 1.0
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -1272,6 +1273,35 @@
           "bb": 1.1752747252747253,
           "hr": 1.0,
           "inplay": 0.9233753531840905
+        },
+        "statcast_quality_mult": {},
+        "vs_pitcher_history": {}
+      },
+      {
+        "id": 690976,
+        "name": "Alex Freeland",
+        "pos": "2B",
+        "bat": "S",
+        "throw": "R",
+        "k_rate": 0.2580087209302325,
+        "bb_rate": 0.11124273255813952,
+        "hbp_rate": 0.00625,
+        "hr_rate": 0.019425872093023256,
+        "inplay_hit_rate": 0.2909444444444444,
+        "xb_hit_share": 0.1875,
+        "vs_pitch_type": {},
+        "vs_pitch_type_hr": {},
+        "platoon_mult_vs_lhp": {
+          "k": 1.1925000000000001,
+          "bb": 0.8075,
+          "hr": 0.78,
+          "inplay": 0.8280790528928776
+        },
+        "platoon_mult_vs_rhp": {
+          "k": 0.9754216981229386,
+          "bb": 1.0070865580232555,
+          "hr": 1.0481568422882976,
+          "inplay": 1.0171185793393165
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -1330,35 +1360,6 @@
           "bb": 0.8176748072672382,
           "hr": 0.78,
           "inplay": 0.8400837300935807
-        },
-        "statcast_quality_mult": {},
-        "vs_pitcher_history": {}
-      },
-      {
-        "id": 669242,
-        "name": "Tommy Edman",
-        "pos": "2B",
-        "bat": "S",
-        "throw": "R",
-        "k_rate": 0.0,
-        "bb_rate": 0.25,
-        "hbp_rate": 0.0,
-        "hr_rate": 0.0,
-        "inplay_hit_rate": 0.0,
-        "xb_hit_share": 0.22,
-        "vs_pitch_type": {},
-        "vs_pitch_type_hr": {},
-        "platoon_mult_vs_lhp": {
-          "k": 1.0,
-          "bb": 1.1833333333333333,
-          "hr": 1.0,
-          "inplay": 1.0
-        },
-        "platoon_mult_vs_rhp": {
-          "k": 1.0,
-          "bb": 0.8075,
-          "hr": 1.0,
-          "inplay": 1.0
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}

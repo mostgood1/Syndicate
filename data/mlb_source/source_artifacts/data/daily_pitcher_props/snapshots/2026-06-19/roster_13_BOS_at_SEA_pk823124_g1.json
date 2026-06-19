@@ -546,7 +546,7 @@
         "role": "CL",
         "leverage_skill": 0.85,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.8333333333333334,
         "platoon_mult_vs_lhb": {
           "k": 1.1232258293670527,
           "bb": 1.0881818181818181,
@@ -720,7 +720,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.875,
         "platoon_mult_vs_lhb": {
           "k": 1.0409458941178142,
           "bb": 0.8075,
@@ -911,13 +911,13 @@
       663728,
       647304,
       608701,
+      641598,
       702284,
       645302,
-      806068,
-      690944
+      806068
     ],
     "lineup_source": "projected_rotowire_default_vs_lhp",
-    "lineup_confidence": 0.48000000000000004,
+    "lineup_confidence": 0.66,
     "probable_pitcher": {
       "id": 682243,
       "source": "feed_gameData_probablePitchers",
@@ -1123,6 +1123,35 @@
         "vs_pitcher_history": {}
       },
       {
+        "id": 641598,
+        "name": "Mitch Garver",
+        "pos": "C",
+        "bat": "R",
+        "throw": "R",
+        "k_rate": 0.3042056074766355,
+        "bb_rate": 0.1457610146862483,
+        "hbp_rate": 0.0,
+        "hr_rate": 0.03097463284379172,
+        "inplay_hit_rate": 0.26182758620689656,
+        "xb_hit_share": 0.1111111111111111,
+        "vs_pitch_type": {},
+        "vs_pitch_type_hr": {},
+        "platoon_mult_vs_lhp": {
+          "k": 0.8430408067855473,
+          "bb": 1.0241977877559962,
+          "hr": 0.83601011994003,
+          "inplay": 1.174351376267615
+        },
+        "platoon_mult_vs_rhp": {
+          "k": 1.1020611417491375,
+          "bb": 1.068573729198497,
+          "hr": 1.0321791972866026,
+          "inplay": 0.8121756881338075
+        },
+        "statcast_quality_mult": {},
+        "vs_pitcher_history": {}
+      },
+      {
         "id": 702284,
         "name": "Cole Young",
         "pos": "2B",
@@ -1208,7 +1237,9 @@
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
-      },
+      }
+    ],
+    "bench": [
       {
         "id": 690944,
         "name": "Curtis Washington Jr.",
@@ -1227,9 +1258,7 @@
         "platoon_mult_vs_rhp": {},
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
-      }
-    ],
-    "bench": [
+      },
       {
         "id": 686527,
         "name": "Dominic Canzone",
@@ -1313,35 +1342,6 @@
           "bb": 1.0323529411764707,
           "hr": 1.0,
           "inplay": 0.8533333333333334
-        },
-        "statcast_quality_mult": {},
-        "vs_pitcher_history": {}
-      },
-      {
-        "id": 641598,
-        "name": "Mitch Garver",
-        "pos": "C",
-        "bat": "R",
-        "throw": "R",
-        "k_rate": 0.3042056074766355,
-        "bb_rate": 0.1457610146862483,
-        "hbp_rate": 0.0,
-        "hr_rate": 0.03097463284379172,
-        "inplay_hit_rate": 0.26182758620689656,
-        "xb_hit_share": 0.1111111111111111,
-        "vs_pitch_type": {},
-        "vs_pitch_type_hr": {},
-        "platoon_mult_vs_lhp": {
-          "k": 0.8430408067855473,
-          "bb": 1.0241977877559962,
-          "hr": 0.83601011994003,
-          "inplay": 1.174351376267615
-        },
-        "platoon_mult_vs_rhp": {
-          "k": 1.1020611417491375,
-          "bb": 1.068573729198497,
-          "hr": 1.0321791972866026,
-          "inplay": 0.8121756881338075
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -1444,7 +1444,7 @@
         "role": "CL",
         "leverage_skill": 0.85,
         "stamina_pitches": 25,
-        "availability_mult": 0.9433333333333334,
+        "availability_mult": 0.7683333333333333,
         "platoon_mult_vs_lhb": {
           "k": 0.9180507506268448,
           "bb": 1.1769954245043213,
@@ -1487,7 +1487,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.97,
+        "availability_mult": 0.8783333333333333,
         "platoon_mult_vs_lhb": {
           "k": 1.0567675402258754,
           "bb": 1.1925000000000001,

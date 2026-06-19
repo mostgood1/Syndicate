@@ -65,10 +65,15 @@
           "active": true
         },
         "leagueRecord": {
-          "wins": 36,
+          "wins": 37,
           "losses": 38,
           "ties": 0,
-          "pct": ".486"
+          "pct": ".493"
+        },
+        "probablePitcher": {
+          "id": 592332,
+          "fullName": "Kevin Gausman",
+          "link": "/api/v1/people/592332"
         },
         "splitSquad": false,
         "seriesNumber": 25,
@@ -132,6 +137,11 @@
           "losses": 36,
           "ties": 0,
           "pct": ".520"
+        },
+        "probablePitcher": {
+          "id": 676962,
+          "fullName": "Ben Brown",
+          "link": "/api/v1/people/676962"
         },
         "splitSquad": false,
         "seriesNumber": 25,
@@ -235,10 +245,10 @@
           "active": true
         },
         "leagueRecord": {
-          "wins": 38,
+          "wins": 39,
           "losses": 34,
           "ties": 0,
-          "pct": ".528"
+          "pct": ".534"
         },
         "probablePitcher": {
           "id": 607200,
@@ -484,9 +494,14 @@
         },
         "leagueRecord": {
           "wins": 45,
-          "losses": 27,
+          "losses": 28,
           "ties": 0,
-          "pct": ".625"
+          "pct": ".616"
+        },
+        "probablePitcher": {
+          "id": 693645,
+          "fullName": "Cam Schlittler",
+          "link": "/api/v1/people/693645"
         },
         "splitSquad": false,
         "seriesNumber": 25,
@@ -775,6 +790,11 @@
           "ties": 0,
           "pct": ".419"
         },
+        "probablePitcher": {
+          "id": 694738,
+          "fullName": "Landen Roupp",
+          "link": "/api/v1/people/694738"
+        },
         "splitSquad": false,
         "seriesNumber": 25,
         "springLeague": {
@@ -941,9 +961,9 @@
         },
         "leagueRecord": {
           "wins": 45,
-          "losses": 26,
+          "losses": 27,
           "ties": 0,
-          "pct": ".634"
+          "pct": ".625"
         },
         "probablePitcher": {
           "id": 694819,
@@ -1012,6 +1032,11 @@
           "losses": 27,
           "ties": 0,
           "pct": ".630"
+        },
+        "probablePitcher": {
+          "id": 527048,
+          "fullName": "Mart\u00edn P\u00e9rez",
+          "link": "/api/v1/people/527048"
         },
         "splitSquad": false,
         "seriesNumber": 25,
@@ -1184,9 +1209,14 @@
         },
         "leagueRecord": {
           "wins": 35,
-          "losses": 38,
+          "losses": 39,
           "ties": 0,
-          "pct": ".479"
+          "pct": ".473"
+        },
+        "probablePitcher": {
+          "id": 594798,
+          "fullName": "Jacob deGrom",
+          "link": "/api/v1/people/594798"
         },
         "splitSquad": false,
         "seriesNumber": 25,
@@ -1290,10 +1320,10 @@
           "active": true
         },
         "leagueRecord": {
-          "wins": 39,
+          "wins": 40,
           "losses": 35,
           "ties": 0,
-          "pct": ".527"
+          "pct": ".533"
         },
         "probablePitcher": {
           "id": 676440,
@@ -1471,9 +1501,9 @@
         },
         "leagueRecord": {
           "wins": 40,
-          "losses": 32,
+          "losses": 33,
           "ties": 0,
-          "pct": ".556"
+          "pct": ".548"
         },
         "probablePitcher": {
           "id": 700241,
@@ -1538,10 +1568,10 @@
           "active": true
         },
         "leagueRecord": {
-          "wins": 30,
+          "wins": 31,
           "losses": 45,
           "ties": 0,
-          "pct": ".400"
+          "pct": ".408"
         },
         "probablePitcher": {
           "id": 607625,
@@ -1831,9 +1861,14 @@
         },
         "leagueRecord": {
           "wins": 30,
-          "losses": 45,
+          "losses": 46,
           "ties": 0,
-          "pct": ".400"
+          "pct": ".395"
+        },
+        "probablePitcher": {
+          "id": 667755,
+          "fullName": "Jos\u00e9 Soriano",
+          "link": "/api/v1/people/667755"
         },
         "splitSquad": false,
         "seriesNumber": 25,
@@ -1893,10 +1928,10 @@
           "active": true
         },
         "leagueRecord": {
-          "wins": 36,
+          "wins": 37,
           "losses": 38,
           "ties": 0,
-          "pct": ".486"
+          "pct": ".493"
         },
         "probablePitcher": {
           "id": 605488,
@@ -2005,10 +2040,15 @@
           "active": true
         },
         "leagueRecord": {
-          "wins": 35,
+          "wins": 36,
           "losses": 40,
           "ties": 0,
-          "pct": ".467"
+          "pct": ".474"
+        },
+        "probablePitcher": {
+          "id": 687570,
+          "fullName": "Connor Prielipp",
+          "link": "/api/v1/people/687570"
         },
         "splitSquad": false,
         "seriesNumber": 25,
@@ -2181,9 +2221,14 @@
         },
         "leagueRecord": {
           "wins": 35,
-          "losses": 40,
+          "losses": 41,
           "ties": 0,
-          "pct": ".467"
+          "pct": ".461"
+        },
+        "probablePitcher": {
+          "id": 694346,
+          "fullName": "Trey Gibson",
+          "link": "/api/v1/people/694346"
         },
         "splitSquad": false,
         "seriesNumber": 25,
@@ -2356,9 +2401,9 @@
         },
         "leagueRecord": {
           "wins": 29,
-          "losses": 42,
+          "losses": 43,
           "ties": 0,
-          "pct": ".408"
+          "pct": ".403"
         },
         "probablePitcher": {
           "id": 624133,
@@ -2423,10 +2468,10 @@
           "active": true
         },
         "leagueRecord": {
-          "wins": 38,
+          "wins": 39,
           "losses": 37,
           "ties": 0,
-          "pct": ".507"
+          "pct": ".513"
         },
         "probablePitcher": {
           "id": 682243,

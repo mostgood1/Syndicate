@@ -45,10 +45,10 @@
       545341,
       678246,
       695657,
-      677592,
-      695731,
       700337,
+      695731,
       682668,
+      678577,
       803011
     ],
     "lineup_source": "projected_rotowire_default_vs_lhp",
@@ -229,30 +229,30 @@
         "vs_pitcher_history": {}
       },
       {
-        "id": 677592,
-        "name": "Everson Pereira",
-        "pos": "RF",
-        "bat": "R",
+        "id": 700337,
+        "name": "Edgar Quero",
+        "pos": "C",
+        "bat": "S",
         "throw": "R",
-        "k_rate": 0.2860984848484849,
-        "bb_rate": 0.0554040404040404,
-        "hbp_rate": 0.027777777777777776,
-        "hr_rate": 0.04087121212121212,
-        "inplay_hit_rate": 0.28502923976608185,
-        "xb_hit_share": 0.25,
+        "k_rate": 0.2460138248847926,
+        "bb_rate": 0.07652073732718895,
+        "hbp_rate": 0.01935483870967742,
+        "hr_rate": 0.014539170506912441,
+        "inplay_hit_rate": 0.22014851485148515,
+        "xb_hit_share": 0.05,
         "vs_pitch_type": {},
         "vs_pitch_type_hr": {},
         "platoon_mult_vs_lhp": {
-          "k": 0.9742949821263073,
-          "bb": 1.1925000000000001,
-          "hr": 1.0616774791473587,
-          "inplay": 1.1925000000000001
+          "k": 0.9426001241382157,
+          "bb": 1.180941772694563,
+          "hr": 1.275,
+          "inplay": 0.8075
         },
         "platoon_mult_vs_rhp": {
-          "k": 1.0267244803389382,
-          "bb": 0.8075,
-          "hr": 0.9882761816496757,
-          "inplay": 0.8721058165777595
+          "k": 1.0554876525865569,
+          "bb": 0.8992246311352002,
+          "hr": 0.78,
+          "inplay": 1.1925000000000001
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -287,35 +287,6 @@
         "vs_pitcher_history": {}
       },
       {
-        "id": 700337,
-        "name": "Edgar Quero",
-        "pos": "C",
-        "bat": "S",
-        "throw": "R",
-        "k_rate": 0.2460138248847926,
-        "bb_rate": 0.07652073732718895,
-        "hbp_rate": 0.01935483870967742,
-        "hr_rate": 0.014539170506912441,
-        "inplay_hit_rate": 0.22014851485148515,
-        "xb_hit_share": 0.05,
-        "vs_pitch_type": {},
-        "vs_pitch_type_hr": {},
-        "platoon_mult_vs_lhp": {
-          "k": 0.9426001241382157,
-          "bb": 1.180941772694563,
-          "hr": 1.275,
-          "inplay": 0.8075
-        },
-        "platoon_mult_vs_rhp": {
-          "k": 1.0554876525865569,
-          "bb": 0.8992246311352002,
-          "hr": 0.78,
-          "inplay": 1.1925000000000001
-        },
-        "statcast_quality_mult": {},
-        "vs_pitcher_history": {}
-      },
-      {
         "id": 682668,
         "name": "Luisangel Acu\u00f1a",
         "pos": "CF",
@@ -341,6 +312,30 @@
           "hr": 1.0,
           "inplay": 1.0275595422208477
         },
+        "statcast_quality_mult": {},
+        "vs_pitcher_history": {}
+      },
+      {
+        "id": 678577,
+        "name": "Junior Perez",
+        "pos": "CF",
+        "bat": "R",
+        "throw": "R",
+        "k_rate": 0.5,
+        "bb_rate": 0.0,
+        "hbp_rate": 0.0,
+        "hr_rate": 0.0,
+        "inplay_hit_rate": 0.0,
+        "xb_hit_share": 0.22,
+        "vs_pitch_type": {},
+        "vs_pitch_type_hr": {},
+        "platoon_mult_vs_lhp": {
+          "k": 1.0,
+          "bb": 1.0,
+          "hr": 1.0,
+          "inplay": 1.0
+        },
+        "platoon_mult_vs_rhp": {},
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
       },
@@ -429,6 +424,35 @@
           "bb": 0.8969242861338078,
           "hr": 1.0458990481784103,
           "inplay": 1.0125088458481672
+        },
+        "statcast_quality_mult": {},
+        "vs_pitcher_history": {}
+      },
+      {
+        "id": 677592,
+        "name": "Everson Pereira",
+        "pos": "RF",
+        "bat": "R",
+        "throw": "R",
+        "k_rate": 0.2860984848484849,
+        "bb_rate": 0.0554040404040404,
+        "hbp_rate": 0.027777777777777776,
+        "hr_rate": 0.04087121212121212,
+        "inplay_hit_rate": 0.28502923976608185,
+        "xb_hit_share": 0.25,
+        "vs_pitch_type": {},
+        "vs_pitch_type_hr": {},
+        "platoon_mult_vs_lhp": {
+          "k": 0.9742949821263073,
+          "bb": 1.1925000000000001,
+          "hr": 1.0616774791473587,
+          "inplay": 1.1925000000000001
+        },
+        "platoon_mult_vs_rhp": {
+          "k": 1.0267244803389382,
+          "bb": 0.8075,
+          "hr": 0.9882761816496757,
+          "inplay": 0.8721058165777595
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -862,17 +886,17 @@
     "confirmed_lineup_ids": [],
     "projected_lineup_ids": [
       805808,
-      681481,
       693307,
       682985,
       679529,
+      681481,
       690993,
-      663837,
       656716,
-      701678
+      701678,
+      681546
     ],
     "lineup_source": "projected_rotowire_default_vs_rhp",
-    "lineup_confidence": 0.48000000000000004,
+    "lineup_confidence": 0.66,
     "probable_pitcher": {
       "id": 669373,
       "source": "feed_gameData_probablePitchers",
@@ -968,35 +992,6 @@
         "vs_pitcher_history": {}
       },
       {
-        "id": 681481,
-        "name": "Kerry Carpenter",
-        "pos": "RF",
-        "bat": "L",
-        "throw": "R",
-        "k_rate": 0.3044239631336405,
-        "bb_rate": 0.0784331797235023,
-        "hbp_rate": 0.025806451612903226,
-        "hr_rate": 0.06006912442396313,
-        "inplay_hit_rate": 0.2596629213483146,
-        "xb_hit_share": 0.15625,
-        "vs_pitch_type": {},
-        "vs_pitch_type_hr": {},
-        "platoon_mult_vs_lhp": {
-          "k": 1.0059048883299566,
-          "bb": 0.8075,
-          "hr": 0.78,
-          "inplay": 1.0551801941027383
-        },
-        "platoon_mult_vs_rhp": {
-          "k": 1.0225428867482829,
-          "bb": 1.0919746445772165,
-          "hr": 1.030317347120699,
-          "inplay": 0.992448100811601
-        },
-        "statcast_quality_mult": {},
-        "vs_pitcher_history": {}
-      },
-      {
         "id": 693307,
         "name": "Dillon Dingler",
         "pos": "C",
@@ -1084,6 +1079,35 @@
         "vs_pitcher_history": {}
       },
       {
+        "id": 681481,
+        "name": "Kerry Carpenter",
+        "pos": "RF",
+        "bat": "L",
+        "throw": "R",
+        "k_rate": 0.3044239631336405,
+        "bb_rate": 0.0784331797235023,
+        "hbp_rate": 0.025806451612903226,
+        "hr_rate": 0.06006912442396313,
+        "inplay_hit_rate": 0.2596629213483146,
+        "xb_hit_share": 0.15625,
+        "vs_pitch_type": {},
+        "vs_pitch_type_hr": {},
+        "platoon_mult_vs_lhp": {
+          "k": 1.0059048883299566,
+          "bb": 0.8075,
+          "hr": 0.78,
+          "inplay": 1.0551801941027383
+        },
+        "platoon_mult_vs_rhp": {
+          "k": 1.0225428867482829,
+          "bb": 1.0919746445772165,
+          "hr": 1.030317347120699,
+          "inplay": 0.992448100811601
+        },
+        "statcast_quality_mult": {},
+        "vs_pitcher_history": {}
+      },
+      {
         "id": 690993,
         "name": "Colt Keith",
         "pos": "3B",
@@ -1108,35 +1132,6 @@
           "bb": 1.0043496045814018,
           "hr": 0.8182742128337983,
           "inplay": 1.0908855873570753
-        },
-        "statcast_quality_mult": {},
-        "vs_pitcher_history": {}
-      },
-      {
-        "id": 663837,
-        "name": "Matt Vierling",
-        "pos": "CF",
-        "bat": "R",
-        "throw": "R",
-        "k_rate": 0.14943877551020407,
-        "bb_rate": 0.07688775510204082,
-        "hbp_rate": 0.0,
-        "hr_rate": 0.017346938775510204,
-        "inplay_hit_rate": 0.2090209238057639,
-        "xb_hit_share": 0.3055555555555556,
-        "vs_pitch_type": {},
-        "vs_pitch_type_hr": {},
-        "platoon_mult_vs_lhp": {
-          "k": 0.8533355626540453,
-          "bb": 1.1925000000000001,
-          "hr": 0.8843271555197421,
-          "inplay": 1.1925000000000001
-        },
-        "platoon_mult_vs_rhp": {
-          "k": 1.138211798471689,
-          "bb": 0.8075,
-          "hr": 1.2233142037302727,
-          "inplay": 0.8978834921024026
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -1195,6 +1190,35 @@
           "bb": 1.1355742296918767,
           "hr": 1.0099405170441547,
           "inplay": 1.0294542728635683
+        },
+        "statcast_quality_mult": {},
+        "vs_pitcher_history": {}
+      },
+      {
+        "id": 681546,
+        "name": "James Outman",
+        "pos": "CF",
+        "bat": "L",
+        "throw": "R",
+        "k_rate": 0.41959459459459464,
+        "bb_rate": 0.09141891891891893,
+        "hbp_rate": 0.013513513513513514,
+        "hr_rate": 0.018986486486486487,
+        "inplay_hit_rate": 0.2511583011583012,
+        "xb_hit_share": 0.45,
+        "vs_pitch_type": {},
+        "vs_pitch_type_hr": {},
+        "platoon_mult_vs_lhp": {
+          "k": 0.9743156199677938,
+          "bb": 0.8510840108401083,
+          "hr": 0.78,
+          "inplay": 1.0756725595695618
+        },
+        "platoon_mult_vs_rhp": {
+          "k": 0.9832023253909769,
+          "bb": 0.9598525561526801,
+          "hr": 0.9409825683093069,
+          "inplay": 1.0339610555982577
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -1260,30 +1284,30 @@
         "vs_pitcher_history": {}
       },
       {
-        "id": 681546,
-        "name": "James Outman",
+        "id": 663837,
+        "name": "Matt Vierling",
         "pos": "CF",
-        "bat": "L",
+        "bat": "R",
         "throw": "R",
-        "k_rate": 0.41959459459459464,
-        "bb_rate": 0.09141891891891893,
-        "hbp_rate": 0.013513513513513514,
-        "hr_rate": 0.018986486486486487,
-        "inplay_hit_rate": 0.2511583011583012,
-        "xb_hit_share": 0.45,
+        "k_rate": 0.14943877551020407,
+        "bb_rate": 0.07688775510204082,
+        "hbp_rate": 0.0,
+        "hr_rate": 0.017346938775510204,
+        "inplay_hit_rate": 0.2090209238057639,
+        "xb_hit_share": 0.3055555555555556,
         "vs_pitch_type": {},
         "vs_pitch_type_hr": {},
         "platoon_mult_vs_lhp": {
-          "k": 0.9743156199677938,
-          "bb": 0.8510840108401083,
-          "hr": 0.78,
-          "inplay": 1.0756725595695618
+          "k": 0.8533355626540453,
+          "bb": 1.1925000000000001,
+          "hr": 0.8843271555197421,
+          "inplay": 1.1925000000000001
         },
         "platoon_mult_vs_rhp": {
-          "k": 0.9832023253909769,
-          "bb": 0.9598525561526801,
-          "hr": 0.9409825683093069,
-          "inplay": 1.0339610555982577
+          "k": 1.138211798471689,
+          "bb": 0.8075,
+          "hr": 1.2233142037302727,
+          "inplay": 0.8978834921024026
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}

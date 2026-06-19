@@ -1,0 +1,1331 @@
+{
+  "date": "2026-05-31",
+  "season": 2026,
+  "spring_mode": false,
+  "generated_at": "2026-05-31T12:13:45.591909",
+  "summary": {
+    "games": 15,
+    "projected_teams": 6,
+    "adjusted_teams": 1,
+    "partial_teams": 0,
+    "fallback_pool_teams": 0,
+    "confirmed_teams": 24,
+    "projected_only_teams": 6,
+    "confirmed_only_teams": 24,
+    "comparable_teams": 0,
+    "exact_match_teams": 0,
+    "true_mismatch_teams": 0
+  },
+  "games": [
+    {
+      "idx": 0,
+      "game_pk": 824832,
+      "away": {
+        "team_id": 141,
+        "abbr": "TOR"
+      },
+      "home": {
+        "team_id": 110,
+        "abbr": "BAL"
+      },
+      "away_confirmed_ids": [
+        664770,
+        665489,
+        662139,
+        672960,
+        676391,
+        660821,
+        807727,
+        665926,
+        678218
+      ],
+      "home_confirmed_ids": [
+        621493,
+        683002,
+        668939,
+        624413,
+        694212,
+        665750,
+        681297,
+        677942,
+        702616
+      ],
+      "away_projected_ids": [],
+      "home_projected_ids": [],
+      "away_projected_validation": {
+        "status": "none",
+        "raw_ids": [],
+        "ids": []
+      },
+      "home_projected_validation": {
+        "status": "none",
+        "raw_ids": [],
+        "ids": []
+      },
+      "away_source": "confirmed_feed_live",
+      "home_source": "confirmed_feed_live",
+      "away_confidence": 1.0,
+      "home_confidence": 1.0,
+      "away_comparison": {
+        "status": "confirmed_only",
+        "is_true_mismatch": false,
+        "confirmed_count": 9,
+        "projected_count": 0,
+        "overlap_count": 0,
+        "missing_from_projection": [],
+        "extra_in_projection": []
+      },
+      "home_comparison": {
+        "status": "confirmed_only",
+        "is_true_mismatch": false,
+        "confirmed_count": 9,
+        "projected_count": 0,
+        "overlap_count": 0,
+        "missing_from_projection": [],
+        "extra_in_projection": []
+      }
+    },
+    {
+      "idx": 1,
+      "game_pk": 822729,
+      "away": {
+        "team_id": 135,
+        "abbr": "SD"
+      },
+      "home": {
+        "team_id": 120,
+        "abbr": "WSH"
+      },
+      "away_confirmed_ids": [
+        665487,
+        657757,
+        592518,
+        593428,
+        701538,
+        664034,
+        592206,
+        823550,
+        666023
+      ],
+      "home_confirmed_ids": [
+        695578,
+        671277,
+        678554,
+        682928,
+        686611,
+        695734,
+        696285,
+        677588,
+        660688
+      ],
+      "away_projected_ids": [],
+      "home_projected_ids": [],
+      "away_projected_validation": {
+        "status": "none",
+        "raw_ids": [],
+        "ids": []
+      },
+      "home_projected_validation": {
+        "status": "none",
+        "raw_ids": [],
+        "ids": []
+      },
+      "away_source": "confirmed_feed_live",
+      "home_source": "confirmed_feed_live",
+      "away_confidence": 1.0,
+      "home_confidence": 1.0,
+      "away_comparison": {
+        "status": "confirmed_only",
+        "is_true_mismatch": false,
+        "confirmed_count": 9,
+        "projected_count": 0,
+        "overlap_count": 0,
+        "missing_from_projection": [],
+        "extra_in_projection": []
+      },
+      "home_comparison": {
+        "status": "confirmed_only",
+        "is_true_mismatch": false,
+        "confirmed_count": 9,
+        "projected_count": 0,
+        "overlap_count": 0,
+        "missing_from_projection": [],
+        "extra_in_projection": []
+      }
+    },
+    {
+      "idx": 2,
+      "game_pk": 823373,
+      "away": {
+        "team_id": 142,
+        "abbr": "MIN"
+      },
+      "home": {
+        "team_id": 134,
+        "abbr": "PIT"
+      },
+      "away_confirmed_ids": [
+        668885,
+        686797,
+        665019,
+        605137,
+        663616,
+        606115,
+        807712,
+        656484,
+        656577
+      ],
+      "home_confirmed_ids": [],
+      "away_projected_ids": [],
+      "home_projected_ids": [
+        687462,
+        664040,
+        668804,
+        665833,
+        693304,
+        542303,
+        669707,
+        680779,
+        682848
+      ],
+      "away_projected_validation": {
+        "status": "none",
+        "raw_ids": [],
+        "ids": []
+      },
+      "home_projected_validation": {
+        "status": "adjusted",
+        "raw_ids": [
+          687462,
+          664040,
+          668804,
+          665833,
+          693304,
+          542303,
+          669707,
+          680779
+        ],
+        "ids": [
+          687462,
+          664040,
+          668804,
+          665833,
+          693304,
+          542303,
+          669707,
+          680779,
+          682848
+        ],
+        "missing_ids": [],
+        "backfilled_ids": [
+          682848
+        ],
+        "pool_source": "active+40Man",
+        "pool_size": 18,
+        "raw_names": [
+          "Spencer Horwitz",
+          "Brandon Lowe",
+          "Bryan Reynolds",
+          "Oneil Cruz",
+          "Ryan O'Hearn",
+          "Nick Gonzales",
+          "Marcell Ozuna",
+          "Jared Triolo",
+          "Henry Davis"
+        ],
+        "matched_names": [
+          "Spencer Horwitz",
+          "Brandon Lowe",
+          "Bryan Reynolds",
+          "Oneil Cruz",
+          "Nick Gonzales",
+          "Marcell Ozuna",
+          "Jared Triolo",
+          "Henry Davis"
+        ],
+        "missing_name_labels": [
+          "Ryan O'Hearn"
+        ],
+        "mapping_source": "projected_rotowire_default_vs_rhp"
+      },
+      "away_source": "confirmed_official_starting_lineups",
+      "home_source": "projected_rotowire_default_vs_rhp",
+      "away_confidence": 1.0,
+      "home_confidence": 0.48000000000000004,
+      "away_comparison": {
+        "status": "confirmed_only",
+        "is_true_mismatch": false,
+        "confirmed_count": 9,
+        "projected_count": 0,
+        "overlap_count": 0,
+        "missing_from_projection": [],
+        "extra_in_projection": []
+      },
+      "home_comparison": {
+        "status": "projected_only",
+        "is_true_mismatch": false,
+        "confirmed_count": 0,
+        "projected_count": 9,
+        "overlap_count": 0,
+        "missing_from_projection": [],
+        "extra_in_projection": []
+      }
+    },
+    {
+      "idx": 3,
+      "game_pk": 824430,
+      "away": {
+        "team_id": 111,
+        "abbr": "BOS"
+      },
+      "home": {
+        "team_id": 114,
+        "abbr": "CLE"
+      },
+      "away_confirmed_ids": [
+        680776,
+        678882,
+        677800,
+        681508,
+        807799,
+        643396,
+        691785,
+        702332,
+        665966
+      ],
+      "home_confirmed_ids": [
+        683953,
+        608070,
+        800050,
+        656555,
+        681807,
+        700932,
+        656413,
+        595978,
+        677587
+      ],
+      "away_projected_ids": [],
+      "home_projected_ids": [],
+      "away_projected_validation": {
+        "status": "none",
+        "raw_ids": [],
+        "ids": []
+      },
+      "home_projected_validation": {
+        "status": "none",
+        "raw_ids": [],
+        "ids": []
+      },
+      "away_source": "confirmed_feed_live",
+      "home_source": "confirmed_feed_live",
+      "away_confidence": 1.0,
+      "home_confidence": 1.0,
+      "away_comparison": {
+        "status": "confirmed_only",
+        "is_true_mismatch": false,
+        "confirmed_count": 9,
+        "projected_count": 0,
+        "overlap_count": 0,
+        "missing_from_projection": [],
+        "extra_in_projection": []
+      },
+      "home_comparison": {
+        "status": "confirmed_only",
+        "is_true_mismatch": false,
+        "confirmed_count": 9,
+        "projected_count": 0,
+        "overlap_count": 0,
+        "missing_from_projection": [],
+        "extra_in_projection": []
+      }
+    },
+    {
+      "idx": 4,
+      "game_pk": 822976,
+      "away": {
+        "team_id": 108,
+        "abbr": "LAA"
+      },
+      "home": {
+        "team_id": 139,
+        "abbr": "TB"
+      },
+      "away_confirmed_ids": [
+        687263,
+        545361,
+        687093,
+        624585,
+        666176,
+        672724,
+        642350,
+        681351,
+        663611
+      ],
+      "home_confirmed_ids": [
+        650490,
+        666018,
+        680700,
+        691406,
+        802415,
+        683748,
+        656775,
+        676439,
+        670764
+      ],
+      "away_projected_ids": [],
+      "home_projected_ids": [],
+      "away_projected_validation": {
+        "status": "none",
+        "raw_ids": [],
+        "ids": []
+      },
+      "home_projected_validation": {
+        "status": "none",
+        "raw_ids": [],
+        "ids": []
+      },
+      "away_source": "confirmed_feed_live",
+      "home_source": "confirmed_feed_live",
+      "away_confidence": 1.0,
+      "home_confidence": 1.0,
+      "away_comparison": {
+        "status": "confirmed_only",
+        "is_true_mismatch": false,
+        "confirmed_count": 9,
+        "projected_count": 0,
+        "overlap_count": 0,
+        "missing_from_projection": [],
+        "extra_in_projection": []
+      },
+      "home_comparison": {
+        "status": "confirmed_only",
+        "is_true_mismatch": false,
+        "confirmed_count": 9,
+        "projected_count": 0,
+        "overlap_count": 0,
+        "missing_from_projection": [],
+        "extra_in_projection": []
+      }
+    },
+    {
+      "idx": 5,
+      "game_pk": 824512,
+      "away": {
+        "team_id": 144,
+        "abbr": "ATL"
+      },
+      "home": {
+        "team_id": 113,
+        "abbr": "CIN"
+      },
+      "away_confirmed_ids": [
+        660670,
+        671739,
+        621566,
+        645277,
+        643289,
+        663586,
+        622761,
+        673490,
+        644433
+      ],
+      "home_confirmed_ids": [
+        694362,
+        682829,
+        668709,
+        701398,
+        553993,
+        663993,
+        668715,
+        666181,
+        664731
+      ],
+      "away_projected_ids": [],
+      "home_projected_ids": [],
+      "away_projected_validation": {
+        "status": "none",
+        "raw_ids": [],
+        "ids": []
+      },
+      "home_projected_validation": {
+        "status": "none",
+        "raw_ids": [],
+        "ids": []
+      },
+      "away_source": "confirmed_feed_live",
+      "home_source": "confirmed_feed_live",
+      "away_confidence": 1.0,
+      "home_confidence": 1.0,
+      "away_comparison": {
+        "status": "confirmed_only",
+        "is_true_mismatch": false,
+        "confirmed_count": 9,
+        "projected_count": 0,
+        "overlap_count": 0,
+        "missing_from_projection": [],
+        "extra_in_projection": []
+      },
+      "home_comparison": {
+        "status": "confirmed_only",
+        "is_true_mismatch": false,
+        "confirmed_count": 9,
+        "projected_count": 0,
+        "overlap_count": 0,
+        "missing_from_projection": [],
+        "extra_in_projection": []
+      }
+    },
+    {
+      "idx": 6,
+      "game_pk": 823621,
+      "away": {
+        "team_id": 146,
+        "abbr": "MIA"
+      },
+      "home": {
+        "team_id": 121,
+        "abbr": "NYM"
+      },
+      "away_confirmed_ids": [
+        669364,
+        689414,
+        672640,
+        669065,
+        691594,
+        805300,
+        681393,
+        683357,
+        665923
+      ],
+      "home_confirmed_ids": [
+        701807,
+        666182,
+        665742,
+        676724,
+        668901,
+        805999,
+        683146,
+        543760,
+        620443
+      ],
+      "away_projected_ids": [],
+      "home_projected_ids": [],
+      "away_projected_validation": {
+        "status": "none",
+        "raw_ids": [],
+        "ids": []
+      },
+      "home_projected_validation": {
+        "status": "none",
+        "raw_ids": [],
+        "ids": []
+      },
+      "away_source": "confirmed_official_starting_lineups",
+      "home_source": "confirmed_official_starting_lineups",
+      "away_confidence": 1.0,
+      "home_confidence": 1.0,
+      "away_comparison": {
+        "status": "confirmed_only",
+        "is_true_mismatch": false,
+        "confirmed_count": 9,
+        "projected_count": 0,
+        "overlap_count": 0,
+        "missing_from_projection": [],
+        "extra_in_projection": []
+      },
+      "home_comparison": {
+        "status": "confirmed_only",
+        "is_true_mismatch": false,
+        "confirmed_count": 9,
+        "projected_count": 0,
+        "overlap_count": 0,
+        "missing_from_projection": [],
+        "extra_in_projection": []
+      }
+    },
+    {
+      "idx": 7,
+      "game_pk": 824592,
+      "away": {
+        "team_id": 116,
+        "abbr": "DET"
+      },
+      "home": {
+        "team_id": 145,
+        "abbr": "CWS"
+      },
+      "away_confirmed_ids": [
+        690993,
+        805808,
+        679529,
+        681481,
+        682985,
+        663837,
+        672761,
+        656716,
+        668670
+      ],
+      "home_confirmed_ids": [
+        803011,
+        678246,
+        643217,
+        695657,
+        805367,
+        694378,
+        671976,
+        691011,
+        807747
+      ],
+      "away_projected_ids": [],
+      "home_projected_ids": [],
+      "away_projected_validation": {
+        "status": "none",
+        "raw_ids": [],
+        "ids": []
+      },
+      "home_projected_validation": {
+        "status": "none",
+        "raw_ids": [],
+        "ids": []
+      },
+      "away_source": "confirmed_official_starting_lineups",
+      "home_source": "confirmed_feed_live",
+      "away_confidence": 1.0,
+      "home_confidence": 1.0,
+      "away_comparison": {
+        "status": "confirmed_only",
+        "is_true_mismatch": false,
+        "confirmed_count": 9,
+        "projected_count": 0,
+        "overlap_count": 0,
+        "missing_from_projection": [],
+        "extra_in_projection": []
+      },
+      "home_comparison": {
+        "status": "confirmed_only",
+        "is_true_mismatch": false,
+        "confirmed_count": 9,
+        "projected_count": 0,
+        "overlap_count": 0,
+        "missing_from_projection": [],
+        "extra_in_projection": []
+      }
+    },
+    {
+      "idx": 8,
+      "game_pk": 824187,
+      "away": {
+        "team_id": 158,
+        "abbr": "MIL"
+      },
+      "home": {
+        "team_id": 117,
+        "abbr": "HOU"
+      },
+      "away_confirmed_ids": [
+        592885,
+        669003,
+        668930,
+        683734,
+        641343,
+        596142,
+        686217,
+        666152,
+        687401
+      ],
+      "home_confirmed_ids": [
+        665161,
+        670541,
+        572233,
+        666211,
+        670623,
+        701358,
+        676694,
+        669397,
+        543877
+      ],
+      "away_projected_ids": [],
+      "home_projected_ids": [],
+      "away_projected_validation": {
+        "status": "none",
+        "raw_ids": [],
+        "ids": []
+      },
+      "home_projected_validation": {
+        "status": "none",
+        "raw_ids": [],
+        "ids": []
+      },
+      "away_source": "confirmed_official_starting_lineups",
+      "home_source": "confirmed_feed_live",
+      "away_confidence": 1.0,
+      "home_confidence": 1.0,
+      "away_comparison": {
+        "status": "confirmed_only",
+        "is_true_mismatch": false,
+        "confirmed_count": 9,
+        "projected_count": 0,
+        "overlap_count": 0,
+        "missing_from_projection": [],
+        "extra_in_projection": []
+      },
+      "home_comparison": {
+        "status": "confirmed_only",
+        "is_true_mismatch": false,
+        "confirmed_count": 9,
+        "projected_count": 0,
+        "overlap_count": 0,
+        "missing_from_projection": [],
+        "extra_in_projection": []
+      }
+    },
+    {
+      "idx": 9,
+      "game_pk": 822895,
+      "away": {
+        "team_id": 118,
+        "abbr": "KC"
+      },
+      "home": {
+        "team_id": 140,
+        "abbr": "TEX"
+      },
+      "away_confirmed_ids": [
+        695600,
+        677951,
+        686469,
+        521692,
+        695506,
+        686555,
+        686681,
+        679845,
+        664728
+      ],
+      "home_confirmed_ids": [
+        592626,
+        673962,
+        607043,
+        669394,
+        677649,
+        696030,
+        543309,
+        670032,
+        680737
+      ],
+      "away_projected_ids": [],
+      "home_projected_ids": [],
+      "away_projected_validation": {
+        "status": "none",
+        "raw_ids": [],
+        "ids": []
+      },
+      "home_projected_validation": {
+        "status": "none",
+        "raw_ids": [],
+        "ids": []
+      },
+      "away_source": "confirmed_feed_live",
+      "home_source": "confirmed_official_starting_lineups",
+      "away_confidence": 1.0,
+      "home_confidence": 1.0,
+      "away_comparison": {
+        "status": "confirmed_only",
+        "is_true_mismatch": false,
+        "confirmed_count": 9,
+        "projected_count": 0,
+        "overlap_count": 0,
+        "missing_from_projection": [],
+        "extra_in_projection": []
+      },
+      "home_comparison": {
+        "status": "confirmed_only",
+        "is_true_mismatch": false,
+        "confirmed_count": 9,
+        "projected_count": 0,
+        "overlap_count": 0,
+        "missing_from_projection": [],
+        "extra_in_projection": []
+      }
+    },
+    {
+      "idx": 10,
+      "game_pk": 824354,
+      "away": {
+        "team_id": 137,
+        "abbr": "SF"
+      },
+      "home": {
+        "team_id": 115,
+        "abbr": "COL"
+      },
+      "away_confirmed_ids": [
+        669477,
+        646240,
+        650333,
+        642715,
+        808982,
+        656305,
+        805811,
+        691740,
+        687551
+      ],
+      "home_confirmed_ids": [
+        650489,
+        671289,
+        681198,
+        696100,
+        678662,
+        691720,
+        664983,
+        690924,
+        677060
+      ],
+      "away_projected_ids": [],
+      "home_projected_ids": [],
+      "away_projected_validation": {
+        "status": "none",
+        "raw_ids": [],
+        "ids": []
+      },
+      "home_projected_validation": {
+        "status": "none",
+        "raw_ids": [],
+        "ids": []
+      },
+      "away_source": "confirmed_official_starting_lineups",
+      "home_source": "confirmed_official_starting_lineups",
+      "away_confidence": 1.0,
+      "home_confidence": 1.0,
+      "away_comparison": {
+        "status": "confirmed_only",
+        "is_true_mismatch": false,
+        "confirmed_count": 9,
+        "projected_count": 0,
+        "overlap_count": 0,
+        "missing_from_projection": [],
+        "extra_in_projection": []
+      },
+      "home_comparison": {
+        "status": "confirmed_only",
+        "is_true_mismatch": false,
+        "confirmed_count": 9,
+        "projected_count": 0,
+        "overlap_count": 0,
+        "missing_from_projection": [],
+        "extra_in_projection": []
+      }
+    },
+    {
+      "idx": 11,
+      "game_pk": 825001,
+      "away": {
+        "team_id": 147,
+        "abbr": "NYY"
+      },
+      "home": {
+        "team_id": 133,
+        "abbr": "ATH"
+      },
+      "away_confirmed_ids": [],
+      "home_confirmed_ids": [
+        666126,
+        667670,
+        701762,
+        691016,
+        641680,
+        671732,
+        680869,
+        643446,
+        687231
+      ],
+      "away_projected_ids": [
+        502671,
+        700250,
+        592450,
+        641355,
+        676609,
+        665862,
+        683011,
+        680474,
+        669224
+      ],
+      "home_projected_ids": [],
+      "away_projected_validation": {
+        "status": "ok",
+        "raw_ids": [
+          502671,
+          700250,
+          592450,
+          641355,
+          676609,
+          665862,
+          683011,
+          680474,
+          669224
+        ],
+        "ids": [
+          502671,
+          700250,
+          592450,
+          641355,
+          676609,
+          665862,
+          683011,
+          680474,
+          669224
+        ],
+        "missing_ids": [],
+        "backfilled_ids": [],
+        "pool_source": "active+40Man",
+        "pool_size": 15,
+        "raw_names": [
+          "Paul Goldschmidt",
+          "Ben Rice",
+          "Aaron Judge",
+          "Cody Bellinger",
+          "Jose Caballero",
+          "Jazz Chisholm",
+          "Anthony Volpe",
+          "Max Schuemann",
+          "Austin Wells"
+        ],
+        "matched_names": [
+          "Paul Goldschmidt",
+          "Ben Rice",
+          "Aaron Judge",
+          "Cody Bellinger",
+          "Jos\u00e9 Caballero",
+          "Jazz Chisholm Jr.",
+          "Anthony Volpe",
+          "Max Schuemann",
+          "Austin Wells"
+        ],
+        "missing_name_labels": [],
+        "mapping_source": "projected_rotowire_default_vs_lhp"
+      },
+      "home_projected_validation": {
+        "status": "none",
+        "raw_ids": [],
+        "ids": []
+      },
+      "away_source": "projected_rotowire_default_vs_lhp",
+      "home_source": "confirmed_official_starting_lineups",
+      "away_confidence": 0.66,
+      "home_confidence": 1.0,
+      "away_comparison": {
+        "status": "projected_only",
+        "is_true_mismatch": false,
+        "confirmed_count": 0,
+        "projected_count": 9,
+        "overlap_count": 0,
+        "missing_from_projection": [],
+        "extra_in_projection": []
+      },
+      "home_comparison": {
+        "status": "confirmed_only",
+        "is_true_mismatch": false,
+        "confirmed_count": 9,
+        "projected_count": 0,
+        "overlap_count": 0,
+        "missing_from_projection": [],
+        "extra_in_projection": []
+      }
+    },
+    {
+      "idx": 12,
+      "game_pk": 823133,
+      "away": {
+        "team_id": 109,
+        "abbr": "AZ"
+      },
+      "home": {
+        "team_id": 136,
+        "abbr": "SEA"
+      },
+      "away_confirmed_ids": [],
+      "home_confirmed_ids": [
+        641487,
+        677594,
+        647304,
+        668227,
+        670042,
+        702284,
+        686527,
+        640902,
+        806068
+      ],
+      "away_projected_ids": [
+        606466,
+        682998,
+        672695,
+        571448,
+        814439,
+        545121,
+        672515,
+        680728,
+        694371
+      ],
+      "home_projected_ids": [],
+      "away_projected_validation": {
+        "status": "ok",
+        "raw_ids": [
+          606466,
+          682998,
+          672695,
+          571448,
+          814439,
+          545121,
+          672515,
+          680728,
+          694371
+        ],
+        "ids": [
+          606466,
+          682998,
+          672695,
+          571448,
+          814439,
+          545121,
+          672515,
+          680728,
+          694371
+        ],
+        "missing_ids": [],
+        "backfilled_ids": [],
+        "pool_source": "active+40Man",
+        "pool_size": 14,
+        "raw_names": [
+          "Ketel Marte",
+          "Corbin Carroll",
+          "Geraldo Perdomo",
+          "Nolan Arenado",
+          "Ryan Waldschmidt",
+          "Ildemaro Vargas",
+          "Gabriel Moreno",
+          "Adrian Del Castillo",
+          "Tommy Troy"
+        ],
+        "matched_names": [
+          "Ketel Marte",
+          "Corbin Carroll",
+          "Geraldo Perdomo",
+          "Nolan Arenado",
+          "Ryan Waldschmidt",
+          "Ildemaro Vargas",
+          "Gabriel Moreno",
+          "Adrian Del Castillo",
+          "Tommy Troy"
+        ],
+        "missing_name_labels": [],
+        "mapping_source": "projected_rotowire_default_vs_rhp"
+      },
+      "home_projected_validation": {
+        "status": "none",
+        "raw_ids": [],
+        "ids": []
+      },
+      "away_source": "projected_rotowire_default_vs_rhp",
+      "home_source": "confirmed_official_starting_lineups",
+      "away_confidence": 0.66,
+      "home_confidence": 1.0,
+      "away_comparison": {
+        "status": "projected_only",
+        "is_true_mismatch": false,
+        "confirmed_count": 0,
+        "projected_count": 9,
+        "overlap_count": 0,
+        "missing_from_projection": [],
+        "extra_in_projection": []
+      },
+      "home_comparison": {
+        "status": "confirmed_only",
+        "is_true_mismatch": false,
+        "confirmed_count": 9,
+        "projected_count": 0,
+        "overlap_count": 0,
+        "missing_from_projection": [],
+        "extra_in_projection": []
+      }
+    },
+    {
+      "idx": 13,
+      "game_pk": 823944,
+      "away": {
+        "team_id": 143,
+        "abbr": "PHI"
+      },
+      "home": {
+        "team_id": 119,
+        "abbr": "LAD"
+      },
+      "away_confirmed_ids": [],
+      "home_confirmed_ids": [
+        660271,
+        681624,
+        518692,
+        605141,
+        663656,
+        571970,
+        669899,
+        687221,
+        690976
+      ],
+      "away_projected_ids": [
+        656941,
+        607208,
+        547180,
+        669016,
+        664761,
+        681082,
+        592663,
+        666969,
+        702222
+      ],
+      "home_projected_ids": [],
+      "away_projected_validation": {
+        "status": "ok",
+        "raw_ids": [
+          656941,
+          607208,
+          547180,
+          669016,
+          664761,
+          681082,
+          592663,
+          666969,
+          702222
+        ],
+        "ids": [
+          656941,
+          607208,
+          547180,
+          669016,
+          664761,
+          681082,
+          592663,
+          666969,
+          702222
+        ],
+        "missing_ids": [],
+        "backfilled_ids": [],
+        "pool_source": "active+40Man",
+        "pool_size": 17,
+        "raw_names": [
+          "Kyle Schwarber",
+          "Trea Turner",
+          "Bryce Harper",
+          "Brandon Marsh",
+          "Alec Bohm",
+          "Bryson Stott",
+          "J.T. Realmuto",
+          "Adolis Garcia",
+          "Justin Crawford"
+        ],
+        "matched_names": [
+          "Kyle Schwarber",
+          "Trea Turner",
+          "Bryce Harper",
+          "Brandon Marsh",
+          "Alec Bohm",
+          "Bryson Stott",
+          "J.T. Realmuto",
+          "Adolis Garc\u00eda",
+          "Justin Crawford"
+        ],
+        "missing_name_labels": [],
+        "mapping_source": "projected_rotowire_default_vs_rhp"
+      },
+      "home_projected_validation": {
+        "status": "none",
+        "raw_ids": [],
+        "ids": []
+      },
+      "away_source": "projected_rotowire_default_vs_rhp",
+      "home_source": "confirmed_official_starting_lineups",
+      "away_confidence": 0.66,
+      "home_confidence": 1.0,
+      "away_comparison": {
+        "status": "projected_only",
+        "is_true_mismatch": false,
+        "confirmed_count": 0,
+        "projected_count": 9,
+        "overlap_count": 0,
+        "missing_from_projection": [],
+        "extra_in_projection": []
+      },
+      "home_comparison": {
+        "status": "confirmed_only",
+        "is_true_mismatch": false,
+        "confirmed_count": 9,
+        "projected_count": 0,
+        "overlap_count": 0,
+        "missing_from_projection": [],
+        "extra_in_projection": []
+      }
+    },
+    {
+      "idx": 14,
+      "game_pk": 823053,
+      "away": {
+        "team_id": 112,
+        "abbr": "CHC"
+      },
+      "home": {
+        "team_id": 138,
+        "abbr": "STL"
+      },
+      "away_confirmed_ids": [],
+      "home_confirmed_ids": [],
+      "away_projected_ids": [
+        663538,
+        608324,
+        664023,
+        673548,
+        608348,
+        683737,
+        621020,
+        665804,
+        691718
+      ],
+      "home_projected_ids": [
+        802139,
+        671056,
+        691023,
+        676369,
+        676475,
+        691026,
+        665877,
+        695336,
+        687363
+      ],
+      "away_projected_validation": {
+        "status": "ok",
+        "raw_ids": [
+          663538,
+          608324,
+          664023,
+          673548,
+          608348,
+          683737,
+          621020,
+          665804,
+          691718
+        ],
+        "ids": [
+          663538,
+          608324,
+          664023,
+          673548,
+          608348,
+          683737,
+          621020,
+          665804,
+          691718
+        ],
+        "missing_ids": [],
+        "backfilled_ids": [],
+        "pool_source": "active+40Man",
+        "pool_size": 15,
+        "raw_names": [
+          "Nico Hoerner",
+          "Alex Bregman",
+          "Ian Happ",
+          "Seiya Suzuki",
+          "Carson Kelly",
+          "Michael Busch",
+          "Dansby Swanson",
+          "Miguel Amaya",
+          "Pete Crow-Armstrong"
+        ],
+        "matched_names": [
+          "Nico Hoerner",
+          "Alex Bregman",
+          "Ian Happ",
+          "Seiya Suzuki",
+          "Carson Kelly",
+          "Michael Busch",
+          "Dansby Swanson",
+          "Miguel Amaya",
+          "Pete Crow-Armstrong"
+        ],
+        "missing_name_labels": [],
+        "mapping_source": "projected_rotowire_default_vs_lhp"
+      },
+      "home_projected_validation": {
+        "status": "ok",
+        "raw_ids": [
+          802139,
+          671056,
+          691023,
+          676369,
+          676475,
+          691026,
+          665877,
+          695336,
+          687363
+        ],
+        "ids": [
+          802139,
+          671056,
+          691023,
+          676369,
+          676475,
+          691026,
+          665877,
+          695336,
+          687363
+        ],
+        "missing_ids": [],
+        "backfilled_ids": [],
+        "pool_source": "active+40Man",
+        "pool_size": 17,
+        "raw_names": [
+          "JJ Wetherholt",
+          "Ivan Herrera",
+          "Jordan Walker",
+          "Nelson Velazquez",
+          "Alec Burleson",
+          "Masyn Winn",
+          "Jose Fermin",
+          "Thomas Saggese",
+          "Victor Scott"
+        ],
+        "matched_names": [
+          "JJ Wetherholt",
+          "Iv\u00e1n Herrera",
+          "Jordan Walker",
+          "Nelson Vel\u00e1zquez",
+          "Alec Burleson",
+          "Masyn Winn",
+          "Jos\u00e9 Ferm\u00edn",
+          "Thomas Saggese",
+          "Victor Scott II"
+        ],
+        "missing_name_labels": [],
+        "mapping_source": "projected_rotowire_default_vs_lhp"
+      },
+      "away_source": "projected_rotowire_default_vs_lhp",
+      "home_source": "projected_rotowire_default_vs_lhp",
+      "away_confidence": 0.66,
+      "home_confidence": 0.66,
+      "away_comparison": {
+        "status": "projected_only",
+        "is_true_mismatch": false,
+        "confirmed_count": 0,
+        "projected_count": 9,
+        "overlap_count": 0,
+        "missing_from_projection": [],
+        "extra_in_projection": []
+      },
+      "home_comparison": {
+        "status": "projected_only",
+        "is_true_mismatch": false,
+        "confirmed_count": 0,
+        "projected_count": 9,
+        "overlap_count": 0,
+        "missing_from_projection": [],
+        "extra_in_projection": []
+      }
+    }
+  ]
+}

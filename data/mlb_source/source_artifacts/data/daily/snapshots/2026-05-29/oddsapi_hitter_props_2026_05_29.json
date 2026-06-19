@@ -1,0 +1,95 @@
+{
+  "date": "2026-05-29",
+  "mode": "live",
+  "retrieved_at": "2026-05-30T04:50:33.522558",
+  "hitter_props": {
+    "cole young": {
+      "batter_home_runs": {
+        "line": 0.5,
+        "over_odds": "+2000",
+        "under_odds": null,
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 0.5,
+            "over_odds": "+2000",
+            "under_odds": null,
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": []
+      }
+    },
+    "dominic canzone": {
+      "batter_home_runs": {
+        "line": 0.5,
+        "over_odds": "+2000",
+        "under_odds": null,
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 0.5,
+            "over_odds": "+2000",
+            "under_odds": null,
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": []
+      }
+    },
+    "gabriel moreno": {
+      "batter_home_runs": {
+        "line": 0.5,
+        "over_odds": "+2600",
+        "under_odds": null,
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 0.5,
+            "over_odds": "+2600",
+            "under_odds": null,
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": []
+      }
+    },
+    "ryan waldschmidt": {
+      "batter_home_runs": {
+        "line": 0.5,
+        "over_odds": "+2600",
+        "under_odds": null,
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 0.5,
+            "over_odds": "+2600",
+            "under_odds": null,
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": []
+      }
+    }
+  },
+  "meta": {
+    "markets": [
+      "batter_hits",
+      "batter_hits_runs_rbis",
+      "batter_total_bases",
+      "batter_home_runs",
+      "batter_rbis",
+      "batter_runs_scored",
+      "batter_strikeouts"
+    ],
+    "regions": "us",
+    "bookmakers": null,
+    "counts": {
+      "players": 4,
+      "markets": {
+        "batter_home_runs": 4
+      },
+      "events_matched": 1
+    }
+  }
+}

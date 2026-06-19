@@ -1,16 +1,17 @@
 ﻿{
     "scope":  "daily_update",
-    "date":  "2026-06-18",
+    "date":  "2026-06-19",
     "runMode":  "standard",
-    "overallStatus":  "resumed",
-    "generatedAt":  "2026-06-18T15:19:15.4795613-05:00",
-    "updatedAt":  "2026-06-18T15:19:16.0104726-05:00",
-    "runDir":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-06-18\\20260618_151913",
-    "latestDir":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\latest",
-    "lastUpdatedAt":  "2026-06-18T15:19:16.0051833-05:00",
-    "currentStage":  "source_update",
+    "overallStatus":  "ok",
+    "generatedAt":  "2026-06-19T11:37:24.7658106+00:00",
+    "updatedAt":  "2026-06-19T12:38:02.2742771+00:00",
+    "runDir":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-06-19\\20260619_113724",
+    "latestDir":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest",
+    "lastUpdatedAt":  "2026-06-19T12:38:02.2664937+00:00",
+    "currentStage":  "queued",
     "completedStages":  [
-
+                            "source_update",
+                            "refresh_gate"
                         ],
     "failedStage":  "",
     "stageDecisions":  [
@@ -80,14 +81,6 @@
                            },
                            {
                                "stage":  "source_update",
-                               "sport":  null,
-                               "workflow":  null,
-                               "name":  "NCAAF local odds refresh",
-                               "decision":  "resumed",
-                               "status":  "resumed"
-                           },
-                           {
-                               "stage":  "source_update",
                                "sport":  "ncaab",
                                "workflow":  "syndicate_mirror",
                                "name":  "NCAAB source mirror export",
@@ -126,7 +119,7 @@
                            }
                        ],
     "provenance":  {
-                       "sourceStepCount":  10,
+                       "sourceStepCount":  9,
                        "sourceSteps":  [
                                            {
                                                "sport":  "mlb",
@@ -169,11 +162,6 @@
                                                "name":  "NFL local odds refresh"
                                            },
                                            {
-                                               "sport":  null,
-                                               "workflow":  null,
-                                               "name":  "NCAAF local odds refresh"
-                                           },
-                                           {
                                                "sport":  "ncaab",
                                                "workflow":  "syndicate_mirror",
                                                "name":  "NCAAB source mirror export"
@@ -182,7 +170,7 @@
                        "latestManifestLoaded":  true,
                        "latestEventSimExecutionPlanCount":  21,
                        "latestArtifactUpdateCount":  21,
-                       "oddsHistoryTriggerPlanCount":  10,
+                       "oddsHistoryTriggerPlanCount":  9,
                        "simExecutionDecision":  true
                    },
     "trace":  {
@@ -191,8 +179,8 @@
                   "inputFingerprintCount":  2,
                   "artifactPathCount":  21,
                   "inputFingerprints":  [
-                                            "273bb599414ea4ae1424dde32f327726ccd6fca9e0860fb7b0859d33fe560422",
-                                            "4a57d34024d5809c0516a43142be0e0352fe5316d550f250c63957b9528ce7dd"
+                                            "39a9c0a7bc2e132bc7285b7f2756557df18eb761b0c716ab54c98f1fa39fe958",
+                                            "273bb599414ea4ae1424dde32f327726ccd6fca9e0860fb7b0859d33fe560422"
                                         ],
                   "artifactPaths":  [
                                         "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_0_NYM_at_CIN_pk824503_g1.json",
@@ -221,7 +209,7 @@
               },
     "replayContext":  {
                           "latestCheckpointLoaded":  true,
-                          "latestCheckpointPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest_checkpoint.json",
+                          "latestCheckpointPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest_checkpoint.json",
                           "latestCheckpointStage":  "source_update",
                           "latestCheckpointFailedStage":  "",
                           "latestCheckpointCompletedStageCount":  0,
