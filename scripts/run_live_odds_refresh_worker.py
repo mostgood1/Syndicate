@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import signal
 import sys
 import time
@@ -20,7 +21,19 @@ def _handle_stop(_signum: int, _frame: object) -> None:
     _LIVE_REFRESH_LOOP_STOP.set()
 
 
+def _run_tick() -> None:
+    try:
+        meta = _run_live_refresh_tick()
+        print(f"LIVE ODDS REFRESH TICK: {meta.get('ok', False)}")
+    except Exception as exc:
+        print(f"LIVE ODDS REFRESH ERROR: {exc}")
+
+
 def main() -> int:
+    parser = argparse.ArgumentParser(description="Run the Syndicate live odds refresh worker loop.")
+    parser.add_argument("--run-once", action="store_true")
+    args = parser.parse_args()
+
     try:
         signal.signal(signal.SIGTERM, _handle_stop)
         signal.signal(signal.SIGINT, _handle_stop)
@@ -36,13 +49,13 @@ def main() -> int:
     except Exception:
         interval_seconds = 30
 
+    if args.run_once:
+        _run_tick()
+        return 0
+
     try:
         while not _LIVE_REFRESH_LOOP_STOP.is_set():
-            try:
-                meta = _run_live_refresh_tick()
-                print(f"LIVE ODDS REFRESH TICK: {meta.get('ok', False)}")
-            except Exception as exc:
-                print(f"LIVE ODDS REFRESH ERROR: {exc}")
+            _run_tick()
             time.sleep(interval_seconds)
     finally:
         _release_process_lock()

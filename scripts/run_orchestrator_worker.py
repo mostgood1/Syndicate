@@ -12,6 +12,22 @@ def _run_script(script_name: str) -> None:
     subprocess.run([sys.executable, str(REPO_ROOT / "scripts" / script_name), "--run-once"], check=False)
 
 
+def run_live_odds_refresh_job() -> None:
+    print("RUNNING LIVE ODDS REFRESH")
+    try:
+        _run_script("run_live_odds_refresh_worker.py")
+    except Exception as exc:
+        print(f"LIVE ODDS REFRESH ERROR: {exc}")
+
+
+def run_refresh_job() -> None:
+    print("RUNNING REFRESH")
+    try:
+        _run_script("run_refresh_worker.py")
+    except Exception as exc:
+        print(f"REFRESH ERROR: {exc}")
+
+
 def run_mlb_live_lens_job() -> None:
     print("RUNNING MLB")
     try:
@@ -46,6 +62,10 @@ def run_intelligence_state_job() -> None:
 
 def main() -> int:
     while True:
+        run_live_odds_refresh_job()
+        time.sleep(5)
+        run_refresh_job()
+        time.sleep(5)
         run_mlb_live_lens_job()
         time.sleep(5)
         run_nba_live_lens_job()
