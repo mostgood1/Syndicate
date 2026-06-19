@@ -35,16 +35,20 @@ Trigger surface:
 - [syndicate/blueprints/ask_the_syndicate.py](../syndicate/blueprints/ask_the_syndicate.py)
 
 Path:
-- `ask_the_syndicate_query_api()` -> `_build_artifact_response()` -> `run_intelligence_query()`.
+- `ask_the_syndicate_query_api()` -> `_build_fast_state_result()` -> `read_latest_intelligence_state()` -> `build_syndicate_query_response()`.
 
 Execution mode:
 - Synchronous in the request thread.
 
 How often it can run:
-- Every Ask request that resolves to the artifact-backed branch.
+- Every Ask request.
 
 Concurrency:
 - Can run concurrently across requests.
+
+Note:
+- Ask no longer calls `run_intelligence_query()`, `run_routed_intelligence_pipeline()`, or `run_intelligence_pipeline()`.
+- Missing snapshots now return a safe fallback Ask response instead of triggering compute.
 
 ### 3. Intelligence state worker
 
@@ -73,8 +77,8 @@ Trigger surface:
 - [syndicate/blueprints/ask_the_syndicate.py](../syndicate/blueprints/ask_the_syndicate.py)
 
 Path:
-- Fallback handlers such as `handle_bet_analysis()`, `handle_matchup_analysis()`, and `handle_market_summary()` call `_build_route_payload()`.
-- `_build_route_payload()` calls `run_routed_intelligence_pipeline()`.
+- Fallback handlers such as `handle_bet_analysis()`, `handle_matchup_analysis()`, and `handle_market_summary()` now format the latest snapshot through `_build_route_payload()`.
+- `_build_route_payload()` reads `read_latest_intelligence_state()` and does not call `run_routed_intelligence_pipeline()`.
 
 Execution mode:
 - Synchronous in the request thread.
@@ -174,7 +178,7 @@ Concurrency:
 ### Intelligence refresh
 
 - [syndicate/templates/intelligence.html](../syndicate/templates/intelligence.html) polls the intelligence query API on an interval and also refreshes on focus and visibility changes.
-- [pipeline/intelligence_state.py](../pipeline/intelligence_state.py) runs `IntelligenceStateService._background_loop()`.
+- [pipeline/intelligence_state.py](../pipeline/intelligence_state.py) runs `IntelligenceStateService._background_loop()` which now routes work through `run_routed_intelligence_pipeline()` and persists with `write_latest_intelligence_state()`.
 - [scripts/run_refresh_worker.py](../scripts/run_refresh_worker.py) runs a separate forever refresh loop.
 - [syndicate/app.py](../syndicate/app.py) can optionally start `start_intelligence_state_background_loop(app)`.
 

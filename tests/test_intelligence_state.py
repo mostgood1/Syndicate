@@ -154,9 +154,8 @@ class IntelligenceStateTests(unittest.TestCase):
             method="POST",
             json={"question": "top edges today", "force_refresh": True},
         ):
-            with patch("syndicate.blueprints.intelligence.read_intelligence_state", return_value=dict(cached_response)) as mocked_read:
-                with patch("syndicate.blueprints.intelligence.build_intelligence_board_contract") as mocked_board_contract:
-                    response = intelligence_query_api()
+            with patch("syndicate.blueprints.intelligence.read_latest_intelligence_state", return_value=dict(cached_response)):
+                response = intelligence_query_api()
 
         payload = response.get_json()
         self.assertIsNotNone(payload)
@@ -165,12 +164,10 @@ class IntelligenceStateTests(unittest.TestCase):
         self.assertIn("response", payload)
         self.assertEqual(payload["state_last_updated"], "2026-06-11T16:00:00Z")
         self.assertEqual(payload["candidate_count"], 2)
-        self.assertEqual(payload["debug_source"], "worker")
+        self.assertEqual(payload["debug_source"], "snapshot_read")
         self.assertEqual(response.headers.get("Cache-Control"), "no-cache, no-store, must-revalidate")
         self.assertEqual(response.headers.get("Pragma"), "no-cache")
         self.assertEqual(response.headers.get("Expires"), "0")
-        mocked_read.assert_called_once()
-        mocked_board_contract.assert_not_called()
         self.assertEqual(payload["response"]["analysis"]["recommendations"], [{"name": "Play 1"}, {"name": "Play 2"}])
 
     def test_query_endpoint_queues_refresh_when_default_cache_is_empty(self) -> None:
@@ -182,10 +179,8 @@ class IntelligenceStateTests(unittest.TestCase):
             method="POST",
             json={"question": "top edges today", "force_refresh": False},
         ):
-            with patch("syndicate.blueprints.intelligence.read_intelligence_state", return_value=None):
-                with patch("syndicate.blueprints.intelligence.compute_intelligence_state_response", return_value={"ok": True, "top_opportunities": [{"name": "Play 1"}], "by_sport": {}, "analysis": {"recommendations": [{"name": "Play 1"}], "picks": [], "top_live_opportunities": [], "portfolio": {}, "parlays": []}}) as mocked_compute:
-                    with patch("syndicate.blueprints.intelligence.write_intelligence_state") as mocked_write:
-                        response = intelligence_query_api()
+            with patch("syndicate.blueprints.intelligence.read_latest_intelligence_state", return_value=None):
+                response = intelligence_query_api()
 
         payload = response.get_json()
         self.assertIsNotNone(payload)
@@ -193,12 +188,10 @@ class IntelligenceStateTests(unittest.TestCase):
         self.assertIn("version", payload)
         self.assertIn("timestamp", payload)
         self.assertIn("response", payload)
-        self.assertEqual(len(payload["response"]["top_opportunities"]), 1)
-        self.assertEqual(payload["response"]["top_opportunities"][0]["name"], "Play 1")
-        self.assertEqual(payload["response"]["analysis"]["recommendations"][0]["name"], "Play 1")
+        self.assertEqual(payload["response"]["top_opportunities"], [])
+        self.assertEqual(payload["response"]["analysis"]["recommendations"], [])
         self.assertEqual(payload["response"]["analysis"]["portfolio"], {})
-        mocked_compute.assert_called_once()
-        mocked_write.assert_called_once()
+        self.assertEqual(payload["debug_source"], "snapshot_read")
 
     def test_query_endpoint_returns_empty_default_response_when_default_cache_exists_but_is_empty(self) -> None:
         app = Flask(__name__)
@@ -224,10 +217,8 @@ class IntelligenceStateTests(unittest.TestCase):
             method="POST",
             json={"question": "top edges today", "force_refresh": False},
         ):
-            with patch("syndicate.blueprints.intelligence.read_intelligence_state", return_value=dict(empty_cached_response)):
-                with patch("syndicate.blueprints.intelligence.compute_intelligence_state_response", return_value=dict(computed_response)) as mocked_compute:
-                    with patch("syndicate.blueprints.intelligence.write_intelligence_state") as mocked_write:
-                        response = intelligence_query_api()
+            with patch("syndicate.blueprints.intelligence.read_latest_intelligence_state", return_value=dict(empty_cached_response)):
+                response = intelligence_query_api()
 
         payload = response.get_json()
         self.assertIsNotNone(payload)
@@ -235,11 +226,10 @@ class IntelligenceStateTests(unittest.TestCase):
         self.assertIn("version", payload)
         self.assertIn("timestamp", payload)
         self.assertIn("response", payload)
-        self.assertEqual(payload["response"]["top_opportunities"][0]["name"], "Play 1")
-        self.assertEqual(payload["response"]["analysis"]["recommendations"][0]["name"], "Play 1")
+        self.assertEqual(payload["response"]["top_opportunities"], [])
+        self.assertEqual(payload["response"]["analysis"]["recommendations"], [])
         self.assertEqual(payload["response"]["analysis"]["portfolio"], {})
-        mocked_compute.assert_called_once()
-        mocked_write.assert_called_once()
+        self.assertEqual(payload["debug_source"], "snapshot_read")
 
     def test_query_endpoint_exposes_line_move_tracking_fields(self) -> None:
         app = Flask(__name__)
@@ -270,9 +260,8 @@ class IntelligenceStateTests(unittest.TestCase):
             method="POST",
             json={"question": "top edges today", "force_refresh": False},
         ):
-            with patch("syndicate.blueprints.intelligence.read_intelligence_state", return_value=dict(cached_response)):
-                with patch("syndicate.blueprints.intelligence.compute_intelligence_state_response") as mocked_compute:
-                    response = intelligence_query_api()
+            with patch("syndicate.blueprints.intelligence.read_latest_intelligence_state", return_value=dict(cached_response)):
+                response = intelligence_query_api()
 
         payload = response.get_json()
         self.assertIsNotNone(payload)
@@ -280,8 +269,7 @@ class IntelligenceStateTests(unittest.TestCase):
         self.assertEqual(payload["line_moves_tracked"], 1)
         self.assertEqual(payload["line_move_history_count"], 2)
         self.assertEqual(payload["line_move_source_count"], 1)
-        self.assertEqual(payload["debug_source"], "worker")
-        mocked_compute.assert_not_called()
+        self.assertEqual(payload["debug_source"], "snapshot_read")
 
     def test_intelligence_state_roundtrip_persists_to_tmp_file(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -515,12 +503,10 @@ class IntelligenceStateTests(unittest.TestCase):
         payload = {"question": "top edges today", "date": "2026-06-15"}
         with patch("syndicate.blueprints.intelligence.read_latest_intelligence_board_snapshot_response", return_value=None):
             with patch("syndicate.blueprints.intelligence.read_latest_intelligence_state_response", return_value=None):
-                with patch("syndicate.blueprints.intelligence.compute_intelligence_state_response") as mocked_compute:
-                    cached_response, source = intelligence_module._cached_intelligence_response_with_source(payload)
+                cached_response, source = intelligence_module._cached_intelligence_response_with_source(payload)
 
         self.assertEqual(source, "fallback")
         self.assertIsNone(cached_response)
-        mocked_compute.assert_not_called()
 
     def test_intelligence_home_renders_initial_board_shell(self) -> None:
         app = create_app()
@@ -610,19 +596,6 @@ class IntelligenceStateTests(unittest.TestCase):
         app = create_app()
         app.testing = True
 
-        computed_response = {
-            "ok": True,
-            "selected_date": "2026-06-17",
-            "top_opportunities": [{"name": "Play 1"}],
-            "by_sport": {"mlb": [{"name": "Play 1"}]},
-            "analysis": {
-                "recommendations": [{"name": "Play 1"}],
-                "picks": [{"name": "Play 1"}],
-                "top_live_opportunities": [],
-                "portfolio": {},
-                "parlays": [],
-            },
-        }
         empty_cached_response = {
             "ok": True,
             "top_opportunities": [],
@@ -639,14 +612,11 @@ class IntelligenceStateTests(unittest.TestCase):
         with app.test_client() as client:
             with patch.dict(os.environ, {"RENDER": "true"}, clear=False):
                 with patch("syndicate.blueprints.intelligence._cached_intelligence_response_with_source", return_value=(dict(empty_cached_response), "worker")):
-                    with patch("syndicate.blueprints.intelligence.compute_intelligence_state_response", return_value=dict(computed_response)) as mocked_compute:
-                        with patch("syndicate.blueprints.intelligence.queue_intelligence_state_refresh") as mocked_queue:
-                            response = client.get("/intelligence?date=2026-06-17")
+                    with patch("syndicate.blueprints.intelligence.queue_intelligence_state_refresh") as mocked_queue:
+                        response = client.get("/intelligence?date=2026-06-17")
 
         self.assertEqual(response.status_code, 200)
-        mocked_compute.assert_called_once()
-        mocked_queue.assert_not_called()
-        self.assertIn("Play 1", response.get_data(as_text=True))
+        mocked_queue.assert_called_once()
 
     def test_intelligence_home_suppresses_live_snapshot_missing_hydration(self) -> None:
         app = create_app()
@@ -736,33 +706,31 @@ class IntelligenceStateTests(unittest.TestCase):
             method="POST",
             json={"question": "top edges today", "date": "2026-06-17"},
         ):
-            with patch("syndicate.blueprints.intelligence.read_intelligence_state", return_value=None):
-                with patch(
-                    "syndicate.blueprints.intelligence.compute_intelligence_state_response",
-                    return_value={
-                        "ok": True,
-                        "top_opportunities": [{"name": "Live Play", "movement": {"line_delta": 0.5, "trend": "up"}}],
-                        "by_sport": {},
-                        "analysis": {
-                            "recommendations": [
-                                {
-                                    "name": "Live Play",
-                                    "event_id": "evt-1",
-                                    "is_live": True,
-                                    "status_display": "Live",
-                                    "status_context": "In Progress",
-                                    "movement_history": [{"timestamp": "2026-06-17T17:15:00Z"}],
-                                }
-                            ],
-                            "top_live_opportunities": [],
-                            "picks": [],
-                            "portfolio": {},
-                            "parlays": [],
-                        },
+            with patch(
+                "syndicate.blueprints.intelligence.read_latest_intelligence_state",
+                return_value={
+                    "ok": True,
+                    "top_opportunities": [{"name": "Live Play", "movement": {"line_delta": 0.5, "trend": "up"}}],
+                    "by_sport": {},
+                    "analysis": {
+                        "recommendations": [
+                            {
+                                "name": "Live Play",
+                                "event_id": "evt-1",
+                                "is_live": True,
+                                "status_display": "Live",
+                                "status_context": "In Progress",
+                                "movement_history": [{"timestamp": "2026-06-17T17:15:00Z"}],
+                            }
+                        ],
+                        "top_live_opportunities": [],
+                        "picks": [],
+                        "portfolio": {},
+                        "parlays": [],
                     },
-                ):
-                    with patch("syndicate.blueprints.intelligence.write_intelligence_state") as mocked_write:
-                        response = intelligence_query_api()
+                },
+            ):
+                response = intelligence_query_api()
 
         payload = response.get_json()
         self.assertIsNotNone(payload)
@@ -770,7 +738,7 @@ class IntelligenceStateTests(unittest.TestCase):
         self.assertEqual(len(payload["response"]["top_opportunities"]), 1)
         self.assertEqual(payload["response"]["top_opportunities"][0]["name"], "Live Play")
         self.assertEqual(payload["response"]["analysis"]["recommendations"][0]["name"], "Live Play")
-        mocked_write.assert_called_once()
+        self.assertEqual(payload["debug_source"], "snapshot_read")
 
     def test_query_endpoint_preserves_recommendation_history_from_engine_response(self) -> None:
         app = Flask(__name__)
@@ -796,7 +764,7 @@ class IntelligenceStateTests(unittest.TestCase):
             method="POST",
             json={"question": "Analyze Jayson Tatum tonight", "date": "2026-06-13"},
         ):
-            with patch("syndicate.blueprints.intelligence.read_intelligence_state", return_value=dict(engine_response)):
+            with patch("syndicate.blueprints.intelligence.read_latest_intelligence_state", return_value=dict(engine_response)):
                 response = intelligence_query_api()
 
         payload = response.get_json()
@@ -848,30 +816,21 @@ class IntelligenceStateTests(unittest.TestCase):
         self.assertEqual(payload["portfolio_event_records"][0]["recommendation_id"], "rec_123")
         mocked_build.assert_called_once()
 
-    def test_status_endpoint_falls_back_to_cached_state_when_live_build_fails(self) -> None:
+    def test_status_endpoint_falls_back_to_empty_status_when_snapshot_is_missing(self) -> None:
         app = Flask(__name__)
         app.register_blueprint(intelligence_bp)
 
         with app.test_request_context("/api/intelligence/status?date=2026-06-10", method="GET"):
-            with patch("builtins.print") as mocked_print:
-                with patch("syndicate.blueprints.intelligence.build_intelligence_status", side_effect=RuntimeError("boom")):
-                    response = intelligence_status_api()
+            with patch("syndicate.blueprints.intelligence.read_latest_intelligence_state", return_value={}) as mocked_read:
+                response = intelligence_status_api()
 
-        if isinstance(response, tuple):
-            response_obj, status_code = response
-        else:
-            response_obj, status_code = response, response.status_code
-
-        payload = response_obj.get_json()
+        payload = response.get_json()
         self.assertIsNotNone(payload)
-        self.assertEqual(status_code, 500)
-        self.assertEqual(payload["error"], "boom")
-        self.assertEqual(response_obj.headers.get("Cache-Control"), "no-cache, no-store, must-revalidate")
-        self.assertEqual(response_obj.headers.get("Pragma"), "no-cache")
-        self.assertEqual(response_obj.headers.get("Expires"), "0")
-        mocked_print.assert_called_once()
-        self.assertEqual(mocked_print.call_args.args[0], "[API ERROR]")
-        self.assertEqual(mocked_print.call_args.args[1], "boom")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(payload["debug_source"], "snapshot_read")
+        self.assertEqual((payload.get("status") or {}).get("board_contract", {}).get("schema"), "intelligence_board_v1")
+        self.assertEqual((payload.get("status") or {}).get("top_opportunities"), [])
+        mocked_read.assert_called_once_with({"date": "2026-06-10"})
 
     def test_status_endpoint_includes_state_debug_fields(self) -> None:
         app = Flask(__name__)
@@ -889,15 +848,14 @@ class IntelligenceStateTests(unittest.TestCase):
         }
 
         with app.test_request_context("/api/intelligence/status?date=2026-06-10", method="GET"):
-            with patch("syndicate.blueprints.intelligence.build_intelligence_status", return_value={"ok": True, "threadAlive": True}):
-                with patch("syndicate.blueprints.intelligence.read_latest_intelligence_state_response", return_value=dict(state_response)):
+            with patch("syndicate.blueprints.intelligence.read_latest_intelligence_state", return_value=dict(state_response)):
                     response = intelligence_status_api()
 
         payload = response.get_json()
         self.assertIsNotNone(payload)
         self.assertEqual(payload["state_last_updated"], "2026-06-11T16:05:00Z")
         self.assertEqual(payload["candidate_count"], 1)
-        self.assertEqual(payload["debug_source"], "worker")
+        self.assertEqual(payload["debug_source"], "snapshot_read")
         self.assertEqual(response.headers.get("Cache-Control"), "no-cache, no-store, must-revalidate")
         self.assertEqual(response.headers.get("Pragma"), "no-cache")
         self.assertEqual(response.headers.get("Expires"), "0")
@@ -926,47 +884,29 @@ class IntelligenceStateTests(unittest.TestCase):
         }
 
         with app.test_request_context("/api/intelligence/status?date=2026-06-10", method="GET"):
-            with patch("syndicate.blueprints.intelligence.build_intelligence_status", return_value={"ok": True, "threadAlive": True}):
-                with patch("syndicate.blueprints.intelligence.read_latest_intelligence_state_response", return_value=dict(state_response)) as mocked_state_response:
+            with patch("syndicate.blueprints.intelligence.read_latest_intelligence_state", return_value=dict(state_response)) as mocked_state_response:
                     response = intelligence_status_api()
 
         payload = response.get_json()
         self.assertIsNotNone(payload)
-        self.assertEqual(payload["debug_source"], "worker")
-        mocked_state_response.assert_called_once_with(expected_payload, force_refresh=True)
+        self.assertEqual(payload["debug_source"], "snapshot_read")
+        mocked_state_response.assert_called_once_with({"date": "2026-06-10"})
         self.assertEqual(response.headers.get("Cache-Control"), "no-cache, no-store, must-revalidate")
         self.assertEqual(response.headers.get("Pragma"), "no-cache")
         self.assertEqual(response.headers.get("Expires"), "0")
 
-    def test_status_endpoint_computes_render_fallback_when_state_cache_is_missing(self) -> None:
+    def test_status_endpoint_does_not_compute_when_snapshot_is_missing(self) -> None:
         app = Flask(__name__)
         app.register_blueprint(intelligence_bp)
 
-        computed_state = {
-            "ok": True,
-            "top_opportunities": [{"name": "Play 1"}],
-            "candidate_pool": {"candidates": [{"name": "Play 1"}]},
-            "analysis": {"recommendations": [{"name": "Play 1"}], "picks": [], "top_live_opportunities": [], "portfolio": {}, "parlays": []},
-        }
-        empty_state = {
-            "ok": True,
-            "top_opportunities": [],
-            "candidate_pool": {"candidates": []},
-            "analysis": {"recommendations": [], "picks": [], "top_live_opportunities": [], "portfolio": {}, "parlays": []},
-        }
-
         with app.test_request_context("/api/intelligence/status?date=2026-06-10", method="GET"):
-            with patch.dict(os.environ, {"RENDER": "true"}, clear=False):
-                with patch("syndicate.blueprints.intelligence.build_intelligence_status", return_value={"ok": True, "threadAlive": True}):
-                    with patch("syndicate.blueprints.intelligence._cached_intelligence_response_with_source", return_value=(dict(empty_state), "worker")):
-                        with patch("syndicate.blueprints.intelligence.compute_intelligence_state_response", return_value=dict(computed_state)) as mocked_compute:
-                            response = intelligence_status_api()
+            with patch("syndicate.blueprints.intelligence.read_latest_intelligence_state", return_value={}):
+                response = intelligence_status_api()
 
         payload = response.get_json()
         self.assertIsNotNone(payload)
-        self.assertEqual(payload["debug_source"], "render_compute")
-        self.assertEqual(payload["candidate_count"], 1)
-        mocked_compute.assert_called_once()
+        self.assertEqual(payload["debug_source"], "snapshot_read")
+        self.assertEqual((payload.get("status") or {}).get("candidate_count", 0), 0)
         self.assertEqual(response.headers.get("Cache-Control"), "no-cache, no-store, must-revalidate")
         self.assertEqual(response.headers.get("Pragma"), "no-cache")
         self.assertEqual(response.headers.get("Expires"), "0")
@@ -1140,32 +1080,22 @@ class IntelligenceStateTests(unittest.TestCase):
         )
         service._latest_key = snapshot_key
 
-        calls = {"count": 0}
-
-        def fake_source_fingerprint(selected_date: str | None) -> str:
-            return "fingerprint-1"
-
-        def fake_build_candidate_pool(selected_date: str | None, source_fingerprint: str) -> dict[str, object]:
-            return {"candidates": [{"name": "Play 1"}, {"name": "Play 2"}]}
-
-        def fake_compute_response(request_payload: dict[str, object]) -> dict[str, object]:
-            calls["count"] += 1
-            service._stop.set()
-            return {"ok": True}
-
-        service._source_state_fingerprint = fake_source_fingerprint
-        service._build_candidate_pool = fake_build_candidate_pool
-        service._compute_response = fake_compute_response
         service._persist_locked = lambda: None
 
-        with patch("builtins.print") as mocked_print:
-            service._background_loop()
+        def fake_write_latest_intelligence_state(state: dict[str, object], logger_info) -> dict[str, object]:
+            service._stop.set()
+            logger_info("STATE WRITTEN", extra={"written": True, "candidate_count": 0})
+            return dict(state)
 
-        self.assertEqual(calls["count"], 1)
-        mocked_print.assert_called_once()
-        printed_args = mocked_print.call_args.args
-        self.assertEqual(printed_args[0], "[WORKER WRITE]")
-        self.assertEqual(printed_args[1]["candidate_count"], 2)
+        with patch("pipeline.intelligence_state.run_routed_intelligence_pipeline", return_value={"ok": True, "top_opportunities": [], "by_sport": {}, "analysis": {}}) as mocked_pipeline:
+            with patch("pipeline.intelligence_state.logger.info") as mocked_logger_info:
+                with patch("pipeline.intelligence_state.write_latest_intelligence_state", side_effect=lambda state: fake_write_latest_intelligence_state(state, mocked_logger_info)) as mocked_write:
+                    service._background_loop()
+
+        mocked_pipeline.assert_called_once_with(normalized)
+        mocked_write.assert_called_once()
+        mocked_logger_info.assert_any_call("WORKER RUN", extra={"payload_key": snapshot_key})
+        mocked_logger_info.assert_any_call("STATE WRITTEN", extra={"written": True, "candidate_count": 0})
 
     def test_build_candidate_pool_skips_sports_without_manifests(self) -> None:
         service = IntelligenceStateService()

@@ -10,19 +10,12 @@ from typing import Any, Mapping
 from flask import Blueprint, jsonify, render_template, request
 from flask import redirect
 
-from pipeline.intelligence_state import get_intelligence_state_response
-from pipeline.intelligence_state import compute_intelligence_state_response
 from pipeline.intelligence_state import read_latest_intelligence_board_snapshot_response
-from pipeline.intelligence_state import read_intelligence_state
 from pipeline.intelligence_state import read_latest_intelligence_state_response
-from pipeline.intelligence_state import intelligence_state_status
-from pipeline.intelligence_state import write_intelligence_state
 from pipeline.intelligence_state import queue_intelligence_state_refresh
-from syndicate.features.intelligence import build_intelligence_status
 from syndicate.features.intelligence import _market_focus_labels
 from syndicate.features.intelligence import _parlay_request_summary
 from syndicate.features.intelligence import _query_preferences
-from syndicate.features.intelligence import run_intelligence_query
 from syndicate.features.intelligence import _attach_intelligence_response_aliases
 from syndicate.features.intelligence_board import build_intelligence_board_contract
 from syndicate.features.shared.artifact_manifests import load_artifact_manifests
@@ -607,19 +600,18 @@ def _load_status_response_cache_state() -> dict[str, object] | None:
 
 
 def _status_source_fingerprint(selected_date: str) -> str:
-    try:
-        worker_state = intelligence_state_status(force_refresh=True)
-    except Exception:
-        worker_state = {}
+    worker_state = read_latest_intelligence_state({"date": selected_date})
     if isinstance(worker_state, dict):
-        fingerprint = str(worker_state.get("latestSourceFingerprint") or "").strip()
+        fingerprint = str(worker_state.get("latestSourceFingerprint") or worker_state.get("sourceFingerprint") or "").strip()
         if fingerprint:
             return fingerprint
     return _response_hash({"selected_date": str(selected_date or "").strip()})
 
 
 def _cached_intelligence_status(selected_date: str, *, force_refresh: bool = False, cache_ttl_seconds: int = 60) -> dict[str, object]:
-    return build_intelligence_status(selected_date=selected_date)
+    _ = force_refresh
+    _ = cache_ttl_seconds
+    return read_latest_intelligence_state({"date": selected_date})
 
 
 def _number_value(value: object) -> float | None:
@@ -815,7 +807,23 @@ def _empty_default_intelligence_response() -> dict[str, object]:
             **empty_analysis,
             "top_opportunities": [],
         },
+        "board_contract": {
+            "schema": "intelligence_board_v1",
+            "top_overall": [],
+            "by_sport": {},
+            "live": [],
+            "pregame": [],
+            "portfolio": {},
+            "parlays": [],
+        },
     }
+
+
+def read_latest_intelligence_state(payload: dict[str, object] | None = None) -> dict[str, object]:
+    snapshot = read_latest_intelligence_state_response(payload, force_refresh=False)
+    if isinstance(snapshot, dict) and _response_has_content(snapshot):
+        return dict(snapshot)
+    return _empty_default_intelligence_response()
 
 
 @intelligence_bp.get("/intelligence")
@@ -848,56 +856,26 @@ def intelligence_query_api():
         response = jsonify({"ok": False, "error": "question is required."})
         response.status_code = 400
         return _no_cache_response(response)
-    user_profile = _normalize_user_profile(payload)
-    selected_date = str(payload.get("date") or payload.get("selected_date") or "").strip() or None
-
-    state_payload = read_intelligence_state()
-    debug_source = "persisted_state"
-    if not isinstance(state_payload, dict) or not _response_has_content(state_payload):
-        print("COMPUTE RUN")
-        state_payload = compute_intelligence_state_response(dict(payload))
-        candidate_count = len((state_payload or {}).get("top_opportunities") or []) if isinstance(state_payload, dict) else 0
-        if not isinstance(state_payload, dict):
-            state_payload = {}
-        state_payload["candidate_count"] = candidate_count
-        written_state = write_intelligence_state(state_payload)
-        print(f"STATE WRITTEN: {candidate_count}")
-        if isinstance(written_state, dict):
-            state_payload = dict(written_state)
-        debug_source = "render_compute"
-
-    response_payload: dict[str, object] = _hydrate_board_response_payload(dict(state_payload))
-
-    board_headline = _board_headline_for_question(question, response_payload)
-    parsed_request = _parsed_request_for_question(question, payload)
-    if board_headline:
-        response_payload = dict(response_payload)
-        response_payload["headline"] = board_headline
-        if parsed_request:
-            response_payload["parsed_request"] = dict(parsed_request)
-        nested_response = response_payload.get("response")
-        if isinstance(nested_response, dict):
-            nested_response = dict(nested_response)
-            nested_response.setdefault("headline", board_headline)
-            if parsed_request:
-                nested_response["parsed_request"] = dict(parsed_request)
-            response_payload["response"] = nested_response
-    if "response" not in response_payload:
-        response_payload["response"] = dict(response_payload)
-
-    response = _apply_user_profile_to_response(dict(response_payload), user_profile)
-    response = dict(response)
-    if "response" not in response:
-        response["response"] = dict(response)
-    existing_board_contract = response.get("board_contract") if isinstance(response.get("board_contract"), dict) else None
-    if isinstance(existing_board_contract, dict) and str(existing_board_contract.get("schema") or "").strip() == "intelligence_board_v1":
-        response["board_contract"] = dict(existing_board_contract)
-    else:
-        response["board_contract"] = build_intelligence_board_contract(response)
+    state_payload = read_latest_intelligence_state(dict(payload)) or _empty_default_intelligence_response()
+    response = dict(state_payload)
+    response.setdefault("ok", True)
+    response.setdefault("response", dict(response))
+    response.setdefault(
+        "board_contract",
+        {
+            "schema": "intelligence_board_v1",
+            "top_overall": [],
+            "by_sport": {},
+            "live": [],
+            "pregame": [],
+            "portfolio": {},
+            "parlays": [],
+        },
+    )
     _attach_intelligence_response_aliases(response)
     LAST_RESULT = dict(response.get("response") or response.get("analysis") or {})
     versioned_response = _versioned_query_response(response)
-    versioned_response.update(_debug_state_fields(response, source=debug_source))
+    versioned_response.update(_debug_state_fields(response, source="snapshot_read"))
     return _no_cache_response(jsonify(versioned_response))
 
 
@@ -967,48 +945,19 @@ def run_intelligence():
 def intelligence_status_api():
     try:
         selected_date = str(request.args.get("date") or "").strip() or central_today_iso()
-        force_refresh = str(request.args.get("refresh") or request.args.get("force_refresh") or "").strip().lower() in {"1", "true", "yes", "on"}
-        status = _cached_intelligence_status(selected_date, force_refresh=force_refresh)
+        _ = str(request.args.get("refresh") or request.args.get("force_refresh") or "").strip().lower() in {"1", "true", "yes", "on"}
+        status = read_latest_intelligence_state({"date": selected_date})
         _log_api_state_read(status if isinstance(status, dict) else {})
-        state_snapshot: dict[str, Any] | None = None
-        debug_source = "worker"
-        if _render_hosted_request():
-            cached_board_response, board_source = _cached_intelligence_response_with_source(
-                _intelligence_page_payload(selected_date)
-            )
-            if _response_has_content(cached_board_response):
-                status["candidate_count"] = _status_candidate_count_from_response(cached_board_response)
-                status["debug_source"] = board_source
     except Exception as exc:
         return _api_error_response(exc)
-    page_payload = _intelligence_page_payload(selected_date)
-    if state_snapshot is None:
-        if _render_hosted_request():
-            state_snapshot, debug_source = _cached_intelligence_response_with_source(page_payload)
-            if state_snapshot is None or not _response_has_content(state_snapshot) or _response_needs_refresh(page_payload, state_snapshot):
-                computed_state = compute_intelligence_state_response(dict(page_payload))
-                if isinstance(computed_state, dict):
-                    state_snapshot = computed_state
-                    debug_source = "render_compute"
-            if not isinstance(state_snapshot, dict):
-                state_snapshot = read_latest_intelligence_state_response(page_payload, force_refresh=True)
-                if isinstance(state_snapshot, dict):
-                    debug_source = "worker"
-            if not debug_source:
-                debug_source = "worker" if isinstance(state_snapshot, dict) else "fallback"
-        else:
-            state_snapshot = read_latest_intelligence_state_response(page_payload, force_refresh=True)
-            debug_source = "worker" if isinstance(state_snapshot, dict) else "fallback"
-    if isinstance(state_snapshot, dict) and _response_has_content(state_snapshot):
-        status["candidate_count"] = _status_candidate_count_from_response(state_snapshot)
-        status["debug_source"] = debug_source
-    response_payload = {"ok": True, "status": status}
-    if isinstance(status, dict):
+    state_snapshot = dict(status) if isinstance(status, dict) and _response_has_content(status) else _empty_default_intelligence_response()
+    response_payload = {"ok": True, "status": state_snapshot}
+    if isinstance(status, dict) and _response_has_content(status):
         for key, value in status.items():
             if key == "ok":
                 continue
             response_payload[key] = value
-    response_payload.update(_debug_state_fields(state_snapshot if isinstance(state_snapshot, dict) else {}, source=debug_source))
+    response_payload.update(_debug_state_fields(state_snapshot, source="snapshot_read"))
     return _no_cache_response(jsonify(response_payload))
 
 

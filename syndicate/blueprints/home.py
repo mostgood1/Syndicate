@@ -2509,9 +2509,9 @@ def _load_home_game_items(
         return [], len(home_games)
     try:
         if slug == "mlb":
-            from syndicate.features.mlb.live_lens import build_live_lens_page_context
+            from syndicate.features.mlb.live_lens import read_latest_live_lens_page_context
 
-            live_games = list(build_live_lens_page_context(context_label).get("games") or [])
+            live_games = list(read_latest_live_lens_page_context(context_label).get("games") or [])
             if live_games:
                 live_games = _apply_mlb_live_scores(live_games, context_label)
             if live_games:
@@ -3316,9 +3316,9 @@ def _load_home_live_prop_items(
         return []
     try:
         if slug == "mlb":
-            from syndicate.features.mlb.live_lens import build_live_lens_page_context
+            from syndicate.features.mlb.live_lens import read_latest_live_lens_page_context
 
-            live_games = list(build_live_lens_page_context(context_label, persist=True).get("games") or [])
+            live_games = list(read_latest_live_lens_page_context(context_label).get("games") or [])
             live_games = [game for game in live_games if isinstance(game, dict)]
             if not live_games:
                 return []

@@ -61,22 +61,20 @@ Entry point:
 Call flow:
 - `ask_the_syndicate_query_api()` validates input and routes the question with `_QUERY_ROUTER.route()`
 - `_smart_route_payload()` adds inferred sport/context hints
-- If possible, `_build_artifact_response()` calls `run_intelligence_query()` directly
-- If artifact state is available, `_build_fast_state_result()` reads `read_latest_intelligence_state_response()` and builds a board contract
-- If neither path resolves, the route falls back to `handle_bet_analysis()`, `handle_matchup_analysis()`, or `handle_market_summary()`
-- Those handlers call `_build_route_payload()`
-- `_build_route_payload()` calls `run_routed_intelligence_pipeline()`
+- `_build_fast_state_result()` reads `read_latest_intelligence_state()` and builds the Ask response from the latest snapshot
+- If no snapshot is available, the route returns a safe fallback Ask response with a clear missing-snapshot message
+- The route no longer calls `run_intelligence_query()`, `run_routed_intelligence_pipeline()`, or `run_intelligence_pipeline()`
 
 ### Does Ask trigger computation?
 
-Yes.
+No.
 
-Ask can:
-- run `run_intelligence_query()` synchronously
-- run the routed pipeline synchronously through `run_routed_intelligence_pipeline()` -> `run_intelligence_pipeline()`
-- queue background refreshes through `queue_intelligence_state_refresh()`
+Ask is now a pure consumer of persisted intelligence snapshots:
+- it reads the latest snapshot state
+- it formats the response from that snapshot
+- it returns a safe fallback message when the snapshot is missing
 
-So Ask is both a response surface and a trigger surface.
+So Ask is now a response surface only.
 
 ## Projection logic
 
@@ -114,7 +112,7 @@ Client-side polling:
 
 Background worker loop:
 - [pipeline/intelligence_state.py](../pipeline/intelligence_state.py)
-- `IntelligenceStateService._background_loop()` waits for queued payloads and refreshes snapshots
+- `IntelligenceStateService._background_loop()` waits for queued payloads, runs the routed pipeline, and writes the latest snapshot state
 - `self._interval_seconds` defaults to 30 seconds and is bounded to at least 10 seconds
 
 Render worker loop:

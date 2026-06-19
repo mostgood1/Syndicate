@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from syndicate.features.shared.request_path_guard import warn_if_compute_in_request_path
+
 
 STAT_KEYS = ["pts", "reb", "ast", "threes", "pra"]
 PRED_COLS = {
@@ -76,6 +78,7 @@ def _merge_pred_recon_for_date(*, processed_root: Path, date_str: str):
 
 
 def compute_biases(*, processed_root: Path, anchor_date: str, window_days: int = 7, min_pairs: int = 50) -> dict[str, float]:
+    warn_if_compute_in_request_path("compute_biases")
     import numpy as np
     import pandas as pd
 
@@ -185,6 +188,7 @@ def compute_player_biases(
     shrink_k_by_stat: dict[str, float] | None = None,
     min_pairs_by_stat: dict[str, int] | None = None,
 ):
+    warn_if_compute_in_request_path("compute_player_biases")
     import numpy as np
     import pandas as pd
 

@@ -3813,7 +3813,9 @@ class IntelligenceBlueprintTests(unittest.TestCase):
             }
         ]
 
-        with patch("syndicate.features.mlb.live_lens.build_live_lens_page_context", return_value={"games": live_lens_games}):
+        live_page_context = {"games": live_lens_games, "counts": {"live": 1, "final": 0, "props": 1}}
+
+        with patch("syndicate.features.mlb.live_lens.read_latest_live_lens_page_context", return_value=live_page_context):
             rows = _load_home_live_prop_items(
                 "mlb",
                 context_label="2026-06-05",
@@ -3826,8 +3828,8 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertTrue(rows[0].get("is_live"))
         self.assertEqual(rows[0].get("href"), "/mlb/live-lens?date=2026-06-05")
 
-    def test_mlb_live_prop_rows_fall_back_to_top_props_when_live_payload_has_no_props(self) -> None:
-        from syndicate.blueprints.home import _load_home_live_prop_items
+    def test_mlb_live_prop_rows_do_not_fall_back_to_top_props_when_live_payload_has_no_props(self) -> None:
+        from syndicate.blueprints.home import _load_home_prop_items
 
         live_lens_games = [
             {
@@ -3840,83 +3842,17 @@ class IntelligenceBlueprintTests(unittest.TestCase):
                 "archivedLiveProps": [],
             }
         ]
-        top_props_payload = {
-            "groups": {
-                "pitcher": {
-                    "sections": [
-                        {
-                            "rows": [
-                                {
-                                    "playerName": "Ryan Feltner",
-                                    "ownerId": 663372,
-                                    "headshotUrl": "https://example.com/feltner.png",
-                                    "team": "COL",
-                                    "teamLogoUrl": "https://example.com/col.svg",
-                                    "opponent": "MIL",
-                                    "opponentLogoUrl": "https://example.com/mil.svg",
-                                    "matchup": "MIL @ COL",
-                                    "gamePk": 824350,
-                                    "mean": 5.468,
-                                    "line": 3.5,
-                                    "selection": "over",
-                                    "selectionLabel": "Over",
-                                    "targetLabel": "4+",
-                                    "simProb": 0.821,
-                                    "rawEdge": 0.3446,
-                                    "odds": 100,
-                                    "statLabel": "Strikeouts",
-                                }
-                            ]
-                        }
-                    ]
-                },
-                "hitter": {
-                    "sections": [
-                        {
-                            "rows": [
-                                {
-                                    "playerName": "Javier Sanoja",
-                                    "ownerId": 691594,
-                                    "headshotUrl": "https://example.com/sanoja.png",
-                                    "team": "MIA",
-                                    "teamLogoUrl": "https://example.com/mia.svg",
-                                    "opponent": "TB",
-                                    "opponentLogoUrl": "https://example.com/tb.svg",
-                                    "matchup": "TB @ MIA",
-                                    "gamePk": 823860,
-                                    "mean": 0.0,
-                                    "line": 0.5,
-                                    "selection": "under",
-                                    "selectionLabel": "Under",
-                                    "targetLabel": "0",
-                                    "simProb": 1.0,
-                                    "rawEdge": 0.6339,
-                                    "odds": 156,
-                                    "statLabel": "Hits",
-                                }
-                            ]
-                        }
-                    ]
-                },
-            }
-        }
+        live_page_context = {"games": live_lens_games, "counts": {"live": 1, "final": 0, "props": 0}}
 
-        with patch("syndicate.features.mlb.live_lens.build_live_lens_page_context", return_value={"games": live_lens_games}):
-            with patch("syndicate.blueprints.home.load_json_or_gz_file", return_value=top_props_payload):
-                rows = _load_home_live_prop_items(
-                    "mlb",
-                    context_label="2026-06-05",
-                    home_games=[],
-                    is_active_today=True,
-                )
+        with patch("syndicate.features.mlb.live_lens.read_latest_live_lens_page_context", return_value=live_page_context):
+            rows = _load_home_prop_items(
+                "mlb",
+                context_label="2026-06-05",
+                home_games=[],
+                is_active_today=True,
+            )
 
-        self.assertEqual(len(rows), 2)
-        self.assertEqual(rows[0].get("name"), "Ryan Feltner")
-        self.assertEqual(rows[0].get("heading"), "Pitcher top props")
-        self.assertFalse(rows[0].get("is_live"))
-        self.assertEqual(rows[0].get("href"), "/mlb/pitcher-top-props?date=2026-06-05")
-        self.assertEqual(rows[1].get("name"), "Javier Sanoja")
-        self.assertEqual(rows[1].get("heading"), "Hitter top props")
+        self.assertEqual(rows, [])
 
     def test_mlb_pregame_rows_include_extra_pitcher_props(self) -> None:
         from syndicate.blueprints.home import _pregame_prop_rows_from_mlb_recommendations

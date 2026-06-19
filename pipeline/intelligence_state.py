@@ -181,9 +181,15 @@ def read_intelligence_state() -> dict[str, Any] | None:
 
 
 def write_intelligence_state(state: dict[str, Any]) -> dict[str, Any] | None:
-    normalized = _normalize_intelligence_state_payload(state)
+    return write_latest_intelligence_state(state)
+
+
+def write_latest_intelligence_state(state: Any) -> dict[str, Any] | None:
+    if hasattr(state, "to_dict") and callable(getattr(state, "to_dict")):
+        state = state.to_dict()
+    normalized = _normalize_intelligence_state_payload(state if isinstance(state, dict) else None)
     if not _is_intelligence_state_payload_valid(normalized):
-        print("[INTELLIGENCE STATE WRITE]", {"path": str(INTELLIGENCE_STATE_PATH), "written": False, "candidate_count": 0})
+        logger.info("STATE WRITTEN", extra={"written": False, "candidate_count": 0})
         return None
     daily_paths = _intelligence_state_daily_paths()
     board_snapshot_payload = {
@@ -204,7 +210,7 @@ def write_intelligence_state(state: dict[str, Any]) -> dict[str, Any] | None:
         history_file.write("\n")
     write_json_file(BOARD_SNAPSHOT_PATH, board_snapshot_payload)
     write_json_file(daily_paths["board_snapshot"], board_snapshot_payload)
-    print("[INTELLIGENCE STATE WRITE]", {"path": str(INTELLIGENCE_STATE_PATH), "written": True, "candidate_count": int(normalized.get("candidate_count") or 0)})
+    logger.info("STATE WRITTEN", extra={"written": True, "candidate_count": int(normalized.get("candidate_count") or 0)})
     return normalized
 
 
@@ -255,17 +261,6 @@ def get_latest_intelligence_cached_response(payload: dict[str, Any] | None = Non
 
 def _get_cached_or_latest_response(payload: dict[str, Any] | None = None) -> dict[str, Any] | None:
     return get_latest_intelligence_cached_response(payload)
-
-
-def _log_worker_state_write(state: dict[str, Any]) -> None:
-    print(
-        "[WORKER WRITE]",
-        {
-            "timestamp": _utc_now(),
-            "state_last_updated": state.get("last_updated"),
-            "candidate_count": len(state.get("candidates", [])),
-        },
-    )
 
 
 def _log_stage_timing(stage_name: str, duration_ms: float) -> None:
@@ -1047,7 +1042,6 @@ class IntelligenceStateService:
     def _background_loop(self) -> None:
         while not self._stop.is_set():
             payload_to_process: dict[str, Any] | None = None
-            source_fingerprint: str | None = None
             with self._condition:
                 if not self._pending_keys:
                     for key, watched_payload in list(self._watched_payloads.items()):
@@ -1073,16 +1067,20 @@ class IntelligenceStateService:
                         self._trim_ordered_dict(self._pending_keys, self._max_snapshots)
                         self._condition.wait(timeout=min(1.0, float(self._interval_seconds)))
                     continue
-                selected_date = str(payload_to_process.get("date") or payload_to_process.get("selected_date") or "").strip() or None
-                source_fingerprint = self._source_state_fingerprint(selected_date)
-                candidate_pool = self._build_candidate_pool(selected_date, source_fingerprint)
-                with self._condition:
-                    current_snapshot = self._snapshots.get(_payload_key(payload_to_process))
-                if self._app is not None:
-                    with self._app.app_context():
-                        response = self._compute_response(payload_to_process, force_refresh=False)
+                logger.info("WORKER RUN", extra={"payload_key": _payload_key(payload_to_process)})
+                state = run_routed_intelligence_pipeline(payload_to_process)
+                written_state = write_latest_intelligence_state(state)
+                if written_state is None:
+                    response = {
+                        "ok": False,
+                        "error": "invalid worker state",
+                        "response": {},
+                        "top_opportunities": [],
+                        "by_sport": {},
+                        "analysis": None,
+                    }
                 else:
-                    response = self._compute_response(payload_to_process, force_refresh=False)
+                    response = dict(written_state)
             except Exception as exc:
                 response = {
                     "ok": False,
@@ -1097,12 +1095,8 @@ class IntelligenceStateService:
                 payload=dict(payload_to_process),
                 response=response,
                 computed_at=_utc_now(),
-                source_fingerprint=source_fingerprint or "",
+                source_fingerprint=str(response.get("source_fingerprint") or response.get("latestSourceFingerprint") or "") if isinstance(response, dict) else "",
             )
-            worker_state = {
-                "last_updated": snapshot.computed_at,
-                "candidates": candidate_pool.get("candidates", []) if isinstance(candidate_pool, dict) else [],
-            }
             with self._condition:
                 self._snapshots[snapshot.key] = snapshot
                 self._snapshots.move_to_end(snapshot.key)
@@ -1111,7 +1105,6 @@ class IntelligenceStateService:
                 self._last_run_started_at = run_started_at
                 self._last_run_finished_at = time.time()
                 self._trim_ordered_dict(self._snapshots, self._max_snapshots)
-                _log_worker_state_write(worker_state)
                 self._persist_locked()
                 self._condition.notify_all()
                 self._condition.wait(timeout=self._interval_seconds)
@@ -1334,10 +1327,6 @@ def get_latest_intelligence_state_response(payload: dict[str, Any], *, refresh: 
 
 def get_intelligence_state_response(payload: dict[str, Any], *, refresh: bool = False, wait: bool = True, force_refresh: bool = True) -> dict[str, Any] | None:
     return _INTELLIGENCE_STATE_SERVICE.get_response(payload, refresh=refresh, wait=wait, force_refresh=force_refresh)
-
-
-def compute_intelligence_state_response(payload: dict[str, Any]) -> dict[str, Any]:
-    return _INTELLIGENCE_STATE_SERVICE._compute_response(payload)
 
 
 def read_latest_intelligence_state_response(payload: dict[str, Any] | None = None, *, force_refresh: bool = True) -> dict[str, Any] | None:

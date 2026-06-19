@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from copy import deepcopy
+import math
 import json
 import re
 from datetime import datetime
@@ -23,6 +25,9 @@ try:
 except Exception:  # pragma: no cover - vendor import is best-effort in tests
     _mlb_vendor_client = None
     fetch_game_feed_live = None
+
+
+LIVE_LENS_SNAPSHOT_PATH = Path("/opt/render/project/data/live/mlb_live_lens.json")
 
 
 def _format_signed_num(value: Any) -> str:
@@ -71,6 +76,16 @@ def _append_jsonl(path: Path, payload: Any) -> None:
     with path.open("a", encoding="utf-8") as handle:
         handle.write(json.dumps(payload, ensure_ascii=False))
         handle.write("\n")
+
+
+def _safe_float(value: Any) -> float | None:
+    try:
+        if value is None or str(value).strip() == "":
+            return None
+        number = float(value)
+        return number if math.isfinite(number) else None
+    except Exception:
+        return None
 
 
 def _status_bucket_from_row(row: dict[str, Any]) -> str:
@@ -826,7 +841,7 @@ def _card_to_live_lens_row(card: dict[str, Any], *, report_date: str) -> dict[st
 
 def _cards_backed_live_lens_report(selected_date: str) -> dict[str, Any] | None:
     try:
-        cards_context = build_cards_page_context(selected_date)
+        cards_context = build_cards_page_context(selected_date, allow_request_daily_ladders_refresh=True)
     except Exception:
         return None
 
@@ -887,7 +902,7 @@ def _cards_backed_live_lens_report(selected_date: str) -> dict[str, Any] | None:
 
 def _merge_cards_context_into_report(report: dict[str, Any], selected_date: str) -> dict[str, Any]:
     try:
-        cards_context = build_cards_page_context(selected_date)
+        cards_context = build_cards_page_context(selected_date, allow_request_daily_ladders_refresh=True)
     except Exception:
         return report
 
@@ -976,16 +991,190 @@ def _persist_live_lens_report(selected_date: str) -> dict[str, Any] | None:
     return payload
 
 
-def build_live_lens_page_context(selected_date: str, *, season: int | None = None, persist: bool = False) -> dict[str, Any]:
+def _value_has_non_finite_number(value: Any) -> bool:
+    if isinstance(value, bool) or value is None:
+        return False
+    if isinstance(value, float):
+        return not math.isfinite(value)
+    if isinstance(value, dict):
+        return any(_value_has_non_finite_number(item) for item in value.values())
+    if isinstance(value, list):
+        return any(_value_has_non_finite_number(item) for item in value)
+    if isinstance(value, tuple):
+        return any(_value_has_non_finite_number(item) for item in value)
+    return False
+
+
+def validate_live_lens_snapshot(snapshot: Any) -> bool:
+    if not isinstance(snapshot, dict):
+        return False
+    games = snapshot.get("games")
+    if not isinstance(games, list):
+        return False
+    if len(games) > 50:
+        return False
+    if _value_has_non_finite_number(snapshot):
+        return False
+    return True
+
+
+def _snapshot_games(snapshot: dict[str, Any]) -> list[dict[str, Any]]:
+    games = snapshot.get("games")
+    if not isinstance(games, list):
+        page_context = snapshot.get("page_context") if isinstance(snapshot.get("page_context"), dict) else {}
+        games = page_context.get("games") if isinstance(page_context.get("games"), list) else []
+    return [dict(game) for game in games if isinstance(game, dict)][:50]
+
+
+def _snapshot_counts(games: list[dict[str, Any]]) -> dict[str, int]:
+    return {
+        "archivedLiveProps": sum(len(game.get("archivedLiveProps") or []) for game in games),
+        "final": sum(1 for game in games if _status_bucket_from_row(game) == "final"),
+        "games": len(games),
+        "live": sum(1 for game in games if _status_bucket_from_row(game) == "live"),
+        "pregame": sum(1 for game in games if _status_bucket_from_row(game) == "pregame"),
+        "props": sum(len(game.get("liveProps") or game.get("props") or game.get("trackedProps") or []) for game in games),
+    }
+
+
+def _snapshot_route_context(selected_date: str, *, season: int | None = None, snapshot: dict[str, Any] | None = None) -> dict[str, Any]:
+    route_path = f"/mlb/season/{int(season)}/live-lens" if season is not None else "/mlb/live-lens"
+    report_path = LIVE_LENS_SNAPSHOT_PATH
+    base = dict(snapshot.get("page_context") if isinstance(snapshot, dict) and isinstance(snapshot.get("page_context"), dict) else snapshot or {})
+    games = _snapshot_games(snapshot or {}) if isinstance(snapshot, dict) else []
+    if not base:
+        base = {
+            "season": season,
+            "date": selected_date,
+            "prev_date": selected_date,
+            "next_date": selected_date,
+            "module_links": build_module_links(selected_date, "Live lens"),
+            "games": [],
+            "scoreboard_items": [],
+            "source_path": str(report_path),
+            "using_sample_data": False,
+            "odds_refreshed_at": None,
+            "oddsRefreshedAt": None,
+            "source_title": "MLB live lens unavailable",
+            "generatedAt": datetime.now().astimezone().isoformat(timespec="seconds"),
+            "counts": {"archivedLiveProps": 0, "final": 0, "games": 0, "live": 0, "pregame": 0, "props": 0},
+            "app": {},
+            "dataRoot": str(report_path.parent.parent),
+            "liveLensDir": str(report_path.parent),
+            "optimizationRegime": None,
+            "performance": {},
+            "header_stats": [
+                {"label": "Games", "value": "0"},
+                {"label": "Live", "value": "0"},
+                {"label": "Final", "value": "0"},
+                {"label": "Props", "value": "0"},
+            ],
+            "empty_state": {
+                "eyebrow": "MLB live lens",
+                "title": "No live-lens games were available for this date",
+                "body": "The live-lens snapshot for this date did not surface any tracked games or live props.",
+                "list_items": [f"Requested date: {selected_date}", f"Snapshot artifact: {report_path.name}"],
+            },
+            "route_path": route_path,
+            "intro_title": f"MLB {int(season)} Live Lens" if season is not None else "MLB Live Lens",
+            "intro_body": "The MLB live lens now serves a stored snapshot artifact directly.",
+            "cards_grid_class": "mlb-cards-grid",
+            "cards_stylesheet": "mlb/cards.css",
+            "teaser": {
+                "label": "Related MLB board",
+                "body": "Use the MLB cards board to compare the pregame slate against this live-lens snapshot.",
+                "href": f"/mlb/cards?date={selected_date}",
+                "cta": "Open cards",
+            },
+        }
+    if games:
+        base["games"] = games
+        base["scoreboard_items"] = [
+            {
+                "target_id": f"game-{game.get('gamePk')}",
+                "label": f"{((game.get('away') or {}).get('abbr') or 'AWY')} @ {((game.get('home') or {}).get('abbr') or 'HOM')}",
+                "status": game.get("status"),
+            }
+            for game in games
+        ]
+        base["counts"] = _snapshot_counts(games)
+        base["header_stats"] = [
+            {"label": "Games", "value": str(len(games))},
+            {"label": "Live", "value": str(base["counts"].get("live") or 0)},
+            {"label": "Final", "value": str(base["counts"].get("final") or 0)},
+            {"label": "Props", "value": str(base["counts"].get("props") or 0)},
+        ]
+        base["empty_state"] = None
+        base["source_title"] = str(base.get("source_title") or "MLB live-lens report artifact").strip() or "MLB live-lens report artifact"
+    base["route_path"] = route_path
+    base["api_path"] = f"/mlb/api/season/{int(season)}/live-lens" if season is not None else "/mlb/api/live-lens"
+    base["form_action"] = route_path
+    base["show_app_header"] = False
+    base["page_body_class"] = "cards-body syndicate-mlb-live-lens-page" + (" syndicate-mlb-live-lens-page--season" if season is not None else "")
+    base["page_shell_class"] = "syndicate-mlb-live-lens-shell"
+    return attach_live_lens_contract(apply_game_board_contract(base, sport="mlb", module="live_lens"), sport="mlb", module="live_lens")
+
+
+def _snapshot_api_payload(selected_date: str, *, season: int | None = None, snapshot: dict[str, Any] | None = None) -> dict[str, Any]:
+    page_context = _snapshot_route_context(selected_date, season=season, snapshot=snapshot)
+    games = _snapshot_games(snapshot or {}) if isinstance(snapshot, dict) else []
+    counts = dict(page_context.get("counts") or {})
+    refreshed_at = page_context.get("odds_refreshed_at") or page_context.get("oddsRefreshedAt") or page_context.get("generatedAt")
+    return {
+        "date": page_context.get("date") or selected_date,
+        "requested_date": page_context.get("requested_date", page_context.get("date", selected_date)),
+        "season": page_context.get("season", season),
+        "games": games,
+        "counts": counts,
+        "generatedAt": page_context.get("generatedAt"),
+        "odds_refreshed_at": refreshed_at,
+        "oddsRefreshedAt": refreshed_at,
+        "dataRoot": page_context.get("dataRoot"),
+        "liveLensDir": page_context.get("liveLensDir"),
+        "source_path": page_context.get("source_path"),
+        "source_title": page_context.get("source_title"),
+        "using_sample_data": bool(page_context.get("using_sample_data", False)),
+    }
+
+
+def read_latest_live_lens_snapshot() -> dict[str, Any] | None:
+    snapshot = load_json_file(LIVE_LENS_SNAPSHOT_PATH)
+    return dict(snapshot) if isinstance(snapshot, dict) else None
+
+
+def read_latest_live_lens_page_context(selected_date: str, *, season: int | None = None) -> dict[str, Any]:
+    snapshot = read_latest_live_lens_snapshot()
+    if snapshot is None:
+        return _snapshot_route_context(selected_date, season=season, snapshot=None)
+    return _snapshot_route_context(selected_date, season=season, snapshot=snapshot)
+
+
+def read_latest_live_lens_api_payload(selected_date: str, *, season: int | None = None) -> dict[str, Any]:
+    snapshot = read_latest_live_lens_snapshot()
+    if snapshot is None:
+        return _snapshot_api_payload(selected_date, season=season, snapshot=None)
+    api_payload = snapshot.get("api_payload") if isinstance(snapshot.get("api_payload"), dict) else None
+    if api_payload is None:
+        return _snapshot_api_payload(selected_date, season=season, snapshot=snapshot)
+    payload = dict(api_payload)
+    payload.setdefault("date", selected_date)
+    payload.setdefault("requested_date", selected_date)
+    payload.setdefault("season", season)
+    payload.setdefault("games", [])
+    payload.setdefault("counts", {})
+    payload.setdefault("using_sample_data", False)
+    return payload
+
+
+def build_live_lens_snapshot_internal(selected_date: str, *, season: int | None = None, persist: bool = False) -> dict[str, Any]:
+    # Worker-only compute function
     parsed_date = parse_iso_date(selected_date)
     prev_date = parsed_date.fromordinal(parsed_date.toordinal() - 1).isoformat()
     next_date = parsed_date.fromordinal(parsed_date.toordinal() + 1).isoformat()
 
     report_path = live_lens_report_path(selected_date)
-    report = _persist_live_lens_report(selected_date) if persist else None
-    if not isinstance(report, dict):
-        report = load_json_file(report_path)
-    if (not isinstance(report, dict)) or not isinstance(report.get("games"), list) or not report.get("games"):
+    report = _persist_live_lens_report(selected_date) if persist else load_json_file(report_path)
+    if not isinstance(report, dict) or not isinstance(report.get("games"), list) or not report.get("games"):
         fallback_report = _cards_backed_live_lens_report(selected_date)
         if fallback_report is not None:
             report = fallback_report
@@ -993,42 +1182,36 @@ def build_live_lens_page_context(selected_date: str, *, season: int | None = Non
         merged_report = _merge_cards_context_into_report(report, selected_date)
         if isinstance(merged_report, dict):
             report = merged_report
+    if not persist and isinstance(report, dict) and str(report.get("source_title") or "").strip() == "MLB Game Cards":
+        refreshed_report = _persist_live_lens_report(selected_date)
+        if isinstance(refreshed_report, dict):
+            report = refreshed_report
     runtime_live_lens_dir = str(report_path.parent)
     runtime_data_root = str(report_path.parent.parent)
-    current_odds_refreshed_at = datetime.now().astimezone().isoformat(timespec="seconds")
-    rows = (report or {}).get("games") if isinstance((report or {}).get("games"), list) else []
-    odds_refreshed_at = current_odds_refreshed_at if persist or bool(rows) else None
     generated_at = str((report or {}).get("generatedAt") or datetime.now().astimezone().isoformat(timespec="seconds")).strip() or selected_date
+    rows = (report or {}).get("games") if isinstance((report or {}).get("games"), list) else []
     games = [_game_from_report_row(row, report_date=selected_date, generated_at=generated_at) for row in rows if isinstance(row, dict)]
-    if odds_refreshed_at:
-        games = [
-            {
-                **game,
-                "oddsRefreshedAt": odds_refreshed_at,
-                "odds_refreshed_at": odds_refreshed_at,
-            }
-            for game in games
-            if isinstance(game, dict)
-        ]
+    if games:
+        games = [dict(game) for game in games if isinstance(game, dict)][:50]
+    persisted_counts = {
+        "games": len(games),
+        "live": sum(1 for game in games if _status_bucket_from_row(game) == "live"),
+        "final": sum(1 for game in games if _status_bucket_from_row(game) == "final"),
+        "pregame": sum(1 for game in games if _status_bucket_from_row(game) == "pregame"),
+        "props": sum(len(game.get("liveProps") or game.get("props") or game.get("trackedProps") or []) for game in games),
+        "archivedLiveProps": 0,
+    }
     if persist and games:
         persisted_games = [dict(game) for game in games if isinstance(game, dict)]
-        persisted_counts = {
-            "games": len(persisted_games),
-            "live": sum(1 for game in persisted_games if _status_bucket_from_row(game) == "live"),
-            "final": sum(1 for game in persisted_games if _status_bucket_from_row(game) == "final"),
-            "pregame": sum(1 for game in persisted_games if _status_bucket_from_row(game) == "pregame"),
-            "props": sum(len(game.get("liveProps") or game.get("props") or game.get("trackedProps") or []) for game in persisted_games),
-            "archivedLiveProps": 0,
-        }
         persisted_report = dict(report or {})
         persisted_report.update({
             "date": str(selected_date),
             "generatedAt": generated_at,
-            "oddsRefreshedAt": odds_refreshed_at,
-            "odds_refreshed_at": odds_refreshed_at,
+            "oddsRefreshedAt": persisted_report.get("oddsRefreshedAt") or persisted_report.get("odds_refreshed_at"),
+            "odds_refreshed_at": persisted_report.get("oddsRefreshedAt") or persisted_report.get("odds_refreshed_at"),
             "dataRoot": runtime_data_root,
             "liveLensDir": runtime_live_lens_dir,
-            "counts": persisted_counts,
+            "counts": dict(persisted_counts),
             "games": persisted_games,
             "source_title": str((persisted_report.get("source_title") or "MLB live-lens report artifact")).strip() or "MLB live-lens report artifact",
             "source_path": str(report_path),
@@ -1039,64 +1222,39 @@ def build_live_lens_page_context(selected_date: str, *, season: int | None = Non
             report = persisted_report
         except Exception:
             pass
-    if odds_refreshed_at:
-        if not isinstance(report, dict):
-            report = {}
-        report["oddsRefreshedAt"] = odds_refreshed_at
-        report["odds_refreshed_at"] = odds_refreshed_at
-    using_sample_data = False
-    scoreboard_items = [
-        {
-            "target_id": f"game-{game.get('gamePk')}",
-            "label": f"{((game.get('away') or {}).get('abbr') or 'AWY')} @ {((game.get('home') or {}).get('abbr') or 'HOM')}",
-            "status": game.get("status"),
-        }
-        for game in games
-        if isinstance(game, dict)
-    ]
-
-    counts = {
-        "archivedLiveProps": int(((report or {}).get("counts") or {}).get("archivedLiveProps") or 0) if isinstance((report or {}).get("counts"), dict) else 0,
-        "final": sum(1 for game in games if _status_bucket_from_row(game) == "final"),
-        "games": len(games),
-        "live": sum(1 for game in games if _status_bucket_from_row(game) == "live"),
-        "pregame": sum(1 for game in games if _status_bucket_from_row(game) == "pregame"),
-        "props": sum(len(game.get("liveProps") or game.get("props") or game.get("trackedProps") or []) for game in games),
-    }
-    route_path = f"/mlb/season/{int(season)}/live-lens" if season is not None else "/mlb/live-lens"
-    intro_title = f"MLB {int(season)} Live Lens" if season is not None else "MLB Live Lens"
-    intro_body = (
-        "This first Syndicate live-lens pass reads the committed MLB live-lens report artifact and turns each game snapshot into the shared game-card surface, instead of leaving the old MLB live monitor outside the migration path."
-    )
-    teaser_href = f"/mlb/season/{int(season)}/betting-card?date={selected_date}" if season is not None else f"/mlb/cards?date={selected_date}"
-    teaser_cta = "Open betting card" if season is not None else "Open cards"
-    teaser_body = "Use the betting-card board for the official pregame slate, then compare it against the intraday live-lens monitor for the same date." if season is not None else "Use the MLB cards board to compare the pregame slate against this live-lens snapshot."
-
-    context = apply_game_board_contract({
+    page_context = apply_game_board_contract({
         "season": season,
         "date": selected_date,
         "prev_date": prev_date,
         "next_date": next_date,
         "module_links": build_module_links(selected_date, "Live lens"),
         "games": games,
-        "scoreboard_items": scoreboard_items,
+        "scoreboard_items": [
+            {
+                "target_id": f"game-{game.get('gamePk')}",
+                "label": f"{((game.get('away') or {}).get('abbr') or 'AWY')} @ {((game.get('home') or {}).get('abbr') or 'HOM')}",
+                "status": game.get("status"),
+            }
+            for game in games
+            if isinstance(game, dict)
+        ],
         "source_path": str(report_path),
-        "using_sample_data": using_sample_data,
-        "odds_refreshed_at": odds_refreshed_at,
-        "oddsRefreshedAt": odds_refreshed_at,
+        "using_sample_data": False,
+        "odds_refreshed_at": (report or {}).get("oddsRefreshedAt") or (report or {}).get("odds_refreshed_at"),
+        "oddsRefreshedAt": (report or {}).get("oddsRefreshedAt") or (report or {}).get("odds_refreshed_at"),
         "source_title": "MLB live-lens report artifact" if games else "MLB live lens unavailable",
         "generatedAt": generated_at,
-        "counts": counts,
+        "counts": persisted_counts,
         "app": (report or {}).get("app") if isinstance((report or {}).get("app"), dict) else {},
         "dataRoot": runtime_data_root,
         "liveLensDir": runtime_live_lens_dir,
         "optimizationRegime": (report or {}).get("optimizationRegime"),
         "performance": (report or {}).get("performance") if isinstance((report or {}).get("performance"), dict) else {},
         "header_stats": [
-            {"label": "Games", "value": str(counts.get("games") or len(games))},
-            {"label": "Live", "value": str(counts.get("live") or 0)},
-            {"label": "Final", "value": str(counts.get("final") or 0)},
-            {"label": "Props", "value": str(counts.get("props") or 0)},
+            {"label": "Games", "value": str(persisted_counts.get("games") or len(games))},
+            {"label": "Live", "value": str(persisted_counts.get("live") or 0)},
+            {"label": "Final", "value": str(persisted_counts.get("final") or 0)},
+            {"label": "Props", "value": str(persisted_counts.get("props") or 0)},
         ],
         "empty_state": {
             "eyebrow": "MLB live lens",
@@ -1107,35 +1265,47 @@ def build_live_lens_page_context(selected_date: str, *, season: int | None = Non
                 f"Report artifact: {report_path.name}",
             ],
         } if not games else None,
-        "route_path": route_path,
-        "intro_title": intro_title,
-        "intro_body": intro_body,
+        "route_path": f"/mlb/season/{int(season)}/live-lens" if season is not None else "/mlb/live-lens",
+        "intro_title": f"MLB {int(season)} Live Lens" if season is not None else "MLB Live Lens",
+        "intro_body": (
+            "This first Syndicate live-lens pass reads the committed MLB live-lens report artifact and turns each game snapshot into the shared game-card surface, instead of leaving the old MLB live monitor outside the migration path."
+        ),
         "cards_grid_class": "mlb-cards-grid",
         "cards_stylesheet": "mlb/cards.css",
         "teaser": {
             "label": "Related MLB board",
-            "body": teaser_body,
-            "href": teaser_href,
-            "cta": teaser_cta,
+            "body": "Use the MLB cards board to compare the pregame slate against this live-lens snapshot.",
+            "href": f"/mlb/cards?date={selected_date}",
+            "cta": "Open cards",
         },
     }, sport="mlb", module="live_lens")
-    return attach_live_lens_contract(context, sport="mlb", module="live_lens")
-
-
-def build_live_lens_api_payload(context: dict[str, Any]) -> dict[str, Any]:
-    refreshed_at = context.get("odds_refreshed_at") or context.get("oddsRefreshedAt") or context.get("generatedAt")
-    return {
-        "date": context.get("date"),
-        "requested_date": context.get("requested_date", context.get("date")),
-        "season": context.get("season"),
-        "games": context.get("games") if isinstance(context.get("games"), list) else [],
-        "counts": context.get("counts") if isinstance(context.get("counts"), dict) else {},
-        "generatedAt": context.get("generatedAt"),
-        "odds_refreshed_at": refreshed_at,
-        "oddsRefreshedAt": refreshed_at,
-        "dataRoot": context.get("dataRoot"),
-        "liveLensDir": context.get("liveLensDir"),
-        "source_path": context.get("source_path"),
-        "source_title": context.get("source_title"),
-        "using_sample_data": bool(context.get("using_sample_data", False)),
+    page_context = attach_live_lens_contract(page_context, sport="mlb", module="live_lens")
+    games = [dict(game) for game in (page_context.get("games") if isinstance(page_context.get("games"), list) else []) if isinstance(game, dict)][:50]
+    page_context = dict(page_context)
+    page_context["games"] = games
+    page_context["scoreboard_items"] = [dict(item) for item in (page_context.get("scoreboard_items") if isinstance(page_context.get("scoreboard_items"), list) else []) if isinstance(item, dict)][:50]
+    page_context["counts"] = _snapshot_counts(games)
+    page_context["header_stats"] = [
+        {"label": "Games", "value": str(len(games))},
+        {"label": "Live", "value": str(page_context["counts"].get("live") or 0)},
+        {"label": "Final", "value": str(page_context["counts"].get("final") or 0)},
+        {"label": "Props", "value": str(page_context["counts"].get("props") or 0)},
+    ]
+    api_payload = _snapshot_api_payload(selected_date, season=season, snapshot={"games": games, "page_context": page_context})
+    snapshot = {
+        "ok": True,
+        "date": page_context.get("date") or selected_date,
+        "requested_date": selected_date,
+        "generatedAt": page_context.get("generatedAt") or datetime.now().astimezone().isoformat(timespec="seconds"),
+        "odds_refreshed_at": page_context.get("odds_refreshed_at") or page_context.get("oddsRefreshedAt"),
+        "source_path": page_context.get("source_path") or str(LIVE_LENS_SNAPSHOT_PATH),
+        "page_context": page_context,
+        "api_payload": api_payload,
+        "games": games,
+        "scoreboard_items": [dict(item) for item in (page_context.get("scoreboard_items") if isinstance(page_context.get("scoreboard_items"), list) else []) if isinstance(item, dict)][:50],
+        "counts": dict(page_context.get("counts") or {}),
+        "source_title": page_context.get("source_title"),
+        "dataRoot": page_context.get("dataRoot"),
+        "liveLensDir": page_context.get("liveLensDir"),
     }
+    return snapshot

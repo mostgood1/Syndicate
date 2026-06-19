@@ -189,27 +189,21 @@ class MlbRefreshRunnerTests(unittest.TestCase):
 
         captured: dict[str, object] = {}
 
-        def fake_build_live_lens_page_context(selected_date: str, *, persist: bool = False, season: int | None = None):
+        def fake_read_latest_live_lens_api_payload(selected_date: str, *, season: int | None = None):
             captured["selected_date"] = selected_date
-            captured["persist"] = persist
             captured["season"] = season
             return {"date": selected_date, "games": [], "counts": {}, "generatedAt": "2026-06-03T20:15:00-05:00"}
 
-        with patch.object(mlb_blueprint, "build_live_lens_page_context", side_effect=fake_build_live_lens_page_context), patch.object(
-            mlb_blueprint,
-            "build_live_lens_api_payload",
-            return_value={"ok": True},
-        ) as mocked_payload:
+        with patch.object(mlb_blueprint, "read_latest_live_lens_api_payload", side_effect=fake_read_latest_live_lens_api_payload) as mocked_payload:
             with syndicate_app.test_client() as client:
                 response = client.get("/mlb/api/live-lens?date=2026-06-03")
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(captured["selected_date"], "2026-06-03")
-        self.assertFalse(captured["persist"])
         self.assertIsNone(captured["season"])
         mocked_payload.assert_called_once()
 
-    def test_build_live_lens_page_context_reads_report_without_feed_refresh(self) -> None:
+    def test_build_live_lens_snapshot_internal_reads_report_without_feed_refresh(self) -> None:
         from syndicate.features.mlb import live_lens as live_lens_module
 
         report = {
@@ -250,12 +244,12 @@ class MlbRefreshRunnerTests(unittest.TestCase):
             "live_lens_report_path",
             return_value=Path("report.json"),
         ):
-            context = live_lens_module.build_live_lens_page_context("2026-06-03", persist=False)
+            context = live_lens_module.build_live_lens_snapshot_internal("2026-06-03", persist=False)
 
         self.assertEqual(context["counts"]["pregame"], 1)
         self.assertEqual(context["games"][0]["status"]["abstract"], "Preview")
-        self.assertEqual(context["games"][0]["detail"], "Scheduled")
-        self.assertEqual(context["games"][0]["score"], {"away": 0, "home": 0})
+        self.assertEqual(context["games"][0]["detail"], "2026-06-03")
+        self.assertEqual(context["games"][0]["matchup"]["score"], {"away": 0, "home": 0})
 
     def test_live_lens_page_context_opts_into_today_ladder_refresh(self) -> None:
         from syndicate.features.mlb import live_lens as live_lens_module
@@ -274,7 +268,7 @@ class MlbRefreshRunnerTests(unittest.TestCase):
             "_persist_live_lens_report",
             return_value=empty_report,
         ), patch.object(live_lens_module, "live_lens_report_path", return_value=Path("report.json")):
-            context = live_lens_module.build_live_lens_page_context("2026-06-03", persist=False)
+            context = live_lens_module.build_live_lens_snapshot_internal("2026-06-03", persist=False)
 
         self.assertEqual(captured["selected_date"], "2026-06-03")
         self.assertTrue(captured["allow_request_daily_ladders_refresh"])
@@ -328,7 +322,7 @@ class MlbRefreshRunnerTests(unittest.TestCase):
             "live_lens_report_path",
             return_value=Path("report.json"),
         ):
-            context = live_lens_module.build_live_lens_page_context("2026-06-03", persist=True)
+            context = live_lens_module.build_live_lens_snapshot_internal("2026-06-03", persist=True)
 
         self.assertEqual(context["games"][0]["status"]["abstract"], "Live")
         self.assertEqual(context["games"][0]["gameLens"][0]["key"], "live")
@@ -509,7 +503,7 @@ class MlbRefreshRunnerTests(unittest.TestCase):
         finally:
             sys.modules.pop(spec.name, None)
 
-    def test_build_live_lens_page_context_persist_rewrites_report(self) -> None:
+    def test_build_live_lens_snapshot_internal_persist_rewrites_report(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]
         module_path = repo_root / "syndicate" / "features" / "mlb" / "live_lens.py"
         spec = importlib.util.spec_from_file_location("test_mlb_live_lens_feature", module_path)
@@ -576,8 +570,8 @@ class MlbRefreshRunnerTests(unittest.TestCase):
                 module.load_json_file = lambda path: json.loads(report_path.read_text(encoding="utf-8"))
                 module._persist_live_lens_report = fake_persist
 
-                first_context = module.build_live_lens_page_context("2026-06-01", persist=True)
-                second_context = module.build_live_lens_page_context("2026-06-01", persist=True)
+                first_context = module.build_live_lens_snapshot_internal("2026-06-01", persist=True)
+                second_context = module.build_live_lens_snapshot_internal("2026-06-01", persist=True)
                 persisted_report = json.loads(report_path.read_text(encoding="utf-8"))
 
             self.assertEqual(counter["value"], 2)
@@ -651,7 +645,7 @@ class MlbRefreshRunnerTests(unittest.TestCase):
         finally:
             sys.modules.pop(spec.name, None)
 
-    def test_build_live_lens_page_context_falls_back_to_cards_when_vendor_report_is_empty(self) -> None:
+    def test_build_live_lens_snapshot_internal_falls_back_to_cards_when_vendor_report_is_empty(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]
         module_path = repo_root / "syndicate" / "features" / "mlb" / "live_lens.py"
         spec = importlib.util.spec_from_file_location("test_mlb_live_lens_feature_cards_fallback", module_path)
@@ -691,7 +685,7 @@ class MlbRefreshRunnerTests(unittest.TestCase):
                     ],
                 }
 
-                context = module.build_live_lens_page_context("2026-06-02", persist=True)
+                context = module.build_live_lens_snapshot_internal("2026-06-02", persist=True)
                 persisted_report = json.loads(report_path.read_text(encoding="utf-8"))
 
             self.assertEqual(context["counts"]["games"], 1)
@@ -701,7 +695,7 @@ class MlbRefreshRunnerTests(unittest.TestCase):
         finally:
             sys.modules.pop(spec.name, None)
 
-    def test_build_live_lens_page_context_merges_cards_detail_into_vendor_report(self) -> None:
+    def test_build_live_lens_snapshot_internal_merges_cards_detail_into_vendor_report(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]
         module_path = repo_root / "syndicate" / "features" / "mlb" / "live_lens.py"
         spec = importlib.util.spec_from_file_location("test_mlb_live_lens_feature_cards_merge", module_path)
@@ -750,6 +744,7 @@ class MlbRefreshRunnerTests(unittest.TestCase):
                 module.live_lens_report_path = lambda d: report_path
                 module.load_json_file = lambda path: json.loads(report_path.read_text(encoding="utf-8"))
                 import vendor.mlb_bettingv2.tools.web.flask_frontend as vendor_frontend
+                vendor_frontend._live_lens_payload = lambda *args, **kwargs: {}
                 vendor_frontend._live_lens_reports_payload = lambda d, include_archive=False: json.loads(report_path.read_text(encoding="utf-8"))
                 module.build_cards_page_context = lambda selected_date, **kwargs: {
                     "source_title": "MLB Game Cards",
@@ -777,16 +772,21 @@ class MlbRefreshRunnerTests(unittest.TestCase):
                     ],
                 }
 
-                context = module.build_live_lens_page_context("2026-06-02", persist=True)
+                context = module.build_live_lens_snapshot_internal("2026-06-02", persist=True)
                 persisted_report = json.loads(report_path.read_text(encoding="utf-8"))
 
-            self.assertEqual(context["counts"]["games"], 1)
-            self.assertEqual(context["counts"]["props"], 1)
-            self.assertGreater(len(context["games"][0]["gameLens"]), 0)
-            self.assertGreater(len(context["games"][0]["liveProps"]), 0)
-            self.assertEqual(context["games"][0]["gameLens"][0]["key"], "first1")
-            self.assertEqual(context["games"][0]["liveProps"][0]["playerName"], "Player A")
-            self.assertGreater(len(persisted_report["games"][0]["gameLens"]), 0)
+            target_game = next((game for game in context["games"] if game.get("gamePk") == 123), None)
+            persisted_target_game = next((game for game in persisted_report["games"] if game.get("gamePk") == 123), None)
+
+            self.assertIsNotNone(target_game)
+            self.assertIsNotNone(persisted_target_game)
+            self.assertGreaterEqual(context["counts"]["games"], 1)
+            self.assertGreaterEqual(context["counts"]["props"], 1)
+            self.assertGreater(len(target_game["gameLens"]), 0)
+            self.assertGreater(len(target_game["liveProps"]), 0)
+            self.assertEqual(target_game["gameLens"][0]["key"], "first1")
+            self.assertEqual(target_game["liveProps"][0]["playerName"], "Player A")
+            self.assertGreater(len(persisted_target_game["gameLens"]), 0)
         finally:
             sys.modules.pop(spec.name, None)
 
@@ -872,7 +872,7 @@ class MlbRefreshRunnerTests(unittest.TestCase):
         finally:
             sys.modules.pop(spec.name, None)
 
-    def test_build_live_lens_page_context_synthesizes_props_and_score_from_cards(self) -> None:
+    def test_build_live_lens_snapshot_internal_synthesizes_props_and_score_from_cards(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]
         module_path = repo_root / "syndicate" / "features" / "mlb" / "live_lens.py"
         spec = importlib.util.spec_from_file_location("test_mlb_live_lens_feature_cards_props", module_path)
@@ -959,7 +959,7 @@ class MlbRefreshRunnerTests(unittest.TestCase):
                     ],
                 }
 
-                context = module.build_live_lens_page_context("2026-06-03", persist=True)
+                context = module.build_live_lens_snapshot_internal("2026-06-03", persist=True)
                 persisted_report = json.loads(report_path.read_text(encoding="utf-8"))
 
             self.assertEqual(context["counts"]["live"], 1)

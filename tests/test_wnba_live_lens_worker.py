@@ -1,0 +1,72 @@
+from __future__ import annotations
+
+import unittest
+from unittest.mock import patch
+
+from syndicate.features.wnba.live_lens import build_live_lens_snapshot
+from syndicate.features.wnba.live_lens import validate_live_lens_snapshot
+
+
+class WnbaLiveLensWorkerTests(unittest.TestCase):
+    def test_snapshot_builder_limits_rank_cards_to_fifty(self) -> None:
+        games = []
+        for index in range(55):
+            games.append(
+                {
+                    "event_id": f"evt-{index}",
+                    "status": "Live",
+                    "detail": f"Q{index % 4 + 1} 05:12",
+                    "summary": f"Summary {index}",
+                    "away": {"abbr": "LAS", "score": index},
+                    "home": {"abbr": "NYL", "score": index + 1},
+                    "betting": {"total": 150.5},
+                    "shared_top_play_rows": [],
+                    "shared_prop_rows": [],
+                }
+            )
+
+        cards_context = {
+            "date": "2026-06-19",
+            "requested_date": "2026-06-19",
+            "games": games,
+            "source_path": "wnba_cards.csv",
+        }
+        live_lines_payload = {"games": [{"event_id": f"evt-{index}", "lines": {"total": 151.5}} for index in range(55)]}
+
+        with patch("syndicate.features.wnba.live_lens.build_cards_page_context", return_value=cards_context), patch(
+            "syndicate.features.wnba.live_lens.build_live_lines_payload", return_value=live_lines_payload
+        ):
+            snapshot = build_live_lens_snapshot("2026-06-19")
+
+        self.assertEqual(len(snapshot.get("rank_cards") or []), 50)
+        self.assertEqual((snapshot.get("api_payload") or {}).get("date"), "2026-06-19")
+        self.assertEqual((snapshot.get("api_payload") or {}).get("rank_cards") and len(snapshot["api_payload"]["rank_cards"]), 50)
+
+    def test_snapshot_builder_returns_safe_empty_board_when_cards_are_missing(self) -> None:
+        with patch("syndicate.features.wnba.live_lens.build_cards_page_context", side_effect=RuntimeError("boom")):
+            snapshot = build_live_lens_snapshot("2026-06-19")
+
+        self.assertEqual(snapshot.get("date"), "2026-06-19")
+        self.assertEqual(snapshot.get("rank_cards"), [])
+        self.assertEqual((snapshot.get("empty_state") or {}).get("eyebrow"), "WNBA live lens")
+        self.assertEqual((snapshot.get("api_payload") or {}).get("rank_cards"), [])
+
+    def test_snapshot_validator_rejects_nan_values(self) -> None:
+        snapshot = {"rank_cards": [{"title": "Bad", "metrics": [{"label": "Score", "value": float("nan")}] }]}
+        self.assertFalse(validate_live_lens_snapshot(snapshot))
+
+    def test_worker_skips_write_when_snapshot_is_invalid(self) -> None:
+        invalid_snapshot = {"date": "2026-06-19", "rank_cards": [{"title": "Bad", "metrics": [{"label": "Score", "value": float("nan")}] }]}
+        with patch("scripts.run_wnba_live_lens_worker.build_live_lens_snapshot", return_value=invalid_snapshot), patch(
+            "scripts.run_wnba_live_lens_worker.write_json_file"
+        ) as mocked_write, patch("scripts.run_wnba_live_lens_worker.logger.warning") as mocked_warning:
+            from scripts.run_wnba_live_lens_worker import _run_tick
+
+            snapshot = _run_tick()
+
+        mocked_write.assert_not_called()
+        mocked_warning.assert_called_once_with(
+            "INVALID LIVE LENS STATE",
+            extra={"path": "/opt/render/project/data/live/wnba_live_lens.json", "date": "2026-06-19"},
+        )
+        self.assertEqual(snapshot, invalid_snapshot)

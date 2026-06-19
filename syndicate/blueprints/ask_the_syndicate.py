@@ -1,20 +1,17 @@
 from __future__ import annotations
 
 from typing import Any
-import calendar
 import hashlib
 import json
 import os
 import re
 import threading
-import time
 
 from flask import Blueprint
 from flask import jsonify
 from flask import request
 
 from router.query_router import QueryRouter as IntelligenceQueryRouter
-from pipeline.intelligence_state import queue_intelligence_state_refresh
 from pipeline.intelligence_state import read_latest_intelligence_state_response
 from syndicate.blueprints.ask_the_syndicate_adapter import build_syndicate_query_response
 from syndicate.blueprints.ask_the_syndicate_router import SyndicateQueryRouter
@@ -165,183 +162,39 @@ def _build_artifact_response(shaped_payload: dict[str, Any], decision: RouteDeci
     return None
 
 
-def _refresh_queue_key(shaped_payload: dict[str, Any]) -> str:
-    queue_payload = {
-        key: shaped_payload.get(key)
-        for key in (
-            "question",
-            "original_question",
-            "query_type",
-            "sport",
-            "sport_slug",
-            "mode",
-            "selected_date",
-            "date",
-            "limit",
-            "include_props",
-            "include_games",
-            "timing",
-        )
-    }
-    canonical = json.dumps(queue_payload, sort_keys=True, separators=(",", ":"), default=str)
-    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
-
-
-def _latest_state_is_fresh(latest_state: dict[str, Any] | None) -> bool:
-    if not isinstance(latest_state, dict):
-        return False
-    latest_updated_at = str(latest_state.get("latestComputedAt") or latest_state.get("last_updated") or "").strip()
-    if not latest_updated_at:
-        return False
-    try:
-        computed_at = time.strptime(latest_updated_at, "%Y-%m-%dT%H:%M:%SZ")
-    except Exception:
-        return False
-    computed_epoch = calendar.timegm(computed_at)
-    return (time.time() - computed_epoch) <= _REFRESH_QUEUE_DEDUPE_SECONDS
-
-
-def _build_fast_state_result(shaped_payload: dict[str, Any]) -> dict[str, Any] | None:
-    latest_state = read_latest_intelligence_state_response(shaped_payload)
-    if not isinstance(latest_state, dict):
-        return None
-
-    analysis = latest_state.get("analysis") if isinstance(latest_state.get("analysis"), dict) else latest_state.get("response")
-    if not isinstance(analysis, dict):
-        analysis = {}
-
-    recommendations = analysis.get("recommendations")
-    if not isinstance(recommendations, list) or not recommendations:
-        recommendations = latest_state.get("top_opportunities") if isinstance(latest_state.get("top_opportunities"), list) else []
-    if recommendations:
-        analysis.setdefault("recommendations", [dict(item) for item in recommendations if isinstance(item, dict)])
-
-    by_sport = latest_state.get("by_sport") if isinstance(latest_state.get("by_sport"), dict) else {}
-    candidate_pool = latest_state.get("candidate_pool") if isinstance(latest_state.get("candidate_pool"), dict) else {}
-    analysis_views = analysis.get("analysis_views") if isinstance(analysis.get("analysis_views"), dict) else {}
-    parsed_request = analysis.get("parsed_request") if isinstance(analysis.get("parsed_request"), dict) else {}
-
-    merged_parsed_request = dict(parsed_request)
-    for key in (
-        "question",
-        "query_type",
-        "sport",
-        "sport_slug",
-        "market",
-        "candidate_type",
-        "selection",
-        "matchup",
-        "player_name",
-        "name",
-        "preview_subject",
-        "player_subject",
-        "selected_date",
-        "date",
-    ):
-        value = shaped_payload.get(key)
-        if value not in (None, ""):
-            merged_parsed_request[key] = value
-
-    analysis.update(
-        {
-            "query_type": shaped_payload.get("query_type") or analysis.get("query_type") or analysis.get("intent") or "explanation",
-            "parsed_request": merged_parsed_request,
-            "analysis_views": analysis_views,
-        }
-    )
-
-    board_contract_source = dict(latest_state)
-    board_contract_source.setdefault("analysis", analysis)
-    board_contract_source.setdefault("response", analysis)
-    board_contract = build_intelligence_board_contract(board_contract_source)
-
+def _empty_ask_result(shaped_payload: dict[str, Any], decision: RouteDecision, *, reason: str) -> dict[str, Any]:
     question = str(shaped_payload.get("original_question") or shaped_payload.get("question") or "").strip()
-    routing_context = {
-        "question": question,
-        "query_type": analysis.get("query_type"),
-        "mode": shaped_payload.get("mode"),
-        "selected_date": shaped_payload.get("selected_date") or shaped_payload.get("date"),
-        "preview_subject": shaped_payload.get("preview_subject"),
-        "player_subject": shaped_payload.get("player_subject"),
-        "sport": shaped_payload.get("sport") or shaped_payload.get("sport_slug"),
-        "limit": shaped_payload.get("limit"),
-        "include_props": shaped_payload.get("include_props"),
-        "include_games": shaped_payload.get("include_games"),
-    }
-    detected_sports = _detect_sports(question)
-    context_awareness = {
-        "is_vague": not bool(routing_context.get("sport")) and not bool(detected_sports),
-        "confidence": "low" if not bool(routing_context.get("sport")) and not bool(detected_sports) else "medium",
-        "detected_sports": detected_sports,
-        "multi_sport": len(detected_sports) > 1,
-        "assumptions": ["Used the latest intelligence state response and preserved the route metadata."] if latest_state else [],
-        "clarifying_questions": [],
-        "reasoning": "The response was served from the latest state snapshot, so the API preserved the route and context fields for consistency.",
-        "recommendation_count": len(analysis.get("recommendations") or []),
-        "reasoning_step_count": len(analysis.get("reasoning_steps") or []),
-    }
-
     return {
-        "ok": True,
-        "top_opportunities": latest_state.get("top_opportunities") if isinstance(latest_state.get("top_opportunities"), list) else list(analysis.get("recommendations") or []),
-        "by_sport": by_sport,
-        "analysis": analysis,
-        "candidate_pool": candidate_pool,
-        "response": analysis,
-        "board_contract": board_contract,
-        "routing_context": routing_context,
-        "context_awareness": context_awareness,
-        "served_from": "latest_state",
-        "served_from_state_cache": False,
-        "state_cache_latest_key": latest_state.get("latestKey") if isinstance(latest_state.get("latestKey"), str) else None,
-        "state_cache_latest_computed_at": latest_state.get("latestComputedAt") if isinstance(latest_state.get("latestComputedAt"), str) else None,
-    }
-
-
-def _maybe_queue_exact_refresh(shaped_payload: dict[str, Any]) -> None:
-    latest_state = read_latest_intelligence_state_response(shaped_payload)
-    if _latest_state_is_fresh(latest_state):
-        return
-
-    queue_key = _refresh_queue_key(shaped_payload)
-    current_time = time.time()
-    with _REFRESH_QUEUE_LOCK:
-        last_queued_at = _REFRESH_QUEUE_STATE.get(queue_key)
-        if last_queued_at is not None and (current_time - last_queued_at) < _REFRESH_QUEUE_DEDUPE_SECONDS:
-            return
-        _REFRESH_QUEUE_STATE[queue_key] = current_time
-        stale_keys = [key for key, queued_at in _REFRESH_QUEUE_STATE.items() if (current_time - queued_at) >= _REFRESH_QUEUE_DEDUPE_SECONDS]
-        for stale_key in stale_keys:
-            _REFRESH_QUEUE_STATE.pop(stale_key, None)
-
-    try:
-        queue_intelligence_state_refresh(shaped_payload)
-    except Exception:
-        with _REFRESH_QUEUE_LOCK:
-            _REFRESH_QUEUE_STATE.pop(queue_key, None)
-
-
-def _build_placeholder_response(shaped_payload: dict[str, Any], decision: RouteDecision, *, reason: str) -> dict[str, Any]:
-    empty_result: dict[str, Any] = {
         "query_type": decision.intent,
+        "summary": "No saved intelligence snapshot is available yet.",
         "parsed_request": {
-            "question": str(shaped_payload.get("original_question") or shaped_payload.get("question") or "").strip(),
+            "question": question,
         },
         "analysis_views": {},
         "recommendations": [],
         "top_opportunities": [],
-        "board_notes": [],
+        "board_notes": ["Ask is serving the latest intelligence snapshot only."],
         "reasoning_steps": [],
-        "summary": None,
-        "pipeline_context": {"routing_context": {"question": str(shaped_payload.get("original_question") or shaped_payload.get("question") or "").strip()}},
+        "pipeline_context": {"routing_context": {"question": question}},
         "structured_response": {"context_awareness": {"reasoning": reason}},
+        "analysis_brief": {
+            "kind": "bundle",
+            "title": "Snapshot unavailable",
+            "summary": "No saved intelligence snapshot is available yet.",
+        },
+        "supporting_evidence": {
+            "kind": "bundle",
+            "title": "Snapshot unavailable",
+            "summary": "The Ask endpoint only serves persisted intelligence snapshots.",
+        },
     }
-    return build_syndicate_query_response(
-        question=str(shaped_payload.get("original_question") or shaped_payload.get("question") or "").strip(),
-        context=_coerce_context(shaped_payload),
-        decision=decision,
-        result=empty_result,
-    )
+
+
+def read_latest_intelligence_state(payload: dict[str, Any] | None = None) -> dict[str, Any]:
+    snapshot = read_latest_intelligence_state_response(payload or {}, force_refresh=False)
+    if isinstance(snapshot, dict):
+        return dict(snapshot)
+    return {}
 
 
 def _base_pipeline_payload(payload: dict[str, Any]) -> dict[str, Any]:
@@ -393,17 +246,8 @@ def _apply_intent_hints(pipeline_payload: dict[str, Any], intent: str) -> dict[s
 
 def _build_route_payload(payload: dict[str, Any], decision: RouteDecision) -> dict[str, Any]:
     pipeline_payload = _apply_intent_hints(payload, decision.intent)
-    cached_result = read_latest_intelligence_state_response(pipeline_payload)
-    if isinstance(cached_result, dict):
-        return build_syndicate_query_response(
-            question=str(payload.get("original_question") or payload.get("question") or "").strip(),
-            context=_coerce_context(payload),
-            decision=decision,
-            result=cached_result,
-        )
-
-    _maybe_queue_exact_refresh(pipeline_payload)
-    result = _build_placeholder_response(payload, decision, reason="queued_refresh")
+    cached_result = read_latest_intelligence_state(pipeline_payload)
+    result = cached_result if isinstance(cached_result, dict) and cached_result else _empty_ask_result(payload, decision, reason="snapshot_missing")
     return build_syndicate_query_response(
         question=str(payload.get("original_question") or payload.get("question") or "").strip(),
         context=_coerce_context(payload),
@@ -447,20 +291,15 @@ def ask_the_syndicate_query_api():
     _read_cached_response(cache_key)
 
     artifact_response = _build_artifact_response(shaped_payload, decision)
-    fast_state_response = _build_fast_state_result(shaped_payload)
-    if fast_state_response is not None:
-        _maybe_queue_exact_refresh(shaped_payload)
-        return _with_cors_headers(jsonify(fast_state_response))
+    if isinstance(artifact_response, dict):
+        return _with_cors_headers(jsonify(artifact_response))
 
-    _maybe_queue_exact_refresh(shaped_payload)
-    fast_state_response = _build_fast_state_result(shaped_payload)
-    if fast_state_response is not None:
-        return _with_cors_headers(jsonify(fast_state_response))
-
-    handler = {
-        "handle_bet_analysis": handle_bet_analysis,
-        "handle_matchup_analysis": handle_matchup_analysis,
-        "handle_market_summary": handle_market_summary,
-    }[decision.handler_name]
-    response = handler(shaped_payload)
+    snapshot = read_latest_intelligence_state(shaped_payload)
+    result = snapshot if isinstance(snapshot, dict) and snapshot else _empty_ask_result(shaped_payload, decision, reason="snapshot_missing")
+    response = build_syndicate_query_response(
+        question=str(shaped_payload.get("original_question") or shaped_payload.get("question") or "").strip(),
+        context=_coerce_context(shaped_payload),
+        decision=decision,
+        result=result,
+    )
     return _with_cors_headers(jsonify(response))

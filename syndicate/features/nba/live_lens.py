@@ -1,15 +1,23 @@
 from __future__ import annotations
 
+from copy import deepcopy
+import math
 from pathlib import Path
 from typing import Any
 
-from syndicate.features.nba.cards import build_cards_page_context
-from syndicate.features.nba.cards import build_live_lines_payload
+from syndicate.features.nba.cards import build_cards_page_context as _compute_cards_page_context
+from syndicate.features.nba.cards import build_live_lines_payload as _compute_live_lines_payload
+from syndicate.features.nba.cards import build_live_pbp_stats_payload as _compute_live_pbp_stats_payload
+from syndicate.features.nba.cards import build_live_player_lens_payload as _compute_live_player_lens_payload
 from syndicate.features.nba.sources import build_module_links
 from syndicate.features.nba.sources import parse_iso_date
+from syndicate.features.nba.sources import load_json
 from syndicate.features.shared.live_lens_contract import attach_live_lens_contract
 from syndicate.features.shared.rank_board import build_rank_api_payload
 from syndicate.features.shared.rank_board import build_rank_page_context
+
+
+LIVE_LENS_SNAPSHOT_PATH = Path("/opt/render/project/data/live/nba_live_lens.json")
 
 
 def _safe_text(value: Any, fallback: str = "-") -> str:
@@ -21,7 +29,8 @@ def _safe_number(value: Any) -> float | None:
     try:
         if value is None or str(value).strip() == "":
             return None
-        return float(value)
+        number = float(value)
+        return number if math.isfinite(number) else None
     except Exception:
         return None
 
@@ -54,6 +63,21 @@ def _live_line_snapshot(game: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _snapshot_list(payload: dict[str, Any], key: str) -> list[Any]:
+    value = payload.get(key)
+    return value if isinstance(value, list) else []
+
+
+def _snapshot_text(payload: dict[str, Any], key: str, fallback: str) -> str:
+    value = str(payload.get(key) or "").strip()
+    return value or fallback
+
+
+def _load_live_lens_snapshot() -> dict[str, Any] | None:
+    payload = load_json(LIVE_LENS_SNAPSHOT_PATH)
+    return payload if isinstance(payload, dict) else None
+
+
 def _live_line_map(selected_date: str, games: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
     event_ids = [
         str(game.get("event_id") or "").strip()
@@ -62,7 +86,7 @@ def _live_line_map(selected_date: str, games: list[dict[str, Any]]) -> dict[str,
     ]
     if not event_ids:
         return {}
-    payload = build_live_lines_payload(selected_date, event_ids)
+    payload = _compute_live_lines_payload(selected_date, event_ids)
     live_games = payload.get("games") if isinstance(payload.get("games"), list) else []
     out: dict[str, dict[str, Any]] = {}
     for live_game in live_games:
@@ -225,12 +249,80 @@ def _rank_card(game: dict[str, Any], selected_date: str, *, live_lines: dict[str
     }
 
 
-def build_live_lens_page_context(selected_date: str, *, season: int | None = None, profile: str | None = None) -> dict[str, Any]:
-    cards_context = build_cards_page_context(selected_date)
+def _route_shell_updates(selected_date: str, *, season: int | None = None, profile: str | None = None) -> dict[str, Any]:
+    resolved_season = int(season) if season is not None else parse_iso_date(selected_date).year
+    normalized_profile = str(profile or "").strip().lower() or None
+    route_path = f"/nba/season/{resolved_season}/live-lens" if season is not None else "/nba/live-lens"
+    query_suffix = f"&profile={normalized_profile}" if normalized_profile else ""
+    updates: dict[str, Any] = {
+        "route_path": route_path,
+        "cards_base_path": route_path,
+        "cards_api_base_path": "/nba/api",
+        "cards_payload_path": f"/nba/api/season/{resolved_season}/live-lens" if season is not None else "/nba/api/live-lens",
+        "cards_query_suffix": query_suffix,
+        "season_betting_profile": normalized_profile or "retuned",
+        "cards_live_audit_href": f"{route_path}?date={selected_date}&profile=retuned" if season is not None else f"/nba/live-lens?date={selected_date}",
+        "cards_live_audit_label": "Live Lens",
+        "query_hidden_fields": ([{"name": "profile", "value": normalized_profile}] if normalized_profile else []),
+        "embed_mode": "",
+        "page_title": "NBA Live Lens",
+        "page_heading": "NBA Live Lens",
+    }
+    return updates
+
+
+def _apply_route_shell_context(context: dict[str, Any], selected_date: str, *, season: int | None = None, profile: str | None = None) -> dict[str, Any]:
+    updated = dict(context)
+    updated.update(_route_shell_updates(selected_date, season=season, profile=profile))
+    return updated
+
+
+def _empty_live_lens_context(selected_date: str, *, season: int | None = None, profile: str | None = None) -> dict[str, Any]:
+    resolved_season = int(season) if season is not None else parse_iso_date(selected_date).year
+    route_path = f"/nba/season/{resolved_season}/live-lens" if season is not None else "/nba/live-lens"
+    requested_date = selected_date
+    context = build_rank_page_context(
+        selected_date=selected_date,
+        route_path=route_path,
+        intro_title="NBA Live Lens",
+        intro_body="NBA live lens serves the stored snapshot artifact directly.",
+        aria_label="NBA live lens board",
+        source_path=str(LIVE_LENS_SNAPSHOT_PATH),
+        source_title="NBA live lens snapshot",
+        rank_cards=[],
+        using_sample_data=False,
+        header_stats=[
+            {"label": "Games", "value": "0"},
+            {"label": "Top plays", "value": "0"},
+            {"label": "Prop signals", "value": "0"},
+            {"label": "Source", "value": LIVE_LENS_SNAPSHOT_PATH.name},
+        ],
+        module_links=build_module_links(selected_date, "Live Lens"),
+        warning_panel={
+            "eyebrow": "NBA live lens",
+            "title": "No stored NBA live-lens rows were available for this date",
+            "body": "The live-lens board only reads the published NBA live-lens snapshot artifact, and none was available for the requested date.",
+            "list_items": [f"Requested date: {requested_date}"],
+        },
+        empty_state={
+            "eyebrow": "NBA live lens",
+            "title": "No stored NBA live-lens rows were available for this date",
+            "body": "The live-lens board only reads the published NBA live-lens snapshot artifact, and none was available for the requested date.",
+            "list_items": [f"Requested date: {requested_date}"],
+        },
+    )
+    context["games"] = []
+    context["requested_date"] = requested_date
+    context["lookahead_applied"] = False
+    context["players_included"] = False
+    context["pregame_portfolio"] = {"enabled": False, "selected": 0, "candidates": 0}
+    return attach_live_lens_contract(_apply_route_shell_context(context, selected_date, season=season, profile=profile), sport="nba", module="live_lens")
+
+
+def _compute_live_lens_page_context(selected_date: str, *, season: int | None = None, profile: str | None = None) -> dict[str, Any]:
+    cards_context = _compute_cards_page_context(selected_date)
     requested_date = str(cards_context.get("requested_date") or selected_date).strip() or selected_date
     resolved_date = str(cards_context.get("date") or selected_date).strip() or selected_date
-    resolved_season = int(season) if season is not None else parse_iso_date(resolved_date).year
-    normalized_profile = str(profile or "").strip().lower() or None
     games = cards_context.get("games") if isinstance(cards_context.get("games"), list) else []
     live_line_by_event_id = _live_line_map(resolved_date, games)
     rank_cards = [
@@ -262,16 +354,16 @@ def build_live_lens_page_context(selected_date: str, *, season: int | None = Non
         warning_panel = {
             "eyebrow": "NBA live lens",
             "title": "No stored NBA live-lens rows were available for this date",
-            "body": "The live-lens board only renders saved NBA cards and props snapshot artifacts, and none were available for the requested date.",
+            "body": "The live-lens board only reads the published NBA live-lens snapshot artifact, and none was available for the requested date.",
             "list_items": [f"Requested date: {requested_date}"],
         }
 
-    route_path = "/nba/live-lens"
+    route_path = f"/nba/season/{int(season)}/live-lens" if season is not None else "/nba/live-lens"
     hidden_fields: list[dict[str, str]] | None = None
     prev_href = None
     next_href = None
     if season is not None:
-        route_path = f"/nba/season/{resolved_season}/live-lens"
+        normalized_profile = str(profile or "").strip().lower() or None
         query_suffix = f"&profile={normalized_profile}" if normalized_profile else ""
         hidden_fields = [{"name": "profile", "value": normalized_profile}] if normalized_profile else None
         prev_href = f"{route_path}?date={cards_context.get('prev_date') or requested_date}{query_suffix}"
@@ -281,10 +373,10 @@ def build_live_lens_page_context(selected_date: str, *, season: int | None = Non
         selected_date=resolved_date,
         route_path=route_path,
         intro_title="NBA Live Lens",
-        intro_body="NBA live lens now reuses the shared cards contract so the route surfaces actual game and prop signals instead of a settled audit shell.",
+        intro_body="NBA live lens now serves the stored snapshot artifact directly.",
         aria_label="NBA live lens board",
-        source_path=str(cards_context.get("source_path") or "NBA cards artifact"),
-        source_title="NBA live game and props lens" if rank_cards else "NBA live lens unavailable",
+        source_path=str(cards_context.get("source_path") or LIVE_LENS_SNAPSHOT_PATH),
+        source_title="NBA live lens snapshot" if rank_cards else "NBA live lens unavailable",
         rank_cards=rank_cards,
         using_sample_data=False,
         header_stats=[
@@ -301,11 +393,317 @@ def build_live_lens_page_context(selected_date: str, *, season: int | None = Non
         empty_state={
             "eyebrow": "NBA live lens",
             "title": "No stored NBA live-lens rows were available for this date",
-            "body": "The live-lens board only renders saved NBA cards and props snapshot artifacts, and none were available for the requested date.",
+            "body": "The live-lens board only reads the published NBA live-lens snapshot artifact, and none was available for the requested date.",
             "list_items": [f"Requested date: {requested_date}"],
         } if not rank_cards else None,
     )
-    return attach_live_lens_contract(context, sport="nba", module="live_lens")
+    context["games"] = [dict(game) for game in games if isinstance(game, dict)]
+    context["requested_date"] = requested_date
+    context["lookahead_applied"] = bool(cards_context.get("lookahead_applied"))
+    context["players_included"] = False
+    context["pregame_portfolio"] = {"enabled": False, "selected": 0, "candidates": 0}
+    return attach_live_lens_contract(_apply_route_shell_context(context, selected_date, season=season, profile=profile), sport="nba", module="live_lens")
+
+
+def _empty_live_lens_api_payload(selected_date: str) -> dict[str, Any]:
+    context = _empty_live_lens_context(selected_date)
+    payload = build_rank_api_payload(context)
+    payload["ok"] = True
+    payload["requested_date"] = selected_date
+    payload["lookahead_applied"] = False
+    payload["players_included"] = False
+    payload["pregame_portfolio"] = {"enabled": False, "selected": 0, "candidates": 0}
+    payload["games"] = []
+    return payload
+
+
+def _compute_live_lens_api_payload(selected_date: str) -> dict[str, Any]:
+    cards_context = _compute_cards_page_context(selected_date)
+    payload = build_rank_api_payload(_compute_live_lens_page_context(selected_date))
+    payload["requested_date"] = cards_context.get("requested_date")
+    payload["lookahead_applied"] = bool(cards_context.get("lookahead_applied"))
+    payload["players_included"] = False
+    payload["pregame_portfolio"] = {"enabled": False, "selected": 0, "candidates": 0}
+    payload["games"] = [dict(game) for game in (cards_context.get("games") or []) if isinstance(game, dict)]
+    return payload
+
+
+def _coerce_snapshot_payload(payload: dict[str, Any] | None, *, key: str) -> dict[str, Any] | None:
+    if not isinstance(payload, dict):
+        return None
+    section = payload.get(key)
+    return dict(section) if isinstance(section, dict) else None
+
+
+def _filter_games_payload(payload: dict[str, Any] | None, event_ids: list[str], *, default_factory) -> dict[str, Any]:
+    requested_ids = [str(event_id).strip() for event_id in event_ids if str(event_id).strip()]
+    if not isinstance(payload, dict):
+        return default_factory(requested_ids)
+    games = payload.get("games") if isinstance(payload.get("games"), list) else []
+    if requested_ids:
+        filtered_games = [dict(game) for game in games if isinstance(game, dict) and str(game.get("event_id") or "").strip() in requested_ids]
+        if filtered_games:
+            result = dict(payload)
+            result["games"] = filtered_games
+            return result
+        return default_factory(requested_ids)
+    result = dict(payload)
+    result["games"] = [dict(game) for game in games if isinstance(game, dict)]
+    return result
+
+
+def _empty_live_player_lens_payload(selected_date: str, event_ids: list[str], ttl: int = 20) -> dict[str, Any]:
+    normalized_event_ids = [str(event_id).strip() for event_id in event_ids if str(event_id).strip()]
+    if not normalized_event_ids:
+        normalized_event_ids = []
+    return {
+        "ok": True,
+        "ttl": int(ttl),
+        "date": selected_date or None,
+        "requested_date": selected_date,
+        "lookahead_applied": False,
+        "games": [{"event_id": event_id, "players": []} for event_id in normalized_event_ids],
+        "generated_at": None,
+    }
+
+
+def _empty_live_lines_payload(selected_date: str, event_ids: list[str], ttl: int = 20, *, include_period_totals: bool = False) -> dict[str, Any]:
+    normalized_event_ids = [str(event_id).strip() for event_id in event_ids if str(event_id).strip()]
+    return {
+        "ok": True,
+        "ttl": int(ttl),
+        "date": selected_date,
+        "requested_date": selected_date,
+        "lookahead_applied": False,
+        "include_period_totals": bool(include_period_totals),
+        "games": [{"event_id": event_id, "found": False} for event_id in normalized_event_ids],
+        "generated_at": None,
+    }
+
+
+def _empty_live_pbp_stats_payload(selected_date: str, event_ids: list[str], ttl: int = 20) -> dict[str, Any]:
+    normalized_event_ids = [str(event_id).strip() for event_id in event_ids if str(event_id).strip()]
+    return {
+        "ok": True,
+        "ttl": int(ttl),
+        "date": selected_date or None,
+        "requested_date": selected_date,
+        "lookahead_applied": False,
+        "games": [
+            {
+                "event_id": event_id,
+                "game_id": None,
+                "home": None,
+                "away": None,
+                "pbp_attempts": {"home": {}, "away": {}, "unknown": {}, "total": {}},
+                "pbp_attempts_periods": {},
+                "pbp_possessions": {"home": {}, "away": {}, "unknown": {}, "total": {}},
+                "pbp_possessions_periods": {},
+                "pbp_quarters": {"q_totals": {"q1": None, "q2": None, "q3": None, "q4": None}, "current": {"period": None, "q_total": None}},
+                "pbp_recent": {"window_sec": 180, "points_total": None, "attempts": None, "possessions": None, "current_scoring_run": {"team": None, "points": None}, "seconds_since_score": None},
+            }
+            for event_id in normalized_event_ids
+        ],
+        "generated_at": None,
+    }
+
+
+def validate_live_lens_snapshot(snapshot: Any) -> bool:
+    if not isinstance(snapshot, dict):
+        return False
+    rank_cards = snapshot.get("rank_cards")
+    if rank_cards is None:
+        page_context = snapshot.get("page_context") if isinstance(snapshot.get("page_context"), dict) else {}
+        rank_cards = page_context.get("rank_cards") if isinstance(page_context.get("rank_cards"), list) else []
+    if not isinstance(rank_cards, list):
+        return False
+
+    def _value_has_non_finite_number(value: Any) -> bool:
+        if isinstance(value, bool) or value is None:
+            return False
+        if isinstance(value, float):
+            return not math.isfinite(value)
+        if isinstance(value, dict):
+            return any(_value_has_non_finite_number(item) for item in value.values())
+        if isinstance(value, list):
+            return any(_value_has_non_finite_number(item) for item in value)
+        if isinstance(value, tuple):
+            return any(_value_has_non_finite_number(item) for item in value)
+        return False
+
+    return not _value_has_non_finite_number(snapshot)
+
+
+def build_live_lens_snapshot(selected_date: str, *, limit: int = 50) -> dict[str, Any]:
+    try:
+        cards_context = _compute_cards_page_context(selected_date, allow_stored_date_fallback=True)
+    except Exception:
+        cards_context = {}
+    resolved_date = str(cards_context.get("date") or selected_date).strip() or selected_date
+    games = [dict(game) for game in (cards_context.get("games") if isinstance(cards_context.get("games"), list) else []) if isinstance(game, dict)]
+    event_ids = [str(game.get("event_id") or "").strip() for game in games if str(game.get("event_id") or "").strip()]
+    page_context = _compute_live_lens_page_context(selected_date)
+    api_payload = _compute_live_lens_api_payload(selected_date)
+    live_player_lens_payload = _compute_live_player_lens_payload(resolved_date, event_ids, ttl=20, allow_stored_date_fallback=True)
+    live_lines_payload = _compute_live_lines_payload(resolved_date, event_ids, ttl=20, include_period_totals=True, allow_stored_date_fallback=True)
+    live_pbp_stats_payload = _compute_live_pbp_stats_payload(resolved_date, event_ids, ttl=20, allow_stored_date_fallback=True)
+    snapshot = {
+        "ok": True,
+        "date": resolved_date,
+        "requested_date": selected_date,
+        "generated_at": api_payload.get("generated_at") if isinstance(api_payload, dict) else None,
+        "source_path": str(page_context.get("source_path") or LIVE_LENS_SNAPSHOT_PATH),
+        "page_context": dict(page_context),
+        "api_payload": dict(api_payload),
+        "live_player_lens_payload": dict(live_player_lens_payload) if isinstance(live_player_lens_payload, dict) else _empty_live_player_lens_payload(resolved_date, event_ids),
+        "live_lines_payload": dict(live_lines_payload) if isinstance(live_lines_payload, dict) else _empty_live_lines_payload(resolved_date, event_ids, include_period_totals=True),
+        "live_pbp_stats_payload": dict(live_pbp_stats_payload) if isinstance(live_pbp_stats_payload, dict) else _empty_live_pbp_stats_payload(resolved_date, event_ids),
+        "games": games[:limit],
+        "rank_cards": [dict(card) for card in (page_context.get("rank_cards") if isinstance(page_context.get("rank_cards"), list) else []) if isinstance(card, dict)][:limit],
+    }
+    return snapshot
+
+
+def _snapshot_route_context(selected_date: str, *, season: int | None = None, profile: str | None = None, snapshot: dict[str, Any] | None = None) -> dict[str, Any]:
+    if isinstance(snapshot, dict):
+        base_context = snapshot.get("page_context") if isinstance(snapshot.get("page_context"), dict) else snapshot
+        if isinstance(base_context, dict):
+            context = dict(base_context)
+        else:
+            context = _empty_live_lens_context(selected_date, season=season, profile=profile)
+    else:
+        context = _empty_live_lens_context(selected_date, season=season, profile=profile)
+    context = _apply_route_shell_context(context, selected_date, season=season, profile=profile)
+    context["asset_version"] = context.get("asset_version") or "1"
+    return context
+
+
+def read_latest_live_lens_snapshot() -> dict[str, Any] | None:
+    snapshot = _load_live_lens_snapshot()
+    return dict(snapshot) if isinstance(snapshot, dict) else None
+
+
+def read_latest_live_lens_page_context(selected_date: str, *, season: int | None = None, profile: str | None = None) -> dict[str, Any]:
+    snapshot = read_latest_live_lens_snapshot()
+    return _snapshot_route_context(selected_date, season=season, profile=profile, snapshot=snapshot)
+
+
+def read_latest_live_lens_api_payload(selected_date: str) -> dict[str, Any]:
+    snapshot = read_latest_live_lens_snapshot()
+    if snapshot is None:
+        return _empty_live_lens_api_payload(selected_date)
+    api_payload = _coerce_snapshot_payload(snapshot, key="api_payload")
+    if api_payload is None:
+        return _empty_live_lens_api_payload(selected_date)
+    payload = dict(api_payload)
+    payload.setdefault("ok", True)
+    payload.setdefault("requested_date", selected_date)
+    payload.setdefault("lookahead_applied", False)
+    payload.setdefault("players_included", False)
+    payload.setdefault("pregame_portfolio", {"enabled": False, "selected": 0, "candidates": 0})
+    payload.setdefault("games", [])
+    return payload
+
+
+def read_latest_live_player_lens_payload(selected_date: str, event_ids: list[str], ttl: int = 20, *, allow_stored_date_fallback: bool = True) -> dict[str, Any]:
+    _ = allow_stored_date_fallback
+    snapshot = read_latest_live_lens_snapshot()
+    payload = _coerce_snapshot_payload(snapshot, key="live_player_lens_payload") if snapshot is not None else None
+    if payload is None:
+        return _empty_live_player_lens_payload(selected_date, event_ids, ttl=ttl)
+    return _filter_games_payload(payload, event_ids, default_factory=lambda requested_ids: _empty_live_player_lens_payload(selected_date, requested_ids, ttl=ttl))
+
+
+def read_latest_live_lines_payload(selected_date: str, event_ids: list[str], ttl: int = 20, include_period_totals: bool = False, *, allow_stored_date_fallback: bool = True) -> dict[str, Any]:
+    _ = allow_stored_date_fallback
+    snapshot = read_latest_live_lens_snapshot()
+    payload = _coerce_snapshot_payload(snapshot, key="live_lines_payload") if snapshot is not None else None
+    if payload is None:
+        return _empty_live_lines_payload(selected_date, event_ids, ttl=ttl, include_period_totals=include_period_totals)
+    filtered = _filter_games_payload(payload, event_ids, default_factory=lambda requested_ids: _empty_live_lines_payload(selected_date, requested_ids, ttl=ttl, include_period_totals=include_period_totals))
+    if not include_period_totals and isinstance(filtered, dict):
+        for game in filtered.get("games") if isinstance(filtered.get("games"), list) else []:
+            if isinstance(game, dict):
+                lines = game.get("lines") if isinstance(game.get("lines"), dict) else None
+                if isinstance(lines, dict):
+                    lines = dict(lines)
+                    lines.pop("period_totals", None)
+                    lines.pop("period_spreads", None)
+                    game["lines"] = lines
+    return filtered
+
+
+def read_latest_live_pbp_stats_payload(selected_date: str, event_ids: list[str], ttl: int = 20, *, allow_stored_date_fallback: bool = True) -> dict[str, Any]:
+    _ = allow_stored_date_fallback
+    snapshot = read_latest_live_lens_snapshot()
+    payload = _coerce_snapshot_payload(snapshot, key="live_pbp_stats_payload") if snapshot is not None else None
+    if payload is None:
+        return _empty_live_pbp_stats_payload(selected_date, event_ids, ttl=ttl)
+    return _filter_games_payload(payload, event_ids, default_factory=lambda requested_ids: _empty_live_pbp_stats_payload(selected_date, requested_ids, ttl=ttl))
+
+
+def build_live_lens_page_context(selected_date: str, *, season: int | None = None, profile: str | None = None) -> dict[str, Any]:
+    return _compute_live_lens_page_context(selected_date, season=season, profile=profile)
+
+
+def build_live_lens_api_payload(selected_date: str) -> dict[str, Any]:
+    return _compute_live_lens_api_payload(selected_date)
+
+
+def build_live_player_lens_payload(
+    selected_date: str,
+    event_ids: list[str],
+    ttl: int = 20,
+    *,
+    allow_stored_date_fallback: bool = True,
+) -> dict[str, Any]:
+    _ = allow_stored_date_fallback
+    snapshot = _load_live_lens_snapshot()
+    payload = _coerce_snapshot_payload(snapshot, key="live_player_lens_payload") if snapshot is not None else None
+    if payload is None:
+        return _empty_live_player_lens_payload(selected_date, event_ids, ttl=ttl)
+    return _filter_games_payload(payload, event_ids, default_factory=lambda requested_ids: _empty_live_player_lens_payload(selected_date, requested_ids, ttl=ttl))
+
+
+def build_live_lines_payload(
+    selected_date: str,
+    event_ids: list[str],
+    ttl: int = 20,
+    include_period_totals: bool = False,
+    *,
+    allow_stored_date_fallback: bool = True,
+) -> dict[str, Any]:
+    _ = allow_stored_date_fallback
+    snapshot = _load_live_lens_snapshot()
+    payload = _coerce_snapshot_payload(snapshot, key="live_lines_payload") if snapshot is not None else None
+    if payload is None:
+        return _empty_live_lines_payload(selected_date, event_ids, ttl=ttl, include_period_totals=include_period_totals)
+    filtered = _filter_games_payload(payload, event_ids, default_factory=lambda requested_ids: _empty_live_lines_payload(selected_date, requested_ids, ttl=ttl, include_period_totals=include_period_totals))
+    if not include_period_totals and isinstance(filtered, dict):
+        for game in filtered.get("games") if isinstance(filtered.get("games"), list) else []:
+            if isinstance(game, dict):
+                lines = game.get("lines") if isinstance(game.get("lines"), dict) else None
+                if isinstance(lines, dict):
+                    lines = dict(lines)
+                    lines.pop("period_totals", None)
+                    lines.pop("period_spreads", None)
+                    game["lines"] = lines
+    return filtered
+
+
+def build_live_pbp_stats_payload(
+    selected_date: str,
+    event_ids: list[str],
+    ttl: int = 20,
+    *,
+    allow_stored_date_fallback: bool = True,
+) -> dict[str, Any]:
+    _ = allow_stored_date_fallback
+    snapshot = _load_live_lens_snapshot()
+    payload = _coerce_snapshot_payload(snapshot, key="live_pbp_stats_payload") if snapshot is not None else None
+    if payload is None:
+        return _empty_live_pbp_stats_payload(selected_date, event_ids, ttl=ttl)
+    return _filter_games_payload(payload, event_ids, default_factory=lambda requested_ids: _empty_live_pbp_stats_payload(selected_date, requested_ids, ttl=ttl))
 
 
 def build_live_lens_api_payload(selected_date: str) -> dict[str, Any]:

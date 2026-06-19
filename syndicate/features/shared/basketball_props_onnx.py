@@ -8,6 +8,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from syndicate.features.shared.request_path_guard import warn_if_compute_in_request_path
+
 
 PRIMARY_ONNX_TARGETS = ["t_pts", "t_reb", "t_ast", "t_pra", "t_threes"]
 EXTRA_TARGETS = ["t_stl", "t_blk", "t_tov"]
@@ -213,6 +215,7 @@ def _to_float(value: Any) -> float:
 
 
 def compute_player_priors_local(*, processed_root: Path, date_str: str, cfg: PlayerPriorsConfig | None = None) -> PlayerPriors:
+    warn_if_compute_in_request_path("compute_player_priors_local")
     import pandas as pd
 
     cfg = cfg or PlayerPriorsConfig()

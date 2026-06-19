@@ -70,6 +70,6 @@ flowchart TD
 flowchart TD
   A[intelligence.html] --> B[setInterval(loadIntelligence, 30000)]
   C[syndicate/app.py] --> D[start_intelligence_state_background_loop()]
-  E[pipeline/intelligence_state.py] --> F[_background_loop()]
+  E[pipeline/intelligence_state.py] --> F[_background_loop() -> run_routed_intelligence_pipeline() -> write_latest_intelligence_state()]
   G[scripts/run_refresh_worker.py] --> H[while True polling loop]
 ```

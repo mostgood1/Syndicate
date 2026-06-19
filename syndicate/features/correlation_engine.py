@@ -3,6 +3,8 @@ from __future__ import annotations
 from itertools import combinations
 from typing import Any
 
+from syndicate.features.shared.request_path_guard import warn_if_compute_in_request_path
+
 
 def _safe_text(value: Any, fallback: str = "") -> str:
     text = str(value or "").strip()
@@ -208,6 +210,7 @@ def _cross_game_correlation(candidate_a: dict[str, Any], candidate_b: dict[str, 
 
 
 def compute_correlation(candidate_a: dict[str, Any], candidate_b: dict[str, Any]) -> dict[str, Any]:
+    warn_if_compute_in_request_path("compute_correlation")
     same_game = _candidate_game_key(candidate_a) and _candidate_game_key(candidate_a) == _candidate_game_key(candidate_b)
     same_team = _candidate_team_key(candidate_a) and _candidate_team_key(candidate_a) == _candidate_team_key(candidate_b)
     same_subject = _candidate_subject_key(candidate_a) and _candidate_subject_key(candidate_a) == _candidate_subject_key(candidate_b)

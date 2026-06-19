@@ -21,8 +21,8 @@ from syndicate.features.mlb.hub import build_hub_context
 from syndicate.features.mlb.hitter_ladders import build_hitter_ladders_page_context
 from syndicate.features.mlb.hr_targets import build_hr_targets_page_context
 from syndicate.features.mlb.ladders_common import build_module_links
-from syndicate.features.mlb.live_lens import build_live_lens_api_payload
-from syndicate.features.mlb.live_lens import build_live_lens_page_context
+from syndicate.features.mlb.live_lens import read_latest_live_lens_api_payload
+from syndicate.features.mlb.live_lens import read_latest_live_lens_page_context
 from syndicate.features.mlb.live_lens_daily_accuracy import build_live_lens_daily_accuracy_payload
 from syndicate.features.mlb.market_accuracy import build_market_accuracy_payload
 from syndicate.features.mlb.pitcher_ladders import build_pitcher_ladders_page_context
@@ -766,10 +766,7 @@ def live_lens():
 @mlb_bp.get("/api/live-lens")
 def api_live_lens():
     selected_date = _iso_or_today(request.args.get("date"))
-    persist_raw = request.args.get("persist")
-    persist = _query_bool(persist_raw, default=True)
-    context = build_live_lens_page_context(selected_date, persist=persist)
-    return jsonify(build_live_lens_api_payload(context))
+    return jsonify(read_latest_live_lens_api_payload(selected_date))
 
 
 @mlb_bp.get("/live-lens-accuracy")
@@ -823,8 +820,7 @@ def season_live_lens(season: int):
 @mlb_bp.get("/api/season/<int:season>/live-lens")
 def api_season_live_lens(season: int):
     selected_date = _iso_or_today(request.args.get("date"))
-    context = build_live_lens_page_context(selected_date, season=season)
-    return jsonify(build_live_lens_api_payload(context))
+    return jsonify(read_latest_live_lens_api_payload(selected_date, season=season))
 
 
 @mlb_bp.get("/season/<int:season>/betting-card")

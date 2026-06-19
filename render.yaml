@@ -20,7 +20,7 @@ services:
     plan: standard
     autoDeploy: true
     buildCommand: pip install -r requirements.txt
-    startCommand: bash -lc "python3 scripts/bootstrap_data_root.py || true; exec gunicorn wsgi:application --bind 0.0.0.0:$PORT --workers ${WEB_CONCURRENCY:-1} --threads ${GUNICORN_THREADS:-1} --timeout ${GUNICORN_TIMEOUT:-60} --graceful-timeout ${GUNICORN_GRACEFUL_TIMEOUT:-30} --keep-alive ${GUNICORN_KEEPALIVE:-5}"
+    startCommand: bash -lc "python3 scripts/bootstrap_data_root.py || true; python scripts/run_mlb_live_lens_worker.py --poll-seconds ${MLB_LIVE_LENS_LOOP_INTERVAL_SECONDS:-30} & exec gunicorn wsgi:application --bind 0.0.0.0:$PORT --workers ${WEB_CONCURRENCY:-1} --threads ${GUNICORN_THREADS:-1} --timeout ${GUNICORN_TIMEOUT:-60} --graceful-timeout ${GUNICORN_GRACEFUL_TIMEOUT:-30} --keep-alive ${GUNICORN_KEEPALIVE:-5}"
     healthCheckPath: /healthz
     disk:
       name: syndicate-data
@@ -131,7 +131,7 @@ services:
     plan: standard
     autoDeploy: true
     buildCommand: pip install -r requirements.txt
-    startCommand: bash -lc "python3 scripts/bootstrap_data_root.py || true; python scripts/run_intelligence_worker.py & python scripts/run_refresh_worker.py --poll-seconds ${SYNDICATE_REFRESH_WORKER_POLL_SECONDS:-30} & wait"
+    startCommand: bash -lc "python3 scripts/bootstrap_data_root.py || true; python scripts/run_intelligence_worker.py & python scripts/run_refresh_worker.py --poll-seconds ${SYNDICATE_REFRESH_WORKER_POLL_SECONDS:-30} & python scripts/run_wnba_live_lens_worker.py --poll-seconds ${SYNDICATE_WNBA_LIVE_LENS_INTERVAL_SECONDS:-30} & python scripts/run_nba_live_lens_worker.py --poll-seconds ${SYNDICATE_NBA_LIVE_LENS_INTERVAL_SECONDS:-30} & python scripts/run_mlb_live_lens_worker.py --poll-seconds ${MLB_LIVE_LENS_LOOP_INTERVAL_SECONDS:-30} & wait"
     disk:
       name: syndicate-data-worker
       mountPath: /opt/render/project/data

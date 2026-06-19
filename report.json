@@ -28,7 +28,9 @@
           "id": "live-prop"
         }
       ],
-      "matchup": {},
+      "matchup": {
+        "liveText": "Live-lens snapshot loaded from the MLB cards artifact."
+      },
       "predictions": {},
       "props": [
         {
@@ -60,7 +62,7 @@
         "detailed": "In Progress"
       },
       "detail": "2026-06-03",
-      "summary": "Live-lens snapshot loaded from artifact.",
+      "summary": "Live-lens snapshot loaded from the MLB cards artifact.",
       "status_badge": "Live",
       "hero_note": "1 live props | snapshot no",
       "metrics": [
@@ -92,7 +94,7 @@
       "panels": [
         {
           "eyebrow": "Live state",
-          "title": "Live state unavailable",
+          "title": "Live-lens snapshot loaded from the MLB cards artifact.",
           "body": "Report snapshot generated at 2026-06-03T12:00:00-05:00. Current score is -."
         },
         {
@@ -122,11 +124,11 @@
     "props": 1,
     "archivedLiveProps": 0
   },
-  "source_title": "MLB Live Lens",
+  "source_title": "MLB Game Cards",
   "generatedAt": "2026-06-03T12:00:00-05:00",
   "date": "2026-06-03",
-  "oddsRefreshedAt": "2026-06-14T18:58:44-05:00",
-  "odds_refreshed_at": "2026-06-14T18:58:44-05:00",
+  "oddsRefreshedAt": null,
+  "odds_refreshed_at": null,
   "dataRoot": ".",
   "liveLensDir": ".",
   "source_path": "report.json"

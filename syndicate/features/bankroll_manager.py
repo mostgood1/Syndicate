@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any, Mapping
 
 from syndicate.features.correlation_engine import compute_correlation as _compute_correlation
+from syndicate.features.shared.request_path_guard import warn_if_compute_in_request_path
 
 
 def _safe_text(value: Any, fallback: str = "") -> str:
@@ -111,6 +112,7 @@ def _portfolio_risk_level(*, average_volatility: float, average_correlation: flo
 
 
 def compute_bet_size(candidate: Mapping[str, Any]) -> dict[str, Any]:
+    warn_if_compute_in_request_path("compute_bet_size")
     base_candidate = dict(candidate) if isinstance(candidate, Mapping) else {}
 
     model_probability = _safe_float(base_candidate.get("model_probability"))

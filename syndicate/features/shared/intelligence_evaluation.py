@@ -10,6 +10,7 @@ from statistics import mean
 from typing import Any, Iterable, Mapping
 
 from syndicate.features.shared.artifact_manifests import load_artifact_manifests
+from syndicate.features.shared.request_path_guard import warn_if_compute_in_request_path
 from syndicate.features.shared.source_roots import repo_root_from
 
 
@@ -700,6 +701,7 @@ def _calibration(records: list[dict[str, Any]]) -> dict[str, Any]:
 
 
 def compute_metrics(*, records: Iterable[Mapping[str, Any]] | None = None, ledger_path: Path | str | None = None, sport: str | None = None) -> dict[str, Any]:
+    warn_if_compute_in_request_path("compute_metrics")
     record_rows = _latest_by_recommendation_id(_iter_record_payloads(records, ledger_path=ledger_path))
     sport_slug = str(sport or "").strip().lower() or None
     if sport_slug:
