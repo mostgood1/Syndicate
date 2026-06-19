@@ -603,13 +603,15 @@ def _artifact_paths(selected_date: str) -> dict[str, Path]:
 
 def _artifact_bundle(selected_date: str) -> dict[str, Any]:
     paths = _artifact_paths(selected_date)
+
     rows = _load_csv_rows(paths["cards"])
-    # If the primary path returned no rows, scan all source roots plus the repo root
-    # explicitly. The repo-bundled data files are always the authoritative fallback.
+
+    # ✅ Existing: search alternate artifact roots
     if not rows:
         csv_name = f"game_cards_{selected_date}.csv"
         repo_data_root = _repo_root_from(__file__) / "data" / "wnba_source"
         candidate_roots = list(_wnba_source_roots()) + [repo_data_root]
+
         for root in candidate_roots:
             alt_path = root / "data" / "processed" / csv_name
             if alt_path != paths["cards"] and alt_path.exists():
@@ -623,15 +625,34 @@ def _artifact_bundle(selected_date: str) -> dict[str, Any]:
                         "props": root / "data" / "processed" / f"cards_props_snapshot_{selected_date}.json",
                     }
                     break
+
+    # ✅ Existing
     rec_summary = load_json(paths["recommendations"])
+
+    # Runtime WNBA fallback if the processed artifacts are empty.
+    if not rows:
+        try:
+            rows, _ = _games_from_live_state_fallback(selected_date)
+        except Exception:
+            rows = []
+
+    if not rows:
+        try:
+            public_payload = _public_scoreboard_live_state_payload(selected_date)
+            rows = public_payload.get("games") if isinstance(public_payload, dict) and isinstance(public_payload.get("games"), list) else []
+        except Exception:
+            rows = []
+
     return {
         "paths": paths,
         "rows": rows,
         "recommendations": _recommendation_index(rec_summary),
-        "sim": _merge_sim_indexes(_artifact_games_index(paths["sim"]), _raw_smart_sim_index(selected_date)),
+        "sim": _merge_sim_indexes(
+            _artifact_games_index(paths["sim"]),
+            _raw_smart_sim_index(selected_date),
+        ),
         "props": _artifact_games_index(paths["props"]),
     }
-
 
 def _source_logo_url(team_tri: str) -> str:
     return f"/wnba/api/source/team-logo/{str(team_tri or '').strip().upper()}"
