@@ -33,6 +33,10 @@ from syndicate.features.shared.timezone import central_now
 from syndicate.features.shared.timezone import central_today_iso
 
 
+def _render_web_dyno() -> bool:
+    return str(os.environ.get("RENDER") or "").strip().lower() in {"1", "true", "yes", "on"}
+
+
 _NBA_CARDS_CONTEXT_CACHE: dict[tuple[Any, ...], dict[str, Any]] = {}
 
 
@@ -2501,6 +2505,19 @@ def build_cards_sim_detail_payload(selected_date: str, away_tri: str, home_tri: 
 
 def build_live_state_payload(selected_date: str, ttl: int = 12, *, allow_stored_date_fallback: bool = True) -> dict[str, Any]:
     is_today = str(selected_date).strip() == central_today_iso()
+    if _render_web_dyno():
+        local_payload = _best_live_state_payload(selected_date)
+        if isinstance(local_payload, dict) and isinstance(local_payload.get("games"), list) and bool(local_payload.get("games")):
+            return _attach_odds_refresh_timestamp(local_payload)
+        return _attach_odds_refresh_timestamp({
+            "date": selected_date,
+            "requested_date": selected_date,
+            "lookahead_applied": False,
+            "ttl": int(ttl),
+            "source": "render_web_dyno_empty",
+            "games": [],
+            "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
+        })
     if is_today:
         espn_payload = _espn_live_state_payload(selected_date)
         if isinstance(espn_payload, dict) and isinstance(espn_payload.get("games"), list) and bool(espn_payload.get("games")):
@@ -2573,6 +2590,16 @@ def build_live_player_boxscore_payload(
             selected_date,
             allow_stored_date_fallback=allow_stored_date_fallback,
         )
+    if _render_web_dyno():
+        return _attach_odds_refresh_timestamp({
+            "ok": True,
+            "ttl": int(ttl),
+            "date": selected_date or None,
+            "requested_date": selected_date,
+            "lookahead_applied": False,
+            "games": [{"event_id": event_id, "players": []} for event_id in normalized_event_ids],
+            "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
+        })
     context = build_cards_page_context(selected_date, allow_stored_date_fallback=allow_stored_date_fallback)
     resolved_date = str(context.get("date") or selected_date).strip() or selected_date
     local_payload = _filtered_local_live_snapshot_payload("live_player_boxscore", resolved_date, normalized_event_ids)
@@ -2629,6 +2656,26 @@ def build_live_player_lens_payload(
             selected_date,
             allow_stored_date_fallback=allow_stored_date_fallback,
         )
+    if _render_web_dyno():
+        return _attach_odds_refresh_timestamp({
+            "ok": True,
+            "ttl": int(ttl),
+            "date": selected_date or None,
+            "requested_date": selected_date,
+            "lookahead_applied": False,
+            "games": [
+                {
+                    "event_id": event_id,
+                    "game_id": None,
+                    "home": None,
+                    "away": None,
+                    "status": {"in_progress": False, "final": False, "period": None, "clock": ""},
+                    "rows": [],
+                }
+                for event_id in normalized_event_ids
+            ],
+            "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
+        })
     context = build_cards_page_context(selected_date, allow_stored_date_fallback=allow_stored_date_fallback)
     resolved_date = str(context.get("date") or selected_date).strip() or selected_date
     local_payload = _filtered_local_live_snapshot_payload("live_player_lens", resolved_date, normalized_event_ids)
@@ -2751,6 +2798,17 @@ def build_live_lines_payload(
             selected_date,
             allow_stored_date_fallback=allow_stored_date_fallback,
         )
+    if _render_web_dyno():
+        return _attach_odds_refresh_timestamp({
+            "ok": True,
+            "ttl": int(ttl),
+            "date": selected_date,
+            "requested_date": selected_date,
+            "lookahead_applied": False,
+            "include_period_totals": bool(include_period_totals),
+            "games": [{"event_id": event_id, "found": False} for event_id in normalized_event_ids],
+            "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
+        })
     context = build_cards_page_context(selected_date, allow_stored_date_fallback=allow_stored_date_fallback)
     resolved_date = str(context.get("date") or selected_date).strip() or selected_date
     local_payload = _filtered_local_live_snapshot_payload("live_lines", resolved_date, normalized_event_ids)
@@ -2856,6 +2914,30 @@ def build_live_pbp_stats_payload(
     allow_stored_date_fallback: bool = True,
 ) -> dict[str, Any]:
     normalized_event_ids = [str(event_id).strip() for event_id in event_ids if str(event_id).strip()]
+    if _render_web_dyno():
+        return _attach_odds_refresh_timestamp({
+            "ok": True,
+            "ttl": int(ttl),
+            "date": selected_date or None,
+            "requested_date": selected_date,
+            "lookahead_applied": False,
+            "games": [
+                {
+                    "event_id": event_id,
+                    "game_id": None,
+                    "home": None,
+                    "away": None,
+                    "pbp_attempts": {"home": {}, "away": {}, "unknown": {}, "total": {}},
+                    "pbp_attempts_periods": {},
+                    "pbp_possessions": {"home": {}, "away": {}, "unknown": {}, "total": {}},
+                    "pbp_possessions_periods": {},
+                    "pbp_quarters": {"q_totals": {"q1": None, "q2": None, "q3": None, "q4": None}, "current": {"period": None, "q_total": None}},
+                    "pbp_recent": {"window_sec": 180, "points_total": None, "attempts": None, "possessions": None, "current_scoring_run": {"team": None, "points": None}, "seconds_since_score": None},
+                }
+                for event_id in normalized_event_ids
+            ],
+            "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
+        })
     context = build_cards_page_context(selected_date, allow_stored_date_fallback=allow_stored_date_fallback)
     resolved_date = str(context.get("date") or selected_date).strip() or selected_date
     local_payload = _filtered_local_live_snapshot_payload("live_pbp_stats", resolved_date, normalized_event_ids)
