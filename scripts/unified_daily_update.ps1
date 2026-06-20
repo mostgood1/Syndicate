@@ -3691,6 +3691,12 @@ if (-not $SkipNBA) {
         throw "NBA self-contained refresh is unavailable because vendor\\nba_betting_repo\\app.py was not found. The fallback NBA Syndicate props refresh still requires a source-root for fresh runs and is not a self-contained replacement."
     }
 
+    $nbaScheduleCheck = Get-BasketballScheduledGamesCheck -Sport 'nba' -DateValue $Date
+    if ($nbaScheduleCheck.known -and [int]$nbaScheduleCheck.count -eq 0) {
+        Write-Host ("NBA vendored daily update skipped: no scheduled games for {0} ({1})" -f $Date, $nbaScheduleCheck.source) -ForegroundColor DarkGray
+    }
+    else {
+
     $preferLocalMirrorArtifactsForGate = $true
     $nbaEnvOverrides = @{
         REFRESH_PREDICT_PROPS_SMART_SIM_N_SIMS = [string]$runtimePolicy.NBA.smartsimNSims
@@ -3735,6 +3741,7 @@ if (-not $SkipNBA) {
         WorkingDirectory = $repoRoot
         EnvironmentOverrides = @{}
         RuntimePolicy = $runtimePolicy.NBA
+    }
     }
 }
 if (-not $SkipWNBA) {

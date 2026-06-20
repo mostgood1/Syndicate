@@ -702,6 +702,68 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
         self.assertEqual(int(state["rc_export"]), 0)
         self.assertEqual(int(state["recs_rows"]), 1)
 
+    def test_run_refresh_via_cli_treats_written_export_artifacts_as_success(self) -> None:
+        module = self._load_module()
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_root = Path(tmp_dir)
+            source_root = tmp_root / "source"
+            raw_root = source_root / "data" / "raw"
+            processed_root = source_root / "data" / "processed"
+            raw_root.mkdir(parents=True, exist_ok=True)
+            processed_root.mkdir(parents=True, exist_ok=True)
+
+            def _fake_run(args, log_file, **kwargs):
+                if "--out" in args:
+                    out_idx = args.index("--out") + 1
+                    out_path = Path(args[out_idx])
+                    out_path.parent.mkdir(parents=True, exist_ok=True)
+                    out_path.write_text("snapshot_ts,event_id\n2026-05-22T12:00:00Z,evt-1\n", encoding="utf-8")
+                elif "props-edges" in args:
+                    (processed_root / "props_edges_2026-05-22.csv").write_text("market\nPTS\n", encoding="utf-8")
+                return 0
+
+            def _fake_predict_export(**kwargs):
+                out_path = kwargs["out_path"]
+                out_path.parent.mkdir(parents=True, exist_ok=True)
+                out_path.write_text("player\nA\n", encoding="utf-8")
+                return 1, out_path
+
+            def _fake_edges_export(**kwargs):
+                out_path = kwargs["out_path"]
+                out_path.parent.mkdir(parents=True, exist_ok=True)
+                out_path.write_text("market\nPTS\n", encoding="utf-8")
+                return 1, out_path
+
+            def _fake_game_cards_artifact(*, source_root, processed_root, date_str, log_file):
+                game_cards_path = processed_root / f"game_cards_{date_str}.csv"
+                recs_path = processed_root / f"props_recommendations_{date_str}.csv"
+                game_cards_path.write_text(
+                    "date,game_id,home_team,visitor_team,commence_time,home_ml,away_ml,home_spread,away_spread,total,bookmaker,home_tri,away_tri\n"
+                    "2026-05-22,401,Chicago Sky,Minnesota Lynx,2026-05-22T23:00:00Z,-140,120,-4.5,4.5,164.5,oddsapi_consensus,CHI,MIN\n",
+                    encoding="utf-8",
+                )
+                recs_path.write_text("market\nATS\n", encoding="utf-8")
+                raise RuntimeError("simulated export helper failure after writing artifacts")
+
+            with patch.object(module, "_run_to_file", side_effect=_fake_run), patch.object(module, "export_props_predictions_local", side_effect=_fake_predict_export), patch.object(module, "export_props_edges_local", side_effect=_fake_edges_export), patch.object(module, "_ensure_player_logs_for_props_refresh", return_value=(True, None)), patch.object(module, "_ensure_game_predictions_for_props_refresh", return_value=(True, None)), patch.object(module, "_ensure_source_game_inputs", return_value={"schedule": 1, "fetch": 0, "build_features": 0, "predict_date": 0}), patch.object(module, "_build_local_game_cards_artifact", side_effect=_fake_game_cards_artifact):
+                state = module._run_refresh_via_cli(
+                    source_root=source_root,
+                    date_str="2026-05-22",
+                    regions="us",
+                    bookmakers="",
+                    markets="",
+                    do_edges=True,
+                    do_export=True,
+                    do_push=False,
+                    log_file=tmp_root / "refresh.log",
+                )
+
+        self.assertEqual(int(state["rc_export"]), 0)
+        self.assertIsNone(state["error"])
+        self.assertGreater(int(state["game_cards_rows"]), 0)
+        self.assertGreater(int(state["recs_rows"]), 0)
+
     def test_cli_backed_exports_prefer_existing_processed_files(self) -> None:
         module = self._load_module()
 

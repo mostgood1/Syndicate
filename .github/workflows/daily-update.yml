@@ -192,8 +192,8 @@ jobs:
             git remote set-url origin "https://x-access-token:$env:GITHUB_TOKEN@github.com/$repo"
           }
 
-          git fetch origin $branch || true
-          git rebase "origin/$branch" || true
+          git fetch origin $branch
+          git rebase --autostash "origin/$branch"
           Write-Host "Pushing commit to origin/$branch"
           git push origin "HEAD:$branch"
 

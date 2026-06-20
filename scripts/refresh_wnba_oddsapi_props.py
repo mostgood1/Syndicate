@@ -2851,6 +2851,7 @@ def _run_refresh_via_cli(
     )
     state["snapshot_alias_path"] = str(alias_path)
     state["snapshot_alias_rows"] = int(alias_rows)
+    _append_log(log_file, f"Snapshot stage finished for {date_str}: rc_snapshot={state['rc_snapshot']}, rows={state['snapshot_rows']}, alias_rows={state['snapshot_alias_rows']}")
     if alias_error and int(state["snapshot_rows"] or 0) > 0:
         state["error"] = f"snapshot alias write failed: {alias_error}"
 
@@ -2903,6 +2904,7 @@ def _run_refresh_via_cli(
                     _append_log(log_file, traceback.format_exc())
                     rc_pred = 1
             state["predictions_rows"] = int(_count_csv_rows_quick(pred_fp))
+            _append_log(log_file, f"Predictions stage finished for {date_str}: rc_pred={int(rc_pred)}, rows={state['predictions_rows']}")
             existing_edges_rows = int(_count_csv_rows_quick(edges_fp))
             existing_recs_rows = int(_count_csv_rows_quick(rec_fp))
             existing_game_cards_rows = int(_count_csv_rows_quick(source_root / 'data' / 'processed' / f'game_cards_{date_str}.csv'))
@@ -2946,6 +2948,7 @@ def _run_refresh_via_cli(
             rc_edges = 1
         state["rc_edges"] = int(rc_edges)
         state["edges_rows"] = int(_count_csv_rows_quick(edges_fp))
+        _append_log(log_file, f"Edges stage finished for {date_str}: rc_edges={int(rc_edges)}, rows={state['edges_rows']}")
         if int(rc_edges) != 0:
             state["error"] = f"props-edges failed with exit code {int(rc_edges)}"
         elif int(state["snapshot_rows"] or 0) > 0 and int(state["edges_rows"] or 0) <= 0:
@@ -2955,6 +2958,13 @@ def _run_refresh_via_cli(
         state["phase"] = "export"
         state["phase_started_at"] = dt.datetime.utcnow().isoformat()
         state["rc_export"] = -1
+        _append_log(log_file, f"Export stage starting for {date_str}: pred_ready={pred_ready}, snapshot_rows={int(state.get('snapshot_rows') or 0)}, edges_rows={int(state.get('edges_rows') or 0)}")
+        game_cards_rows = 0
+        local_game_cards_path = None
+        rc_game_cards = 1
+        local_recommendations_path = None
+        rc_recommendations = 1
+        rc_local_props_export = 0
         try:
             _touch_progress()
             game_input_rcs = _ensure_source_game_inputs(
@@ -2985,11 +2995,28 @@ def _run_refresh_via_cli(
         except Exception:
             _append_log(log_file, traceback.format_exc())
             rc_export = 1
+            game_cards_rows = int(_count_csv_rows_quick(source_root / 'data' / 'processed' / f'game_cards_{date_str}.csv'))
+            local_recommendations_path = processed_root / f"props_recommendations_{date_str}.csv"
+        state["game_cards_rows"] = int(game_cards_rows)
         state["rc_export"] = int(rc_export)
         state["recs_rows"] = int(_count_csv_rows_quick(rec_fp))
+        _append_log(log_file, f"Export stage finished for {date_str}: rc_export={state['rc_export']}, game_cards_rows={game_cards_rows}, recs_rows={state['recs_rows']}")
         source_game_cards_rows = int(_count_csv_rows_quick(source_root / 'data' / 'processed' / f'game_cards_{date_str}.csv'))
         if int(rc_export) != 0:
-            state["error"] = f"export-props-recommendations failed with exit code {int(rc_export)}"
+            export_artifacts_ready = (
+                int(state.get("snapshot_rows") or 0) > 0
+                and int(state.get("predictions_rows") or 0) > 0
+                and (not do_edges or int(state.get("edges_rows") or 0) > 0)
+                and int(state.get("recs_rows") or 0) > 0
+                and int(game_cards_rows or 0) > 0
+                and source_game_cards_rows > 0
+            )
+            if export_artifacts_ready:
+                _append_log(log_file, f"Export stage returned {rc_export} but required WNBA artifacts were present; treating as warning for {date_str}")
+                state["rc_export"] = 0
+                rc_export = 0
+            else:
+                state["error"] = f"export-props-recommendations failed with exit code {int(rc_export)}"
         elif int(state["snapshot_rows"] or 0) > 0 and source_game_cards_rows <= 0:
             state["error"] = f"local game_cards builder completed without writing rows to game_cards_{date_str}.csv"
 
