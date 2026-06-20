@@ -6,6 +6,7 @@ from datetime import date
 from datetime import datetime, timedelta
 import importlib.util
 import json
+import os
 from math import exp
 from pathlib import Path
 import re
@@ -1735,10 +1736,12 @@ def _daily_sim_by_game(selected_date: str, game_pks: list[int]) -> dict[int, dic
 def _daily_actual_by_game(selected_date: str, game_pks: list[int]) -> dict[int, dict[str, Any]]:
     out: dict[int, dict[str, Any]] = {}
     today_iso = central_today_iso()
+    allow_live_feed_fetch = str(os.environ.get("SYNDICATE_MLB_ALLOW_LIVE_FEED_FETCH") or "").strip().lower() in {"1", "true", "yes", "on"}
+    render_web_dyno = str(os.environ.get("RENDER") or "").strip().lower() in {"1", "true", "yes", "on"}
     for game_pk in game_pks:
         feed_path = raw_feed_live_path(selected_date, int(game_pk))
         payload = load_json_or_gz_file(feed_path)
-        if not isinstance(payload, dict) and selected_date == today_iso:
+        if not isinstance(payload, dict) and selected_date == today_iso and allow_live_feed_fetch and not render_web_dyno:
             payload = _fetch_current_feed_live(int(game_pk))
         if isinstance(payload, dict):
             out[int(game_pk)] = payload
