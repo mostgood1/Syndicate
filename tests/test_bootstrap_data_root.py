@@ -171,7 +171,7 @@ class BootstrapDataRootTests(unittest.TestCase):
         sync_mock.assert_called_once()
         bootstrap_mock.assert_called_once()
 
-    def test_main_skips_bootstrap_when_intelligence_state_exists(self) -> None:
+    def test_main_still_bootstraps_when_intelligence_state_exists(self) -> None:
         module = _load_module()
         with tempfile.TemporaryDirectory() as temp_dir:
             data_root = Path(temp_dir) / "data-root"
@@ -185,7 +185,7 @@ class BootstrapDataRootTests(unittest.TestCase):
                         exit_code = module.main()
 
         self.assertEqual(exit_code, 0)
-        sync_mock.assert_not_called()
+        sync_mock.assert_called_once()
         wnba_mock.assert_not_called()
 
 

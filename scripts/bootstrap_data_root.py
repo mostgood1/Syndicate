@@ -16,6 +16,20 @@ logger = logging.getLogger("bootstrap_data_root")
 logger.setLevel(logging.INFO)
 
 BOOTSTRAP_ROOTS = (
+    Path("data/mlb_source/source_artifacts"),
+    Path("data/mlb_source/manifests"),
+    Path("data/nba_source/source_artifacts"),
+    Path("data/nba_source/manifests"),
+    Path("data/nhl_source/source_artifacts"),
+    Path("data/nhl_source/manifests"),
+    Path("data/nfl_source/source_artifacts"),
+    Path("data/nfl_source/manifests"),
+    Path("data/ncaaf_source/source_artifacts"),
+    Path("data/ncaaf_source/manifests"),
+    Path("data/ncaab_source/source_artifacts"),
+    Path("data/ncaab_source/manifests"),
+    Path("data/wnba_source/source_artifacts"),
+    Path("data/wnba_source/manifests"),
     Path("reports/odds_control_plane"),
     Path("reports/intelligence"),
     Path("reports/daily_update/latest"),
@@ -142,8 +156,7 @@ def main() -> int:
 
     intelligence_latest_state_path = _intelligence_latest_state_path(data_root)
     if intelligence_latest_state_path.exists():
-        logger.info("Bootstrap skipped because intelligence state already exists at %s", intelligence_latest_state_path)
-        return 0
+        logger.info("Intelligence state already exists at %s; continuing bootstrap sync", intelligence_latest_state_path)
 
     # Merge the Render-critical published artifact roots into the mounted data root on startup.
     logger.info("Bootstrapping data root: repo=%s data_root=%s", repo_root, data_root)
