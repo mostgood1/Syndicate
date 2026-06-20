@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from copy import deepcopy
 import csv
 from datetime import date
 from datetime import datetime
@@ -32,6 +33,21 @@ from syndicate.features.wnba.sources import _source_roots as _wnba_source_roots
 from syndicate.features.shared.source_roots import repo_root_from as _repo_root_from
 from syndicate.features.shared.timezone import central_now
 from syndicate.features.shared.timezone import central_today_iso
+
+
+_WNBA_CARDS_CONTEXT_CACHE: dict[tuple[Any, ...], dict[str, Any]] = {}
+
+
+def _path_cache_signature(path: Path | None) -> int:
+    if path is None:
+        return 0
+    try:
+        if not path.exists() or not path.is_file():
+            return 0
+        stat = path.stat()
+        return int((stat.st_mtime_ns << 16) ^ int(stat.st_size))
+    except OSError:
+        return 0
 
 
 def _canonical_wnba_tri(team_tri: str) -> str:
@@ -630,13 +646,13 @@ def _artifact_bundle(selected_date: str) -> dict[str, Any]:
     rec_summary = load_json(paths["recommendations"])
 
     # Runtime WNBA fallback if the processed artifacts are empty.
-    if not rows:
+    if not rows and selected_date == central_today_iso():
         try:
             rows, _ = _games_from_live_state_fallback(selected_date)
         except Exception:
             rows = []
 
-    if not rows:
+    if not rows and selected_date == central_today_iso():
         try:
             public_payload = _public_scoreboard_live_state_payload(selected_date)
             rows = public_payload.get("games") if isinstance(public_payload, dict) and isinstance(public_payload.get("games"), list) else []
@@ -1465,6 +1481,20 @@ def _supplement_games_with_live_state(games: list[dict[str, Any]], selected_date
 
 def build_cards_page_context(selected_date: str, *, allow_stored_date_fallback: bool = False) -> dict[str, Any]:
     requested_date = str(selected_date or "").strip() or parse_iso_date(selected_date).isoformat()
+    cache_key = (
+        requested_date,
+        bool(allow_stored_date_fallback),
+        tuple(available_dates()),
+        _path_cache_signature(_artifact_paths(requested_date)["cards"]),
+        _path_cache_signature(_artifact_paths(requested_date)["recommendations"]),
+        _path_cache_signature(_artifact_paths(requested_date)["sim"]),
+        _path_cache_signature(_artifact_paths(requested_date)["props"]),
+        _path_cache_signature(live_snapshot_path(f"live_state_{requested_date}.jsonl")),
+    )
+    cached_context = _WNBA_CARDS_CONTEXT_CACHE.get(cache_key)
+    if cached_context is not None:
+        return deepcopy(cached_context)
+
     resolved_date = requested_date
     parsed_date = parse_iso_date(resolved_date)
     prev_date = (parsed_date - timedelta(days=1)).isoformat()
@@ -1483,7 +1513,7 @@ def build_cards_page_context(selected_date: str, *, allow_stored_date_fallback: 
             cards_path = str(live_source_path)
             recs_path = str(live_source_path)
 
-    if not games:
+    if not games and resolved_date == central_today_iso():
         live_games, live_source_path = _games_from_live_state_fallback(resolved_date)
         if live_games:
             games = live_games
@@ -1507,12 +1537,13 @@ def build_cards_page_context(selected_date: str, *, allow_stored_date_fallback: 
                     cards_path = str(live_source_path)
                     recs_path = str(live_source_path)
             if not games:
-                live_games, live_source_path = _games_from_live_state_fallback(resolved_date)
-                if live_games:
-                    games = live_games
-                    cards_path = live_source_path
-                    recs_path = live_source_path
-                    source_title = "WNBA live scoreboard fallback"
+                if resolved_date == central_today_iso():
+                    live_games, live_source_path = _games_from_live_state_fallback(resolved_date)
+                    if live_games:
+                        games = live_games
+                        cards_path = live_source_path
+                        recs_path = live_source_path
+                        source_title = "WNBA live scoreboard fallback"
 
     parsed_date = parse_iso_date(resolved_date)
     prev_date = (parsed_date - timedelta(days=1)).isoformat()
@@ -1528,7 +1559,7 @@ def build_cards_page_context(selected_date: str, *, allow_stored_date_fallback: 
         for game in games
     ]
 
-    return apply_game_board_contract(
+    result = apply_game_board_contract(
         {
             "date": resolved_date,
             "requested_date": requested_date,
@@ -1577,6 +1608,8 @@ def build_cards_page_context(selected_date: str, *, allow_stored_date_fallback: 
         source_kind="artifact_backed",
         live_lens_integrated=True,
     )
+    _WNBA_CARDS_CONTEXT_CACHE[cache_key] = deepcopy(result)
+    return deepcopy(result)
 
 
 @lru_cache(maxsize=64)

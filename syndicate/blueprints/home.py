@@ -3755,8 +3755,6 @@ def _load_home_games(slug: str, *, context_label: str, season: int | None = None
 
             payload = build_cards_page_context(context_label)
             games = list(payload.get("games") or [])
-            if is_active_today and not games:
-                games = _mlb_schedule_fallback_games(context_label)
             return _apply_mlb_live_scores(games, context_label) if is_active_today else games
         if slug == "nba":
             from syndicate.features.nba.cards import build_cards_page_context

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from copy import deepcopy
 import csv
 import json
 import math
@@ -15,6 +16,7 @@ from urllib import parse as urllib_parse
 from urllib import request as urllib_request
 
 from syndicate.features.nba.sources import build_module_links
+from syndicate.features.nba.sources import available_dates
 from syndicate.features.nba.sources import format_moneyline
 from syndicate.features.nba.sources import format_num
 from syndicate.features.nba.sources import format_signed_num
@@ -29,6 +31,21 @@ from syndicate.features.shared.game_board_contract import apply_game_board_contr
 from syndicate.features.shared.game_board_contract import build_game_board_api_payload
 from syndicate.features.shared.timezone import central_now
 from syndicate.features.shared.timezone import central_today_iso
+
+
+_NBA_CARDS_CONTEXT_CACHE: dict[tuple[Any, ...], dict[str, Any]] = {}
+
+
+def _path_cache_signature(path: Path | None) -> int:
+    if path is None:
+        return 0
+    try:
+        if not path.exists() or not path.is_file():
+            return 0
+        stat = path.stat()
+        return int((stat.st_mtime_ns << 16) ^ int(stat.st_size))
+    except OSError:
+        return 0
 
 
 def _remote_source_base_url() -> str:
@@ -562,17 +579,14 @@ def _artifact_paths(selected_date: str) -> dict[str, Path]:
 
 
 def _next_available_cards_date(selected_date: str, *, max_ahead_days: int = 14) -> str | None:
-    parsed_date = parse_iso_date(selected_date)
-    for offset in range(1, max_ahead_days + 1):
-        candidate = (parsed_date + timedelta(days=offset)).isoformat()
-        rows = _load_csv_rows(processed_path(f"game_cards_{candidate}.csv"))
-        if rows:
-            return candidate
-    for offset in range(1, max_ahead_days + 1):
-        candidate = (parsed_date - timedelta(days=offset)).isoformat()
-        rows = _load_csv_rows(processed_path(f"game_cards_{candidate}.csv"))
-        if rows:
-            return candidate
+    _ = max_ahead_days
+    dates = available_dates()
+    future_dates = [value for value in dates if value > selected_date]
+    if future_dates:
+        return future_dates[0]
+    past_dates = [value for value in dates if value < selected_date]
+    if past_dates:
+        return past_dates[-1]
     return None
 
 
@@ -2258,6 +2272,20 @@ def _next_available_actionable_cards_date(selected_date: str, *, max_days: int =
 
 def build_cards_page_context(selected_date: str, *, allow_stored_date_fallback: bool = False) -> dict[str, Any]:
     requested_date = str(selected_date or "").strip() or parse_iso_date(selected_date).isoformat()
+    cache_key = (
+        requested_date,
+        bool(allow_stored_date_fallback),
+        tuple(available_dates()),
+        _path_cache_signature(_artifact_paths(requested_date)["cards"]),
+        _path_cache_signature(_artifact_paths(requested_date)["recommendations"]),
+        _path_cache_signature(_artifact_paths(requested_date)["sim"]),
+        _path_cache_signature(_artifact_paths(requested_date)["props"]),
+        _path_cache_signature(live_snapshot_path(f"live_state_{requested_date}.jsonl")),
+    )
+    cached_context = _NBA_CARDS_CONTEXT_CACHE.get(cache_key)
+    if cached_context is not None:
+        return deepcopy(cached_context)
+
     resolved_date = requested_date
     source_title = "NBA processed game cards"
     parsed_date = parse_iso_date(resolved_date)
@@ -2274,7 +2302,7 @@ def build_cards_page_context(selected_date: str, *, allow_stored_date_fallback: 
             recs_path = str(live_source_path)
     has_actionable_data = _games_have_actionable_data(games)
 
-    if not games:
+    if not games and resolved_date == central_today_iso():
         live_games, live_source_path = _games_from_live_state_fallback(resolved_date)
         if live_games:
             games = live_games
@@ -2306,7 +2334,7 @@ def build_cards_page_context(selected_date: str, *, allow_stored_date_fallback: 
                     cards_path = str(live_source_path)
                     recs_path = str(live_source_path)
             has_actionable_data = _games_have_actionable_data(games)
-            if not games:
+            if not games and resolved_date == central_today_iso():
                 live_games, live_source_path = _games_from_live_state_fallback(resolved_date)
                 if live_games:
                     games = live_games
@@ -2315,7 +2343,7 @@ def build_cards_page_context(selected_date: str, *, allow_stored_date_fallback: 
                     source_title = "NBA live scoreboard fallback"
                     has_actionable_data = _games_have_actionable_data(games)
 
-    if _remote_source_fallback_enabled() and (not games or not has_actionable_data):
+    if _remote_source_fallback_enabled() and (not games or not has_actionable_data) and resolved_date == central_today_iso():
         remote_cards = _remote_cards_payload(resolved_date)
         remote_games = remote_cards.get("games") if isinstance(remote_cards, dict) and isinstance(remote_cards.get("games"), list) else []
         normalized_remote_games = [_normalize_remote_card_game(game) for game in remote_games if isinstance(game, dict)]
@@ -2391,7 +2419,9 @@ def build_cards_page_context(selected_date: str, *, allow_stored_date_fallback: 
         "module_links": build_module_links(resolved_date, "Cards"),
         "active_sport_name": "NBA",
     }
-    return apply_game_board_contract(context, sport="nba", module="cards")
+    result = apply_game_board_contract(context, sport="nba", module="cards")
+    _NBA_CARDS_CONTEXT_CACHE[cache_key] = deepcopy(result)
+    return deepcopy(result)
 
 
 def build_cards_api_payload(selected_date: str, *, allow_stored_date_fallback: bool = False) -> dict[str, Any]:

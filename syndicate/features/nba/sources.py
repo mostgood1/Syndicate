@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from functools import lru_cache
 import os
 from datetime import date
 from datetime import datetime
@@ -104,6 +105,37 @@ def _resolve_processed_candidates(filenames: list[str]) -> Path:
     return _processed_candidate_path(filenames[0], root=None)
 
 
+def _artifact_roots_signature() -> tuple[tuple[str, int], ...]:
+    signature: list[tuple[str, int]] = []
+    for root in _artifact_roots():
+        processed_dir = root / "data" / "processed"
+        try:
+            mtime_ns = int(processed_dir.stat().st_mtime_ns) if processed_dir.exists() else 0
+        except OSError:
+            mtime_ns = 0
+        signature.append((str(processed_dir).lower(), mtime_ns))
+    return tuple(signature)
+
+
+@lru_cache(maxsize=8)
+def _available_dates_cached(signature: tuple[tuple[str, int], ...]) -> tuple[str, ...]:
+    dates: set[str] = set()
+    roots = _artifact_roots()
+    if not roots:
+        return ()
+
+    for root in roots:
+        processed_dir = root / "data" / "processed"
+        if not processed_dir.exists():
+            continue
+        for pattern in ("recommendations_slate_*.json", "game_cards_*.csv", "cards_sim_detail_*.json"):
+            for path in processed_dir.glob(pattern):
+                match = _DATE_PATTERN.search(path.stem)
+                if match:
+                    dates.add(match.group(1))
+    return tuple(sorted(dates))
+
+
 def season_betting_card_manifest_path(season: int, *, profile: str = "retuned", requested_date: str | None = None) -> Path:
     profile_slug = str(profile or "retuned").strip().lower() or "retuned"
     filenames: list[str] = []
@@ -130,21 +162,7 @@ _DATE_PATTERN = re.compile(r"(\d{4}-\d{2}-\d{2})")
 
 
 def available_dates() -> list[str]:
-    dates: set[str] = set()
-    roots = _artifact_roots()
-    if not roots:
-        return []
-
-    for root in roots:
-        processed_dir = root / "data" / "processed"
-        if not processed_dir.exists():
-            continue
-        for pattern in ("recommendations_slate_*.json", "game_cards_*.csv", "cards_sim_detail_*.json"):
-            for path in processed_dir.glob(pattern):
-                match = _DATE_PATTERN.search(path.stem)
-                if match:
-                    dates.add(match.group(1))
-    return sorted(dates)
+    return list(_available_dates_cached(_artifact_roots_signature()))
 
 
 def default_date() -> str:

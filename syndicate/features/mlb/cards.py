@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from copy import deepcopy
 from collections import defaultdict
 from datetime import date
 from datetime import datetime, timedelta
@@ -42,6 +43,7 @@ from syndicate.features.shared.timezone import central_today_iso
 
 _MLB_TODAY_CACHE_TTL_SECONDS = 60
 _MLB_TODAY_CACHE: dict[tuple[str, str, int, int], dict[str, Any]] = {}
+_MLB_CARDS_CONTEXT_CACHE: dict[tuple[Any, ...], dict[str, Any]] = {}
 
 
 def _today_cache_bucket() -> int:
@@ -4251,6 +4253,15 @@ def build_cards_page_context(selected_date: str) -> dict[str, Any]:
     today_iso = central_today_iso()
     summary_path = daily_artifact_path(resolved_date)
     live_lens_path = live_lens_report_path(resolved_date)
+    page_cache_key = (
+        resolved_date,
+        tuple(available_dates),
+        _path_cache_signature(summary_path),
+        _path_cache_signature(live_lens_path),
+    )
+    cached_context = _MLB_CARDS_CONTEXT_CACHE.get(page_cache_key)
+    if cached_context is not None:
+        return deepcopy(cached_context)
     cache_key = None
     if selected_date == today_iso:
         cache_key = (
@@ -4398,6 +4409,7 @@ def build_cards_page_context(selected_date: str) -> dict[str, Any]:
         "cards_stylesheet": "mlb/cards_exact.css",
         "cards_script": "mlb/cards_source.js",
     }, sport="mlb", module="cards")
+    _MLB_CARDS_CONTEXT_CACHE[page_cache_key] = deepcopy(result)
     if cache_key is not None and games:
         _MLB_TODAY_CACHE[cache_key] = result
-    return result
+    return deepcopy(result)

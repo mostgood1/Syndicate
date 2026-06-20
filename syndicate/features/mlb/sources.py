@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from functools import lru_cache
 import gzip
 import json
 import os
@@ -127,6 +128,23 @@ def daily_artifact_path(selected_date: str, suffix: str = "") -> Path:
 
 
 def available_daily_summary_dates() -> list[str]:
+    return list(_available_daily_summary_dates_cached(_daily_summary_roots_signature()))
+
+
+def _daily_summary_roots_signature() -> tuple[tuple[str, int], ...]:
+    signature: list[tuple[str, int]] = []
+    for root in _artifact_roots():
+        daily_dir = root / "data" / "daily"
+        try:
+            mtime_ns = int(daily_dir.stat().st_mtime_ns) if daily_dir.exists() else 0
+        except OSError:
+            mtime_ns = 0
+        signature.append((str(daily_dir).lower(), mtime_ns))
+    return tuple(signature)
+
+
+@lru_cache(maxsize=8)
+def _available_daily_summary_dates_cached(signature: tuple[tuple[str, int], ...]) -> tuple[str, ...]:
     dates: set[str] = set()
     pattern = "daily_summary_*.json"
     for root in _artifact_roots():
@@ -138,7 +156,7 @@ def available_daily_summary_dates() -> list[str]:
             if not match or any(token in path.name for token in ("_hr_targets", "_rfi_targets", "_locked_policy")):
                 continue
             dates.add(f"{match.group(1)}-{match.group(2)}-{match.group(3)}")
-    return sorted(dates)
+    return tuple(sorted(dates))
 
 
 def daily_ladders_path(selected_date: str) -> Path:

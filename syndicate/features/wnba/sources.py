@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from functools import lru_cache
 from datetime import date
 from datetime import datetime
 import json
@@ -90,18 +91,7 @@ def load_json(path: Path) -> dict[str, Any] | None:
 
 
 def available_dates() -> list[str]:
-    dates: set[str] = set()
-    for root in _source_roots():
-        processed_dir = root / "data" / "processed"
-        if not processed_dir.exists():
-            continue
-        for pattern in ("game_cards_*.csv", "recommendations_slate_*.json"):
-            for path in sorted(processed_dir.glob(pattern)):
-                if path.stem.startswith("game_cards_"):
-                    dates.add(path.stem.replace("game_cards_", "", 1))
-                elif path.stem.startswith("recommendations_slate_"):
-                    dates.add(path.stem.replace("recommendations_slate_", "", 1))
-    return sorted(dates)
+    return list(_available_dates_cached(_source_roots_signature()))
 
 
 def default_date() -> str:
@@ -117,6 +107,34 @@ def default_date_for_season(season: int) -> str:
     if season_dates:
         return season_dates[-1]
     return default_date()
+
+
+def _source_roots_signature() -> tuple[tuple[str, int], ...]:
+    signature: list[tuple[str, int]] = []
+    for root in _source_roots():
+        processed_dir = root / "data" / "processed"
+        try:
+            mtime_ns = int(processed_dir.stat().st_mtime_ns) if processed_dir.exists() else 0
+        except OSError:
+            mtime_ns = 0
+        signature.append((str(processed_dir).lower(), mtime_ns))
+    return tuple(signature)
+
+
+@lru_cache(maxsize=8)
+def _available_dates_cached(signature: tuple[tuple[str, int], ...]) -> tuple[str, ...]:
+    dates: set[str] = set()
+    for root in _source_roots():
+        processed_dir = root / "data" / "processed"
+        if not processed_dir.exists():
+            continue
+        for pattern in ("game_cards_*.csv", "recommendations_slate_*.json"):
+            for path in sorted(processed_dir.glob(pattern)):
+                if path.stem.startswith("game_cards_"):
+                    dates.add(path.stem.replace("game_cards_", "", 1))
+                elif path.stem.startswith("recommendations_slate_"):
+                    dates.add(path.stem.replace("recommendations_slate_", "", 1))
+    return tuple(sorted(dates))
 
 
 def format_num(value: Any) -> str:
