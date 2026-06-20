@@ -151,8 +151,8 @@
   }
 
   async function fetchApiJson(url, fallbackMessage, options = {}) {
-    const retries = Math.max(0, Number(options?.retries) || 0);
-    const retryDelayMs = Math.max(100, Number(options?.retryDelayMs) || 700);
+    const retries = Math.min(3, Math.max(0, Number(options?.retries) || 0));
+    const retryDelayMs = Math.max(5000, Number(options?.retryDelayMs) || 5000);
     let lastError = null;
 
     for (let attempt = 0; attempt <= retries; attempt += 1) {
@@ -164,7 +164,7 @@
         if (attempt >= retries || !isRetryableApiError(error)) {
           throw error;
         }
-        await waitFor(retryDelayMs * (attempt + 1));
+        await waitFor(Math.min(10000, retryDelayMs + (attempt * 2500)));
       }
     }
 
@@ -6039,6 +6039,19 @@
     gridEl.innerHTML = filteredGames.map(renderGameCard).join('');
   }
 
+  function renderDataUnavailableState(message) {
+    const detail = String(message || 'Data unavailable.').trim() || 'Data unavailable.';
+    state.boardInitialized = false;
+    if (headerMeta) {
+      headerMeta.textContent = 'Data unavailable';
+    }
+    if (sourceMeta) {
+      sourceMeta.innerHTML = `<span>${escapeHtml(detail)}</span>`;
+    }
+    scoreboardRoot.innerHTML = '<div class="cards-loading-strip">Data unavailable.</div>';
+    gridRoot.innerHTML = '<div class="cards-empty-state">Data unavailable.</div>';
+  }
+
   async function loadBoard(options = {}) {
     const silent = Boolean(options?.silent);
     const epoch = state.refreshEpoch + 1;
@@ -6050,7 +6063,7 @@
       const payload = await fetchApiJson(
         `${CARDS_PAYLOAD_PATH}?date=${encodeURIComponent(state.date)}${cardsQuerySuffix}`,
         'Failed to load game cards.',
-        { retries: silent ? 2 : 4 }
+        { retries: silent ? 2 : 3, retryDelayMs: 5000 }
       );
       if (epoch !== state.refreshEpoch) {
         return;
@@ -6108,25 +6121,15 @@
       }
       if (silent && state.payload && state.boardInitialized) {
         state.liveDataLoading = false;
-        if (!isRetryableApiError(error)) {
-          showNote(error?.message || 'Failed to refresh slate.', 'warning');
-        }
+        showNote('Data unavailable.', 'warning');
         return;
       }
       state.payload = null;
       state.propsStripPayload = null;
       clearPropsStrip();
-      state.boardInitialized = false;
       state.liveDataLoading = false;
-      if (headerMeta) {
-        headerMeta.textContent = 'Failed to load slate.';
-      }
-      if (sourceMeta) {
-        sourceMeta.innerHTML = `<span>${escapeHtml(error?.message || 'Failed to load slate metadata.')}</span>`;
-      }
-      scoreboardRoot.innerHTML = '<div class="cards-loading-strip">Failed to load scoreboard.</div>';
-      gridRoot.innerHTML = `<div class="cards-empty-state">${escapeHtml(error?.message || 'Failed to load slate.')}</div>`;
-      showNote(error?.message || 'Failed to load slate.', 'warning');
+      renderDataUnavailableState(error?.message || 'Data unavailable.');
+      showNote('Data unavailable.', 'warning');
     }
   }
 

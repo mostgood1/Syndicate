@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+from collections import deque
 from datetime import date
 from pathlib import Path
+import threading
+import time
 from urllib.error import HTTPError
 from urllib.error import URLError
 from urllib.request import Request
@@ -47,6 +50,12 @@ from syndicate.features.shared.timezone import central_year
 
 
 wnba_bp = Blueprint("syndicate_wnba", __name__, url_prefix="/wnba")
+
+
+_WNBA_API_THROTTLE_LOCK = threading.Lock()
+_WNBA_API_THROTTLE_STATE: dict[str, dict[str, object]] = {}
+_WNBA_API_THROTTLE_WINDOW_SECONDS = 8.0
+_WNBA_API_THROTTLE_MAX_REQUESTS = 1
 
 
 _WNBA_OFFICIAL_LOGO_TEAM_IDS: dict[str, int] = {
@@ -103,6 +112,63 @@ def _snapshot_unavailable_payload() -> dict:
         "error": "snapshot_unavailable",
         "cards": [],
     }
+
+
+def _throttled_api_payload(selected_date: str, endpoint_name: str, retry_after_seconds: int = 8) -> dict[str, object]:
+    return {
+        "ok": False,
+        "error": "throttled",
+        "status": "throttled",
+        "endpoint": endpoint_name,
+        "date": selected_date,
+        "requested_date": selected_date,
+        "cards": [],
+        "games": [],
+        "retry_after_seconds": int(retry_after_seconds),
+    }
+
+
+def _throttle_request_key(endpoint_name: str, selected_date: str) -> str:
+    query = request.query_string.decode("utf-8") if request.query_string else ""
+    return f"{endpoint_name}:{selected_date}:{query}"
+
+
+def _acquire_wnba_api_throttle(endpoint_name: str, selected_date: str) -> tuple[str | None, Response | None]:
+    now = time.monotonic()
+    throttle_key = _throttle_request_key(endpoint_name, selected_date)
+    with _WNBA_API_THROTTLE_LOCK:
+        state = _WNBA_API_THROTTLE_STATE.setdefault(
+            throttle_key,
+            {"recent": deque(), "in_flight": 0},
+        )
+        recent = state["recent"]
+        if not isinstance(recent, deque):
+            recent = deque()
+            state["recent"] = recent
+        while recent and now - float(recent[0]) > _WNBA_API_THROTTLE_WINDOW_SECONDS:
+            recent.popleft()
+        in_flight = int(state.get("in_flight") or 0)
+        if in_flight > 0 or len(recent) >= _WNBA_API_THROTTLE_MAX_REQUESTS:
+            response = jsonify(_throttled_api_payload(selected_date, endpoint_name))
+            response.status_code = 429
+            response.headers["Retry-After"] = "8"
+            response.headers["Cache-Control"] = "no-store"
+            return None, response
+        recent.append(now)
+        state["in_flight"] = in_flight + 1
+    return throttle_key, None
+
+
+def _release_wnba_api_throttle(throttle_key: str | None) -> None:
+    if not throttle_key:
+        return
+    with _WNBA_API_THROTTLE_LOCK:
+        state = _WNBA_API_THROTTLE_STATE.get(throttle_key)
+        if not isinstance(state, dict):
+            return
+        in_flight = int(state.get("in_flight") or 0)
+        if in_flight > 0:
+            state["in_flight"] = in_flight - 1
 
 
 def _query_string() -> str:
@@ -354,10 +420,15 @@ def api_source_team_logo(team_id: str):
 @wnba_bp.get("/api/source/cards")
 def api_source_cards():
     selected_date = _selected_date()
+    throttle_key, throttle_response = _acquire_wnba_api_throttle("api_source_cards", selected_date)
+    if throttle_response is not None:
+        return throttle_response
     try:
         return jsonify(build_source_cards_payload(selected_date, allow_stored_date_fallback=_allow_stored_date_fallback()))
     except Exception:
         return jsonify(_snapshot_unavailable_payload())
+    finally:
+        _release_wnba_api_throttle(throttle_key)
 
 
 @wnba_bp.get("/api/source/cards/sim-detail")
@@ -366,7 +437,14 @@ def api_source_cards_sim_detail():
     home_tri = str(request.args.get("home") or "").strip().upper()
     if not away_tri or not home_tri:
         return jsonify({"error": "missing home/away"}), 400
-    return jsonify(build_source_cards_sim_detail_payload(_selected_date(), away_tri, home_tri))
+    selected_date = _selected_date()
+    throttle_key, throttle_response = _acquire_wnba_api_throttle("api_source_cards_sim_detail", selected_date)
+    if throttle_response is not None:
+        return throttle_response
+    try:
+        return jsonify(build_source_cards_sim_detail_payload(selected_date, away_tri, home_tri))
+    finally:
+        _release_wnba_api_throttle(throttle_key)
 
 
 @wnba_bp.get("/api/source/cards/props-strip")
@@ -381,7 +459,14 @@ def api_source_cards_props_strip():
         per_game_limit = 8
     limit = max(1, min(24, limit))
     per_game_limit = max(1, min(8, per_game_limit))
-    return jsonify(build_source_cards_props_strip_payload(_selected_date(), limit=limit, per_game_limit=per_game_limit))
+    selected_date = _selected_date()
+    throttle_key, throttle_response = _acquire_wnba_api_throttle("api_source_cards_props_strip", selected_date)
+    if throttle_response is not None:
+        return throttle_response
+    try:
+        return jsonify(build_source_cards_props_strip_payload(selected_date, limit=limit, per_game_limit=per_game_limit))
+    finally:
+        _release_wnba_api_throttle(throttle_key)
 
 
 @wnba_bp.get("/game/<game_pk>")
@@ -401,6 +486,9 @@ def api_game_detail(game_pk: str):
 @wnba_bp.get("/api/cards")
 def api_cards():
     selected_date = _selected_date()
+    throttle_key, throttle_response = _acquire_wnba_api_throttle("api_cards", selected_date)
+    if throttle_response is not None:
+        return throttle_response
     try:
         context = build_cards_page_context(selected_date, allow_stored_date_fallback=False)
     except Exception:
@@ -420,6 +508,8 @@ def api_cards():
         except Exception as error:
             print("WNBA SNAPSHOT ERROR:", error)
             return jsonify(_snapshot_unavailable_payload())
+    finally:
+        _release_wnba_api_throttle(throttle_key)
     try:
         return jsonify(build_game_board_api_payload(context))
     except Exception as error:
@@ -494,17 +584,29 @@ def market_accuracy():
 @wnba_bp.get("/api/live-lens")
 def api_live_lens():
     selected_date = _selected_date()
+    throttle_key, throttle_response = _acquire_wnba_api_throttle("api_live_lens", selected_date)
+    if throttle_response is not None:
+        return throttle_response
     try:
         return jsonify(build_live_lens_api_payload(selected_date))
     except Exception as error:
         print("WNBA SNAPSHOT ERROR:", error)
         return jsonify(_snapshot_unavailable_payload())
+    finally:
+        _release_wnba_api_throttle(throttle_key)
 
 
 @wnba_bp.get("/api/live-player-props-audit")
 @wnba_bp.get("/api/live_player_props_projection_audit")
 def api_live_player_props_audit():
-    payload = build_live_prop_audit_payload(_query_string())
+    selected_date = _selected_date()
+    throttle_key, throttle_response = _acquire_wnba_api_throttle("api_live_player_props_audit", selected_date)
+    if throttle_response is not None:
+        return throttle_response
+    try:
+        payload = build_live_prop_audit_payload(_query_string())
+    finally:
+        _release_wnba_api_throttle(throttle_key)
     if not isinstance(payload, dict):
         return jsonify({"ok": False, "error": "failed to load live player props audit"}), 502
     return jsonify(payload)
@@ -513,7 +615,14 @@ def api_live_player_props_audit():
 @wnba_bp.get("/api/live-player-props-lens-accuracy")
 @wnba_bp.get("/api/live_player_props_lens_analytics")
 def api_live_player_props_lens_accuracy():
-    payload = build_live_prop_accuracy_payload(_query_string())
+    selected_date = _selected_date()
+    throttle_key, throttle_response = _acquire_wnba_api_throttle("api_live_player_props_lens_accuracy", selected_date)
+    if throttle_response is not None:
+        return throttle_response
+    try:
+        payload = build_live_prop_accuracy_payload(_query_string())
+    finally:
+        _release_wnba_api_throttle(throttle_key)
     if not isinstance(payload, dict):
         return jsonify({"ok": False, "error": "failed to load live player props lens accuracy"}), 502
     return jsonify(payload)
