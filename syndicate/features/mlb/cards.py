@@ -4401,7 +4401,6 @@ def build_cards_page_context(selected_date: str) -> dict[str, Any]:
         "intro_title": "MLB Cards",
         "intro_body": "This is the first real Syndicate route expanded from the MLB app. The layout now follows the MLB card-page structure, and reusable pieces are being extracted into the shared layer immediately.",
         "hr_targets_shelf": _hr_targets_shelf(resolved_date),
-        "card_detail_payloads": card_detail_payloads,
         "show_app_header": False,
         "show_intro": False,
         "show_source_summary": False,
