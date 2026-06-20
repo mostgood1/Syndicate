@@ -1757,7 +1757,6 @@ def source_cards_api_payload(context: dict[str, Any]) -> dict[str, Any]:
     games = context.get("games") if isinstance(context.get("games"), list) else []
     hr_targets = context.get("hr_targets_shelf") if isinstance(context.get("hr_targets_shelf"), dict) else None
     hr_rows = hr_targets.get("rows") if hr_targets and isinstance(hr_targets.get("rows"), list) else []
-    card_detail_payloads = context.get("card_detail_payloads") if isinstance(context.get("card_detail_payloads"), dict) else {}
     selected_date = str(context.get("date") or "").strip()
     today_iso = central_today_iso()
     cache_key = None
@@ -1790,12 +1789,6 @@ def source_cards_api_payload(context: dict[str, Any]) -> dict[str, Any]:
         tracked_lines = _tracked_game_lines_for_source_card(game, game_lines_index)
         merged_game = dict(game)
         merged_game["trackedGameLines"] = tracked_lines
-        try:
-            game_pk = int(merged_game.get("gamePk") or merged_game.get("game_pk") or 0)
-        except Exception:
-            game_pk = 0
-        if game_pk and isinstance(card_detail_payloads.get(game_pk), dict):
-            merged_game["details"] = dict(card_detail_payloads.get(game_pk) or {})
 
         existing_markets = merged_game.get("markets") if isinstance(merged_game.get("markets"), dict) else {}
         tracked_markets = _markets_from_tracked_game_lines(tracked_lines)
@@ -1940,35 +1933,6 @@ def source_cards_api_payload(context: dict[str, Any]) -> dict[str, Any]:
         market_warnings.append("hitter props are unavailable for this slate")
     lineup_health = _lineup_health_summary(lineups_path, lineups_doc)
     workflow = _workflow_summary(ops_report_path, ops_report_doc)
-    card_detail_payloads: dict[int, dict[str, Any]] = {}
-    live_lens_by_game_pk: dict[int, dict[str, Any]] = {}
-    if isinstance(live_lens_report, dict):
-        for row in live_lens_rows:
-            if not isinstance(row, dict):
-                continue
-            try:
-                game_pk = int(row.get("gamePk") or 0)
-            except Exception:
-                game_pk = 0
-            if game_pk:
-                live_lens_by_game_pk[game_pk] = row
-    for game in games:
-        if not isinstance(game, dict):
-            continue
-        try:
-            game_pk = int(game.get("gamePk") or game.get("game_pk") or 0)
-        except Exception:
-            game_pk = 0
-        if not game_pk:
-            continue
-        card_detail_payloads[game_pk] = _source_card_detail_payload(
-            selected_date,
-            game_pk,
-            sim_payload=sim_games.get(game_pk),
-            actual_payload=actual_games.get(game_pk),
-            live_lens_row=live_lens_by_game_pk.get(game_pk),
-        )
-
     game_lines_summary = _snapshot_market_summary(
         game_lines_path,
         game_lines_doc,
