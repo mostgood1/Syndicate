@@ -656,7 +656,7 @@ def _artifact_bundle(selected_date: str) -> dict[str, Any]:
         except Exception:
             rows = []
 
-    if not rows and selected_date == central_today_iso():
+    if not rows and selected_date == central_today_iso() and not _render_web_dyno():
         try:
             public_payload = _public_scoreboard_live_state_payload(selected_date)
             rows = public_payload.get("games") if isinstance(public_payload, dict) and isinstance(public_payload.get("games"), list) else []
