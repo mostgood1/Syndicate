@@ -114,6 +114,7 @@ def _run_tick() -> dict[str, object]:
     if not validate_live_lens_snapshot(snapshot):
         logger.warning("INVALID LIVE LENS STATE", extra={"path": _snapshot_path_text(), "date": snapshot.get("date") if isinstance(snapshot, dict) else None})
         return snapshot
+    print("WNBA SNAPSHOT WRITTEN:", len(snapshot.get("cards") or []))
     write_json_file(LIVE_LENS_SNAPSHOT_PATH, snapshot)
     logger.info(
         "WNBA LIVE LENS UPDATED",

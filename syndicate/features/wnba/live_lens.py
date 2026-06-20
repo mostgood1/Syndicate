@@ -114,7 +114,7 @@ def _snapshot_context(selected_date: str, payload: dict[str, Any] | None) -> dic
         aria_label=_snapshot_text(snapshot, "aria_label", "WNBA live lens board"),
         source_path=source_path,
         source_title=_snapshot_text(snapshot, "source_title", "WNBA live lens snapshot"),
-        rank_cards=rank_cards,
+            cards=rank_cards,
         using_sample_data=bool(snapshot.get("using_sample_data", False)),
         header_stats=header_stats,
         module_links=[dict(link) for link in (_snapshot_list(snapshot, "module_links") or build_module_links(resolved_date, "Live Lens")) if isinstance(link, dict)],
@@ -182,10 +182,12 @@ def _value_has_non_finite_number(value: Any) -> bool:
 def validate_live_lens_snapshot(snapshot: Any) -> bool:
     if not isinstance(snapshot, dict):
         return False
-    rank_cards = snapshot.get("rank_cards")
-    if rank_cards is None:
-        rank_cards = snapshot.get("cards")
-    if not isinstance(rank_cards, list):
+    if not str(snapshot.get("date") or "").strip():
+        return False
+    if not isinstance(snapshot.get("games"), list):
+        return False
+    cards = snapshot.get("cards")
+    if not isinstance(cards, list):
         return False
     if _value_has_non_finite_number(snapshot):
         return False
@@ -271,6 +273,7 @@ def build_live_lens_snapshot(selected_date: str, *, limit: int = 50) -> dict[str
         empty_state=empty_state,
     )
     context["games"] = games
+    context["cards"] = [dict(card) for card in rank_cards]
     context["requested_date"] = resolved_date
     context["lookahead_applied"] = bool(cards_context.get("lookahead_applied", False))
     context["players_included"] = False

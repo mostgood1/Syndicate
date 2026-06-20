@@ -39,6 +39,7 @@ class WnbaLiveLensWorkerTests(unittest.TestCase):
             snapshot = build_live_lens_snapshot("2026-06-19")
 
         self.assertEqual(len(snapshot.get("rank_cards") or []), 50)
+        self.assertEqual(len(snapshot.get("cards") or []), 50)
         self.assertEqual((snapshot.get("api_payload") or {}).get("date"), "2026-06-19")
         self.assertEqual((snapshot.get("api_payload") or {}).get("rank_cards") and len(snapshot["api_payload"]["rank_cards"]), 50)
 
@@ -48,12 +49,18 @@ class WnbaLiveLensWorkerTests(unittest.TestCase):
 
         self.assertEqual(snapshot.get("date"), "2026-06-19")
         self.assertEqual(snapshot.get("rank_cards"), [])
+        self.assertEqual(snapshot.get("cards"), [])
         self.assertEqual((snapshot.get("empty_state") or {}).get("eyebrow"), "WNBA live lens")
         self.assertEqual((snapshot.get("api_payload") or {}).get("rank_cards"), [])
 
     def test_snapshot_validator_rejects_nan_values(self) -> None:
         snapshot = {"rank_cards": [{"title": "Bad", "metrics": [{"label": "Score", "value": float("nan")}] }]}
         self.assertFalse(validate_live_lens_snapshot(snapshot))
+
+    def test_snapshot_validator_requires_games_cards_and_date(self) -> None:
+        self.assertFalse(validate_live_lens_snapshot({"date": "2026-06-19", "games": [], "rank_cards": []}))
+        self.assertFalse(validate_live_lens_snapshot({"games": [], "cards": [], "rank_cards": []}))
+        self.assertFalse(validate_live_lens_snapshot({"date": "2026-06-19", "cards": [], "rank_cards": []}))
 
     def test_worker_skips_write_when_snapshot_is_invalid(self) -> None:
         invalid_snapshot = {"date": "2026-06-19", "rank_cards": [{"title": "Bad", "metrics": [{"label": "Score", "value": float("nan")}] }]}

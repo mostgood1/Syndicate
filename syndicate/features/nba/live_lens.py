@@ -583,26 +583,45 @@ def read_latest_live_lens_snapshot() -> dict[str, Any] | None:
     return dict(snapshot) if isinstance(snapshot, dict) else None
 
 
+def _safe_empty_live_lens_response(selected_date: str) -> dict[str, Any]:
+    return {
+        "games": [],
+        "cards": [],
+        "date": selected_date,
+        "status": "empty",
+    }
+
+
 def read_latest_live_lens_page_context(selected_date: str, *, season: int | None = None, profile: str | None = None) -> dict[str, Any]:
-    snapshot = read_latest_live_lens_snapshot()
-    return _snapshot_route_context(selected_date, season=season, profile=profile, snapshot=snapshot)
+    try:
+        snapshot = read_latest_live_lens_snapshot()
+        if not isinstance(snapshot, dict):
+            return _safe_empty_live_lens_response(selected_date)
+        return _snapshot_route_context(selected_date, season=season, profile=profile, snapshot=snapshot)
+    except Exception as error:
+        print("WNBA SNAPSHOT ERROR:", error)
+        return _safe_empty_live_lens_response(selected_date)
 
 
 def read_latest_live_lens_api_payload(selected_date: str) -> dict[str, Any]:
-    snapshot = read_latest_live_lens_snapshot()
-    if snapshot is None:
-        return _empty_live_lens_api_payload(selected_date)
-    api_payload = _coerce_snapshot_payload(snapshot, key="api_payload")
-    if api_payload is None:
-        return _empty_live_lens_api_payload(selected_date)
-    payload = dict(api_payload)
-    payload.setdefault("ok", True)
-    payload.setdefault("requested_date", selected_date)
-    payload.setdefault("lookahead_applied", False)
-    payload.setdefault("players_included", False)
-    payload.setdefault("pregame_portfolio", {"enabled": False, "selected": 0, "candidates": 0})
-    payload.setdefault("games", [])
-    return payload
+    try:
+        snapshot = read_latest_live_lens_snapshot()
+        if not isinstance(snapshot, dict):
+            return _safe_empty_live_lens_response(selected_date)
+        api_payload = _coerce_snapshot_payload(snapshot, key="api_payload")
+        if api_payload is None:
+            return _safe_empty_live_lens_response(selected_date)
+        payload = dict(api_payload)
+        payload.setdefault("ok", True)
+        payload.setdefault("requested_date", selected_date)
+        payload.setdefault("lookahead_applied", False)
+        payload.setdefault("players_included", False)
+        payload.setdefault("pregame_portfolio", {"enabled": False, "selected": 0, "candidates": 0})
+        payload.setdefault("games", [])
+        return payload
+    except Exception as error:
+        print("WNBA SNAPSHOT ERROR:", error)
+        return _safe_empty_live_lens_response(selected_date)
 
 
 def read_latest_live_player_lens_payload(selected_date: str, event_ids: list[str], ttl: int = 20, *, allow_stored_date_fallback: bool = True) -> dict[str, Any]:

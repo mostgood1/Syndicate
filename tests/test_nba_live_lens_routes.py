@@ -7,6 +7,35 @@ from syndicate.app import create_app
 
 
 class NbaLiveLensRouteTests(unittest.TestCase):
+    def test_nba_live_lens_snapshot_readers_return_empty_contract_on_failure(self) -> None:
+        from syndicate.features.nba import live_lens as nba_live_lens
+
+        with patch.object(nba_live_lens, "_load_live_lens_snapshot", side_effect=FileNotFoundError("missing snapshot")), patch(
+            "builtins.print"
+        ) as mocked_print:
+            page_context = nba_live_lens.read_latest_live_lens_page_context("2026-06-05", season=2026, profile="retuned")
+            api_payload = nba_live_lens.read_latest_live_lens_api_payload("2026-06-05")
+
+        expected = {
+            "games": [],
+            "cards": [],
+            "date": "2026-06-05",
+            "status": "empty",
+        }
+
+        self.assertEqual(page_context, expected)
+        self.assertEqual(api_payload, expected)
+        self.assertGreaterEqual(mocked_print.call_count, 2)
+        self.assertTrue(
+            any(
+                call.args
+                and call.args[0] == "WNBA SNAPSHOT ERROR:"
+                and len(call.args) > 1
+                and isinstance(call.args[1], FileNotFoundError)
+                for call in mocked_print.call_args_list
+            )
+        )
+
     def test_nba_live_lens_routes_read_snapshot_payloads(self) -> None:
         app = create_app()
         app.config.update(TESTING=True)
@@ -92,9 +121,9 @@ class NbaLiveLensRouteTests(unittest.TestCase):
         self.assertEqual(lines_response.get_json(), lines_payload)
         self.assertEqual(pbp_response.status_code, 200)
         self.assertEqual(pbp_response.get_json(), pbp_payload)
-        mocked_player.assert_called_once_with("2026-06-05", ["evt-1"], ttl=20, allow_stored_date_fallback=True)
-        mocked_lines.assert_called_once_with("2026-06-05", ["evt-1"], ttl=20, include_period_totals=True, allow_stored_date_fallback=True)
-        mocked_pbp.assert_called_once_with("2026-06-05", ["evt-1"], ttl=20, allow_stored_date_fallback=True)
+        mocked_player.assert_called_once_with("2026-06-05", ["evt-1"], ttl=20, allow_stored_date_fallback=False)
+        mocked_lines.assert_called_once_with("2026-06-05", ["evt-1"], ttl=20, include_period_totals=True, allow_stored_date_fallback=False)
+        mocked_pbp.assert_called_once_with("2026-06-05", ["evt-1"], ttl=20, allow_stored_date_fallback=False)
 
 
 if __name__ == "__main__":
