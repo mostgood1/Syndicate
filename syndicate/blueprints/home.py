@@ -7,6 +7,7 @@ from datetime import date
 from datetime import datetime
 from datetime import timedelta
 from datetime import timezone
+import logging
 import os
 from pathlib import Path
 import re
@@ -52,6 +53,7 @@ from syndicate.features.shared.timezone import central_year
 
 
 home_bp = Blueprint("syndicate_home", __name__)
+_LOGGER = logging.getLogger(__name__)
 
 _HOME_OVERVIEW_TTL_SEC = 10.0
 _HOME_OVERVIEW_CACHE: dict[str, tuple[float, dict[str, Any]]] = {}
@@ -4211,14 +4213,14 @@ def _build_sport_overview(
     }
     props_count = _dashboard_prop_count(overview)
     overview["props_count"] = props_count
-    overview["show_on_home"] = bool(active_today and games_count > 0)
+    overview["show_on_home"] = bool(active_today)
     data_warnings: list[str] = []
     if active_today and games_count <= 0:
         data_warnings.append("No game rows surfaced")
     if props_count <= 0:
         data_warnings.append("No prop rows surfaced")
     if active_today and slug == "wnba" and (games_count <= 0 or props_count <= 0):
-        current_app.logger.warning(
+        _LOGGER.warning(
             "WNBA overview source missing for %s: games=%s pregame=%s live=%s dashboard_games=%s",
             context_label,
             games_count,
@@ -4238,7 +4240,7 @@ def build_home_overview(
     selected_date: str | None = None,
     force_refresh: bool = False,
 ) -> list[dict[str, Any]]:
-    today_value = str(selected_date or central_today_iso()).strip() or central_today_iso()
+    today_value = str(selected_date or date.today().isoformat()).strip() or date.today().isoformat()
     preserve_requested_date = selected_date is not None
     sport_items = [sport for sport in sports if isinstance(sport, dict)]
     if len(sport_items) <= 1:
@@ -4281,7 +4283,7 @@ def build_home_overview(
 
 
 def _home_payload(*, selected_date: str | None = None, cached_only: bool = False, force_refresh: bool = False) -> dict[str, Any]:
-    effective_date = str(selected_date or central_today_iso()).strip() or central_today_iso()
+    effective_date = str(selected_date or date.today().isoformat()).strip() or date.today().isoformat()
     cache_key = effective_date
     now = time.monotonic()
     cached = _HOME_PAYLOAD_CACHE.get(cache_key)
@@ -4328,6 +4330,23 @@ def _build_light_home_sports(selected_date: str | None = None) -> list[dict[str,
             continue
         slug = str(sport.get("slug") or "").strip()
         name = str(sport.get("name") or slug.upper() or "Sport").strip()
+        live_links: list[dict[str, str]] = []
+        if slug == "mlb":
+            live_links = [{"href": f"/mlb/live-lens?date={context_label}", "label": "Open Live Lens"}]
+        elif slug == "nba":
+            live_links = [{"href": f"/nba/season/{central_year()}/live-lens?date={context_label}&profile=retuned", "label": "Open Live Lens"}]
+        elif slug == "nhl":
+            live_links = [{"href": f"/nhl/live-lens?date={context_label}", "label": "Open Live Lens"}]
+        elif slug == "wnba":
+            live_links = [{"href": f"/wnba/live-lens?date={context_label}", "label": "Open Live Lens"}]
+        elif slug == "ncaab":
+            live_links = [{"href": f"/ncaab/live-lens?date={context_label}", "label": "Open Live Lens"}]
+        elif slug == "ncaaf":
+            live_links = [{"href": f"/ncaaf/live-lens?week={ncaaf_default_week()}", "label": "Open Live Lens"}]
+        elif slug == "nfl":
+            nfl_season = nfl_latest_season()
+            nfl_week = (nfl_tracked_week() or {}).get("week") or nfl_default_week(nfl_season)
+            live_links = [{"href": f"/nfl/live-lens?season={nfl_season}&week={nfl_week}", "label": "Open Live Lens"}]
         sports.append(
             {
                 "slug": slug,
@@ -4347,7 +4366,7 @@ def _build_light_home_sports(selected_date: str | None = None) -> list[dict[str,
                 "active_today": False,
                 "data_warnings": [],
                 "overview_stats": [],
-                "home_rails": {"compact": empty_game_rail, "pregame": empty_prop_rail, "live": empty_live_rail},
+                "home_rails": {"compact": empty_game_rail, "pregame": empty_prop_rail, "live": {**empty_live_rail, "links": live_links}},
                 "game_bar": {"opportunity_tags": []},
                 "props_bar": {"opportunity_tags": []},
                 "feature_links": [],

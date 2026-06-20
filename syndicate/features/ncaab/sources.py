@@ -81,7 +81,7 @@ def latest_date() -> str:
 
 
 def default_date() -> str:
-    return central_today_iso()
+    return date.today().isoformat()
 
 
 def schedule_dates() -> list[str]:

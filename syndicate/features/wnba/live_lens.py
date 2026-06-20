@@ -114,7 +114,7 @@ def _snapshot_context(selected_date: str, payload: dict[str, Any] | None) -> dic
         aria_label=_snapshot_text(snapshot, "aria_label", "WNBA live lens board"),
         source_path=source_path,
         source_title=_snapshot_text(snapshot, "source_title", "WNBA live lens snapshot"),
-            cards=rank_cards,
+        rank_cards=rank_cards,
         using_sample_data=bool(snapshot.get("using_sample_data", False)),
         header_stats=header_stats,
         module_links=[dict(link) for link in (_snapshot_list(snapshot, "module_links") or build_module_links(resolved_date, "Live Lens")) if isinstance(link, dict)],

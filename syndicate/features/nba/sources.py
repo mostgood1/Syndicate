@@ -148,7 +148,7 @@ def available_dates() -> list[str]:
 
 
 def default_date() -> str:
-    return central_today_iso()
+    return date.today().isoformat()
 
 
 def default_date_for_season(season: int) -> str:

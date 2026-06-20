@@ -4235,6 +4235,8 @@ def _games_from_daily_summary(summary: dict[str, Any], *, betting_games: dict[in
                 "predictions": _source_predictions(output),
                 "markets": markets,
                 "first1BetSignal": dict(first1_signal) if isinstance(first1_signal, dict) else None,
+                "run_projection_rows": _run_projection_rows(output),
+                "segment_overview_cards": _segment_overview_cards(output, betting_game),
             }
         )
     return games
