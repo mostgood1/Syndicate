@@ -60,13 +60,17 @@
         </div>
       {% endfor %}
     {% else %}
-      {% for metric in game.metrics[:5] %}
-        <div class="cards-market-tile">
-          <div class="cards-market-label">{{ metric.label }}</div>
-          <div class="cards-market-main">{{ metric.value }}</div>
-          <div class="cards-market-sub">{{ game.away.abbr }} @ {{ game.home.abbr }}</div>
-        </div>
-      {% endfor %}
+      {% if game.metrics %}
+        {% for metric in game.metrics[:5] %}
+          <div class="cards-market-tile">
+            <div class="cards-market-label">{{ metric.label }}</div>
+            <div class="cards-market-main">{{ metric.value }}</div>
+            <div class="cards-market-sub">{{ game.away.abbr }} @ {{ game.home.abbr }}</div>
+          </div>
+        {% endfor %}
+      {% else %}
+        {# no metrics available #}
+      {% endif %}
     {% endif %}
   </div>
 
@@ -85,9 +89,13 @@
           </div>
         {% endfor %}
       {% else %}
-        {% for metric in game.metrics[:3] %}
-          <span class="cards-source-meta-pill">{{ metric.label }} {{ metric.value }}</span>
-        {% endfor %}
+        {% if game.metrics %}
+          {% for metric in game.metrics[:3] %}
+            <span class="cards-source-meta-pill">{{ metric.label }} {{ metric.value }}</span>
+          {% endfor %}
+        {% else %}
+          {# no metrics available #}
+        {% endif %}
       {% endif %}
     </div>
   </div>
@@ -129,12 +137,16 @@
                 </div>
               {% endfor %}
             {% else %}
-              {% for metric in game.metrics %}
-                <div class="cards-live-lens-card">
-                  <div class="cards-lens-label">{{ metric.label }}</div>
-                  <div class="cards-market-main">{{ metric.value }}</div>
-                </div>
-              {% endfor %}
+              {% if game.metrics %}
+                {% for metric in game.metrics %}
+                  <div class="cards-live-lens-card">
+                    <div class="cards-lens-label">{{ metric.label }}</div>
+                    <div class="cards-market-main">{{ metric.value }}</div>
+                  </div>
+                {% endfor %}
+              {% else %}
+                {# no metrics available #}
+              {% endif %}
             {% endif %}
           </div>
           <div>

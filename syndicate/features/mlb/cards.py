@@ -2062,6 +2062,7 @@ def _trim_source_cards_games(games: list[dict[str, Any]]) -> list[dict[str, Any]
         "gameType",
         "away",
         "home",
+        "metrics",
         "status",
         "detail",
         "summary",
@@ -2084,6 +2085,7 @@ def _trim_source_cards_games(games: list[dict[str, Any]]) -> list[dict[str, Any]
         if not isinstance(game, dict):
             continue
         trimmed = {key: value for key, value in game.items() if key in allowed_keys}
+        trimmed["metrics"] = game.get("metrics", []) if isinstance(game.get("metrics", []), list) else []
         trimmed_games.append(trimmed)
     return trimmed_games
 
