@@ -1988,6 +1988,7 @@ def source_cards_api_payload(context: dict[str, Any]) -> dict[str, Any]:
     result = {
         "date": context.get("date"),
         "cards": source_cards,
+        "games": source_cards,
         "scoreboard": context.get("scoreboard_items", []),
         "board_contract": context.get("board_contract", {}),
         "source_path": context.get("source_path"),

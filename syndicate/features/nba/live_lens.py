@@ -89,7 +89,7 @@ def _live_line_map(selected_date: str, games: list[dict[str, Any]]) -> dict[str,
     ]
     if not event_ids:
         return {}
-    payload = _compute_live_lines_payload(selected_date, event_ids)
+    payload = build_live_lines_payload(selected_date, event_ids, ttl=20, include_period_totals=True, allow_stored_date_fallback=True)
     live_games = payload.get("games") if isinstance(payload.get("games"), list) else []
     out: dict[str, dict[str, Any]] = {}
     for live_game in live_games:
@@ -252,9 +252,10 @@ def _rank_card(game: dict[str, Any], selected_date: str, *, live_lines: dict[str
     }
 
 
-def _route_shell_updates(selected_date: str, *, season: int | None = None, profile: str | None = None) -> dict[str, Any]:
+def _route_shell_updates(selected_date: str, *, season: int | None = None, profile: str | None = None, embed_mode: str | None = None) -> dict[str, Any]:
     resolved_season = int(season) if season is not None else parse_iso_date(selected_date).year
     normalized_profile = str(profile or "").strip().lower() or None
+    normalized_embed_mode = str(embed_mode or "").strip().lower() or ""
     route_path = f"/nba/season/{resolved_season}/live-lens" if season is not None else "/nba/live-lens"
     query_suffix = f"&profile={normalized_profile}" if normalized_profile else ""
     updates: dict[str, Any] = {
@@ -267,20 +268,20 @@ def _route_shell_updates(selected_date: str, *, season: int | None = None, profi
         "cards_live_audit_href": f"{route_path}?date={selected_date}&profile=retuned" if season is not None else f"/nba/live-lens?date={selected_date}",
         "cards_live_audit_label": "Live Lens",
         "query_hidden_fields": ([{"name": "profile", "value": normalized_profile}] if normalized_profile else []),
-        "embed_mode": "",
+        "embed_mode": normalized_embed_mode,
         "page_title": "NBA Live Lens",
         "page_heading": "NBA Live Lens",
     }
     return updates
 
 
-def _apply_route_shell_context(context: dict[str, Any], selected_date: str, *, season: int | None = None, profile: str | None = None) -> dict[str, Any]:
+def _apply_route_shell_context(context: dict[str, Any], selected_date: str, *, season: int | None = None, profile: str | None = None, embed_mode: str | None = None) -> dict[str, Any]:
     updated = dict(context)
-    updated.update(_route_shell_updates(selected_date, season=season, profile=profile))
+    updated.update(_route_shell_updates(selected_date, season=season, profile=profile, embed_mode=embed_mode))
     return updated
 
 
-def _empty_live_lens_context(selected_date: str, *, season: int | None = None, profile: str | None = None) -> dict[str, Any]:
+def _empty_live_lens_context(selected_date: str, *, season: int | None = None, profile: str | None = None, embed_mode: str | None = None) -> dict[str, Any]:
     resolved_season = int(season) if season is not None else parse_iso_date(selected_date).year
     route_path = f"/nba/season/{resolved_season}/live-lens" if season is not None else "/nba/live-lens"
     requested_date = selected_date
@@ -319,11 +320,11 @@ def _empty_live_lens_context(selected_date: str, *, season: int | None = None, p
     context["lookahead_applied"] = False
     context["players_included"] = False
     context["pregame_portfolio"] = {"enabled": False, "selected": 0, "candidates": 0}
-    return attach_live_lens_contract(_apply_route_shell_context(context, selected_date, season=season, profile=profile), sport="nba", module="live_lens")
+    return attach_live_lens_contract(_apply_route_shell_context(context, selected_date, season=season, profile=profile, embed_mode=embed_mode), sport="nba", module="live_lens")
 
 
 def _compute_live_lens_page_context(selected_date: str, *, season: int | None = None, profile: str | None = None) -> dict[str, Any]:
-    cards_context = _compute_cards_page_context(selected_date)
+    cards_context = build_cards_page_context(selected_date)
     requested_date = str(cards_context.get("requested_date") or selected_date).strip() or selected_date
     resolved_date = str(cards_context.get("date") or selected_date).strip() or selected_date
     games = cards_context.get("games") if isinstance(cards_context.get("games"), list) else []
@@ -567,16 +568,16 @@ def build_live_lens_snapshot(selected_date: str, *, limit: int = 50) -> dict[str
     return snapshot
 
 
-def _snapshot_route_context(selected_date: str, *, season: int | None = None, profile: str | None = None, snapshot: dict[str, Any] | None = None) -> dict[str, Any]:
+def _snapshot_route_context(selected_date: str, *, season: int | None = None, profile: str | None = None, embed_mode: str | None = None, snapshot: dict[str, Any] | None = None) -> dict[str, Any]:
     if isinstance(snapshot, dict):
         base_context = snapshot.get("page_context") if isinstance(snapshot.get("page_context"), dict) else snapshot
         if isinstance(base_context, dict):
             context = dict(base_context)
         else:
-            context = _empty_live_lens_context(selected_date, season=season, profile=profile)
+            context = _empty_live_lens_context(selected_date, season=season, profile=profile, embed_mode=embed_mode)
     else:
-        context = _empty_live_lens_context(selected_date, season=season, profile=profile)
-    context = _apply_route_shell_context(context, selected_date, season=season, profile=profile)
+        context = _empty_live_lens_context(selected_date, season=season, profile=profile, embed_mode=embed_mode)
+    context = _apply_route_shell_context(context, selected_date, season=season, profile=profile, embed_mode=embed_mode)
     context["asset_version"] = context.get("asset_version") or "1"
     return context
 
@@ -595,25 +596,25 @@ def _safe_empty_live_lens_response(selected_date: str) -> dict[str, Any]:
     }
 
 
-def read_latest_live_lens_page_context(selected_date: str, *, season: int | None = None, profile: str | None = None) -> dict[str, Any]:
+def read_latest_live_lens_page_context(selected_date: str, *, season: int | None = None, profile: str | None = None, embed_mode: str | None = None) -> dict[str, Any]:
     try:
         snapshot = read_latest_live_lens_snapshot()
         if not isinstance(snapshot, dict):
-            return _safe_empty_live_lens_response(selected_date)
-        return _snapshot_route_context(selected_date, season=season, profile=profile, snapshot=snapshot)
+            return _empty_live_lens_context(selected_date, season=season, profile=profile, embed_mode=embed_mode)
+        return _snapshot_route_context(selected_date, season=season, profile=profile, embed_mode=embed_mode, snapshot=snapshot)
     except Exception as error:
         print("WNBA SNAPSHOT ERROR:", error)
-        return _safe_empty_live_lens_response(selected_date)
+        return _empty_live_lens_context(selected_date, season=season, profile=profile, embed_mode=embed_mode)
 
 
-def read_latest_live_lens_api_payload(selected_date: str) -> dict[str, Any]:
+def read_latest_live_lens_api_payload(selected_date: str, *, season: int | None = None, profile: str | None = None) -> dict[str, Any]:
     try:
         snapshot = read_latest_live_lens_snapshot()
         if not isinstance(snapshot, dict):
-            return _safe_empty_live_lens_response(selected_date)
+            return build_rank_api_payload(_empty_live_lens_context(selected_date, season=season, profile=profile))
         api_payload = _coerce_snapshot_payload(snapshot, key="api_payload")
         if api_payload is None:
-            return _safe_empty_live_lens_response(selected_date)
+            return build_rank_api_payload(_empty_live_lens_context(selected_date, season=season, profile=profile))
         payload = dict(api_payload)
         payload.setdefault("ok", True)
         payload.setdefault("requested_date", selected_date)
@@ -624,7 +625,7 @@ def read_latest_live_lens_api_payload(selected_date: str) -> dict[str, Any]:
         return payload
     except Exception as error:
         print("WNBA SNAPSHOT ERROR:", error)
-        return _safe_empty_live_lens_response(selected_date)
+        return build_rank_api_payload(_empty_live_lens_context(selected_date, season=season, profile=profile))
 
 
 def read_latest_live_player_lens_payload(selected_date: str, event_ids: list[str], ttl: int = 20, *, allow_stored_date_fallback: bool = True) -> dict[str, Any]:

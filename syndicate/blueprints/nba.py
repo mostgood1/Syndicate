@@ -421,7 +421,8 @@ def _market_accuracy_template_context(selected_date: str, *, season: int | None 
 @nba_bp.get("/live-lens")
 def live_lens():
     selected_date = _selected_date()
-    return render_template("nba/cards_source.html", **read_latest_live_lens_page_context(selected_date))
+    embed_mode = str(request.args.get("embed") or "").strip().lower() or None
+    return render_template("nba/cards_source.html", **read_latest_live_lens_page_context(selected_date, embed_mode=embed_mode))
 
 
 @nba_bp.get("/live-player-props-audit")
@@ -465,7 +466,8 @@ def reconciliation_alias():
 def season_live_lens(season: int):
     selected_date = _selected_date(season)
     profile = str(request.args.get("profile") or "").strip().lower() or None
-    return render_template("nba/cards_source.html", **read_latest_live_lens_page_context(selected_date, season=season, profile=profile))
+    embed_mode = str(request.args.get("embed") or "").strip().lower() or None
+    return render_template("nba/cards_source.html", **read_latest_live_lens_page_context(selected_date, season=season, profile=profile, embed_mode=embed_mode))
 
 
 @nba_bp.get("/season/<int:season>/live-lens-accuracy")
@@ -599,7 +601,7 @@ def api_betting_recap():
 def api_season_live_lens(season: int):
     selected_date = _selected_date(season)
     profile = str(request.args.get("profile") or "").strip().lower() or None
-    return jsonify(read_latest_live_lens_api_payload(selected_date) | {"route_path": f"/nba/season/{season}/live-lens", "hidden_fields": ([{"name": "profile", "value": profile}] if profile else [])})
+    return jsonify(read_latest_live_lens_api_payload(selected_date, season=season, profile=profile) | {"route_path": f"/nba/season/{season}/live-lens", "hidden_fields": ([{"name": "profile", "value": profile}] if profile else [])})
 
 
 @nba_bp.get("/api/season/<int:season>/live-lens-accuracy")
