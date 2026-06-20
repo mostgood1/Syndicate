@@ -39,8 +39,7 @@
       "use_closer_in_9th_only": true,
       "pinch_hit_aggressiveness": 0.15
     },
-    "confirmed_lineup_ids": [],
-    "projected_lineup_ids": [
+    "confirmed_lineup_ids": [
       695578,
       678554,
       665953,
@@ -51,8 +50,9 @@
       683083,
       660688
     ],
-    "lineup_source": "projected_rotowire_default_vs_lhp",
-    "lineup_confidence": 0.66,
+    "projected_lineup_ids": [],
+    "lineup_source": "confirmed_feed_live",
+    "lineup_confidence": 1.0,
     "probable_pitcher": {
       "id": 676917,
       "source": "feed_gameData_probablePitchers",
@@ -855,20 +855,20 @@
       "use_closer_in_9th_only": true,
       "pinch_hit_aggressiveness": 0.15
     },
-    "confirmed_lineup_ids": [],
-    "projected_lineup_ids": [
+    "confirmed_lineup_ids": [
       650490,
       666018,
       656775,
       691406,
-      680700,
-      676356,
+      810938,
       802415,
-      676439,
+      683748,
+      663743,
       670764
     ],
-    "lineup_source": "projected_rotowire_default_vs_rhp",
-    "lineup_confidence": 0.66,
+    "projected_lineup_ids": [],
+    "lineup_source": "confirmed_feed_live",
+    "lineup_confidence": 1.0,
     "probable_pitcher": {
       "id": 693855,
       "source": "feed_gameData_probablePitchers",
@@ -1045,59 +1045,30 @@
         "vs_pitcher_history": {}
       },
       {
-        "id": 680700,
-        "name": "Richie Palacios",
+        "id": 810938,
+        "name": "Ben Williamson",
         "pos": "2B",
-        "bat": "L",
-        "throw": "R",
-        "k_rate": 0.2145191802417236,
-        "bb_rate": 0.12227009984235417,
-        "hbp_rate": 0.017341040462427744,
-        "hr_rate": 0.0049132947976878606,
-        "inplay_hit_rate": 0.29553571428571423,
-        "xb_hit_share": 0.22857142857142856,
-        "vs_pitch_type": {},
-        "vs_pitch_type_hr": {},
-        "platoon_mult_vs_lhp": {
-          "k": 1.0416630707802352,
-          "bb": 0.8075,
-          "hr": 0.78,
-          "inplay": 1.0703423967774421
-        },
-        "platoon_mult_vs_rhp": {
-          "k": 0.9906807653615302,
-          "bb": 1.0314049016546623,
-          "hr": 1.2115046018407363,
-          "inplay": 1.004348524779842
-        },
-        "statcast_quality_mult": {},
-        "vs_pitcher_history": {}
-      },
-      {
-        "id": 676356,
-        "name": "Jonny DeLuca",
-        "pos": "RF",
         "bat": "R",
         "throw": "R",
-        "k_rate": 0.21540697674418605,
-        "bb_rate": 0.03919573643410852,
-        "hbp_rate": 0.0,
-        "hr_rate": 0.022892441860465115,
-        "inplay_hit_rate": 0.3114160097028502,
-        "xb_hit_share": 0.3333333333333333,
+        "k_rate": 0.18695238095238095,
+        "bb_rate": 0.08438095238095238,
+        "hbp_rate": 0.005714285714285714,
+        "hr_rate": 0.00819047619047619,
+        "inplay_hit_rate": 0.2884,
+        "xb_hit_share": 0.20512820512820512,
         "vs_pitch_type": {},
         "vs_pitch_type_hr": {},
         "platoon_mult_vs_lhp": {
-          "k": 1.007085020242915,
-          "bb": 1.1925000000000001,
+          "k": 0.9991594498217015,
+          "bb": 0.8075,
           "hr": 1.275,
-          "inplay": 0.9481381826715549
+          "inplay": 1.00896982160792
         },
         "platoon_mult_vs_rhp": {
-          "k": 0.9675620965094649,
-          "bb": 0.8075,
+          "k": 1.0089658685685177,
+          "bb": 1.1925000000000001,
           "hr": 0.78,
-          "inplay": 1.0285586102815394
+          "inplay": 1.047739458049558
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -1132,30 +1103,59 @@
         "vs_pitcher_history": {}
       },
       {
-        "id": 676439,
-        "name": "Hunter Feduccia",
-        "pos": "C",
+        "id": 683748,
+        "name": "Victor Mesa Jr.",
+        "pos": "RF",
         "bat": "L",
-        "throw": "R",
-        "k_rate": 0.2998834498834499,
-        "bb_rate": 0.0973970473970474,
-        "hbp_rate": 0.010101010101010102,
-        "hr_rate": 0.012432012432012432,
-        "inplay_hit_rate": 0.3351034482758621,
-        "xb_hit_share": 0.14285714285714285,
+        "throw": "L",
+        "k_rate": 0.23658536585365852,
+        "bb_rate": 0.1589430894308943,
+        "hbp_rate": 0.0,
+        "hr_rate": 0.03699186991869918,
+        "inplay_hit_rate": 0.19576612903225807,
+        "xb_hit_share": 0.05,
         "vs_pitch_type": {},
         "vs_pitch_type_hr": {},
         "platoon_mult_vs_lhp": {
-          "k": 0.8075,
-          "bb": 0.8075,
+          "k": 0.9666093928980527,
+          "bb": 0.8344842284739983,
           "hr": 0.78,
-          "inplay": 0.8976229676888248
+          "inplay": 0.9182457947133539
         },
         "platoon_mult_vs_rhp": {
-          "k": 1.0471312105134718,
-          "bb": 1.1066265619057336,
-          "hr": 0.9644258720930232,
-          "inplay": 1.0436559926085833
+          "k": 1.0035100638193422,
+          "bb": 1.0267263427109974,
+          "hr": 1.158006279434851,
+          "inplay": 1.0118949536560247
+        },
+        "statcast_quality_mult": {},
+        "vs_pitcher_history": {}
+      },
+      {
+        "id": 663743,
+        "name": "Nick Fortes",
+        "pos": "C",
+        "bat": "R",
+        "throw": "R",
+        "k_rate": 0.11425188243866892,
+        "bb_rate": 0.027003886324993925,
+        "hbp_rate": 0.0335195530726257,
+        "hr_rate": 0.0047486033519553075,
+        "inplay_hit_rate": 0.28380626223091976,
+        "xb_hit_share": 0.23255813953488372,
+        "vs_pitch_type": {},
+        "vs_pitch_type_hr": {},
+        "platoon_mult_vs_lhp": {
+          "k": 1.03836861841911,
+          "bb": 1.1289146240911476,
+          "hr": 0.78,
+          "inplay": 0.9344854335459404
+        },
+        "platoon_mult_vs_rhp": {
+          "k": 1.0449795017721337,
+          "bb": 0.9076952521962792,
+          "hr": 1.275,
+          "inplay": 1.0785216435190579
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -1192,59 +1192,88 @@
     ],
     "bench": [
       {
-        "id": 810938,
-        "name": "Ben Williamson",
-        "pos": "2B",
-        "bat": "R",
+        "id": 676439,
+        "name": "Hunter Feduccia",
+        "pos": "C",
+        "bat": "L",
         "throw": "R",
-        "k_rate": 0.18695238095238095,
-        "bb_rate": 0.08438095238095238,
-        "hbp_rate": 0.005714285714285714,
-        "hr_rate": 0.00819047619047619,
-        "inplay_hit_rate": 0.2884,
-        "xb_hit_share": 0.20512820512820512,
+        "k_rate": 0.2998834498834499,
+        "bb_rate": 0.0973970473970474,
+        "hbp_rate": 0.010101010101010102,
+        "hr_rate": 0.012432012432012432,
+        "inplay_hit_rate": 0.3351034482758621,
+        "xb_hit_share": 0.14285714285714285,
         "vs_pitch_type": {},
         "vs_pitch_type_hr": {},
         "platoon_mult_vs_lhp": {
-          "k": 0.9991594498217015,
+          "k": 0.8075,
           "bb": 0.8075,
-          "hr": 1.275,
-          "inplay": 1.00896982160792
+          "hr": 0.78,
+          "inplay": 0.8976229676888248
         },
         "platoon_mult_vs_rhp": {
-          "k": 1.0089658685685177,
-          "bb": 1.1925000000000001,
-          "hr": 0.78,
-          "inplay": 1.047739458049558
+          "k": 1.0471312105134718,
+          "bb": 1.1066265619057336,
+          "hr": 0.9644258720930232,
+          "inplay": 1.0436559926085833
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
       },
       {
-        "id": 663743,
-        "name": "Nick Fortes",
-        "pos": "C",
+        "id": 676356,
+        "name": "Jonny DeLuca",
+        "pos": "RF",
         "bat": "R",
         "throw": "R",
-        "k_rate": 0.11425188243866892,
-        "bb_rate": 0.027003886324993925,
-        "hbp_rate": 0.0335195530726257,
-        "hr_rate": 0.0047486033519553075,
-        "inplay_hit_rate": 0.28380626223091976,
-        "xb_hit_share": 0.23255813953488372,
+        "k_rate": 0.21540697674418605,
+        "bb_rate": 0.03919573643410852,
+        "hbp_rate": 0.0,
+        "hr_rate": 0.022892441860465115,
+        "inplay_hit_rate": 0.3114160097028502,
+        "xb_hit_share": 0.3333333333333333,
         "vs_pitch_type": {},
         "vs_pitch_type_hr": {},
         "platoon_mult_vs_lhp": {
-          "k": 1.03836861841911,
-          "bb": 1.1289146240911476,
-          "hr": 0.78,
-          "inplay": 0.9344854335459404
+          "k": 1.007085020242915,
+          "bb": 1.1925000000000001,
+          "hr": 1.275,
+          "inplay": 0.9481381826715549
         },
         "platoon_mult_vs_rhp": {
-          "k": 1.0449795017721337,
-          "bb": 0.9076952521962792,
-          "hr": 1.275,
-          "inplay": 1.0785216435190579
+          "k": 0.9675620965094649,
+          "bb": 0.8075,
+          "hr": 0.78,
+          "inplay": 1.0285586102815394
+        },
+        "statcast_quality_mult": {},
+        "vs_pitcher_history": {}
+      },
+      {
+        "id": 680700,
+        "name": "Richie Palacios",
+        "pos": "2B",
+        "bat": "L",
+        "throw": "R",
+        "k_rate": 0.2145191802417236,
+        "bb_rate": 0.12227009984235417,
+        "hbp_rate": 0.017341040462427744,
+        "hr_rate": 0.0049132947976878606,
+        "inplay_hit_rate": 0.29553571428571423,
+        "xb_hit_share": 0.22857142857142856,
+        "vs_pitch_type": {},
+        "vs_pitch_type_hr": {},
+        "platoon_mult_vs_lhp": {
+          "k": 1.0416630707802352,
+          "bb": 0.8075,
+          "hr": 0.78,
+          "inplay": 1.0703423967774421
+        },
+        "platoon_mult_vs_rhp": {
+          "k": 0.9906807653615302,
+          "bb": 1.0314049016546623,
+          "hr": 1.2115046018407363,
+          "inplay": 1.004348524779842
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -1274,35 +1303,6 @@
           "bb": 1.052484821920509,
           "hr": 1.1056989185512993,
           "inplay": 0.9518596578229606
-        },
-        "statcast_quality_mult": {},
-        "vs_pitcher_history": {}
-      },
-      {
-        "id": 683748,
-        "name": "Victor Mesa Jr.",
-        "pos": "RF",
-        "bat": "L",
-        "throw": "L",
-        "k_rate": 0.23658536585365852,
-        "bb_rate": 0.1589430894308943,
-        "hbp_rate": 0.0,
-        "hr_rate": 0.03699186991869918,
-        "inplay_hit_rate": 0.19576612903225807,
-        "xb_hit_share": 0.05,
-        "vs_pitch_type": {},
-        "vs_pitch_type_hr": {},
-        "platoon_mult_vs_lhp": {
-          "k": 0.9666093928980527,
-          "bb": 0.8344842284739983,
-          "hr": 0.78,
-          "inplay": 0.9182457947133539
-        },
-        "platoon_mult_vs_rhp": {
-          "k": 1.0035100638193422,
-          "bb": 1.0267263427109974,
-          "hr": 1.158006279434851,
-          "inplay": 1.0118949536560247
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -1660,11 +1660,11 @@
   },
   "weather": {
     "source": "statsapi_live_feed",
-    "condition": "",
-    "temperature_f": null,
-    "wind_speed_mph": null,
+    "condition": "Dome",
+    "temperature_f": 72.0,
+    "wind_speed_mph": 0.0,
     "wind_direction": "unknown",
-    "wind_raw": "",
+    "wind_raw": "0 mph, None",
     "is_dome": true,
     "multipliers": {
       "hr_mult": 1.0,
@@ -1689,8 +1689,8 @@
   },
   "umpire": {
     "source": "statsapi_live_feed",
-    "home_plate_umpire_id": null,
-    "home_plate_umpire_name": "",
+    "home_plate_umpire_id": 596809,
+    "home_plate_umpire_name": "Ryan Additon",
     "called_strike_mult": 1.0,
     "multipliers": {
       "called_strike_mult": 1.0

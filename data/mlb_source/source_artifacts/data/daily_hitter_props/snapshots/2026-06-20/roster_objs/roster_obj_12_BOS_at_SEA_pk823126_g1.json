@@ -33,18 +33,18 @@
         691785
       ],
       "home_lineup_ids": [
-        608701,
+        641487,
         663728,
         677594,
         647304,
-        641598,
+        608701,
         702284,
-        645302,
-        806068,
-        642215
+        641598,
+        656582,
+        806068
       ],
       "away_lineup_source": "projected_rotowire_default_vs_rhp",
-      "home_lineup_source": "projected_rotowire_default_vs_lhp"
+      "home_lineup_source": "confirmed_feed_live"
     }
   },
   "away": {
@@ -2372,66 +2372,143 @@
       "batters": [
         {
           "player": {
-            "mlbam_id": 608701,
-            "full_name": "Rob Refsnyder",
-            "primary_position": "DH",
-            "bat_side": "R",
+            "mlbam_id": 641487,
+            "full_name": "J.P. Crawford",
+            "primary_position": "SS",
+            "bat_side": "L",
             "throw_side": "R"
           },
-          "k_rate": 0.28255291005291006,
-          "bb_rate": 0.05937830687830688,
-          "hbp_rate": 0.018518518518518517,
-          "hr_rate": 0.027896825396825396,
-          "inplay_hit_rate": 0.155,
-          "xb_hit_share": 0.05,
-          "triple_share_of_xb": 0.12,
-          "sb_attempt_rate": 0.0,
-          "sb_success_rate": 0.72,
+          "k_rate": 0.2097667950363714,
+          "bb_rate": 0.14281129653401795,
+          "hbp_rate": 0.02032520325203252,
+          "hr_rate": 0.04507916131792897,
+          "inplay_hit_rate": 0.2351661392405063,
+          "xb_hit_share": 0.1111111111111111,
+          "triple_share_of_xb": 0.02,
+          "sb_attempt_rate": 0.056338028169014086,
+          "sb_success_rate": 0.4,
           "vs_pitch_type": {},
           "vs_pitch_type_hr": {},
           "platoon_mult_vs_lhp": {
-            "k": 1.0093500239721438,
-            "bb": 1.088802897504244,
-            "hr": 1.129844999264237,
-            "inplay": 0.9756869772998805
+            "k": 0.850577115950159,
+            "bb": 1.038383270911361,
+            "hr": 0.78,
+            "inplay": 0.99737218832203
           },
           "platoon_mult_vs_rhp": {
-            "k": 1.0061537381208745,
-            "bb": 0.8910781911338828,
-            "hr": 0.78,
-            "inplay": 0.9569124423963133
+            "k": 0.9924743388415945,
+            "bb": 1.0033384992896812,
+            "hr": 1.0810737606991474,
+            "inplay": 0.9556804491623668
           },
           "venue_mult_home": {
-            "k": 1.0260357661158186,
-            "bb": 0.8775000000000001,
-            "hr": 0.8740398293029872,
-            "inplay": 0.8775000000000001
+            "k": 0.9628474170023968,
+            "bb": 1.0712289325842697,
+            "hr": 1.0746002906976744,
+            "inplay": 0.9848696383515559
           },
           "venue_mult_away": {
-            "k": 0.9834977835235313,
-            "bb": 1.1225,
-            "hr": 1.132547324652588,
-            "inplay": 1.1225
+            "k": 0.9752199137200058,
+            "bb": 0.9407712816606362,
+            "hr": 0.86,
+            "inplay": 0.9743751482607664
           },
           "vs_venue_hr_mult": {
-            "136": 0.8740398293029872
+            "108": 0.86,
+            "136": 1.0746002906976744,
+            "138": 0.86,
+            "142": 1.175,
+            "145": 0.86,
+            "117": 1.0586378737541529,
+            "118": 0.86,
+            "133": 1.167607973421927
           },
           "vs_venue_k_mult": {
-            "136": 1.0260357661158186
+            "108": 1.1225,
+            "136": 0.9628474170023968,
+            "138": 0.9066953165147872,
+            "142": 0.8775000000000001,
+            "145": 1.0350429747721808,
+            "117": 0.8775000000000001,
+            "118": 0.8775000000000001,
+            "133": 1.1225
           },
           "vs_venue_bb_mult": {
-            "136": 0.8775000000000001
+            "108": 1.1225,
+            "136": 1.0712289325842697,
+            "138": 1.0270440795159896,
+            "142": 1.1225,
+            "145": 1.0270440795159896,
+            "117": 0.9079775280898876,
+            "118": 0.8775000000000001,
+            "133": 0.8775000000000001
           },
           "vs_venue_inplay_mult": {
-            "136": 0.8775000000000001
+            "108": 0.9476619007569387,
+            "136": 0.97670208619664,
+            "138": 0.8775000000000001,
+            "142": 0.9476619007569387,
+            "145": 1.0220773759461732,
+            "117": 1.0220773759461732,
+            "118": 0.8775000000000001,
+            "133": 1.1225
           },
           "vs_venue_history": {
+            "108": {
+              "pa": 13.0,
+              "k_mult": 1.35,
+              "bb_mult": 1.35,
+              "hr_mult": 0.6,
+              "inplay_mult": 0.8504625735912533
+            },
             "136": {
-              "pa": 56.0,
-              "k_mult": 1.074387903188053,
-              "bb_mult": 0.65,
-              "hr_mult": 0.6401137980085349,
+              "pa": 128.0,
+              "k_mult": 0.8938497628639911,
+              "bb_mult": 1.2035112359550564,
+              "hr_mult": 1.2131436877076411,
+              "inplay_mult": 0.9334345319903999
+            },
+            "138": {
+              "pa": 13.0,
+              "k_mult": 0.7334151900422491,
+              "bb_mult": 1.0772687986171134,
+              "hr_mult": 0.6,
               "inplay_mult": 0.65
+            },
+            "142": {
+              "pa": 14.0,
+              "k_mult": 0.65,
+              "bb_mult": 1.35,
+              "hr_mult": 1.5,
+              "inplay_mult": 0.8504625735912533
+            },
+            "145": {
+              "pa": 13.0,
+              "k_mult": 1.1001227850633737,
+              "bb_mult": 1.0772687986171134,
+              "hr_mult": 0.6,
+              "inplay_mult": 1.0630782169890665
+            },
+            "117": {
+              "pa": 19.0,
+              "k_mult": 0.65,
+              "bb_mult": 0.7370786516853933,
+              "hr_mult": 1.1675367821547222,
+              "inplay_mult": 1.0630782169890665
+            },
+            "118": {
+              "pa": 13.0,
+              "k_mult": 0.65,
+              "bb_mult": 0.65,
+              "hr_mult": 0.6,
+              "inplay_mult": 0.65
+            },
+            "133": {
+              "pa": 15.0,
+              "k_mult": 1.35,
+              "bb_mult": 0.65,
+              "hr_mult": 1.4788799240626482,
+              "inplay_mult": 1.35
             }
           },
           "statcast_quality_mult": {},
@@ -2984,65 +3061,65 @@
         },
         {
           "player": {
-            "mlbam_id": 641598,
-            "full_name": "Mitch Garver",
-            "primary_position": "C",
+            "mlbam_id": 608701,
+            "full_name": "Rob Refsnyder",
+            "primary_position": "DH",
             "bat_side": "R",
             "throw_side": "R"
           },
-          "k_rate": 0.31386363636363634,
-          "bb_rate": 0.14159090909090907,
-          "hbp_rate": 0.0,
-          "hr_rate": 0.029999999999999995,
-          "inplay_hit_rate": 0.25648631029986957,
-          "xb_hit_share": 0.1111111111111111,
-          "triple_share_of_xb": 0.02,
+          "k_rate": 0.28255291005291006,
+          "bb_rate": 0.05937830687830688,
+          "hbp_rate": 0.018518518518518517,
+          "hr_rate": 0.027896825396825396,
+          "inplay_hit_rate": 0.155,
+          "xb_hit_share": 0.05,
+          "triple_share_of_xb": 0.12,
           "sb_attempt_rate": 0.0,
           "sb_success_rate": 0.72,
           "vs_pitch_type": {},
           "vs_pitch_type_hr": {},
           "platoon_mult_vs_lhp": {
-            "k": 0.8309463841576678,
-            "bb": 1.0411089399120665,
-            "hr": 0.8485507246376812,
-            "inplay": 1.1894358482215242
+            "k": 1.0093500239721438,
+            "bb": 1.088802897504244,
+            "hr": 1.129844999264237,
+            "inplay": 0.9756869772998805
           },
           "platoon_mult_vs_rhp": {
-            "k": 1.1071325126719769,
-            "bb": 1.0569422150882826,
-            "hr": 1.0229166666666667,
-            "inplay": 0.8075
+            "k": 1.0061537381208745,
+            "bb": 0.8910781911338828,
+            "hr": 0.78,
+            "inplay": 0.9569124423963133
           },
           "venue_mult_home": {
-            "k": 1.057452793405002,
-            "bb": 1.0302938634399308,
-            "hr": 0.86,
+            "k": 1.0260357661158186,
+            "bb": 0.8775000000000001,
+            "hr": 0.8740398293029872,
             "inplay": 0.8775000000000001
           },
           "venue_mult_away": {
-            "k": 0.938396714025319,
-            "bb": 1.0335722588144132,
-            "hr": 1.175,
-            "inplay": 1.091486697614616
+            "k": 0.9834977835235313,
+            "bb": 1.1225,
+            "hr": 1.132547324652588,
+            "inplay": 1.1225
           },
           "vs_venue_hr_mult": {
-            "136": 0.86
+            "136": 0.8740398293029872
           },
           "vs_venue_k_mult": {
-            "136": 1.057452793405002
+            "136": 1.0260357661158186
           },
           "vs_venue_bb_mult": {
-            "136": 1.0302938634399308
+            "136": 0.8775000000000001
           },
           "vs_venue_inplay_mult": {
             "136": 0.8775000000000001
           },
           "vs_venue_history": {
             "136": {
-              "pa": 52.0,
-              "k_mult": 1.1641508383000057,
-              "bb_mult": 1.0865538955426597,
-              "hr_mult": 0.6,
+              "pa": 56.0,
+              "k_mult": 1.074387903188053,
+              "bb_mult": 0.65,
+              "hr_mult": 0.6401137980085349,
               "inplay_mult": 0.65
             }
           },
@@ -3246,66 +3323,142 @@
         },
         {
           "player": {
-            "mlbam_id": 645302,
-            "full_name": "Victor Robles",
+            "mlbam_id": 641598,
+            "full_name": "Mitch Garver",
+            "primary_position": "C",
+            "bat_side": "R",
+            "throw_side": "R"
+          },
+          "k_rate": 0.31386363636363634,
+          "bb_rate": 0.14159090909090907,
+          "hbp_rate": 0.0,
+          "hr_rate": 0.029999999999999995,
+          "inplay_hit_rate": 0.25648631029986957,
+          "xb_hit_share": 0.1111111111111111,
+          "triple_share_of_xb": 0.02,
+          "sb_attempt_rate": 0.0,
+          "sb_success_rate": 0.72,
+          "vs_pitch_type": {},
+          "vs_pitch_type_hr": {},
+          "platoon_mult_vs_lhp": {
+            "k": 0.8309463841576678,
+            "bb": 1.0411089399120665,
+            "hr": 0.8485507246376812,
+            "inplay": 1.1894358482215242
+          },
+          "platoon_mult_vs_rhp": {
+            "k": 1.1071325126719769,
+            "bb": 1.0569422150882826,
+            "hr": 1.0229166666666667,
+            "inplay": 0.8075
+          },
+          "venue_mult_home": {
+            "k": 1.057452793405002,
+            "bb": 1.0302938634399308,
+            "hr": 0.86,
+            "inplay": 0.8775000000000001
+          },
+          "venue_mult_away": {
+            "k": 0.938396714025319,
+            "bb": 1.0335722588144132,
+            "hr": 1.175,
+            "inplay": 1.091486697614616
+          },
+          "vs_venue_hr_mult": {
+            "136": 0.86
+          },
+          "vs_venue_k_mult": {
+            "136": 1.057452793405002
+          },
+          "vs_venue_bb_mult": {
+            "136": 1.0302938634399308
+          },
+          "vs_venue_inplay_mult": {
+            "136": 0.8775000000000001
+          },
+          "vs_venue_history": {
+            "136": {
+              "pa": 52.0,
+              "k_mult": 1.1641508383000057,
+              "bb_mult": 1.0865538955426597,
+              "hr_mult": 0.6,
+              "inplay_mult": 0.65
+            }
+          },
+          "statcast_quality_mult": {},
+          "vs_pitcher_hr_mult": {},
+          "vs_pitcher_k_mult": {},
+          "vs_pitcher_bb_mult": {},
+          "vs_pitcher_inplay_mult": {},
+          "vs_pitcher_history": {},
+          "bb_gb_rate": 0.44,
+          "bb_fb_rate": 0.25,
+          "bb_ld_rate": 0.2,
+          "bb_pu_rate": 0.11,
+          "bb_inplay_n": 0
+        },
+        {
+          "player": {
+            "mlbam_id": 656582,
+            "full_name": "Connor Joe",
             "primary_position": "RF",
             "bat_side": "R",
             "throw_side": "R"
           },
-          "k_rate": 0.12838915470494416,
-          "bb_rate": 0.03891547049441786,
+          "k_rate": 0.32866726296958854,
+          "bb_rate": 0.14745080500894453,
           "hbp_rate": 0.0,
-          "hr_rate": 0.0,
-          "inplay_hit_rate": 0.28939838591342626,
-          "xb_hit_share": 0.14285714285714285,
+          "hr_rate": 0.019767441860465116,
+          "inplay_hit_rate": 0.2592391304347826,
+          "xb_hit_share": 0.2857142857142857,
           "triple_share_of_xb": 0.02,
-          "sb_attempt_rate": 0.21428571428571427,
-          "sb_success_rate": 0.6666666666666666,
+          "sb_attempt_rate": 0.2,
+          "sb_success_rate": 0.95,
           "vs_pitch_type": {},
           "vs_pitch_type_hr": {},
           "platoon_mult_vs_lhp": {
-            "k": 1.1925000000000001,
-            "bb": 0.8075,
-            "hr": 1.0,
-            "inplay": 1.0834981197447924
+            "k": 1.0078083185920987,
+            "bb": 1.0716762713578,
+            "hr": 1.275,
+            "inplay": 0.8075
           },
           "platoon_mult_vs_rhp": {
-            "k": 0.8075,
-            "bb": 1.1925000000000001,
-            "hr": 1.0,
-            "inplay": 0.9616715582554092
+            "k": 0.9784499860346199,
+            "bb": 0.8426376450680841,
+            "hr": 0.78,
+            "inplay": 1.1925000000000001
           },
           "venue_mult_home": {
-            "k": 1.1225,
-            "bb": 1.0097540983606557,
-            "hr": 1.0,
-            "inplay": 0.9682646056134124
+            "k": 1.030323853585522,
+            "bb": 1.1225,
+            "hr": 1.175,
+            "inplay": 0.8775000000000001
           },
           "venue_mult_away": {
-            "k": 0.9055706521739131,
-            "bb": 0.9310578893442623,
-            "hr": 1.0,
-            "inplay": 1.0387374825706681
+            "k": 0.933975144010523,
+            "bb": 0.8775000000000001,
+            "hr": 0.86,
+            "inplay": 1.1225
           },
           "vs_venue_hr_mult": {
-            "136": 1.0
+            "136": 1.175
           },
           "vs_venue_k_mult": {
-            "136": 1.1225
+            "136": 1.030323853585522
           },
           "vs_venue_bb_mult": {
-            "136": 1.0097540983606557
+            "136": 1.1225
           },
           "vs_venue_inplay_mult": {
-            "136": 0.9682646056134124
+            "136": 0.8775000000000001
           },
           "vs_venue_history": {
             "136": {
-              "pa": 25.0,
-              "k_mult": 1.35,
-              "bb_mult": 1.0278688524590165,
-              "hr_mult": 1.0,
-              "inplay_mult": 0.9093274446097497
+              "pa": 28.0,
+              "k_mult": 1.0866395816729195,
+              "bb_mult": 1.35,
+              "hr_mult": 1.5,
+              "inplay_mult": 0.65
             }
           },
           "statcast_quality_mult": {},
@@ -3404,82 +3557,6 @@
               "bb_mult": 0.65,
               "hr_mult": 1.2904427415921667,
               "inplay_mult": 0.7387508394895903
-            }
-          },
-          "statcast_quality_mult": {},
-          "vs_pitcher_hr_mult": {},
-          "vs_pitcher_k_mult": {},
-          "vs_pitcher_bb_mult": {},
-          "vs_pitcher_inplay_mult": {},
-          "vs_pitcher_history": {},
-          "bb_gb_rate": 0.44,
-          "bb_fb_rate": 0.25,
-          "bb_ld_rate": 0.2,
-          "bb_pu_rate": 0.11,
-          "bb_inplay_n": 0
-        },
-        {
-          "player": {
-            "mlbam_id": 642215,
-            "full_name": "Weston Wilson",
-            "primary_position": "3B",
-            "bat_side": "R",
-            "throw_side": "R"
-          },
-          "k_rate": 0.2189413265306122,
-          "bb_rate": 0.11814413265306123,
-          "hbp_rate": 0.02040816326530612,
-          "hr_rate": 0.022034438775510205,
-          "inplay_hit_rate": 0.24544179523141652,
-          "xb_hit_share": 0.1111111111111111,
-          "triple_share_of_xb": 0.02,
-          "sb_attempt_rate": 0.21428571428571427,
-          "sb_success_rate": 0.6666666666666666,
-          "vs_pitch_type": {},
-          "vs_pitch_type_hr": {},
-          "platoon_mult_vs_lhp": {
-            "k": 1.18884957420195,
-            "bb": 0.8075,
-            "hr": 1.184144888056525,
-            "inplay": 1.090244897959184
-          },
-          "platoon_mult_vs_rhp": {
-            "k": 0.8075,
-            "bb": 1.1925000000000001,
-            "hr": 0.78,
-            "inplay": 0.8981714285714286
-          },
-          "venue_mult_home": {
-            "k": 0.9807452012414999,
-            "bb": 1.0586183628833357,
-            "hr": 0.86,
-            "inplay": 0.9502105263157895
-          },
-          "venue_mult_away": {
-            "k": 1.0496504515001457,
-            "bb": 0.9462483130904183,
-            "hr": 1.175,
-            "inplay": 1.1225
-          },
-          "vs_venue_hr_mult": {
-            "110": 0.86
-          },
-          "vs_venue_k_mult": {
-            "110": 1.0189081090770575
-          },
-          "vs_venue_bb_mult": {
-            "110": 1.1057666355237206
-          },
-          "vs_venue_inplay_mult": {
-            "110": 0.9855294117647059
-          },
-          "vs_venue_history": {
-            "110": {
-              "pa": 26.0,
-              "k_mult": 1.054023168791593,
-              "bb_mult": 1.3021903872106302,
-              "hr_mult": 0.6,
-              "inplay_mult": 0.9586554621848741
             }
           },
           "statcast_quality_mult": {},
@@ -3663,82 +3740,6 @@
       "bench": [
         {
           "player": {
-            "mlbam_id": 656582,
-            "full_name": "Connor Joe",
-            "primary_position": "RF",
-            "bat_side": "R",
-            "throw_side": "R"
-          },
-          "k_rate": 0.32866726296958854,
-          "bb_rate": 0.14745080500894453,
-          "hbp_rate": 0.0,
-          "hr_rate": 0.019767441860465116,
-          "inplay_hit_rate": 0.2592391304347826,
-          "xb_hit_share": 0.2857142857142857,
-          "triple_share_of_xb": 0.02,
-          "sb_attempt_rate": 0.2,
-          "sb_success_rate": 0.95,
-          "vs_pitch_type": {},
-          "vs_pitch_type_hr": {},
-          "platoon_mult_vs_lhp": {
-            "k": 1.0078083185920987,
-            "bb": 1.0716762713578,
-            "hr": 1.275,
-            "inplay": 0.8075
-          },
-          "platoon_mult_vs_rhp": {
-            "k": 0.9784499860346199,
-            "bb": 0.8426376450680841,
-            "hr": 0.78,
-            "inplay": 1.1925000000000001
-          },
-          "venue_mult_home": {
-            "k": 1.030323853585522,
-            "bb": 1.1225,
-            "hr": 1.175,
-            "inplay": 0.8775000000000001
-          },
-          "venue_mult_away": {
-            "k": 0.933975144010523,
-            "bb": 0.8775000000000001,
-            "hr": 0.86,
-            "inplay": 1.1225
-          },
-          "vs_venue_hr_mult": {
-            "136": 1.175
-          },
-          "vs_venue_k_mult": {
-            "136": 1.030323853585522
-          },
-          "vs_venue_bb_mult": {
-            "136": 1.1225
-          },
-          "vs_venue_inplay_mult": {
-            "136": 0.8775000000000001
-          },
-          "vs_venue_history": {
-            "136": {
-              "pa": 28.0,
-              "k_mult": 1.0866395816729195,
-              "bb_mult": 1.35,
-              "hr_mult": 1.5,
-              "inplay_mult": 0.65
-            }
-          },
-          "statcast_quality_mult": {},
-          "vs_pitcher_hr_mult": {},
-          "vs_pitcher_k_mult": {},
-          "vs_pitcher_bb_mult": {},
-          "vs_pitcher_inplay_mult": {},
-          "vs_pitcher_history": {},
-          "bb_gb_rate": 0.44,
-          "bb_fb_rate": 0.25,
-          "bb_ld_rate": 0.2,
-          "bb_pu_rate": 0.11,
-          "bb_inplay_n": 0
-        },
-        {
-          "player": {
             "mlbam_id": 686527,
             "full_name": "Dominic Canzone",
             "primary_position": "DH",
@@ -3837,159 +3838,6 @@
         },
         {
           "player": {
-            "mlbam_id": 641487,
-            "full_name": "J.P. Crawford",
-            "primary_position": "SS",
-            "bat_side": "L",
-            "throw_side": "R"
-          },
-          "k_rate": 0.2097667950363714,
-          "bb_rate": 0.14281129653401795,
-          "hbp_rate": 0.02032520325203252,
-          "hr_rate": 0.04507916131792897,
-          "inplay_hit_rate": 0.2351661392405063,
-          "xb_hit_share": 0.1111111111111111,
-          "triple_share_of_xb": 0.02,
-          "sb_attempt_rate": 0.056338028169014086,
-          "sb_success_rate": 0.4,
-          "vs_pitch_type": {},
-          "vs_pitch_type_hr": {},
-          "platoon_mult_vs_lhp": {
-            "k": 0.850577115950159,
-            "bb": 1.038383270911361,
-            "hr": 0.78,
-            "inplay": 0.99737218832203
-          },
-          "platoon_mult_vs_rhp": {
-            "k": 0.9924743388415945,
-            "bb": 1.0033384992896812,
-            "hr": 1.0810737606991474,
-            "inplay": 0.9556804491623668
-          },
-          "venue_mult_home": {
-            "k": 0.9628474170023968,
-            "bb": 1.0712289325842697,
-            "hr": 1.0746002906976744,
-            "inplay": 0.9848696383515559
-          },
-          "venue_mult_away": {
-            "k": 0.9752199137200058,
-            "bb": 0.9407712816606362,
-            "hr": 0.86,
-            "inplay": 0.9743751482607664
-          },
-          "vs_venue_hr_mult": {
-            "108": 0.86,
-            "136": 1.0746002906976744,
-            "138": 0.86,
-            "142": 1.175,
-            "145": 0.86,
-            "117": 1.0586378737541529,
-            "118": 0.86,
-            "133": 1.167607973421927
-          },
-          "vs_venue_k_mult": {
-            "108": 1.1225,
-            "136": 0.9628474170023968,
-            "138": 0.9066953165147872,
-            "142": 0.8775000000000001,
-            "145": 1.0350429747721808,
-            "117": 0.8775000000000001,
-            "118": 0.8775000000000001,
-            "133": 1.1225
-          },
-          "vs_venue_bb_mult": {
-            "108": 1.1225,
-            "136": 1.0712289325842697,
-            "138": 1.0270440795159896,
-            "142": 1.1225,
-            "145": 1.0270440795159896,
-            "117": 0.9079775280898876,
-            "118": 0.8775000000000001,
-            "133": 0.8775000000000001
-          },
-          "vs_venue_inplay_mult": {
-            "108": 0.9476619007569387,
-            "136": 0.97670208619664,
-            "138": 0.8775000000000001,
-            "142": 0.9476619007569387,
-            "145": 1.0220773759461732,
-            "117": 1.0220773759461732,
-            "118": 0.8775000000000001,
-            "133": 1.1225
-          },
-          "vs_venue_history": {
-            "108": {
-              "pa": 13.0,
-              "k_mult": 1.35,
-              "bb_mult": 1.35,
-              "hr_mult": 0.6,
-              "inplay_mult": 0.8504625735912533
-            },
-            "136": {
-              "pa": 128.0,
-              "k_mult": 0.8938497628639911,
-              "bb_mult": 1.2035112359550564,
-              "hr_mult": 1.2131436877076411,
-              "inplay_mult": 0.9334345319903999
-            },
-            "138": {
-              "pa": 13.0,
-              "k_mult": 0.7334151900422491,
-              "bb_mult": 1.0772687986171134,
-              "hr_mult": 0.6,
-              "inplay_mult": 0.65
-            },
-            "142": {
-              "pa": 14.0,
-              "k_mult": 0.65,
-              "bb_mult": 1.35,
-              "hr_mult": 1.5,
-              "inplay_mult": 0.8504625735912533
-            },
-            "145": {
-              "pa": 13.0,
-              "k_mult": 1.1001227850633737,
-              "bb_mult": 1.0772687986171134,
-              "hr_mult": 0.6,
-              "inplay_mult": 1.0630782169890665
-            },
-            "117": {
-              "pa": 19.0,
-              "k_mult": 0.65,
-              "bb_mult": 0.7370786516853933,
-              "hr_mult": 1.1675367821547222,
-              "inplay_mult": 1.0630782169890665
-            },
-            "118": {
-              "pa": 13.0,
-              "k_mult": 0.65,
-              "bb_mult": 0.65,
-              "hr_mult": 0.6,
-              "inplay_mult": 0.65
-            },
-            "133": {
-              "pa": 15.0,
-              "k_mult": 1.35,
-              "bb_mult": 0.65,
-              "hr_mult": 1.4788799240626482,
-              "inplay_mult": 1.35
-            }
-          },
-          "statcast_quality_mult": {},
-          "vs_pitcher_hr_mult": {},
-          "vs_pitcher_k_mult": {},
-          "vs_pitcher_bb_mult": {},
-          "vs_pitcher_inplay_mult": {},
-          "vs_pitcher_history": {},
-          "bb_gb_rate": 0.44,
-          "bb_fb_rate": 0.25,
-          "bb_ld_rate": 0.2,
-          "bb_pu_rate": 0.11,
-          "bb_inplay_n": 0
-        },
-        {
-          "player": {
             "mlbam_id": 670042,
             "full_name": "Luke Raley",
             "primary_position": "RF",
@@ -4072,6 +3920,158 @@
               "bb_mult": 1.35,
               "hr_mult": 1.3370332996972756,
               "inplay_mult": 0.65
+            }
+          },
+          "statcast_quality_mult": {},
+          "vs_pitcher_hr_mult": {},
+          "vs_pitcher_k_mult": {},
+          "vs_pitcher_bb_mult": {},
+          "vs_pitcher_inplay_mult": {},
+          "vs_pitcher_history": {},
+          "bb_gb_rate": 0.44,
+          "bb_fb_rate": 0.25,
+          "bb_ld_rate": 0.2,
+          "bb_pu_rate": 0.11,
+          "bb_inplay_n": 0
+        },
+        {
+          "player": {
+            "mlbam_id": 645302,
+            "full_name": "Victor Robles",
+            "primary_position": "RF",
+            "bat_side": "R",
+            "throw_side": "R"
+          },
+          "k_rate": 0.12838915470494416,
+          "bb_rate": 0.03891547049441786,
+          "hbp_rate": 0.0,
+          "hr_rate": 0.0,
+          "inplay_hit_rate": 0.28939838591342626,
+          "xb_hit_share": 0.14285714285714285,
+          "triple_share_of_xb": 0.02,
+          "sb_attempt_rate": 0.21428571428571427,
+          "sb_success_rate": 0.6666666666666666,
+          "vs_pitch_type": {},
+          "vs_pitch_type_hr": {},
+          "platoon_mult_vs_lhp": {
+            "k": 1.1925000000000001,
+            "bb": 0.8075,
+            "hr": 1.0,
+            "inplay": 1.0834981197447924
+          },
+          "platoon_mult_vs_rhp": {
+            "k": 0.8075,
+            "bb": 1.1925000000000001,
+            "hr": 1.0,
+            "inplay": 0.9616715582554092
+          },
+          "venue_mult_home": {
+            "k": 1.1225,
+            "bb": 1.0097540983606557,
+            "hr": 1.0,
+            "inplay": 0.9682646056134124
+          },
+          "venue_mult_away": {
+            "k": 0.9055706521739131,
+            "bb": 0.9310578893442623,
+            "hr": 1.0,
+            "inplay": 1.0387374825706681
+          },
+          "vs_venue_hr_mult": {
+            "136": 1.0
+          },
+          "vs_venue_k_mult": {
+            "136": 1.1225
+          },
+          "vs_venue_bb_mult": {
+            "136": 1.0097540983606557
+          },
+          "vs_venue_inplay_mult": {
+            "136": 0.9682646056134124
+          },
+          "vs_venue_history": {
+            "136": {
+              "pa": 25.0,
+              "k_mult": 1.35,
+              "bb_mult": 1.0278688524590165,
+              "hr_mult": 1.0,
+              "inplay_mult": 0.9093274446097497
+            }
+          },
+          "statcast_quality_mult": {},
+          "vs_pitcher_hr_mult": {},
+          "vs_pitcher_k_mult": {},
+          "vs_pitcher_bb_mult": {},
+          "vs_pitcher_inplay_mult": {},
+          "vs_pitcher_history": {},
+          "bb_gb_rate": 0.44,
+          "bb_fb_rate": 0.25,
+          "bb_ld_rate": 0.2,
+          "bb_pu_rate": 0.11,
+          "bb_inplay_n": 0
+        },
+        {
+          "player": {
+            "mlbam_id": 642215,
+            "full_name": "Weston Wilson",
+            "primary_position": "3B",
+            "bat_side": "R",
+            "throw_side": "R"
+          },
+          "k_rate": 0.2189413265306122,
+          "bb_rate": 0.11814413265306123,
+          "hbp_rate": 0.02040816326530612,
+          "hr_rate": 0.022034438775510205,
+          "inplay_hit_rate": 0.24544179523141652,
+          "xb_hit_share": 0.1111111111111111,
+          "triple_share_of_xb": 0.02,
+          "sb_attempt_rate": 0.21428571428571427,
+          "sb_success_rate": 0.6666666666666666,
+          "vs_pitch_type": {},
+          "vs_pitch_type_hr": {},
+          "platoon_mult_vs_lhp": {
+            "k": 1.18884957420195,
+            "bb": 0.8075,
+            "hr": 1.184144888056525,
+            "inplay": 1.090244897959184
+          },
+          "platoon_mult_vs_rhp": {
+            "k": 0.8075,
+            "bb": 1.1925000000000001,
+            "hr": 0.78,
+            "inplay": 0.8981714285714286
+          },
+          "venue_mult_home": {
+            "k": 0.9807452012414999,
+            "bb": 1.0586183628833357,
+            "hr": 0.86,
+            "inplay": 0.9502105263157895
+          },
+          "venue_mult_away": {
+            "k": 1.0496504515001457,
+            "bb": 0.9462483130904183,
+            "hr": 1.175,
+            "inplay": 1.1225
+          },
+          "vs_venue_hr_mult": {
+            "110": 0.86
+          },
+          "vs_venue_k_mult": {
+            "110": 1.0189081090770575
+          },
+          "vs_venue_bb_mult": {
+            "110": 1.1057666355237206
+          },
+          "vs_venue_inplay_mult": {
+            "110": 0.9855294117647059
+          },
+          "vs_venue_history": {
+            "110": {
+              "pa": 26.0,
+              "k_mult": 1.054023168791593,
+              "bb_mult": 1.3021903872106302,
+              "hr_mult": 0.6,
+              "inplay_mult": 0.9586554621848741
             }
           },
           "statcast_quality_mult": {},

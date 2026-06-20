@@ -7,7 +7,7 @@
   "meta": {
     "sims_per_game": null,
     "season": 2026,
-    "generated_at": "2026-06-20T04:46:04-05:00",
+    "generated_at": "2026-06-20T17:30:58-05:00",
     "use_raw": null,
     "jobs": null,
     "skipped_games": 0
@@ -43,7 +43,7 @@
       "card_path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_21_locked_policy.json",
       "selected_counts": {
         "totals": 0,
-        "ml": 0,
+        "ml": 1,
         "pitcher_props": 0,
         "hitter_props": 0,
         "hitter_home_runs": 0,
@@ -52,7 +52,7 @@
         "hitter_total_bases": 0,
         "hitter_runs": 0,
         "hitter_rbis": 0,
-        "combined": 0
+        "combined": 1
       },
       "results": {
         "combined": {
@@ -67,12 +67,12 @@
       "profit_u": 0.0,
       "roi": null,
       "settled_n": 0,
-      "unresolved_n": 0
+      "unresolved_n": 1
     },
     "cap_profile": "nototals_p1_tbheavy11_r1_nohr",
     "selected_counts": {
       "totals": 0,
-      "ml": 0,
+      "ml": 1,
       "pitcher_props": 0,
       "hitter_props": 0,
       "hitter_home_runs": 0,
@@ -81,7 +81,7 @@
       "hitter_total_bases": 0,
       "hitter_runs": 0,
       "hitter_rbis": 0,
-      "combined": 0
+      "combined": 1
     },
     "playable_selected_counts": {
       "totals": 0,
@@ -98,7 +98,7 @@
     },
     "all_selected_counts": {
       "totals": 0,
-      "ml": 0,
+      "ml": 1,
       "pitcher_props": 0,
       "hitter_props": 0,
       "hitter_home_runs": 0,
@@ -107,7 +107,7 @@
       "hitter_total_bases": 0,
       "hitter_runs": 0,
       "hitter_rbis": 0,
-      "combined": 0
+      "combined": 1
     },
     "results": {
       "combined": {
@@ -164,7 +164,7 @@
       },
       "starter_names": {
         "away": "Chase Burns",
-        "home": "Gerrit Cole"
+        "home": "Elmer Rodr\u00edguez"
       },
       "segments": {},
       "pitcher_props": {},
@@ -860,7 +860,7 @@
       },
       "starter_names": {
         "away": "",
-        "home": "MacKenzie Gore"
+        "home": ""
       },
       "segments": {},
       "pitcher_props": {},
@@ -1215,7 +1215,51 @@
       "betting": {
         "markets": {
           "totals": null,
-          "ml": null,
+          "ml": {
+            "date": "2026-06-21",
+            "game_pk": 823123,
+            "away": "Boston Red Sox",
+            "home": "Seattle Mariners",
+            "away_abbr": "BOS",
+            "home_abbr": "SEA",
+            "double_header": "N",
+            "game_number": 1,
+            "event_id": "71c529205c80b00be4370b29fc54ecb5",
+            "commence_time": "2026-06-21T20:11:00Z",
+            "market": "ml",
+            "selection": "away",
+            "edge": 0.22137707948244,
+            "model_prob": 0.335,
+            "selected_side_model_prob": 0.665,
+            "selected_side_market_prob": 0.44362292051756,
+            "market_no_vig_prob": 0.5563770794824399,
+            "odds": "+115",
+            "stake_u": 1.0,
+            "sim_sample_size": 1000,
+            "baseball_reasons": [
+              "Across his last 5 starts, Payton Tolle has allowed about 2.4 earned runs per outing.",
+              "The projected lineup is mostly 3 left-handed, 5 right-handed, and 1 switch-hitting, and the power risk also comes in lighter than baseline."
+            ],
+            "explanation_diagnostic": {
+              "status": "supported",
+              "flag_sparse_support": false,
+              "support_min_reasons": 2,
+              "baseball_reasons_n": 2,
+              "reason_sentences_n": 4,
+              "market": "ml",
+              "subject": "BOS @ SEA",
+              "supporting_reasons": [
+                "Across his last 5 starts, Payton Tolle has allowed about 2.4 earned runs per outing.",
+                "The projected lineup is mostly 3 left-handed, 5 right-handed, and 1 switch-hitting, and the power risk also comes in lighter than baseline."
+              ]
+            },
+            "reasons": [
+              "The model lands on the away side in 66.5% of sims, while the market is pricing it closer to 44.4%. Across his last 5 starts, Payton Tolle has allowed about 2.4 earned runs per outing. The projected lineup is mostly 3 left-handed, 5 right-handed, and 1 switch-hitting, and the power risk also comes in lighter than baseline. BOS wins this matchup in about 66.5% of model runs."
+            ],
+            "reason_summary": "The model lands on the away side in 66.5% of sims, while the market is pricing it closer to 44.4%. Across his last 5 starts, Payton Tolle has allowed about 2.4 earned runs per outing. The projected lineup is mostly 3 left-handed, 5 right-handed, and 1 switch-hitting, and the power risk also comes in lighter than baseline. BOS wins this matchup in about 66.5% of model runs.",
+            "rank": 1,
+            "recommendation_tier": "official"
+          },
           "pitcherProps": [],
           "hitterProps": [],
           "extraPitcherProps": [],
@@ -1254,11 +1298,35 @@
         "settled_rows": [],
         "playable_settled_rows": [],
         "all_settled_rows": [],
-        "unresolved_rows": [],
+        "unresolved_rows": [
+          {
+            "path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\daily_summary_2026_06_21_locked_policy.json",
+            "date": "2026-06-21",
+            "game_pk": 823123,
+            "market": "ml",
+            "player_name": null,
+            "selection": "away",
+            "market_line": null,
+            "reason": "game not final",
+            "recommendation_tier": "official"
+          }
+        ],
         "playable_unresolved_rows": [],
-        "all_unresolved_rows": [],
+        "all_unresolved_rows": [
+          {
+            "path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\daily_summary_2026_06_21_locked_policy.json",
+            "date": "2026-06-21",
+            "game_pk": 823123,
+            "market": "ml",
+            "player_name": null,
+            "selection": "away",
+            "market_line": null,
+            "reason": "game not final",
+            "recommendation_tier": "official"
+          }
+        ],
         "counts": {
-          "official": 0,
+          "official": 1,
           "playable": 0,
           "pitcher": 0,
           "hitter": 0,
@@ -1266,8 +1334,8 @@
           "extra_hitter": 0
         },
         "flags": {
-          "hasAnyRecommendations": false,
-          "hasOfficialRecommendations": false,
+          "hasAnyRecommendations": true,
+          "hasOfficialRecommendations": true,
           "hasPlayableCandidates": false
         }
       }
@@ -1381,7 +1449,7 @@
         "logo": "https://www.mlbstatic.com/team-logos/143.svg"
       },
       "starter_names": {
-        "away": "",
+        "away": "David Peterson",
         "home": "Zack Wheeler"
       },
       "segments": {},

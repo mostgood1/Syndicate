@@ -39,20 +39,20 @@
       "use_closer_in_9th_only": true,
       "pinch_hit_aggressiveness": 0.15
     },
-    "confirmed_lineup_ids": [],
-    "projected_lineup_ids": [
+    "confirmed_lineup_ids": [
       543807,
-      664770,
-      665489,
-      672386,
-      672960,
-      660821,
-      676391,
       682818,
-      665926
+      665489,
+      678218,
+      672960,
+      662139,
+      676914,
+      676391,
+      664702
     ],
-    "lineup_source": "projected_rotowire_default_vs_rhp",
-    "lineup_confidence": 0.66,
+    "projected_lineup_ids": [],
+    "lineup_source": "confirmed_feed_live",
+    "lineup_confidence": 1.0,
     "probable_pitcher": {
       "id": 571578,
       "source": "feed_gameData_probablePitchers",
@@ -136,30 +136,30 @@
         "vs_pitcher_history": {}
       },
       {
-        "id": 664770,
-        "name": "Nathan Lukes",
-        "pos": "RF",
+        "id": 682818,
+        "name": "Yohendrick Pi\u00f1ango",
+        "pos": "LF",
         "bat": "L",
-        "throw": "R",
-        "k_rate": 0.1590711175616836,
-        "bb_rate": 0.044154901702071515,
-        "hbp_rate": 0.027972027972027972,
-        "hr_rate": 0.01471830056735717,
-        "inplay_hit_rate": 0.35114864864864864,
-        "xb_hit_share": 0.1951219512195122,
+        "throw": "L",
+        "k_rate": 0.221875,
+        "bb_rate": 0.06875,
+        "hbp_rate": 0.0,
+        "hr_rate": 0.031249999999999997,
+        "inplay_hit_rate": 0.3304123711340206,
+        "xb_hit_share": 0.19444444444444445,
         "vs_pitch_type": {},
         "vs_pitch_type_hr": {},
         "platoon_mult_vs_lhp": {
           "k": 1.1925000000000001,
-          "bb": 0.9915716615022834,
+          "bb": 0.8075,
           "hr": 0.78,
           "inplay": 0.8075
         },
         "platoon_mult_vs_rhp": {
-          "k": 0.9398228406326034,
-          "bb": 0.9690061756063548,
-          "hr": 1.072807410727626,
-          "inplay": 1.0373580912064653
+          "k": 0.8781690140845071,
+          "bb": 1.1045454545454545,
+          "hr": 1.09,
+          "inplay": 1.0386952551272783
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -194,30 +194,30 @@
         "vs_pitcher_history": {}
       },
       {
-        "id": 672386,
-        "name": "Alejandro Kirk",
+        "id": 678218,
+        "name": "Brandon Valenzuela",
         "pos": "C",
-        "bat": "R",
+        "bat": "S",
         "throw": "R",
-        "k_rate": 0.18604651162790697,
-        "bb_rate": 0.09302325581395349,
+        "k_rate": 0.22329059829059827,
+        "bb_rate": 0.10886752136752137,
         "hbp_rate": 0.0,
-        "hr_rate": 0.023255813953488372,
-        "inplay_hit_rate": 0.1935483870967742,
-        "xb_hit_share": 0.2857142857142857,
+        "hr_rate": 0.04754273504273504,
+        "inplay_hit_rate": 0.28023815895103027,
+        "xb_hit_share": 0.17142857142857143,
         "vs_pitch_type": {},
         "vs_pitch_type_hr": {},
         "platoon_mult_vs_lhp": {
-          "k": 1.1925000000000001,
-          "bb": 0.8075,
-          "hr": 0.78,
-          "inplay": 1.1604166666666667
+          "k": 1.0657894736842106,
+          "bb": 1.138910696761531,
+          "hr": 0.9758426966292135,
+          "inplay": 0.9588264679097813
         },
         "platoon_mult_vs_rhp": {
-          "k": 0.8075,
-          "bb": 1.1925000000000001,
-          "hr": 1.2383333333333333,
-          "inplay": 0.9442028985507246
+          "k": 0.9923466924191212,
+          "bb": 0.959836050814344,
+          "hr": 0.9806669415524173,
+          "inplay": 1.0069587013607064
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -252,30 +252,30 @@
         "vs_pitcher_history": {}
       },
       {
-        "id": 660821,
-        "name": "Jes\u00fas S\u00e1nchez",
-        "pos": "RF",
-        "bat": "L",
+        "id": 676914,
+        "name": "Davis Schneider",
+        "pos": "LF",
+        "bat": "R",
         "throw": "R",
-        "k_rate": 0.2155683369077793,
-        "bb_rate": 0.04082667186586079,
-        "hbp_rate": 0.017937219730941704,
-        "hr_rate": 0.029942483914993174,
-        "inplay_hit_rate": 0.3161220043572985,
-        "xb_hit_share": 0.2413793103448276,
+        "k_rate": 0.3197843665768194,
+        "bb_rate": 0.15719676549865227,
+        "hbp_rate": 0.0,
+        "hr_rate": 0.03262803234501348,
+        "inplay_hit_rate": 0.22460317460317458,
+        "xb_hit_share": 0.3333333333333333,
         "vs_pitch_type": {},
         "vs_pitch_type_hr": {},
         "platoon_mult_vs_lhp": {
-          "k": 0.9056062690983326,
-          "bb": 0.8075,
+          "k": 1.0233029894358283,
+          "bb": 1.1925000000000001,
           "hr": 0.78,
-          "inplay": 0.8075
+          "inplay": 0.9397526501766785
         },
         "platoon_mult_vs_rhp": {
-          "k": 1.0126153312763,
-          "bb": 1.0717654837998678,
-          "hr": 1.1093838306682193,
-          "inplay": 1.0340873289357093
+          "k": 0.9765027454002504,
+          "bb": 0.8075,
+          "hr": 1.1380273794771936,
+          "inplay": 1.0410807846959913
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -310,34 +310,65 @@
         "vs_pitcher_history": {}
       },
       {
-        "id": 682818,
-        "name": "Yohendrick Pi\u00f1ango",
-        "pos": "LF",
-        "bat": "L",
-        "throw": "L",
-        "k_rate": 0.221875,
-        "bb_rate": 0.06875,
+        "id": 664702,
+        "name": "Myles Straw",
+        "pos": "RF",
+        "bat": "R",
+        "throw": "R",
+        "k_rate": 0.1625,
+        "bb_rate": 0.08636363636363636,
         "hbp_rate": 0.0,
-        "hr_rate": 0.031249999999999997,
-        "inplay_hit_rate": 0.3304123711340206,
-        "xb_hit_share": 0.19444444444444445,
+        "hr_rate": 0.012878787878787878,
+        "inplay_hit_rate": 0.26523232323232326,
+        "xb_hit_share": 0.17857142857142858,
+        "vs_pitch_type": {},
+        "vs_pitch_type_hr": {},
+        "platoon_mult_vs_lhp": {
+          "k": 1.18767258382643,
+          "bb": 1.0215249662618084,
+          "hr": 0.9975113122171946,
+          "inplay": 0.9876139335313682
+        },
+        "platoon_mult_vs_rhp": {
+          "k": 0.8075,
+          "bb": 1.0396686159844053,
+          "hr": 1.2408496732026144,
+          "inplay": 1.0029743316322643
+        },
+        "statcast_quality_mult": {},
+        "vs_pitcher_history": {}
+      },
+      {
+        "id": 672386,
+        "name": "Alejandro Kirk",
+        "pos": "C",
+        "bat": "R",
+        "throw": "R",
+        "k_rate": 0.18604651162790697,
+        "bb_rate": 0.09302325581395349,
+        "hbp_rate": 0.0,
+        "hr_rate": 0.023255813953488372,
+        "inplay_hit_rate": 0.1935483870967742,
+        "xb_hit_share": 0.2857142857142857,
         "vs_pitch_type": {},
         "vs_pitch_type_hr": {},
         "platoon_mult_vs_lhp": {
           "k": 1.1925000000000001,
           "bb": 0.8075,
           "hr": 0.78,
-          "inplay": 0.8075
+          "inplay": 1.1604166666666667
         },
         "platoon_mult_vs_rhp": {
-          "k": 0.8781690140845071,
-          "bb": 1.1045454545454545,
-          "hr": 1.09,
-          "inplay": 1.0386952551272783
+          "k": 0.8075,
+          "bb": 1.1925000000000001,
+          "hr": 1.2383333333333333,
+          "inplay": 0.9442028985507246
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
-      },
+      }
+    ],
+    "bench": [
       {
         "id": 665926,
         "name": "Andr\u00e9s Gim\u00e9nez",
@@ -363,37 +394,6 @@
           "bb": 1.1089783281733747,
           "hr": 1.0040539463723654,
           "inplay": 1.0146577510179664
-        },
-        "statcast_quality_mult": {},
-        "vs_pitcher_history": {}
-      }
-    ],
-    "bench": [
-      {
-        "id": 678218,
-        "name": "Brandon Valenzuela",
-        "pos": "C",
-        "bat": "S",
-        "throw": "R",
-        "k_rate": 0.22329059829059827,
-        "bb_rate": 0.10886752136752137,
-        "hbp_rate": 0.0,
-        "hr_rate": 0.04754273504273504,
-        "inplay_hit_rate": 0.28023815895103027,
-        "xb_hit_share": 0.17142857142857143,
-        "vs_pitch_type": {},
-        "vs_pitch_type_hr": {},
-        "platoon_mult_vs_lhp": {
-          "k": 1.0657894736842106,
-          "bb": 1.138910696761531,
-          "hr": 0.9758426966292135,
-          "inplay": 0.9588264679097813
-        },
-        "platoon_mult_vs_rhp": {
-          "k": 0.9923466924191212,
-          "bb": 0.959836050814344,
-          "hr": 0.9806669415524173,
-          "inplay": 1.0069587013607064
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -428,59 +428,59 @@
         "vs_pitcher_history": {}
       },
       {
-        "id": 676914,
-        "name": "Davis Schneider",
-        "pos": "LF",
-        "bat": "R",
+        "id": 660821,
+        "name": "Jes\u00fas S\u00e1nchez",
+        "pos": "RF",
+        "bat": "L",
         "throw": "R",
-        "k_rate": 0.3197843665768194,
-        "bb_rate": 0.15719676549865227,
-        "hbp_rate": 0.0,
-        "hr_rate": 0.03262803234501348,
-        "inplay_hit_rate": 0.22460317460317458,
-        "xb_hit_share": 0.3333333333333333,
+        "k_rate": 0.2155683369077793,
+        "bb_rate": 0.04082667186586079,
+        "hbp_rate": 0.017937219730941704,
+        "hr_rate": 0.029942483914993174,
+        "inplay_hit_rate": 0.3161220043572985,
+        "xb_hit_share": 0.2413793103448276,
         "vs_pitch_type": {},
         "vs_pitch_type_hr": {},
         "platoon_mult_vs_lhp": {
-          "k": 1.0233029894358283,
-          "bb": 1.1925000000000001,
+          "k": 0.9056062690983326,
+          "bb": 0.8075,
           "hr": 0.78,
-          "inplay": 0.9397526501766785
+          "inplay": 0.8075
         },
         "platoon_mult_vs_rhp": {
-          "k": 0.9765027454002504,
-          "bb": 0.8075,
-          "hr": 1.1380273794771936,
-          "inplay": 1.0410807846959913
+          "k": 1.0126153312763,
+          "bb": 1.0717654837998678,
+          "hr": 1.1093838306682193,
+          "inplay": 1.0340873289357093
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
       },
       {
-        "id": 664702,
-        "name": "Myles Straw",
+        "id": 664770,
+        "name": "Nathan Lukes",
         "pos": "RF",
-        "bat": "R",
+        "bat": "L",
         "throw": "R",
-        "k_rate": 0.1625,
-        "bb_rate": 0.08636363636363636,
-        "hbp_rate": 0.0,
-        "hr_rate": 0.012878787878787878,
-        "inplay_hit_rate": 0.26523232323232326,
-        "xb_hit_share": 0.17857142857142858,
+        "k_rate": 0.1590711175616836,
+        "bb_rate": 0.044154901702071515,
+        "hbp_rate": 0.027972027972027972,
+        "hr_rate": 0.01471830056735717,
+        "inplay_hit_rate": 0.35114864864864864,
+        "xb_hit_share": 0.1951219512195122,
         "vs_pitch_type": {},
         "vs_pitch_type_hr": {},
         "platoon_mult_vs_lhp": {
-          "k": 1.18767258382643,
-          "bb": 1.0215249662618084,
-          "hr": 0.9975113122171946,
-          "inplay": 0.9876139335313682
+          "k": 1.1925000000000001,
+          "bb": 0.9915716615022834,
+          "hr": 0.78,
+          "inplay": 0.8075
         },
         "platoon_mult_vs_rhp": {
-          "k": 0.8075,
-          "bb": 1.0396686159844053,
-          "hr": 1.2408496732026144,
-          "inplay": 1.0029743316322643
+          "k": 0.9398228406326034,
+          "bb": 0.9690061756063548,
+          "hr": 1.072807410727626,
+          "inplay": 1.0373580912064653
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -807,8 +807,7 @@
       "use_closer_in_9th_only": true,
       "pinch_hit_aggressiveness": 0.15
     },
-    "confirmed_lineup_ids": [],
-    "projected_lineup_ids": [
+    "confirmed_lineup_ids": [
       691718,
       663538,
       673548,
@@ -816,11 +815,12 @@
       608324,
       664023,
       807713,
-      608348,
+      699393,
       621020
     ],
-    "lineup_source": "projected_rotowire_default_vs_lhp",
-    "lineup_confidence": 0.66,
+    "projected_lineup_ids": [],
+    "lineup_source": "confirmed_feed_live",
+    "lineup_confidence": 1.0,
     "probable_pitcher": {
       "id": 607067,
       "source": "feed_gameData_probablePitchers",
@@ -1090,30 +1090,30 @@
         "vs_pitcher_history": {}
       },
       {
-        "id": 608348,
-        "name": "Carson Kelly",
-        "pos": "C",
-        "bat": "R",
+        "id": 699393,
+        "name": "Pedro Ram\u00edrez",
+        "pos": "2B",
+        "bat": "S",
         "throw": "R",
-        "k_rate": 0.1675665561851812,
-        "bb_rate": 0.09392173634128087,
-        "hbp_rate": 0.01507537688442211,
-        "hr_rate": 0.023468405859082647,
-        "inplay_hit_rate": 0.30259324009324007,
-        "xb_hit_share": 0.14,
+        "k_rate": 0.07861990950226244,
+        "bb_rate": 0.07420814479638009,
+        "hbp_rate": 0.0,
+        "hr_rate": 0.026206636500754145,
+        "inplay_hit_rate": 0.27319749216300937,
+        "xb_hit_share": 0.2,
         "vs_pitch_type": {},
         "vs_pitch_type_hr": {},
         "platoon_mult_vs_lhp": {
-          "k": 1.0126762071872937,
-          "bb": 1.1925000000000001,
+          "k": 0.8075,
+          "bb": 0.8075,
           "hr": 1.275,
-          "inplay": 1.093740972556572
+          "inplay": 0.8075
         },
         "platoon_mult_vs_rhp": {
-          "k": 1.0097683198116485,
-          "bb": 0.8585539143337829,
+          "k": 1.0672661870503597,
+          "bb": 1.1039634146341464,
           "hr": 0.78,
-          "inplay": 1.0048529001849835
+          "inplay": 1.0970985984755348
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -1149,6 +1149,35 @@
       }
     ],
     "bench": [
+      {
+        "id": 608348,
+        "name": "Carson Kelly",
+        "pos": "C",
+        "bat": "R",
+        "throw": "R",
+        "k_rate": 0.1675665561851812,
+        "bb_rate": 0.09392173634128087,
+        "hbp_rate": 0.01507537688442211,
+        "hr_rate": 0.023468405859082647,
+        "inplay_hit_rate": 0.30259324009324007,
+        "xb_hit_share": 0.14,
+        "vs_pitch_type": {},
+        "vs_pitch_type_hr": {},
+        "platoon_mult_vs_lhp": {
+          "k": 1.0126762071872937,
+          "bb": 1.1925000000000001,
+          "hr": 1.275,
+          "inplay": 1.093740972556572
+        },
+        "platoon_mult_vs_rhp": {
+          "k": 1.0097683198116485,
+          "bb": 0.8585539143337829,
+          "hr": 0.78,
+          "inplay": 1.0048529001849835
+        },
+        "statcast_quality_mult": {},
+        "vs_pitcher_history": {}
+      },
       {
         "id": 681909,
         "name": "Justin Dean",
@@ -1227,35 +1256,6 @@
           "bb": 0.8773875616648056,
           "hr": 1.275,
           "inplay": 0.8887069689336693
-        },
-        "statcast_quality_mult": {},
-        "vs_pitcher_history": {}
-      },
-      {
-        "id": 699393,
-        "name": "Pedro Ram\u00edrez",
-        "pos": "2B",
-        "bat": "S",
-        "throw": "R",
-        "k_rate": 0.07861990950226244,
-        "bb_rate": 0.07420814479638009,
-        "hbp_rate": 0.0,
-        "hr_rate": 0.026206636500754145,
-        "inplay_hit_rate": 0.27319749216300937,
-        "xb_hit_share": 0.2,
-        "vs_pitch_type": {},
-        "vs_pitch_type_hr": {},
-        "platoon_mult_vs_lhp": {
-          "k": 0.8075,
-          "bb": 0.8075,
-          "hr": 1.275,
-          "inplay": 0.8075
-        },
-        "platoon_mult_vs_rhp": {
-          "k": 1.0672661870503597,
-          "bb": 1.1039634146341464,
-          "hr": 0.78,
-          "inplay": 1.0970985984755348
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -1659,16 +1659,16 @@
   },
   "weather": {
     "source": "statsapi_live_feed",
-    "condition": "",
-    "temperature_f": null,
-    "wind_speed_mph": null,
-    "wind_direction": "unknown",
-    "wind_raw": "",
+    "condition": "Partly Cloudy",
+    "temperature_f": 71.0,
+    "wind_speed_mph": 6.0,
+    "wind_direction": "in",
+    "wind_raw": "6 mph, In From RF",
     "is_dome": null,
     "multipliers": {
-      "hr_mult": 1.0,
-      "inplay_hit_mult": 1.0,
-      "xb_share_mult": 1.0
+      "hr_mult": 1.003,
+      "inplay_hit_mult": 1.0015,
+      "xb_share_mult": 1.0008
     }
   },
   "park": {
@@ -1688,8 +1688,8 @@
   },
   "umpire": {
     "source": "statsapi_live_feed",
-    "home_plate_umpire_id": null,
-    "home_plate_umpire_name": "",
+    "home_plate_umpire_id": 623946,
+    "home_plate_umpire_name": "Malachi Moore",
     "called_strike_mult": 1.0,
     "multipliers": {
       "called_strike_mult": 1.0

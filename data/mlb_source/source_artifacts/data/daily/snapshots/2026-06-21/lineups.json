@@ -2,7 +2,7 @@
   "date": "2026-06-21",
   "season": 2026,
   "spring_mode": false,
-  "generated_at": "2026-06-20T09:45:25.019202",
+  "generated_at": "2026-06-20T22:24:38.908639",
   "summary": {
     "games": 15,
     "projected_teams": 30,
@@ -2345,10 +2345,10 @@
         547180,
         669016,
         664761,
-        681082,
         592663,
-        687282,
-        702222
+        624641,
+        681082,
+        656537
       ],
       "away_projected_validation": {
         "status": "ok",
@@ -2411,10 +2411,10 @@
           547180,
           669016,
           664761,
-          681082,
           592663,
-          687282,
-          702222
+          624641,
+          681082,
+          656537
         ],
         "ids": [
           656941,
@@ -2422,10 +2422,10 @@
           547180,
           669016,
           664761,
-          681082,
           592663,
-          687282,
-          702222
+          624641,
+          681082,
+          656537
         ],
         "missing_ids": [],
         "backfilled_ids": [],
@@ -2437,10 +2437,10 @@
           "Bryce Harper",
           "Brandon Marsh",
           "Alec Bohm",
-          "Bryson Stott",
           "J.T. Realmuto",
-          "Gabriel Rincones",
-          "Justin Crawford"
+          "Edmundo Sosa",
+          "Bryson Stott",
+          "Derek Hill"
         ],
         "matched_names": [
           "Kyle Schwarber",
@@ -2448,18 +2448,18 @@
           "Bryce Harper",
           "Brandon Marsh",
           "Alec Bohm",
-          "Bryson Stott",
           "J.T. Realmuto",
-          "Gabriel Rincones Jr.",
-          "Justin Crawford"
+          "Edmundo Sosa",
+          "Bryson Stott",
+          "Derek Hill"
         ],
         "missing_name_labels": [],
-        "mapping_source": "projected_rotowire_default_vs_rhp"
+        "mapping_source": "projected_rotowire_default_vs_lhp"
       },
       "away_source": "projected_rotowire_default_vs_rhp",
-      "home_source": "projected_rotowire_default_vs_rhp",
+      "home_source": "projected_rotowire_default_vs_lhp",
       "away_confidence": 0.66,
-      "home_confidence": 0.58,
+      "home_confidence": 0.66,
       "away_comparison": {
         "status": "projected_only",
         "is_true_mismatch": false,

@@ -39,20 +39,20 @@
       "use_closer_in_9th_only": true,
       "pinch_hit_aggressiveness": 0.15
     },
-    "confirmed_lineup_ids": [],
-    "projected_lineup_ids": [
+    "confirmed_lineup_ids": [
       663616,
       621439,
       665019,
-      668904,
       605137,
-      605170,
+      668904,
       686797,
-      656484,
-      807712
+      605170,
+      807712,
+      668952
     ],
-    "lineup_source": "projected_rotowire_default_vs_rhp",
-    "lineup_confidence": 0.66,
+    "projected_lineup_ids": [],
+    "lineup_source": "confirmed_feed_live",
+    "lineup_confidence": 1.0,
     "probable_pitcher": {
       "id": 671737,
       "source": "feed_gameData_probablePitchers",
@@ -206,35 +206,6 @@
         "vs_pitcher_history": {}
       },
       {
-        "id": 668904,
-        "name": "Royce Lewis",
-        "pos": "3B",
-        "bat": "R",
-        "throw": "R",
-        "k_rate": 0.28137931034482755,
-        "bb_rate": 0.0903448275862069,
-        "hbp_rate": 0.011764705882352941,
-        "hr_rate": 0.04534482758620689,
-        "inplay_hit_rate": 0.22745445344129556,
-        "xb_hit_share": 0.16666666666666666,
-        "vs_pitch_type": {},
-        "vs_pitch_type_hr": {},
-        "platoon_mult_vs_lhp": {
-          "k": 0.8749254049445866,
-          "bb": 1.1117158977763026,
-          "hr": 0.977359894197388,
-          "inplay": 0.9336133051507398
-        },
-        "platoon_mult_vs_rhp": {
-          "k": 1.0490077482605946,
-          "bb": 0.9900455552819503,
-          "hr": 0.9390837728443518,
-          "inplay": 1.0055017694299038
-        },
-        "statcast_quality_mult": {},
-        "vs_pitcher_history": {}
-      },
-      {
         "id": 605137,
         "name": "Josh Bell",
         "pos": "DH",
@@ -264,30 +235,30 @@
         "vs_pitcher_history": {}
       },
       {
-        "id": 605170,
-        "name": "Victor Caratini",
-        "pos": "C",
-        "bat": "S",
+        "id": 668904,
+        "name": "Royce Lewis",
+        "pos": "3B",
+        "bat": "R",
         "throw": "R",
-        "k_rate": 0.17892156862745098,
-        "bb_rate": 0.10392156862745097,
-        "hbp_rate": 0.0392156862745098,
-        "hr_rate": 0.029656862745098038,
-        "inplay_hit_rate": 0.26212299255777516,
-        "xb_hit_share": 0.1282051282051282,
+        "k_rate": 0.28137931034482755,
+        "bb_rate": 0.0903448275862069,
+        "hbp_rate": 0.011764705882352941,
+        "hr_rate": 0.04534482758620689,
+        "inplay_hit_rate": 0.22745445344129556,
+        "xb_hit_share": 0.16666666666666666,
         "vs_pitch_type": {},
         "vs_pitch_type_hr": {},
         "platoon_mult_vs_lhp": {
-          "k": 1.1925000000000001,
-          "bb": 1.0819346662911855,
-          "hr": 0.78,
-          "inplay": 1.0328476788204821
+          "k": 0.8749254049445866,
+          "bb": 1.1117158977763026,
+          "hr": 0.977359894197388,
+          "inplay": 0.9336133051507398
         },
         "platoon_mult_vs_rhp": {
-          "k": 0.9211928807119288,
-          "bb": 0.913572510673461,
-          "hr": 0.9914731254147312,
-          "inplay": 0.9437062691185261
+          "k": 1.0490077482605946,
+          "bb": 0.9900455552819503,
+          "hr": 0.9390837728443518,
+          "inplay": 1.0055017694299038
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -322,30 +293,30 @@
         "vs_pitcher_history": {}
       },
       {
-        "id": 656484,
-        "name": "Tristan Gray",
-        "pos": "3B",
-        "bat": "L",
+        "id": 605170,
+        "name": "Victor Caratini",
+        "pos": "C",
+        "bat": "S",
         "throw": "R",
-        "k_rate": 0.29563806777217017,
-        "bb_rate": 0.05052271088680605,
-        "hbp_rate": 0.00684931506849315,
-        "hr_rate": 0.02328767123287671,
-        "inplay_hit_rate": 0.30591397849462365,
-        "xb_hit_share": 0.125,
+        "k_rate": 0.17892156862745098,
+        "bb_rate": 0.10392156862745097,
+        "hbp_rate": 0.0392156862745098,
+        "hr_rate": 0.029656862745098038,
+        "inplay_hit_rate": 0.26212299255777516,
+        "xb_hit_share": 0.1282051282051282,
         "vs_pitch_type": {},
         "vs_pitch_type_hr": {},
         "platoon_mult_vs_lhp": {
           "k": 1.1925000000000001,
-          "bb": 0.8075,
-          "hr": 1.275,
-          "inplay": 0.8994727592267135
+          "bb": 1.0819346662911855,
+          "hr": 0.78,
+          "inplay": 1.0328476788204821
         },
         "platoon_mult_vs_rhp": {
-          "k": 0.9372431352738632,
-          "bb": 1.1411868802700056,
-          "hr": 1.0123249299719888,
-          "inplay": 0.9999431407009202
+          "k": 0.9211928807119288,
+          "bb": 0.913572510673461,
+          "hr": 0.9914731254147312,
+          "inplay": 0.9437062691185261
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -375,6 +346,35 @@
           "bb": 0.9063868812452296,
           "hr": 0.78,
           "inplay": 0.9957972925798069
+        },
+        "statcast_quality_mult": {},
+        "vs_pitcher_history": {}
+      },
+      {
+        "id": 668952,
+        "name": "Ryan Kreidler",
+        "pos": "CF",
+        "bat": "R",
+        "throw": "R",
+        "k_rate": 0.19729166666666664,
+        "bb_rate": 0.11229166666666666,
+        "hbp_rate": 0.0125,
+        "hr_rate": 0.04805555555555556,
+        "inplay_hit_rate": 0.23706199460916444,
+        "xb_hit_share": 0.23529411764705882,
+        "vs_pitch_type": {},
+        "vs_pitch_type_hr": {},
+        "platoon_mult_vs_lhp": {
+          "k": 0.8075,
+          "bb": 1.1925000000000001,
+          "hr": 0.78,
+          "inplay": 1.051499168298486
+        },
+        "platoon_mult_vs_rhp": {
+          "k": 1.1925000000000001,
+          "bb": 0.8075,
+          "hr": 1.275,
+          "inplay": 0.9854003585953557
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -469,30 +469,30 @@
         "vs_pitcher_history": {}
       },
       {
-        "id": 668952,
-        "name": "Ryan Kreidler",
-        "pos": "CF",
-        "bat": "R",
+        "id": 656484,
+        "name": "Tristan Gray",
+        "pos": "3B",
+        "bat": "L",
         "throw": "R",
-        "k_rate": 0.19729166666666664,
-        "bb_rate": 0.11229166666666666,
-        "hbp_rate": 0.0125,
-        "hr_rate": 0.04805555555555556,
-        "inplay_hit_rate": 0.23706199460916444,
-        "xb_hit_share": 0.23529411764705882,
+        "k_rate": 0.29563806777217017,
+        "bb_rate": 0.05052271088680605,
+        "hbp_rate": 0.00684931506849315,
+        "hr_rate": 0.02328767123287671,
+        "inplay_hit_rate": 0.30591397849462365,
+        "xb_hit_share": 0.125,
         "vs_pitch_type": {},
         "vs_pitch_type_hr": {},
         "platoon_mult_vs_lhp": {
-          "k": 0.8075,
-          "bb": 1.1925000000000001,
-          "hr": 0.78,
-          "inplay": 1.051499168298486
-        },
-        "platoon_mult_vs_rhp": {
           "k": 1.1925000000000001,
           "bb": 0.8075,
           "hr": 1.275,
-          "inplay": 0.9854003585953557
+          "inplay": 0.8994727592267135
+        },
+        "platoon_mult_vs_rhp": {
+          "k": 0.9372431352738632,
+          "bb": 1.1411868802700056,
+          "hr": 1.0123249299719888,
+          "inplay": 0.9999431407009202
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -905,20 +905,20 @@
       "use_closer_in_9th_only": true,
       "pinch_hit_aggressiveness": 0.15
     },
-    "confirmed_lineup_ids": [],
-    "projected_lineup_ids": [
+    "confirmed_lineup_ids": [
       606466,
       672695,
       682998,
-      672515,
       666971,
-      571448,
-      691783,
       656976,
+      571448,
+      680728,
+      678489,
       694371
     ],
-    "lineup_source": "projected_rotowire_default_vs_rhp",
-    "lineup_confidence": 0.66,
+    "projected_lineup_ids": [],
+    "lineup_source": "confirmed_feed_live",
+    "lineup_confidence": 1.0,
     "probable_pitcher": {
       "id": 668678,
       "source": "feed_gameData_probablePitchers",
@@ -1078,35 +1078,6 @@
         "vs_pitcher_history": {}
       },
       {
-        "id": 672515,
-        "name": "Gabriel Moreno",
-        "pos": "C",
-        "bat": "R",
-        "throw": "R",
-        "k_rate": 0.1679507122973637,
-        "bb_rate": 0.10806860979204191,
-        "hbp_rate": 0.015228426395939087,
-        "hr_rate": 0.03314638938922548,
-        "inplay_hit_rate": 0.2931107288082577,
-        "xb_hit_share": 0.2553191489361702,
-        "vs_pitch_type": {},
-        "vs_pitch_type_hr": {},
-        "platoon_mult_vs_lhp": {
-          "k": 1.0394586491822457,
-          "bb": 0.8075,
-          "hr": 1.1137223663085094,
-          "inplay": 0.8944162055219419
-        },
-        "platoon_mult_vs_rhp": {
-          "k": 1.0292110687353888,
-          "bb": 1.0385653780433344,
-          "hr": 0.9015118138153124,
-          "inplay": 1.0445105675629058
-        },
-        "statcast_quality_mult": {},
-        "vs_pitcher_history": {}
-      },
-      {
         "id": 666971,
         "name": "Lourdes Gurriel Jr.",
         "pos": "LF",
@@ -1131,6 +1102,35 @@
           "bb": 0.9543436293436294,
           "hr": 1.0990683229813665,
           "inplay": 1.0400332536180403
+        },
+        "statcast_quality_mult": {},
+        "vs_pitcher_history": {}
+      },
+      {
+        "id": 656976,
+        "name": "Pavin Smith",
+        "pos": "DH",
+        "bat": "L",
+        "throw": "L",
+        "k_rate": 0.24185463659147866,
+        "bb_rate": 0.16140350877192983,
+        "hbp_rate": 0.0,
+        "hr_rate": 0.024185463659147866,
+        "inplay_hit_rate": 0.20260869565217393,
+        "xb_hit_share": 0.05,
+        "vs_pitch_type": {},
+        "vs_pitch_type_hr": {},
+        "platoon_mult_vs_lhp": {
+          "k": 0.8075,
+          "bb": 0.8075,
+          "hr": 0.78,
+          "inplay": 0.8075
+        },
+        "platoon_mult_vs_rhp": {
+          "k": 1.0185233160621763,
+          "bb": 1.0463315217391305,
+          "hr": 1.0185233160621763,
+          "inplay": 1.0401287553648069
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -1165,59 +1165,59 @@
         "vs_pitcher_history": {}
       },
       {
-        "id": 691783,
-        "name": "Jordan Lawlar",
-        "pos": "LF",
-        "bat": "R",
+        "id": 680728,
+        "name": "Adrian Del Castillo",
+        "pos": "DH",
+        "bat": "L",
         "throw": "R",
-        "k_rate": 0.22727272727272727,
-        "bb_rate": 0.06818181818181818,
-        "hbp_rate": 0.06818181818181818,
-        "hr_rate": 0.022727272727272728,
-        "inplay_hit_rate": 0.3871543778801843,
+        "k_rate": 0.30472191116088093,
+        "bb_rate": 0.0860488988428518,
+        "hbp_rate": 0.0,
+        "hr_rate": 0.028060843598357595,
+        "inplay_hit_rate": 0.22376137512639027,
         "xb_hit_share": 0.16666666666666666,
         "vs_pitch_type": {},
         "vs_pitch_type_hr": {},
         "platoon_mult_vs_lhp": {
-          "k": 0.9594736842105263,
-          "bb": 1.1925000000000001,
+          "k": 1.1925000000000001,
+          "bb": 0.8075,
           "hr": 0.78,
-          "inplay": 1.0419258046917623
+          "inplay": 0.896904654315409
         },
         "platoon_mult_vs_rhp": {
-          "k": 1.0308,
-          "bb": 0.8075,
-          "hr": 1.275,
-          "inplay": 0.982733224222586
+          "k": 0.9720855582220193,
+          "bb": 1.0310649604164408,
+          "hr": 1.0979426792030718,
+          "inplay": 1.03991414369634
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
       },
       {
-        "id": 656976,
-        "name": "Pavin Smith",
-        "pos": "DH",
-        "bat": "L",
+        "id": 678489,
+        "name": "Jorge Barrosa",
+        "pos": "CF",
+        "bat": "S",
         "throw": "L",
-        "k_rate": 0.24185463659147866,
-        "bb_rate": 0.16140350877192983,
-        "hbp_rate": 0.0,
-        "hr_rate": 0.024185463659147866,
-        "inplay_hit_rate": 0.20260869565217393,
-        "xb_hit_share": 0.05,
+        "k_rate": 0.2913690476190476,
+        "bb_rate": 0.06904761904761904,
+        "hbp_rate": 0.008928571428571428,
+        "hr_rate": 0.007589285714285713,
+        "inplay_hit_rate": 0.2201783723522854,
+        "xb_hit_share": 0.45,
         "vs_pitch_type": {},
         "vs_pitch_type_hr": {},
         "platoon_mult_vs_lhp": {
-          "k": 0.8075,
-          "bb": 0.8075,
-          "hr": 0.78,
-          "inplay": 0.8075
+          "k": 0.8361082737487232,
+          "bb": 1.1925000000000001,
+          "hr": 1.275,
+          "inplay": 1.052959406372763
         },
         "platoon_mult_vs_rhp": {
-          "k": 1.0185233160621763,
-          "bb": 1.0463315217391305,
-          "hr": 1.0185233160621763,
-          "inplay": 1.0401287553648069
+          "k": 1.1439854593522805,
+          "bb": 0.8075,
+          "hr": 0.78,
+          "inplay": 1.0120443037974685
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -1254,30 +1254,30 @@
     ],
     "bench": [
       {
-        "id": 680728,
-        "name": "Adrian Del Castillo",
-        "pos": "DH",
-        "bat": "L",
+        "id": 672515,
+        "name": "Gabriel Moreno",
+        "pos": "C",
+        "bat": "R",
         "throw": "R",
-        "k_rate": 0.30472191116088093,
-        "bb_rate": 0.0860488988428518,
-        "hbp_rate": 0.0,
-        "hr_rate": 0.028060843598357595,
-        "inplay_hit_rate": 0.22376137512639027,
-        "xb_hit_share": 0.16666666666666666,
+        "k_rate": 0.1679507122973637,
+        "bb_rate": 0.10806860979204191,
+        "hbp_rate": 0.015228426395939087,
+        "hr_rate": 0.03314638938922548,
+        "inplay_hit_rate": 0.2931107288082577,
+        "xb_hit_share": 0.2553191489361702,
         "vs_pitch_type": {},
         "vs_pitch_type_hr": {},
         "platoon_mult_vs_lhp": {
-          "k": 1.1925000000000001,
+          "k": 1.0394586491822457,
           "bb": 0.8075,
-          "hr": 0.78,
-          "inplay": 0.896904654315409
+          "hr": 1.1137223663085094,
+          "inplay": 0.8944162055219419
         },
         "platoon_mult_vs_rhp": {
-          "k": 0.9720855582220193,
-          "bb": 1.0310649604164408,
-          "hr": 1.0979426792030718,
-          "inplay": 1.03991414369634
+          "k": 1.0292110687353888,
+          "bb": 1.0385653780433344,
+          "hr": 0.9015118138153124,
+          "inplay": 1.0445105675629058
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -1312,30 +1312,30 @@
         "vs_pitcher_history": {}
       },
       {
-        "id": 678489,
-        "name": "Jorge Barrosa",
-        "pos": "CF",
-        "bat": "S",
-        "throw": "L",
-        "k_rate": 0.2913690476190476,
-        "bb_rate": 0.06904761904761904,
-        "hbp_rate": 0.008928571428571428,
-        "hr_rate": 0.007589285714285713,
-        "inplay_hit_rate": 0.2201783723522854,
-        "xb_hit_share": 0.45,
+        "id": 691783,
+        "name": "Jordan Lawlar",
+        "pos": "LF",
+        "bat": "R",
+        "throw": "R",
+        "k_rate": 0.22727272727272727,
+        "bb_rate": 0.06818181818181818,
+        "hbp_rate": 0.06818181818181818,
+        "hr_rate": 0.022727272727272728,
+        "inplay_hit_rate": 0.3871543778801843,
+        "xb_hit_share": 0.16666666666666666,
         "vs_pitch_type": {},
         "vs_pitch_type_hr": {},
         "platoon_mult_vs_lhp": {
-          "k": 0.8361082737487232,
+          "k": 0.9594736842105263,
           "bb": 1.1925000000000001,
-          "hr": 1.275,
-          "inplay": 1.052959406372763
+          "hr": 0.78,
+          "inplay": 1.0419258046917623
         },
         "platoon_mult_vs_rhp": {
-          "k": 1.1439854593522805,
+          "k": 1.0308,
           "bb": 0.8075,
-          "hr": 0.78,
-          "inplay": 1.0120443037974685
+          "hr": 1.275,
+          "inplay": 0.982733224222586
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -1795,16 +1795,16 @@
   },
   "weather": {
     "source": "statsapi_live_feed",
-    "condition": "",
-    "temperature_f": null,
-    "wind_speed_mph": null,
+    "condition": "Roof Closed",
+    "temperature_f": 72.0,
+    "wind_speed_mph": 0.0,
     "wind_direction": "unknown",
-    "wind_raw": "",
+    "wind_raw": "0 mph, None",
     "is_dome": null,
     "multipliers": {
-      "hr_mult": 1.0,
-      "inplay_hit_mult": 1.0,
-      "xb_share_mult": 1.0
+      "hr_mult": 1.006,
+      "inplay_hit_mult": 1.003,
+      "xb_share_mult": 1.0016
     }
   },
   "park": {
@@ -1824,8 +1824,8 @@
   },
   "umpire": {
     "source": "statsapi_live_feed",
-    "home_plate_umpire_id": null,
-    "home_plate_umpire_name": "",
+    "home_plate_umpire_id": 428442,
+    "home_plate_umpire_name": "James Hoye",
     "called_strike_mult": 1.0,
     "multipliers": {
       "called_strike_mult": 1.0

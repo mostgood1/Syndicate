@@ -1,7 +1,7 @@
 ﻿{
     "sport":  "wnba",
     "date":  "2026-06-20",
-    "refreshedAtUtc":  "2026-06-20T10:22:22.9884831Z",
+    "refreshedAtUtc":  "2026-06-20T22:46:05.4034695Z",
     "sourceRepo":  null,
     "sourceArtifactRoot":  "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts",
     "sourceRootEnvVar":  "SYNDICATE_SOURCE_ROOT_WNBA",
@@ -9,10 +9,10 @@
     "destinationRoot":  "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source",
     "usedExistingMirrorArtifacts":  false,
     "usedArtifactBundle":  true,
-    "copiedArtifactCount":  23,
+    "copiedArtifactCount":  22,
     "artifactGroups":  {
-                           "processed":  16,
-                           "live_lens":  6,
+                           "processed":  14,
+                           "live_lens":  7,
                            "raw":  1,
                            "other":  0
                        },
@@ -30,14 +30,13 @@
                             "boxscores_history.csv",
                             "live_lens_projections_2026-06-20.jsonl",
                             "live_lens_tuning_override.json",
-                            "smart_sim_2026-06-20_ATL_IND.json",
                             "smart_sim_2026-06-20_DAL_CHI.json",
-                            "smart_sim_2026-06-20_PHX_SEA.json",
                             "live_lens\\live_lens_projections_2026-06-20.jsonl",
                             "live_lens\\live_lens_tuning_override.json",
                             "live_snapshots\\live_state_2026-06-20.jsonl",
                             "live_snapshots\\live_pbp_stats_2026-06-20.jsonl",
                             "live_snapshots\\live_lines_2026-06-20.jsonl",
+                            "live_snapshots\\live_player_boxscore_2026-06-20.jsonl",
                             "live_snapshots\\live_player_lens_2026-06-20.jsonl",
                             "raw\\odds_wnba_player_props_2026-06-20.csv"
                         ]

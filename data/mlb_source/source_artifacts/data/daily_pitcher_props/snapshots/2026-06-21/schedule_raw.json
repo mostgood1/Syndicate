@@ -65,10 +65,10 @@
           "active": true
         },
         "leagueRecord": {
-          "wins": 35,
+          "wins": 36,
           "losses": 39,
           "ties": 0,
-          "pct": ".473"
+          "pct": ".480"
         },
         "probablePitcher": {
           "id": 695505,
@@ -134,14 +134,14 @@
         },
         "leagueRecord": {
           "wins": 46,
-          "losses": 28,
+          "losses": 29,
           "ties": 0,
-          "pct": ".622"
+          "pct": ".613"
         },
         "probablePitcher": {
-          "id": 543037,
-          "fullName": "Gerrit Cole",
-          "link": "/api/v1/people/543037"
+          "id": 695684,
+          "fullName": "Elmer Rodr\u00edguez",
+          "link": "/api/v1/people/695684"
         },
         "splitSquad": false,
         "seriesNumber": 25,
@@ -606,9 +606,9 @@
         },
         "leagueRecord": {
           "wins": 39,
-          "losses": 35,
+          "losses": 36,
           "ties": 0,
-          "pct": ".527"
+          "pct": ".520"
         },
         "probablePitcher": {
           "id": 663436,
@@ -673,10 +673,10 @@
           "active": true
         },
         "leagueRecord": {
-          "wins": 31,
+          "wins": 32,
           "losses": 44,
           "ties": 0,
-          "pct": ".413"
+          "pct": ".421"
         },
         "probablePitcher": {
           "id": 672456,
@@ -1325,10 +1325,10 @@
           "active": true
         },
         "leagueRecord": {
-          "wins": 37,
+          "wins": 38,
           "losses": 39,
           "ties": 0,
-          "pct": ".487"
+          "pct": ".494"
         },
         "probablePitcher": {
           "id": 656302,
@@ -1394,9 +1394,9 @@
         },
         "leagueRecord": {
           "wins": 40,
-          "losses": 36,
+          "losses": 37,
           "ties": 0,
-          "pct": ".526"
+          "pct": ".519"
         },
         "probablePitcher": {
           "id": 684007,
@@ -1572,11 +1572,6 @@
           "losses": 39,
           "ties": 0,
           "pct": ".480"
-        },
-        "probablePitcher": {
-          "id": 669022,
-          "fullName": "MacKenzie Gore",
-          "link": "/api/v1/people/669022"
         },
         "splitSquad": false,
         "seriesNumber": 25,
@@ -2569,6 +2564,11 @@
           "losses": 41,
           "ties": 0,
           "pct": ".453"
+        },
+        "probablePitcher": {
+          "id": 656849,
+          "fullName": "David Peterson",
+          "link": "/api/v1/people/656849"
         },
         "splitSquad": false,
         "seriesNumber": 25,

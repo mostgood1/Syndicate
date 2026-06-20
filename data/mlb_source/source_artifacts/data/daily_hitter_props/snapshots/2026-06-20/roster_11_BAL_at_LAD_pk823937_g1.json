@@ -905,20 +905,20 @@
       "use_closer_in_9th_only": true,
       "pinch_hit_aggressiveness": 0.15
     },
-    "confirmed_lineup_ids": [],
-    "projected_lineup_ids": [
+    "confirmed_lineup_ids": [
       660271,
       681624,
       518692,
       605141,
+      500743,
+      669242,
       663656,
       669743,
-      500743,
-      687221,
-      690976
+      687221
     ],
-    "lineup_source": "projected_rotowire_default_vs_lhp",
-    "lineup_confidence": 0.66,
+    "projected_lineup_ids": [],
+    "lineup_source": "confirmed_feed_live",
+    "lineup_confidence": 1.0,
     "probable_pitcher": {
       "id": 808967,
       "source": "feed_gameData_probablePitchers",
@@ -1101,6 +1101,64 @@
         "vs_pitcher_history": {}
       },
       {
+        "id": 500743,
+        "name": "Miguel Rojas",
+        "pos": "SS",
+        "bat": "R",
+        "throw": "R",
+        "k_rate": 0.11665739710789766,
+        "bb_rate": 0.08238320355951056,
+        "hbp_rate": 0.016129032258064516,
+        "hr_rate": 0.018882091212458284,
+        "inplay_hit_rate": 0.27467532467532463,
+        "xb_hit_share": 0.1724137931034483,
+        "vs_pitch_type": {},
+        "vs_pitch_type_hr": {},
+        "platoon_mult_vs_lhp": {
+          "k": 1.1332841028830043,
+          "bb": 1.0305320124747752,
+          "hr": 1.275,
+          "inplay": 1.1046190216402985
+        },
+        "platoon_mult_vs_rhp": {
+          "k": 0.8075,
+          "bb": 0.8141518987341771,
+          "hr": 0.78,
+          "inplay": 0.8760349077008199
+        },
+        "statcast_quality_mult": {},
+        "vs_pitcher_history": {}
+      },
+      {
+        "id": 669242,
+        "name": "Tommy Edman",
+        "pos": "2B",
+        "bat": "S",
+        "throw": "R",
+        "k_rate": 0.1111111111111111,
+        "bb_rate": 0.1111111111111111,
+        "hbp_rate": 0.0,
+        "hr_rate": 0.0,
+        "inplay_hit_rate": 0.42857142857142855,
+        "xb_hit_share": 0.3333333333333333,
+        "vs_pitch_type": {},
+        "vs_pitch_type_hr": {},
+        "platoon_mult_vs_lhp": {
+          "k": 0.8075,
+          "bb": 1.1925000000000001,
+          "hr": 1.0,
+          "inplay": 0.8075
+        },
+        "platoon_mult_vs_rhp": {
+          "k": 1.1925000000000001,
+          "bb": 0.8075,
+          "hr": 1.0,
+          "inplay": 1.1925000000000001
+        },
+        "statcast_quality_mult": {},
+        "vs_pitcher_history": {}
+      },
+      {
         "id": 663656,
         "name": "Kyle Tucker",
         "pos": "RF",
@@ -1159,35 +1217,6 @@
         "vs_pitcher_history": {}
       },
       {
-        "id": 500743,
-        "name": "Miguel Rojas",
-        "pos": "SS",
-        "bat": "R",
-        "throw": "R",
-        "k_rate": 0.11665739710789766,
-        "bb_rate": 0.08238320355951056,
-        "hbp_rate": 0.016129032258064516,
-        "hr_rate": 0.018882091212458284,
-        "inplay_hit_rate": 0.27467532467532463,
-        "xb_hit_share": 0.1724137931034483,
-        "vs_pitch_type": {},
-        "vs_pitch_type_hr": {},
-        "platoon_mult_vs_lhp": {
-          "k": 1.1332841028830043,
-          "bb": 1.0305320124747752,
-          "hr": 1.275,
-          "inplay": 1.1046190216402985
-        },
-        "platoon_mult_vs_rhp": {
-          "k": 0.8075,
-          "bb": 0.8141518987341771,
-          "hr": 0.78,
-          "inplay": 0.8760349077008199
-        },
-        "statcast_quality_mult": {},
-        "vs_pitcher_history": {}
-      },
-      {
         "id": 687221,
         "name": "Dalton Rushing",
         "pos": "C",
@@ -1215,7 +1244,9 @@
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
-      },
+      }
+    ],
+    "bench": [
       {
         "id": 690976,
         "name": "Alex Freeland",
@@ -1244,9 +1275,7 @@
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
-      }
-    ],
-    "bench": [
+      },
       {
         "id": 642020,
         "name": "Chuckie Robinson",
@@ -1330,35 +1359,6 @@
           "bb": 1.0229166666666667,
           "hr": 1.0229166666666667,
           "inplay": 1.027629966742517
-        },
-        "statcast_quality_mult": {},
-        "vs_pitcher_history": {}
-      },
-      {
-        "id": 669242,
-        "name": "Tommy Edman",
-        "pos": "2B",
-        "bat": "S",
-        "throw": "R",
-        "k_rate": 0.1111111111111111,
-        "bb_rate": 0.1111111111111111,
-        "hbp_rate": 0.0,
-        "hr_rate": 0.0,
-        "inplay_hit_rate": 0.42857142857142855,
-        "xb_hit_share": 0.3333333333333333,
-        "vs_pitch_type": {},
-        "vs_pitch_type_hr": {},
-        "platoon_mult_vs_lhp": {
-          "k": 0.8075,
-          "bb": 1.1925000000000001,
-          "hr": 1.0,
-          "inplay": 0.8075
-        },
-        "platoon_mult_vs_rhp": {
-          "k": 1.1925000000000001,
-          "bb": 0.8075,
-          "hr": 1.0,
-          "inplay": 1.1925000000000001
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -1755,16 +1755,16 @@
   },
   "weather": {
     "source": "statsapi_live_feed",
-    "condition": "",
-    "temperature_f": null,
-    "wind_speed_mph": null,
-    "wind_direction": "unknown",
-    "wind_raw": "",
+    "condition": "Partly Cloudy",
+    "temperature_f": 73.0,
+    "wind_speed_mph": 7.0,
+    "wind_direction": "out",
+    "wind_raw": "7 mph, Out To CF",
     "is_dome": null,
     "multipliers": {
-      "hr_mult": 1.0,
-      "inplay_hit_mult": 1.0,
-      "xb_share_mult": 1.0
+      "hr_mult": 1.009,
+      "inplay_hit_mult": 1.0045,
+      "xb_share_mult": 1.0024
     }
   },
   "park": {
@@ -1784,8 +1784,8 @@
   },
   "umpire": {
     "source": "statsapi_live_feed",
-    "home_plate_umpire_id": null,
-    "home_plate_umpire_name": "",
+    "home_plate_umpire_id": 605671,
+    "home_plate_umpire_name": "Charlie Ramos",
     "called_strike_mult": 1.0,
     "multipliers": {
       "called_strike_mult": 1.0

@@ -498,7 +498,7 @@
       "throw": "R",
       "role": "SP",
       "leverage_skill": 0.5,
-      "stamina_pitches": 91,
+      "stamina_pitches": 94,
       "availability_mult": 1.0,
       "platoon_mult_vs_lhb": {
         "k": 0.9767089826631917,
@@ -545,7 +545,7 @@
         "throw": "R",
         "role": "MR",
         "leverage_skill": 0.5,
-        "stamina_pitches": 24,
+        "stamina_pitches": 25,
         "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 0.9449469699675035,
@@ -587,7 +587,7 @@
         "throw": "R",
         "role": "SU",
         "leverage_skill": 0.7,
-        "stamina_pitches": 19,
+        "stamina_pitches": 25,
         "availability_mult": 0.9633333333333334,
         "platoon_mult_vs_lhb": {
           "k": 1.0664948182093523,
@@ -631,7 +631,7 @@
         "throw": "L",
         "role": "MR",
         "leverage_skill": 0.5,
-        "stamina_pitches": 22,
+        "stamina_pitches": 25,
         "availability_mult": 0.9566666666666667,
         "platoon_mult_vs_lhb": {
           "k": 1.089703938673011,
@@ -675,7 +675,7 @@
         "throw": "L",
         "role": "CL",
         "leverage_skill": 0.85,
-        "stamina_pitches": 19,
+        "stamina_pitches": 25,
         "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 0.9639802631578948,
@@ -719,7 +719,7 @@
         "throw": "R",
         "role": "MR",
         "leverage_skill": 0.5,
-        "stamina_pitches": 21,
+        "stamina_pitches": 25,
         "availability_mult": 0.9466666666666667,
         "platoon_mult_vs_lhb": {
           "k": 1.0054514409461937,
@@ -762,7 +762,7 @@
         "throw": "R",
         "role": "SU",
         "leverage_skill": 0.7,
-        "stamina_pitches": 22,
+        "stamina_pitches": 25,
         "availability_mult": 0.95,
         "platoon_mult_vs_lhb": {
           "k": 1.0448127307440909,
@@ -806,7 +806,7 @@
         "throw": "L",
         "role": "LR",
         "leverage_skill": 0.35,
-        "stamina_pitches": 21,
+        "stamina_pitches": 25,
         "availability_mult": 0.8,
         "platoon_mult_vs_lhb": {
           "k": 0.9988586725527804,
@@ -1314,7 +1314,7 @@
       "throw": "R",
       "role": "SP",
       "leverage_skill": 0.5,
-      "stamina_pitches": 89,
+      "stamina_pitches": 94,
       "availability_mult": 1.0,
       "platoon_mult_vs_lhb": {
         "k": 0.9942646036958324,
@@ -1450,7 +1450,7 @@
         "throw": "R",
         "role": "MR",
         "leverage_skill": 0.5,
-        "stamina_pitches": 19,
+        "stamina_pitches": 25,
         "availability_mult": 0.9166666666666666,
         "platoon_mult_vs_lhb": {
           "k": 0.977285412020358,
@@ -1493,7 +1493,7 @@
         "throw": "R",
         "role": "CL",
         "leverage_skill": 0.85,
-        "stamina_pitches": 23,
+        "stamina_pitches": 25,
         "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 1.0493331922099915,
@@ -1537,7 +1537,7 @@
         "throw": "R",
         "role": "SU",
         "leverage_skill": 0.7,
-        "stamina_pitches": 22,
+        "stamina_pitches": 25,
         "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 1.1637014194581108,
@@ -1624,16 +1624,16 @@
   },
   "weather": {
     "source": "statsapi_live_feed",
-    "condition": "",
-    "temperature_f": null,
-    "wind_speed_mph": null,
-    "wind_direction": "unknown",
-    "wind_raw": "",
+    "condition": "Partly Cloudy",
+    "temperature_f": 87.0,
+    "wind_speed_mph": 14.0,
+    "wind_direction": "in",
+    "wind_raw": "14 mph, In From LF",
     "is_dome": null,
     "multipliers": {
-      "hr_mult": 1.0,
-      "inplay_hit_mult": 1.0,
-      "xb_share_mult": 1.0
+      "hr_mult": 0.96692,
+      "inplay_hit_mult": 1.0255,
+      "xb_share_mult": 1.0136
     }
   },
   "park": {
@@ -1653,8 +1653,8 @@
   },
   "umpire": {
     "source": "statsapi_live_feed",
-    "home_plate_umpire_id": null,
-    "home_plate_umpire_name": "",
+    "home_plate_umpire_id": 503077,
+    "home_plate_umpire_name": "Adam Hamari",
     "called_strike_mult": 1.0,
     "multipliers": {
       "called_strike_mult": 1.0

@@ -861,20 +861,20 @@
       "use_closer_in_9th_only": true,
       "pinch_hit_aggressiveness": 0.15
     },
-    "confirmed_lineup_ids": [],
-    "projected_lineup_ids": [
+    "confirmed_lineup_ids": [
       664983,
       650489,
       681198,
       696100,
       687859,
-      671289,
       694249,
+      666397,
       678662,
-      691720
+      694514
     ],
-    "lineup_source": "projected_rotowire_default_vs_rhp",
-    "lineup_confidence": 0.66,
+    "projected_lineup_ids": [],
+    "lineup_source": "confirmed_feed_live",
+    "lineup_confidence": 1.0,
     "probable_pitcher": {
       "id": 608372,
       "source": "feed_gameData_probablePitchers",
@@ -1074,35 +1074,6 @@
         "vs_pitcher_history": {}
       },
       {
-        "id": 671289,
-        "name": "Tyler Freeman",
-        "pos": "RF",
-        "bat": "R",
-        "throw": "R",
-        "k_rate": 0.11687055476529161,
-        "bb_rate": 0.05450924608819346,
-        "hbp_rate": 0.05945945945945946,
-        "hr_rate": 0.016415362731152204,
-        "inplay_hit_rate": 0.28341441167528125,
-        "xb_hit_share": 0.13953488372093023,
-        "vs_pitch_type": {},
-        "vs_pitch_type_hr": {},
-        "platoon_mult_vs_lhp": {
-          "k": 1.1925000000000001,
-          "bb": 0.8075,
-          "hr": 1.275,
-          "inplay": 0.8695937610087694
-        },
-        "platoon_mult_vs_rhp": {
-          "k": 0.8683165638861842,
-          "bb": 1.0479277816438568,
-          "hr": 0.78,
-          "inplay": 1.0358478927292252
-        },
-        "statcast_quality_mult": {},
-        "vs_pitcher_history": {}
-      },
-      {
         "id": 694249,
         "name": "Cole Carrigg",
         "pos": "CF",
@@ -1127,6 +1098,35 @@
           "bb": 1.1925000000000001,
           "hr": 1.1500000000000001,
           "inplay": 0.8075
+        },
+        "statcast_quality_mult": {},
+        "vs_pitcher_history": {}
+      },
+      {
+        "id": 666397,
+        "name": "Edouard Julien",
+        "pos": "2B",
+        "bat": "L",
+        "throw": "R",
+        "k_rate": 0.260667623833453,
+        "bb_rate": 0.1153697056712132,
+        "hbp_rate": 0.005025125628140704,
+        "hr_rate": 0.008542713567839196,
+        "inplay_hit_rate": 0.3224173553719008,
+        "xb_hit_share": 0.15384615384615385,
+        "vs_pitch_type": {},
+        "vs_pitch_type_hr": {},
+        "platoon_mult_vs_lhp": {
+          "k": 1.1925000000000001,
+          "bb": 1.0459103353867216,
+          "hr": 0.78,
+          "inplay": 0.8075
+        },
+        "platoon_mult_vs_rhp": {
+          "k": 0.991904009879437,
+          "bb": 1.0231159509730219,
+          "hr": 1.1536322725811636,
+          "inplay": 0.9934609397373771
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -1161,30 +1161,30 @@
         "vs_pitcher_history": {}
       },
       {
-        "id": 691720,
-        "name": "Kyle Karros",
-        "pos": "3B",
-        "bat": "R",
+        "id": 694514,
+        "name": "Sterlin Thompson",
+        "pos": "RF",
+        "bat": "L",
         "throw": "R",
-        "k_rate": 0.1832519964507542,
-        "bb_rate": 0.11712511091393078,
-        "hbp_rate": 0.004081632653061225,
-        "hr_rate": 0.017138420585625556,
-        "inplay_hit_rate": 0.29878048780487804,
-        "xb_hit_share": 0.25,
+        "k_rate": 0.2743055555555556,
+        "bb_rate": 0.0697420634920635,
+        "hbp_rate": 0.041666666666666664,
+        "hr_rate": 0.030753968253968252,
+        "inplay_hit_rate": 0.2995555555555555,
+        "xb_hit_share": 0.26666666666666666,
         "vs_pitch_type": {},
         "vs_pitch_type_hr": {},
         "platoon_mult_vs_lhp": {
-          "k": 1.0958561580340138,
-          "bb": 0.8075,
-          "hr": 0.856223273706734,
-          "inplay": 1.0745626822157435
+          "k": 1.1183544303797468,
+          "bb": 0.97574679943101,
+          "hr": 0.78,
+          "inplay": 1.0620178041543027
         },
         "platoon_mult_vs_rhp": {
-          "k": 1.0466502494665746,
-          "bb": 1.1289156626506025,
-          "hr": 1.029969372701783,
-          "inplay": 0.9442932728647014
+          "k": 0.9424716855429712,
+          "bb": 1.0034176836115893,
+          "hr": 1.0775042444821732,
+          "inplay": 0.9600148367952522
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -1250,59 +1250,59 @@
         "vs_pitcher_history": {}
       },
       {
-        "id": 666397,
-        "name": "Edouard Julien",
-        "pos": "2B",
-        "bat": "L",
+        "id": 691720,
+        "name": "Kyle Karros",
+        "pos": "3B",
+        "bat": "R",
         "throw": "R",
-        "k_rate": 0.260667623833453,
-        "bb_rate": 0.1153697056712132,
-        "hbp_rate": 0.005025125628140704,
-        "hr_rate": 0.008542713567839196,
-        "inplay_hit_rate": 0.3224173553719008,
-        "xb_hit_share": 0.15384615384615385,
+        "k_rate": 0.1832519964507542,
+        "bb_rate": 0.11712511091393078,
+        "hbp_rate": 0.004081632653061225,
+        "hr_rate": 0.017138420585625556,
+        "inplay_hit_rate": 0.29878048780487804,
+        "xb_hit_share": 0.25,
         "vs_pitch_type": {},
         "vs_pitch_type_hr": {},
         "platoon_mult_vs_lhp": {
-          "k": 1.1925000000000001,
-          "bb": 1.0459103353867216,
-          "hr": 0.78,
-          "inplay": 0.8075
+          "k": 1.0958561580340138,
+          "bb": 0.8075,
+          "hr": 0.856223273706734,
+          "inplay": 1.0745626822157435
         },
         "platoon_mult_vs_rhp": {
-          "k": 0.991904009879437,
-          "bb": 1.0231159509730219,
-          "hr": 1.1536322725811636,
-          "inplay": 0.9934609397373771
+          "k": 1.0466502494665746,
+          "bb": 1.1289156626506025,
+          "hr": 1.029969372701783,
+          "inplay": 0.9442932728647014
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
       },
       {
-        "id": 694514,
-        "name": "Sterlin Thompson",
+        "id": 671289,
+        "name": "Tyler Freeman",
         "pos": "RF",
-        "bat": "L",
+        "bat": "R",
         "throw": "R",
-        "k_rate": 0.2743055555555556,
-        "bb_rate": 0.0697420634920635,
-        "hbp_rate": 0.041666666666666664,
-        "hr_rate": 0.030753968253968252,
-        "inplay_hit_rate": 0.2995555555555555,
-        "xb_hit_share": 0.26666666666666666,
+        "k_rate": 0.11687055476529161,
+        "bb_rate": 0.05450924608819346,
+        "hbp_rate": 0.05945945945945946,
+        "hr_rate": 0.016415362731152204,
+        "inplay_hit_rate": 0.28341441167528125,
+        "xb_hit_share": 0.13953488372093023,
         "vs_pitch_type": {},
         "vs_pitch_type_hr": {},
         "platoon_mult_vs_lhp": {
-          "k": 1.1183544303797468,
-          "bb": 0.97574679943101,
-          "hr": 0.78,
-          "inplay": 1.0620178041543027
+          "k": 1.1925000000000001,
+          "bb": 0.8075,
+          "hr": 1.275,
+          "inplay": 0.8695937610087694
         },
         "platoon_mult_vs_rhp": {
-          "k": 0.9424716855429712,
-          "bb": 1.0034176836115893,
-          "hr": 1.0775042444821732,
-          "inplay": 0.9600148367952522
+          "k": 0.8683165638861842,
+          "bb": 1.0479277816438568,
+          "hr": 0.78,
+          "inplay": 1.0358478927292252
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -1624,16 +1624,16 @@
   },
   "weather": {
     "source": "statsapi_live_feed",
-    "condition": "",
-    "temperature_f": null,
-    "wind_speed_mph": null,
-    "wind_direction": "unknown",
-    "wind_raw": "",
+    "condition": "Partly Cloudy",
+    "temperature_f": 87.0,
+    "wind_speed_mph": 14.0,
+    "wind_direction": "in",
+    "wind_raw": "14 mph, In From LF",
     "is_dome": null,
     "multipliers": {
-      "hr_mult": 1.0,
-      "inplay_hit_mult": 1.0,
-      "xb_share_mult": 1.0
+      "hr_mult": 0.96692,
+      "inplay_hit_mult": 1.0255,
+      "xb_share_mult": 1.0136
     }
   },
   "park": {
@@ -1653,8 +1653,8 @@
   },
   "umpire": {
     "source": "statsapi_live_feed",
-    "home_plate_umpire_id": null,
-    "home_plate_umpire_name": "",
+    "home_plate_umpire_id": 503077,
+    "home_plate_umpire_name": "Adam Hamari",
     "called_strike_mult": 1.0,
     "multipliers": {
       "called_strike_mult": 1.0

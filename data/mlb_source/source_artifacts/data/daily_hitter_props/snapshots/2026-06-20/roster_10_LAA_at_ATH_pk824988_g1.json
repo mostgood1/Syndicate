@@ -901,20 +901,20 @@
       "use_closer_in_9th_only": true,
       "pinch_hit_aggressiveness": 0.15
     },
-    "confirmed_lineup_ids": [],
-    "projected_lineup_ids": [
+    "confirmed_lineup_ids": [
+      680869,
       701762,
       669127,
       691016,
       805779,
-      666126,
-      680869,
+      641680,
       671732,
       703607,
-      643446
+      691777
     ],
-    "lineup_source": "projected_rotowire_default_vs_rhp",
-    "lineup_confidence": 0.66,
+    "projected_lineup_ids": [],
+    "lineup_source": "confirmed_feed_live",
+    "lineup_confidence": 1.0,
     "probable_pitcher": {
       "id": 669372,
       "source": "feed_gameData_probablePitchers",
@@ -986,6 +986,35 @@
       }
     ],
     "lineup": [
+      {
+        "id": 680869,
+        "name": "Zack Gelof",
+        "pos": "3B",
+        "bat": "R",
+        "throw": "R",
+        "k_rate": 0.24992984788066755,
+        "bb_rate": 0.06343966917737409,
+        "hbp_rate": 0.013513513513513514,
+        "hr_rate": 0.05441219908433023,
+        "inplay_hit_rate": 0.3175528455284553,
+        "xb_hit_share": 0.1724137931034483,
+        "vs_pitch_type": {},
+        "vs_pitch_type_hr": {},
+        "platoon_mult_vs_lhp": {
+          "k": 0.9811835373622226,
+          "bb": 0.8075,
+          "hr": 0.9728290041719997,
+          "inplay": 1.0273317289229114
+        },
+        "platoon_mult_vs_rhp": {
+          "k": 1.000154377982302,
+          "bb": 1.0843649480028732,
+          "hr": 0.9430745079996095,
+          "inplay": 0.9792207515126689
+        },
+        "statcast_quality_mult": {},
+        "vs_pitcher_history": {}
+      },
       {
         "id": 701762,
         "name": "Nick Kurtz",
@@ -1103,59 +1132,30 @@
         "vs_pitcher_history": {}
       },
       {
-        "id": 666126,
-        "name": "Carlos Cortes",
-        "pos": "RF",
-        "bat": "L",
-        "throw": "S",
-        "k_rate": 0.11819194061505833,
-        "bb_rate": 0.0935949098621421,
-        "hbp_rate": 0.014634146341463415,
-        "hr_rate": 0.028138918345705196,
-        "inplay_hit_rate": 0.2529250769757099,
-        "xb_hit_share": 0.2,
-        "vs_pitch_type": {},
-        "vs_pitch_type_hr": {},
-        "platoon_mult_vs_lhp": {
-          "k": 1.1925000000000001,
-          "bb": 0.8075,
-          "hr": 0.78,
-          "inplay": 1.1925000000000001
-        },
-        "platoon_mult_vs_rhp": {
-          "k": 0.929736863890794,
-          "bb": 1.0861038496849749,
-          "hr": 1.054511839061034,
-          "inplay": 1.0116405531274886
-        },
-        "statcast_quality_mult": {},
-        "vs_pitcher_history": {}
-      },
-      {
-        "id": 680869,
-        "name": "Zack Gelof",
-        "pos": "3B",
-        "bat": "R",
+        "id": 641680,
+        "name": "Jonah Heim",
+        "pos": "C",
+        "bat": "S",
         "throw": "R",
-        "k_rate": 0.24992984788066755,
-        "bb_rate": 0.06343966917737409,
-        "hbp_rate": 0.013513513513513514,
-        "hr_rate": 0.05441219908433023,
-        "inplay_hit_rate": 0.3175528455284553,
-        "xb_hit_share": 0.1724137931034483,
+        "k_rate": 0.16575757575757577,
+        "bb_rate": 0.08287878787878789,
+        "hbp_rate": 0.0,
+        "hr_rate": 0.06303030303030302,
+        "inplay_hit_rate": 0.2502738225629792,
+        "xb_hit_share": 0.3076923076923077,
         "vs_pitch_type": {},
         "vs_pitch_type_hr": {},
         "platoon_mult_vs_lhp": {
-          "k": 0.9811835373622226,
-          "bb": 0.8075,
-          "hr": 0.9728290041719997,
-          "inplay": 1.0273317289229114
+          "k": 1.113619744058501,
+          "bb": 0.8481718464351005,
+          "hr": 1.275,
+          "inplay": 0.9845496481163878
         },
         "platoon_mult_vs_rhp": {
-          "k": 1.000154377982302,
-          "bb": 1.0843649480028732,
-          "hr": 0.9430745079996095,
-          "inplay": 0.9792207515126689
+          "k": 0.8924131627056673,
+          "bb": 1.113619744058501,
+          "hr": 0.78,
+          "inplay": 0.975511369041956
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -1219,30 +1219,30 @@
         "vs_pitcher_history": {}
       },
       {
-        "id": 643446,
-        "name": "Jeff McNeil",
-        "pos": "2B",
-        "bat": "L",
+        "id": 691777,
+        "name": "Max Muncy",
+        "pos": "3B",
+        "bat": "R",
         "throw": "R",
-        "k_rate": 0.13793422025129343,
-        "bb_rate": 0.08619733924611975,
-        "hbp_rate": 0.012195121951219513,
-        "hr_rate": 0.013774944567627494,
-        "inplay_hit_rate": 0.23908010012515643,
-        "xb_hit_share": 0.17647058823529413,
+        "k_rate": 0.30382850814744505,
+        "bb_rate": 0.05530770447713969,
+        "hbp_rate": 0.031007751937984496,
+        "hr_rate": 0.032479038126878655,
+        "inplay_hit_rate": 0.2753246753246753,
+        "xb_hit_share": 0.2962962962962963,
         "vs_pitch_type": {},
         "vs_pitch_type_hr": {},
         "platoon_mult_vs_lhp": {
-          "k": 0.8075,
+          "k": 0.922234359258798,
           "bb": 1.1925000000000001,
-          "hr": 0.78,
-          "inplay": 0.8682698599659731
+          "hr": 0.8181304136046931,
+          "inplay": 0.8939203354297693
         },
         "platoon_mult_vs_rhp": {
-          "k": 1.0589145074386546,
-          "bb": 0.8900487858964408,
-          "hr": 1.0400625427441497,
-          "inplay": 1.0733570171105793
+          "k": 1.0824905976418038,
+          "bb": 0.8075,
+          "hr": 1.0620722539451524,
+          "inplay": 1.1291981132075473
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -1279,6 +1279,35 @@
         "vs_pitcher_history": {}
       },
       {
+        "id": 666126,
+        "name": "Carlos Cortes",
+        "pos": "RF",
+        "bat": "L",
+        "throw": "S",
+        "k_rate": 0.11819194061505833,
+        "bb_rate": 0.0935949098621421,
+        "hbp_rate": 0.014634146341463415,
+        "hr_rate": 0.028138918345705196,
+        "inplay_hit_rate": 0.2529250769757099,
+        "xb_hit_share": 0.2,
+        "vs_pitch_type": {},
+        "vs_pitch_type_hr": {},
+        "platoon_mult_vs_lhp": {
+          "k": 1.1925000000000001,
+          "bb": 0.8075,
+          "hr": 0.78,
+          "inplay": 1.1925000000000001
+        },
+        "platoon_mult_vs_rhp": {
+          "k": 0.929736863890794,
+          "bb": 1.0861038496849749,
+          "hr": 1.054511839061034,
+          "inplay": 1.0116405531274886
+        },
+        "statcast_quality_mult": {},
+        "vs_pitcher_history": {}
+      },
+      {
         "id": 687515,
         "name": "Colby Thomas",
         "pos": "RF",
@@ -1308,59 +1337,30 @@
         "vs_pitcher_history": {}
       },
       {
-        "id": 641680,
-        "name": "Jonah Heim",
-        "pos": "C",
-        "bat": "S",
+        "id": 643446,
+        "name": "Jeff McNeil",
+        "pos": "2B",
+        "bat": "L",
         "throw": "R",
-        "k_rate": 0.16575757575757577,
-        "bb_rate": 0.08287878787878789,
-        "hbp_rate": 0.0,
-        "hr_rate": 0.06303030303030302,
-        "inplay_hit_rate": 0.2502738225629792,
-        "xb_hit_share": 0.3076923076923077,
+        "k_rate": 0.13793422025129343,
+        "bb_rate": 0.08619733924611975,
+        "hbp_rate": 0.012195121951219513,
+        "hr_rate": 0.013774944567627494,
+        "inplay_hit_rate": 0.23908010012515643,
+        "xb_hit_share": 0.17647058823529413,
         "vs_pitch_type": {},
         "vs_pitch_type_hr": {},
         "platoon_mult_vs_lhp": {
-          "k": 1.113619744058501,
-          "bb": 0.8481718464351005,
-          "hr": 1.275,
-          "inplay": 0.9845496481163878
-        },
-        "platoon_mult_vs_rhp": {
-          "k": 0.8924131627056673,
-          "bb": 1.113619744058501,
-          "hr": 0.78,
-          "inplay": 0.975511369041956
-        },
-        "statcast_quality_mult": {},
-        "vs_pitcher_history": {}
-      },
-      {
-        "id": 691777,
-        "name": "Max Muncy",
-        "pos": "3B",
-        "bat": "R",
-        "throw": "R",
-        "k_rate": 0.30382850814744505,
-        "bb_rate": 0.05530770447713969,
-        "hbp_rate": 0.031007751937984496,
-        "hr_rate": 0.032479038126878655,
-        "inplay_hit_rate": 0.2753246753246753,
-        "xb_hit_share": 0.2962962962962963,
-        "vs_pitch_type": {},
-        "vs_pitch_type_hr": {},
-        "platoon_mult_vs_lhp": {
-          "k": 0.922234359258798,
+          "k": 0.8075,
           "bb": 1.1925000000000001,
-          "hr": 0.8181304136046931,
-          "inplay": 0.8939203354297693
+          "hr": 0.78,
+          "inplay": 0.8682698599659731
         },
         "platoon_mult_vs_rhp": {
-          "k": 1.0824905976418038,
-          "bb": 0.8075,
-          "hr": 1.0620722539451524,
-          "inplay": 1.1291981132075473
+          "k": 1.0589145074386546,
+          "bb": 0.8900487858964408,
+          "hr": 1.0400625427441497,
+          "inplay": 1.0733570171105793
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -1810,16 +1810,16 @@
   },
   "weather": {
     "source": "statsapi_live_feed",
-    "condition": "",
-    "temperature_f": null,
-    "wind_speed_mph": null,
-    "wind_direction": "unknown",
-    "wind_raw": "",
+    "condition": "Partly Cloudy",
+    "temperature_f": 78.0,
+    "wind_speed_mph": 8.0,
+    "wind_direction": "out",
+    "wind_raw": "8 mph, Out To CF",
     "is_dome": null,
     "multipliers": {
-      "hr_mult": 1.0,
-      "inplay_hit_mult": 1.0,
-      "xb_share_mult": 1.0
+      "hr_mult": 1.024,
+      "inplay_hit_mult": 1.012,
+      "xb_share_mult": 1.0064
     }
   },
   "park": {
@@ -1839,8 +1839,8 @@
   },
   "umpire": {
     "source": "statsapi_live_feed",
-    "home_plate_umpire_id": null,
-    "home_plate_umpire_name": "",
+    "home_plate_umpire_id": 483564,
+    "home_plate_umpire_name": "Dan Bellino",
     "called_strike_mult": 1.0,
     "multipliers": {
       "called_strike_mult": 1.0

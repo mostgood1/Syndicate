@@ -1,11 +1,11 @@
 {
-  "recordedAt": "2026-06-20T09:46:06+00:00",
+  "recordedAt": "2026-06-20T22:31:00+00:00",
   "date": "2026-06-20",
   "counts": {
     "games": 14,
-    "live": 0,
-    "final": 0,
-    "pregame": 14,
+    "live": 5,
+    "final": 2,
+    "pregame": 7,
     "props": 0,
     "archivedLiveProps": 0
   },

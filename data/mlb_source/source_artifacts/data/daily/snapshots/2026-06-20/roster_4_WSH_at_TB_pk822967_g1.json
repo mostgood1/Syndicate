@@ -498,7 +498,7 @@
       "throw": "R",
       "role": "SP",
       "leverage_skill": 0.5,
-      "stamina_pitches": 88,
+      "stamina_pitches": 94,
       "availability_mult": 1.0,
       "platoon_mult_vs_lhb": {
         "k": 1.027243813282489,
@@ -587,7 +587,7 @@
         "throw": "R",
         "role": "SU",
         "leverage_skill": 0.7,
-        "stamina_pitches": 21,
+        "stamina_pitches": 25,
         "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 0.9291557876414273,
@@ -628,7 +628,7 @@
         "throw": "R",
         "role": "CL",
         "leverage_skill": 0.85,
-        "stamina_pitches": 20,
+        "stamina_pitches": 25,
         "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 1.1159067593753562,
@@ -713,7 +713,7 @@
         "throw": "R",
         "role": "SU",
         "leverage_skill": 0.7,
-        "stamina_pitches": 20,
+        "stamina_pitches": 25,
         "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 1.0427256398742704,
@@ -756,7 +756,7 @@
         "throw": "R",
         "role": "MR",
         "leverage_skill": 0.5,
-        "stamina_pitches": 24,
+        "stamina_pitches": 25,
         "availability_mult": 0.94,
         "platoon_mult_vs_lhb": {
           "k": 0.9683231607766308,
@@ -1314,7 +1314,7 @@
       "throw": "L",
       "role": "SP",
       "leverage_skill": 0.5,
-      "stamina_pitches": 115,
+      "stamina_pitches": 117,
       "availability_mult": 1.0,
       "platoon_mult_vs_lhb": {
         "k": 1.1512395648874274,
@@ -1360,7 +1360,7 @@
         "throw": "R",
         "role": "CL",
         "leverage_skill": 0.85,
-        "stamina_pitches": 19,
+        "stamina_pitches": 25,
         "availability_mult": 0.8916666666666666,
         "platoon_mult_vs_lhb": {
           "k": 0.8600288440204127,
@@ -1402,7 +1402,7 @@
         "throw": "L",
         "role": "MR",
         "leverage_skill": 0.5,
-        "stamina_pitches": 23,
+        "stamina_pitches": 25,
         "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 1.1925000000000001,
@@ -1444,7 +1444,7 @@
         "throw": "R",
         "role": "MR",
         "leverage_skill": 0.5,
-        "stamina_pitches": 23,
+        "stamina_pitches": 25,
         "availability_mult": 0.9366666666666666,
         "platoon_mult_vs_lhb": {
           "k": 1.1521062654732432,
@@ -1488,7 +1488,7 @@
         "throw": "R",
         "role": "SU",
         "leverage_skill": 0.7,
-        "stamina_pitches": 22,
+        "stamina_pitches": 25,
         "availability_mult": 0.9633333333333334,
         "platoon_mult_vs_lhb": {
           "k": 0.9797289225698759,
@@ -1531,7 +1531,7 @@
         "throw": "R",
         "role": "MR",
         "leverage_skill": 0.5,
-        "stamina_pitches": 21,
+        "stamina_pitches": 25,
         "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 0.8293880837359098,
@@ -1575,7 +1575,7 @@
         "throw": "L",
         "role": "MR",
         "leverage_skill": 0.5,
-        "stamina_pitches": 20,
+        "stamina_pitches": 25,
         "availability_mult": 0.8616666666666667,
         "platoon_mult_vs_lhb": {
           "k": 0.9389669106033485,
@@ -1618,7 +1618,7 @@
         "throw": "R",
         "role": "SU",
         "leverage_skill": 0.7,
-        "stamina_pitches": 19,
+        "stamina_pitches": 25,
         "availability_mult": 0.8066666666666666,
         "platoon_mult_vs_lhb": {
           "k": 0.8075,
@@ -1660,11 +1660,11 @@
   },
   "weather": {
     "source": "statsapi_live_feed",
-    "condition": "",
-    "temperature_f": null,
-    "wind_speed_mph": null,
+    "condition": "Dome",
+    "temperature_f": 72.0,
+    "wind_speed_mph": 0.0,
     "wind_direction": "unknown",
-    "wind_raw": "",
+    "wind_raw": "0 mph, None",
     "is_dome": true,
     "multipliers": {
       "hr_mult": 1.0,
@@ -1689,8 +1689,8 @@
   },
   "umpire": {
     "source": "statsapi_live_feed",
-    "home_plate_umpire_id": null,
-    "home_plate_umpire_name": "",
+    "home_plate_umpire_id": 596809,
+    "home_plate_umpire_name": "Ryan Additon",
     "called_strike_mult": 1.0,
     "multipliers": {
       "called_strike_mult": 1.0

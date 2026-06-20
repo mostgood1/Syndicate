@@ -498,7 +498,7 @@
       "throw": "L",
       "role": "SP",
       "leverage_skill": 0.5,
-      "stamina_pitches": 92,
+      "stamina_pitches": 94,
       "availability_mult": 1.0,
       "platoon_mult_vs_lhb": {
         "k": 1.1925000000000001,
@@ -543,7 +543,7 @@
         "throw": "L",
         "role": "SU",
         "leverage_skill": 0.7,
-        "stamina_pitches": 19,
+        "stamina_pitches": 25,
         "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 0.9639719044873934,
@@ -586,7 +586,7 @@
         "throw": "L",
         "role": "MR",
         "leverage_skill": 0.5,
-        "stamina_pitches": 23,
+        "stamina_pitches": 25,
         "availability_mult": 0.825,
         "platoon_mult_vs_lhb": {
           "k": 0.9762979300984052,
@@ -629,7 +629,7 @@
         "throw": "L",
         "role": "SU",
         "leverage_skill": 0.7,
-        "stamina_pitches": 19,
+        "stamina_pitches": 25,
         "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 1.0634706134706136,
@@ -672,7 +672,7 @@
         "throw": "R",
         "role": "MR",
         "leverage_skill": 0.5,
-        "stamina_pitches": 21,
+        "stamina_pitches": 25,
         "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 0.8075,
@@ -717,7 +717,7 @@
         "throw": "R",
         "role": "CL",
         "leverage_skill": 0.85,
-        "stamina_pitches": 19,
+        "stamina_pitches": 25,
         "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 0.8075,
@@ -1321,7 +1321,7 @@
       "throw": "R",
       "role": "SP",
       "leverage_skill": 0.5,
-      "stamina_pitches": 90,
+      "stamina_pitches": 94,
       "availability_mult": 1.0,
       "platoon_mult_vs_lhb": {
         "k": 0.9268380790480238,
@@ -1366,7 +1366,7 @@
         "throw": "L",
         "role": "MR",
         "leverage_skill": 0.5,
-        "stamina_pitches": 19,
+        "stamina_pitches": 25,
         "availability_mult": 0.8383333333333334,
         "platoon_mult_vs_lhb": {
           "k": 1.0690886290151995,
@@ -1409,7 +1409,7 @@
         "throw": "R",
         "role": "SU",
         "leverage_skill": 0.7,
-        "stamina_pitches": 18,
+        "stamina_pitches": 25,
         "availability_mult": 0.92,
         "platoon_mult_vs_lhb": {
           "k": 0.9261118752865658,
@@ -1452,7 +1452,7 @@
         "throw": "R",
         "role": "CL",
         "leverage_skill": 0.85,
-        "stamina_pitches": 21,
+        "stamina_pitches": 25,
         "availability_mult": 0.9166666666666666,
         "platoon_mult_vs_lhb": {
           "k": 0.9480499798966999,
@@ -1494,7 +1494,7 @@
         "throw": "R",
         "role": "MR",
         "leverage_skill": 0.5,
-        "stamina_pitches": 19,
+        "stamina_pitches": 25,
         "availability_mult": 0.95,
         "platoon_mult_vs_lhb": {
           "k": 0.9916642490407604,
@@ -1537,7 +1537,7 @@
         "throw": "R",
         "role": "MR",
         "leverage_skill": 0.5,
-        "stamina_pitches": 19,
+        "stamina_pitches": 25,
         "availability_mult": 0.7716666666666667,
         "platoon_mult_vs_lhb": {
           "k": 0.901686823007004,
@@ -1580,7 +1580,7 @@
         "throw": "R",
         "role": "MR",
         "leverage_skill": 0.5,
-        "stamina_pitches": 24,
+        "stamina_pitches": 25,
         "availability_mult": 0.89,
         "platoon_mult_vs_lhb": {
           "k": 0.9905714285714285,
@@ -1670,7 +1670,7 @@
         "throw": "L",
         "role": "MR",
         "leverage_skill": 0.5,
-        "stamina_pitches": 16,
+        "stamina_pitches": 25,
         "availability_mult": 0.95,
         "platoon_mult_vs_lhb": {
           "k": 1.0652561247216035,
@@ -1710,16 +1710,16 @@
   },
   "weather": {
     "source": "statsapi_live_feed",
-    "condition": "",
-    "temperature_f": null,
-    "wind_speed_mph": null,
-    "wind_direction": "unknown",
-    "wind_raw": "",
+    "condition": "Partly Cloudy",
+    "temperature_f": 79.0,
+    "wind_speed_mph": 16.0,
+    "wind_direction": "out",
+    "wind_raw": "16 mph, Out To RF",
     "is_dome": null,
     "multipliers": {
-      "hr_mult": 1.0,
-      "inplay_hit_mult": 1.0,
-      "xb_share_mult": 1.0
+      "hr_mult": 1.15024,
+      "inplay_hit_mult": 1.0135,
+      "xb_share_mult": 1.0072
     }
   },
   "park": {
@@ -1739,8 +1739,8 @@
   },
   "umpire": {
     "source": "statsapi_live_feed",
-    "home_plate_umpire_id": null,
-    "home_plate_umpire_name": "",
+    "home_plate_umpire_id": 427113,
+    "home_plate_umpire_name": "Laz Diaz",
     "called_strike_mult": 1.0,
     "multipliers": {
       "called_strike_mult": 1.0

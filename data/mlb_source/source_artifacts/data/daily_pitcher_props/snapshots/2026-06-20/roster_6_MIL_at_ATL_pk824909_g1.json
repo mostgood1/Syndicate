@@ -1747,16 +1747,16 @@
   },
   "weather": {
     "source": "statsapi_live_feed",
-    "condition": "",
-    "temperature_f": null,
-    "wind_speed_mph": null,
-    "wind_direction": "unknown",
-    "wind_raw": "",
+    "condition": "Cloudy",
+    "temperature_f": 82.0,
+    "wind_speed_mph": 5.0,
+    "wind_direction": "in",
+    "wind_raw": "5 mph, In From RF",
     "is_dome": null,
     "multipliers": {
-      "hr_mult": 1.0,
-      "inplay_hit_mult": 1.0,
-      "xb_share_mult": 1.0
+      "hr_mult": 1.036,
+      "inplay_hit_mult": 1.018,
+      "xb_share_mult": 1.0096
     }
   },
   "park": {
@@ -1776,8 +1776,8 @@
   },
   "umpire": {
     "source": "statsapi_live_feed",
-    "home_plate_umpire_id": null,
-    "home_plate_umpire_name": "",
+    "home_plate_umpire_id": 427292,
+    "home_plate_umpire_name": "Ron Kulpa",
     "called_strike_mult": 1.0,
     "multipliers": {
       "called_strike_mult": 1.0

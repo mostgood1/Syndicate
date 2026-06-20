@@ -54,18 +54,18 @@
     "lineup_source": "projected_rotowire_default_vs_rhp",
     "lineup_confidence": 0.66,
     "probable_pitcher": {
-      "id": null,
-      "source": "none",
-      "confidence": 0.0,
-      "raw_schedule_id": null,
+      "id": 656849,
+      "source": "schedule_probablePitcher",
+      "confidence": 0.8,
+      "raw_schedule_id": 656849,
       "raw_feed_id": null
     },
     "starter": {
-      "id": 642547,
-      "name": "Freddy Peralta",
+      "id": 656849,
+      "name": "David Peterson",
       "role": "SP",
-      "selection_source": "heuristic",
-      "requested_id": null
+      "selection_source": "probable",
+      "requested_id": 656849
     },
     "bullpen": [
       {
@@ -487,44 +487,44 @@
       }
     ],
     "starter_profile": {
-      "id": 642547,
-      "name": "Freddy Peralta",
-      "throw": "R",
+      "id": 656849,
+      "name": "David Peterson",
+      "throw": "L",
       "role": "SP",
       "leverage_skill": 0.5,
-      "stamina_pitches": 96,
+      "stamina_pitches": 117,
       "availability_mult": 1.0,
       "platoon_mult_vs_lhb": {
-        "k": 1.0129787234042553,
-        "bb": 0.9792962356792144,
-        "hr": 1.1785607008760952,
-        "inplay": 1.0252022787318362
+        "k": 1.1925000000000001,
+        "bb": 0.8075,
+        "hr": 1.0991226603020303,
+        "inplay": 1.0150088108910396
       },
       "platoon_mult_vs_rhb": {
-        "k": 0.9922131147540985,
-        "bb": 1.0325977301387137,
-        "hr": 0.78,
-        "inplay": 0.9335710583081116
+        "k": 0.8870352907329859,
+        "bb": 1.0835761024868638,
+        "hr": 0.896469732207738,
+        "inplay": 0.9918778059900216
       },
       "statcast_quality_mult": {},
       "arsenal_source": "statsapi_pitchArsenal",
-      "arsenal_sample_size": 1429,
+      "arsenal_sample_size": 1058,
       "statcast_splits_found": false,
       "statcast_splits_source": "",
       "statcast_splits_n_pitches": 0,
       "statcast_splits_start_date": "",
       "statcast_splits_end_date": "",
-      "k_rate": 0.22448979591836732,
-      "bb_rate": 0.09285714285714286,
-      "hbp_rate": 0.011204481792717087,
-      "hr_rate": 0.028911564625850338,
-      "inplay_hit_rate": 0.31673640167364014,
+      "k_rate": 0.19030667195737203,
+      "bb_rate": 0.09739527237684938,
+      "hbp_rate": 0.010033444816053512,
+      "hr_rate": 0.018027606144776373,
+      "inplay_hit_rate": 0.3629761904761905,
       "arsenal": {
-        "FF": 0.5311406771609509,
-        "OTHER": 0.04128761122463272,
-        "CU": 0.1259622045836252,
-        "CH": 0.23023092010007043,
-        "SL": 0.07137858693072077
+        "FF": 0.22495274,
+        "CU": 0.1294896,
+        "CH": 0.11625709,
+        "SI": 0.28922495,
+        "SL": 0.24007562
       },
       "pitch_type_whiff_mult": {},
       "pitch_type_inplay_mult": {},
@@ -812,13 +812,13 @@
       547180,
       669016,
       664761,
-      681082,
       592663,
-      687282,
-      702222
+      624641,
+      681082,
+      656537
     ],
-    "lineup_source": "projected_rotowire_default_vs_rhp",
-    "lineup_confidence": 0.58,
+    "lineup_source": "projected_rotowire_default_vs_lhp",
+    "lineup_confidence": 0.66,
     "probable_pitcher": {
       "id": 554430,
       "source": "feed_gameData_probablePitchers",
@@ -1036,35 +1036,6 @@
         "vs_pitcher_history": {}
       },
       {
-        "id": 681082,
-        "name": "Bryson Stott",
-        "pos": "2B",
-        "bat": "L",
-        "throw": "R",
-        "k_rate": 0.16321843251088533,
-        "bb_rate": 0.08192670537010159,
-        "hbp_rate": 0.0038461538461538464,
-        "hr_rate": 0.019615384615384614,
-        "inplay_hit_rate": 0.2749465669249265,
-        "xb_hit_share": 0.2857142857142857,
-        "vs_pitch_type": {},
-        "vs_pitch_type_hr": {},
-        "platoon_mult_vs_lhp": {
-          "k": 0.8075,
-          "bb": 1.1925000000000001,
-          "hr": 1.0222288915566227,
-          "inplay": 1.065504209139579
-        },
-        "platoon_mult_vs_rhp": {
-          "k": 1.0728387701599331,
-          "bb": 0.8636167293813465,
-          "hr": 1.114436390670012,
-          "inplay": 0.9311061381565697
-        },
-        "statcast_quality_mult": {},
-        "vs_pitcher_history": {}
-      },
-      {
         "id": 592663,
         "name": "J.T. Realmuto",
         "pos": "C",
@@ -1089,95 +1060,6 @@
           "bb": 0.9597947425279078,
           "hr": 1.0807792844306485,
           "inplay": 1.060519843386894
-        },
-        "statcast_quality_mult": {},
-        "vs_pitcher_history": {}
-      },
-      {
-        "id": 687282,
-        "name": "Gabriel Rincones Jr.",
-        "pos": "RF",
-        "bat": "L",
-        "throw": "R",
-        "k_rate": 0.2,
-        "bb_rate": 0.0,
-        "hbp_rate": 0.0,
-        "hr_rate": 0.06666666666666667,
-        "inplay_hit_rate": 0.08333333333333333,
-        "xb_hit_share": 0.05,
-        "vs_pitch_type": {},
-        "vs_pitch_type_hr": {},
-        "platoon_mult_vs_lhp": {
-          "k": 0.8075,
-          "bb": 1.0,
-          "hr": 0.78,
-          "inplay": 0.8075
-        },
-        "platoon_mult_vs_rhp": {
-          "k": 1.0392857142857144,
-          "bb": 1.0,
-          "hr": 1.0392857142857144,
-          "inplay": 1.05
-        },
-        "statcast_quality_mult": {},
-        "vs_pitcher_history": {}
-      },
-      {
-        "id": 702222,
-        "name": "Justin Crawford",
-        "pos": "CF",
-        "bat": "L",
-        "throw": "R",
-        "k_rate": 0.2173104520449653,
-        "bb_rate": 0.05670892131069122,
-        "hbp_rate": 0.008849557522123894,
-        "hr_rate": 0.00752212389380531,
-        "inplay_hit_rate": 0.3079990561585654,
-        "xb_hit_share": 0.22,
-        "vs_pitch_type": {},
-        "vs_pitch_type_hr": {},
-        "platoon_mult_vs_lhp": {
-          "k": 0.9828297493037825,
-          "bb": 1.1925000000000001,
-          "hr": 0.78,
-          "inplay": 0.8075
-        },
-        "platoon_mult_vs_rhp": {
-          "k": 0.9750356971198176,
-          "bb": 1.017474223103637,
-          "hr": 1.2278473091364206,
-          "inplay": 1.0104813838695805
-        },
-        "statcast_quality_mult": {},
-        "vs_pitcher_history": {}
-      }
-    ],
-    "bench": [
-      {
-        "id": 656537,
-        "name": "Derek Hill",
-        "pos": "RF",
-        "bat": "R",
-        "throw": "R",
-        "k_rate": 0.3616666666666667,
-        "bb_rate": 0.058333333333333334,
-        "hbp_rate": 0.00980392156862745,
-        "hr_rate": 0.03833333333333333,
-        "inplay_hit_rate": 0.2680084745762712,
-        "xb_hit_share": 0.05,
-        "vs_pitch_type": {},
-        "vs_pitch_type_hr": {},
-        "platoon_mult_vs_lhp": {
-          "k": 0.9420032529140688,
-          "bb": 1.0046218487394958,
-          "hr": 1.275,
-          "inplay": 0.9874741200828158
-        },
-        "platoon_mult_vs_rhp": {
-          "k": 1.0314583898075358,
-          "bb": 1.1925000000000001,
-          "hr": 0.78,
-          "inplay": 1.0535805626598467
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -1212,6 +1094,95 @@
         "vs_pitcher_history": {}
       },
       {
+        "id": 681082,
+        "name": "Bryson Stott",
+        "pos": "2B",
+        "bat": "L",
+        "throw": "R",
+        "k_rate": 0.16321843251088533,
+        "bb_rate": 0.08192670537010159,
+        "hbp_rate": 0.0038461538461538464,
+        "hr_rate": 0.019615384615384614,
+        "inplay_hit_rate": 0.2749465669249265,
+        "xb_hit_share": 0.2857142857142857,
+        "vs_pitch_type": {},
+        "vs_pitch_type_hr": {},
+        "platoon_mult_vs_lhp": {
+          "k": 0.8075,
+          "bb": 1.1925000000000001,
+          "hr": 1.0222288915566227,
+          "inplay": 1.065504209139579
+        },
+        "platoon_mult_vs_rhp": {
+          "k": 1.0728387701599331,
+          "bb": 0.8636167293813465,
+          "hr": 1.114436390670012,
+          "inplay": 0.9311061381565697
+        },
+        "statcast_quality_mult": {},
+        "vs_pitcher_history": {}
+      },
+      {
+        "id": 656537,
+        "name": "Derek Hill",
+        "pos": "RF",
+        "bat": "R",
+        "throw": "R",
+        "k_rate": 0.3616666666666667,
+        "bb_rate": 0.058333333333333334,
+        "hbp_rate": 0.00980392156862745,
+        "hr_rate": 0.03833333333333333,
+        "inplay_hit_rate": 0.2680084745762712,
+        "xb_hit_share": 0.05,
+        "vs_pitch_type": {},
+        "vs_pitch_type_hr": {},
+        "platoon_mult_vs_lhp": {
+          "k": 0.9420032529140688,
+          "bb": 1.0046218487394958,
+          "hr": 1.275,
+          "inplay": 0.9874741200828158
+        },
+        "platoon_mult_vs_rhp": {
+          "k": 1.0314583898075358,
+          "bb": 1.1925000000000001,
+          "hr": 0.78,
+          "inplay": 1.0535805626598467
+        },
+        "statcast_quality_mult": {},
+        "vs_pitcher_history": {}
+      }
+    ],
+    "bench": [
+      {
+        "id": 687282,
+        "name": "Gabriel Rincones Jr.",
+        "pos": "RF",
+        "bat": "L",
+        "throw": "R",
+        "k_rate": 0.2,
+        "bb_rate": 0.0,
+        "hbp_rate": 0.0,
+        "hr_rate": 0.06666666666666667,
+        "inplay_hit_rate": 0.08333333333333333,
+        "xb_hit_share": 0.05,
+        "vs_pitch_type": {},
+        "vs_pitch_type_hr": {},
+        "platoon_mult_vs_lhp": {
+          "k": 0.8075,
+          "bb": 1.0,
+          "hr": 0.78,
+          "inplay": 0.8075
+        },
+        "platoon_mult_vs_rhp": {
+          "k": 1.0392857142857144,
+          "bb": 1.0,
+          "hr": 1.0392857142857144,
+          "inplay": 1.05
+        },
+        "statcast_quality_mult": {},
+        "vs_pitcher_history": {}
+      },
+      {
         "id": 596117,
         "name": "Garrett Stubbs",
         "pos": "C",
@@ -1236,6 +1207,35 @@
           "bb": 1.0423076923076924,
           "hr": 1.0,
           "inplay": 1.036951249090468
+        },
+        "statcast_quality_mult": {},
+        "vs_pitcher_history": {}
+      },
+      {
+        "id": 702222,
+        "name": "Justin Crawford",
+        "pos": "CF",
+        "bat": "L",
+        "throw": "R",
+        "k_rate": 0.2173104520449653,
+        "bb_rate": 0.05670892131069122,
+        "hbp_rate": 0.008849557522123894,
+        "hr_rate": 0.00752212389380531,
+        "inplay_hit_rate": 0.3079990561585654,
+        "xb_hit_share": 0.22,
+        "vs_pitch_type": {},
+        "vs_pitch_type_hr": {},
+        "platoon_mult_vs_lhp": {
+          "k": 0.9828297493037825,
+          "bb": 1.1925000000000001,
+          "hr": 0.78,
+          "inplay": 0.8075
+        },
+        "platoon_mult_vs_rhp": {
+          "k": 0.9750356971198176,
+          "bb": 1.017474223103637,
+          "hr": 1.2278473091364206,
+          "inplay": 1.0104813838695805
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}

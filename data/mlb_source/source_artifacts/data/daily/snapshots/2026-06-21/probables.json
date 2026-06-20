@@ -2,7 +2,7 @@
   "date": "2026-06-21",
   "season": 2026,
   "spring_mode": false,
-  "generated_at": "2026-06-20T09:45:25.022207",
+  "generated_at": "2026-06-20T22:24:38.912664",
   "games": [
     {
       "idx": 0,
@@ -59,9 +59,9 @@
       },
       "raw": {
         "away_schedule_id": 695505,
-        "home_schedule_id": 543037,
+        "home_schedule_id": 695684,
         "away_schedule_name": "Chase Burns",
-        "home_schedule_name": "Gerrit Cole",
+        "home_schedule_name": "Elmer Rodr\u00edguez",
         "away_feed_id": 695505,
         "home_feed_id": 543037,
         "away_feed_name": "Chase Burns",
@@ -567,9 +567,9 @@
       },
       "raw": {
         "away_schedule_id": null,
-        "home_schedule_id": 669022,
+        "home_schedule_id": null,
         "away_schedule_name": "",
-        "home_schedule_name": "MacKenzie Gore",
+        "home_schedule_name": "",
         "away_feed_id": null,
         "home_feed_id": 669022,
         "away_feed_name": "",
@@ -895,23 +895,27 @@
         "team_id": 143,
         "abbr": "PHI"
       },
-      "away_probable_id": null,
+      "away_probable_id": 656849,
       "home_probable_id": 554430,
-      "away_source": "none",
+      "away_source": "schedule_probablePitcher",
       "home_source": "feed_gameData_probablePitchers",
-      "away_confidence": 0.0,
+      "away_confidence": 0.8,
       "home_confidence": 0.75,
       "away_validation": {
-        "status": "none",
-        "selected_id": null,
-        "selected_name": "",
-        "selected_source": "none",
+        "status": "ok",
+        "selected_id": 656849,
+        "selected_name": "David Peterson",
+        "selected_source": "schedule_probablePitcher",
         "override_reason": "",
-        "roster_team_ids": [],
-        "registry_team_ids": [],
-        "on_expected_team": false,
+        "roster_team_ids": [
+          121
+        ],
+        "registry_team_ids": [
+          121
+        ],
+        "on_expected_team": true,
         "on_opponent_team": false,
-        "on_expected_registry_team": false,
+        "on_expected_registry_team": true,
         "on_opponent_registry_team": false,
         "rejected_candidates": []
       },
@@ -934,9 +938,9 @@
         "rejected_candidates": []
       },
       "raw": {
-        "away_schedule_id": null,
+        "away_schedule_id": 656849,
         "home_schedule_id": 554430,
-        "away_schedule_name": "",
+        "away_schedule_name": "David Peterson",
         "home_schedule_name": "Zack Wheeler",
         "away_feed_id": null,
         "home_feed_id": 554430,

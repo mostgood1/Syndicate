@@ -504,7 +504,7 @@
       "throw": "R",
       "role": "SP",
       "leverage_skill": 0.5,
-      "stamina_pitches": 95,
+      "stamina_pitches": 97,
       "availability_mult": 1.0,
       "platoon_mult_vs_lhb": {
         "k": 1.0520455498133838,
@@ -549,7 +549,7 @@
         "throw": "L",
         "role": "MR",
         "leverage_skill": 0.5,
-        "stamina_pitches": 19,
+        "stamina_pitches": 25,
         "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 0.9768990169794459,
@@ -592,7 +592,7 @@
         "throw": "R",
         "role": "MR",
         "leverage_skill": 0.5,
-        "stamina_pitches": 23,
+        "stamina_pitches": 25,
         "availability_mult": 0.7423333333333333,
         "platoon_mult_vs_lhb": {
           "k": 1.0572342793544798,
@@ -634,7 +634,7 @@
         "throw": "R",
         "role": "MR",
         "leverage_skill": 0.5,
-        "stamina_pitches": 21,
+        "stamina_pitches": 25,
         "availability_mult": 0.9400000000000001,
         "platoon_mult_vs_lhb": {
           "k": 0.9935186024799901,
@@ -677,7 +677,7 @@
         "throw": "R",
         "role": "MR",
         "leverage_skill": 0.5,
-        "stamina_pitches": 21,
+        "stamina_pitches": 25,
         "availability_mult": 0.91,
         "platoon_mult_vs_lhb": {
           "k": 0.967812015074263,
@@ -719,7 +719,7 @@
         "throw": "L",
         "role": "SU",
         "leverage_skill": 0.7,
-        "stamina_pitches": 19,
+        "stamina_pitches": 25,
         "availability_mult": 0.925,
         "platoon_mult_vs_lhb": {
           "k": 0.9776245766811804,
@@ -805,7 +805,7 @@
         "throw": "R",
         "role": "CL",
         "leverage_skill": 0.85,
-        "stamina_pitches": 22,
+        "stamina_pitches": 25,
         "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 1.0492617277621124,
@@ -1376,7 +1376,7 @@
       "throw": "R",
       "role": "SP",
       "leverage_skill": 0.5,
-      "stamina_pitches": 88,
+      "stamina_pitches": 94,
       "availability_mult": 1.0,
       "platoon_mult_vs_lhb": {
         "k": 0.8723322263299705,
@@ -1421,7 +1421,7 @@
         "throw": "L",
         "role": "MR",
         "leverage_skill": 0.5,
-        "stamina_pitches": 18,
+        "stamina_pitches": 25,
         "availability_mult": 0.8833333333333333,
         "platoon_mult_vs_lhb": {
           "k": 0.9810799811506662,
@@ -1507,7 +1507,7 @@
         "throw": "R",
         "role": "SU",
         "leverage_skill": 0.7,
-        "stamina_pitches": 18,
+        "stamina_pitches": 25,
         "availability_mult": 0.9166666666666666,
         "platoon_mult_vs_lhb": {
           "k": 1.0650708905857718,
@@ -1551,7 +1551,7 @@
         "throw": "R",
         "role": "SU",
         "leverage_skill": 0.7,
-        "stamina_pitches": 19,
+        "stamina_pitches": 25,
         "availability_mult": 0.97,
         "platoon_mult_vs_lhb": {
           "k": 1.0182656826568264,
@@ -1594,7 +1594,7 @@
         "throw": "R",
         "role": "MR",
         "leverage_skill": 0.5,
-        "stamina_pitches": 19,
+        "stamina_pitches": 25,
         "availability_mult": 0.8666666666666667,
         "platoon_mult_vs_lhb": {
           "k": 1.0744825547013603,
@@ -1636,7 +1636,7 @@
         "throw": "R",
         "role": "CL",
         "leverage_skill": 0.85,
-        "stamina_pitches": 18,
+        "stamina_pitches": 25,
         "availability_mult": 0.8916666666666666,
         "platoon_mult_vs_lhb": {
           "k": 0.9539043231420727,
@@ -1677,7 +1677,7 @@
         "throw": "R",
         "role": "MR",
         "leverage_skill": 0.5,
-        "stamina_pitches": 18,
+        "stamina_pitches": 25,
         "availability_mult": 0.8333333333333334,
         "platoon_mult_vs_lhb": {
           "k": 0.8075,
@@ -1719,7 +1719,7 @@
         "throw": "R",
         "role": "MR",
         "leverage_skill": 0.5,
-        "stamina_pitches": 18,
+        "stamina_pitches": 25,
         "availability_mult": 0.8616666666666667,
         "platoon_mult_vs_lhb": {
           "k": 1.000489070868747,
@@ -1795,16 +1795,16 @@
   },
   "weather": {
     "source": "statsapi_live_feed",
-    "condition": "",
-    "temperature_f": null,
-    "wind_speed_mph": null,
+    "condition": "Roof Closed",
+    "temperature_f": 72.0,
+    "wind_speed_mph": 0.0,
     "wind_direction": "unknown",
-    "wind_raw": "",
+    "wind_raw": "0 mph, None",
     "is_dome": null,
     "multipliers": {
-      "hr_mult": 1.0,
-      "inplay_hit_mult": 1.0,
-      "xb_share_mult": 1.0
+      "hr_mult": 1.006,
+      "inplay_hit_mult": 1.003,
+      "xb_share_mult": 1.0016
     }
   },
   "park": {
@@ -1824,8 +1824,8 @@
   },
   "umpire": {
     "source": "statsapi_live_feed",
-    "home_plate_umpire_id": null,
-    "home_plate_umpire_name": "",
+    "home_plate_umpire_id": 428442,
+    "home_plate_umpire_name": "James Hoye",
     "called_strike_mult": 1.0,
     "multipliers": {
       "called_strike_mult": 1.0

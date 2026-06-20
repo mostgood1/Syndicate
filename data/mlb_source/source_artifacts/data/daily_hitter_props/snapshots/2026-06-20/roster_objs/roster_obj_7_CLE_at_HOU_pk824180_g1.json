@@ -27,10 +27,10 @@
         677587,
         656555,
         682177,
-        680757,
-        672356,
         696135,
-        672275
+        680757,
+        672275,
+        690984
       ],
       "home_lineup_ids": [
         665161,
@@ -43,8 +43,8 @@
         676694,
         694728
       ],
-      "away_lineup_source": "projected_rotowire_default_vs_rhp",
-      "home_lineup_source": "projected_rotowire_default_vs_lhp"
+      "away_lineup_source": "confirmed_feed_live",
+      "home_lineup_source": "confirmed_feed_live"
     }
   },
   "away": {
@@ -722,6 +722,61 @@
         },
         {
           "player": {
+            "mlbam_id": 696135,
+            "full_name": "Kahlil Watson",
+            "primary_position": "LF",
+            "bat_side": "L",
+            "throw_side": "R"
+          },
+          "k_rate": 0.6666666666666666,
+          "bb_rate": 0.0,
+          "hbp_rate": 0.0,
+          "hr_rate": 0.0,
+          "inplay_hit_rate": 0.0,
+          "xb_hit_share": 0.22,
+          "triple_share_of_xb": 0.12,
+          "sb_attempt_rate": 0.0,
+          "sb_success_rate": 0.72,
+          "vs_pitch_type": {},
+          "vs_pitch_type_hr": {},
+          "platoon_mult_vs_lhp": {
+            "k": 1.0,
+            "bb": 1.0,
+            "hr": 1.0,
+            "inplay": 1.0
+          },
+          "platoon_mult_vs_rhp": {
+            "k": 1.0,
+            "bb": 1.0,
+            "hr": 1.0,
+            "inplay": 1.0
+          },
+          "venue_mult_home": {},
+          "venue_mult_away": {
+            "k": 1.0,
+            "bb": 1.0,
+            "hr": 1.0,
+            "inplay": 1.0
+          },
+          "vs_venue_hr_mult": {},
+          "vs_venue_k_mult": {},
+          "vs_venue_bb_mult": {},
+          "vs_venue_inplay_mult": {},
+          "vs_venue_history": {},
+          "statcast_quality_mult": {},
+          "vs_pitcher_hr_mult": {},
+          "vs_pitcher_k_mult": {},
+          "vs_pitcher_bb_mult": {},
+          "vs_pitcher_inplay_mult": {},
+          "vs_pitcher_history": {},
+          "bb_gb_rate": 0.44,
+          "bb_fb_rate": 0.25,
+          "bb_ld_rate": 0.2,
+          "bb_pu_rate": 0.11,
+          "bb_inplay_n": 0
+        },
+        {
+          "player": {
             "mlbam_id": 680757,
             "full_name": "Steven Kwan",
             "primary_position": "CF",
@@ -864,137 +919,6 @@
         },
         {
           "player": {
-            "mlbam_id": 672356,
-            "full_name": "Gabriel Arias",
-            "primary_position": "SS",
-            "bat_side": "R",
-            "throw_side": "R"
-          },
-          "k_rate": 0.4,
-          "bb_rate": 0.044444444444444446,
-          "hbp_rate": 0.0,
-          "hr_rate": 0.044444444444444446,
-          "inplay_hit_rate": 0.32,
-          "xb_hit_share": 0.2,
-          "triple_share_of_xb": 0.02,
-          "sb_attempt_rate": 0.0,
-          "sb_success_rate": 0.72,
-          "vs_pitch_type": {},
-          "vs_pitch_type_hr": {},
-          "platoon_mult_vs_lhp": {
-            "k": 0.8730769230769231,
-            "bb": 0.8075,
-            "hr": 0.78,
-            "inplay": 1.0229166666666667
-          },
-          "platoon_mult_vs_rhp": {
-            "k": 1.0515625,
-            "bb": 1.1925000000000001,
-            "hr": 1.2234375,
-            "inplay": 0.987109375
-          },
-          "venue_mult_home": {
-            "k": 0.8775000000000001,
-            "bb": 1.1225,
-            "hr": 1.175,
-            "inplay": 1.06015625
-          },
-          "venue_mult_away": {
-            "k": 1.0477272727272726,
-            "bb": 0.8886363636363637,
-            "hr": 0.8886363636363637,
-            "inplay": 0.9716911764705882
-          },
-          "vs_venue_hr_mult": {
-            "114": 1.175
-          },
-          "vs_venue_k_mult": {
-            "114": 0.8775000000000001
-          },
-          "vs_venue_bb_mult": {
-            "114": 1.1225
-          },
-          "vs_venue_inplay_mult": {
-            "114": 1.06015625
-          },
-          "vs_venue_history": {
-            "114": {
-              "pa": 12.0,
-              "k_mult": 0.65,
-              "bb_mult": 1.35,
-              "hr_mult": 1.5,
-              "inplay_mult": 1.171875
-            }
-          },
-          "statcast_quality_mult": {},
-          "vs_pitcher_hr_mult": {},
-          "vs_pitcher_k_mult": {},
-          "vs_pitcher_bb_mult": {},
-          "vs_pitcher_inplay_mult": {},
-          "vs_pitcher_history": {},
-          "bb_gb_rate": 0.44,
-          "bb_fb_rate": 0.25,
-          "bb_ld_rate": 0.2,
-          "bb_pu_rate": 0.11,
-          "bb_inplay_n": 0
-        },
-        {
-          "player": {
-            "mlbam_id": 696135,
-            "full_name": "Kahlil Watson",
-            "primary_position": "LF",
-            "bat_side": "L",
-            "throw_side": "R"
-          },
-          "k_rate": 0.6666666666666666,
-          "bb_rate": 0.0,
-          "hbp_rate": 0.0,
-          "hr_rate": 0.0,
-          "inplay_hit_rate": 0.0,
-          "xb_hit_share": 0.22,
-          "triple_share_of_xb": 0.12,
-          "sb_attempt_rate": 0.0,
-          "sb_success_rate": 0.72,
-          "vs_pitch_type": {},
-          "vs_pitch_type_hr": {},
-          "platoon_mult_vs_lhp": {
-            "k": 1.0,
-            "bb": 1.0,
-            "hr": 1.0,
-            "inplay": 1.0
-          },
-          "platoon_mult_vs_rhp": {
-            "k": 1.0,
-            "bb": 1.0,
-            "hr": 1.0,
-            "inplay": 1.0
-          },
-          "venue_mult_home": {},
-          "venue_mult_away": {
-            "k": 1.0,
-            "bb": 1.0,
-            "hr": 1.0,
-            "inplay": 1.0
-          },
-          "vs_venue_hr_mult": {},
-          "vs_venue_k_mult": {},
-          "vs_venue_bb_mult": {},
-          "vs_venue_inplay_mult": {},
-          "vs_venue_history": {},
-          "statcast_quality_mult": {},
-          "vs_pitcher_hr_mult": {},
-          "vs_pitcher_k_mult": {},
-          "vs_pitcher_bb_mult": {},
-          "vs_pitcher_inplay_mult": {},
-          "vs_pitcher_history": {},
-          "bb_gb_rate": 0.44,
-          "bb_fb_rate": 0.25,
-          "bb_ld_rate": 0.2,
-          "bb_pu_rate": 0.11,
-          "bb_inplay_n": 0
-        },
-        {
-          "player": {
             "mlbam_id": 672275,
             "full_name": "Patrick Bailey",
             "primary_position": "C",
@@ -1065,6 +989,82 @@
               "k_mult": 0.8613365364896142,
               "bb_mult": 1.0808028821410192,
               "hr_mult": 0.6,
+              "inplay_mult": 1.35
+            }
+          },
+          "statcast_quality_mult": {},
+          "vs_pitcher_hr_mult": {},
+          "vs_pitcher_k_mult": {},
+          "vs_pitcher_bb_mult": {},
+          "vs_pitcher_inplay_mult": {},
+          "vs_pitcher_history": {},
+          "bb_gb_rate": 0.44,
+          "bb_fb_rate": 0.25,
+          "bb_ld_rate": 0.2,
+          "bb_pu_rate": 0.11,
+          "bb_inplay_n": 0
+        },
+        {
+          "player": {
+            "mlbam_id": 690984,
+            "full_name": "Petey Halpin",
+            "primary_position": "CF",
+            "bat_side": "L",
+            "throw_side": "R"
+          },
+          "k_rate": 0.2890522875816993,
+          "bb_rate": 0.02361111111111111,
+          "hbp_rate": 0.0,
+          "hr_rate": 0.0,
+          "inplay_hit_rate": 0.2109090909090909,
+          "xb_hit_share": 0.2,
+          "triple_share_of_xb": 0.02,
+          "sb_attempt_rate": 0.35,
+          "sb_success_rate": 0.95,
+          "vs_pitch_type": {},
+          "vs_pitch_type_hr": {},
+          "platoon_mult_vs_lhp": {
+            "k": 1.0208309779536462,
+            "bb": 0.8075,
+            "hr": 1.0,
+            "inplay": 0.8075
+          },
+          "platoon_mult_vs_rhp": {
+            "k": 0.9622842109840414,
+            "bb": 1.1925000000000001,
+            "hr": 1.0,
+            "inplay": 1.1743773946360154
+          },
+          "venue_mult_home": {
+            "k": 1.022570335261121,
+            "bb": 0.8775000000000001,
+            "hr": 1.0,
+            "inplay": 1.1225
+          },
+          "venue_mult_away": {
+            "k": 0.9658748494605156,
+            "bb": 1.1225,
+            "hr": 1.0,
+            "inplay": 0.8775000000000001
+          },
+          "vs_venue_hr_mult": {
+            "114": 1.0
+          },
+          "vs_venue_k_mult": {
+            "114": 1.022570335261121
+          },
+          "vs_venue_bb_mult": {
+            "114": 0.8775000000000001
+          },
+          "vs_venue_inplay_mult": {
+            "114": 1.1225
+          },
+          "vs_venue_history": {
+            "114": {
+              "pa": 13.0,
+              "k_mult": 1.0644866721746316,
+              "bb_mult": 0.65,
+              "hr_mult": 1.0,
               "inplay_mult": 1.35
             }
           },
@@ -1389,66 +1389,66 @@
         },
         {
           "player": {
-            "mlbam_id": 690984,
-            "full_name": "Petey Halpin",
-            "primary_position": "CF",
-            "bat_side": "L",
+            "mlbam_id": 672356,
+            "full_name": "Gabriel Arias",
+            "primary_position": "SS",
+            "bat_side": "R",
             "throw_side": "R"
           },
-          "k_rate": 0.2890522875816993,
-          "bb_rate": 0.02361111111111111,
+          "k_rate": 0.4,
+          "bb_rate": 0.044444444444444446,
           "hbp_rate": 0.0,
-          "hr_rate": 0.0,
-          "inplay_hit_rate": 0.2109090909090909,
+          "hr_rate": 0.044444444444444446,
+          "inplay_hit_rate": 0.32,
           "xb_hit_share": 0.2,
           "triple_share_of_xb": 0.02,
-          "sb_attempt_rate": 0.35,
-          "sb_success_rate": 0.95,
+          "sb_attempt_rate": 0.0,
+          "sb_success_rate": 0.72,
           "vs_pitch_type": {},
           "vs_pitch_type_hr": {},
           "platoon_mult_vs_lhp": {
-            "k": 1.0208309779536462,
+            "k": 0.8730769230769231,
             "bb": 0.8075,
-            "hr": 1.0,
-            "inplay": 0.8075
+            "hr": 0.78,
+            "inplay": 1.0229166666666667
           },
           "platoon_mult_vs_rhp": {
-            "k": 0.9622842109840414,
+            "k": 1.0515625,
             "bb": 1.1925000000000001,
-            "hr": 1.0,
-            "inplay": 1.1743773946360154
+            "hr": 1.2234375,
+            "inplay": 0.987109375
           },
           "venue_mult_home": {
-            "k": 1.022570335261121,
-            "bb": 0.8775000000000001,
-            "hr": 1.0,
-            "inplay": 1.1225
+            "k": 0.8775000000000001,
+            "bb": 1.1225,
+            "hr": 1.175,
+            "inplay": 1.06015625
           },
           "venue_mult_away": {
-            "k": 0.9658748494605156,
-            "bb": 1.1225,
-            "hr": 1.0,
-            "inplay": 0.8775000000000001
+            "k": 1.0477272727272726,
+            "bb": 0.8886363636363637,
+            "hr": 0.8886363636363637,
+            "inplay": 0.9716911764705882
           },
           "vs_venue_hr_mult": {
-            "114": 1.0
+            "114": 1.175
           },
           "vs_venue_k_mult": {
-            "114": 1.022570335261121
-          },
-          "vs_venue_bb_mult": {
             "114": 0.8775000000000001
           },
-          "vs_venue_inplay_mult": {
+          "vs_venue_bb_mult": {
             "114": 1.1225
+          },
+          "vs_venue_inplay_mult": {
+            "114": 1.06015625
           },
           "vs_venue_history": {
             "114": {
-              "pa": 13.0,
-              "k_mult": 1.0644866721746316,
-              "bb_mult": 0.65,
-              "hr_mult": 1.0,
-              "inplay_mult": 1.35
+              "pa": 12.0,
+              "k_mult": 0.65,
+              "bb_mult": 1.35,
+              "hr_mult": 1.5,
+              "inplay_mult": 1.171875
             }
           },
           "statcast_quality_mult": {},

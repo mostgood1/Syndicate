@@ -39,20 +39,20 @@
       "use_closer_in_9th_only": true,
       "pinch_hit_aggressiveness": 0.15
     },
-    "confirmed_lineup_ids": [],
-    "projected_lineup_ids": [
-      656305,
+    "confirmed_lineup_ids": [
       650333,
       805811,
+      656305,
       646240,
-      669477,
-      642715,
       808982,
-      691740,
-      687551
+      642715,
+      669477,
+      687551,
+      606992
     ],
-    "lineup_source": "projected_rotowire_default_vs_rhp",
-    "lineup_confidence": 0.66,
+    "projected_lineup_ids": [],
+    "lineup_source": "confirmed_feed_live",
+    "lineup_confidence": 1.0,
     "probable_pitcher": {
       "id": 686790,
       "source": "feed_gameData_probablePitchers",
@@ -119,35 +119,6 @@
     ],
     "lineup": [
       {
-        "id": 656305,
-        "name": "Matt Chapman",
-        "pos": "3B",
-        "bat": "R",
-        "throw": "R",
-        "k_rate": 0.20382339077148692,
-        "bb_rate": 0.10928874456607134,
-        "hbp_rate": 0.012779552715654952,
-        "hr_rate": 0.031304666631749856,
-        "inplay_hit_rate": 0.28527685492801774,
-        "xb_hit_share": 0.2647058823529412,
-        "vs_pitch_type": {},
-        "vs_pitch_type_hr": {},
-        "platoon_mult_vs_lhp": {
-          "k": 1.0094274033628403,
-          "bb": 1.1925000000000001,
-          "hr": 0.8785186711663001,
-          "inplay": 1.0548475949841127
-        },
-        "platoon_mult_vs_rhp": {
-          "k": 1.0223909617295373,
-          "bb": 0.8639318775937279,
-          "hr": 0.8302871324203096,
-          "inplay": 0.9956467100976959
-        },
-        "statcast_quality_mult": {},
-        "vs_pitcher_history": {}
-      },
-      {
         "id": 650333,
         "name": "Luis Arraez",
         "pos": "2B",
@@ -206,6 +177,35 @@
         "vs_pitcher_history": {}
       },
       {
+        "id": 656305,
+        "name": "Matt Chapman",
+        "pos": "3B",
+        "bat": "R",
+        "throw": "R",
+        "k_rate": 0.20382339077148692,
+        "bb_rate": 0.10928874456607134,
+        "hbp_rate": 0.012779552715654952,
+        "hr_rate": 0.031304666631749856,
+        "inplay_hit_rate": 0.28527685492801774,
+        "xb_hit_share": 0.2647058823529412,
+        "vs_pitch_type": {},
+        "vs_pitch_type_hr": {},
+        "platoon_mult_vs_lhp": {
+          "k": 1.0094274033628403,
+          "bb": 1.1925000000000001,
+          "hr": 0.8785186711663001,
+          "inplay": 1.0548475949841127
+        },
+        "platoon_mult_vs_rhp": {
+          "k": 1.0223909617295373,
+          "bb": 0.8639318775937279,
+          "hr": 0.8302871324203096,
+          "inplay": 0.9956467100976959
+        },
+        "statcast_quality_mult": {},
+        "vs_pitcher_history": {}
+      },
+      {
         "id": 646240,
         "name": "Rafael Devers",
         "pos": "1B",
@@ -230,64 +230,6 @@
           "bb": 0.932366692192979,
           "hr": 0.9802702193767064,
           "inplay": 1.072725541416365
-        },
-        "statcast_quality_mult": {},
-        "vs_pitcher_history": {}
-      },
-      {
-        "id": 669477,
-        "name": "Casey Schmitt",
-        "pos": "DH",
-        "bat": "R",
-        "throw": "R",
-        "k_rate": 0.19240215924426451,
-        "bb_rate": 0.02087719298245614,
-        "hbp_rate": 0.021052631578947368,
-        "hr_rate": 0.05165991902834007,
-        "inplay_hit_rate": 0.2884259259259259,
-        "xb_hit_share": 0.18181818181818182,
-        "vs_pitch_type": {},
-        "vs_pitch_type_hr": {},
-        "platoon_mult_vs_lhp": {
-          "k": 0.9204018368059038,
-          "bb": 0.8075,
-          "hr": 0.8542994325622,
-          "inplay": 1.165088282504013
-        },
-        "platoon_mult_vs_rhp": {
-          "k": 1.0466971768594682,
-          "bb": 1.1925000000000001,
-          "hr": 1.070187479075996,
-          "inplay": 0.9267255216693419
-        },
-        "statcast_quality_mult": {},
-        "vs_pitcher_history": {}
-      },
-      {
-        "id": 642715,
-        "name": "Willy Adames",
-        "pos": "SS",
-        "bat": "R",
-        "throw": "R",
-        "k_rate": 0.2704507057605319,
-        "bb_rate": 0.059174886914818245,
-        "hbp_rate": 0.003215434083601286,
-        "hr_rate": 0.04824241103057387,
-        "inplay_hit_rate": 0.23990384615384616,
-        "xb_hit_share": 0.2835820895522388,
-        "vs_pitch_type": {},
-        "vs_pitch_type_hr": {},
-        "platoon_mult_vs_lhp": {
-          "k": 1.023591422850869,
-          "bb": 1.164960256174108,
-          "hr": 0.78,
-          "inplay": 0.9085170340681363
-        },
-        "platoon_mult_vs_rhp": {
-          "k": 0.9998689527680783,
-          "bb": 0.8887953503557828,
-          "hr": 0.9882331579488354,
-          "inplay": 1.0884414398417088
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -322,30 +264,59 @@
         "vs_pitcher_history": {}
       },
       {
-        "id": 691740,
-        "name": "Daniel Susac",
-        "pos": "C",
+        "id": 642715,
+        "name": "Willy Adames",
+        "pos": "SS",
         "bat": "R",
         "throw": "R",
-        "k_rate": 0.2018867924528302,
-        "bb_rate": 0.05377358490566038,
-        "hbp_rate": 0.018867924528301886,
-        "hr_rate": 0.0,
-        "inplay_hit_rate": 0.34125939849624054,
-        "xb_hit_share": 0.2222222222222222,
+        "k_rate": 0.2704507057605319,
+        "bb_rate": 0.059174886914818245,
+        "hbp_rate": 0.003215434083601286,
+        "hr_rate": 0.04824241103057387,
+        "inplay_hit_rate": 0.23990384615384616,
+        "xb_hit_share": 0.2835820895522388,
         "vs_pitch_type": {},
         "vs_pitch_type_hr": {},
         "platoon_mult_vs_lhp": {
-          "k": 0.8075,
-          "bb": 1.1925000000000001,
-          "hr": 1.0,
-          "inplay": 1.1591379785183147
+          "k": 1.023591422850869,
+          "bb": 1.164960256174108,
+          "hr": 0.78,
+          "inplay": 0.9085170340681363
         },
         "platoon_mult_vs_rhp": {
-          "k": 1.1126673402374336,
-          "bb": 0.8646514935988621,
-          "hr": 1.0,
-          "inplay": 0.9556242271075327
+          "k": 0.9998689527680783,
+          "bb": 0.8887953503557828,
+          "hr": 0.9882331579488354,
+          "inplay": 1.0884414398417088
+        },
+        "statcast_quality_mult": {},
+        "vs_pitcher_history": {}
+      },
+      {
+        "id": 669477,
+        "name": "Casey Schmitt",
+        "pos": "DH",
+        "bat": "R",
+        "throw": "R",
+        "k_rate": 0.19240215924426451,
+        "bb_rate": 0.02087719298245614,
+        "hbp_rate": 0.021052631578947368,
+        "hr_rate": 0.05165991902834007,
+        "inplay_hit_rate": 0.2884259259259259,
+        "xb_hit_share": 0.18181818181818182,
+        "vs_pitch_type": {},
+        "vs_pitch_type_hr": {},
+        "platoon_mult_vs_lhp": {
+          "k": 0.9204018368059038,
+          "bb": 0.8075,
+          "hr": 0.8542994325622,
+          "inplay": 1.165088282504013
+        },
+        "platoon_mult_vs_rhp": {
+          "k": 1.0466971768594682,
+          "bb": 1.1925000000000001,
+          "hr": 1.070187479075996,
+          "inplay": 0.9267255216693419
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -375,6 +346,35 @@
           "bb": 0.9901018315195096,
           "hr": 1.204158215010142,
           "inplay": 1.0923357664233577
+        },
+        "statcast_quality_mult": {},
+        "vs_pitcher_history": {}
+      },
+      {
+        "id": 606992,
+        "name": "Eric Haase",
+        "pos": "C",
+        "bat": "R",
+        "throw": "R",
+        "k_rate": 0.23828028110789584,
+        "bb_rate": 0.0722612649855312,
+        "hbp_rate": 0.0,
+        "hr_rate": 0.0649441918147995,
+        "inplay_hit_rate": 0.1880758807588076,
+        "xb_hit_share": 0.25,
+        "vs_pitch_type": {},
+        "vs_pitch_type_hr": {},
+        "platoon_mult_vs_lhp": {
+          "k": 1.0270515267175573,
+          "bb": 1.1925000000000001,
+          "hr": 0.78,
+          "inplay": 1.1925000000000001
+        },
+        "platoon_mult_vs_rhp": {
+          "k": 0.9867921178767974,
+          "bb": 0.8075,
+          "hr": 1.2377962488712566,
+          "inplay": 0.921669610486195
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -411,30 +411,30 @@
         "vs_pitcher_history": {}
       },
       {
-        "id": 606992,
-        "name": "Eric Haase",
+        "id": 691740,
+        "name": "Daniel Susac",
         "pos": "C",
         "bat": "R",
         "throw": "R",
-        "k_rate": 0.23828028110789584,
-        "bb_rate": 0.0722612649855312,
-        "hbp_rate": 0.0,
-        "hr_rate": 0.0649441918147995,
-        "inplay_hit_rate": 0.1880758807588076,
-        "xb_hit_share": 0.25,
+        "k_rate": 0.2018867924528302,
+        "bb_rate": 0.05377358490566038,
+        "hbp_rate": 0.018867924528301886,
+        "hr_rate": 0.0,
+        "inplay_hit_rate": 0.34125939849624054,
+        "xb_hit_share": 0.2222222222222222,
         "vs_pitch_type": {},
         "vs_pitch_type_hr": {},
         "platoon_mult_vs_lhp": {
-          "k": 1.0270515267175573,
+          "k": 0.8075,
           "bb": 1.1925000000000001,
-          "hr": 0.78,
-          "inplay": 1.1925000000000001
+          "hr": 1.0,
+          "inplay": 1.1591379785183147
         },
         "platoon_mult_vs_rhp": {
-          "k": 0.9867921178767974,
-          "bb": 0.8075,
-          "hr": 1.2377962488712566,
-          "inplay": 0.921669610486195
+          "k": 1.1126673402374336,
+          "bb": 0.8646514935988621,
+          "hr": 1.0,
+          "inplay": 0.9556242271075327
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -905,20 +905,20 @@
       "use_closer_in_9th_only": true,
       "pinch_hit_aggressiveness": 0.15
     },
-    "confirmed_lineup_ids": [],
-    "projected_lineup_ids": [
-      689414,
+    "confirmed_lineup_ids": [
+      805300,
       672640,
       669065,
       669364,
       681715,
       683357,
-      805300,
+      677870,
       691788,
-      691594
+      665923
     ],
-    "lineup_source": "projected_rotowire_default_vs_rhp",
-    "lineup_confidence": 0.66,
+    "projected_lineup_ids": [],
+    "lineup_source": "confirmed_feed_live",
+    "lineup_confidence": 1.0,
     "probable_pitcher": {
       "id": 676974,
       "source": "feed_gameData_probablePitchers",
@@ -991,30 +991,30 @@
     ],
     "lineup": [
       {
-        "id": 689414,
-        "name": "Liam Hicks",
-        "pos": "C",
+        "id": 805300,
+        "name": "Jakob Marsee",
+        "pos": "CF",
         "bat": "L",
-        "throw": "R",
-        "k_rate": 0.09985200364298724,
-        "bb_rate": 0.10280339253187615,
-        "hbp_rate": 0.017361111111111112,
-        "hr_rate": 0.04082707194899817,
-        "inplay_hit_rate": 0.25849180945208056,
-        "xb_hit_share": 0.11594202898550725,
+        "throw": "L",
+        "k_rate": 0.2447777777777778,
+        "bb_rate": 0.1408888888888889,
+        "hbp_rate": 0.02287581699346405,
+        "hr_rate": 0.014111111111111112,
+        "inplay_hit_rate": 0.27054054054054055,
+        "xb_hit_share": 0.23076923076923078,
         "vs_pitch_type": {},
         "vs_pitch_type_hr": {},
         "platoon_mult_vs_lhp": {
-          "k": 1.1925000000000001,
-          "bb": 1.0444464438969019,
-          "hr": 0.78,
-          "inplay": 0.8979425244832591
+          "k": 1.0741488878801635,
+          "bb": 0.992192429022082,
+          "hr": 0.9913385826771652,
+          "inplay": 0.8895604395604395
         },
         "platoon_mult_vs_rhp": {
-          "k": 0.8737039895459688,
-          "bb": 0.9758564696011056,
-          "hr": 1.140843767595249,
-          "inplay": 0.9932494445860801
+          "k": 0.9589214008869025,
+          "bb": 0.9671681630672166,
+          "hr": 0.9496971532404602,
+          "inplay": 0.9994505494505495
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -1165,30 +1165,30 @@
         "vs_pitcher_history": {}
       },
       {
-        "id": 805300,
-        "name": "Jakob Marsee",
-        "pos": "CF",
-        "bat": "L",
-        "throw": "L",
-        "k_rate": 0.2447777777777778,
-        "bb_rate": 0.1408888888888889,
-        "hbp_rate": 0.02287581699346405,
-        "hr_rate": 0.014111111111111112,
-        "inplay_hit_rate": 0.27054054054054055,
-        "xb_hit_share": 0.23076923076923078,
+        "id": 677870,
+        "name": "Leo Jim\u00e9nez",
+        "pos": "3B",
+        "bat": "R",
+        "throw": "R",
+        "k_rate": 0.22362306368330465,
+        "bb_rate": 0.06858864027538726,
+        "hbp_rate": 0.03614457831325301,
+        "hr_rate": 0.0,
+        "inplay_hit_rate": 0.2435344827586207,
+        "xb_hit_share": 0.14285714285714285,
         "vs_pitch_type": {},
         "vs_pitch_type_hr": {},
         "platoon_mult_vs_lhp": {
-          "k": 1.0741488878801635,
-          "bb": 0.992192429022082,
-          "hr": 0.9913385826771652,
-          "inplay": 0.8895604395604395
+          "k": 1.1147286116210495,
+          "bb": 0.8834497609278036,
+          "hr": 1.0,
+          "inplay": 0.9205014749262537
         },
         "platoon_mult_vs_rhp": {
-          "k": 0.9589214008869025,
-          "bb": 0.9671681630672166,
-          "hr": 0.9496971532404602,
-          "inplay": 0.9994505494505495
+          "k": 0.8777384109561537,
+          "bb": 1.1472887458403798,
+          "hr": 1.0,
+          "inplay": 1.0851769911504425
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -1223,30 +1223,30 @@
         "vs_pitcher_history": {}
       },
       {
-        "id": 691594,
-        "name": "Javier Sanoja",
-        "pos": "3B",
+        "id": 665923,
+        "name": "Esteury Ruiz",
+        "pos": "RF",
         "bat": "R",
         "throw": "R",
-        "k_rate": 0.11528159340659341,
-        "bb_rate": 0.054498626373626374,
-        "hbp_rate": 0.0,
-        "hr_rate": 0.01246565934065934,
-        "inplay_hit_rate": 0.25891556291390727,
-        "xb_hit_share": 0.2857142857142857,
+        "k_rate": 0.29370967741935483,
+        "bb_rate": 0.10919354838709677,
+        "hbp_rate": 0.0375,
+        "hr_rate": 0.05217741935483871,
+        "inplay_hit_rate": 0.3311111111111111,
+        "xb_hit_share": 0.4444444444444444,
         "vs_pitch_type": {},
         "vs_pitch_type_hr": {},
         "platoon_mult_vs_lhp": {
-          "k": 1.1925000000000001,
-          "bb": 0.9811577620800583,
-          "hr": 1.275,
-          "inplay": 1.016465240698703
+          "k": 1.0161341200209442,
+          "bb": 1.0356892583559478,
+          "hr": 1.1854156931814097,
+          "inplay": 0.955544207761891
         },
         "platoon_mult_vs_rhp": {
-          "k": 0.8698415251712839,
-          "bb": 1.095887838689351,
+          "k": 1.006718167920804,
+          "bb": 0.858399536907661,
           "hr": 0.78,
-          "inplay": 1.0111212289939984
+          "inplay": 0.978523489932886
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -1312,59 +1312,59 @@
         "vs_pitcher_history": {}
       },
       {
-        "id": 665923,
-        "name": "Esteury Ruiz",
-        "pos": "RF",
+        "id": 691594,
+        "name": "Javier Sanoja",
+        "pos": "3B",
         "bat": "R",
         "throw": "R",
-        "k_rate": 0.29370967741935483,
-        "bb_rate": 0.10919354838709677,
-        "hbp_rate": 0.0375,
-        "hr_rate": 0.05217741935483871,
-        "inplay_hit_rate": 0.3311111111111111,
-        "xb_hit_share": 0.4444444444444444,
+        "k_rate": 0.11528159340659341,
+        "bb_rate": 0.054498626373626374,
+        "hbp_rate": 0.0,
+        "hr_rate": 0.01246565934065934,
+        "inplay_hit_rate": 0.25891556291390727,
+        "xb_hit_share": 0.2857142857142857,
         "vs_pitch_type": {},
         "vs_pitch_type_hr": {},
         "platoon_mult_vs_lhp": {
-          "k": 1.0161341200209442,
-          "bb": 1.0356892583559478,
-          "hr": 1.1854156931814097,
-          "inplay": 0.955544207761891
+          "k": 1.1925000000000001,
+          "bb": 0.9811577620800583,
+          "hr": 1.275,
+          "inplay": 1.016465240698703
         },
         "platoon_mult_vs_rhp": {
-          "k": 1.006718167920804,
-          "bb": 0.858399536907661,
+          "k": 0.8698415251712839,
+          "bb": 1.095887838689351,
           "hr": 0.78,
-          "inplay": 0.978523489932886
+          "inplay": 1.0111212289939984
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
       },
       {
-        "id": 677870,
-        "name": "Leo Jim\u00e9nez",
-        "pos": "3B",
-        "bat": "R",
+        "id": 689414,
+        "name": "Liam Hicks",
+        "pos": "C",
+        "bat": "L",
         "throw": "R",
-        "k_rate": 0.22362306368330465,
-        "bb_rate": 0.06858864027538726,
-        "hbp_rate": 0.03614457831325301,
-        "hr_rate": 0.0,
-        "inplay_hit_rate": 0.2435344827586207,
-        "xb_hit_share": 0.14285714285714285,
+        "k_rate": 0.09985200364298724,
+        "bb_rate": 0.10280339253187615,
+        "hbp_rate": 0.017361111111111112,
+        "hr_rate": 0.04082707194899817,
+        "inplay_hit_rate": 0.25849180945208056,
+        "xb_hit_share": 0.11594202898550725,
         "vs_pitch_type": {},
         "vs_pitch_type_hr": {},
         "platoon_mult_vs_lhp": {
-          "k": 1.1147286116210495,
-          "bb": 0.8834497609278036,
-          "hr": 1.0,
-          "inplay": 0.9205014749262537
+          "k": 1.1925000000000001,
+          "bb": 1.0444464438969019,
+          "hr": 0.78,
+          "inplay": 0.8979425244832591
         },
         "platoon_mult_vs_rhp": {
-          "k": 0.8777384109561537,
-          "bb": 1.1472887458403798,
-          "hr": 1.0,
-          "inplay": 1.0851769911504425
+          "k": 0.8737039895459688,
+          "bb": 0.9758564696011056,
+          "hr": 1.140843767595249,
+          "inplay": 0.9932494445860801
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -1814,16 +1814,16 @@
   },
   "weather": {
     "source": "statsapi_live_feed",
-    "condition": "",
-    "temperature_f": null,
-    "wind_speed_mph": null,
+    "condition": "Roof Closed",
+    "temperature_f": 72.0,
+    "wind_speed_mph": 0.0,
     "wind_direction": "unknown",
-    "wind_raw": "",
+    "wind_raw": "0 mph, None",
     "is_dome": null,
     "multipliers": {
-      "hr_mult": 1.0,
-      "inplay_hit_mult": 1.0,
-      "xb_share_mult": 1.0
+      "hr_mult": 1.006,
+      "inplay_hit_mult": 1.003,
+      "xb_share_mult": 1.0016
     }
   },
   "park": {
@@ -1843,8 +1843,8 @@
   },
   "umpire": {
     "source": "statsapi_live_feed",
-    "home_plate_umpire_id": null,
-    "home_plate_umpire_name": "",
+    "home_plate_umpire_id": 427533,
+    "home_plate_umpire_name": "Mark Wegner",
     "called_strike_mult": 1.0,
     "multipliers": {
       "called_strike_mult": 1.0

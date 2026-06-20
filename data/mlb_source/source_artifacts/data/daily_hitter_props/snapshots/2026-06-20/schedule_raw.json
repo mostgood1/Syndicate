@@ -8,12 +8,12 @@
     "gameDate": "2026-06-20T17:10:00Z",
     "officialDate": "2026-06-20",
     "status": {
-      "abstractGameState": "Preview",
-      "codedGameState": "S",
-      "detailedState": "Scheduled",
-      "statusCode": "S",
+      "abstractGameState": "Final",
+      "codedGameState": "F",
+      "detailedState": "Final",
+      "statusCode": "F",
       "startTimeTBD": false,
-      "abstractGameCode": "P"
+      "abstractGameCode": "F"
     },
     "teams": {
       "away": {
@@ -66,9 +66,16 @@
         },
         "leagueRecord": {
           "wins": 39,
-          "losses": 35,
+          "losses": 36,
           "ties": 0,
-          "pct": ".527"
+          "pct": ".520"
+        },
+        "score": 1,
+        "isWinner": false,
+        "probablePitcher": {
+          "id": 656794,
+          "fullName": "Sean Newcomb",
+          "link": "/api/v1/people/656794"
         },
         "splitSquad": false,
         "seriesNumber": 25,
@@ -128,11 +135,13 @@
           "active": true
         },
         "leagueRecord": {
-          "wins": 31,
+          "wins": 32,
           "losses": 44,
           "ties": 0,
-          "pct": ".413"
+          "pct": ".421"
         },
+        "score": 4,
+        "isWinner": true,
         "probablePitcher": {
           "id": 675512,
           "fullName": "Troy Melton",
@@ -156,6 +165,7 @@
     "content": {
       "link": "/api/v1/game/824263/content"
     },
+    "isTie": false,
     "gameNumber": 1,
     "publicFacing": true,
     "doubleHeader": "N",
@@ -183,12 +193,12 @@
     "gameDate": "2026-06-20T17:35:00Z",
     "officialDate": "2026-06-20",
     "status": {
-      "abstractGameState": "Preview",
-      "codedGameState": "S",
-      "detailedState": "Scheduled",
-      "statusCode": "S",
+      "abstractGameState": "Final",
+      "codedGameState": "F",
+      "detailedState": "Final",
+      "statusCode": "F",
       "startTimeTBD": false,
-      "abstractGameCode": "P"
+      "abstractGameCode": "F"
     },
     "teams": {
       "away": {
@@ -240,11 +250,13 @@
           "active": true
         },
         "leagueRecord": {
-          "wins": 35,
+          "wins": 36,
           "losses": 39,
           "ties": 0,
-          "pct": ".473"
+          "pct": ".480"
         },
+        "score": 10,
+        "isWinner": true,
         "probablePitcher": {
           "id": 671096,
           "fullName": "Andrew Abbott",
@@ -309,10 +321,12 @@
         },
         "leagueRecord": {
           "wins": 46,
-          "losses": 28,
+          "losses": 29,
           "ties": 0,
-          "pct": ".622"
+          "pct": ".613"
         },
+        "score": 2,
+        "isWinner": false,
         "probablePitcher": {
           "id": 701542,
           "fullName": "Will Warren",
@@ -336,6 +350,7 @@
     "content": {
       "link": "/api/v1/game/823532/content"
     },
+    "isTie": false,
     "gameNumber": 1,
     "publicFacing": true,
     "doubleHeader": "N",
@@ -363,12 +378,12 @@
     "gameDate": "2026-06-20T18:20:00Z",
     "officialDate": "2026-06-20",
     "status": {
-      "abstractGameState": "Preview",
-      "codedGameState": "S",
-      "detailedState": "Scheduled",
-      "statusCode": "S",
+      "abstractGameState": "Final",
+      "codedGameState": "F",
+      "detailedState": "Final",
+      "statusCode": "F",
       "startTimeTBD": false,
-      "abstractGameCode": "P"
+      "abstractGameCode": "F"
     },
     "teams": {
       "away": {
@@ -420,11 +435,13 @@
           "active": true
         },
         "leagueRecord": {
-          "wins": 37,
+          "wins": 38,
           "losses": 39,
           "ties": 0,
-          "pct": ".487"
+          "pct": ".494"
         },
+        "score": 8,
+        "isWinner": true,
         "probablePitcher": {
           "id": 571578,
           "fullName": "Patrick Corbin",
@@ -489,10 +506,12 @@
         },
         "leagueRecord": {
           "wins": 40,
-          "losses": 36,
+          "losses": 37,
           "ties": 0,
-          "pct": ".526"
+          "pct": ".519"
         },
+        "score": 6,
+        "isWinner": false,
         "probablePitcher": {
           "id": 607067,
           "fullName": "Colin Rea",
@@ -516,6 +535,7 @@
     "content": {
       "link": "/api/v1/game/824665/content"
     },
+    "isTie": false,
     "gameNumber": 1,
     "publicFacing": true,
     "doubleHeader": "N",
@@ -543,12 +563,12 @@
     "gameDate": "2026-06-20T20:05:00Z",
     "officialDate": "2026-06-20",
     "status": {
-      "abstractGameState": "Preview",
-      "codedGameState": "S",
-      "detailedState": "Scheduled",
-      "statusCode": "S",
+      "abstractGameState": "Live",
+      "codedGameState": "I",
+      "detailedState": "In Progress",
+      "statusCode": "I",
       "startTimeTBD": false,
-      "abstractGameCode": "P"
+      "abstractGameCode": "L"
     },
     "teams": {
       "away": {
@@ -605,6 +625,7 @@
           "ties": 0,
           "pct": ".514"
         },
+        "score": 1,
         "probablePitcher": {
           "id": 621111,
           "fullName": "Walker Buehler",
@@ -673,10 +694,11 @@
           "ties": 0,
           "pct": ".480"
         },
+        "score": 3,
         "probablePitcher": {
-          "id": 543135,
-          "fullName": "Nathan Eovaldi",
-          "link": "/api/v1/people/543135"
+          "id": 669022,
+          "fullName": "MacKenzie Gore",
+          "link": "/api/v1/people/669022"
         },
         "splitSquad": false,
         "seriesNumber": 25,
@@ -723,12 +745,12 @@
     "gameDate": "2026-06-20T20:10:00Z",
     "officialDate": "2026-06-20",
     "status": {
-      "abstractGameState": "Preview",
-      "codedGameState": "S",
-      "detailedState": "Scheduled",
-      "statusCode": "S",
+      "abstractGameState": "Live",
+      "codedGameState": "I",
+      "detailedState": "In Progress",
+      "statusCode": "I",
       "startTimeTBD": false,
-      "abstractGameCode": "P"
+      "abstractGameCode": "L"
     },
     "teams": {
       "away": {
@@ -785,6 +807,7 @@
           "ties": 0,
           "pct": ".513"
         },
+        "score": 3,
         "probablePitcher": {
           "id": 676917,
           "fullName": "Cade Cavalli",
@@ -853,6 +876,7 @@
           "ties": 0,
           "pct": ".583"
         },
+        "score": 2,
         "probablePitcher": {
           "id": 693855,
           "fullName": "Ian Seymour",
@@ -903,12 +927,12 @@
     "gameDate": "2026-06-20T20:10:00Z",
     "officialDate": "2026-06-20",
     "status": {
-      "abstractGameState": "Preview",
-      "codedGameState": "S",
-      "detailedState": "Scheduled",
-      "statusCode": "S",
+      "abstractGameState": "Live",
+      "codedGameState": "I",
+      "detailedState": "In Progress",
+      "statusCode": "I",
       "startTimeTBD": false,
-      "abstractGameCode": "P"
+      "abstractGameCode": "L"
     },
     "teams": {
       "away": {
@@ -965,6 +989,7 @@
           "ties": 0,
           "pct": ".413"
         },
+        "score": 2,
         "probablePitcher": {
           "id": 686790,
           "fullName": "Trevor McDonald",
@@ -1033,6 +1058,7 @@
           "ties": 0,
           "pct": ".500"
         },
+        "score": 6,
         "probablePitcher": {
           "id": 676974,
           "fullName": "Max Meyer",
@@ -1083,12 +1109,12 @@
     "gameDate": "2026-06-20T20:10:00Z",
     "officialDate": "2026-06-20",
     "status": {
-      "abstractGameState": "Preview",
-      "codedGameState": "S",
-      "detailedState": "Scheduled",
-      "statusCode": "S",
+      "abstractGameState": "Live",
+      "codedGameState": "I",
+      "detailedState": "In Progress",
+      "statusCode": "I",
       "startTimeTBD": false,
-      "abstractGameCode": "P"
+      "abstractGameCode": "L"
     },
     "teams": {
       "away": {
@@ -1145,6 +1171,7 @@
           "ties": 0,
           "pct": ".616"
         },
+        "score": 3,
         "probablePitcher": {
           "id": 690986,
           "fullName": "Kyle Harrison",
@@ -1213,6 +1240,7 @@
           "ties": 0,
           "pct": ".635"
         },
+        "score": 2,
         "probablePitcher": {
           "id": 519242,
           "fullName": "Chris Sale",
@@ -1264,9 +1292,9 @@
     "officialDate": "2026-06-20",
     "status": {
       "abstractGameState": "Preview",
-      "codedGameState": "S",
-      "detailedState": "Scheduled",
-      "statusCode": "S",
+      "codedGameState": "P",
+      "detailedState": "Pre-Game",
+      "statusCode": "P",
       "startTimeTBD": false,
       "abstractGameCode": "P"
     },
@@ -1325,6 +1353,7 @@
           "ties": 0,
           "pct": ".526"
         },
+        "score": 0,
         "probablePitcher": {
           "id": 676282,
           "fullName": "Joey Cantillo",
@@ -1393,6 +1422,7 @@
           "ties": 0,
           "pct": ".468"
         },
+        "score": 0,
         "probablePitcher": {
           "id": 681293,
           "fullName": "Spencer Arrighetti",
@@ -1444,9 +1474,9 @@
     "officialDate": "2026-06-20",
     "status": {
       "abstractGameState": "Preview",
-      "codedGameState": "S",
-      "detailedState": "Scheduled",
-      "statusCode": "S",
+      "codedGameState": "P",
+      "detailedState": "Pre-Game",
+      "statusCode": "P",
       "startTimeTBD": false,
       "abstractGameCode": "P"
     },
@@ -1505,6 +1535,7 @@
           "ties": 0,
           "pct": ".453"
         },
+        "score": 0,
         "probablePitcher": {
           "id": 642547,
           "fullName": "Freddy Peralta",
@@ -1573,6 +1604,7 @@
           "ties": 0,
           "pct": ".533"
         },
+        "score": 0,
         "probablePitcher": {
           "id": 650911,
           "fullName": "Cristopher S\u00e1nchez",
@@ -1624,9 +1656,9 @@
     "officialDate": "2026-06-20",
     "status": {
       "abstractGameState": "Preview",
-      "codedGameState": "S",
-      "detailedState": "Scheduled",
-      "statusCode": "S",
+      "codedGameState": "P",
+      "detailedState": "Pre-Game",
+      "statusCode": "P",
       "startTimeTBD": false,
       "abstractGameCode": "P"
     },
@@ -1804,9 +1836,9 @@
     "officialDate": "2026-06-20",
     "status": {
       "abstractGameState": "Preview",
-      "codedGameState": "S",
-      "detailedState": "Scheduled",
-      "statusCode": "S",
+      "codedGameState": "P",
+      "detailedState": "Pre-Game",
+      "statusCode": "P",
       "startTimeTBD": false,
       "abstractGameCode": "P"
     },
@@ -1984,9 +2016,9 @@
     "officialDate": "2026-06-20",
     "status": {
       "abstractGameState": "Preview",
-      "codedGameState": "S",
-      "detailedState": "Scheduled",
-      "statusCode": "S",
+      "codedGameState": "P",
+      "detailedState": "Pre-Game",
+      "statusCode": "P",
       "startTimeTBD": false,
       "abstractGameCode": "P"
     },
@@ -2164,9 +2196,9 @@
     "officialDate": "2026-06-20",
     "status": {
       "abstractGameState": "Preview",
-      "codedGameState": "S",
-      "detailedState": "Scheduled",
-      "statusCode": "S",
+      "codedGameState": "P",
+      "detailedState": "Pre-Game",
+      "statusCode": "P",
       "startTimeTBD": false,
       "abstractGameCode": "P"
     },
@@ -2344,9 +2376,9 @@
     "officialDate": "2026-06-20",
     "status": {
       "abstractGameState": "Preview",
-      "codedGameState": "S",
-      "detailedState": "Scheduled",
-      "statusCode": "S",
+      "codedGameState": "P",
+      "detailedState": "Pre-Game",
+      "statusCode": "P",
       "startTimeTBD": false,
       "abstractGameCode": "P"
     },
@@ -2405,6 +2437,7 @@
           "ties": 0,
           "pct": ".468"
         },
+        "score": 0,
         "probablePitcher": {
           "id": 671737,
           "fullName": "Taj Bradley",
@@ -2473,6 +2506,7 @@
           "ties": 0,
           "pct": ".520"
         },
+        "score": 0,
         "probablePitcher": {
           "id": 668678,
           "fullName": "Zac Gallen",

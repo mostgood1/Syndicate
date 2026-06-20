@@ -3,12 +3,12 @@
     "date":  "2026-06-20",
     "runMode":  "standard",
     "overallStatus":  "ok",
-    "generatedAt":  "2026-06-20T09:28:55.4096714+00:00",
-    "updatedAt":  "2026-06-20T10:22:27.5050933+00:00",
-    "runDir":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-06-20\\20260620_092854",
+    "generatedAt":  "2026-06-20T22:11:59.8190648+00:00",
+    "updatedAt":  "2026-06-20T22:46:09.8285854+00:00",
+    "runDir":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-06-20\\20260620_221158",
     "latestDir":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest",
-    "lastUpdatedAt":  "2026-06-20T10:22:27.4982504+00:00",
-    "currentStage":  "queued",
+    "lastUpdatedAt":  "2026-06-20T22:46:09.8225583+00:00",
+    "currentStage":  "completed",
     "completedStages":  [
                             "source_update",
                             "refresh_gate"
@@ -28,22 +28,6 @@
                                "sport":  "mlb",
                                "workflow":  "syndicate_refresh",
                                "name":  "MLB current-day live-lens refresh",
-                               "decision":  "planned",
-                               "status":  "pending"
-                           },
-                           {
-                               "stage":  "source_update",
-                               "sport":  "nba",
-                               "workflow":  "vendored_daily_update",
-                               "name":  "NBA vendored daily update",
-                               "decision":  "planned",
-                               "status":  "pending"
-                           },
-                           {
-                               "stage":  "source_update",
-                               "sport":  "nba",
-                               "workflow":  "syndicate_mirror",
-                               "name":  "NBA source mirror refresh",
                                "decision":  "planned",
                                "status":  "pending"
                            },
@@ -119,7 +103,7 @@
                            }
                        ],
     "provenance":  {
-                       "sourceStepCount":  9,
+                       "sourceStepCount":  7,
                        "sourceSteps":  [
                                            {
                                                "sport":  "mlb",
@@ -130,16 +114,6 @@
                                                "sport":  "mlb",
                                                "workflow":  "syndicate_refresh",
                                                "name":  "MLB current-day live-lens refresh"
-                                           },
-                                           {
-                                               "sport":  "nba",
-                                               "workflow":  "vendored_daily_update",
-                                               "name":  "NBA vendored daily update"
-                                           },
-                                           {
-                                               "sport":  "nba",
-                                               "workflow":  "syndicate_mirror",
-                                               "name":  "NBA source mirror refresh"
                                            },
                                            {
                                                "sport":  "wnba",
@@ -170,7 +144,7 @@
                        "latestManifestLoaded":  true,
                        "latestEventSimExecutionPlanCount":  21,
                        "latestArtifactUpdateCount":  21,
-                       "oddsHistoryTriggerPlanCount":  9,
+                       "oddsHistoryTriggerPlanCount":  7,
                        "simExecutionDecision":  true
                    },
     "trace":  {
@@ -179,7 +153,7 @@
                   "inputFingerprintCount":  2,
                   "artifactPathCount":  21,
                   "inputFingerprints":  [
-                                            "fc657362059e46ac2fdd3c0dce0de3c139286716c8764d13d95a5e021427c298",
+                                            "c3d691139954519f606d1206f45bf50af754a91e61386ec21a86377cae9cfe08",
                                             "273bb599414ea4ae1424dde32f327726ccd6fca9e0860fb7b0859d33fe560422"
                                         ],
                   "artifactPaths":  [

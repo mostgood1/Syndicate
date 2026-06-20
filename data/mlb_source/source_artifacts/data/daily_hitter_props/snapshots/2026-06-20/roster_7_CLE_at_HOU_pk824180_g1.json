@@ -39,20 +39,20 @@
       "use_closer_in_9th_only": true,
       "pinch_hit_aggressiveness": 0.15
     },
-    "confirmed_lineup_ids": [],
-    "projected_lineup_ids": [
+    "confirmed_lineup_ids": [
       683953,
       700932,
       677587,
       656555,
       682177,
-      680757,
-      672356,
       696135,
-      672275
+      680757,
+      672275,
+      690984
     ],
-    "lineup_source": "projected_rotowire_default_vs_rhp",
-    "lineup_confidence": 0.66,
+    "projected_lineup_ids": [],
+    "lineup_source": "confirmed_feed_live",
+    "lineup_confidence": 1.0,
     "probable_pitcher": {
       "id": 676282,
       "source": "feed_gameData_probablePitchers",
@@ -264,64 +264,6 @@
         "vs_pitcher_history": {}
       },
       {
-        "id": 680757,
-        "name": "Steven Kwan",
-        "pos": "CF",
-        "bat": "L",
-        "throw": "L",
-        "k_rate": 0.1054121295161174,
-        "bb_rate": 0.12031441551885773,
-        "hbp_rate": 0.007067137809187279,
-        "hr_rate": 0.0030035335689045936,
-        "inplay_hit_rate": 0.2312115340779576,
-        "xb_hit_share": 0.16,
-        "vs_pitch_type": {},
-        "vs_pitch_type_hr": {},
-        "platoon_mult_vs_lhp": {
-          "k": 1.1925000000000001,
-          "bb": 1.0595141053304564,
-          "hr": 0.78,
-          "inplay": 0.9331884812560077
-        },
-        "platoon_mult_vs_rhp": {
-          "k": 0.9095827451480808,
-          "bb": 1.0421445323806244,
-          "hr": 1.275,
-          "inplay": 1.020905774776329
-        },
-        "statcast_quality_mult": {},
-        "vs_pitcher_history": {}
-      },
-      {
-        "id": 672356,
-        "name": "Gabriel Arias",
-        "pos": "SS",
-        "bat": "R",
-        "throw": "R",
-        "k_rate": 0.4,
-        "bb_rate": 0.044444444444444446,
-        "hbp_rate": 0.0,
-        "hr_rate": 0.044444444444444446,
-        "inplay_hit_rate": 0.32,
-        "xb_hit_share": 0.2,
-        "vs_pitch_type": {},
-        "vs_pitch_type_hr": {},
-        "platoon_mult_vs_lhp": {
-          "k": 0.8730769230769231,
-          "bb": 0.8075,
-          "hr": 0.78,
-          "inplay": 1.0229166666666667
-        },
-        "platoon_mult_vs_rhp": {
-          "k": 1.0515625,
-          "bb": 1.1925000000000001,
-          "hr": 1.2234375,
-          "inplay": 0.987109375
-        },
-        "statcast_quality_mult": {},
-        "vs_pitcher_history": {}
-      },
-      {
         "id": 696135,
         "name": "Kahlil Watson",
         "pos": "LF",
@@ -351,6 +293,35 @@
         "vs_pitcher_history": {}
       },
       {
+        "id": 680757,
+        "name": "Steven Kwan",
+        "pos": "CF",
+        "bat": "L",
+        "throw": "L",
+        "k_rate": 0.1054121295161174,
+        "bb_rate": 0.12031441551885773,
+        "hbp_rate": 0.007067137809187279,
+        "hr_rate": 0.0030035335689045936,
+        "inplay_hit_rate": 0.2312115340779576,
+        "xb_hit_share": 0.16,
+        "vs_pitch_type": {},
+        "vs_pitch_type_hr": {},
+        "platoon_mult_vs_lhp": {
+          "k": 1.1925000000000001,
+          "bb": 1.0595141053304564,
+          "hr": 0.78,
+          "inplay": 0.9331884812560077
+        },
+        "platoon_mult_vs_rhp": {
+          "k": 0.9095827451480808,
+          "bb": 1.0421445323806244,
+          "hr": 1.275,
+          "inplay": 1.020905774776329
+        },
+        "statcast_quality_mult": {},
+        "vs_pitcher_history": {}
+      },
+      {
         "id": 672275,
         "name": "Patrick Bailey",
         "pos": "C",
@@ -375,6 +346,35 @@
           "bb": 0.9405351292318894,
           "hr": 0.8445480631276902,
           "inplay": 0.9787792536369387
+        },
+        "statcast_quality_mult": {},
+        "vs_pitcher_history": {}
+      },
+      {
+        "id": 690984,
+        "name": "Petey Halpin",
+        "pos": "CF",
+        "bat": "L",
+        "throw": "R",
+        "k_rate": 0.2890522875816993,
+        "bb_rate": 0.02361111111111111,
+        "hbp_rate": 0.0,
+        "hr_rate": 0.0,
+        "inplay_hit_rate": 0.2109090909090909,
+        "xb_hit_share": 0.2,
+        "vs_pitch_type": {},
+        "vs_pitch_type_hr": {},
+        "platoon_mult_vs_lhp": {
+          "k": 1.0208309779536462,
+          "bb": 0.8075,
+          "hr": 1.0,
+          "inplay": 0.8075
+        },
+        "platoon_mult_vs_rhp": {
+          "k": 0.9622842109840414,
+          "bb": 1.1925000000000001,
+          "hr": 1.0,
+          "inplay": 1.1743773946360154
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -440,30 +440,30 @@
         "vs_pitcher_history": {}
       },
       {
-        "id": 690984,
-        "name": "Petey Halpin",
-        "pos": "CF",
-        "bat": "L",
+        "id": 672356,
+        "name": "Gabriel Arias",
+        "pos": "SS",
+        "bat": "R",
         "throw": "R",
-        "k_rate": 0.2890522875816993,
-        "bb_rate": 0.02361111111111111,
+        "k_rate": 0.4,
+        "bb_rate": 0.044444444444444446,
         "hbp_rate": 0.0,
-        "hr_rate": 0.0,
-        "inplay_hit_rate": 0.2109090909090909,
+        "hr_rate": 0.044444444444444446,
+        "inplay_hit_rate": 0.32,
         "xb_hit_share": 0.2,
         "vs_pitch_type": {},
         "vs_pitch_type_hr": {},
         "platoon_mult_vs_lhp": {
-          "k": 1.0208309779536462,
+          "k": 0.8730769230769231,
           "bb": 0.8075,
-          "hr": 1.0,
-          "inplay": 0.8075
+          "hr": 0.78,
+          "inplay": 1.0229166666666667
         },
         "platoon_mult_vs_rhp": {
-          "k": 0.9622842109840414,
+          "k": 1.0515625,
           "bb": 1.1925000000000001,
-          "hr": 1.0,
-          "inplay": 1.1743773946360154
+          "hr": 1.2234375,
+          "inplay": 0.987109375
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -903,8 +903,7 @@
       "use_closer_in_9th_only": true,
       "pinch_hit_aggressiveness": 0.15
     },
-    "confirmed_lineup_ids": [],
-    "projected_lineup_ids": [
+    "confirmed_lineup_ids": [
       665161,
       670541,
       572233,
@@ -915,8 +914,9 @@
       676694,
       694728
     ],
-    "lineup_source": "projected_rotowire_default_vs_lhp",
-    "lineup_confidence": 0.66,
+    "projected_lineup_ids": [],
+    "lineup_source": "confirmed_feed_live",
+    "lineup_confidence": 1.0,
     "probable_pitcher": {
       "id": 681293,
       "source": "feed_gameData_probablePitchers",
@@ -1704,16 +1704,16 @@
   },
   "weather": {
     "source": "statsapi_live_feed",
-    "condition": "",
-    "temperature_f": null,
-    "wind_speed_mph": null,
+    "condition": "Roof Closed",
+    "temperature_f": 73.0,
+    "wind_speed_mph": 0.0,
     "wind_direction": "unknown",
-    "wind_raw": "",
+    "wind_raw": "0 mph, None",
     "is_dome": null,
     "multipliers": {
-      "hr_mult": 1.0,
-      "inplay_hit_mult": 1.0,
-      "xb_share_mult": 1.0
+      "hr_mult": 1.009,
+      "inplay_hit_mult": 1.0045,
+      "xb_share_mult": 1.0024
     }
   },
   "park": {
@@ -1733,8 +1733,8 @@
   },
   "umpire": {
     "source": "statsapi_live_feed",
-    "home_plate_umpire_id": null,
-    "home_plate_umpire_name": "",
+    "home_plate_umpire_id": 483569,
+    "home_plate_umpire_name": "Vic Carapazza",
     "called_strike_mult": 1.0,
     "multipliers": {
       "called_strike_mult": 1.0

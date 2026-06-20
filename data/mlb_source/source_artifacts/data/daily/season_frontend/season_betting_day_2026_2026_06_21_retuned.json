@@ -6,7 +6,135 @@
     "retuned": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/eval/seasons/2026/season_betting_cards_retuned_manifest.json"
   },
   "found": true,
-  "games": {},
+  "games": {
+    "823123": {
+      "markets": {
+        "totals": null,
+        "ml": {
+          "date": "2026-06-21",
+          "game_pk": 823123,
+          "away": "Boston Red Sox",
+          "home": "Seattle Mariners",
+          "away_abbr": "BOS",
+          "home_abbr": "SEA",
+          "double_header": "N",
+          "game_number": 1,
+          "event_id": "71c529205c80b00be4370b29fc54ecb5",
+          "commence_time": "2026-06-21T20:11:00Z",
+          "market": "ml",
+          "selection": "away",
+          "edge": 0.22137707948244,
+          "model_prob": 0.335,
+          "selected_side_model_prob": 0.665,
+          "selected_side_market_prob": 0.44362292051756,
+          "market_no_vig_prob": 0.5563770794824399,
+          "odds": "+115",
+          "stake_u": 1.0,
+          "sim_sample_size": 1000,
+          "baseball_reasons": [
+            "Across his last 5 starts, Payton Tolle has allowed about 2.4 earned runs per outing.",
+            "The projected lineup is mostly 3 left-handed, 5 right-handed, and 1 switch-hitting, and the power risk also comes in lighter than baseline."
+          ],
+          "explanation_diagnostic": {
+            "status": "supported",
+            "flag_sparse_support": false,
+            "support_min_reasons": 2,
+            "baseball_reasons_n": 2,
+            "reason_sentences_n": 4,
+            "market": "ml",
+            "subject": "BOS @ SEA",
+            "supporting_reasons": [
+              "Across his last 5 starts, Payton Tolle has allowed about 2.4 earned runs per outing.",
+              "The projected lineup is mostly 3 left-handed, 5 right-handed, and 1 switch-hitting, and the power risk also comes in lighter than baseline."
+            ]
+          },
+          "reasons": [
+            "The model lands on the away side in 66.5% of sims, while the market is pricing it closer to 44.4%. Across his last 5 starts, Payton Tolle has allowed about 2.4 earned runs per outing. The projected lineup is mostly 3 left-handed, 5 right-handed, and 1 switch-hitting, and the power risk also comes in lighter than baseline. BOS wins this matchup in about 66.5% of model runs."
+          ],
+          "reason_summary": "The model lands on the away side in 66.5% of sims, while the market is pricing it closer to 44.4%. Across his last 5 starts, Payton Tolle has allowed about 2.4 earned runs per outing. The projected lineup is mostly 3 left-handed, 5 right-handed, and 1 switch-hitting, and the power risk also comes in lighter than baseline. BOS wins this matchup in about 66.5% of model runs.",
+          "rank": 1,
+          "recommendation_tier": "official"
+        },
+        "pitcherProps": [],
+        "hitterProps": [],
+        "extraPitcherProps": [],
+        "extraHitterProps": []
+      },
+      "results": {
+        "combined": {
+          "n": 0,
+          "wins": 0,
+          "losses": 0,
+          "stake_u": 0.0,
+          "profit_u": 0.0,
+          "roi": null
+        }
+      },
+      "playable_results": {
+        "combined": {
+          "n": 0,
+          "wins": 0,
+          "losses": 0,
+          "stake_u": 0.0,
+          "profit_u": 0.0,
+          "roi": null
+        }
+      },
+      "all_results": {
+        "combined": {
+          "n": 0,
+          "wins": 0,
+          "losses": 0,
+          "stake_u": 0.0,
+          "profit_u": 0.0,
+          "roi": null
+        }
+      },
+      "settled_rows": [],
+      "playable_settled_rows": [],
+      "all_settled_rows": [],
+      "unresolved_rows": [
+        {
+          "path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\daily_summary_2026_06_21_locked_policy.json",
+          "date": "2026-06-21",
+          "game_pk": 823123,
+          "market": "ml",
+          "player_name": null,
+          "selection": "away",
+          "market_line": null,
+          "reason": "game not final",
+          "recommendation_tier": "official"
+        }
+      ],
+      "playable_unresolved_rows": [],
+      "all_unresolved_rows": [
+        {
+          "path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\daily_summary_2026_06_21_locked_policy.json",
+          "date": "2026-06-21",
+          "game_pk": 823123,
+          "market": "ml",
+          "player_name": null,
+          "selection": "away",
+          "market_line": null,
+          "reason": "game not final",
+          "recommendation_tier": "official"
+        }
+      ],
+      "counts": {
+        "official": 1,
+        "playable": 0,
+        "pitcher": 0,
+        "hitter": 0,
+        "extra_pitcher": 0,
+        "extra_hitter": 0
+      },
+      "flags": {
+        "hasAnyRecommendations": true,
+        "hasOfficialRecommendations": true,
+        "hasPlayableCandidates": false
+      }
+    }
+  },
   "source_kind": "canonical_daily_fallback",
   "manifest_source": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/eval/seasons/2026/season_betting_cards_retuned_manifest.json",
   "card_source": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_21_locked_policy.json",
@@ -16,7 +144,7 @@
     "card_path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_21_locked_policy.json",
     "selected_counts": {
       "totals": 0,
-      "ml": 0,
+      "ml": 1,
       "pitcher_props": 0,
       "hitter_props": 0,
       "hitter_home_runs": 0,
@@ -25,7 +153,7 @@
       "hitter_total_bases": 0,
       "hitter_runs": 0,
       "hitter_rbis": 0,
-      "combined": 0
+      "combined": 1
     },
     "results": {
       "combined": {
@@ -40,12 +168,12 @@
     "profit_u": 0.0,
     "roi": null,
     "settled_n": 0,
-    "unresolved_n": 0
+    "unresolved_n": 1
   },
   "cap_profile": "nototals_p1_tbheavy11_r1_nohr",
   "selected_counts": {
     "totals": 0,
-    "ml": 0,
+    "ml": 1,
     "pitcher_props": 0,
     "hitter_props": 0,
     "hitter_home_runs": 0,
@@ -54,7 +182,7 @@
     "hitter_total_bases": 0,
     "hitter_runs": 0,
     "hitter_rbis": 0,
-    "combined": 0
+    "combined": 1
   },
   "playable_selected_counts": {
     "totals": 0,
@@ -71,7 +199,7 @@
   },
   "all_selected_counts": {
     "totals": 0,
-    "ml": 0,
+    "ml": 1,
     "pitcher_props": 0,
     "hitter_props": 0,
     "hitter_home_runs": 0,
@@ -80,7 +208,7 @@
     "hitter_total_bases": 0,
     "hitter_runs": 0,
     "hitter_rbis": 0,
-    "combined": 0
+    "combined": 1
   },
   "results": {
     "combined": {
@@ -115,7 +243,7 @@
   "card": {
     "date": "2026-06-21",
     "season": 2026,
-    "generated_at": "2026-06-20T09:45:25.182634",
+    "generated_at": "2026-06-20T22:30:34.924465",
     "tool": "tools/daily_update_multi_profile.py",
     "selection_source": "_tmp_best_set_selection_holdout13.json",
     "best_selection": null,
@@ -218,7 +346,7 @@
           "data/tuning/pitch_model_overrides/_tmp_hr_bbhbp1p04_starterbbhbp1p04.json"
         ],
         "exit_code": 0,
-        "duration_s": 169.341,
+        "duration_s": 151.292,
         "skipped": false
       },
       "pitcher_props_recos": {
@@ -229,8 +357,8 @@
         "snapshot_dir": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily_pitcher_props\\snapshots\\2026-06-21",
         "extra_args": [],
         "exit_code": 0,
-        "skipped": true,
-        "skip_reason": "no pitcher prop market entries in D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\market\\oddsapi\\oddsapi_pitcher_props_2026_06_21.json"
+        "duration_s": 173.965,
+        "skipped": false
       },
       "hitter_props_recos": {
         "profile": "hitter_props",
@@ -249,8 +377,8 @@
           "24"
         ],
         "exit_code": 0,
-        "skipped": true,
-        "skip_reason": "no hitter prop market entries in D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\market\\oddsapi\\oddsapi_hitter_props_2026_06_21.json"
+        "duration_s": 179.063,
+        "skipped": false
       }
     },
     "inputs": {
@@ -261,29 +389,28 @@
       "outs_prob_calibration": "data\\tuning\\outs_calibration\\default.json"
     },
     "warnings": [
-      "No game lines entries found in D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\market\\oddsapi\\oddsapi_game_lines_2026_06_21.json",
-      "No pitcher lines entries found in D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\market\\oddsapi\\oddsapi_pitcher_props_2026_06_21.json",
-      "No hitter lines entries found in D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\market\\oddsapi\\oddsapi_hitter_props_2026_06_21.json",
-      "No support-qualified hitter strikeout shadow candidates were published; current hitter sim artifacts may not include strikeout distributions yet."
+      "No support-qualified hitter strikeout shadow candidates were published; current hitter sim artifacts may not include strikeout distributions yet.",
+      "Removed 1 sparse-support official recommendation(s) before final publish",
+      "Official card could not fully replace 1 sparse-support recommendation slot(s) with support-qualified alternatives"
     ],
     "timings": {
-      "collect_game_candidates_s": 0.032,
-      "collect_pitcher_candidates_s": 0.0,
-      "collect_shadow_pitcher_candidates_s": 0.0,
-      "collect_hitter_candidates_s": 0.0,
-      "collect_shadow_hitter_candidates_s": 0.0,
+      "collect_game_candidates_s": 2.494,
+      "collect_pitcher_candidates_s": 0.054,
+      "collect_shadow_pitcher_candidates_s": 0.042,
+      "collect_hitter_candidates_s": 0.196,
+      "collect_shadow_hitter_candidates_s": 0.074,
       "selection_and_support_s": 0.0,
       "explanation_diagnostics_s": 0.0,
-      "total_build_s": 0.035
+      "total_build_s": 2.861
     },
     "explanation_diagnostics": {
-      "selected_rows_n": 0,
+      "selected_rows_n": 1,
       "sparse_support_n": 0,
       "sparse_support_rate": 0.0,
       "support_min_reasons": 2,
       "status_counts": {
         "strong": 0,
-        "supported": 0,
+        "supported": 1,
         "thin": 0,
         "none": 0
       },
@@ -300,11 +427,11 @@
           "examples": []
         },
         "ml": {
-          "selected_n": 0,
+          "selected_n": 1,
           "sparse_support_n": 0,
           "status_counts": {
             "strong": 0,
-            "supported": 0,
+            "supported": 1,
             "thin": 0,
             "none": 0
           },
@@ -392,13 +519,13 @@
     },
     "audit_track": {
       "official_card_explanation_support": {
-        "selected_rows_n": 0,
+        "selected_rows_n": 1,
         "sparse_support_n": 0,
         "sparse_support_rate": 0.0,
         "support_min_reasons": 2,
         "status_counts": {
           "strong": 0,
-          "supported": 0,
+          "supported": 1,
           "thin": 0,
           "none": 0
         },
@@ -415,11 +542,11 @@
             "examples": []
           },
           "ml": {
-            "selected_n": 0,
+            "selected_n": 1,
             "sparse_support_n": 0,
             "status_counts": {
               "strong": 0,
-              "supported": 0,
+              "supported": 1,
               "thin": 0,
               "none": 0
             },
@@ -507,9 +634,9 @@
       },
       "selected_support_policy": {
         "support_min_reasons": 2,
-        "removed_sparse_support_n": 0,
+        "removed_sparse_support_n": 1,
         "replacement_added_n": 0,
-        "selection_shortfall_n": 0,
+        "selection_shortfall_n": 1,
         "markets": {
           "totals": {
             "market": "totals",
@@ -524,8 +651,8 @@
           "ml": {
             "market": "ml",
             "support_min_reasons": 2,
-            "baseline_selected_n": 0,
-            "final_selected_n": 0,
+            "baseline_selected_n": 1,
+            "final_selected_n": 1,
             "removed_sparse_support_n": 0,
             "replacement_added_n": 0,
             "selection_shortfall_n": 0,
@@ -534,12 +661,20 @@
           "pitcher_props": {
             "market": "pitcher_props",
             "support_min_reasons": 2,
-            "baseline_selected_n": 0,
+            "baseline_selected_n": 1,
             "final_selected_n": 0,
-            "removed_sparse_support_n": 0,
+            "removed_sparse_support_n": 1,
             "replacement_added_n": 0,
-            "selection_shortfall_n": 0,
-            "removed_examples": []
+            "selection_shortfall_n": 1,
+            "removed_examples": [
+              {
+                "subject": "Chase Burns",
+                "selection": "over",
+                "market": "pitcher_props:outs",
+                "baseball_reasons_n": 1,
+                "reason_summary": "The model lands on the over side in 88.6% of sims, while the market is pricing it closer to 49.1%. His modeled workload cap still reaches roughly 94 pitches, so the deeper-start path is still available if the outing stays efficient. The model baseline sits around 20.9 outs against a line of 16.5. If he stays on his normal starter path, the matchup against NYY gives him a fair shot to reach full workload volume."
+              }
+            ]
           },
           "hitter_props": {
             "market": "hitter_props",
@@ -671,10 +806,18 @@
       "shadow_support_policy": {
         "pitcher_props": {
           "market": "shadow_pitcher_props",
-          "evaluated_n": 0,
+          "evaluated_n": 1,
           "kept_n": 0,
-          "removed_sparse_support_n": 0,
-          "removed_examples": []
+          "removed_sparse_support_n": 1,
+          "removed_examples": [
+            {
+              "subject": "Chase Burns",
+              "selection": "over",
+              "market": "pitcher_props:hits allowed",
+              "baseball_reasons_n": 1,
+              "reason_summary": "The model lands on the over side in 75.3% of sims, while the market is pricing it closer to 41.9%. He leans heavily on his four-seam fastball, with slider and changeup working as the main support. The model baseline sits around 6.4 hits allowed against a line of 4.5. If he stays on his normal starter path, the matchup against NYY gives him a fair shot to reach full workload volume."
+            }
+          ]
         },
         "hitter_props": {
           "market": "shadow_hitter_props",
@@ -687,7 +830,7 @@
     },
     "market_groups": {
       "hitter_props": {
-        "raw_candidates_n": 0,
+        "raw_candidates_n": 1,
         "selected_n": 0,
         "other_playable_candidates_n": 0,
         "cap": 11,
@@ -722,21 +865,66 @@
     },
     "markets": {
       "totals": {
-        "raw_candidates_n": 0,
+        "raw_candidates_n": 7,
         "selected_n": 0,
         "cap": 0,
         "stake_u": 1.0,
         "recommendations": []
       },
       "ml": {
-        "raw_candidates_n": 0,
-        "selected_n": 0,
+        "raw_candidates_n": 11,
+        "selected_n": 1,
         "cap": 1,
         "stake_u": 1.0,
-        "recommendations": []
+        "recommendations": [
+          {
+            "date": "2026-06-21",
+            "game_pk": 823123,
+            "away": "Boston Red Sox",
+            "home": "Seattle Mariners",
+            "away_abbr": "BOS",
+            "home_abbr": "SEA",
+            "double_header": "N",
+            "game_number": 1,
+            "event_id": "71c529205c80b00be4370b29fc54ecb5",
+            "commence_time": "2026-06-21T20:11:00Z",
+            "market": "ml",
+            "selection": "away",
+            "edge": 0.22137707948244,
+            "model_prob": 0.335,
+            "selected_side_model_prob": 0.665,
+            "selected_side_market_prob": 0.44362292051756,
+            "market_no_vig_prob": 0.5563770794824399,
+            "odds": "+115",
+            "stake_u": 1.0,
+            "sim_sample_size": 1000,
+            "baseball_reasons": [
+              "Across his last 5 starts, Payton Tolle has allowed about 2.4 earned runs per outing.",
+              "The projected lineup is mostly 3 left-handed, 5 right-handed, and 1 switch-hitting, and the power risk also comes in lighter than baseline."
+            ],
+            "explanation_diagnostic": {
+              "status": "supported",
+              "flag_sparse_support": false,
+              "support_min_reasons": 2,
+              "baseball_reasons_n": 2,
+              "reason_sentences_n": 4,
+              "market": "ml",
+              "subject": "BOS @ SEA",
+              "supporting_reasons": [
+                "Across his last 5 starts, Payton Tolle has allowed about 2.4 earned runs per outing.",
+                "The projected lineup is mostly 3 left-handed, 5 right-handed, and 1 switch-hitting, and the power risk also comes in lighter than baseline."
+              ]
+            },
+            "reasons": [
+              "The model lands on the away side in 66.5% of sims, while the market is pricing it closer to 44.4%. Across his last 5 starts, Payton Tolle has allowed about 2.4 earned runs per outing. The projected lineup is mostly 3 left-handed, 5 right-handed, and 1 switch-hitting, and the power risk also comes in lighter than baseline. BOS wins this matchup in about 66.5% of model runs."
+            ],
+            "reason_summary": "The model lands on the away side in 66.5% of sims, while the market is pricing it closer to 44.4%. Across his last 5 starts, Payton Tolle has allowed about 2.4 earned runs per outing. The projected lineup is mostly 3 left-handed, 5 right-handed, and 1 switch-hitting, and the power risk also comes in lighter than baseline. BOS wins this matchup in about 66.5% of model runs.",
+            "rank": 1
+          }
+        ]
       },
       "pitcher_props": {
-        "raw_candidates_n": 0,
+        "raw_candidates_n": 1,
         "selected_n": 0,
         "other_playable_candidates_n": 0,
         "cap": 1,
@@ -773,7 +961,7 @@
         "playable_support_removed_n": 0
       },
       "hitter_hits_runs_rbis": {
-        "raw_candidates_n": 0,
+        "raw_candidates_n": 1,
         "selected_n": 0,
         "other_playable_candidates_n": 0,
         "cap": 0,
@@ -827,7 +1015,7 @@
     },
     "shadow_markets": {
       "pitcher_props": {
-        "raw_candidates_n": 0,
+        "raw_candidates_n": 1,
         "selected_n": 0,
         "cap": 8,
         "stake_u": 0.0,
@@ -836,7 +1024,7 @@
           "hits_allowed",
           "walks_allowed"
         ],
-        "playable_support_removed_n": 0,
+        "playable_support_removed_n": 1,
         "recommendations": []
       },
       "hitter_props": {
@@ -853,8 +1041,8 @@
       }
     },
     "combined": {
-      "raw_candidates_n": 0,
-      "selected_n": 0
+      "raw_candidates_n": 20,
+      "selected_n": 1
     }
   },
   "artifactDate": "2026-06-21"

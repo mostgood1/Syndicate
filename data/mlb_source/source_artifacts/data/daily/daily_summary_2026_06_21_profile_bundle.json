@@ -1,7 +1,7 @@
 {
   "date": "2026-06-21",
   "season": 2026,
-  "generated_at": "2026-06-20T09:45:25.488679",
+  "generated_at": "2026-06-20T22:30:35.343775",
   "tool": "tools/daily_update_multi_profile.py",
   "daily_update_tool": "tools\\daily_update.py",
   "python_exe": "C:\\hostedtoolcache\\windows\\Python\\3.11.9\\x64\\python.exe",
@@ -37,7 +37,7 @@
         "data/tuning/pitch_model_overrides/_tmp_hr_bbhbp1p04_starterbbhbp1p04.json"
       ],
       "exit_code": 0,
-      "duration_s": 169.341,
+      "duration_s": 151.292,
       "skipped": false
     },
     "pitcher_props_recos": {
@@ -48,8 +48,8 @@
       "snapshot_dir": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily_pitcher_props\\snapshots\\2026-06-21",
       "extra_args": [],
       "exit_code": 0,
-      "skipped": true,
-      "skip_reason": "no pitcher prop market entries in D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\market\\oddsapi\\oddsapi_pitcher_props_2026_06_21.json"
+      "duration_s": 173.965,
+      "skipped": false
     },
     "hitter_props_recos": {
       "profile": "hitter_props",
@@ -68,8 +68,8 @@
         "24"
       ],
       "exit_code": 0,
-      "skipped": true,
-      "skip_reason": "no hitter prop market entries in D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\market\\oddsapi\\oddsapi_hitter_props_2026_06_21.json"
+      "duration_s": 179.063,
+      "skipped": false
     }
   },
   "selection_source": "_tmp_best_set_selection_holdout13.json",
@@ -99,7 +99,7 @@
     },
     "selected_counts": {
       "totals": 0,
-      "ml": 0,
+      "ml": 1,
       "pitcher_props": 0,
       "hitter_props": 0,
       "hitter_home_runs": 0,
@@ -111,7 +111,7 @@
     },
     "shadow_counts": {
       "pitcher_props": {
-        "raw_candidates_n": 0,
+        "raw_candidates_n": 1,
         "selected_n": 0,
         "cap": 8,
         "stake_u": 0.0,
@@ -120,7 +120,7 @@
           "hits_allowed",
           "walks_allowed"
         ],
-        "playable_support_removed_n": 0,
+        "playable_support_removed_n": 1,
         "recommendations": []
       },
       "hitter_props": {
@@ -137,19 +137,18 @@
       }
     },
     "warnings": [
-      "No game lines entries found in D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\market\\oddsapi\\oddsapi_game_lines_2026_06_21.json",
-      "No pitcher lines entries found in D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\market\\oddsapi\\oddsapi_pitcher_props_2026_06_21.json",
-      "No hitter lines entries found in D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\market\\oddsapi\\oddsapi_hitter_props_2026_06_21.json",
-      "No support-qualified hitter strikeout shadow candidates were published; current hitter sim artifacts may not include strikeout distributions yet."
+      "No support-qualified hitter strikeout shadow candidates were published; current hitter sim artifacts may not include strikeout distributions yet.",
+      "Removed 1 sparse-support official recommendation(s) before final publish",
+      "Official card could not fully replace 1 sparse-support recommendation slot(s) with support-qualified alternatives"
     ],
     "explanation_diagnostics": {
-      "selected_rows_n": 0,
+      "selected_rows_n": 1,
       "sparse_support_n": 0,
       "sparse_support_rate": 0.0,
       "support_min_reasons": 2,
       "status_counts": {
         "strong": 0,
-        "supported": 0,
+        "supported": 1,
         "thin": 0,
         "none": 0
       },
@@ -166,11 +165,11 @@
           "examples": []
         },
         "ml": {
-          "selected_n": 0,
+          "selected_n": 1,
           "sparse_support_n": 0,
           "status_counts": {
             "strong": 0,
-            "supported": 0,
+            "supported": 1,
             "thin": 0,
             "none": 0
           },
@@ -258,13 +257,13 @@
     },
     "audit_track": {
       "official_card_explanation_support": {
-        "selected_rows_n": 0,
+        "selected_rows_n": 1,
         "sparse_support_n": 0,
         "sparse_support_rate": 0.0,
         "support_min_reasons": 2,
         "status_counts": {
           "strong": 0,
-          "supported": 0,
+          "supported": 1,
           "thin": 0,
           "none": 0
         },
@@ -281,11 +280,11 @@
             "examples": []
           },
           "ml": {
-            "selected_n": 0,
+            "selected_n": 1,
             "sparse_support_n": 0,
             "status_counts": {
               "strong": 0,
-              "supported": 0,
+              "supported": 1,
               "thin": 0,
               "none": 0
             },
@@ -373,9 +372,9 @@
       },
       "selected_support_policy": {
         "support_min_reasons": 2,
-        "removed_sparse_support_n": 0,
+        "removed_sparse_support_n": 1,
         "replacement_added_n": 0,
-        "selection_shortfall_n": 0,
+        "selection_shortfall_n": 1,
         "markets": {
           "totals": {
             "market": "totals",
@@ -390,8 +389,8 @@
           "ml": {
             "market": "ml",
             "support_min_reasons": 2,
-            "baseline_selected_n": 0,
-            "final_selected_n": 0,
+            "baseline_selected_n": 1,
+            "final_selected_n": 1,
             "removed_sparse_support_n": 0,
             "replacement_added_n": 0,
             "selection_shortfall_n": 0,
@@ -400,12 +399,20 @@
           "pitcher_props": {
             "market": "pitcher_props",
             "support_min_reasons": 2,
-            "baseline_selected_n": 0,
+            "baseline_selected_n": 1,
             "final_selected_n": 0,
-            "removed_sparse_support_n": 0,
+            "removed_sparse_support_n": 1,
             "replacement_added_n": 0,
-            "selection_shortfall_n": 0,
-            "removed_examples": []
+            "selection_shortfall_n": 1,
+            "removed_examples": [
+              {
+                "subject": "Chase Burns",
+                "selection": "over",
+                "market": "pitcher_props:outs",
+                "baseball_reasons_n": 1,
+                "reason_summary": "The model lands on the over side in 88.6% of sims, while the market is pricing it closer to 49.1%. His modeled workload cap still reaches roughly 94 pitches, so the deeper-start path is still available if the outing stays efficient. The model baseline sits around 20.9 outs against a line of 16.5. If he stays on his normal starter path, the matchup against NYY gives him a fair shot to reach full workload volume."
+              }
+            ]
           },
           "hitter_props": {
             "market": "hitter_props",
@@ -537,10 +544,18 @@
       "shadow_support_policy": {
         "pitcher_props": {
           "market": "shadow_pitcher_props",
-          "evaluated_n": 0,
+          "evaluated_n": 1,
           "kept_n": 0,
-          "removed_sparse_support_n": 0,
-          "removed_examples": []
+          "removed_sparse_support_n": 1,
+          "removed_examples": [
+            {
+              "subject": "Chase Burns",
+              "selection": "over",
+              "market": "pitcher_props:hits allowed",
+              "baseball_reasons_n": 1,
+              "reason_summary": "The model lands on the over side in 75.3% of sims, while the market is pricing it closer to 41.9%. He leans heavily on his four-seam fastball, with slider and changeup working as the main support. The model baseline sits around 6.4 hits allowed against a line of 4.5. If he stays on his normal starter path, the matchup against NYY gives him a fair shot to reach full workload volume."
+            }
+          ]
         },
         "hitter_props": {
           "market": "shadow_hitter_props",
@@ -569,10 +584,12 @@
   },
   "timings": {
     "profiles": {
-      "game_recos": 169.341
+      "game_recos": 151.292,
+      "pitcher_props_recos": 173.965,
+      "hitter_props_recos": 179.063
     },
-    "locked_policy_s": 0.342,
-    "total_s": 169.746
+    "locked_policy_s": 3.282,
+    "total_s": 507.674
   },
   "failures": [],
   "failures_n": 0
