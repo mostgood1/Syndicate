@@ -655,15 +655,20 @@
 
   function ensureDetail(card) {
     const gamePk = Number(card.gamePk);
+    const embeddedDetail = card?.details || card?.cardDetail || card?.card_detail || null;
     if (!state.details.has(gamePk)) {
       const initialProp = officialPropRows(card)[0] || allPropRows(card)[0] || null;
       state.details.set(gamePk, {
-        snapshot: null,
-        sim: null,
+        snapshot: embeddedDetail?.snapshot || null,
+        sim: embeddedDetail?.sim || null,
         activeTab: "overview",
         selectedPropKey: initialProp ? propKey(initialProp) : null,
         propFilters: { board: "auto", side: "all", type: "all" },
       });
+    } else if (embeddedDetail) {
+      const detail = state.details.get(gamePk);
+      detail.snapshot = embeddedDetail.snapshot || null;
+      detail.sim = embeddedDetail.sim || { found: false };
     }
     return state.details.get(gamePk);
   }
@@ -3346,18 +3351,14 @@
 
   async function loadCardDetail(card, isRefresh) {
     const detail = ensureDetail(card);
-    try {
-      const payload = await fetchJson(
-        `/mlb/api/game/${encodeURIComponent(card.gamePk)}/card-detail?date=${encodeURIComponent(state.date)}`,
-        { timeoutMs: DETAIL_REQUEST_TIMEOUT_MS }
-      );
-      detail.snapshot = payload?.snapshot || null;
-      detail.sim = payload?.sim || { found: false };
-      syncCard(card);
-    } catch (_error) {
+    const embeddedDetail = card?.details || card?.cardDetail || card?.card_detail || null;
+    if (embeddedDetail) {
+      detail.snapshot = detail.snapshot || embeddedDetail.snapshot || null;
+      detail.sim = detail.sim || embeddedDetail.sim || { found: false };
+    } else {
       detail.sim = detail.sim || { found: false };
-      if (!isRefresh) syncCard(card);
     }
+    if (!isRefresh) syncCard(card);
   }
 
   function cardIsLive(card) {
@@ -3524,41 +3525,14 @@
   }
 
   function queueDeferredHydration(cards, options = {}) {
-    const deferred = Array.isArray(cards) ? cards.slice() : [];
-    if (!deferred.length) return;
-    const generation = state.hydrationGeneration;
-    const kickoff = function () {
-      if (generation !== state.hydrationGeneration) return;
-      runHydrationQueue(deferred, HYDRATE_CARD_CONCURRENCY, async function (card) {
-        if (generation !== state.hydrationGeneration) return;
-        await loadCardDetail(card, !!options.liveOnly);
-      });
-    };
-    if (typeof window.requestIdleCallback === "function") {
-      window.requestIdleCallback(kickoff, { timeout: 1500 });
-      return;
-    }
-    window.setTimeout(kickoff, 0);
+    void cards;
+    void options;
   }
 
   async function hydrateCards(options = {}) {
     state.hydrationGeneration += 1;
-    const generation = state.hydrationGeneration;
-    const { liveTargets, deferredTargets } = partitionHydrationTargets(state.cards, options);
-    const priorityTargets = liveTargets.length
-      ? liveTargets.slice(0, INITIAL_LIVE_PRIORITY_CARD_LIMIT)
-      : deferredTargets.slice(0, INITIAL_LIVE_PRIORITY_CARD_LIMIT);
-    const backgroundTargets = liveTargets.length
-      ? [...liveTargets.slice(INITIAL_LIVE_PRIORITY_CARD_LIMIT), ...deferredTargets]
-      : deferredTargets.slice(INITIAL_LIVE_PRIORITY_CARD_LIMIT);
-
-    await runHydrationQueue(priorityTargets, HYDRATE_CARD_CONCURRENCY, async function (card) {
-      if (generation !== state.hydrationGeneration) return;
-      await loadCardDetail(card, !!options.liveOnly);
-    });
-
-    if (generation !== state.hydrationGeneration) return;
-    queueDeferredHydration(backgroundTargets, options);
+    void options;
+    syncExistingCards();
   }
 
   function sameSlate(nextCards, currentCards) {
