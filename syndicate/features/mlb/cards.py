@@ -1764,6 +1764,7 @@ def source_cards_api_payload(context: dict[str, Any]) -> dict[str, Any]:
     hr_rows = hr_targets.get("rows") if hr_targets and isinstance(hr_targets.get("rows"), list) else []
     selected_date = str(context.get("date") or "").strip()
     today_iso = central_today_iso()
+    render_web_dyno = str(os.environ.get("RENDER") or "").strip().lower() in {"1", "true", "yes", "on"}
     cache_key = None
     if selected_date == today_iso:
         cache_key = (
@@ -1810,7 +1811,7 @@ def source_cards_api_payload(context: dict[str, Any]) -> dict[str, Any]:
         enriched_games.append(merged_game)
     games = enriched_games
     live_lens_report = None
-    if selected_date == today_iso:
+    if selected_date == today_iso and not render_web_dyno:
         try:
             from syndicate.features.mlb.live_lens import _persist_live_lens_report
 

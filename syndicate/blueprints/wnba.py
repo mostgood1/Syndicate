@@ -424,7 +424,8 @@ def api_source_cards():
     if throttle_response is not None:
         return throttle_response
     try:
-        return jsonify(build_source_cards_payload(selected_date, allow_stored_date_fallback=_allow_stored_date_fallback()))
+        payload = build_source_cards_payload(selected_date, allow_stored_date_fallback=_allow_stored_date_fallback())
+        return jsonify(payload)
     except Exception:
         return jsonify(_snapshot_unavailable_payload())
     finally:
@@ -490,6 +491,19 @@ def api_cards():
     if throttle_response is not None:
         return throttle_response
     try:
+        if str(__import__("os").environ.get("RENDER") or "").strip().lower() in {"1", "true", "yes", "on"}:
+            context = build_source_cards_payload(selected_date, allow_stored_date_fallback=True)
+            context = {
+                **context,
+                "source_title": "WNBA source cards fallback",
+                "empty_state": {
+                    "eyebrow": "WNBA cards",
+                    "title": "WNBA source cards fallback",
+                    "body": "The shared WNBA board is using the artifact-backed source cards payload on Render to avoid request-path live hydration.",
+                    "list_items": ["Reload after the next WNBA refresh cycle."] if not context.get("games") else [],
+                },
+            }
+            return jsonify(build_game_board_api_payload(context))
         context = build_cards_page_context(selected_date, allow_stored_date_fallback=False)
     except Exception:
         try:
