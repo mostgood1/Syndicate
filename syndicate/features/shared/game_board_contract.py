@@ -442,7 +442,6 @@ def build_game_board_api_payload(context: dict[str, Any]) -> dict[str, Any]:
         "lookahead_applied": bool(context.get("lookahead_applied", False)),
         "pregame_portfolio": pregame_portfolio,
         "games": games,
-        "cards": games,
         "scoreboard": context.get("scoreboard_items", []),
         "using_sample_data": using_sample_data,
         "usingSampleData": using_sample_data,

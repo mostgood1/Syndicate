@@ -59,6 +59,12 @@
     return `/mlb/game/${encodeURIComponent(gamePk)}${params.toString() ? `?${params.toString()}` : ""}`;
   }
 
+  function mlbCardDetailHref(gamePk) {
+    const params = new URLSearchParams();
+    if (state.date) params.set("date", state.date);
+    return `/mlb/api/game/${encodeURIComponent(gamePk)}/card-detail${params.toString() ? `?${params.toString()}` : ""}`;
+  }
+
   function simBattingColumns(sim) {
     return sim?.boxscoreMode === "aggregate" ? AGGREGATE_SIM_BATTING_COLUMNS : SIM_BATTING_COLUMNS;
   }
@@ -588,8 +594,9 @@
   }
 
   function starterText(card) {
-    const awayStarter = card?.probable?.away?.fullName || "TBD";
-    const homeStarter = card?.probable?.home?.fullName || "TBD";
+    const awayStarter = card?.probable?.away?.fullName || null;
+    const homeStarter = card?.probable?.home?.fullName || null;
+    if (!awayStarter && !homeStarter) return "Expand card details to load starters";
     return `${awayStarter} vs ${homeStarter}`;
   }
 
@@ -655,20 +662,18 @@
 
   function ensureDetail(card) {
     const gamePk = Number(card.gamePk);
-    const embeddedDetail = card?.details || card?.cardDetail || card?.card_detail || null;
     if (!state.details.has(gamePk)) {
-      const initialProp = officialPropRows(card)[0] || allPropRows(card)[0] || null;
       state.details.set(gamePk, {
-        snapshot: embeddedDetail?.snapshot || null,
-        sim: embeddedDetail?.sim || null,
+        snapshot: null,
+        sim: null,
+        loaded: false,
+        loading: false,
+        loadError: null,
+        expanded: false,
         activeTab: "overview",
-        selectedPropKey: initialProp ? propKey(initialProp) : null,
+        selectedPropKey: null,
         propFilters: { board: "auto", side: "all", type: "all" },
       });
-    } else if (embeddedDetail) {
-      const detail = state.details.get(gamePk);
-      detail.snapshot = embeddedDetail.snapshot || null;
-      detail.sim = embeddedDetail.sim || { found: false };
     }
     return state.details.get(gamePk);
   }
@@ -1893,6 +1898,7 @@
     article.className = "cards-game-card";
     article.id = `game-card-${card.gamePk}`;
     article.dataset.gamePk = String(card.gamePk);
+    article.dataset.expanded = detail.expanded ? "true" : "false";
     const statusBadge = statusBadgePresentation(card, null);
     article.innerHTML = `
       <div class="cards-strip-head">
@@ -1916,6 +1922,7 @@
           ${first1SignalMarkup(card)}
           <div class="cards-start-time" data-role="status-detail">${escapeHtml(statusDetailText(null, card) || card.startTime || "")}</div>
           <a class="cards-game-link" href="${mlbGameHref(card.gamePk)}">Open game view</a>
+          <button type="button" class="cards-game-link cards-expand-toggle" data-role="expand-card">${detail.expanded ? "Hide detail" : "Load detail"}</button>
         </div>
       </div>
 
@@ -1928,94 +1935,104 @@
         </div>
       </div>
 
-      <div class="cards-market-row">
-        ${marketTiles(card)}
-      </div>
-
-      <div class="cards-tabs-rail">
-        <div class="cards-tabs">
-          <button class="cards-tab is-active" type="button" data-tab-target="overview">Game</button>
-          <button class="cards-tab" type="button" data-tab-target="boxscore">Box Score</button>
-          <button class="cards-tab" type="button" data-tab-target="props">Props</button>
+      <div class="cards-card-detail" data-role="card-detail" ${detail.expanded ? "" : "hidden"}>
+        <div class="cards-market-row" data-role="market-row">
+          ${detail.expanded ? marketTiles(card) : '<div class="cards-empty-copy">Expand detail to load market tiles.</div>'}
         </div>
-        <div class="cards-mini-metrics cards-mini-metrics--rail">
-          ${starterMetricMarkup("Away starter", card?.probable?.away, card)}
-          ${starterMetricMarkup("Home starter", card?.probable?.home, card)}
-        </div>
-      </div>
-
-      <section class="cards-panel is-active" data-panel-id="overview">
-        <div class="cards-overview-grid">
-          <div class="cards-panel-card cards-panel-card--overview-main">
-            <div class="cards-box-head">
-              <div class="cards-table-title"><strong>Game lens</strong></div>
-              <span class="cards-overview-badge">${escapeHtml(card.gameType || "MLB")}</span>
-            </div>
-            <div class="cards-overview-main-grid">
-              <div class="cards-live-lens-grid" data-role="game-lens"></div>
-              <div data-role="overview-bars">${overviewBarGroups(card, detail)}</div>
-            </div>
+        <div class="cards-tabs-rail">
+          <div class="cards-tabs">
+            <button class="cards-tab is-active" type="button" data-tab-target="overview">Game</button>
+            <button class="cards-tab" type="button" data-tab-target="boxscore">Box Score</button>
+            <button class="cards-tab" type="button" data-tab-target="props">Props</button>
           </div>
-
-          <div class="cards-panel-card">
-            <div class="cards-box-head">
-              <div class="cards-table-title"><strong>Official card</strong></div>
-              <span class="cards-chip">${escapeHtml(marketCountSummary(card))}</span>
-            </div>
-            <ul class="cards-callout-list">${calloutMarkup(card)}</ul>
-            <div data-role="prop-overview-lens"></div>
+          <div class="cards-mini-metrics cards-mini-metrics--rail">
+            ${starterMetricMarkup("Away starter", card?.probable?.away, card)}
+            ${starterMetricMarkup("Home starter", card?.probable?.home, card)}
           </div>
         </div>
-      </section>
 
-      <section class="cards-panel" data-panel-id="boxscore">
-        <div class="cards-box-grid">
-          <div class="cards-panel-card cards-box-panel">
-            <div class="cards-box-head">
-              <div class="cards-table-title"><strong>Live / final box</strong></div>
-              <span class="cards-overview-badge" data-role="actual-badge">${escapeHtml(card.status?.abstract || "Scheduled")}</span>
+        <section class="cards-panel is-active" data-panel-id="overview">
+          <div class="cards-overview-grid">
+            <div class="cards-panel-card cards-panel-card--overview-main">
+              <div class="cards-box-head">
+                <div class="cards-table-title"><strong>Game lens</strong></div>
+                <span class="cards-overview-badge">${escapeHtml(card.gameType || "MLB")}</span>
+              </div>
+              <div class="cards-overview-main-grid">
+                <div class="cards-live-lens-grid" data-role="game-lens">${detail.expanded ? "" : '<div class="cards-empty-copy">Expand detail to load projections.</div>'}</div>
+                <div data-role="overview-bars">${detail.expanded ? overviewBarGroups(card, detail) : '<div class="cards-empty-copy">Expand detail to load projections.</div>'}</div>
+              </div>
             </div>
-            <div class="cards-box-totals" data-role="actual-totals">
-              <div class="cards-empty-copy">Loading live box...</div>
-            </div>
-            <div data-role="actual-box"></div>
-          </div>
 
-          <div class="cards-panel-card cards-box-panel">
-            <div class="cards-box-head">
-              <div class="cards-table-title"><strong>Sim box</strong></div>
-              <span class="cards-chip" data-role="sim-badge">Loading</span>
+            <div class="cards-panel-card">
+              <div class="cards-box-head">
+                <div class="cards-table-title"><strong>Official card</strong></div>
+                <span class="cards-chip" data-role="official-chip">${escapeHtml(marketCountSummary(card))}</span>
+              </div>
+              <ul class="cards-callout-list" data-role="official-callouts">${calloutMarkup(card)}</ul>
+              <div data-role="prop-overview-lens">${detail.expanded ? "" : '<div class="cards-empty-copy">Expand detail to load props.</div>'}</div>
             </div>
-            <div class="cards-box-totals" data-role="sim-totals">
-              <div class="cards-empty-copy">Loading sim box...</div>
-            </div>
-            <div data-role="sim-box"></div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      <section class="cards-panel" data-panel-id="props">
-        <div class="cards-props-grid">
-          <div class="cards-panel-card">
-            <div class="cards-box-head">
-              <div class="cards-table-title"><strong>Props board</strong></div>
-              <span class="cards-chip" data-role="prop-summary-chip">${escapeHtml(propCountBadge(officialPropCount, extraPropCount))}</span>
+        <section class="cards-panel" data-panel-id="boxscore">
+          <div class="cards-box-grid">
+            <div class="cards-panel-card cards-box-panel">
+              <div class="cards-box-head">
+                <div class="cards-table-title"><strong>Live / final box</strong></div>
+                <span class="cards-overview-badge" data-role="actual-badge">${escapeHtml(card.status?.abstract || "Scheduled")}</span>
+              </div>
+              <div class="cards-box-totals" data-role="actual-totals">
+                <div class="cards-empty-copy">Loading live box...</div>
+              </div>
+              <div data-role="actual-box"></div>
             </div>
-            <div class="cards-prop-filter-shell" data-role="prop-filters"></div>
-            <div class="cards-prop-groups" data-role="prop-groups"></div>
+
+            <div class="cards-panel-card cards-box-panel">
+              <div class="cards-box-head">
+                <div class="cards-table-title"><strong>Sim box</strong></div>
+                <span class="cards-chip" data-role="sim-badge">Loading</span>
+              </div>
+              <div class="cards-box-totals" data-role="sim-totals">
+                <div class="cards-empty-copy">Loading sim box...</div>
+              </div>
+              <div data-role="sim-box"></div>
+            </div>
           </div>
-          <div class="cards-lens-shell" data-role="prop-lens"></div>
+        </section>
+
+        <section class="cards-panel" data-panel-id="props">
+          <div class="cards-props-grid">
+            <div class="cards-panel-card">
+              <div class="cards-box-head">
+                <div class="cards-table-title"><strong>Props board</strong></div>
+                <span class="cards-chip" data-role="prop-summary-chip">${escapeHtml(propCountBadge(officialPropCount, extraPropCount))}</span>
+              </div>
+              <div class="cards-prop-filter-shell" data-role="prop-filters"></div>
+              <div class="cards-prop-groups" data-role="prop-groups"></div>
+            </div>
+            <div class="cards-lens-shell" data-role="prop-lens"></div>
+          </div>
+        </section>
         </div>
       </section>`;
 
     attachCardEvents(article, card);
-    renderPropSections(card, article);
-    activateTab(article, detail?.activeTab || "overview");
+    if (detail.expanded) {
+      renderPropSections(card, article);
+      activateTab(article, detail?.activeTab || "overview");
+    }
     return article;
   }
 
   function attachCardEvents(node, card) {
     node.addEventListener("click", function (event) {
+      const expandButton = event.target.closest("[data-role='expand-card']");
+      if (expandButton && node.contains(expandButton)) {
+        event.preventDefault();
+        toggleCardDetail(card);
+        return;
+      }
       const tabButton = event.target.closest("[data-tab-target]");
       if (tabButton && node.contains(tabButton)) {
         activateTab(node, tabButton.getAttribute("data-tab-target"));
@@ -3351,14 +3368,42 @@
 
   async function loadCardDetail(card, isRefresh) {
     const detail = ensureDetail(card);
-    const embeddedDetail = card?.details || card?.cardDetail || card?.card_detail || null;
-    if (embeddedDetail) {
-      detail.snapshot = detail.snapshot || embeddedDetail.snapshot || null;
-      detail.sim = detail.sim || embeddedDetail.sim || { found: false };
-    } else {
-      detail.sim = detail.sim || { found: false };
+    if (detail.loaded && !isRefresh) {
+      return detail;
     }
+    if (detail.loading) {
+      return detail;
+    }
+    detail.loading = true;
+    detail.loadError = null;
     if (!isRefresh) syncCard(card);
+    try {
+      const payload = await fetchJson(mlbCardDetailHref(card.gamePk), { timeoutMs: DETAIL_REQUEST_TIMEOUT_MS });
+      if (payload && payload.card && typeof payload.card === "object") {
+        Object.assign(card, payload.card);
+      }
+      detail.snapshot = payload?.snapshot || null;
+      detail.sim = payload?.sim || { found: false };
+      detail.loaded = true;
+      detail.loadError = null;
+    } catch (error) {
+      detail.loadError = error && error.message ? error.message : "Failed to load card detail";
+      detail.snapshot = null;
+      detail.sim = { found: false };
+    } finally {
+      detail.loading = false;
+      syncCard(card);
+    }
+    return detail;
+  }
+
+  function toggleCardDetail(card) {
+    const detail = ensureDetail(card);
+    detail.expanded = !detail.expanded;
+    syncCard(card);
+    if (detail.expanded && !detail.loaded && !detail.loading) {
+      void loadCardDetail(card, false);
+    }
   }
 
   function cardIsLive(card) {
@@ -3444,10 +3489,20 @@
     const gameLens = node.querySelector('[data-role="game-lens"]');
     const overviewBars = node.querySelector('[data-role="overview-bars"]');
     const propOverviewLens = node.querySelector('[data-role="prop-overview-lens"]');
+    const marketRow = node.querySelector('[data-role="market-row"]');
+    const officialChip = node.querySelector('[data-role="official-chip"]');
+    const officialCallouts = node.querySelector('[data-role="official-callouts"]');
+    const detailRoot = node.querySelector('[data-role="card-detail"]');
+    const expandButton = node.querySelector('[data-role="expand-card"]');
     const probableCopy = node.querySelector('.cards-score-meta .cards-mini-copy');
     const starterRail = node.querySelector('.cards-mini-metrics--rail');
     const snapshot = detail.snapshot;
     const sim = detail.sim;
+
+    if (detailRoot) detailRoot.hidden = !detail.expanded;
+    if (expandButton) {
+      expandButton.textContent = detail.expanded ? (detail.loading ? "Loading..." : "Hide detail") : "Load detail";
+    }
 
     if (statusBadge) {
       const status = statusBadgePresentation(card, snapshot);
@@ -3477,6 +3532,16 @@
           ${starterMetricMarkup("Away starter", card?.probable?.away, card)}
           ${starterMetricMarkup("Home starter", card?.probable?.home, card)}`;
     }
+
+    if (!detail.expanded) {
+      syncStrip(card, detail);
+      return;
+    }
+
+    if (marketRow) marketRow.innerHTML = marketTiles(card);
+    if (officialChip) officialChip.textContent = marketCountSummary(card);
+    if (officialCallouts) officialCallouts.innerHTML = calloutMarkup(card);
+
     if (gameLens) gameLens.innerHTML = renderGameLens(card, detail);
     if (overviewBars) overviewBars.innerHTML = overviewBarGroups(card, detail);
     if (propOverviewLens) propOverviewLens.innerHTML = renderPropOverviewLens(card, detail);

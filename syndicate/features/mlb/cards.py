@@ -1982,10 +1982,10 @@ def source_cards_api_payload(context: dict[str, Any]) -> dict[str, Any]:
             if warning not in combined_market_warnings:
                 combined_market_warnings.append(warning)
 
+    source_cards = _trim_source_cards_games(games)
     result = {
         "date": context.get("date"),
-        "cards": games,
-        "games": games,
+        "cards": source_cards,
         "scoreboard": context.get("scoreboard_items", []),
         "board_contract": context.get("board_contract", {}),
         "source_path": context.get("source_path"),
@@ -2011,7 +2011,7 @@ def source_cards_api_payload(context: dict[str, Any]) -> dict[str, Any]:
             "pageHref": hr_targets.get("href") if hr_targets else f"/mlb/hr-targets?date={context.get('date')}",
             "sourcePath": hr_targets.get("source_path") if hr_targets else None,
             "rows": int(hr_targets.get("row_count") or len(hr_rows)) if hr_targets else 0,
-            "games": int(hr_targets.get("game_count") or len(games)) if hr_targets else len(games),
+            "games": int(hr_targets.get("game_count") or len(source_cards)) if hr_targets else len(source_cards),
             "topRows": top_rows,
         },
     }
@@ -2035,17 +2035,7 @@ def _merge_live_lens_row_into_game(game: dict[str, Any], live_lens_row: dict[str
         "score",
         "matchup",
         "predictions",
-        "gameMarkets",
         "markets",
-        "gameLens",
-        "props",
-        "liveProps",
-        "trackedProps",
-        "archivedLiveProps",
-        "snapshotAvailable",
-        "simContextAvailable",
-        "oddsRefreshedAt",
-        "odds_refreshed_at",
     ):
         value = live_lens_row.get(key)
         if value is None:
@@ -2063,6 +2053,39 @@ def _merge_live_lens_row_into_game(game: dict[str, Any], live_lens_row: dict[str
     if start_time:
         merged["startTime"] = start_time
     return merged
+
+
+def _trim_source_cards_games(games: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    allowed_keys = {
+        "gamePk",
+        "card_variant",
+        "gameType",
+        "away",
+        "home",
+        "status",
+        "detail",
+        "summary",
+        "startTime",
+        "gameDate",
+        "officialDate",
+        "href",
+        "href_label",
+        "first1BetSignal",
+        "flags",
+        "markets",
+        "probable",
+        "trackedGameLines",
+        "oddsRefreshedAt",
+        "odds_refreshed_at",
+    }
+
+    trimmed_games: list[dict[str, Any]] = []
+    for game in games:
+        if not isinstance(game, dict):
+            continue
+        trimmed = {key: value for key, value in game.items() if key in allowed_keys}
+        trimmed_games.append(trimmed)
+    return trimmed_games
 
 
 def _live_prop_kind(market_label: str) -> tuple[str, str]:
@@ -3317,12 +3340,25 @@ def _source_sim_detail(selected_date: str, game_pk: int, sim_payload: dict[str, 
 
 
 def source_card_detail_payload(selected_date: str, game_pk: int) -> dict[str, Any]:
+    page_context = build_cards_page_context(selected_date)
+    full_card = None
+    for game in page_context.get("games") if isinstance(page_context.get("games"), list) else []:
+        if not isinstance(game, dict):
+            continue
+        try:
+            current_game_pk = int(game.get("gamePk") or 0)
+        except Exception:
+            current_game_pk = 0
+        if current_game_pk == int(game_pk):
+            full_card = game
+            break
     sim_payload = _daily_sim_by_game(selected_date, [int(game_pk)]).get(int(game_pk))
     actual_payload = _daily_actual_by_game(selected_date, [int(game_pk)]).get(int(game_pk))
     live_lens_row = _live_lens_game_row(selected_date, int(game_pk))
     return {
         "date": selected_date,
         "gamePk": int(game_pk),
+        "card": full_card,
         "snapshot": _source_snapshot_detail(selected_date, int(game_pk), actual_payload),
         "sim": _source_sim_detail(selected_date, int(game_pk), sim_payload, actual_payload, live_lens_row),
     }
@@ -4181,37 +4217,19 @@ def _games_from_daily_summary(summary: dict[str, Any], *, betting_games: dict[in
             {
                 "gamePk": game_pk,
                 "card_variant": "mlb_main",
-            "gameType": schedule["gameType"],
+                "gameType": schedule["gameType"],
                 "away": _team_display(away_abbr),
                 "home": _team_display(home_abbr),
                 "status": _source_status(actual_payload),
-            "detail": schedule["detail"],
+                "detail": schedule["detail"],
                 "detail_label": "First pitch",
-            "startTime": schedule["startTime"],
-            "gameDate": schedule["gameDate"],
-            "officialDate": schedule["officialDate"],
+                "startTime": schedule["startTime"],
+                "gameDate": schedule["gameDate"],
+                "officialDate": schedule["officialDate"],
                 "summary": f"{away_starter} vs {home_starter}{f' | {official_count} official pick(s)' if official_count else ''}{f' | +{playable_count} playable' if playable_count else ''}",
-                "status_badge": "Official card" if official_count else "Model-only board",
-                "hero_note": f"{official_count} official pick(s){f' | +{playable_count} playable' if playable_count else ''}" if official_count or playable_count else "No official picks published yet",
                 "probable": _source_probable(output, betting_game=betting_game),
                 "predictions": _source_predictions(output),
-                "flags": {
-                    "hasAnyRecommendations": bool(betting_flags.get("hasAnyRecommendations") if betting_flags else (official_count or playable_count)),
-                    "hasOfficialRecommendations": bool(betting_flags.get("hasOfficialRecommendations") if betting_flags else official_count),
-                    "hasPlayableCandidates": bool(betting_flags.get("hasPlayableCandidates") if betting_flags else playable_count),
-                    "hasPitcherProps": has_pitcher_props,
-                    "hasHitterProps": has_hitter_props,
-                },
                 "markets": markets,
-                "metrics": _metrics_for_output(output) + [{"label": "Official", "value": str(official_count)}] + ([{"label": "Playable", "value": str(playable_count)}] if playable_count else []),
-                "market_tiles": _market_tiles(betting_game or {}, away_abbr, home_abbr),
-                "starter_metrics": _starter_metrics(output),
-                "segment_overview_cards": _segment_overview_cards(output, betting_game=betting_game),
-                "probability_rows": _probability_rows(output),
-                "run_projection_rows": _run_projection_rows(output),
-                "panels": _panels_for_output(output, betting_game=betting_game, sim_payload=sim_payload, actual_payload=actual_payload, selected_date=selected_date),
-                "href": f"/mlb/game/{game_pk}?date={selected_date or ''}",
-                "href_label": "Open game detail",
                 "first1BetSignal": dict(first1_signal) if isinstance(first1_signal, dict) else None,
             }
         )

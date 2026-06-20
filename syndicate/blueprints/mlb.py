@@ -341,11 +341,13 @@ def _render_cards_page(selected_date: str):
 def api_cards():
     selected_date = _iso_or_today(request.args.get("date"))
     context = dict(build_cards_page_context(selected_date))
-    payload = build_game_board_api_payload(context)
-    payload.update(source_cards_api_payload(context))
-    payload["app"] = _app_meta()
     requested_client = str(request.args.get("client") or "").strip().lower()
     effective_client = "board" if requested_client == "board" else "source"
+    if effective_client == "board":
+        payload = build_game_board_api_payload(context)
+    else:
+        payload = source_cards_api_payload(context)
+    payload["app"] = _app_meta()
     payload["view"] = {"client": effective_client}
     payload["sources"] = {
         "primary": context.get("source_path"),

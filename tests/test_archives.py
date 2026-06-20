@@ -4978,6 +4978,63 @@ class ArchiveRouteTests(unittest.TestCase):
         self.assertIsInstance(payload, dict)
         self.assertEqual(payload.get("date"), today_date)
 
+    def test_mlb_source_cards_api_payload_trims_heavy_game_detail(self) -> None:
+        payload = source_cards_api_payload(
+            {
+                "date": "1900-01-01",
+                "games": [
+                    {
+                        "gamePk": 123,
+                        "card_variant": "mlb_main",
+                        "gameType": "R",
+                        "away": {"abbr": "AWY", "name": "Away Team"},
+                        "home": {"abbr": "HME", "name": "Home Team"},
+                        "status": {"abstract": "Final", "detailed": "Final"},
+                        "detail": "7:05 PM",
+                        "summary": "Away Team vs Home Team",
+                        "startTime": "7:05 PM",
+                        "gameDate": "1900-01-01T19:05:00Z",
+                        "officialDate": "1900-01-01",
+                        "href": "/mlb/game/123?date=1900-01-01",
+                        "href_label": "Open game detail",
+                        "first1BetSignal": {"label": "F1", "summary": "lightweight"},
+                        "flags": {"hasAnyRecommendations": False},
+                        "markets": {"ml": {"selection": "away"}},
+                        "probable": {"away": {"fullName": "Starter A"}, "home": {"fullName": "Starter H"}},
+                        "trackedGameLines": {"ml": {"last_seen_at": "1900-01-01T19:00:00Z"}},
+                        "oddsRefreshedAt": "1900-01-01T19:00:00Z",
+                        "odds_refreshed_at": "1900-01-01T19:00:00Z",
+                        "panels": [{"title": "heavy"}],
+                        "predictions": {"full": {"away_runs_mean": 3.1}},
+                        "market_tiles": [{"title": "heavy"}],
+                        "actual_box_panel": {"title": "heavy"},
+                        "prop_lens": {"title": "heavy"},
+                        "prop_groups": [{"title": "heavy"}],
+                        "run_projection_rows": [{"title": "heavy"}],
+                        "segment_overview_cards": [{"title": "heavy"}],
+                        "sim_box": {"title": "heavy"},
+                    }
+                ],
+            }
+        )
+
+        card = (payload.get("cards") or [{}])[0]
+        self.assertEqual(card.get("gamePk"), 123)
+        self.assertEqual(card.get("summary"), "Away Team vs Home Team")
+        self.assertEqual(card.get("first1BetSignal", {}).get("label"), "F1")
+        self.assertEqual(card.get("probable", {}).get("away", {}).get("fullName"), "Starter A")
+        self.assertEqual(card.get("markets", {}).get("ml", {}).get("selection"), "away")
+        self.assertIn("trackedGameLines", card)
+        self.assertNotIn("panels", card)
+        self.assertNotIn("predictions", card)
+        self.assertNotIn("market_tiles", card)
+        self.assertNotIn("actual_box_panel", card)
+        self.assertNotIn("prop_lens", card)
+        self.assertNotIn("prop_groups", card)
+        self.assertNotIn("run_projection_rows", card)
+        self.assertNotIn("segment_overview_cards", card)
+        self.assertNotIn("sim_box", card)
+
     def test_nba_cards_api_without_date_preserves_today_request(self) -> None:
         today_date = date.today().isoformat()
         response = self.client.get("/nba/api/cards")
