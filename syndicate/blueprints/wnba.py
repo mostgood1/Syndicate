@@ -336,7 +336,7 @@ def cards():
         "wnba/cards_source.html",
         date=selected_date,
         asset_version=_cards_source_asset_version(),
-        cards_payload_path="/wnba/api/cards",
+        cards_payload_path="/wnba/api/source/cards",
     )
 
 

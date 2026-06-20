@@ -2036,6 +2036,8 @@ def _merge_live_lens_row_into_game(game: dict[str, Any], live_lens_row: dict[str
         "matchup",
         "predictions",
         "markets",
+        "oddsRefreshedAt",
+        "odds_refreshed_at",
     ):
         value = live_lens_row.get(key)
         if value is None:

@@ -3590,14 +3590,22 @@
   }
 
   function queueDeferredHydration(cards, options = {}) {
-    void cards;
-    void options;
+    if (!Array.isArray(cards) || !cards.length) return;
+    const liveOnly = Boolean(options.liveOnly);
+    const { liveTargets, deferredTargets } = partitionHydrationTargets(cards, options);
+    const orderedTargets = liveOnly
+      ? liveTargets
+      : liveTargets.slice(0, INITIAL_LIVE_PRIORITY_CARD_LIMIT).concat(deferredTargets, liveTargets.slice(INITIAL_LIVE_PRIORITY_CARD_LIMIT));
+
+    void runHydrationQueue(orderedTargets, HYDRATE_CARD_CONCURRENCY, async function (card) {
+      await loadCardDetail(card, liveOnly);
+    });
   }
 
   async function hydrateCards(options = {}) {
     state.hydrationGeneration += 1;
-    void options;
     syncExistingCards();
+    queueDeferredHydration(state.cards, options);
   }
 
   function sameSlate(nextCards, currentCards) {

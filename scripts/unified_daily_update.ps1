@@ -445,6 +445,20 @@ function Update-RunStateStage {
     Sync-RunStateArtifacts -Manifest $Manifest
 }
 
+function Set-RunTerminalState {
+    param(
+        [psobject]$Manifest,
+        [string]$Stage = 'completed'
+    )
+
+    if ($null -eq $Manifest -or $null -eq $Manifest.runState) {
+        return
+    }
+
+    $Manifest.runState.currentStage = $Stage
+    Sync-RunStateArtifacts -Manifest $Manifest
+}
+
 function Set-RunFailureState {
     param(
         [psobject]$Manifest,
@@ -3984,7 +3998,7 @@ $runManifest = [ordered]@{
         latestCheckpointFailedStage = if ($null -ne $latestCheckpoint) { [string]$latestCheckpoint.failedStage } else { $null }
         latestCheckpointCompletedStageCount = if ($null -ne $latestCheckpoint) { @($latestCheckpoint.completedStages).Count } else { 0 }
         latestCheckpointCompletedStages = if ($null -ne $latestCheckpoint) { @($latestCheckpoint.completedStages) } else { @() }
-        resumeEligible = [bool]($null -ne $latestCheckpoint -and -not [string]::IsNullOrWhiteSpace([string]$latestCheckpoint.currentStage) -and [string]$latestCheckpoint.currentStage -ne 'queued')
+        resumeEligible = [bool]($null -ne $latestCheckpoint -and -not [string]::IsNullOrWhiteSpace([string]$latestCheckpoint.currentStage) -and [string]$latestCheckpoint.currentStage -ne 'queued' -and [string]$latestCheckpoint.currentStage -ne 'completed')
         resumedFromCheckpoint = [bool]($null -ne $latestCheckpoint -and $null -eq $latestManifest)
     }
     runState = [ordered]@{
@@ -4464,6 +4478,7 @@ try {
 
     $runManifest.overallStatus = if ($DryRun) { 'dry_run' } else { 'ok' }
     $runManifest.completedAt = (Get-Date).ToString('o')
+    Set-RunTerminalState -Manifest $runManifest -Stage 'completed'
     if ($shouldRunManifestGeneration) {
         Write-RunManifest -Manifest $runManifest
     }

@@ -248,6 +248,12 @@ class DateArchiveHelperTests(unittest.TestCase):
             r"actualSegment:\s*projection\.closed\s*\?\s*null\s*:\s*\{\s*away:\s*actualAway,\s*home:\s*actualHome\s*\}",
         )
 
+    def test_mlb_cards_source_js_hydrates_compact_cards(self) -> None:
+        content = (REPO_ROOT / "syndicate" / "static" / "mlb" / "cards_source.js").read_text(encoding="utf-8")
+
+        self.assertIn('queueDeferredHydration(state.cards, options);', content)
+        self.assertIn('await loadCardDetail(card, liveOnly);', content)
+
     def test_mlb_source_card_detail_preserves_source_snapshot_status_and_ids(self) -> None:
         actual_payload = {
             "gameData": {
@@ -5035,6 +5041,21 @@ class ArchiveRouteTests(unittest.TestCase):
         self.assertNotIn("segment_overview_cards", card)
         self.assertNotIn("sim_box", card)
 
+    def test_mlb_live_lens_merge_preserves_odds_refresh_metadata(self) -> None:
+        from syndicate.features.mlb.cards import _merge_live_lens_row_into_game
+
+        merged = _merge_live_lens_row_into_game(
+            {"gamePk": 123, "summary": "Original"},
+            {
+                "status": {"abstract": "Live"},
+                "oddsRefreshedAt": "2026-06-19T19:00:00Z",
+                "odds_refreshed_at": "2026-06-19T19:00:00Z",
+            },
+        )
+
+        self.assertEqual(merged.get("oddsRefreshedAt"), "2026-06-19T19:00:00Z")
+        self.assertEqual(merged.get("odds_refreshed_at"), "2026-06-19T19:00:00Z")
+
     def test_nba_cards_api_without_date_preserves_today_request(self) -> None:
         today_date = date.today().isoformat()
         response = self.client.get("/nba/api/cards")
@@ -5074,6 +5095,14 @@ class ArchiveRouteTests(unittest.TestCase):
         self.assertIn("/wnba/cards-parity.js", body)
         self.assertIn("WNBA Game Cards", body)
         self.assertNotIn("/static/shared/game_board.js", body)
+
+    def test_wnba_cards_source_shell_uses_source_cards_api(self) -> None:
+        response = self.client.get("/wnba/cards?date=2026-05-21")
+        body = response.get_data(as_text=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('data-cards-payload-path="/wnba/api/source/cards"', body)
+        self.assertNotIn('data-cards-payload-path="/wnba/api/cards"', body)
 
     def test_wnba_cards_source_shell_uses_versioned_assets(self) -> None:
         response = self.client.get("/wnba/cards?date=2026-05-21")
