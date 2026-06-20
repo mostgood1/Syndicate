@@ -3750,7 +3750,7 @@ if (-not $SkipWNBA) {
         REFRESH_PREDICT_PROPS_SMART_SIM_WORKERS = [string]$runtimePolicy.WNBA.smartsimWorkers
         APP_TZ = 'America/Chicago'
         APP_TZ_OFFSET_HOURS = '-6'
-        SYNDICATE_WNBA_SOURCE_APP_FALLBACK = '1'
+        SYNDICATE_WNBA_SOURCE_APP_FALLBACK = '0'
     }
     if (-not [string]::IsNullOrWhiteSpace($sharedOddsApiKey)) {
         $wnbaEnvOverrides.ODDS_API_KEY = $sharedOddsApiKey
