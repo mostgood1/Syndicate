@@ -82,8 +82,8 @@ jobs:
           Write-Host "  BaseUrl: $(if ($baseUrl) { $baseUrl } else { '<empty>' })"
           Write-Host "  EventSimForceWindowMinutes: $forceWindow"
 
-      - name: Run archive regression suite
-        run: python -m unittest tests.test_archives || true
+      - name: Run archive smoke test
+        run: python -m unittest tests.test_daily_update_smoke || true
 
       - name: Run active-sport gate regression
         run: python -m unittest tests.test_migration_gate.MigrationGateRuntimeDependencyTests.test_evaluate_active_sport_advanced_readiness_skips_out_of_season_and_no_games
