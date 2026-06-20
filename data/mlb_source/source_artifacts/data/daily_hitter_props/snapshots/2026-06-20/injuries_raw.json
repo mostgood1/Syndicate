@@ -232,6 +232,7 @@
         467793,
         543510,
         640462,
+        669194,
         669203,
         679885,
         685314,
@@ -350,6 +351,21 @@
           "status": {
             "code": "D60",
             "description": "Injured 60-Day"
+          },
+          "position": {
+            "code": "1",
+            "name": "Pitcher",
+            "type": "Pitcher",
+            "abbreviation": "P"
+          },
+          "roster_type_source": "40Man"
+        },
+        {
+          "player_id": 669194,
+          "full_name": "Ryne Nelson",
+          "status": {
+            "code": "D15",
+            "description": "Injured 15-Day"
           },
           "position": {
             "code": "1",
@@ -1021,7 +1037,6 @@
       },
       "injured_ids": [
         608070,
-        681870,
         682657,
         800050
       ],
@@ -1053,21 +1068,6 @@
             "name": "Outfielder",
             "type": "Outfielder",
             "abbreviation": "RF"
-          },
-          "roster_type_source": "40Man"
-        },
-        {
-          "player_id": 681870,
-          "full_name": "Erik Sabrowski",
-          "status": {
-            "code": "D15",
-            "description": "Injured 15-Day"
-          },
-          "position": {
-            "code": "1",
-            "name": "Pitcher",
-            "type": "Pitcher",
-            "abbreviation": "P"
           },
           "roster_type_source": "40Man"
         },
@@ -1271,6 +1271,7 @@
         595879,
         650402,
         656427,
+        672761,
         676428,
         678009,
         681857,
@@ -1441,6 +1442,21 @@
             "name": "Shortstop",
             "type": "Infielder",
             "abbreviation": "SS"
+          },
+          "roster_type_source": "40Man"
+        },
+        {
+          "player_id": 672761,
+          "full_name": "Wenceel P\u00e9rez",
+          "status": {
+            "code": "D10",
+            "description": "Injured 10-Day"
+          },
+          "position": {
+            "code": "9",
+            "name": "Outfielder",
+            "type": "Outfielder",
+            "abbreviation": "RF"
           },
           "roster_type_source": "40Man"
         }
@@ -1624,7 +1640,6 @@
         "abbreviation": "KC"
       },
       "injured_ids": [
-        607625,
         608032,
         663460,
         663697,
@@ -1747,21 +1762,6 @@
           "status": {
             "code": "D15",
             "description": "Injured 15-Day"
-          },
-          "position": {
-            "code": "1",
-            "name": "Pitcher",
-            "type": "Pitcher",
-            "abbreviation": "P"
-          },
-          "roster_type_source": "40Man"
-        },
-        {
-          "player_id": 607625,
-          "full_name": "Seth Lugo",
-          "status": {
-            "code": "D7",
-            "description": "Injured 7-Day"
           },
           "position": {
             "code": "1",
@@ -3038,7 +3038,6 @@
         669947,
         670955,
         675627,
-        676356,
         686752
       ],
       "injured": [
@@ -3114,21 +3113,6 @@
             "name": "Pitcher",
             "type": "Pitcher",
             "abbreviation": "P"
-          },
-          "roster_type_source": "40Man"
-        },
-        {
-          "player_id": 676356,
-          "full_name": "Jonny DeLuca",
-          "status": {
-            "code": "D10",
-            "description": "Injured 10-Day"
-          },
-          "position": {
-            "code": "9",
-            "name": "Outfielder",
-            "type": "Outfielder",
-            "abbreviation": "RF"
           },
           "roster_type_source": "40Man"
         },
@@ -3337,8 +3321,8 @@
           "player_id": 680737,
           "full_name": "Michael Helman",
           "status": {
-            "code": "D10",
-            "description": "Injured 10-Day"
+            "code": "D60",
+            "description": "Injured 60-Day"
           },
           "position": {
             "code": "8",
@@ -4944,6 +4928,22 @@
       "roster_type_source": "40Man"
     },
     {
+      "team_id": 109,
+      "player_id": 669194,
+      "full_name": "Ryne Nelson",
+      "status": {
+        "code": "D15",
+        "description": "Injured 15-Day"
+      },
+      "position": {
+        "code": "1",
+        "name": "Pitcher",
+        "type": "Pitcher",
+        "abbreviation": "P"
+      },
+      "roster_type_source": "40Man"
+    },
+    {
       "team_id": 110,
       "player_id": 700249,
       "full_name": "Cade Povich",
@@ -5585,22 +5585,6 @@
     },
     {
       "team_id": 114,
-      "player_id": 681870,
-      "full_name": "Erik Sabrowski",
-      "status": {
-        "code": "D15",
-        "description": "Injured 15-Day"
-      },
-      "position": {
-        "code": "1",
-        "name": "Pitcher",
-        "type": "Pitcher",
-        "abbreviation": "P"
-      },
-      "roster_type_source": "40Man"
-    },
-    {
-      "team_id": 114,
       "player_id": 608070,
       "full_name": "Jos\u00e9 Ram\u00edrez",
       "status": {
@@ -5952,6 +5936,22 @@
       "roster_type_source": "40Man"
     },
     {
+      "team_id": 116,
+      "player_id": 672761,
+      "full_name": "Wenceel P\u00e9rez",
+      "status": {
+        "code": "D10",
+        "description": "Injured 10-Day"
+      },
+      "position": {
+        "code": "9",
+        "name": "Outfielder",
+        "type": "Outfielder",
+        "abbreviation": "RF"
+      },
+      "roster_type_source": "40Man"
+    },
+    {
       "team_id": 117,
       "player_id": 656986,
       "full_name": "Bennett Sousa",
@@ -6230,22 +6230,6 @@
       "status": {
         "code": "D15",
         "description": "Injured 15-Day"
-      },
-      "position": {
-        "code": "1",
-        "name": "Pitcher",
-        "type": "Pitcher",
-        "abbreviation": "P"
-      },
-      "roster_type_source": "40Man"
-    },
-    {
-      "team_id": 118,
-      "player_id": 607625,
-      "full_name": "Seth Lugo",
-      "status": {
-        "code": "D7",
-        "description": "Injured 7-Day"
       },
       "position": {
         "code": "1",
@@ -7489,22 +7473,6 @@
     },
     {
       "team_id": 139,
-      "player_id": 676356,
-      "full_name": "Jonny DeLuca",
-      "status": {
-        "code": "D10",
-        "description": "Injured 10-Day"
-      },
-      "position": {
-        "code": "9",
-        "name": "Outfielder",
-        "type": "Outfielder",
-        "abbreviation": "RF"
-      },
-      "roster_type_source": "40Man"
-    },
-    {
-      "team_id": 139,
       "player_id": 655889,
       "full_name": "Manuel Rodr\u00edguez",
       "status": {
@@ -7700,8 +7668,8 @@
       "player_id": 680737,
       "full_name": "Michael Helman",
       "status": {
-        "code": "D10",
-        "description": "Injured 10-Day"
+        "code": "D60",
+        "description": "Injured 60-Day"
       },
       "position": {
         "code": "8",

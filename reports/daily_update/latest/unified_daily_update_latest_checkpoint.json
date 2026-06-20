@@ -1,91 +1,91 @@
 ﻿{
     "scope":  "daily_update",
-    "date":  "2026-06-19",
+    "date":  "2026-06-20",
     "runMode":  "standard",
     "overallStatus":  "ok",
-    "generatedAt":  "2026-06-19T11:37:24.7658106+00:00",
-    "updatedAt":  "2026-06-19T12:38:02.2742771+00:00",
-    "runDir":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-06-19\\20260619_113724",
+    "generatedAt":  "2026-06-20T09:28:55.4096714+00:00",
+    "updatedAt":  "2026-06-20T10:22:27.5050933+00:00",
+    "runDir":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-06-20\\20260620_092854",
     "latestDir":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest",
-    "lastUpdatedAt":  "2026-06-19T12:38:02.2664937+00:00",
+    "lastUpdatedAt":  "2026-06-20T10:22:27.4982504+00:00",
     "currentStage":  "queued",
     "completedStages":  [
                             "source_update",
                             "refresh_gate"
                         ],
-    "failedStage":  "",
+    "failedStage":  null,
     "stageDecisions":  [
                            {
                                "stage":  "source_update",
                                "sport":  "mlb",
                                "workflow":  "vendored_daily_update",
                                "name":  "MLB vendored daily update",
-                               "decision":  "resumed",
-                               "status":  "resumed"
+                               "decision":  "planned",
+                               "status":  "pending"
                            },
                            {
                                "stage":  "source_update",
                                "sport":  "mlb",
                                "workflow":  "syndicate_refresh",
                                "name":  "MLB current-day live-lens refresh",
-                               "decision":  "resumed",
-                               "status":  "resumed"
+                               "decision":  "planned",
+                               "status":  "pending"
                            },
                            {
                                "stage":  "source_update",
                                "sport":  "nba",
                                "workflow":  "vendored_daily_update",
                                "name":  "NBA vendored daily update",
-                               "decision":  "resumed",
-                               "status":  "resumed"
+                               "decision":  "planned",
+                               "status":  "pending"
                            },
                            {
                                "stage":  "source_update",
                                "sport":  "nba",
                                "workflow":  "syndicate_mirror",
                                "name":  "NBA source mirror refresh",
-                               "decision":  "resumed",
-                               "status":  "resumed"
+                               "decision":  "planned",
+                               "status":  "pending"
                            },
                            {
                                "stage":  "source_update",
                                "sport":  "wnba",
                                "workflow":  "vendored_daily_update",
                                "name":  "WNBA vendored daily update",
-                               "decision":  "resumed",
-                               "status":  "resumed"
+                               "decision":  "planned",
+                               "status":  "pending"
                            },
                            {
                                "stage":  "source_update",
                                "sport":  "wnba",
                                "workflow":  "syndicate_mirror",
                                "name":  "WNBA source mirror refresh",
-                               "decision":  "resumed",
-                               "status":  "resumed"
+                               "decision":  "planned",
+                               "status":  "pending"
                            },
                            {
                                "stage":  "source_update",
                                "sport":  "nhl",
                                "workflow":  "vendored_daily_update",
                                "name":  "NHL vendored daily update",
-                               "decision":  "resumed",
-                               "status":  "resumed"
+                               "decision":  "planned",
+                               "status":  "pending"
                            },
                            {
                                "stage":  "source_update",
                                "sport":  null,
                                "workflow":  null,
                                "name":  "NFL local odds refresh",
-                               "decision":  "resumed",
-                               "status":  "resumed"
+                               "decision":  "planned",
+                               "status":  "pending"
                            },
                            {
                                "stage":  "source_update",
                                "sport":  "ncaab",
                                "workflow":  "syndicate_mirror",
                                "name":  "NCAAB source mirror export",
-                               "decision":  "resumed",
-                               "status":  "resumed"
+                               "decision":  "planned",
+                               "status":  "pending"
                            },
                            {
                                "stage":  "sim_execution",
@@ -179,7 +179,7 @@
                   "inputFingerprintCount":  2,
                   "artifactPathCount":  21,
                   "inputFingerprints":  [
-                                            "39a9c0a7bc2e132bc7285b7f2756557df18eb761b0c716ab54c98f1fa39fe958",
+                                            "fc657362059e46ac2fdd3c0dce0de3c139286716c8764d13d95a5e021427c298",
                                             "273bb599414ea4ae1424dde32f327726ccd6fca9e0860fb7b0859d33fe560422"
                                         ],
                   "artifactPaths":  [
@@ -210,13 +210,14 @@
     "replayContext":  {
                           "latestCheckpointLoaded":  true,
                           "latestCheckpointPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest_checkpoint.json",
-                          "latestCheckpointStage":  "source_update",
+                          "latestCheckpointStage":  "queued",
                           "latestCheckpointFailedStage":  "",
-                          "latestCheckpointCompletedStageCount":  0,
-                          "latestCheckpointCompletedStages":  {
-
-                                                              },
-                          "resumeEligible":  true,
+                          "latestCheckpointCompletedStageCount":  2,
+                          "latestCheckpointCompletedStages":  [
+                                                                  "source_update",
+                                                                  "refresh_gate"
+                                                              ],
+                          "resumeEligible":  false,
                           "resumedFromCheckpoint":  false
                       },
     "runPlan":  {

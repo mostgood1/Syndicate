@@ -66,9 +66,9 @@
         },
         "leagueRecord": {
           "wins": 39,
-          "losses": 34,
+          "losses": 35,
           "ties": 0,
-          "pct": ".534"
+          "pct": ".527"
         },
         "splitSquad": false,
         "seriesNumber": 25,
@@ -128,10 +128,10 @@
           "active": true
         },
         "leagueRecord": {
-          "wins": 30,
+          "wins": 31,
           "losses": 44,
           "ties": 0,
-          "pct": ".405"
+          "pct": ".413"
         },
         "probablePitcher": {
           "id": 675512,
@@ -241,9 +241,9 @@
         },
         "leagueRecord": {
           "wins": 35,
-          "losses": 38,
+          "losses": 39,
           "ties": 0,
-          "pct": ".479"
+          "pct": ".473"
         },
         "probablePitcher": {
           "id": 671096,
@@ -308,10 +308,10 @@
           "active": true
         },
         "leagueRecord": {
-          "wins": 45,
+          "wins": 46,
           "losses": 28,
           "ties": 0,
-          "pct": ".616"
+          "pct": ".622"
         },
         "probablePitcher": {
           "id": 701542,
@@ -421,9 +421,9 @@
         },
         "leagueRecord": {
           "wins": 37,
-          "losses": 38,
+          "losses": 39,
           "ties": 0,
-          "pct": ".493"
+          "pct": ".487"
         },
         "probablePitcher": {
           "id": 571578,
@@ -488,10 +488,10 @@
           "active": true
         },
         "leagueRecord": {
-          "wins": 39,
+          "wins": 40,
           "losses": 36,
           "ties": 0,
-          "pct": ".520"
+          "pct": ".526"
         },
         "probablePitcher": {
           "id": 607067,
@@ -601,9 +601,9 @@
         },
         "leagueRecord": {
           "wins": 38,
-          "losses": 35,
+          "losses": 36,
           "ties": 0,
-          "pct": ".521"
+          "pct": ".514"
         },
         "probablePitcher": {
           "id": 621111,
@@ -668,10 +668,10 @@
           "active": true
         },
         "leagueRecord": {
-          "wins": 35,
+          "wins": 36,
           "losses": 39,
           "ties": 0,
-          "pct": ".473"
+          "pct": ".480"
         },
         "probablePitcher": {
           "id": 543135,
@@ -781,14 +781,14 @@
         },
         "leagueRecord": {
           "wins": 39,
-          "losses": 36,
+          "losses": 37,
           "ties": 0,
-          "pct": ".520"
+          "pct": ".513"
         },
         "probablePitcher": {
-          "id": 571945,
-          "fullName": "Miles Mikolas",
-          "link": "/api/v1/people/571945"
+          "id": 676917,
+          "fullName": "Cade Cavalli",
+          "link": "/api/v1/people/676917"
         },
         "splitSquad": false,
         "seriesNumber": 25,
@@ -848,10 +848,15 @@
           "active": true
         },
         "leagueRecord": {
-          "wins": 41,
+          "wins": 42,
           "losses": 30,
           "ties": 0,
-          "pct": ".577"
+          "pct": ".583"
+        },
+        "probablePitcher": {
+          "id": 693855,
+          "fullName": "Ian Seymour",
+          "link": "/api/v1/people/693855"
         },
         "splitSquad": false,
         "seriesNumber": 25,
@@ -956,9 +961,9 @@
         },
         "leagueRecord": {
           "wins": 31,
-          "losses": 43,
+          "losses": 44,
           "ties": 0,
-          "pct": ".419"
+          "pct": ".413"
         },
         "probablePitcher": {
           "id": 686790,
@@ -1023,10 +1028,10 @@
           "active": true
         },
         "leagueRecord": {
-          "wins": 37,
+          "wins": 38,
           "losses": 38,
           "ties": 0,
-          "pct": ".493"
+          "pct": ".500"
         },
         "probablePitcher": {
           "id": 676974,
@@ -1136,9 +1141,9 @@
         },
         "leagueRecord": {
           "wins": 45,
-          "losses": 27,
+          "losses": 28,
           "ties": 0,
-          "pct": ".625"
+          "pct": ".616"
         },
         "probablePitcher": {
           "id": 690986,
@@ -1203,10 +1208,10 @@
           "active": true
         },
         "leagueRecord": {
-          "wins": 46,
+          "wins": 47,
           "losses": 27,
           "ties": 0,
-          "pct": ".630"
+          "pct": ".635"
         },
         "probablePitcher": {
           "id": 519242,
@@ -1316,9 +1321,9 @@
         },
         "leagueRecord": {
           "wins": 40,
-          "losses": 35,
+          "losses": 36,
           "ties": 0,
-          "pct": ".533"
+          "pct": ".526"
         },
         "probablePitcher": {
           "id": 676282,
@@ -1383,10 +1388,10 @@
           "active": true
         },
         "leagueRecord": {
-          "wins": 35,
+          "wins": 36,
           "losses": 41,
           "ties": 0,
-          "pct": ".461"
+          "pct": ".468"
         },
         "probablePitcher": {
           "id": 681293,
@@ -1676,9 +1681,9 @@
         },
         "leagueRecord": {
           "wins": 38,
-          "losses": 37,
+          "losses": 38,
           "ties": 0,
-          "pct": ".507"
+          "pct": ".500"
         },
         "probablePitcher": {
           "id": 694973,
@@ -1743,10 +1748,10 @@
           "active": true
         },
         "leagueRecord": {
-          "wins": 28,
+          "wins": 29,
           "losses": 47,
           "ties": 0,
-          "pct": ".373"
+          "pct": ".382"
         },
         "probablePitcher": {
           "id": 608372,
@@ -1856,9 +1861,14 @@
         },
         "leagueRecord": {
           "wins": 30,
-          "losses": 46,
+          "losses": 47,
           "ties": 0,
-          "pct": ".395"
+          "pct": ".390"
+        },
+        "probablePitcher": {
+          "id": 700712,
+          "fullName": "Walbert Ure\u00f1a",
+          "link": "/api/v1/people/700712"
         },
         "splitSquad": false,
         "seriesNumber": 25,
@@ -1918,10 +1928,10 @@
           "active": true
         },
         "leagueRecord": {
-          "wins": 37,
+          "wins": 38,
           "losses": 38,
           "ties": 0,
-          "pct": ".493"
+          "pct": ".500"
         },
         "probablePitcher": {
           "id": 669372,
@@ -2031,9 +2041,9 @@
         },
         "leagueRecord": {
           "wins": 35,
-          "losses": 41,
+          "losses": 42,
           "ties": 0,
-          "pct": ".461"
+          "pct": ".455"
         },
         "probablePitcher": {
           "id": 669432,
@@ -2098,10 +2108,10 @@
           "active": true
         },
         "leagueRecord": {
-          "wins": 48,
+          "wins": 49,
           "losses": 27,
           "ties": 0,
-          "pct": ".640"
+          "pct": ".645"
         },
         "probablePitcher": {
           "id": 808967,
@@ -2210,10 +2220,10 @@
           "active": true
         },
         "leagueRecord": {
-          "wins": 29,
+          "wins": 30,
           "losses": 43,
           "ties": 0,
-          "pct": ".403"
+          "pct": ".411"
         },
         "probablePitcher": {
           "id": 813349,
@@ -2279,9 +2289,9 @@
         },
         "leagueRecord": {
           "wins": 39,
-          "losses": 37,
+          "losses": 38,
           "ties": 0,
-          "pct": ".513"
+          "pct": ".506"
         },
         "probablePitcher": {
           "id": 676106,
@@ -2391,9 +2401,9 @@
         },
         "leagueRecord": {
           "wins": 36,
-          "losses": 40,
+          "losses": 41,
           "ties": 0,
-          "pct": ".474"
+          "pct": ".468"
         },
         "probablePitcher": {
           "id": 671737,
@@ -2458,10 +2468,10 @@
           "active": true
         },
         "leagueRecord": {
-          "wins": 38,
+          "wins": 39,
           "losses": 36,
           "ties": 0,
-          "pct": ".514"
+          "pct": ".520"
         },
         "probablePitcher": {
           "id": 668678,

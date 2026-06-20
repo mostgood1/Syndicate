@@ -2,7 +2,7 @@
   "date": "2026-06-20",
   "season": 2026,
   "spring_mode": false,
-  "generated_at": "2026-06-19T11:49:12.800894",
+  "generated_at": "2026-06-20T09:41:12.756388",
   "games": [
     {
       "idx": 0,
@@ -267,16 +267,16 @@
         "team_id": 139,
         "abbr": "TB"
       },
-      "away_probable_id": 571945,
-      "home_probable_id": null,
+      "away_probable_id": 676917,
+      "home_probable_id": 693855,
       "away_source": "feed_gameData_probablePitchers",
-      "home_source": "none",
+      "home_source": "feed_gameData_probablePitchers",
       "away_confidence": 0.75,
-      "home_confidence": 0.0,
+      "home_confidence": 0.75,
       "away_validation": {
         "status": "ok",
-        "selected_id": 571945,
-        "selected_name": "Miles Mikolas",
+        "selected_id": 676917,
+        "selected_name": "Cade Cavalli",
         "selected_source": "feed_gameData_probablePitchers",
         "override_reason": "",
         "roster_team_ids": [
@@ -292,28 +292,32 @@
         "rejected_candidates": []
       },
       "home_validation": {
-        "status": "none",
-        "selected_id": null,
-        "selected_name": "",
-        "selected_source": "none",
+        "status": "ok",
+        "selected_id": 693855,
+        "selected_name": "Ian Seymour",
+        "selected_source": "feed_gameData_probablePitchers",
         "override_reason": "",
-        "roster_team_ids": [],
-        "registry_team_ids": [],
-        "on_expected_team": false,
+        "roster_team_ids": [
+          139
+        ],
+        "registry_team_ids": [
+          139
+        ],
+        "on_expected_team": true,
         "on_opponent_team": false,
-        "on_expected_registry_team": false,
+        "on_expected_registry_team": true,
         "on_opponent_registry_team": false,
         "rejected_candidates": []
       },
       "raw": {
-        "away_schedule_id": 571945,
-        "home_schedule_id": null,
-        "away_schedule_name": "Miles Mikolas",
-        "home_schedule_name": "",
-        "away_feed_id": 571945,
-        "home_feed_id": null,
-        "away_feed_name": "Miles Mikolas",
-        "home_feed_name": ""
+        "away_schedule_id": 676917,
+        "home_schedule_id": 693855,
+        "away_schedule_name": "Cade Cavalli",
+        "home_schedule_name": "Ian Seymour",
+        "away_feed_id": 676917,
+        "home_feed_id": 693855,
+        "away_feed_name": "Cade Cavalli",
+        "home_feed_name": "Ian Seymour"
       }
     },
     {
@@ -647,23 +651,27 @@
         "team_id": 133,
         "abbr": "ATH"
       },
-      "away_probable_id": null,
+      "away_probable_id": 700712,
       "home_probable_id": 669372,
-      "away_source": "none",
+      "away_source": "feed_gameData_probablePitchers",
       "home_source": "feed_gameData_probablePitchers",
-      "away_confidence": 0.0,
+      "away_confidence": 0.75,
       "home_confidence": 0.75,
       "away_validation": {
-        "status": "none",
-        "selected_id": null,
-        "selected_name": "",
-        "selected_source": "none",
+        "status": "ok",
+        "selected_id": 700712,
+        "selected_name": "Walbert Ure\u00f1a",
+        "selected_source": "feed_gameData_probablePitchers",
         "override_reason": "",
-        "roster_team_ids": [],
-        "registry_team_ids": [],
-        "on_expected_team": false,
+        "roster_team_ids": [
+          108
+        ],
+        "registry_team_ids": [
+          108
+        ],
+        "on_expected_team": true,
         "on_opponent_team": false,
-        "on_expected_registry_team": false,
+        "on_expected_registry_team": true,
         "on_opponent_registry_team": false,
         "rejected_candidates": []
       },
@@ -686,13 +694,13 @@
         "rejected_candidates": []
       },
       "raw": {
-        "away_schedule_id": null,
+        "away_schedule_id": 700712,
         "home_schedule_id": 669372,
-        "away_schedule_name": "",
+        "away_schedule_name": "Walbert Ure\u00f1a",
         "home_schedule_name": "J.T. Ginn",
-        "away_feed_id": null,
+        "away_feed_id": 700712,
         "home_feed_id": 669372,
-        "away_feed_name": "",
+        "away_feed_name": "Walbert Ure\u00f1a",
         "home_feed_name": "J.T. Ginn"
       }
     },

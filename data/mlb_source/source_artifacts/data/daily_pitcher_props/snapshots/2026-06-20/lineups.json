@@ -2,7 +2,7 @@
   "date": "2026-06-20",
   "season": 2026,
   "spring_mode": false,
-  "generated_at": "2026-06-19T11:49:12.796876",
+  "generated_at": "2026-06-20T09:38:55.776420",
   "summary": {
     "games": 14,
     "projected_teams": 28,
@@ -132,7 +132,7 @@
         "missing_ids": [],
         "backfilled_ids": [],
         "pool_source": "active+40Man",
-        "pool_size": 18,
+        "pool_size": 17,
         "raw_names": [
           "Kevin McGonigle",
           "Dillon Dingler",
@@ -536,13 +536,13 @@
       "home_projected_ids": [
         592626,
         673962,
-        607043,
         694671,
+        607043,
         677649,
         669394,
-        669701,
+        696030,
         543309,
-        696030
+        670032
       ],
       "away_projected_validation": {
         "status": "ok",
@@ -602,50 +602,50 @@
         "raw_ids": [
           592626,
           673962,
-          607043,
           694671,
+          607043,
           677649,
           669394,
-          669701,
+          696030,
           543309,
-          696030
+          670032
         ],
         "ids": [
           592626,
           673962,
-          607043,
           694671,
+          607043,
           677649,
           669394,
-          669701,
+          696030,
           543309,
-          696030
+          670032
         ],
         "missing_ids": [],
         "backfilled_ids": [],
         "pool_source": "active+40Man",
-        "pool_size": 14,
+        "pool_size": 15,
         "raw_names": [
           "Joc Pederson",
           "Josh Jung",
-          "Brandon Nimmo",
           "Wyatt Langford",
+          "Brandon Nimmo",
           "Ezequiel Duran",
           "Jake Burger",
-          "Josh Smith",
+          "Alejandro Osuna",
           "Kyle Higashioka",
-          "Alejandro Osuna"
+          "Nicky Lopez"
         ],
         "matched_names": [
           "Joc Pederson",
           "Josh Jung",
-          "Brandon Nimmo",
           "Wyatt Langford",
+          "Brandon Nimmo",
           "Ezequiel Duran",
           "Jake Burger",
-          "Josh Smith",
+          "Alejandro Osuna",
           "Kyle Higashioka",
-          "Alejandro Osuna"
+          "Nicky Lopez"
         ],
         "missing_name_labels": [],
         "mapping_source": "projected_rotowire_default_vs_rhp"
@@ -688,14 +688,14 @@
       "home_confirmed_ids": [],
       "away_projected_ids": [
         695578,
-        671277,
         678554,
+        665953,
         682928,
         686611,
         695734,
         696285,
-        660688,
-        683083
+        683083,
+        660688
       ],
       "home_projected_ids": [
         650490,
@@ -703,8 +703,8 @@
         656775,
         691406,
         680700,
+        676356,
         802415,
-        683748,
         676439,
         670764
       ],
@@ -712,25 +712,25 @@
         "status": "ok",
         "raw_ids": [
           695578,
-          671277,
           678554,
+          665953,
           682928,
           686611,
           695734,
           696285,
-          660688,
-          683083
+          683083,
+          660688
         ],
         "ids": [
           695578,
-          671277,
           678554,
+          665953,
           682928,
           686611,
           695734,
           696285,
-          660688,
-          683083
+          683083,
+          660688
         ],
         "missing_ids": [],
         "backfilled_ids": [],
@@ -738,28 +738,28 @@
         "pool_size": 19,
         "raw_names": [
           "James Wood",
-          "Luis Garcia",
           "Curtis Mead",
+          "Andres Chaparro",
           "CJ Abrams",
           "Dylan Crews",
           "Daylen Lile",
           "Jacob Young",
-          "Keibert Ruiz",
-          "Nasim Nunez"
+          "Nasim Nunez",
+          "Keibert Ruiz"
         ],
         "matched_names": [
           "James Wood",
-          "Luis Garc\u00eda Jr.",
           "Curtis Mead",
+          "Andr\u00e9s Chaparro",
           "CJ Abrams",
           "Dylan Crews",
           "Daylen Lile",
           "Jacob Young",
-          "Keibert Ruiz",
-          "Nasim Nu\u00f1ez"
+          "Nasim Nu\u00f1ez",
+          "Keibert Ruiz"
         ],
         "missing_name_labels": [],
-        "mapping_source": "projected_rotowire_default_vs_rhp"
+        "mapping_source": "projected_rotowire_default_vs_lhp"
       },
       "home_projected_validation": {
         "status": "ok",
@@ -769,8 +769,8 @@
           656775,
           691406,
           680700,
+          676356,
           802415,
-          683748,
           676439,
           670764
         ],
@@ -780,8 +780,8 @@
           656775,
           691406,
           680700,
+          676356,
           802415,
-          683748,
           676439,
           670764
         ],
@@ -795,8 +795,8 @@
           "Cedric Mullins",
           "Junior Caminero",
           "Richie Palacios",
+          "Jonny DeLuca",
           "Chandler Simpson",
-          "Victor Mesa",
           "Hunter Feduccia",
           "Taylor Walls"
         ],
@@ -806,17 +806,17 @@
           "Cedric Mullins",
           "Junior Caminero",
           "Richie Palacios",
+          "Jonny DeLuca",
           "Chandler Simpson",
-          "Victor Mesa Jr.",
           "Hunter Feduccia",
           "Taylor Walls"
         ],
         "missing_name_labels": [],
         "mapping_source": "projected_rotowire_default_vs_rhp"
       },
-      "away_source": "projected_rotowire_default_vs_rhp",
+      "away_source": "projected_rotowire_default_vs_lhp",
       "home_source": "projected_rotowire_default_vs_rhp",
-      "away_confidence": 0.58,
+      "away_confidence": 0.66,
       "home_confidence": 0.66,
       "away_comparison": {
         "status": "projected_only",
@@ -1026,15 +1026,15 @@
         687401
       ],
       "home_projected_ids": [
-        686948,
-        671739,
-        621566,
-        645277,
-        642086,
-        663586,
         643289,
-        573262,
-        642201
+        686948,
+        645277,
+        621566,
+        663586,
+        642201,
+        671739,
+        673490,
+        663698
       ],
       "away_projected_validation": {
         "status": "ok",
@@ -1092,60 +1092,60 @@
       "home_projected_validation": {
         "status": "ok",
         "raw_ids": [
-          686948,
-          671739,
-          621566,
-          645277,
-          642086,
-          663586,
           643289,
-          573262,
-          642201
+          686948,
+          645277,
+          621566,
+          663586,
+          642201,
+          671739,
+          673490,
+          663698
         ],
         "ids": [
-          686948,
-          671739,
-          621566,
-          645277,
-          642086,
-          663586,
           643289,
-          573262,
-          642201
+          686948,
+          645277,
+          621566,
+          663586,
+          642201,
+          671739,
+          673490,
+          663698
         ],
         "missing_ids": [],
         "backfilled_ids": [],
         "pool_source": "active+40Man",
         "pool_size": 18,
         "raw_names": [
-          "Drake Baldwin",
-          "Michael Harris",
-          "Matt Olson",
-          "Ozzie Albies",
-          "Dominic Smith",
-          "Austin Riley",
           "Mauricio Dubon",
-          "Mike Yastrzemski",
-          "Eli White"
+          "Drake Baldwin",
+          "Ozzie Albies",
+          "Matt Olson",
+          "Austin Riley",
+          "Eli White",
+          "Michael Harris",
+          "Ha-Seong Kim",
+          "Joey Bart"
         ],
         "matched_names": [
-          "Drake Baldwin",
-          "Michael Harris II",
-          "Matt Olson",
-          "Ozzie Albies",
-          "Dominic Smith",
-          "Austin Riley",
           "Mauricio Dub\u00f3n",
-          "Mike Yastrzemski",
-          "Eli White"
+          "Drake Baldwin",
+          "Ozzie Albies",
+          "Matt Olson",
+          "Austin Riley",
+          "Eli White",
+          "Michael Harris II",
+          "Ha-Seong Kim",
+          "Joey Bart"
         ],
         "missing_name_labels": [],
-        "mapping_source": "projected_rotowire_default_vs_rhp"
+        "mapping_source": "projected_rotowire_default_vs_lhp"
       },
       "away_source": "projected_rotowire_default_vs_lhp",
-      "home_source": "projected_rotowire_default_vs_rhp",
+      "home_source": "projected_rotowire_default_vs_lhp",
       "away_confidence": 0.66,
-      "home_confidence": 0.56,
+      "home_confidence": 0.66,
       "away_comparison": {
         "status": "projected_only",
         "is_true_mismatch": false,
@@ -1674,8 +1674,8 @@
         687263,
         685133,
         687093,
-        694384,
         666176,
+        694384,
         694203,
         681351,
         622268,
@@ -1698,8 +1698,8 @@
           687263,
           685133,
           687093,
-          694384,
           666176,
+          694384,
           694203,
           681351,
           622268,
@@ -1709,8 +1709,8 @@
           687263,
           685133,
           687093,
-          694384,
           666176,
+          694384,
           694203,
           681351,
           622268,
@@ -1724,8 +1724,8 @@
           "Zach Neto",
           "Wade Meckler",
           "Vaughn Grissom",
-          "Nolan Schanuel",
           "Jo Adell",
+          "Nolan Schanuel",
           "Denzer Guzman",
           "Logan O'Hoppe",
           "Donovan Walton",
@@ -1735,8 +1735,8 @@
           "Zach Neto",
           "Wade Meckler",
           "Vaughn Grissom",
-          "Nolan Schanuel",
           "Jo Adell",
+          "Nolan Schanuel",
           "Denzer Guzman",
           "Logan O'Hoppe",
           "Donovan Walton",
@@ -1801,7 +1801,7 @@
       "away_source": "projected_rotowire_default_vs_rhp",
       "home_source": "projected_rotowire_default_vs_rhp",
       "away_confidence": 0.66,
-      "home_confidence": 0.58,
+      "home_confidence": 0.66,
       "away_comparison": {
         "status": "projected_only",
         "is_true_mismatch": false,
@@ -2010,15 +2010,15 @@
         691785
       ],
       "home_projected_ids": [
-        641487,
-        677594,
-        663728,
-        647304,
         608701,
+        663728,
+        677594,
+        647304,
         641598,
         702284,
         645302,
-        806068
+        806068,
+        642215
       ],
       "away_projected_validation": {
         "status": "ok",
@@ -2076,52 +2076,52 @@
       "home_projected_validation": {
         "status": "ok",
         "raw_ids": [
-          641487,
-          677594,
-          663728,
-          647304,
           608701,
+          663728,
+          677594,
+          647304,
           641598,
           702284,
           645302,
-          806068
+          806068,
+          642215
         ],
         "ids": [
-          641487,
-          677594,
-          663728,
-          647304,
           608701,
+          663728,
+          677594,
+          647304,
           641598,
           702284,
           645302,
-          806068
+          806068,
+          642215
         ],
         "missing_ids": [],
         "backfilled_ids": [],
         "pool_source": "active+40Man",
         "pool_size": 19,
         "raw_names": [
-          "J.P. Crawford",
-          "Julio Rodriguez",
-          "Cal Raleigh",
-          "Josh Naylor",
           "Rob Refsnyder",
+          "Cal Raleigh",
+          "Julio Rodriguez",
+          "Josh Naylor",
           "Mitch Garver",
           "Cole Young",
           "Victor Robles",
-          "Colt Emerson"
+          "Colt Emerson",
+          "Weston Wilson"
         ],
         "matched_names": [
-          "J.P. Crawford",
-          "Julio Rodr\u00edguez",
-          "Cal Raleigh",
-          "Josh Naylor",
           "Rob Refsnyder",
+          "Cal Raleigh",
+          "Julio Rodr\u00edguez",
+          "Josh Naylor",
           "Mitch Garver",
           "Cole Young",
           "Victor Robles",
-          "Colt Emerson"
+          "Colt Emerson",
+          "Weston Wilson"
         ],
         "missing_name_labels": [],
         "mapping_source": "projected_rotowire_default_vs_lhp"
