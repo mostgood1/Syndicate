@@ -3677,7 +3677,7 @@ if (-not $SkipMLB) {
             '--date', $Date,
             '--source-root', 'data\mlb_source\source_artifacts',
             '--artifact-root', 'data\mlb_source',
-            '--overwrite', 'off'
+            '--overwrite', 'on'
         )
         WorkingDirectory = $repoRoot
         EnvironmentOverrides = $mlbEnvOverrides
