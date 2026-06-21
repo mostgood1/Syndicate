@@ -328,13 +328,29 @@ function Sync-SportSourceArtifacts {
 
     New-Item -ItemType Directory -Path $artifactDataRoot -Force | Out-Null
 
-    $copiedCount = 0
-    foreach ($item in Get-ChildItem -LiteralPath $sourceDataRoot -Force -ErrorAction SilentlyContinue) {
-        Copy-Item -Path $item.FullName -Destination $artifactDataRoot -Recurse -Force
-        $copiedCount += 1
+    $robocopyArgs = @(
+        $sourceDataRoot
+        $artifactDataRoot
+        '/MIR'
+        '/FFT'
+        '/R:1'
+        '/W:1'
+        '/NFL'
+        '/NDL'
+        '/NJH'
+        '/NJS'
+        '/NP'
+        '/XD'
+        'cache'
+    )
+
+    & robocopy @robocopyArgs | Out-Null
+    $exitCode = $LASTEXITCODE
+    if ($exitCode -ge 8) {
+        throw "Robocopy failed for $sportSlug with exit code $exitCode"
     }
 
-    Write-Host ("    synced source_artifacts for {0}: {1} top-level item(s)" -f $sportSlug, $copiedCount) -ForegroundColor DarkGray
+    Write-Host ("    synced source_artifacts for {0}: robocopy exit {1}" -f $sportSlug, $exitCode) -ForegroundColor DarkGray
 }
 
 Push-Location $repoRoot
