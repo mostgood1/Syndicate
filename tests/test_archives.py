@@ -5050,11 +5050,33 @@ class ArchiveRouteTests(unittest.TestCase):
                 "status": {"abstract": "Live"},
                 "oddsRefreshedAt": "2026-06-19T19:00:00Z",
                 "odds_refreshed_at": "2026-06-19T19:00:00Z",
+                "probable": {"away": {"miniLadderBadges": [{"label": "K 5+"}]}},
+                "gameLens": [{"key": "live", "label": "Top 9"}],
+                "props": [{"id": "live-prop"}],
+                "liveProps": [{"id": "live-prop"}],
+                "trackedProps": [{"id": "tracked-prop"}],
+                "actual_box_panel": {"title": "Live box"},
+                "sim_box": {"title": "Sim box"},
+                "first1BetSignal": {"label": "F1"},
+                "segment_overview_cards": [{"title": "Overview"}],
+                "run_projection_rows": [{"title": "Projection"}],
+                "snapshotAvailable": True,
+                "simContextAvailable": True,
             },
         )
 
         self.assertEqual(merged.get("oddsRefreshedAt"), "2026-06-19T19:00:00Z")
         self.assertEqual(merged.get("odds_refreshed_at"), "2026-06-19T19:00:00Z")
+        self.assertEqual(merged.get("probable", {}).get("away", {}).get("miniLadderBadges", [{}])[0].get("label"), "K 5+")
+        self.assertEqual(merged.get("gameLens", [{}])[0].get("key"), "live")
+        self.assertEqual(merged.get("props", [{}])[0].get("id"), "live-prop")
+        self.assertEqual(merged.get("liveProps", [{}])[0].get("id"), "live-prop")
+        self.assertEqual(merged.get("trackedProps", [{}])[0].get("id"), "tracked-prop")
+        self.assertEqual(merged.get("actual_box_panel", {}).get("title"), "Live box")
+        self.assertEqual(merged.get("sim_box", {}).get("title"), "Sim box")
+        self.assertEqual(merged.get("first1BetSignal", {}).get("label"), "F1")
+        self.assertTrue(merged.get("snapshotAvailable"))
+        self.assertTrue(merged.get("simContextAvailable"))
 
     def test_nba_cards_api_without_date_preserves_today_request(self) -> None:
         today_date = date.today().isoformat()

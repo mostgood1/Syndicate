@@ -2044,6 +2044,22 @@ def _merge_live_lens_row_into_game(game: dict[str, Any], live_lens_row: dict[str
         "markets",
         "oddsRefreshedAt",
         "odds_refreshed_at",
+        "probable",
+        "gameLens",
+        "props",
+        "liveProps",
+        "trackedProps",
+        "archivedLiveProps",
+        "prop_groups",
+        "prop_lens",
+        "market_tiles",
+        "actual_box_panel",
+        "sim_box",
+        "first1BetSignal",
+        "segment_overview_cards",
+        "run_projection_rows",
+        "snapshotAvailable",
+        "simContextAvailable",
     ):
         value = live_lens_row.get(key)
         if value is None:
@@ -2060,6 +2076,9 @@ def _merge_live_lens_row_into_game(game: dict[str, Any], live_lens_row: dict[str
     start_time = str(live_lens_row.get("startTime") or "").strip()
     if start_time:
         merged["startTime"] = start_time
+    summary = str(live_lens_row.get("summary") or "").strip()
+    if summary:
+        merged["summary"] = summary
     return merged
 
 
