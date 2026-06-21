@@ -2840,6 +2840,29 @@ if __name__ == '__main__':
     }
 }
 
+function New-PublishParitySummary {
+    param(
+        [string]$DateValue,
+        [bool]$SkipGitPush,
+        [string[]]$ForcedPublishArtifactPaths,
+        [string[]]$IntelligencePublishArtifactPaths
+    )
+
+    if ($SkipGitPush) {
+        return [ordered]@{
+            date = $DateValue
+            skipped = $true
+            forcedPublishArtifactPathCount = 0
+            intelligencePublishArtifactPathCount = 0
+            missingForcedPublishArtifactPaths = @()
+            missingIntelligencePublishArtifactPaths = @()
+            status = 'skipped'
+        }
+    }
+
+    return Get-PublishParitySummary -DateValue $DateValue -ForcedPublishArtifactPaths $ForcedPublishArtifactPaths -IntelligencePublishArtifactPaths $IntelligencePublishArtifactPaths
+}
+
 function Get-ForcedPublishArtifactPaths {
     param(
         [string]$RepoPath,
@@ -3058,18 +3081,6 @@ function Get-ForcedPublishArtifactPaths {
         $intelligencePublishArtifactPaths = @(
             Get-IntelligencePublishArtifactPaths -RepoPath $repoRoot -DateValue $Date -SkipMLB ([bool]$SkipMLB) -SkipNBA ([bool]$SkipNBA) -SkipNHL ([bool]$SkipNHL) -SkipWNBA ([bool]$SkipWNBA) -SkipNFL ([bool]$SkipNFL) -SkipNCAAF ([bool]$SkipNCAAF) -SkipNCAAB ([bool]$SkipNCAAB)
         )
-        $publishParitySummary = Get-PublishParitySummary -DateValue $Date -ForcedPublishArtifactPaths $forcedPublishArtifactPaths -IntelligencePublishArtifactPaths $intelligencePublishArtifactPaths
-    }
-    else {
-        $publishParitySummary = [ordered]@{
-            date = $Date
-            skipped = $true
-            forcedPublishArtifactPathCount = 0
-            intelligencePublishArtifactPathCount = 0
-            missingForcedPublishArtifactPaths = @()
-            missingIntelligencePublishArtifactPaths = @()
-            status = 'skipped'
-        }
     }
 
     if (-not $SkipMLB) {
@@ -4021,7 +4032,7 @@ $runManifest = [ordered]@{
         oddsRegions = $OddsRegions
         oddsHistoryTriggerPlan = @($oddsHistoryTriggerPlan)
     }
-    publishParity = $publishParitySummary
+    publishParity = New-PublishParitySummary -DateValue $Date -SkipGitPush ([bool]$SkipGitPush) -ForcedPublishArtifactPaths $forcedPublishArtifactPaths -IntelligencePublishArtifactPaths $intelligencePublishArtifactPaths
     runProvenance = [ordered]@{
         sourceStepCount = $sourceSteps.Count
         sourceSteps = @($sourceSteps | ForEach-Object { [ordered]@{ sport = $_.Sport; workflow = $_.Workflow; name = $_.Name } })
@@ -4096,7 +4107,7 @@ $runManifest = [ordered]@{
             failedStage = $null
             policyPerformance = @()
             replayContext = $null
-            publishParity = $publishParitySummary
+            publishParity = New-PublishParitySummary -DateValue $Date -SkipGitPush ([bool]$SkipGitPush) -ForcedPublishArtifactPaths $forcedPublishArtifactPaths -IntelligencePublishArtifactPaths $intelligencePublishArtifactPaths
         }
     }
     sportRuns = @()
