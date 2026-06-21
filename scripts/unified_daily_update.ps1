@@ -2,7 +2,8 @@ param(
     [string]$Date,
     [string]$BaseUrl,
     [int]$EventSimForceWindowMinutes = 30,
-    [switch]$SkipGitPush
+    [switch]$SkipGitPush,
+    [switch]$DryRun
 )
 
 
@@ -2776,67 +2777,56 @@ function Get-PublishParitySummary {
         [string[]]$IntelligencePublishArtifactPaths
     )
 
-    $forcedPaths = @($ForcedPublishArtifactPaths | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -Unique)
-    $intelligencePaths = @($IntelligencePublishArtifactPaths | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -Unique)
-
-    $forcedTempPath = Join-Path $runDir ('.tmp_publish_parity_forced_{0}.json' -f ([System.Guid]::NewGuid().ToString('N')))
-    $intelligenceTempPath = Join-Path $runDir ('.tmp_publish_parity_intelligence_{0}.json' -f ([System.Guid]::NewGuid().ToString('N')))
-    $scriptTempPath = Join-Path $runDir ('.tmp_publish_parity_{0}.py' -f ([System.Guid]::NewGuid().ToString('N')))
-    $scriptContent = @'
-import json
-import sys
-from pathlib import Path
-
-from syndicate.features.shared.publish_parity import build_publish_parity_summary
-
-
-def main() -> int:
-    date_value = str(sys.argv[1] or '').strip()
-    forced_path = Path(sys.argv[2])
-    intelligence_path = Path(sys.argv[3])
-    forced_paths = json.loads(forced_path.read_text(encoding='utf-8'))
-    intelligence_paths = json.loads(intelligence_path.read_text(encoding='utf-8'))
-    summary = build_publish_parity_summary(
-        date=date_value,
-        forced_paths=forced_paths,
-        intelligence_paths=intelligence_paths,
+    $forcedPaths = @(
+        $ForcedPublishArtifactPaths |
+            Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
+            ForEach-Object { ([string]$_).Trim().Replace('\', '/') } |
+            Select-Object -Unique
     )
-    print(json.dumps(summary, separators=(',', ':')))
-    return 0
+    $intelligencePaths = @(
+        $IntelligencePublishArtifactPaths |
+            Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
+            ForEach-Object { ([string]$_).Trim().Replace('\', '/') } |
+            Select-Object -Unique
+    )
 
+    $sportPrefixes = [ordered]@{
+        mlb = 'data/mlb_source/'
+        nba = 'data/nba_source/'
+        wnba = 'data/wnba_source/'
+        nhl = 'data/nhl_source/'
+        nfl = 'data/nfl_source/'
+        ncaaf = 'data/ncaaf_source/'
+        ncaab = 'data/ncaab_source/'
+    }
 
-if __name__ == '__main__':
-    raise SystemExit(main())
-'@
+    $sports = @()
+    foreach ($entry in $sportPrefixes.GetEnumerator()) {
+        $prefix = [string]$entry.Value
+        $forcedCount = @($forcedPaths | Where-Object { $_.StartsWith($prefix) }).Count
+        $intelligenceCount = @($intelligencePaths | Where-Object { $_.StartsWith($prefix) }).Count
+        $totalCount = @(
+            ($forcedPaths + $intelligencePaths) |
+                Where-Object { $_.StartsWith($prefix) } |
+                Select-Object -Unique
+        ).Count
 
-    Set-Content -Path $forcedTempPath -Value (@($forcedPaths) | ConvertTo-Json -Depth 4) -Encoding utf8
-    Set-Content -Path $intelligenceTempPath -Value (@($intelligencePaths) | ConvertTo-Json -Depth 4) -Encoding utf8
-    Set-Content -Path $scriptTempPath -Value $scriptContent -Encoding utf8
-
-    try {
-        Push-Location $repoRoot
-        try {
-            $pythonExe = Resolve-Python $repoRoot
-            $rawOutput = & $pythonExe $scriptTempPath $DateValue $forcedTempPath $intelligenceTempPath
-            if ($LASTEXITCODE -ne 0) {
-                throw "publish parity helper exited with code $LASTEXITCODE"
-            }
-        }
-        finally {
-            Pop-Location
-        }
-
-        try {
-            return ($rawOutput | Out-String | ConvertFrom-Json -ErrorAction Stop)
-        }
-        catch {
-            throw 'Unable to parse publish parity payload'
+        $sports += [ordered]@{
+            sport = [string]$entry.Key
+            rootPrefix = $prefix
+            forcedPublishPathCount = $forcedCount
+            intelligencePublishPathCount = $intelligenceCount
+            totalPublishPathCount = $totalCount
         }
     }
-    finally {
-        Remove-Item -Path $forcedTempPath -Force -ErrorAction SilentlyContinue
-        Remove-Item -Path $intelligenceTempPath -Force -ErrorAction SilentlyContinue
-        Remove-Item -Path $scriptTempPath -Force -ErrorAction SilentlyContinue
+
+    return [ordered]@{
+        generatedAt = (Get-Date).ToUniversalTime().ToString('o')
+        date = if ([string]::IsNullOrWhiteSpace($DateValue)) { $null } else { [string]$DateValue.Trim() }
+        totalForcedPublishPaths = $forcedPaths.Count
+        totalIntelligencePublishPaths = $intelligencePaths.Count
+        totalPublishPaths = @($forcedPaths + $intelligencePaths | Select-Object -Unique).Count
+        sports = @($sports)
     }
 }
 
@@ -3074,7 +3064,7 @@ function Get-ForcedPublishArtifactPaths {
 
     $forcedPublishArtifactPaths = @()
     $intelligencePublishArtifactPaths = @()
-    if (-not $SkipGitPush) {
+    if (-not $SkipGitPush -and -not $DryRun) {
         $forcedPublishArtifactPaths = @(
             Get-ForcedPublishArtifactPaths -RepoPath $repoRoot -DateValue $Date -SkipGitPush ([bool]$SkipGitPush) -SkipMLB ([bool]$SkipMLB) -SkipNBA ([bool]$SkipNBA) -SkipNHL ([bool]$SkipNHL) -SkipWNBA ([bool]$SkipWNBA) -SkipNFL ([bool]$SkipNFL) -SkipNCAAF ([bool]$SkipNCAAF) -SkipNCAAB ([bool]$SkipNCAAB)
         )
@@ -3278,7 +3268,8 @@ function Invoke-GitPublish {
         [string]$RepoPath,
         [string]$CommitMessage,
         [string]$RemoteName,
-        [string[]]$ForceIncludePaths = @()
+        [string[]]$ForceIncludePaths = @(),
+        [bool]$DryRun = $false
     )
 
     $result = [ordered]@{
@@ -3303,7 +3294,7 @@ function Invoke-GitPublish {
         }
 
         if (-not [System.IO.Path]::IsPathRooted($text)) {
-            return $text
+            return $text.Replace('\', '/')
         }
 
         try {
@@ -3311,15 +3302,25 @@ function Invoke-GitPublish {
             $candidateFullPath = [System.IO.Path]::GetFullPath($text)
             $prefixWithSeparator = $baseFullPath + [System.IO.Path]::DirectorySeparatorChar
             if ($candidateFullPath.StartsWith($prefixWithSeparator, [System.StringComparison]::OrdinalIgnoreCase)) {
-                return $candidateFullPath.Substring($prefixWithSeparator.Length)
+                return $candidateFullPath.Substring($prefixWithSeparator.Length).Replace('\', '/')
             }
             if ($candidateFullPath.Equals($baseFullPath, [System.StringComparison]::OrdinalIgnoreCase)) {
                 return '.'
             }
-            return $text
+
+            $repoLeaf = Split-Path -Leaf $baseFullPath
+            if (-not [string]::IsNullOrWhiteSpace($repoLeaf)) {
+                $marker = [System.IO.Path]::DirectorySeparatorChar + $repoLeaf + [System.IO.Path]::DirectorySeparatorChar
+                $markerIndex = $candidateFullPath.LastIndexOf($marker, [System.StringComparison]::OrdinalIgnoreCase)
+                if ($markerIndex -ge 0) {
+                    return $candidateFullPath.Substring($markerIndex + $marker.Length).Replace('\', '/')
+                }
+            }
+
+            return $text.Replace('\', '/')
         }
         catch {
-            return $text
+            return $text.Replace('\', '/')
         }
     }
 
@@ -4169,7 +4170,7 @@ try {
     $shouldRunArtifactGeneration = if ($SkipGitPush) { $false } else { Get-RunPlanDecisionValue -Plan $runManifest.runPlan -Key 'artifactGeneration' -Fallback $true }
     if ($shouldRunArtifactGeneration) {
         foreach ($repo in $publishRepos) {
-            $result = Invoke-GitPublish -Name $repo.Name -RepoPath $repo.RepoPath -CommitMessage "$CommitMessagePrefix $Date (pre-source publish)" -RemoteName $GitRemote -ForceIncludePaths (& $resolveForcedPublishArtifactPaths)
+            $result = Invoke-GitPublish -Name $repo.Name -RepoPath $repo.RepoPath -CommitMessage "$CommitMessagePrefix $Date (pre-source publish)" -RemoteName $GitRemote -ForceIncludePaths (& $resolveForcedPublishArtifactPaths) -DryRun ([bool]$DryRun)
             $runManifest.pushResults += @([ordered]@{
                 name = $result.name
                 repoPath = $result.repoPath
@@ -4410,7 +4411,7 @@ try {
             if ($shouldRunArtifactGeneration) {
                 if ($artifactGenerationFallbackToFullPublish) {
                     foreach ($repo in $publishRepos) {
-                        $result = Invoke-GitPublish -Name $repo.Name -RepoPath $repo.RepoPath -CommitMessage "$CommitMessagePrefix $Date [$($step.Name)]" -RemoteName $GitRemote -ForceIncludePaths (& $resolveForcedPublishArtifactPaths)
+                        $result = Invoke-GitPublish -Name $repo.Name -RepoPath $repo.RepoPath -CommitMessage "$CommitMessagePrefix $Date [$($step.Name)]" -RemoteName $GitRemote -ForceIncludePaths (& $resolveForcedPublishArtifactPaths) -DryRun ([bool]$DryRun)
                         $runManifest.pushResults += @([ordered]@{
                             name = $result.name
                             repoPath = $result.repoPath
@@ -4489,9 +4490,16 @@ try {
 
     if ($shouldRunArtifactGeneration) {
         $artifactUpdatePaths = @($runManifest.artifactUpdates | ForEach-Object { [string]$_.artifactPath } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -Unique)
-        if ($artifactGenerationFallbackToFullPublish) {
+        if ($DryRun) {
+            Write-Host 'Artifact stage dry-run: skipping artifact publish.' -ForegroundColor Yellow
+            foreach ($stageDecision in @($runManifest.stageDecisions | Where-Object { [string]$_.stage -eq 'artifact_generation' })) {
+                $stageDecision.decision = 'skipped'
+                $stageDecision.status = 'dry_run'
+            }
+        }
+        elseif ($artifactGenerationFallbackToFullPublish) {
             foreach ($repo in $publishRepos) {
-                $result = Invoke-GitPublish -Name $repo.Name -RepoPath $repo.RepoPath -CommitMessage $repo.CommitMessage -RemoteName $GitRemote -ForceIncludePaths (& $resolveForcedPublishArtifactPaths)
+                $result = Invoke-GitPublish -Name $repo.Name -RepoPath $repo.RepoPath -CommitMessage $repo.CommitMessage -RemoteName $GitRemote -ForceIncludePaths (& $resolveForcedPublishArtifactPaths) -DryRun ([bool]$DryRun)
                 $runManifest.pushResults += @([ordered]@{
                     name = $result.name
                     repoPath = $result.repoPath
@@ -4506,7 +4514,7 @@ try {
         elseif ($artifactUpdatePaths.Count -gt 0) {
             Write-Host ("Artifact stage incremental: publishing {0} updated event artifact(s)." -f $artifactUpdatePaths.Count) -ForegroundColor Yellow
             foreach ($repo in $publishRepos) {
-                $result = Invoke-GitPublish -Name $repo.Name -RepoPath $repo.RepoPath -CommitMessage $repo.CommitMessage -RemoteName $GitRemote -ForceIncludePaths $artifactUpdatePaths
+                $result = Invoke-GitPublish -Name $repo.Name -RepoPath $repo.RepoPath -CommitMessage $repo.CommitMessage -RemoteName $GitRemote -ForceIncludePaths $artifactUpdatePaths -DryRun ([bool]$DryRun)
                 $runManifest.pushResults += @([ordered]@{
                     name = $result.name
                     repoPath = $result.repoPath
@@ -4563,7 +4571,7 @@ finally {
         }
         else {
             foreach ($repo in $publishRepos) {
-                $result = Invoke-GitPublish -Name $repo.Name -RepoPath $repo.RepoPath -CommitMessage $repo.CommitMessage -RemoteName $GitRemote -ForceIncludePaths (& $resolveForcedPublishArtifactPaths)
+                $result = Invoke-GitPublish -Name $repo.Name -RepoPath $repo.RepoPath -CommitMessage $repo.CommitMessage -RemoteName $GitRemote -ForceIncludePaths (& $resolveForcedPublishArtifactPaths) -DryRun ([bool]$DryRun)
                 $runManifest.pushResults += @([ordered]@{
                     name = $result.name
                     repoPath = $result.repoPath
@@ -4579,7 +4587,7 @@ finally {
     else {
         Write-Host ("Artifact stage incremental: publishing {0} updated event artifact(s)." -f $artifactUpdatePaths.Count) -ForegroundColor Yellow
         foreach ($repo in $publishRepos) {
-            $result = Invoke-GitPublish -Name $repo.Name -RepoPath $repo.RepoPath -CommitMessage $repo.CommitMessage -RemoteName $GitRemote -ForceIncludePaths $artifactUpdatePaths
+            $result = Invoke-GitPublish -Name $repo.Name -RepoPath $repo.RepoPath -CommitMessage $repo.CommitMessage -RemoteName $GitRemote -ForceIncludePaths $artifactUpdatePaths -DryRun ([bool]$DryRun)
             $runManifest.pushResults += @([ordered]@{
                 name = $result.name
                 repoPath = $result.repoPath

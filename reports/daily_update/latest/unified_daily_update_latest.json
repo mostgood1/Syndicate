@@ -1,12 +1,12 @@
 ﻿{
     "date":  "2026-06-21",
-    "generatedAt":  "2026-06-21T13:24:51.5148416-05:00",
-    "lastUpdatedAt":  "2026-06-21T13:24:53.9606267-05:00",
-    "completedAt":  "2026-06-21T13:24:53.9586174-05:00",
+    "generatedAt":  "2026-06-21T15:20:43.6314338-05:00",
+    "lastUpdatedAt":  "2026-06-21T15:20:46.1981218-05:00",
+    "completedAt":  "2026-06-21T15:20:46.1981218-05:00",
     "runMode":  "standard",
     "overallStatus":  "error",
     "error":  "The script failed due to call depth overflow.",
-    "runDir":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-06-21\\20260621_132449",
+    "runDir":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-06-21\\20260621_152041",
     "latestDir":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\latest",
     "runtimePolicy":  {
                           "MLB":  {
@@ -903,7 +903,64 @@
                                                    null
                                                ]
                 },
-    "publishParity":  null,
+    "publishParity":  {
+                          "generatedAt":  "2026-06-21T20:20:43.6685904Z",
+                          "date":  "2026-06-21",
+                          "totalForcedPublishPaths":  0,
+                          "totalIntelligencePublishPaths":  0,
+                          "totalPublishPaths":  0,
+                          "sports":  [
+                                         {
+                                             "sport":  "mlb",
+                                             "rootPrefix":  "data/mlb_source/",
+                                             "forcedPublishPathCount":  0,
+                                             "intelligencePublishPathCount":  0,
+                                             "totalPublishPathCount":  0
+                                         },
+                                         {
+                                             "sport":  "nba",
+                                             "rootPrefix":  "data/nba_source/",
+                                             "forcedPublishPathCount":  0,
+                                             "intelligencePublishPathCount":  0,
+                                             "totalPublishPathCount":  0
+                                         },
+                                         {
+                                             "sport":  "wnba",
+                                             "rootPrefix":  "data/wnba_source/",
+                                             "forcedPublishPathCount":  0,
+                                             "intelligencePublishPathCount":  0,
+                                             "totalPublishPathCount":  0
+                                         },
+                                         {
+                                             "sport":  "nhl",
+                                             "rootPrefix":  "data/nhl_source/",
+                                             "forcedPublishPathCount":  0,
+                                             "intelligencePublishPathCount":  0,
+                                             "totalPublishPathCount":  0
+                                         },
+                                         {
+                                             "sport":  "nfl",
+                                             "rootPrefix":  "data/nfl_source/",
+                                             "forcedPublishPathCount":  0,
+                                             "intelligencePublishPathCount":  0,
+                                             "totalPublishPathCount":  0
+                                         },
+                                         {
+                                             "sport":  "ncaaf",
+                                             "rootPrefix":  "data/ncaaf_source/",
+                                             "forcedPublishPathCount":  0,
+                                             "intelligencePublishPathCount":  0,
+                                             "totalPublishPathCount":  0
+                                         },
+                                         {
+                                             "sport":  "ncaab",
+                                             "rootPrefix":  "data/ncaab_source/",
+                                             "forcedPublishPathCount":  0,
+                                             "intelligencePublishPathCount":  0,
+                                             "totalPublishPathCount":  0
+                                         }
+                                     ]
+                      },
     "runProvenance":  {
                           "sourceStepCount":  8,
                           "sourceSteps":  [
@@ -972,7 +1029,7 @@
 
                                          ],
                      "failedStage":  "",
-                     "lastUpdatedAt":  "2026-06-21T13:24:53.9606267-05:00"
+                     "lastUpdatedAt":  "2026-06-21T15:20:46.1981218-05:00"
                  },
     "eventSimExecution":  [
                               {
@@ -1877,7 +1934,7 @@
                                             "--artifact-root",
                                             "data\\wnba_source\\source_artifacts",
                                             "--log-file",
-                                            "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-06-21\\20260621_132449\\wnba_props_refresh.log",
+                                            "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-06-21\\20260621_152041\\wnba_props_refresh.log",
                                             "--force-refresh",
                                             "--days-ahead",
                                             "0",
@@ -2155,9 +2212,9 @@
     "statusArtifact":  {
                            "format":  "json",
                            "scope":  "daily_update",
-                           "runManifestPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-06-21\\20260621_132449\\unified_daily_update_run.json",
+                           "runManifestPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-06-21\\20260621_152041\\unified_daily_update_run.json",
                            "latestManifestPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest.json",
-                           "runCheckpointPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-06-21\\20260621_132449\\unified_daily_update_checkpoint.json",
+                           "runCheckpointPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-06-21\\20260621_152041\\unified_daily_update_checkpoint.json",
                            "latestCheckpointPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest_checkpoint.json",
                            "state":  {
                                          "runMode":  "standard",
@@ -2253,8 +2310,65 @@
                                                                "resumeEligible":  true,
                                                                "resumedFromCheckpoint":  false
                                                            },
-                                         "publishParity":  null,
-                                         "lastUpdatedAt":  "2026-06-21T13:24:53.9606267-05:00"
+                                         "publishParity":  {
+                                                               "generatedAt":  "2026-06-21T20:20:43.6972988Z",
+                                                               "date":  "2026-06-21",
+                                                               "totalForcedPublishPaths":  0,
+                                                               "totalIntelligencePublishPaths":  0,
+                                                               "totalPublishPaths":  0,
+                                                               "sports":  [
+                                                                              {
+                                                                                  "sport":  "mlb",
+                                                                                  "rootPrefix":  "data/mlb_source/",
+                                                                                  "forcedPublishPathCount":  0,
+                                                                                  "intelligencePublishPathCount":  0,
+                                                                                  "totalPublishPathCount":  0
+                                                                              },
+                                                                              {
+                                                                                  "sport":  "nba",
+                                                                                  "rootPrefix":  "data/nba_source/",
+                                                                                  "forcedPublishPathCount":  0,
+                                                                                  "intelligencePublishPathCount":  0,
+                                                                                  "totalPublishPathCount":  0
+                                                                              },
+                                                                              {
+                                                                                  "sport":  "wnba",
+                                                                                  "rootPrefix":  "data/wnba_source/",
+                                                                                  "forcedPublishPathCount":  0,
+                                                                                  "intelligencePublishPathCount":  0,
+                                                                                  "totalPublishPathCount":  0
+                                                                              },
+                                                                              {
+                                                                                  "sport":  "nhl",
+                                                                                  "rootPrefix":  "data/nhl_source/",
+                                                                                  "forcedPublishPathCount":  0,
+                                                                                  "intelligencePublishPathCount":  0,
+                                                                                  "totalPublishPathCount":  0
+                                                                              },
+                                                                              {
+                                                                                  "sport":  "nfl",
+                                                                                  "rootPrefix":  "data/nfl_source/",
+                                                                                  "forcedPublishPathCount":  0,
+                                                                                  "intelligencePublishPathCount":  0,
+                                                                                  "totalPublishPathCount":  0
+                                                                              },
+                                                                              {
+                                                                                  "sport":  "ncaaf",
+                                                                                  "rootPrefix":  "data/ncaaf_source/",
+                                                                                  "forcedPublishPathCount":  0,
+                                                                                  "intelligencePublishPathCount":  0,
+                                                                                  "totalPublishPathCount":  0
+                                                                              },
+                                                                              {
+                                                                                  "sport":  "ncaab",
+                                                                                  "rootPrefix":  "data/ncaab_source/",
+                                                                                  "forcedPublishPathCount":  0,
+                                                                                  "intelligencePublishPathCount":  0,
+                                                                                  "totalPublishPathCount":  0
+                                                                              }
+                                                                          ]
+                                                           },
+                                         "lastUpdatedAt":  "2026-06-21T15:20:46.1981218-05:00"
                                      }
                        },
     "sportRuns":  [
@@ -2281,8 +2395,8 @@
                         "oddsPhase":  null,
                         "oddsSports":  null,
                         "oddsRegions":  null,
-                        "manifestPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-06-21\\20260621_132449\\migration\\refresh_status_manifest.json",
-                        "runSummaryPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-06-21\\20260621_132449\\migration\\refresh_and_gate_run.json"
+                        "manifestPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-06-21\\20260621_152041\\migration\\refresh_status_manifest.json",
+                        "runSummaryPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-06-21\\20260621_152041\\migration\\refresh_and_gate_run.json"
                     },
     "pushResults":  [
 
