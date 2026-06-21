@@ -603,12 +603,14 @@ def evaluate_protected_local_resolvers() -> list[dict[str, object]]:
 
         with TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
-            local_root = root / "data" / "mlb_source"
+            source_root = root / "data" / "mlb_source"
+            artifact_root = source_root / "source_artifacts"
             expected_daily_suffix = Path("data/mlb_source/source_artifacts/data/daily/daily_summary_2026_05_17.json")
-            with patch("syndicate.features.mlb.sources._source_roots", return_value=[local_root]):
-                actual_daily = mlb_daily_artifact_path("2026-05-17")
-                actual_dates = mlb_available_daily_summary_dates()
-                actual_feed = mlb_raw_feed_live_path("2026-05-17", 123)
+            with patch("syndicate.features.mlb.sources._source_roots", return_value=[source_root]):
+                with patch("syndicate.features.mlb.sources._artifact_roots", return_value=[artifact_root]):
+                    actual_daily = mlb_daily_artifact_path("2026-05-17")
+                    actual_dates = mlb_available_daily_summary_dates()
+                    actual_feed = mlb_raw_feed_live_path("2026-05-17", 123)
             actual_daily_path = Path(actual_daily)
             actual_daily_suffix = Path(*actual_daily_path.parts[-len(expected_daily_suffix.parts):]) if len(actual_daily_path.parts) >= len(expected_daily_suffix.parts) else actual_daily_path
             if actual_daily_suffix != expected_daily_suffix:
