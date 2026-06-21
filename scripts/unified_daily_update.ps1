@@ -3280,6 +3280,38 @@ function Invoke-GitPublish {
         commit = $null
     }
 
+    function Resolve-RepoRelativePath {
+        param(
+            [string]$BasePath,
+            [string]$CandidatePath
+        )
+
+        $text = [string]$CandidatePath
+        if ([string]::IsNullOrWhiteSpace($text)) {
+            return $null
+        }
+
+        if (-not [System.IO.Path]::IsPathRooted($text)) {
+            return $text
+        }
+
+        try {
+            $baseFullPath = [System.IO.Path]::GetFullPath($BasePath).TrimEnd([System.IO.Path]::DirectorySeparatorChar, [System.IO.Path]::AltDirectorySeparatorChar)
+            $candidateFullPath = [System.IO.Path]::GetFullPath($text)
+            $prefixWithSeparator = $baseFullPath + [System.IO.Path]::DirectorySeparatorChar
+            if ($candidateFullPath.StartsWith($prefixWithSeparator, [System.StringComparison]::OrdinalIgnoreCase)) {
+                return $candidateFullPath.Substring($prefixWithSeparator.Length)
+            }
+            if ($candidateFullPath.Equals($baseFullPath, [System.StringComparison]::OrdinalIgnoreCase)) {
+                return '.'
+            }
+            return $text
+        }
+        catch {
+            return $text
+        }
+    }
+
     if (-not (Test-Path (Join-Path $RepoPath '.git'))) {
         $result.status = 'not_a_git_repo'
         return [pscustomobject]$result
@@ -3337,9 +3369,10 @@ function Invoke-GitPublish {
         }
 
         foreach ($relativePath in @($ForceIncludePaths | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })) {
-            & git add -f -- $relativePath
+            $repoRelativePath = Resolve-RepoRelativePath -BasePath $RepoPath -CandidatePath $relativePath
+            & git add -f -- $repoRelativePath
             if ($LASTEXITCODE -ne 0) {
-                throw "git add -f failed for $RepoPath path $relativePath with exit code $LASTEXITCODE"
+                throw "git add -f failed for $RepoPath path $repoRelativePath with exit code $LASTEXITCODE"
             }
         }
 
