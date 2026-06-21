@@ -306,13 +306,13 @@ def hub():
 
 @mlb_bp.get("")
 def root_cards():
-    selected_date = _iso_or_today(request.args.get("date")) if request.args.get("date") else _latest_available_cards_date()
+    selected_date = _iso_or_today(request.args.get("date")) if request.args.get("date") else central_today_iso()
     return _render_cards_page(selected_date)
 
 
 @mlb_bp.get("/cards")
 def cards():
-    selected_date = _iso_or_today(request.args.get("date")) if request.args.get("date") else _latest_available_cards_date()
+    selected_date = _iso_or_today(request.args.get("date")) if request.args.get("date") else central_today_iso()
     return _render_cards_page(selected_date)
 
 
