@@ -82,6 +82,8 @@ def _remote_source_auth_token() -> str:
 
 
 def _remote_source_fallback_enabled() -> bool:
+    if _render_web_dyno():
+        return False
     source_flag = str(os.environ.get("SYNDICATE_NBA_SOURCE_APP_FALLBACK") or "").strip().lower()
     if source_flag in {"1", "true", "yes", "on"}:
         return True

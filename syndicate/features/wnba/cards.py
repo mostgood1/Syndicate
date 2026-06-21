@@ -1307,7 +1307,7 @@ def _games_from_live_state_fallback(selected_date: str, ttl: int = 12) -> tuple[
         not isinstance(payload, dict)
         or not isinstance(payload.get("games"), list)
         or not payload.get("games")
-    ):
+    ) and not _render_web_dyno():
         public_payload = _public_scoreboard_live_state_payload(selected_date)
         if isinstance(public_payload, dict) and isinstance(public_payload.get("games"), list) and public_payload.get("games"):
             payload = public_payload
