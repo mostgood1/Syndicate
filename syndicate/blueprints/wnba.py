@@ -471,7 +471,7 @@ def api_game_detail(game_pk: str):
 def api_cards():
     selected_date = _selected_date()
     if str(__import__("os").environ.get("RENDER") or "").strip().lower() in {"1", "true", "yes", "on"}:
-        context = build_source_cards_payload(selected_date, allow_stored_date_fallback=True)
+        context = build_source_cards_payload(selected_date, allow_stored_date_fallback=False)
         context = {
             **context,
             "source_title": "WNBA source cards fallback",
@@ -487,7 +487,7 @@ def api_cards():
         context = build_cards_page_context(selected_date, allow_stored_date_fallback=False)
     except Exception:
         try:
-            context = build_source_cards_payload(selected_date, allow_stored_date_fallback=True)
+            context = build_source_cards_payload(selected_date, allow_stored_date_fallback=False)
             context = {
                 **context,
                 "source_title": "WNBA source cards fallback",
