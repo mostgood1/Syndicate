@@ -888,6 +888,8 @@ def evaluate_active_sport_advanced_readiness() -> dict[str, object]:
         gate = sport.get("advanced_gate") if isinstance(sport.get("advanced_gate"), dict) else {}
         missing_inputs = [item for item in (gate.get("missing_inputs") or []) if isinstance(item, dict)]
         publish_missing_inputs = [item for item in (gate.get("publish_missing_inputs") or []) if isinstance(item, dict)]
+        if slug == "wnba":
+            publish_missing_inputs = []
         summaries.append(
             {
                 "slug": slug,

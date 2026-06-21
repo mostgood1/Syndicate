@@ -1,25 +1,24 @@
 ﻿{
     "scope":  "daily_update",
-    "date":  "2026-06-20",
+    "date":  "2026-06-21",
     "runMode":  "standard",
-    "overallStatus":  "ok",
-    "generatedAt":  "2026-06-20T22:11:59.8190648+00:00",
-    "updatedAt":  "2026-06-20T22:46:09.8245676+00:00",
-    "runManifestPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-06-20\\20260620_221158\\unified_daily_update_run.json",
-    "latestManifestPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest.json",
-    "runCheckpointPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-06-20\\20260620_221158\\unified_daily_update_checkpoint.json",
-    "latestCheckpointPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest_checkpoint.json",
-    "currentStage":  "completed",
+    "overallStatus":  "started",
+    "generatedAt":  "2026-06-21T12:39:27.3628490-05:00",
+    "updatedAt":  "2026-06-21T12:39:28.1049833-05:00",
+    "runManifestPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-06-21\\20260621_123925\\unified_daily_update_run.json",
+    "latestManifestPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest.json",
+    "runCheckpointPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-06-21\\20260621_123925\\unified_daily_update_checkpoint.json",
+    "latestCheckpointPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest_checkpoint.json",
+    "currentStage":  "source_update",
     "completedStages":  [
-                            "source_update",
-                            "refresh_gate"
+
                         ],
     "failedStage":  null,
-    "lastUpdatedAt":  "2026-06-20T22:46:09.8225583+00:00",
+    "lastUpdatedAt":  "2026-06-21T12:39:28.1029794-05:00",
     "replayContext":  {
                           "latestCheckpointLoaded":  true,
-                          "latestCheckpointPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest_checkpoint.json",
-                          "latestCheckpointStage":  "queued",
+                          "latestCheckpointPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest_checkpoint.json",
+                          "latestCheckpointStage":  "completed",
                           "latestCheckpointFailedStage":  "",
                           "latestCheckpointCompletedStageCount":  2,
                           "latestCheckpointCompletedStages":  [
@@ -80,6 +79,14 @@
                            },
                            {
                                "stage":  "source_update",
+                               "sport":  null,
+                               "workflow":  null,
+                               "name":  "NCAAF local odds refresh",
+                               "decision":  "planned",
+                               "status":  "pending"
+                           },
+                           {
+                               "stage":  "source_update",
                                "sport":  "ncaab",
                                "workflow":  "syndicate_mirror",
                                "name":  "NCAAB source mirror export",
@@ -123,7 +130,7 @@
                      "inputFingerprintCount":  2,
                      "artifactPathCount":  21,
                      "inputFingerprints":  [
-                                               "c3d691139954519f606d1206f45bf50af754a91e61386ec21a86377cae9cfe08",
+                                               "002a54be991b3c054a2c578093d3865a1d81c4fadb5ba76c4dc750d66b04fdf4",
                                                "273bb599414ea4ae1424dde32f327726ccd6fca9e0860fb7b0859d33fe560422"
                                            ],
                      "artifactPaths":  [

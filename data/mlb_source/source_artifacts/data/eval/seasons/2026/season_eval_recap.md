@@ -1,18 +1,18 @@
 # MLB Season Eval 2026
 
-- Generated: 2026-06-20T22:12:06.925606
-- Batch: D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/eval/batches/season_2026_ui_daily_live
-- Status: partial (5 of ? reports published)
-- Days: 5 | Games: 68 | Season card days: 0 | Legacy cards-page days: 0
+- Generated: 2026-06-21T12:39:35.154296
+- Batch: C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/eval/batches/season_2026_ui_daily_live
+- Status: partial (6 of ? reports published)
+- Days: 6 | Games: 82 | Season card days: 0 | Legacy cards-page days: 0
 
 ## Overall recap
 
-- Full-game moneyline: brier 0.25280638235294123, logloss 0.6988483113372891, accuracy 0.5
-- Totals: mae 3.434470588235295, rmse 4.71151354800094, avg exact-total nll 2.99737762932655
-- Runline (-1.5 fav): brier 0.23757613235294114, accuracy 0.6176470588235294
-- Starter props: SO mae 2.270795081967213, Outs mae 5.65156557377049
-- Hitter HR 1+: brier 0.11585335212418292, logloss 0.4030068430900982, avg p 0.07889624183006536, emp rate 0.13071895424836602
-- Segment error: full total mae 3.434470588235295, first5 total mae 2.8898823529411763, first3 total mae 2.131529411764706
+- Full-game moneyline: brier 0.25680270731707316, logloss 0.7069800912874691, accuracy 0.4878048780487805
+- Totals: mae 3.5325365853658544, rmse 4.870817743538617, avg exact-total nll 3.0069413557965934
+- Runline (-1.5 fav): brier 0.23863232926829264, accuracy 0.6219512195121951
+- Starter props: SO mae 2.1808648648648647, Outs mae 5.576047297297296
+- Hitter HR 1+: brier 0.11165488008130074, logloss 0.38932924927207246, avg p 0.07881233062330623, emp rate 0.12601626016260162
+- Segment error: full total mae 3.5325365853658544, first5 total mae 3.0197804878048777, first3 total mae 2.0483658536585363
 
 ## Day leaders
 
@@ -23,4 +23,4 @@
 
 | Month | Days | Games | ML Brier | Total MAE | SO MAE | Outs MAE |
 |---|---|---|---|---|---|---|
-| Jun 2026 | 5 | 68 | 0.25280638235294123 | 3.434470588235295 | 2.270795081967213 | 5.65156557377049 |
+| Jun 2026 | 6 | 82 | 0.25680270731707316 | 3.5325365853658544 | 2.1808648648648647 | 5.576047297297296 |

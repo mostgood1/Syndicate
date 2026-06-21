@@ -693,6 +693,20 @@
         "reused": false,
         "artifact_root": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts"
       }
+    },
+    "mlb_live_lens:2026-06-21": {
+      "inputHash": "3ae075d2b502c8ca9369fa71dd46e30028c719a6e07aa58425741089771aa908",
+      "updatedAt": "2026-06-21T17:34:51.111679",
+      "outputs": [
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\live_lens\\live_lens_report_2026_06_21.json",
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\live_lens\\live_lens_2026_06_21.jsonl",
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\live_lens\\prop_registry\\live_prop_registry_2026_06_21.json"
+      ],
+      "metadata": {
+        "date": "2026-06-21",
+        "trigger": "syndicate_refresh",
+        "source_root": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\source_artifacts"
+      }
     }
   }
 }

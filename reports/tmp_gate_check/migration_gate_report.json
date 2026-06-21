@@ -1,6 +1,6 @@
 {
   "ok": false,
-  "generated_at": "2026-06-21T17:01:47.440054+00:00",
+  "generated_at": "2026-06-21T17:16:39.794064+00:00",
   "audit": {
     "ok": true,
     "parse_error": null,
@@ -147,7 +147,7 @@
       "ok": true,
       "returncode": 0,
       "timed_out": false,
-      "stdout_excerpt": "{\n  \"generated_at\": \"2026-06-21T16:57:56.431489+00:00\",\n  \"reference_module\": \"mlb\",\n  \"reference_surfaces\": [\n    \"cards\",\n    \"game\",\n    \"live-lens\",\n    \"daily archive\",\n    \"season betting-card\",\n    \"hub\"\n  ],\n  \"modules\": [\n    {\n      \"slug\": \"mlb\",\n      \"name\": \"MLB\",\n      \"status\": \"Phase-1 complete\",\n      \"phase\": \"Reference module\",\n      \"summary\": \"Phase-1 complete reference module for the shared Syndicate board contract with cards, game detail, live lens, a daily archive, season betting-card surfaces, and stabilized shared rank-board API transport across the main ranked ML...",
+      "stdout_excerpt": "{\n  \"generated_at\": \"2026-06-21T17:14:15.743761+00:00\",\n  \"reference_module\": \"mlb\",\n  \"reference_surfaces\": [\n    \"cards\",\n    \"game\",\n    \"live-lens\",\n    \"daily archive\",\n    \"season betting-card\",\n    \"hub\"\n  ],\n  \"modules\": [\n    {\n      \"slug\": \"mlb\",\n      \"name\": \"MLB\",\n      \"status\": \"Phase-1 complete\",\n      \"phase\": \"Reference module\",\n      \"summary\": \"Phase-1 complete reference module for the shared Syndicate board contract with cards, game detail, live lens, a daily archive, season betting-card surfaces, and stabilized shared rank-board API transport across the main ranked ML...",
       "stderr_excerpt": ""
     }
   ]

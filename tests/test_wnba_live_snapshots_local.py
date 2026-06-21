@@ -123,6 +123,57 @@ class WnbaLiveSnapshotLocalTests(unittest.TestCase):
         self.assertEqual([game.get("event_id") for game in payload.get("games") or []], ["evt-2"])
         self.assertEqual((((payload.get("games") or [{}])[0]).get("pbp_recent") or {}).get("points_total"), 14)
 
+    def test_date_scoped_paths_prefer_current_day_over_larger_previous_snapshot(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            processed_root = root / "data" / "processed"
+            live_root = processed_root / "live_snapshots"
+            processed_root.mkdir(parents=True, exist_ok=True)
+            live_root.mkdir(parents=True, exist_ok=True)
+
+            older_processed = processed_root / "recommendations_slate_2026-06-20.json"
+            newer_processed = processed_root / "recommendations_slate_2026-06-21.json"
+            older_live = live_root / "live_pbp_stats_2026-06-20.jsonl"
+            newer_live = live_root / "live_pbp_stats_2026-06-21.jsonl"
+
+            older_processed.write_text("{\"ok\": true, \"date\": \"2026-06-20\", \"payload\": \"older\"}\n", encoding="utf-8")
+            newer_processed.write_text("{\"ok\": true, \"date\": \"2026-06-21\", \"payload\": \"newer\"}\n", encoding="utf-8")
+            older_live.write_text("{\"ok\": true, \"date\": \"2026-06-20\", \"games\": []}\n" * 3, encoding="utf-8")
+            newer_live.write_text("{\"ok\": true, \"date\": \"2026-06-21\", \"games\": []}\n", encoding="utf-8")
+
+            with patch("syndicate.features.wnba.sources._source_roots", return_value=[root]):
+                from syndicate.features.wnba.sources import live_snapshot_path
+                from syndicate.features.wnba.sources import processed_path
+
+                selected_processed = processed_path("recommendations_slate_2026-06-21.json")
+                selected_live = live_snapshot_path("live_pbp_stats_2026-06-21.jsonl")
+
+        self.assertEqual(selected_processed, newer_processed)
+        self.assertEqual(selected_live, newer_live)
+
+    def test_date_scoped_paths_fallback_to_latest_available_when_current_day_missing(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            processed_root = root / "data" / "processed"
+            live_root = processed_root / "live_snapshots"
+            processed_root.mkdir(parents=True, exist_ok=True)
+            live_root.mkdir(parents=True, exist_ok=True)
+
+            fallback_processed = processed_root / "recommendations_slate_2026-06-20.json"
+            fallback_live = live_root / "live_pbp_stats_2026-06-20.jsonl"
+            fallback_processed.write_text("{\"ok\": true, \"date\": \"2026-06-20\", \"payload\": \"fallback\"}\n", encoding="utf-8")
+            fallback_live.write_text("{\"ok\": true, \"date\": \"2026-06-20\", \"games\": []}\n", encoding="utf-8")
+
+            with patch("syndicate.features.wnba.sources._source_roots", return_value=[root]):
+                from syndicate.features.wnba.sources import live_snapshot_path
+                from syndicate.features.wnba.sources import processed_path
+
+                selected_processed = processed_path("recommendations_slate_2026-06-21.json")
+                selected_live = live_snapshot_path("live_pbp_stats_2026-06-21.jsonl")
+
+        self.assertEqual(selected_processed, fallback_processed)
+        self.assertEqual(selected_live, fallback_live)
+
     def test_live_state_payload_falls_back_to_cards_context(self) -> None:
         with patch(
             "syndicate.features.wnba.cards.build_cards_page_context",

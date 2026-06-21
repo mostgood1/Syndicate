@@ -3,6 +3,7 @@ from __future__ import annotations
 from functools import lru_cache
 from datetime import date
 from datetime import datetime
+import re
 import json
 from pathlib import Path
 from typing import Any
@@ -11,6 +12,9 @@ from syndicate.features.shared.source_roots import preferred_artifact_roots
 from syndicate.features.shared.source_roots import preferred_source_roots
 from syndicate.features.shared.timezone import central_today
 from syndicate.features.shared.timezone import central_today_iso
+
+
+_DATE_TOKEN = re.compile(r"(\d{4}-\d{2}-\d{2})")
 
 
 def _source_roots() -> list[Path]:
@@ -47,11 +51,37 @@ def _best_existing_path(candidates: list[Path]) -> Path | None:
             mtime = int(stat.st_mtime_ns)
         except OSError:
             return (0, 0, 0)
-        # Prefer larger files (more complete data) over newer files.
-        # This prevents a header-only disk file from beating a full repo file.
-        return (1 if size > 0 else 0, size, mtime)
+
+        date_match = _DATE_TOKEN.search(path.name)
+        date_token = date_match.group(1) if date_match else ""
+
+        # Prefer the latest date-scoped snapshot when one exists, then fall back
+        # to size/mtime so non-date files still pick the most complete payload.
+        return (1 if date_token else 0, date_token, size, mtime)
 
     return max(existing, key=_score)
+
+
+def _dated_fallback_candidates(roots: list[Path], subdir: tuple[str, ...], filename: str) -> list[Path]:
+    date_match = _DATE_TOKEN.search(filename)
+    if not date_match:
+        return []
+    pattern = f"{filename[:date_match.start()]}*{filename[date_match.end():]}"
+    candidates: list[Path] = []
+    for root in roots:
+        directory = root.joinpath(*subdir)
+        try:
+            if not directory.exists():
+                continue
+            for candidate in directory.glob(pattern):
+                try:
+                    if candidate.is_file():
+                        candidates.append(candidate)
+                except OSError:
+                    continue
+        except OSError:
+            continue
+    return candidates
 
 
 def processed_path(filename: str) -> Path:
@@ -67,6 +97,10 @@ def processed_path(filename: str) -> Path:
     best = _best_existing_path(candidates)
     if best is not None:
         return best
+    dated_candidates = _dated_fallback_candidates(roots, ("data", "processed"), filename)
+    best = _best_existing_path(dated_candidates)
+    if best is not None:
+        return best
     return roots[0] / "data" / "processed" / filename
 
 
@@ -74,6 +108,10 @@ def live_snapshot_path(filename: str) -> Path:
     roots = _source_roots()
     candidates = [root / "data" / "processed" / "live_snapshots" / filename for root in roots]
     best = _best_existing_path(candidates)
+    if best is not None:
+        return best
+    dated_candidates = _dated_fallback_candidates(roots, ("data", "processed", "live_snapshots"), filename)
+    best = _best_existing_path(dated_candidates)
     if best is not None:
         return best
     return roots[0] / "data" / "processed" / "live_snapshots" / filename

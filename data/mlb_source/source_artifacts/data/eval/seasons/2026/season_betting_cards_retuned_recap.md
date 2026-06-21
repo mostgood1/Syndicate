@@ -1,15 +1,15 @@
 # MLB 2026 Betting Card Recap
 
 - Season: 2026
-- Generated: 2026-06-20T22:12:07.618405
-- Batch: D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/eval/batches/season_2026_ui_daily_live
-- Cards Dir: D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/eval/seasons/2026/locked_cards_retuned
+- Generated: 2026-06-21T12:39:36.103697
+- Batch: C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/eval/batches/season_2026_ui_daily_live
+- Cards Dir: C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/eval/seasons/2026/locked_cards_retuned
 - Source Mode: season_eval_batch_reconstruction
 - Cap Profile: nototals_p1_tbheavy11_r1_nohr
 
 ## Overall
 
-- Cards: 5 total, 0 with bets, 5 without bets
+- Cards: 6 total, 0 with bets, 6 without bets
 - Recommendations: selected 0 / settled 0 / unresolved 0
 - Combined ROI: n/a on 0.0u staked, profit 0.0u (0-0)
 - Hitter Props ROI: n/a on 0.0u staked, profit 0.0u
@@ -35,4 +35,4 @@
 
 | Month | Cards | Bets | Profit (u) | ROI | Hitter ROI |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| Jun 2026 | 5 | 0 | 0.0000 | n/a | n/a |
+| Jun 2026 | 6 | 0 | 0.0000 | n/a | n/a |
