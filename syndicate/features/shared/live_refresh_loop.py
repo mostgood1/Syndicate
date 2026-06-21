@@ -139,6 +139,11 @@ def _live_refresh_loop_execution_mode() -> str:
 	return mode if mode in {"source", "ingest"} else "source"
 
 
+def _live_refresh_loop_mode() -> str:
+	raw = str(os.environ.get("SYNDICATE_LIVE_ODDS_REFRESH_MODE") or os.environ.get("SYNDICATE_REFRESH_MODE") or "fast").strip().lower()
+	return raw if raw in {"fast", "full"} else "fast"
+
+
 def _live_refresh_loop_launch_mode() -> str:
 	raw = str(os.environ.get("SYNDICATE_LIVE_ODDS_REFRESH_LAUNCH_MODE") or "").strip().lower()
 	if raw in {"detached_subprocess", "manifest_only", "external_runner"}:
@@ -169,6 +174,7 @@ def _status_payload() -> dict[str, Any]:
 		"phase": _live_refresh_loop_phase(),
 		"regions": _live_refresh_loop_regions(),
 		"executionMode": _live_refresh_loop_execution_mode(),
+		"mode": _live_refresh_loop_mode(),
 		"launchMode": _live_refresh_loop_launch_mode(),
 		"skipMirror": bool(_live_refresh_loop_skip_mirror()),
 		"sports": _live_refresh_loop_sports() or "active",
@@ -185,6 +191,7 @@ def _run_live_refresh_tick() -> dict[str, Any]:
 		"phase": _live_refresh_loop_phase(),
 		"regions": _live_refresh_loop_regions(),
 		"executionMode": _live_refresh_loop_execution_mode(),
+		"mode": _live_refresh_loop_mode(),
 		"skipMirror": bool(_live_refresh_loop_skip_mirror()),
 		"sports": _live_refresh_loop_sports() or "active",
 	}
@@ -194,6 +201,7 @@ def _run_live_refresh_tick() -> dict[str, Any]:
 			sports=_live_refresh_loop_sports(),
 			phase=str(meta["phase"]),
 			regions=str(meta["regions"]),
+			mode=str(meta["mode"]),
 			execution_mode=str(meta["executionMode"]),
 			launch_mode=_live_refresh_loop_launch_mode(),
 			skip_mirror=bool(meta["skipMirror"]),

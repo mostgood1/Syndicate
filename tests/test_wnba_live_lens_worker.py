@@ -4,6 +4,7 @@ import unittest
 from unittest.mock import patch
 
 from syndicate.features.wnba.live_lens import build_live_lens_snapshot
+from syndicate.features.wnba.live_lens import build_live_lens_page_context
 from syndicate.features.wnba.live_lens import validate_live_lens_snapshot
 
 
@@ -52,6 +53,32 @@ class WnbaLiveLensWorkerTests(unittest.TestCase):
         self.assertEqual(snapshot.get("cards"), [])
         self.assertEqual((snapshot.get("empty_state") or {}).get("eyebrow"), "WNBA live lens")
         self.assertEqual((snapshot.get("api_payload") or {}).get("rank_cards"), [])
+
+    def test_page_context_rebuilds_when_persisted_snapshot_is_stale_for_today(self) -> None:
+        stale_snapshot = {
+            "date": "2026-06-18",
+            "rank_cards": [{"title": "Stale", "metrics": [], "summary": "old"}],
+            "games": [],
+            "cards": [],
+            "source_path": "wnba_live_lens.json",
+        }
+        fresh_snapshot = {
+            "date": "2026-06-21",
+            "requested_date": "2026-06-21",
+            "rank_cards": [{"title": "Fresh", "metrics": [], "summary": "new"}],
+            "games": [{"event_id": "evt-1", "rows": []}],
+            "cards": [{"title": "Fresh", "metrics": [], "summary": "new"}],
+            "source_path": "wnba_live_lens.json",
+        }
+
+        with patch("syndicate.features.wnba.live_lens._load_live_lens_snapshot", return_value=stale_snapshot), patch(
+            "syndicate.features.wnba.live_lens.build_live_lens_snapshot", return_value=fresh_snapshot
+        ) as mocked_rebuild, patch("syndicate.features.wnba.live_lens.central_today_iso", return_value="2026-06-21"):
+            context = build_live_lens_page_context("2026-06-21")
+
+        mocked_rebuild.assert_called_once_with("2026-06-21", limit=50)
+        self.assertEqual(context.get("date"), "2026-06-21")
+        self.assertEqual((context.get("rank_cards") or [{}])[0].get("title"), "Fresh")
 
     def test_snapshot_validator_rejects_nan_values(self) -> None:
         snapshot = {"rank_cards": [{"title": "Bad", "metrics": [{"label": "Score", "value": float("nan")}] }]}

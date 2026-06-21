@@ -163,7 +163,7 @@ def _bootstrap_wnba_today_artifacts(repo_root: Path, data_root: Path) -> bool:
             "source",
             "--skip-mirror",
             "--mode",
-            "fast",
+            "full",
         ],
         cwd=str(repo_root),
         env=_prepend_pythonpath(repo_root),

@@ -20,6 +20,7 @@ class LiveRefreshLoopTests(unittest.TestCase):
             {
                 "SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP": "true",
                 "SYNDICATE_LIVE_ODDS_REFRESH_SKIP_MIRROR": "true",
+                "SYNDICATE_LIVE_ODDS_REFRESH_MODE": "full",
             },
             clear=False,
         ), patch.object(live_refresh_loop, "central_today_iso", return_value="2026-06-07"), patch.object(
@@ -35,6 +36,7 @@ class LiveRefreshLoopTests(unittest.TestCase):
             sports=None,
             phase="live",
             regions="us",
+            mode="full",
             execution_mode="source",
             launch_mode="detached_subprocess",
             skip_mirror=True,
@@ -48,6 +50,7 @@ class LiveRefreshLoopTests(unittest.TestCase):
             {
                 "SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP": "true",
                 "SYNDICATE_LIVE_ODDS_REFRESH_LAUNCH_MODE": "manifest_only",
+                "SYNDICATE_LIVE_ODDS_REFRESH_MODE": "full",
             },
             clear=False,
         ), patch.object(live_refresh_loop, "central_today_iso", return_value="2026-06-07"), patch.object(
@@ -63,6 +66,7 @@ class LiveRefreshLoopTests(unittest.TestCase):
             sports=None,
             phase="live",
             regions="us",
+            mode="full",
             execution_mode="source",
             launch_mode="manifest_only",
             skip_mirror=True,
@@ -88,11 +92,11 @@ class LiveRefreshLoopTests(unittest.TestCase):
 
         self.assertFalse(started)
 
-    def test_create_app_does_not_start_shared_live_refresh_loop(self) -> None:
-        with patch("syndicate.features.shared.live_refresh_loop.start_live_refresh_background_loop") as mocked_start:
+    def test_create_app_starts_shared_live_refresh_loop(self) -> None:
+        with patch("syndicate.app.start_live_refresh_background_loop") as mocked_start:
             create_app()
 
-        mocked_start.assert_not_called()
+        mocked_start.assert_called_once()
 
 
 if __name__ == "__main__":

@@ -95,6 +95,8 @@ services:
         value: "live"
       - key: SYNDICATE_LIVE_ODDS_REFRESH_EXECUTION_MODE
         value: "source"
+      - key: SYNDICATE_LIVE_ODDS_REFRESH_MODE
+        value: "full"
       - key: SYNDICATE_LIVE_ODDS_REFRESH_REGIONS
         value: us
       - key: SYNDICATE_LIVE_ODDS_REFRESH_SKIP_MIRROR

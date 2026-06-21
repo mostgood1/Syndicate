@@ -9,6 +9,7 @@ from syndicate.features.shared.rank_board import build_rank_api_payload
 from syndicate.features.shared.rank_board import build_rank_page_context
 from syndicate.features.shared.live_lens_contract import attach_live_lens_contract
 from syndicate.features.shared.request_path_guard import warn_if_compute_in_request_path
+from syndicate.features.shared.timezone import central_today_iso
 from syndicate.features.wnba.cards import build_cards_page_context
 from syndicate.features.wnba.cards import build_live_lines_payload
 from syndicate.features.wnba.sources import build_module_links
@@ -51,6 +52,18 @@ def _live_line_map(selected_date: str, games: list[dict[str, Any]]) -> dict[str,
 def _load_live_lens_snapshot() -> dict[str, Any] | None:
     payload = load_json(LIVE_LENS_SNAPSHOT_PATH)
     return payload if isinstance(payload, dict) else None
+
+
+def _live_lens_snapshot_is_current(snapshot: dict[str, Any] | None, selected_date: str) -> bool:
+    if not validate_live_lens_snapshot(snapshot):
+        return False
+    snapshot_date = str((snapshot or {}).get("date") or "").strip()
+    requested_date = str(selected_date or "").strip()
+    if not snapshot_date or not requested_date:
+        return False
+    if requested_date == central_today_iso() and snapshot_date != requested_date:
+        return False
+    return True
 
 
 def _snapshot_list(payload: dict[str, Any], key: str) -> list[Any]:
@@ -432,6 +445,10 @@ def _rank_card(game: dict[str, Any], selected_date: str, *, live_line: float | N
 def build_live_lens_page_context(selected_date: str) -> dict[str, Any]:
     warn_if_compute_in_request_path("build_live_lens_page_context")
     snapshot = _load_live_lens_snapshot()
+    if not _live_lens_snapshot_is_current(snapshot, selected_date):
+        rebuilt_snapshot = build_live_lens_snapshot(selected_date, limit=50)
+        if validate_live_lens_snapshot(rebuilt_snapshot):
+            snapshot = rebuilt_snapshot
     context = _empty_live_lens_context(selected_date) if snapshot is None else _snapshot_context(selected_date, snapshot)
     return attach_live_lens_contract(context, sport="wnba", module="live_lens")
 

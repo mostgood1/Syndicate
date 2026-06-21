@@ -1,9 +1,10 @@
 {
-  "startedAt": "2026-06-19T20:06:28Z",
+  "startedAt": "2026-06-21T16:32:26Z",
   "date": "2026-06-07",
   "phase": "live",
   "regions": "us",
   "executionMode": "source",
+  "mode": "full",
   "skipMirror": true,
   "sports": "active",
   "ok": true,
@@ -11,5 +12,5 @@
     "ok": true,
     "state": "running"
   },
-  "finishedAt": "2026-06-19T20:06:28Z"
+  "finishedAt": "2026-06-21T16:32:26Z"
 }
