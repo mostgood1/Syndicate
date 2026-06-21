@@ -420,16 +420,11 @@ def api_source_team_logo(team_id: str):
 @wnba_bp.get("/api/source/cards")
 def api_source_cards():
     selected_date = _selected_date()
-    throttle_key, throttle_response = _acquire_wnba_api_throttle("api_source_cards", selected_date)
-    if throttle_response is not None:
-        return throttle_response
     try:
         payload = build_source_cards_payload(selected_date, allow_stored_date_fallback=_allow_stored_date_fallback())
         return jsonify(payload)
     except Exception:
         return jsonify(_snapshot_unavailable_payload())
-    finally:
-        _release_wnba_api_throttle(throttle_key)
 
 
 @wnba_bp.get("/api/source/cards/sim-detail")
@@ -439,13 +434,7 @@ def api_source_cards_sim_detail():
     if not away_tri or not home_tri:
         return jsonify({"error": "missing home/away"}), 400
     selected_date = _selected_date()
-    throttle_key, throttle_response = _acquire_wnba_api_throttle("api_source_cards_sim_detail", selected_date)
-    if throttle_response is not None:
-        return throttle_response
-    try:
-        return jsonify(build_source_cards_sim_detail_payload(selected_date, away_tri, home_tri))
-    finally:
-        _release_wnba_api_throttle(throttle_key)
+    return jsonify(build_source_cards_sim_detail_payload(selected_date, away_tri, home_tri))
 
 
 @wnba_bp.get("/api/source/cards/props-strip")
@@ -461,13 +450,7 @@ def api_source_cards_props_strip():
     limit = max(1, min(24, limit))
     per_game_limit = max(1, min(8, per_game_limit))
     selected_date = _selected_date()
-    throttle_key, throttle_response = _acquire_wnba_api_throttle("api_source_cards_props_strip", selected_date)
-    if throttle_response is not None:
-        return throttle_response
-    try:
-        return jsonify(build_source_cards_props_strip_payload(selected_date, limit=limit, per_game_limit=per_game_limit))
-    finally:
-        _release_wnba_api_throttle(throttle_key)
+    return jsonify(build_source_cards_props_strip_payload(selected_date, limit=limit, per_game_limit=per_game_limit))
 
 
 @wnba_bp.get("/game/<game_pk>")
@@ -487,23 +470,20 @@ def api_game_detail(game_pk: str):
 @wnba_bp.get("/api/cards")
 def api_cards():
     selected_date = _selected_date()
-    throttle_key, throttle_response = _acquire_wnba_api_throttle("api_cards", selected_date)
-    if throttle_response is not None:
-        return throttle_response
+    if str(__import__("os").environ.get("RENDER") or "").strip().lower() in {"1", "true", "yes", "on"}:
+        context = build_source_cards_payload(selected_date, allow_stored_date_fallback=True)
+        context = {
+            **context,
+            "source_title": "WNBA source cards fallback",
+            "empty_state": {
+                "eyebrow": "WNBA cards",
+                "title": "WNBA source cards fallback",
+                "body": "The shared WNBA board is using the artifact-backed source cards payload on Render to avoid request-path live hydration.",
+                "list_items": ["Reload after the next WNBA refresh cycle."] if not context.get("games") else [],
+            },
+        }
+        return jsonify(build_game_board_api_payload(context))
     try:
-        if str(__import__("os").environ.get("RENDER") or "").strip().lower() in {"1", "true", "yes", "on"}:
-            context = build_source_cards_payload(selected_date, allow_stored_date_fallback=True)
-            context = {
-                **context,
-                "source_title": "WNBA source cards fallback",
-                "empty_state": {
-                    "eyebrow": "WNBA cards",
-                    "title": "WNBA source cards fallback",
-                    "body": "The shared WNBA board is using the artifact-backed source cards payload on Render to avoid request-path live hydration.",
-                    "list_items": ["Reload after the next WNBA refresh cycle."] if not context.get("games") else [],
-                },
-            }
-            return jsonify(build_game_board_api_payload(context))
         context = build_cards_page_context(selected_date, allow_stored_date_fallback=False)
     except Exception:
         try:
@@ -522,8 +502,6 @@ def api_cards():
         except Exception as error:
             print("WNBA SNAPSHOT ERROR:", error)
             return jsonify(_snapshot_unavailable_payload())
-    finally:
-        _release_wnba_api_throttle(throttle_key)
     try:
         return jsonify(build_game_board_api_payload(context))
     except Exception as error:
