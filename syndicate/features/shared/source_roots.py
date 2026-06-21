@@ -21,19 +21,26 @@ def preferred_source_roots(
     local_dir_name: str,
 ) -> list[Path]:
     env_value = str(os.environ.get(env_var) or "").strip()
+
     def _has_files(path: Path) -> bool:
         try:
             return path.exists() and path.is_dir() and any(path.iterdir())
         except Exception:
             return path.exists()
 
+    def _append_repo_fallback(candidates: list[Path]) -> None:
+        if not _strict_hosted_storage_enabled():
+            return
+        if str(os.environ.get("RENDER") or "").strip().lower() not in {"1", "true", "yes", "on"}:
+            return
+        repo_fallback = (repo_root_from(file_path) / "data" / local_dir_name).resolve()
+        if repo_fallback not in candidates:
+            candidates.append(repo_fallback)
+
     if env_value:
         env_root = Path(env_value).resolve()
         candidates: list[Path] = [env_root]
-        if _strict_hosted_storage_enabled() and str(os.environ.get("RENDER") or "").strip().lower() in {"1", "true", "yes", "on"}:
-            repo_fallback = (repo_root_from(file_path) / "data" / local_dir_name).resolve()
-            if not _has_files(env_root):
-                candidates.append(repo_fallback)
+        _append_repo_fallback(candidates)
         return candidates
 
     repo_root = repo_root_from(file_path)
@@ -52,10 +59,11 @@ def preferred_source_roots(
                 f"SYNDICATE_DATA_ROOT must be set when strict hosted storage is enabled for {local_dir_name}."
             )
     elif _strict_hosted_storage_enabled() and str(os.environ.get("RENDER") or "").strip().lower() in {"1", "true", "yes", "on"}:
-        if not any(path.exists() and path.is_dir() and any(path.iterdir()) for path in candidates if path.exists() and path.is_dir()):
-            repo_mirror = (repo_root / "data" / local_dir_name).resolve()
-            if repo_mirror not in candidates:
-                candidates.append(repo_mirror)
+        repo_mirror = (repo_root / "data" / local_dir_name).resolve()
+        if repo_mirror not in candidates:
+            candidates.append(repo_mirror)
+
+    _append_repo_fallback(candidates)
 
     deduped: list[Path] = []
     seen: set[Path] = set()
@@ -117,9 +125,8 @@ def preferred_artifact_roots(
             )
 
     if _strict_hosted_storage_enabled() and str(os.environ.get("RENDER") or "").strip().lower() in {"1", "true", "yes", "on"}:
-        if not any(_has_files(candidate) for candidate in candidates if candidate.exists() and candidate.is_dir()):
-            local_mirror = (repo_root / "data" / local_dir_name).resolve()
-            _append_root(local_mirror / "source_artifacts")
-            _append_root(local_mirror)
+        local_mirror = (repo_root / "data" / local_dir_name).resolve()
+        _append_root(local_mirror / "source_artifacts")
+        _append_root(local_mirror)
 
     return candidates

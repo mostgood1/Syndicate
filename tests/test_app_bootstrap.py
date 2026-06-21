@@ -13,6 +13,12 @@ class AppBootstrapTests(unittest.TestCase):
 
         self.assertEqual(calls, [1])
 
+    def test_create_app_triggers_bootstrap(self) -> None:
+        with patch("syndicate.app._bootstrap_render_data") as bootstrap_mock:
+            syndicate_app.create_app()
+
+        bootstrap_mock.assert_called_once()
+
     def test_bootstrap_render_data_skips_when_disabled(self) -> None:
         calls: list[int] = []
 

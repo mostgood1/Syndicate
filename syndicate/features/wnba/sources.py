@@ -56,13 +56,17 @@ def _best_existing_path(candidates: list[Path]) -> Path | None:
 
 def processed_path(filename: str) -> Path:
     roots = _source_roots()
+    candidates: list[Path] = []
     for root in roots:
         candidate = root / "data" / "processed" / filename
         try:
             if candidate.exists() and candidate.is_file():
-                return candidate
+                candidates.append(candidate)
         except OSError:
             continue
+    best = _best_existing_path(candidates)
+    if best is not None:
+        return best
     return roots[0] / "data" / "processed" / filename
 
 

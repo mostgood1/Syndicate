@@ -39,6 +39,8 @@ def _bootstrap_render_data(bootstrap_main: Callable[[], int] | None = None) -> N
         return
 
 def create_app() -> Flask:
+    _bootstrap_render_data()
+
     app = Flask(
         __name__,
         template_folder="templates",

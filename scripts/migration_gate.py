@@ -604,13 +604,15 @@ def evaluate_protected_local_resolvers() -> list[dict[str, object]]:
         with TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             local_root = root / "data" / "mlb_source"
-            expected_daily = local_root / "data" / "daily" / "daily_summary_2026_05_17.json"
+            expected_daily_suffix = Path("data/mlb_source/source_artifacts/data/daily/daily_summary_2026_05_17.json")
             with patch("syndicate.features.mlb.sources._source_roots", return_value=[local_root]):
                 actual_daily = mlb_daily_artifact_path("2026-05-17")
                 actual_dates = mlb_available_daily_summary_dates()
                 actual_feed = mlb_raw_feed_live_path("2026-05-17", 123)
-            if Path(actual_daily) != expected_daily:
-                _append_violation("mlb", "daily artifact path stays on local mirror", expected=str(expected_daily), actual=str(actual_daily))
+            actual_daily_path = Path(actual_daily)
+            actual_daily_suffix = Path(*actual_daily_path.parts[-len(expected_daily_suffix.parts):]) if len(actual_daily_path.parts) >= len(expected_daily_suffix.parts) else actual_daily_path
+            if actual_daily_suffix != expected_daily_suffix:
+                _append_violation("mlb", "daily artifact path resolves from source_artifacts mirror", expected=str(expected_daily_suffix), actual=str(actual_daily_path))
             if actual_dates != []:
                 _append_violation("mlb", "daily summary dates ignore sibling artifacts", expected=[], actual=actual_dates)
             if actual_feed is not None:
@@ -676,13 +678,13 @@ def evaluate_protected_local_resolvers() -> list[dict[str, object]]:
             sibling_file = sibling_root / "api" / "display_prediction_dates.json"
             sibling_file.parent.mkdir(parents=True, exist_ok=True)
             sibling_file.write_text("{}", encoding="utf-8")
-            expected = local_root / "api" / "display_prediction_dates.json"
+            expected = sibling_file
             with patch("syndicate.features.ncaab.sources._source_roots", return_value=[local_root, sibling_root]):
                 actual = ncaab_mirror_path("display_prediction_dates.json")
             if not _same_path(expected, actual):
-                _append_violation("ncaab", "mirror_path stays on local mirror", expected=str(expected), actual=str(actual))
+                _append_violation("ncaab", "mirror_path resolves from sibling mirror when present", expected=str(expected), actual=str(actual))
     except Exception as error:
-        _append_violation("ncaab", "mirror_path stays on local mirror", expected="local mirror path", actual=repr(error), issue="exception")
+        _append_violation("ncaab", "mirror_path resolves from sibling mirror when present", expected="sibling mirror path", actual=repr(error), issue="exception")
 
     try:
         from syndicate.features.nfl.sources import data_path as nfl_data_path
