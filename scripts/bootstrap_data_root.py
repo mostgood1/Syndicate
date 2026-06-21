@@ -10,6 +10,8 @@ import sys
 from pathlib import Path
 from typing import Dict
 
+from syndicate.features.shared.timezone import central_today_iso
+
 
 logging.basicConfig()
 logger = logging.getLogger("bootstrap_data_root")
@@ -108,14 +110,38 @@ def _wnba_today_props_path(data_root: Path, date_str: str) -> Path:
     return data_root / "wnba_source" / "source_artifacts" / "data" / "processed" / f"props_recommendations_top_by_game_{date_str}.json"
 
 
+def _wnba_today_bundle_paths(data_root: Path, date_str: str) -> list[Path]:
+    processed_root = data_root / "wnba_source" / "source_artifacts" / "data" / "processed"
+    return [
+        processed_root / f"game_cards_{date_str}.csv",
+        processed_root / f"recommendations_slate_{date_str}.json",
+        processed_root / f"cards_sim_detail_{date_str}.json",
+        processed_root / f"cards_props_snapshot_{date_str}.json",
+    ]
+
+
+def _wnba_today_bundle_ready(data_root: Path, date_str: str) -> bool:
+    bundle_paths = _wnba_today_bundle_paths(data_root, date_str)
+    if not bundle_paths:
+        return False
+    for path in bundle_paths:
+        try:
+            if not path.exists() or not path.is_file() or path.stat().st_size <= 0:
+                return False
+        except OSError:
+            return False
+    return True
+
+
 def _bootstrap_wnba_today_artifacts(repo_root: Path, data_root: Path) -> bool:
-    if not _env_bool("SYNDICATE_BOOTSTRAP_ON_START"):
+    if not _env_bool("RENDER"):
         return False
 
-    today = dt.datetime.now().strftime("%Y-%m-%d")
-    target_path = _wnba_today_props_path(data_root, today)
-    if target_path.exists():
+    today = central_today_iso()
+    if _wnba_today_bundle_ready(data_root, today):
         return False
+
+    target_path = _wnba_today_props_path(data_root, today)
 
     refresh_script = repo_root / "scripts" / "refresh_odds_sources.py"
     if not refresh_script.exists():
@@ -161,8 +187,7 @@ def main() -> int:
     # Merge the Render-critical published artifact roots into the mounted data root on startup.
     logger.info("Bootstrapping data root: repo=%s data_root=%s", repo_root, data_root)
     counters = _sync_bootstrap_roots(repo_root, data_root)
-    if _env_bool("SYNDICATE_BOOTSTRAP_WNBA_TODAY"):
-        _bootstrap_wnba_today_artifacts(repo_root, data_root)
+    _bootstrap_wnba_today_artifacts(repo_root, data_root)
 
     # Log summary counts
     if counters:
