@@ -924,6 +924,17 @@ def _source_game_from_row(
 
 def build_source_cards_payload(selected_date: str, *, allow_stored_date_fallback: bool = False) -> dict[str, Any]:
     requested_date = str(selected_date or "").strip() or parse_iso_date(selected_date).isoformat()
+    if requested_date == central_today_iso():
+        live_games, live_source_path = _games_from_live_state_fallback(requested_date)
+        if live_games:
+            return {
+                "date": requested_date,
+                "requested_date": requested_date,
+                "lookahead_applied": False,
+                "players_included": False,
+                "source_path": str(live_source_path),
+                "games": live_games,
+            }
     resolved_date = _resolved_source_cards_date(selected_date, allow_stored_date_fallback=allow_stored_date_fallback)
     bundle = _artifact_bundle(resolved_date)
     rows = bundle["rows"]
@@ -1307,7 +1318,7 @@ def _games_from_live_state_fallback(selected_date: str, ttl: int = 12) -> tuple[
         not isinstance(payload, dict)
         or not isinstance(payload.get("games"), list)
         or not payload.get("games")
-    ) and not _render_web_dyno():
+    ):
         public_payload = _public_scoreboard_live_state_payload(selected_date)
         if isinstance(public_payload, dict) and isinstance(public_payload.get("games"), list) and public_payload.get("games"):
             payload = public_payload
