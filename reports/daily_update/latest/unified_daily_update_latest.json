@@ -1,12 +1,12 @@
 ﻿{
     "date":  "2026-06-21",
-    "generatedAt":  "2026-06-21T12:39:27.3628490-05:00",
-    "lastUpdatedAt":  "2026-06-21T12:39:28.1029794-05:00",
-    "completedAt":  null,
+    "generatedAt":  "2026-06-21T13:24:51.5148416-05:00",
+    "lastUpdatedAt":  "2026-06-21T13:24:53.9606267-05:00",
+    "completedAt":  "2026-06-21T13:24:53.9586174-05:00",
     "runMode":  "standard",
-    "overallStatus":  "started",
-    "error":  null,
-    "runDir":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-06-21\\20260621_123925",
+    "overallStatus":  "error",
+    "error":  "The script failed due to call depth overflow.",
+    "runDir":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-06-21\\20260621_132449",
     "latestDir":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\latest",
     "runtimePolicy":  {
                           "MLB":  {
@@ -772,21 +772,39 @@
                                         ],
                     "policyPerformance":  [
                                               {
-                                                  "policyId":  "",
+                                                  "policyId":  "sport:mlb:default",
                                                   "policySource":  "sport",
                                                   "keyParameters":  {
                                                                         "forceWithinMinutes":  20
                                                                     },
-                                                  "recordCount":  14,
-                                                  "sampleSize":  14,
-                                                  "exploratoryCount":  1,
-                                                  "exploratoryRate":  0.0714,
-                                                  "plannedCount":  14,
+                                                  "recordCount":  13,
+                                                  "sampleSize":  13,
+                                                  "exploratoryCount":  0,
+                                                  "exploratoryRate":  0,
+                                                  "plannedCount":  13,
                                                   "skippedCount":  0,
                                                   "dryRunCount":  0,
                                                   "withinWindowCount":  0,
                                                   "averageTimeToStartMinutes":  null,
-                                                  "averageForceWithinMinutes":  20.71,
+                                                  "averageForceWithinMinutes":  20,
+                                                  "roi":  null
+                                              },
+                                              {
+                                                  "policyId":  "sport:mlb:balanced",
+                                                  "policySource":  "sport",
+                                                  "keyParameters":  {
+                                                                        "forceWithinMinutes":  30
+                                                                    },
+                                                  "recordCount":  1,
+                                                  "sampleSize":  1,
+                                                  "exploratoryCount":  1,
+                                                  "exploratoryRate":  1,
+                                                  "plannedCount":  1,
+                                                  "skippedCount":  0,
+                                                  "dryRunCount":  0,
+                                                  "withinWindowCount":  0,
+                                                  "averageTimeToStartMinutes":  null,
+                                                  "averageForceWithinMinutes":  30,
                                                   "roi":  null
                                               },
                                               {
@@ -828,9 +846,9 @@
                                           ],
                     "sourceUpdates":  true,
                     "refreshGate":  true,
-                    "artifactGeneration":  false,
+                    "artifactGeneration":  true,
                     "manifestGeneration":  true,
-                    "publish":  false,
+                    "publish":  true,
                     "refreshOdds":  false,
                     "oddsPhase":  null,
                     "oddsSports":  null,
@@ -939,23 +957,22 @@
     "replayContext":  {
                           "latestCheckpointLoaded":  true,
                           "latestCheckpointPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest_checkpoint.json",
-                          "latestCheckpointStage":  "completed",
+                          "latestCheckpointStage":  "failed",
                           "latestCheckpointFailedStage":  "",
-                          "latestCheckpointCompletedStageCount":  2,
-                          "latestCheckpointCompletedStages":  [
-                                                                  "source_update",
-                                                                  "refresh_gate"
-                                                              ],
-                          "resumeEligible":  false,
+                          "latestCheckpointCompletedStageCount":  0,
+                          "latestCheckpointCompletedStages":  {
+
+                                                              },
+                          "resumeEligible":  true,
                           "resumedFromCheckpoint":  false
                       },
     "runState":  {
-                     "currentStage":  "source_update",
+                     "currentStage":  "failed",
                      "completedStages":  [
 
                                          ],
-                     "failedStage":  null,
-                     "lastUpdatedAt":  "2026-06-21T12:39:28.1029794-05:00"
+                     "failedStage":  "",
+                     "lastUpdatedAt":  "2026-06-21T13:24:53.9606267-05:00"
                  },
     "eventSimExecution":  [
                               {
@@ -1698,21 +1715,39 @@
                         ],
     "policyPerformance":  [
                               {
-                                  "policyId":  "",
+                                  "policyId":  "sport:mlb:default",
                                   "policySource":  "sport",
                                   "keyParameters":  {
                                                         "forceWithinMinutes":  20
                                                     },
-                                  "recordCount":  14,
-                                  "sampleSize":  14,
-                                  "exploratoryCount":  1,
-                                  "exploratoryRate":  0.0714,
-                                  "plannedCount":  14,
+                                  "recordCount":  13,
+                                  "sampleSize":  13,
+                                  "exploratoryCount":  0,
+                                  "exploratoryRate":  0,
+                                  "plannedCount":  13,
                                   "skippedCount":  0,
                                   "dryRunCount":  0,
                                   "withinWindowCount":  0,
                                   "averageTimeToStartMinutes":  null,
-                                  "averageForceWithinMinutes":  20.71,
+                                  "averageForceWithinMinutes":  20,
+                                  "roi":  null
+                              },
+                              {
+                                  "policyId":  "sport:mlb:balanced",
+                                  "policySource":  "sport",
+                                  "keyParameters":  {
+                                                        "forceWithinMinutes":  30
+                                                    },
+                                  "recordCount":  1,
+                                  "sampleSize":  1,
+                                  "exploratoryCount":  1,
+                                  "exploratoryRate":  1,
+                                  "plannedCount":  1,
+                                  "skippedCount":  0,
+                                  "dryRunCount":  0,
+                                  "withinWindowCount":  0,
+                                  "averageTimeToStartMinutes":  null,
+                                  "averageForceWithinMinutes":  30,
                                   "roi":  null
                               },
                               {
@@ -1842,7 +1877,7 @@
                                             "--artifact-root",
                                             "data\\wnba_source\\source_artifacts",
                                             "--log-file",
-                                            "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-06-21\\20260621_123925\\wnba_props_refresh.log",
+                                            "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-06-21\\20260621_132449\\wnba_props_refresh.log",
                                             "--force-refresh",
                                             "--days-ahead",
                                             "0",
@@ -2037,8 +2072,8 @@
                            },
                            {
                                "stage":  "artifact_generation",
-                               "decision":  "skipped",
-                               "status":  "skipped"
+                               "decision":  "planned",
+                               "status":  "pending"
                            },
                            {
                                "stage":  "manifest_generation",
@@ -2047,8 +2082,8 @@
                            },
                            {
                                "stage":  "git_publish",
-                               "decision":  "skipped",
-                               "status":  "skipped"
+                               "decision":  "planned",
+                               "status":  "pending"
                            }
                        ],
     "simTriggerPlan":  [
@@ -2120,35 +2155,53 @@
     "statusArtifact":  {
                            "format":  "json",
                            "scope":  "daily_update",
-                           "runManifestPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-06-21\\20260621_123925\\unified_daily_update_run.json",
+                           "runManifestPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-06-21\\20260621_132449\\unified_daily_update_run.json",
                            "latestManifestPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest.json",
-                           "runCheckpointPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-06-21\\20260621_123925\\unified_daily_update_checkpoint.json",
+                           "runCheckpointPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-06-21\\20260621_132449\\unified_daily_update_checkpoint.json",
                            "latestCheckpointPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest_checkpoint.json",
                            "state":  {
                                          "runMode":  "standard",
-                                         "overallStatus":  "started",
-                                         "currentStage":  "source_update",
+                                         "overallStatus":  "error",
+                                         "currentStage":  "failed",
                                          "completedStages":  [
 
                                                              ],
-                                         "failedStage":  null,
+                                         "failedStage":  "",
                                          "policyPerformance":  [
                                                                    {
-                                                                       "policyId":  "",
+                                                                       "policyId":  "sport:mlb:default",
                                                                        "policySource":  "sport",
                                                                        "keyParameters":  {
                                                                                              "forceWithinMinutes":  20
                                                                                          },
-                                                                       "recordCount":  14,
-                                                                       "sampleSize":  14,
-                                                                       "exploratoryCount":  1,
-                                                                       "exploratoryRate":  0.0714,
-                                                                       "plannedCount":  14,
+                                                                       "recordCount":  13,
+                                                                       "sampleSize":  13,
+                                                                       "exploratoryCount":  0,
+                                                                       "exploratoryRate":  0,
+                                                                       "plannedCount":  13,
                                                                        "skippedCount":  0,
                                                                        "dryRunCount":  0,
                                                                        "withinWindowCount":  0,
                                                                        "averageTimeToStartMinutes":  null,
-                                                                       "averageForceWithinMinutes":  20.71,
+                                                                       "averageForceWithinMinutes":  20,
+                                                                       "roi":  null
+                                                                   },
+                                                                   {
+                                                                       "policyId":  "sport:mlb:balanced",
+                                                                       "policySource":  "sport",
+                                                                       "keyParameters":  {
+                                                                                             "forceWithinMinutes":  30
+                                                                                         },
+                                                                       "recordCount":  1,
+                                                                       "sampleSize":  1,
+                                                                       "exploratoryCount":  1,
+                                                                       "exploratoryRate":  1,
+                                                                       "plannedCount":  1,
+                                                                       "skippedCount":  0,
+                                                                       "dryRunCount":  0,
+                                                                       "withinWindowCount":  0,
+                                                                       "averageTimeToStartMinutes":  null,
+                                                                       "averageForceWithinMinutes":  30,
                                                                        "roi":  null
                                                                    },
                                                                    {
@@ -2191,64 +2244,23 @@
                                          "replayContext":  {
                                                                "latestCheckpointLoaded":  true,
                                                                "latestCheckpointPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest_checkpoint.json",
-                                                               "latestCheckpointStage":  "completed",
+                                                               "latestCheckpointStage":  "failed",
                                                                "latestCheckpointFailedStage":  "",
-                                                               "latestCheckpointCompletedStageCount":  2,
-                                                               "latestCheckpointCompletedStages":  [
-                                                                                                       "source_update",
-                                                                                                       "refresh_gate"
-                                                                                                   ],
-                                                               "resumeEligible":  false,
+                                                               "latestCheckpointCompletedStageCount":  0,
+                                                               "latestCheckpointCompletedStages":  {
+
+                                                                                                   },
+                                                               "resumeEligible":  true,
                                                                "resumedFromCheckpoint":  false
                                                            },
                                          "publishParity":  null,
-                                         "lastUpdatedAt":  "2026-06-21T12:39:28.1029794-05:00"
+                                         "lastUpdatedAt":  "2026-06-21T13:24:53.9606267-05:00"
                                      }
                        },
     "sportRuns":  [
-                      {
-                          "sport":  "mlb",
-                          "workflow":  "vendored_daily_update",
-                          "name":  "MLB vendored daily update",
-                          "startedAt":  "2026-06-21T12:39:27.7159814-05:00",
-                          "completedAt":  null,
-                          "status":  "started",
-                          "error":  null,
-                          "workingDirectory":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\vendor\\mlb_bettingv2",
-                          "environmentOverrides":  {
-                                                       "MLB_BETTING_DATA_ROOT":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\source_artifacts\\data",
-                                                       "MLB_LIVE_LENS_DIR":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\live_lens",
-                                                       "ODDS_API_KEY":  "77ae1c35140c82da1675af85dde36a44"
-                                                   },
-                          "runtimePolicy":  {
-                                                "simsPerGame":  1000,
-                                                "workers":  4
-                                            },
-                          "command":  [
-                                          "C:\\Users\\tempadmin\\AppData\\Local\\Programs\\Python\\Python311-arm64\\python.exe",
-                                          "tools\\daily_update.py",
-                                          "--workflow",
-                                          "ui-daily",
-                                          "--date",
-                                          "2026-06-21",
-                                          "--season",
-                                          "2026",
-                                          "--sims",
-                                          "1000",
-                                          "--workers",
-                                          "4",
-                                          "--git-push",
-                                          "off",
-                                          "--validate-render-frontend",
-                                          "off",
-                                          "--build-next-day",
-                                          "on"
-                                      ],
-                          "mirrorManifestPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\manifests\\mirror_refresh_2026-06-21.json",
-                          "mirrorManifestExists":  false
-                      }
+
                   ],
-    "skipGitPush":  true,
+    "skipGitPush":  false,
     "gitRemote":  null,
     "commitMessagePrefix":  null,
     "skipped":  {
@@ -2269,8 +2281,8 @@
                         "oddsPhase":  null,
                         "oddsSports":  null,
                         "oddsRegions":  null,
-                        "manifestPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-06-21\\20260621_123925\\migration\\refresh_status_manifest.json",
-                        "runSummaryPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-06-21\\20260621_123925\\migration\\refresh_and_gate_run.json"
+                        "manifestPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-06-21\\20260621_132449\\migration\\refresh_status_manifest.json",
+                        "runSummaryPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-06-21\\20260621_132449\\migration\\refresh_and_gate_run.json"
                     },
     "pushResults":  [
 

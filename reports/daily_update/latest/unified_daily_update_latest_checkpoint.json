@@ -2,17 +2,17 @@
     "scope":  "daily_update",
     "date":  "2026-06-21",
     "runMode":  "standard",
-    "overallStatus":  "started",
-    "generatedAt":  "2026-06-21T12:39:27.3628490-05:00",
-    "updatedAt":  "2026-06-21T12:39:28.1096213-05:00",
-    "runDir":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-06-21\\20260621_123925",
+    "overallStatus":  "error",
+    "generatedAt":  "2026-06-21T13:24:51.5148416-05:00",
+    "updatedAt":  "2026-06-21T13:24:53.9800553-05:00",
+    "runDir":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-06-21\\20260621_132449",
     "latestDir":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\latest",
-    "lastUpdatedAt":  "2026-06-21T12:39:28.1029794-05:00",
-    "currentStage":  "source_update",
+    "lastUpdatedAt":  "2026-06-21T13:24:53.9606267-05:00",
+    "currentStage":  "failed",
     "completedStages":  [
 
                         ],
-    "failedStage":  null,
+    "failedStage":  "",
     "stageDecisions":  [
                            {
                                "stage":  "source_update",
@@ -95,8 +95,8 @@
                            },
                            {
                                "stage":  "artifact_generation",
-                               "decision":  "skipped",
-                               "status":  "skipped"
+                               "decision":  "planned",
+                               "status":  "pending"
                            },
                            {
                                "stage":  "manifest_generation",
@@ -105,8 +105,8 @@
                            },
                            {
                                "stage":  "git_publish",
-                               "decision":  "skipped",
-                               "status":  "skipped"
+                               "decision":  "planned",
+                               "status":  "pending"
                            }
                        ],
     "provenance":  {
@@ -196,23 +196,22 @@
     "replayContext":  {
                           "latestCheckpointLoaded":  true,
                           "latestCheckpointPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest_checkpoint.json",
-                          "latestCheckpointStage":  "completed",
+                          "latestCheckpointStage":  "failed",
                           "latestCheckpointFailedStage":  "",
-                          "latestCheckpointCompletedStageCount":  2,
-                          "latestCheckpointCompletedStages":  [
-                                                                  "source_update",
-                                                                  "refresh_gate"
-                                                              ],
-                          "resumeEligible":  false,
+                          "latestCheckpointCompletedStageCount":  0,
+                          "latestCheckpointCompletedStages":  {
+
+                                                              },
+                          "resumeEligible":  true,
                           "resumedFromCheckpoint":  false
                       },
     "runPlan":  {
                     "simExecution":  true,
                     "sourceUpdates":  true,
                     "refreshGate":  true,
-                    "artifactGeneration":  false,
+                    "artifactGeneration":  true,
                     "manifestGeneration":  true,
-                    "publish":  false,
+                    "publish":  true,
                     "refreshOdds":  false,
                     "oddsPhase":  null,
                     "oddsSports":  null,

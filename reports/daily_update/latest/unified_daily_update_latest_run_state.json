@@ -2,30 +2,29 @@
     "scope":  "daily_update",
     "date":  "2026-06-21",
     "runMode":  "standard",
-    "overallStatus":  "started",
-    "generatedAt":  "2026-06-21T12:39:27.3628490-05:00",
-    "updatedAt":  "2026-06-21T12:39:28.1049833-05:00",
-    "runManifestPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-06-21\\20260621_123925\\unified_daily_update_run.json",
+    "overallStatus":  "error",
+    "generatedAt":  "2026-06-21T13:24:51.5148416-05:00",
+    "updatedAt":  "2026-06-21T13:24:53.9626321-05:00",
+    "runManifestPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-06-21\\20260621_132449\\unified_daily_update_run.json",
     "latestManifestPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest.json",
-    "runCheckpointPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-06-21\\20260621_123925\\unified_daily_update_checkpoint.json",
+    "runCheckpointPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-06-21\\20260621_132449\\unified_daily_update_checkpoint.json",
     "latestCheckpointPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest_checkpoint.json",
-    "currentStage":  "source_update",
+    "currentStage":  "failed",
     "completedStages":  [
 
                         ],
-    "failedStage":  null,
-    "lastUpdatedAt":  "2026-06-21T12:39:28.1029794-05:00",
+    "failedStage":  "",
+    "lastUpdatedAt":  "2026-06-21T13:24:53.9606267-05:00",
     "replayContext":  {
                           "latestCheckpointLoaded":  true,
                           "latestCheckpointPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest_checkpoint.json",
-                          "latestCheckpointStage":  "completed",
+                          "latestCheckpointStage":  "failed",
                           "latestCheckpointFailedStage":  "",
-                          "latestCheckpointCompletedStageCount":  2,
-                          "latestCheckpointCompletedStages":  [
-                                                                  "source_update",
-                                                                  "refresh_gate"
-                                                              ],
-                          "resumeEligible":  false,
+                          "latestCheckpointCompletedStageCount":  0,
+                          "latestCheckpointCompletedStages":  {
+
+                                                              },
+                          "resumeEligible":  true,
                           "resumedFromCheckpoint":  false
                       },
     "stageDecisions":  [
@@ -110,8 +109,8 @@
                            },
                            {
                                "stage":  "artifact_generation",
-                               "decision":  "skipped",
-                               "status":  "skipped"
+                               "decision":  "planned",
+                               "status":  "pending"
                            },
                            {
                                "stage":  "manifest_generation",
@@ -120,8 +119,8 @@
                            },
                            {
                                "stage":  "git_publish",
-                               "decision":  "skipped",
-                               "status":  "skipped"
+                               "decision":  "planned",
+                               "status":  "pending"
                            }
                        ],
     "runTrace":  {
