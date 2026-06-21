@@ -1412,9 +1412,6 @@ def _game_matchup_key(game: dict[str, Any]) -> tuple[str, str]:
 
 
 def _supplement_games_with_live_state(games: list[dict[str, Any]], selected_date: str) -> tuple[list[dict[str, Any]], str | None, int, int]:
-    if _render_web_dyno():
-        return games, None, 0, 0
-
     live_games, live_source_path = _games_from_live_state_fallback(selected_date)
     if not live_games:
         return games, None, 0, 0
@@ -3115,19 +3112,6 @@ def _fallback_live_player_lens_game(game: dict[str, Any], *, event_id: str | Non
 
 def build_live_state_payload(selected_date: str, ttl: int = 12, *, allow_stored_date_fallback: bool = True) -> dict[str, Any]:
     is_today = str(selected_date).strip() == central_today_iso()
-
-    if _render_web_dyno():
-        local_payload = _local_live_state_payload(selected_date)
-        if isinstance(local_payload, dict) and isinstance(local_payload.get("games"), list) and local_payload.get("games"):
-            return _attach_odds_refresh_timestamp(local_payload)
-        return _attach_odds_refresh_timestamp({
-            "date": selected_date,
-            "ttl": int(ttl),
-            "requested_date": selected_date,
-            "source": "render_web_dyno_empty",
-            "games": [],
-            "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
-        })
 
     # Live-state is operationally critical for in-progress scoreboards on WNBA and Home.
     # For today's slate, prefer fresher remote/public live sources ahead of the local snapshot

@@ -3662,7 +3662,7 @@
         return;
       }
 
-      await hydrateCards({ liveOnly: Boolean(silent && slateUnchanged) });
+      await hydrateCards({ liveOnly: false });
     } catch (error) {
       if (silent && state.cards.length) {
         if (root.headerMeta) {
