@@ -1,0 +1,5 @@
+market,side,home,away,date,ev,price,implied_prob,edge,line,pred_margin,market_home_margin,pred_total,tier
+ATS,Minnesota Lynx,Minnesota Lynx,Golden State Valkyries,2026-06-04,0.06825,-110.0,0.52381,6.825,3.5,3.325,-3.5,,High
+TOTAL,Under,Minnesota Lynx,Golden State Valkyries,2026-06-04,0.03052,-110.0,0.52381,-3.051986,164.0,,,160.948014,Medium
+ATS,Indiana Fever,Indiana Fever,Atlanta Dream,2026-06-04,0.0195,-110.0,0.52381,1.95,1.0,0.95,-1.0,,Low
+TOTAL,Under,Indiana Fever,Atlanta Dream,2026-06-04,0.03768,-110.0,0.52381,-3.76805,174.0,,,170.23195,Medium

@@ -1,0 +1,5 @@
+market,side,home,away,date,ev,price,implied_prob,edge,line,pred_margin,market_home_margin,pred_total,tier
+ATS,New York Liberty,New York Liberty,Toronto Tempo,2026-06-03,0.18525,-110.0,0.52381,18.525,9.5,9.025,-9.5,,High
+TOTAL,Under,New York Liberty,Toronto Tempo,2026-06-03,0.021768,-110.0,0.52381,-2.176827,162.5,,,160.323173,Medium
+ATS,Phoenix Mercury,Seattle Storm,Phoenix Mercury,2026-06-03,0.14625,-110.0,0.52381,14.625,7.5,7.125,7.5,,High
+TOTAL,Under,Seattle Storm,Phoenix Mercury,2026-06-03,0.014084,-110.0,0.52381,-1.408371,160.5,,,159.091629,Low

@@ -1,0 +1,46 @@
+{
+  "date": "2026-06-22",
+  "season": 2026,
+  "generated_at": "2026-06-22T03:57:32.374729",
+  "tool": "tools/daily_update_multi_profile.py",
+  "locked": true,
+  "source_profile": "game_recos",
+  "source_sim_dir": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-22",
+  "thresholds": {
+    "nrfi_min_prob": 0.55,
+    "nrfi_max_mean_runs": 0.8,
+    "yrfi_max_nrfi_prob": 0.5,
+    "yrfi_min_mean_runs": 0.95,
+    "yrfi_min_side_lead_prob": 0.24
+  },
+  "counts": {
+    "rows": 1,
+    "games": 1
+  },
+  "signals": [
+    {
+      "game_pk": 823613,
+      "date": "2026-06-22",
+      "away": "Chicago Cubs",
+      "home": "New York Mets",
+      "away_abbr": "CHC",
+      "home_abbr": "NYM",
+      "away_team_id": 112,
+      "home_team_id": 121,
+      "starter_names": {
+        "away": "Shota Imanaga",
+        "home": "Kodai Senga"
+      },
+      "signal": {
+        "label": "F1 YRFI",
+        "tone": "yrfi",
+        "summary": "F1 mean 1.26 | side lead 30.5%",
+        "detail": "Season filter qualified: only 48.7% simulated NRFI, 1.26 expected first-inning runs, and one side reaches a 30.5% chance to be ahead after one.",
+        "nrfiProb": 0.487,
+        "yrfiProb": 0.513,
+        "meanTotalRuns": 1.265,
+        "maxSideLeadProb": 0.305
+      }
+    }
+  ]
+}

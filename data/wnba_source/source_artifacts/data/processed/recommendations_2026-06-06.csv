@@ -1,0 +1,5 @@
+market,side,home,away,date,ev,price,implied_prob,edge,line,pred_margin,market_home_margin,pred_total,tier
+ATS,Atlanta Dream,Atlanta Dream,Washington Mystics,2026-06-06,0.18975,-110.0,0.52381,18.975,9.0,9.975,-9.0,,High
+TOTAL,Under,Atlanta Dream,Washington Mystics,2026-06-06,0.011562,-110.0,0.52381,-1.1562,160.5,,,159.3438,Low
+ATS,New York Liberty,New York Liberty,Indiana Fever,2026-06-06,0.05825,-110.0,0.52381,5.825,2.5,3.325,-2.5,,High
+TOTAL,Under,New York Liberty,Indiana Fever,2026-06-06,0.042712,-110.0,0.52381,-4.271214,175.0,,,170.728786,High

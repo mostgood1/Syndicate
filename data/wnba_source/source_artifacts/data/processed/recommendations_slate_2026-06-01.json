@@ -1,0 +1,202 @@
+{
+  "date": "2026-06-01",
+  "counts": {
+    "games": 2,
+    "picks": 10
+  },
+  "per_game": [
+    {
+      "home": "DAL",
+      "away": "SEA",
+      "matchup": "SEA @ DAL",
+      "picks": [
+        {
+          "market": "ATS",
+          "team": "Dallas Wings",
+          "display_pick": "Dallas Wings -12.5",
+          "selection": "Dallas Wings",
+          "price": -110.0,
+          "score": 24.375,
+          "ev_pct": 24.375,
+          "win_prob": 0.76756,
+          "p_win": 0.76756,
+          "basketball_summary": "Model margin 11.9 vs market -12.5",
+          "top_play_reasons": [
+            "Edge 24.4",
+            "EV 24.4%"
+          ],
+          "matchup": "SEA @ DAL"
+        },
+        {
+          "market": "PROPS",
+          "team": "DAL",
+          "display_pick": "Azzi Fudd UNDER 17.5",
+          "selection": "UNDER 17.5",
+          "price": -124.0,
+          "score": 9.087596215492965,
+          "ev_pct": 9.087596215492965,
+          "win_prob": 0.5535714285714286,
+          "p_win": 0.5535714285714286,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 9.1%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "SEA @ DAL"
+        },
+        {
+          "market": "PROPS",
+          "team": "SEA",
+          "display_pick": "Jade Melbourne OVER 3.5",
+          "selection": "OVER 3.5",
+          "price": -129.0,
+          "score": 5.971354589422978,
+          "ev_pct": 5.971354589422978,
+          "win_prob": 0.5633187772925764,
+          "p_win": 0.5633187772925764,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 6.0%",
+            "Regular price range (-150 to +150)",
+            "Consensus: 4 books aligned",
+            "Best line available"
+          ],
+          "matchup": "SEA @ DAL"
+        },
+        {
+          "market": "TOTAL",
+          "team": "Total",
+          "display_pick": "Under 166.5",
+          "selection": "Under",
+          "price": -110.0,
+          "score": -3.640757,
+          "ev_pct": 3.6408000000000005,
+          "win_prob": 0.560218,
+          "p_win": 0.560218,
+          "basketball_summary": "Model total 162.9 vs line 166.5",
+          "top_play_reasons": [
+            "Edge -3.6",
+            "EV 3.6%"
+          ],
+          "matchup": "SEA @ DAL"
+        },
+        {
+          "market": "PROPS",
+          "team": "DAL",
+          "display_pick": "Jessica Shepard OVER 5.5",
+          "selection": "OVER 5.5",
+          "price": 105.0,
+          "score": 2.5961098897822055,
+          "ev_pct": 2.5961098897822055,
+          "win_prob": 0.4878048780487805,
+          "p_win": 0.4878048780487805,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 2.6%",
+            "Regular price range (-150 to +150)",
+            "Consensus: 4 books aligned",
+            "Best line available"
+          ],
+          "matchup": "SEA @ DAL"
+        }
+      ]
+    },
+    {
+      "home": "PHX",
+      "away": "MIN",
+      "matchup": "MIN @ PHX",
+      "picks": [
+        {
+          "market": "PROPS",
+          "team": "MIN",
+          "display_pick": "Natasha Howard OVER 11.5",
+          "selection": "OVER 11.5",
+          "price": 108.0,
+          "score": 12.462042301235233,
+          "ev_pct": 12.462042301235233,
+          "win_prob": 0.4807692307692308,
+          "p_win": 0.4807692307692308,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.5%",
+            "Regular price range (-150 to +150)"
+          ],
+          "matchup": "MIN @ PHX"
+        },
+        {
+          "market": "PROPS",
+          "team": "PHX",
+          "display_pick": "Alyssa Thomas UNDER 8.5",
+          "selection": "UNDER 8.5",
+          "price": 103.0,
+          "score": 7.985061207594645,
+          "ev_pct": 7.985061207594645,
+          "win_prob": 0.49261083743842365,
+          "p_win": 0.49261083743842365,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 8.0%",
+            "Regular price range (-150 to +150)",
+            "Consensus: 3 books aligned",
+            "Best line available"
+          ],
+          "matchup": "MIN @ PHX"
+        },
+        {
+          "market": "PROPS",
+          "team": "MIN",
+          "display_pick": "Olivia Miles UNDER 5.5",
+          "selection": "UNDER 5.5",
+          "price": 118.0,
+          "score": 7.870299969492933,
+          "ev_pct": 7.870299969492933,
+          "win_prob": 0.45871559633027525,
+          "p_win": 0.45871559633027525,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 7.9%",
+            "Regular price range (-150 to +150)",
+            "Consensus: 3 books aligned",
+            "Best line available"
+          ],
+          "matchup": "MIN @ PHX"
+        },
+        {
+          "market": "ATS",
+          "team": "Minnesota Lynx",
+          "display_pick": "Minnesota Lynx -3.0",
+          "selection": "Minnesota Lynx",
+          "price": -110.0,
+          "score": 5.85,
+          "ev_pct": 5.8500000000000005,
+          "win_prob": 0.58231,
+          "p_win": 0.58231,
+          "basketball_summary": "Model margin 2.9 vs market -3.0",
+          "top_play_reasons": [
+            "Edge 5.8",
+            "EV 5.9%"
+          ],
+          "matchup": "MIN @ PHX"
+        },
+        {
+          "market": "TOTAL",
+          "team": "Total",
+          "display_pick": "Under 166.5",
+          "selection": "Under",
+          "price": -110.0,
+          "score": -2.8794,
+          "ev_pct": 2.8794,
+          "win_prob": 0.552604,
+          "p_win": 0.552604,
+          "basketball_summary": "Model total 163.6 vs line 166.5",
+          "top_play_reasons": [
+            "Edge -2.9",
+            "EV 2.9%"
+          ],
+          "matchup": "MIN @ PHX"
+        }
+      ]
+    }
+  ]
+}

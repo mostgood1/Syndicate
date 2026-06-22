@@ -1,0 +1,2175 @@
+{
+  "date": "2026-06-01",
+  "games": [
+    {
+      "home_tri": "DAL",
+      "away_tri": "SEA",
+      "sim": {
+        "quarters": [],
+        "players_summary": {
+          "home": 11,
+          "away": 13,
+          "missing_home": 0,
+          "missing_away": 0,
+          "injured_home": 0,
+          "injured_away": 0
+        },
+        "players": {
+          "home": [
+            {
+              "team": "DAL",
+              "opponent": "SEA",
+              "player_name": "Jessica Shepard",
+              "player_id": 3906949,
+              "pts_mean": 11.542556249999995,
+              "reb_mean": 10.453833152173912,
+              "ast_mean": 5.762266032608695,
+              "threes_mean": 0.0,
+              "pra_mean": 27.758655434782604,
+              "stl_mean": 0.1677912137681159,
+              "blk_mean": 0.0,
+              "tov_mean": 1.1745384963768115,
+              "pts_sd": 2.885639062499999,
+              "reb_sd": 2.613458288043478,
+              "ast_sd": 1.4405665081521737,
+              "threes_sd": 1.0,
+              "pra_sd": 6.939663858695651,
+              "stl_sd": 1.0,
+              "blk_sd": 1.0,
+              "tov_sd": 1.0,
+              "q_pts": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_reb": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_ast": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_threes": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "position": "F",
+              "minutes": 30.87358333333333
+            },
+            {
+              "team": "DAL",
+              "opponent": "SEA",
+              "player_name": "Paige Bueckers",
+              "player_id": 4433730,
+              "pts_mean": 19.46437188208617,
+              "reb_mean": 3.2556408163265305,
+              "ast_mean": 4.954936961451247,
+              "threes_mean": 2.0624072562358275,
+              "pra_mean": 27.67494965986394,
+              "stl_mean": 0.3347482993197279,
+              "blk_mean": 0.1673741496598639,
+              "tov_mean": 1.8411156462585032,
+              "pts_sd": 4.866092970521542,
+              "reb_sd": 1.0,
+              "ast_sd": 1.2387342403628117,
+              "threes_sd": 1.0,
+              "pra_sd": 6.918737414965985,
+              "stl_sd": 1.0,
+              "blk_sd": 1.0,
+              "tov_sd": 1.0,
+              "q_pts": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_reb": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_ast": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_threes": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "position": "G",
+              "minutes": 32.80533333333333
+            },
+            {
+              "team": "DAL",
+              "opponent": "SEA",
+              "player_name": "Arike Ogunbowale",
+              "player_id": 3904577,
+              "pts_mean": 14.633822385861562,
+              "reb_mean": 2.339818262150221,
+              "ast_mean": 3.0095882179675995,
+              "threes_mean": 2.374619734904271,
+              "pra_mean": 19.98322886597938,
+              "stl_mean": 0.8383271968581247,
+              "blk_mean": 0.1676654393716249,
+              "tov_mean": 1.5089889543446244,
+              "pts_sd": 3.6584555964653904,
+              "reb_sd": 1.0,
+              "ast_sd": 1.0,
+              "threes_sd": 1.0,
+              "pra_sd": 4.995807216494845,
+              "stl_sd": 1.0,
+              "blk_sd": 1.0,
+              "tov_sd": 1.0,
+              "q_pts": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_reb": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_ast": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_threes": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "position": "G",
+              "minutes": 32.52709523809524
+            },
+            {
+              "team": "DAL",
+              "opponent": "SEA",
+              "player_name": "Azzi Fudd",
+              "player_id": 4433790,
+              "pts_mean": 13.530044,
+              "reb_mean": 1.219528,
+              "ast_mean": 1.491116,
+              "threes_mean": 2.194292,
+              "pra_mean": 16.240688,
+              "stl_mean": 1.23588,
+              "blk_mean": 1.23588,
+              "tov_mean": 1.0299,
+              "pts_sd": 3.382511,
+              "reb_sd": 1.0,
+              "ast_sd": 1.0,
+              "threes_sd": 1.0,
+              "pra_sd": 4.060172,
+              "stl_sd": 1.0,
+              "blk_sd": 1.0,
+              "tov_sd": 1.0,
+              "q_pts": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_reb": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_ast": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_threes": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "position": "G",
+              "minutes": 25.7475
+            },
+            {
+              "team": "DAL",
+              "opponent": "SEA",
+              "player_name": "Awak Kuier",
+              "player_id": 4790266,
+              "pts_mean": 7.42435172413793,
+              "reb_mean": 3.4578354679802947,
+              "ast_mean": 0.9545044334975368,
+              "threes_mean": 0.9778965517241378,
+              "pra_mean": 11.83669162561576,
+              "stl_mean": 0.7050049261083743,
+              "blk_mean": 0.8812561576354678,
+              "tov_mean": 0.8812561576354678,
+              "pts_sd": 1.8560879310344824,
+              "reb_sd": 1.0,
+              "ast_sd": 1.0,
+              "threes_sd": 1.0,
+              "pra_sd": 2.95917290640394,
+              "stl_sd": 1.0,
+              "blk_sd": 1.0,
+              "tov_sd": 1.0,
+              "q_pts": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_reb": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_ast": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_threes": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "position": "F",
+              "minutes": 15.33385714285714
+            },
+            {
+              "team": "DAL",
+              "opponent": "SEA",
+              "player_name": "Odyssey Sims",
+              "player_id": 2529047,
+              "pts_mean": 5.418125793650793,
+              "reb_mean": 0.4391030753968253,
+              "ast_mean": 3.157721527777777,
+              "threes_mean": 0.4213252976190476,
+              "pra_mean": 9.014950396825396,
+              "stl_mean": 0.7555332341269841,
+              "blk_mean": 0.0,
+              "tov_mean": 1.0577465277777778,
+              "pts_sd": 1.3545314484126982,
+              "reb_sd": 1.0,
+              "ast_sd": 1.0,
+              "threes_sd": 1.0,
+              "pra_sd": 2.253737599206349,
+              "stl_sd": 1.0,
+              "blk_sd": 1.0,
+              "tov_sd": 1.0,
+              "q_pts": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_reb": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_ast": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_threes": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "position": "G",
+              "minutes": 16.923944444444444
+            },
+            {
+              "team": "DAL",
+              "opponent": "SEA",
+              "player_name": "Aziaha James",
+              "player_id": 4433807,
+              "pts_mean": 4.80536507936508,
+              "reb_mean": 2.466238095238096,
+              "ast_mean": 0.9244497354497356,
+              "threes_mean": 0.3493354497354497,
+              "pra_mean": 8.196052910052911,
+              "stl_mean": 1.4333492063492064,
+              "blk_mean": 0.3185220458553792,
+              "tov_mean": 0.4777830687830688,
+              "pts_sd": 1.20134126984127,
+              "reb_sd": 1.0,
+              "ast_sd": 1.0,
+              "threes_sd": 1.0,
+              "pra_sd": 2.049013227513228,
+              "stl_sd": 1.0,
+              "blk_sd": 1.0,
+              "tov_sd": 1.0,
+              "q_pts": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_reb": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_ast": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_threes": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "position": "G",
+              "minutes": 10.033444444444443
+            },
+            {
+              "team": "DAL",
+              "opponent": "SEA",
+              "player_name": "Alanna Smith",
+              "player_id": 3913881,
+              "pts_mean": 3.0932810457516338,
+              "reb_mean": 3.190522875816993,
+              "ast_mean": 1.8380130718954248,
+              "threes_mean": 0.3251503267973856,
+              "pra_mean": 8.121816993464051,
+              "stl_mean": 0.9235294117647058,
+              "blk_mean": 0.4617647058823529,
+              "tov_mean": 1.0774509803921568,
+              "pts_sd": 1.0,
+              "reb_sd": 1.0,
+              "ast_sd": 1.0,
+              "threes_sd": 1.0,
+              "pra_sd": 2.030454248366013,
+              "stl_sd": 1.0,
+              "blk_sd": 1.0,
+              "tov_sd": 1.0,
+              "q_pts": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_reb": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_ast": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_threes": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "position": "F",
+              "minutes": 15.7
+            },
+            {
+              "team": "DAL",
+              "opponent": "SEA",
+              "player_name": "Maddy Siegrist",
+              "player_id": 4399415,
+              "pts_mean": 5.4980828828828825,
+              "reb_mean": 1.7738216216216216,
+              "ast_mean": 0.5919351351351351,
+              "threes_mean": 0.4672846846846846,
+              "pra_mean": 7.863839639639639,
+              "stl_mean": 0.3221681681681681,
+              "blk_mean": 0.4832522522522521,
+              "tov_mean": 0.161084084084084,
+              "pts_sd": 1.3745207207207206,
+              "reb_sd": 1.0,
+              "ast_sd": 1.0,
+              "threes_sd": 1.0,
+              "pra_sd": 1.9659599099099097,
+              "stl_sd": 1.0,
+              "blk_sd": 1.0,
+              "tov_sd": 1.0,
+              "q_pts": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_reb": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_ast": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_threes": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "position": "F",
+              "minutes": 11.920222222222222
+            },
+            {
+              "team": "DAL",
+              "opponent": "SEA",
+              "player_name": "Amy Okonkwo",
+              "player_id": 3142242,
+              "pts_mean": 4.6,
+              "reb_mean": 2.575,
+              "ast_mean": 0.0,
+              "threes_mean": 0.575,
+              "pra_mean": 7.175,
+              "stl_mean": 0.2199999999999999,
+              "blk_mean": 0.18,
+              "tov_mean": 0.6,
+              "pts_sd": 1.15,
+              "reb_sd": 1.0,
+              "ast_sd": 1.0,
+              "threes_sd": 1.0,
+              "pra_sd": 1.79375,
+              "stl_sd": 1.0,
+              "blk_sd": 1.0,
+              "tov_sd": 1.0,
+              "q_pts": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_reb": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_ast": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_threes": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "position": "nan",
+              "minutes": 10.0
+            },
+            {
+              "team": "DAL",
+              "opponent": "SEA",
+              "player_name": "Grace Berger",
+              "player_id": 4398899,
+              "pts_mean": 2.425,
+              "reb_mean": 1.425,
+              "ast_mean": 2.425,
+              "threes_mean": 0.4249999999999999,
+              "pra_mean": 6.275,
+              "stl_mean": 0.24475,
+              "blk_mean": 0.2002499999999999,
+              "tov_mean": 0.6675,
+              "pts_sd": 1.0,
+              "reb_sd": 1.0,
+              "ast_sd": 1.0,
+              "threes_sd": 1.0,
+              "pra_sd": 1.56875,
+              "stl_sd": 1.0,
+              "blk_sd": 1.0,
+              "tov_sd": 1.0,
+              "q_pts": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_reb": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_ast": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_threes": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "position": "nan",
+              "minutes": 11.125
+            }
+          ],
+          "away": [
+            {
+              "team": "SEA",
+              "opponent": "DAL",
+              "player_name": "Natisha Hiedeman",
+              "player_id": 3906753,
+              "pts_mean": 16.012678260869563,
+              "reb_mean": 1.2282202898550725,
+              "ast_mean": 4.5781777777777775,
+              "threes_mean": 2.416440579710145,
+              "pra_mean": 21.81907632850241,
+              "stl_mean": 0.3927149758454106,
+              "blk_mean": 0.1963574879227053,
+              "tov_mean": 1.3745024154589371,
+              "pts_sd": 4.003169565217391,
+              "reb_sd": 1.0,
+              "ast_sd": 1.1445444444444444,
+              "threes_sd": 1.0,
+              "pra_sd": 5.454769082125602,
+              "stl_sd": 1.0,
+              "blk_sd": 1.0,
+              "tov_sd": 1.0,
+              "q_pts": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_reb": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_ast": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_threes": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "position": "G",
+              "minutes": 27.09733333333333
+            },
+            {
+              "team": "SEA",
+              "opponent": "DAL",
+              "player_name": "Flau'jae Johnson",
+              "player_id": 4698736,
+              "pts_mean": 12.385984496124031,
+              "reb_mean": 5.460570542635658,
+              "ast_mean": 1.5719090439276486,
+              "threes_mean": 1.1638320413436691,
+              "pra_mean": 19.418464082687336,
+              "stl_mean": 0.7843686477174849,
+              "blk_mean": 1.960921619293712,
+              "tov_mean": 2.3531059431524546,
+              "pts_sd": 3.096496124031008,
+              "reb_sd": 1.3651426356589145,
+              "ast_sd": 1.0,
+              "threes_sd": 1.0,
+              "pra_sd": 4.854616020671834,
+              "stl_sd": 1.0,
+              "blk_sd": 1.0,
+              "tov_sd": 1.0,
+              "q_pts": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_reb": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_ast": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_threes": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "position": "G",
+              "minutes": 25.29588888888889
+            },
+            {
+              "team": "SEA",
+              "opponent": "DAL",
+              "player_name": "Zia Cooke",
+              "player_id": 4432832,
+              "pts_mean": 12.941339569160998,
+              "reb_mean": 2.723604761904762,
+              "ast_mean": 1.877812925170068,
+              "threes_mean": 1.4295801587301589,
+              "pra_mean": 17.542757256235827,
+              "stl_mean": 0.3948265306122449,
+              "blk_mean": 0.0,
+              "tov_mean": 2.171545918367347,
+              "pts_sd": 3.2353348922902496,
+              "reb_sd": 1.0,
+              "ast_sd": 1.0,
+              "threes_sd": 1.0,
+              "pra_sd": 4.385689314058957,
+              "stl_sd": 1.0,
+              "blk_sd": 1.0,
+              "tov_sd": 1.0,
+              "q_pts": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_reb": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_ast": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_threes": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "position": "G",
+              "minutes": 19.3465
+            },
+            {
+              "team": "SEA",
+              "opponent": "DAL",
+              "player_name": "Stefanie Dolson",
+              "player_id": 2529183,
+              "pts_mean": 9.228872094995758,
+              "reb_mean": 3.4929402883799834,
+              "ast_mean": 2.0207692960135706,
+              "threes_mean": 1.025940203562341,
+              "pra_mean": 14.742581679389312,
+              "stl_mean": 0.5926068702290076,
+              "blk_mean": 1.3827493638676844,
+              "tov_mean": 1.3827493638676844,
+              "pts_sd": 2.3072180237489395,
+              "reb_sd": 1.0,
+              "ast_sd": 1.0,
+              "threes_sd": 1.0,
+              "pra_sd": 3.685645419847328,
+              "stl_sd": 1.0,
+              "blk_sd": 1.0,
+              "tov_sd": 1.0,
+              "q_pts": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_reb": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_ast": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_threes": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "position": "C",
+              "minutes": 25.877166666666668
+            },
+            {
+              "team": "SEA",
+              "opponent": "DAL",
+              "player_name": "Jade Melbourne",
+              "player_id": 5017726,
+              "pts_mean": 8.000144444444445,
+              "reb_mean": 1.813312373737374,
+              "ast_mean": 4.372294444444445,
+              "threes_mean": 0.1886396464646464,
+              "pra_mean": 14.185751262626262,
+              "stl_mean": 1.35561069023569,
+              "blk_mean": 0.19365867003367,
+              "tov_mean": 2.7112213804713803,
+              "pts_sd": 2.000036111111111,
+              "reb_sd": 1.0,
+              "ast_sd": 1.0930736111111112,
+              "threes_sd": 1.0,
+              "pra_sd": 3.5464378156565655,
+              "stl_sd": 1.0,
+              "blk_sd": 1.0,
+              "tov_sd": 1.0,
+              "q_pts": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_reb": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_ast": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_threes": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "position": "G",
+              "minutes": 25.562944444444444
+            },
+            {
+              "team": "SEA",
+              "opponent": "DAL",
+              "player_name": "Mackenzie Holmes",
+              "player_id": 4433643,
+              "pts_mean": 5.453486453576865,
+              "reb_mean": 4.047969254185693,
+              "ast_mean": 0.4280459665144597,
+              "threes_mean": 0.2229118721461187,
+              "pra_mean": 9.929501674277018,
+              "stl_mean": 1.2824520547945204,
+              "blk_mean": 0.6412260273972602,
+              "tov_mean": 0.4274840182648402,
+              "pts_sd": 1.3633716133942162,
+              "reb_sd": 1.0119923135464233,
+              "ast_sd": 1.0,
+              "threes_sd": 1.0,
+              "pra_sd": 2.4823754185692546,
+              "stl_sd": 1.0,
+              "blk_sd": 1.0,
+              "tov_sd": 1.0,
+              "q_pts": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_reb": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_ast": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_threes": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "position": "F",
+              "minutes": 15.603166666666668
+            },
+            {
+              "team": "SEA",
+              "opponent": "DAL",
+              "player_name": "Jaelyn Brown",
+              "player_id": 4066527,
+              "pts_mean": 6.85,
+              "reb_mean": 0.8499999999999999,
+              "ast_mean": 0.4249999999999999,
+              "threes_mean": 1.0,
+              "pra_mean": 8.125,
+              "stl_mean": 0.2639999999999999,
+              "blk_mean": 0.2159999999999999,
+              "tov_mean": 0.7199999999999999,
+              "pts_sd": 1.7125,
+              "reb_sd": 1.0,
+              "ast_sd": 1.0,
+              "threes_sd": 1.0,
+              "pra_sd": 2.03125,
+              "stl_sd": 1.0,
+              "blk_sd": 1.0,
+              "tov_sd": 1.0,
+              "q_pts": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_reb": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_ast": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_threes": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "position": "nan",
+              "minutes": 11.999999999999998
+            },
+            {
+              "team": "SEA",
+              "opponent": "DAL",
+              "player_name": "Jordan Horston",
+              "player_id": 4432830,
+              "pts_mean": 3.342114009661836,
+              "reb_mean": 2.8179608695652174,
+              "ast_mean": 0.8859384057971015,
+              "threes_mean": 0.2554099033816425,
+              "pra_mean": 7.046013285024155,
+              "stl_mean": 1.3827451690821255,
+              "blk_mean": 0.0,
+              "tov_mean": 0.987675120772947,
+              "pts_sd": 1.0,
+              "reb_sd": 1.0,
+              "ast_sd": 1.0,
+              "threes_sd": 1.0,
+              "pra_sd": 1.7615033212560387,
+              "stl_sd": 1.0,
+              "blk_sd": 1.0,
+              "tov_sd": 1.0,
+              "q_pts": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_reb": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_ast": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_threes": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "position": "F",
+              "minutes": 18.173222222222225
+            },
+            {
+              "team": "SEA",
+              "opponent": "DAL",
+              "player_name": "Lexie Brown",
+              "player_id": 3058892,
+              "pts_mean": 4.058449707602339,
+              "reb_mean": 1.7477807017543858,
+              "ast_mean": 0.8364456140350878,
+              "threes_mean": 0.6612230994152046,
+              "pra_mean": 6.642676023391813,
+              "stl_mean": 0.7740760233918129,
+              "blk_mean": 0.0,
+              "tov_mean": 0.967595029239766,
+              "pts_sd": 1.0146124269005847,
+              "reb_sd": 1.0,
+              "ast_sd": 1.0,
+              "threes_sd": 1.0,
+              "pra_sd": 1.6606690058479532,
+              "stl_sd": 1.0,
+              "blk_sd": 1.0,
+              "tov_sd": 1.0,
+              "q_pts": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_reb": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_ast": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_threes": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "position": "G",
+              "minutes": 14.707444444444445
+            },
+            {
+              "team": "SEA",
+              "opponent": "DAL",
+              "player_name": "Dominique Malonga",
+              "player_id": 5220150,
+              "pts_mean": 2.981111111111111,
+              "reb_mean": 1.3344444444444443,
+              "ast_mean": 0.1366666666666666,
+              "threes_mean": 0.2066666666666666,
+              "pra_mean": 4.452222222222222,
+              "stl_mean": 0.3607999999999999,
+              "blk_mean": 0.2951999999999999,
+              "tov_mean": 0.984,
+              "pts_sd": 1.0,
+              "reb_sd": 1.0,
+              "ast_sd": 1.0,
+              "threes_sd": 1.0,
+              "pra_sd": 1.1130555555555555,
+              "stl_sd": 1.0,
+              "blk_sd": 1.0,
+              "tov_sd": 1.0,
+              "q_pts": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_reb": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_ast": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_threes": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "position": "C",
+              "minutes": 16.4
+            },
+            {
+              "team": "SEA",
+              "opponent": "DAL",
+              "player_name": "Awa Fam",
+              "player_id": 5345325,
+              "pts_mean": 3.6,
+              "reb_mean": 0.72,
+              "ast_mean": 0.0,
+              "threes_mean": 0.0,
+              "pra_mean": 4.32,
+              "stl_mean": 0.2683999999999999,
+              "blk_mean": 0.2195999999999999,
+              "tov_mean": 0.732,
+              "pts_sd": 1.0,
+              "reb_sd": 1.0,
+              "ast_sd": 1.0,
+              "threes_sd": 1.0,
+              "pra_sd": 1.08,
+              "stl_sd": 1.0,
+              "blk_sd": 1.0,
+              "tov_sd": 1.0,
+              "q_pts": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_reb": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_ast": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_threes": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "position": "C",
+              "minutes": 12.2
+            },
+            {
+              "team": "SEA",
+              "opponent": "DAL",
+              "player_name": "Joyner Holmes",
+              "player_id": 4068161,
+              "pts_mean": 0.8499999999999999,
+              "reb_mean": 2.125,
+              "ast_mean": 0.4249999999999999,
+              "threes_mean": 0.0,
+              "pra_mean": 3.3999999999999995,
+              "stl_mean": 0.2298999999999999,
+              "blk_mean": 0.1880999999999999,
+              "tov_mean": 0.6269999999999999,
+              "pts_sd": 1.0,
+              "reb_sd": 1.0,
+              "ast_sd": 1.0,
+              "threes_sd": 1.0,
+              "pra_sd": 1.0,
+              "stl_sd": 1.0,
+              "blk_sd": 1.0,
+              "tov_sd": 1.0,
+              "q_pts": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_reb": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_ast": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_threes": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "position": "F",
+              "minutes": 10.45
+            },
+            {
+              "team": "SEA",
+              "opponent": "DAL",
+              "player_name": "Katie Lou Samuelson",
+              "player_id": 3917453,
+              "pts_mean": 1.0266666666666666,
+              "reb_mean": 0.6844444444444444,
+              "ast_mean": 0.6844444444444444,
+              "threes_mean": 0.3422222222222222,
+              "pra_mean": 2.395555555555555,
+              "stl_mean": 0.253,
+              "blk_mean": 0.207,
+              "tov_mean": 0.69,
+              "pts_sd": 1.0,
+              "reb_sd": 1.0,
+              "ast_sd": 1.0,
+              "threes_sd": 1.0,
+              "pra_sd": 1.0,
+              "stl_sd": 1.0,
+              "blk_sd": 1.0,
+              "tov_sd": 1.0,
+              "q_pts": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_reb": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_ast": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_threes": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "position": "F",
+              "minutes": 11.5
+            }
+          ]
+        },
+        "missing_prop_players": {
+          "home": [],
+          "away": []
+        },
+        "injuries": {
+          "home": [],
+          "away": []
+        }
+      }
+    },
+    {
+      "home_tri": "PHX",
+      "away_tri": "MIN",
+      "sim": {
+        "quarters": [],
+        "players_summary": {
+          "home": 10,
+          "away": 10,
+          "missing_home": 0,
+          "missing_away": 0,
+          "injured_home": 0,
+          "injured_away": 0
+        },
+        "players": {
+          "home": [
+            {
+              "team": "PHX",
+              "opponent": "MIN",
+              "player_name": "Alyssa Thomas",
+              "player_id": 2529140,
+              "pts_mean": 17.63707302504817,
+              "reb_mean": 8.178730892742454,
+              "ast_mean": 7.249746692357098,
+              "threes_mean": 0.0,
+              "pra_mean": 33.065550610147724,
+              "stl_mean": 1.7886907514450872,
+              "blk_mean": 0.1987434168272318,
+              "tov_mean": 3.378638086062942,
+              "pts_sd": 4.409268256262043,
+              "reb_sd": 2.0446827231856135,
+              "ast_sd": 1.8124366730892745,
+              "threes_sd": 1.0,
+              "pra_sd": 8.266387652536931,
+              "stl_sd": 1.0,
+              "blk_sd": 1.0,
+              "tov_sd": 1.0,
+              "q_pts": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_reb": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_ast": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_threes": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "position": "F",
+              "minutes": 34.38261111111112
+            },
+            {
+              "team": "PHX",
+              "opponent": "MIN",
+              "player_name": "Kahleah Copper",
+              "player_id": 2998938,
+              "pts_mean": 20.557693464052285,
+              "reb_mean": 3.2739222222222217,
+              "ast_mean": 1.9372091503267967,
+              "threes_mean": 0.9786045751633988,
+              "pra_mean": 25.768824836601304,
+              "stl_mean": 0.9717483660130718,
+              "blk_mean": 0.0,
+              "tov_mean": 2.9152450980392155,
+              "pts_sd": 5.139423366013071,
+              "reb_sd": 1.0,
+              "ast_sd": 1.0,
+              "threes_sd": 1.0,
+              "pra_sd": 6.442206209150326,
+              "stl_sd": 1.0,
+              "blk_sd": 1.0,
+              "tov_sd": 1.0,
+              "q_pts": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_reb": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_ast": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_threes": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "position": "G",
+              "minutes": 33.03944444444444
+            },
+            {
+              "team": "PHX",
+              "opponent": "MIN",
+              "player_name": "Natasha Mack",
+              "player_id": 4068042,
+              "pts_mean": 8.831744444444446,
+              "reb_mean": 8.012244444444445,
+              "ast_mean": 1.6697666666666668,
+              "threes_mean": 0.0088888888888888,
+              "pra_mean": 18.51375555555556,
+              "stl_mean": 0.748962962962963,
+              "blk_mean": 1.6851666666666667,
+              "tov_mean": 0.9362037037037038,
+              "pts_sd": 2.2079361111111115,
+              "reb_sd": 2.003061111111111,
+              "ast_sd": 1.0,
+              "threes_sd": 1.0,
+              "pra_sd": 4.62843888888889,
+              "stl_sd": 1.0,
+              "blk_sd": 1.0,
+              "tov_sd": 1.0,
+              "q_pts": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_reb": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_ast": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_threes": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "position": "F",
+              "minutes": 22.46888888888889
+            },
+            {
+              "team": "PHX",
+              "opponent": "MIN",
+              "player_name": "Jovana Nogic",
+              "player_id": 3906769,
+              "pts_mean": 13.088165624999998,
+              "reb_mean": 0.9780734375,
+              "ast_mean": 1.78211015625,
+              "threes_mean": 2.336146875,
+              "pra_mean": 15.848349218749998,
+              "stl_mean": 0.777859375,
+              "blk_mean": 0.0,
+              "tov_mean": 1.75018359375,
+              "pts_sd": 3.2720414062499996,
+              "reb_sd": 1.0,
+              "ast_sd": 1.0,
+              "threes_sd": 1.0,
+              "pra_sd": 3.9620873046874996,
+              "stl_sd": 1.0,
+              "blk_sd": 1.0,
+              "tov_sd": 1.0,
+              "q_pts": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_reb": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_ast": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_threes": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "position": "G",
+              "minutes": 24.8915
+            },
+            {
+              "team": "PHX",
+              "opponent": "MIN",
+              "player_name": "DeWanna Bonner",
+              "player_id": 869,
+              "pts_mean": 9.1525283446712,
+              "reb_mean": 4.805981405895691,
+              "ast_mean": 0.993030612244898,
+              "threes_mean": 0.5313739229024943,
+              "pra_mean": 14.951540362811787,
+              "stl_mean": 1.3422566137566136,
+              "blk_mean": 0.5752528344671202,
+              "tov_mean": 0.958754724111867,
+              "pts_sd": 2.2881320861678,
+              "reb_sd": 1.2014953514739228,
+              "ast_sd": 1.0,
+              "threes_sd": 1.0,
+              "pra_sd": 3.737885090702947,
+              "stl_sd": 1.0,
+              "blk_sd": 1.0,
+              "tov_sd": 1.0,
+              "q_pts": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_reb": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_ast": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_threes": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "position": "F",
+              "minutes": 28.187388888888886
+            },
+            {
+              "team": "PHX",
+              "opponent": "MIN",
+              "player_name": "Noemie Brochant",
+              "player_id": 5345524,
+              "pts_mean": 3.171245744680851,
+              "reb_mean": 3.190572340425532,
+              "ast_mean": 0.9173063829787234,
+              "threes_mean": 0.2493265957446808,
+              "pra_mean": 7.279124468085106,
+              "stl_mean": 0.6566329787234042,
+              "blk_mean": 0.6566329787234042,
+              "tov_mean": 0.6566329787234042,
+              "pts_sd": 1.0,
+              "reb_sd": 1.0,
+              "ast_sd": 1.0,
+              "threes_sd": 1.0,
+              "pra_sd": 1.8197811170212765,
+              "stl_sd": 1.0,
+              "blk_sd": 1.0,
+              "tov_sd": 1.0,
+              "q_pts": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_reb": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_ast": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_threes": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "position": "F",
+              "minutes": 20.5745
+            },
+            {
+              "team": "PHX",
+              "opponent": "MIN",
+              "player_name": "Lauren Jensen",
+              "player_id": 4597505,
+              "pts_mean": 3.7,
+              "reb_mean": 1.0,
+              "ast_mean": 1.275,
+              "threes_mean": 0.0,
+              "pra_mean": 5.975,
+              "stl_mean": 0.2634499999999999,
+              "blk_mean": 0.2155499999999999,
+              "tov_mean": 0.7184999999999999,
+              "pts_sd": 1.0,
+              "reb_sd": 1.0,
+              "ast_sd": 1.0,
+              "threes_sd": 1.0,
+              "pra_sd": 1.49375,
+              "stl_sd": 1.0,
+              "blk_sd": 1.0,
+              "tov_sd": 1.0,
+              "q_pts": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_reb": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_ast": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_threes": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "position": "nan",
+              "minutes": 11.975
+            },
+            {
+              "team": "PHX",
+              "opponent": "MIN",
+              "player_name": "Marta Suarez",
+              "player_id": 4704594,
+              "pts_mean": 3.1166666666666663,
+              "reb_mean": 2.433333333333333,
+              "ast_mean": 0.2833333333333333,
+              "threes_mean": 0.8499999999999999,
+              "pra_mean": 5.833333333333332,
+              "stl_mean": 0.2283049999999999,
+              "blk_mean": 0.1867949999999999,
+              "tov_mean": 0.6226499999999998,
+              "pts_sd": 1.0,
+              "reb_sd": 1.0,
+              "ast_sd": 1.0,
+              "threes_sd": 1.0,
+              "pra_sd": 1.458333333333333,
+              "stl_sd": 1.0,
+              "blk_sd": 1.0,
+              "tov_sd": 1.0,
+              "q_pts": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_reb": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_ast": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_threes": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "position": "F",
+              "minutes": 10.377499999999998
+            },
+            {
+              "team": "PHX",
+              "opponent": "MIN",
+              "player_name": "Kiana Williams",
+              "player_id": 4282168,
+              "pts_mean": 4.093044444444445,
+              "reb_mean": 0.3215888888888889,
+              "ast_mean": 0.6892111111111111,
+              "threes_mean": 0.6825444444444444,
+              "pra_mean": 5.103844444444444,
+              "stl_mean": 0.4378888888888889,
+              "blk_mean": 0.2189444444444444,
+              "tov_mean": 0.8757777777777779,
+              "pts_sd": 1.0232611111111112,
+              "reb_sd": 1.0,
+              "ast_sd": 1.0,
+              "threes_sd": 1.0,
+              "pra_sd": 1.275961111111111,
+              "stl_sd": 1.0,
+              "blk_sd": 1.0,
+              "tov_sd": 1.0,
+              "q_pts": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_reb": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_ast": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_threes": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "position": "G",
+              "minutes": 14.23138888888889
+            },
+            {
+              "team": "PHX",
+              "opponent": "MIN",
+              "player_name": "Morgan Maly",
+              "player_id": 4599199,
+              "pts_mean": 2.0,
+              "reb_mean": 2.15,
+              "ast_mean": 0.4249999999999999,
+              "threes_mean": 0.0,
+              "pra_mean": 4.575,
+              "stl_mean": 0.3233999999999999,
+              "blk_mean": 0.2645999999999999,
+              "tov_mean": 0.8819999999999999,
+              "pts_sd": 1.0,
+              "reb_sd": 1.0,
+              "ast_sd": 1.0,
+              "threes_sd": 1.0,
+              "pra_sd": 1.14375,
+              "stl_sd": 1.0,
+              "blk_sd": 1.0,
+              "tov_sd": 1.0,
+              "q_pts": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_reb": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_ast": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_threes": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "position": "nan",
+              "minutes": 14.7
+            }
+          ],
+          "away": [
+            {
+              "team": "MIN",
+              "opponent": "PHX",
+              "player_name": "Natasha Howard",
+              "player_id": 2529130,
+              "pts_mean": 18.68269189189189,
+              "reb_mean": 9.018136824324325,
+              "ast_mean": 4.182463851351351,
+              "threes_mean": 0.0,
+              "pra_mean": 31.883292567567565,
+              "stl_mean": 0.5820152027027027,
+              "blk_mean": 0.5820152027027027,
+              "tov_mean": 4.268111486486487,
+              "pts_sd": 4.670672972972972,
+              "reb_sd": 2.254534206081081,
+              "ast_sd": 1.0456159628378376,
+              "threes_sd": 1.0,
+              "pra_sd": 7.970823141891891,
+              "stl_sd": 1.0,
+              "blk_sd": 1.0,
+              "tov_sd": 1.0670278716216217,
+              "q_pts": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_reb": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_ast": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_threes": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "position": "F",
+              "minutes": 28.71275
+            },
+            {
+              "team": "MIN",
+              "opponent": "PHX",
+              "player_name": "Courtney Williams",
+              "player_id": 2987891,
+              "pts_mean": 15.85091111111111,
+              "reb_mean": 5.941162962962963,
+              "ast_mean": 3.3182296296296294,
+              "threes_mean": 1.8083703703703704,
+              "pra_mean": 25.110303703703703,
+              "stl_mean": 1.378654320987654,
+              "blk_mean": 0.7878024691358024,
+              "tov_mean": 1.1817037037037037,
+              "pts_sd": 3.9627277777777774,
+              "reb_sd": 1.4852907407407407,
+              "ast_sd": 1.0,
+              "threes_sd": 1.0,
+              "pra_sd": 6.277575925925926,
+              "stl_sd": 1.0,
+              "blk_sd": 1.0,
+              "tov_sd": 1.0,
+              "q_pts": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_reb": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_ast": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_threes": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "position": "G",
+              "minutes": 30.133444444444443
+            },
+            {
+              "team": "MIN",
+              "opponent": "PHX",
+              "player_name": "Olivia Miles",
+              "player_id": 4433791,
+              "pts_mean": 13.806946457867264,
+              "reb_mean": 5.69904668158091,
+              "ast_mean": 4.864384787472036,
+              "threes_mean": 0.2151087248322147,
+              "pra_mean": 24.37037792692021,
+              "stl_mean": 1.4051573452647277,
+              "blk_mean": 0.6022102908277405,
+              "tov_mean": 3.2117882177479493,
+              "pts_sd": 3.451736614466816,
+              "reb_sd": 1.4247616703952275,
+              "ast_sd": 1.216096196868009,
+              "threes_sd": 1.0,
+              "pra_sd": 6.092594481730052,
+              "stl_sd": 1.0,
+              "blk_sd": 1.0,
+              "tov_sd": 1.0,
+              "q_pts": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_reb": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_ast": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_threes": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "position": "G",
+              "minutes": 29.90977777777778
+            },
+            {
+              "team": "MIN",
+              "opponent": "PHX",
+              "player_name": "Kayla McBride",
+              "player_id": 2529205,
+              "pts_mean": 13.795123232323231,
+              "reb_mean": 5.222589898989899,
+              "ast_mean": 2.2325777777777778,
+              "threes_mean": 1.410630303030303,
+              "pra_mean": 21.250290909090907,
+              "stl_mean": 1.5516767676767675,
+              "blk_mean": 0.3879191919191919,
+              "tov_mean": 1.5516767676767675,
+              "pts_sd": 3.448780808080808,
+              "reb_sd": 1.3056474747474747,
+              "ast_sd": 1.0,
+              "threes_sd": 1.0,
+              "pra_sd": 5.312572727272727,
+              "stl_sd": 1.0,
+              "blk_sd": 1.0,
+              "tov_sd": 1.0,
+              "q_pts": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_reb": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_ast": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_threes": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "position": "G",
+              "minutes": 32.00333333333333
+            },
+            {
+              "team": "MIN",
+              "opponent": "PHX",
+              "player_name": "Nia Coffey",
+              "player_id": 3054590,
+              "pts_mean": 8.280009523809525,
+              "reb_mean": 5.883542063492063,
+              "ast_mean": 0.9639404761904764,
+              "threes_mean": 1.21485,
+              "pra_mean": 15.127492063492063,
+              "stl_mean": 0.3952195767195768,
+              "blk_mean": 0.988048941798942,
+              "tov_mean": 1.5808783068783072,
+              "pts_sd": 2.0700023809523813,
+              "reb_sd": 1.4708855158730159,
+              "ast_sd": 1.0,
+              "threes_sd": 1.0,
+              "pra_sd": 3.781873015873016,
+              "stl_sd": 1.0,
+              "blk_sd": 1.0,
+              "tov_sd": 1.0,
+              "q_pts": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_reb": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_ast": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_threes": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "position": "F",
+              "minutes": 24.898833333333336
+            },
+            {
+              "team": "MIN",
+              "opponent": "PHX",
+              "player_name": "Saylor Poffenbarger",
+              "player_id": 4433542,
+              "pts_mean": 4.816666666666667,
+              "reb_mean": 5.4,
+              "ast_mean": 0.5666666666666667,
+              "threes_mean": 0.8499999999999999,
+              "pra_mean": 10.783333333333331,
+              "stl_mean": 0.4795999999999999,
+              "blk_mean": 0.3923999999999999,
+              "tov_mean": 1.3079999999999998,
+              "pts_sd": 1.2041666666666668,
+              "reb_sd": 1.35,
+              "ast_sd": 1.0,
+              "threes_sd": 1.0,
+              "pra_sd": 2.695833333333333,
+              "stl_sd": 1.0,
+              "blk_sd": 1.0,
+              "tov_sd": 1.0,
+              "q_pts": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_reb": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_ast": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_threes": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "position": "nan",
+              "minutes": 21.8
+            },
+            {
+              "team": "MIN",
+              "opponent": "PHX",
+              "player_name": "Maya Caldwell",
+              "player_id": 4280850,
+              "pts_mean": 4.7892392857142845,
+              "reb_mean": 2.165321428571428,
+              "ast_mean": 2.0153214285714283,
+              "threes_mean": 1.007660714285714,
+              "pra_mean": 8.969882142857141,
+              "stl_mean": 0.6076607142857142,
+              "blk_mean": 0.4051071428571428,
+              "tov_mean": 0.4051071428571428,
+              "pts_sd": 1.1973098214285711,
+              "reb_sd": 1.0,
+              "ast_sd": 1.0,
+              "threes_sd": 1.0,
+              "pra_sd": 2.2424705357142853,
+              "stl_sd": 1.0,
+              "blk_sd": 1.0,
+              "tov_sd": 1.0,
+              "q_pts": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_reb": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_ast": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_threes": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "position": "G",
+              "minutes": 14.178749999999996
+            },
+            {
+              "team": "MIN",
+              "opponent": "PHX",
+              "player_name": "Liatu King",
+              "player_id": 4596309,
+              "pts_mean": 2.8566666666666665,
+              "reb_mean": 3.693333333333333,
+              "ast_mean": 0.4466666666666666,
+              "threes_mean": 0.2033333333333333,
+              "pra_mean": 6.996666666666666,
+              "stl_mean": 0.2644216666666666,
+              "blk_mean": 0.2163449999999999,
+              "tov_mean": 0.72115,
+              "pts_sd": 1.0,
+              "reb_sd": 1.0,
+              "ast_sd": 1.0,
+              "threes_sd": 1.0,
+              "pra_sd": 1.7491666666666665,
+              "stl_sd": 1.0,
+              "blk_sd": 1.0,
+              "tov_sd": 1.0,
+              "q_pts": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_reb": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_ast": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_threes": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "position": "F",
+              "minutes": 12.019166666666669
+            },
+            {
+              "team": "MIN",
+              "opponent": "PHX",
+              "player_name": "Antonia Delaere",
+              "player_id": 4873358,
+              "pts_mean": 2.682908126036484,
+              "reb_mean": 0.6464961857379767,
+              "ast_mean": 1.3492318407960198,
+              "threes_mean": 0.61982951907131,
+              "pra_mean": 4.678636152570481,
+              "stl_mean": 0.0,
+              "blk_mean": 0.0,
+              "tov_mean": 0.3904278606965173,
+              "pts_sd": 1.0,
+              "reb_sd": 1.0,
+              "ast_sd": 1.0,
+              "threes_sd": 1.0,
+              "pra_sd": 1.1696590381426202,
+              "stl_sd": 1.0,
+              "blk_sd": 1.0,
+              "tov_sd": 1.0,
+              "q_pts": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_reb": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_ast": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_threes": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "position": "F",
+              "minutes": 13.079333333333333
+            },
+            {
+              "team": "MIN",
+              "opponent": "PHX",
+              "player_name": "Emma Cechova",
+              "player_id": 5345322,
+              "pts_mean": 1.935,
+              "reb_mean": 0.985,
+              "ast_mean": 0.0,
+              "threes_mean": 0.0,
+              "pra_mean": 2.92,
+              "stl_mean": 0.2414499999999999,
+              "blk_mean": 0.1975499999999999,
+              "tov_mean": 0.6585,
+              "pts_sd": 1.0,
+              "reb_sd": 1.0,
+              "ast_sd": 1.0,
+              "threes_sd": 1.0,
+              "pra_sd": 1.0,
+              "stl_sd": 1.0,
+              "blk_sd": 1.0,
+              "tov_sd": 1.0,
+              "q_pts": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_reb": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_ast": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "q_threes": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "position": "F",
+              "minutes": 10.975
+            }
+          ]
+        },
+        "missing_prop_players": {
+          "home": [],
+          "away": []
+        },
+        "injuries": {
+          "home": [],
+          "away": []
+        }
+      }
+    }
+  ]
+}

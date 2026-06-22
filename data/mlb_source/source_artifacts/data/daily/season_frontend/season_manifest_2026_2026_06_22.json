@@ -1,0 +1,1588 @@
+{
+  "meta": {
+    "season": 2026,
+    "title": "MLB 2026 Rolling Season Eval",
+    "generated_at": "2026-06-22T03:49:14.515132",
+    "batch_dir": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/eval/batches/season_2026_ui_daily_live",
+    "game_types": [
+      "R"
+    ],
+    "status": "partial",
+    "partial": true,
+    "progress": {
+      "partial": true,
+      "in_progress": false,
+      "completed_reports": 6,
+      "expected_reports": null,
+      "completion_ratio": null,
+      "lock_path": null,
+      "date_file": null
+    },
+    "sources": {
+      "batch_meta": null,
+      "summary": null,
+      "manifest": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/eval/seasons/2026/season_eval_manifest.json"
+    },
+    "batch_meta": {
+      "sims_per_game": null,
+      "jobs": null,
+      "prop_lines_source": null,
+      "use_raw": null
+    }
+  },
+  "overview": {
+    "days": 6,
+    "reports": 6,
+    "completed_reports": 6,
+    "expected_reports": null,
+    "completion_ratio": null,
+    "total_games": 69,
+    "cards_available_days": 0,
+    "legacy_cards_page_days": 0,
+    "betting_cards": {
+      "available_profiles": [],
+      "manifest_paths": {},
+      "default_profile": null,
+      "days_any": 0,
+      "days_by_profile": {},
+      "settled_days_by_profile": {},
+      "unresolved_recommendations_by_profile": {},
+      "cards_with_bets_by_profile": {},
+      "days_with_playable_by_profile": {},
+      "official_recommendations_by_profile": {},
+      "playable_recommendations_by_profile": {}
+    },
+    "first_date": "2026-06-14",
+    "last_date": "2026-06-21"
+  },
+  "recap": {
+    "segments": {
+      "full": {
+        "brier_home_win": 0.25196108695652175,
+        "brier_home_win_weight": 69.0,
+        "mae_total_runs": 3.4395797101449284,
+        "mae_total_runs_weight": 69.0,
+        "mae_run_margin": 4.084304347826087,
+        "mae_run_margin_weight": 69.0
+      },
+      "first5": {
+        "brier_home_win": 0.26228,
+        "brier_home_win_weight": 69.0,
+        "mae_total_runs": 2.857478260869565,
+        "mae_total_runs_weight": 69.0,
+        "mae_run_margin": 3.1062318840579706,
+        "mae_run_margin_weight": 69.0
+      },
+      "first3": {
+        "brier_home_win": 0.2601816956521739,
+        "brier_home_win_weight": 69.0,
+        "mae_total_runs": 2.126188405797101,
+        "mae_total_runs_weight": 69.0,
+        "mae_run_margin": 2.142391304347826,
+        "mae_run_margin_weight": 69.0
+      }
+    },
+    "full_game": {
+      "totals": {
+        "mae": 3.4395797101449284,
+        "mae_weight": 69.0,
+        "rmse": 4.698114800928462,
+        "rmse_weight": 69.0,
+        "avg_nll_exact_total": 2.9888351362732943,
+        "avg_nll_exact_total_weight": 69.0
+      },
+      "moneyline": {
+        "brier": 0.25196108695652175,
+        "brier_weight": 69.0,
+        "logloss": 0.6971491445907637,
+        "logloss_weight": 69.0,
+        "accuracy": 0.5072463768115942,
+        "accuracy_weight": 69.0
+      },
+      "runline_fav_minus_1_5": {
+        "brier": 0.23892466666666667,
+        "brier_weight": 69.0,
+        "logloss": 0.6707571875462992,
+        "logloss_weight": 69.0,
+        "accuracy": 0.6086956521739131,
+        "accuracy_weight": 69.0
+      },
+      "pitcher_props_starters": {
+        "so_mae": 2.2489354838709676,
+        "so_mae_weight": 124.0,
+        "so_rmse": 2.710942440451245,
+        "so_rmse_weight": 124.0,
+        "outs_mae": 5.657048387096773,
+        "outs_mae_weight": 124.0,
+        "outs_rmse": 7.16933710248706,
+        "outs_rmse_weight": 124.0
+      },
+      "pitcher_props_at_market_lines": {
+        "strikeouts": {},
+        "outs": {}
+      }
+    },
+    "starter_sources": {},
+    "hitter_hr_likelihood_topn": {
+      "hr_brier": 0.11559139452495966,
+      "hr_brier_weight": 1242.0,
+      "hr_logloss": 0.4021888206107591,
+      "hr_logloss_weight": 1242.0,
+      "hr_avg_p": 0.078890499194847,
+      "hr_avg_p_weight": 1242.0,
+      "hr_emp_rate": 0.13043478260869565,
+      "hr_emp_rate_weight": 1242.0
+    },
+    "hitter_props_likelihood_topn": {
+      "hits_1plus_brier": 0.2491343631239936,
+      "hits_1plus_brier_weight": 1242.0,
+      "hits_1plus_logloss": 0.6928349373062678,
+      "hits_1plus_logloss_weight": 1242.0,
+      "hits_1plus_avg_p": 0.651147342995169,
+      "hits_1plus_avg_p_weight": 1242.0,
+      "hits_1plus_emp_rate": 0.571658615136876,
+      "hits_1plus_emp_rate_weight": 1242.0,
+      "hits_2plus_brier": 0.16627564573268927,
+      "hits_2plus_brier_weight": 1242.0,
+      "hits_2plus_logloss": 0.5150729838236903,
+      "hits_2plus_logloss_weight": 1242.0,
+      "hits_2plus_avg_p": 0.25981803542673104,
+      "hits_2plus_avg_p_weight": 1242.0,
+      "hits_2plus_emp_rate": 0.20531400966183574,
+      "hits_2plus_emp_rate_weight": 1242.0,
+      "hits_3plus_brier": 0.04744575764895329,
+      "hits_3plus_brier_weight": 1242.0,
+      "hits_3plus_logloss": 0.19816237944810083,
+      "hits_3plus_logloss_weight": 1242.0,
+      "hits_3plus_avg_p": 0.06542270531400966,
+      "hits_3plus_avg_p_weight": 1242.0,
+      "hits_3plus_emp_rate": 0.0499194847020934,
+      "hits_3plus_emp_rate_weight": 1242.0,
+      "hits_runs_rbis_2plus_brier": 0.0,
+      "hits_runs_rbis_2plus_brier_weight": 1242.0,
+      "hits_runs_rbis_2plus_logloss": 9.999778782803771e-13,
+      "hits_runs_rbis_2plus_logloss_weight": 1242.0,
+      "hits_runs_rbis_2plus_avg_p": 0.0,
+      "hits_runs_rbis_2plus_avg_p_weight": 1242.0,
+      "hits_runs_rbis_2plus_emp_rate": 0.0,
+      "hits_runs_rbis_2plus_emp_rate_weight": 1242.0,
+      "hits_runs_rbis_3plus_brier": 0.0,
+      "hits_runs_rbis_3plus_brier_weight": 1242.0,
+      "hits_runs_rbis_3plus_logloss": 9.999778782803771e-13,
+      "hits_runs_rbis_3plus_logloss_weight": 1242.0,
+      "hits_runs_rbis_3plus_avg_p": 0.0,
+      "hits_runs_rbis_3plus_avg_p_weight": 1242.0,
+      "hits_runs_rbis_3plus_emp_rate": 0.0,
+      "hits_runs_rbis_3plus_emp_rate_weight": 1242.0,
+      "hits_runs_rbis_4plus_brier": 0.0,
+      "hits_runs_rbis_4plus_brier_weight": 1242.0,
+      "hits_runs_rbis_4plus_logloss": 9.999778782803771e-13,
+      "hits_runs_rbis_4plus_logloss_weight": 1242.0,
+      "hits_runs_rbis_4plus_avg_p": 0.0,
+      "hits_runs_rbis_4plus_avg_p_weight": 1242.0,
+      "hits_runs_rbis_4plus_emp_rate": 0.0,
+      "hits_runs_rbis_4plus_emp_rate_weight": 1242.0,
+      "hits_runs_rbis_5plus_brier": 0.0,
+      "hits_runs_rbis_5plus_brier_weight": 1242.0,
+      "hits_runs_rbis_5plus_logloss": 9.999778782803771e-13,
+      "hits_runs_rbis_5plus_logloss_weight": 1242.0,
+      "hits_runs_rbis_5plus_avg_p": 0.0,
+      "hits_runs_rbis_5plus_avg_p_weight": 1242.0,
+      "hits_runs_rbis_5plus_emp_rate": 0.0,
+      "hits_runs_rbis_5plus_emp_rate_weight": 1242.0,
+      "doubles_1plus_brier": 0.1295033003220612,
+      "doubles_1plus_brier_weight": 1242.0,
+      "doubles_1plus_logloss": 0.43111924683281033,
+      "doubles_1plus_logloss_weight": 1242.0,
+      "doubles_1plus_avg_p": 0.14818276972624791,
+      "doubles_1plus_avg_p_weight": 1242.0,
+      "doubles_1plus_emp_rate": 0.1497584541062802,
+      "doubles_1plus_emp_rate_weight": 1242.0,
+      "triples_1plus_brier": 0.011269121578099839,
+      "triples_1plus_brier_weight": 1242.0,
+      "triples_1plus_logloss": 0.06313744894599574,
+      "triples_1plus_logloss_weight": 1242.0,
+      "triples_1plus_avg_p": 0.01445169082125601,
+      "triples_1plus_avg_p_weight": 1242.0,
+      "triples_1plus_emp_rate": 0.011272141706924315,
+      "triples_1plus_emp_rate_weight": 1242.0,
+      "runs_1plus_brier": 0.2280825740740741,
+      "runs_1plus_brier_weight": 1242.0,
+      "runs_1plus_logloss": 0.6484119312511246,
+      "runs_1plus_logloss_weight": 1242.0,
+      "runs_1plus_avg_p": 0.38157407407407407,
+      "runs_1plus_avg_p_weight": 1242.0,
+      "runs_1plus_emp_rate": 0.35990338164251207,
+      "runs_1plus_emp_rate_weight": 1242.0,
+      "runs_2plus_brier": 0.0688933639291465,
+      "runs_2plus_brier_weight": 1242.0,
+      "runs_2plus_logloss": 0.26681987266560875,
+      "runs_2plus_logloss_weight": 1242.0,
+      "runs_2plus_avg_p": 0.08059259259259262,
+      "runs_2plus_avg_p_weight": 1242.0,
+      "runs_2plus_emp_rate": 0.07407407407407407,
+      "runs_2plus_emp_rate_weight": 1242.0,
+      "runs_3plus_brier": 0.015090506441223834,
+      "runs_3plus_brier_weight": 1242.0,
+      "runs_3plus_logloss": 0.08120686521674107,
+      "runs_3plus_logloss_weight": 1242.0,
+      "runs_3plus_avg_p": 0.011071658615136854,
+      "runs_3plus_avg_p_weight": 1242.0,
+      "runs_3plus_emp_rate": 0.015297906602254429,
+      "runs_3plus_emp_rate_weight": 1242.0,
+      "rbi_1plus_brier": 0.199797227858293,
+      "rbi_1plus_brier_weight": 1242.0,
+      "rbi_1plus_logloss": 0.5888877332142853,
+      "rbi_1plus_logloss_weight": 1242.0,
+      "rbi_1plus_avg_p": 0.2991119162640902,
+      "rbi_1plus_avg_p_weight": 1242.0,
+      "rbi_1plus_emp_rate": 0.27616747181964574,
+      "rbi_1plus_emp_rate_weight": 1242.0,
+      "rbi_2plus_brier": 0.09907776167471813,
+      "rbi_2plus_brier_weight": 1242.0,
+      "rbi_2plus_logloss": 0.34989961651196255,
+      "rbi_2plus_logloss_weight": 1242.0,
+      "rbi_2plus_avg_p": 0.107768115942029,
+      "rbi_2plus_avg_p_weight": 1242.0,
+      "rbi_2plus_emp_rate": 0.1111111111111111,
+      "rbi_2plus_emp_rate_weight": 1242.0,
+      "rbi_3plus_brier": 0.03357070450885667,
+      "rbi_3plus_brier_weight": 1242.0,
+      "rbi_3plus_logloss": 0.15142607353347212,
+      "rbi_3plus_logloss_weight": 1242.0,
+      "rbi_3plus_avg_p": 0.03993156199677938,
+      "rbi_3plus_avg_p_weight": 1242.0,
+      "rbi_3plus_emp_rate": 0.03462157809983897,
+      "rbi_3plus_emp_rate_weight": 1242.0,
+      "rbi_4plus_brier": 0.015069396135265698,
+      "rbi_4plus_brier_weight": 1242.0,
+      "rbi_4plus_logloss": 0.07860320507067894,
+      "rbi_4plus_logloss_weight": 1242.0,
+      "rbi_4plus_avg_p": 0.013328502415458911,
+      "rbi_4plus_avg_p_weight": 1242.0,
+      "rbi_4plus_emp_rate": 0.015297906602254429,
+      "rbi_4plus_emp_rate_weight": 1242.0,
+      "total_bases_1plus_brier": 0.2491343631239936,
+      "total_bases_1plus_brier_weight": 1242.0,
+      "total_bases_1plus_logloss": 0.6928349373062678,
+      "total_bases_1plus_logloss_weight": 1242.0,
+      "total_bases_1plus_avg_p": 0.651147342995169,
+      "total_bases_1plus_avg_p_weight": 1242.0,
+      "total_bases_1plus_emp_rate": 0.571658615136876,
+      "total_bases_1plus_emp_rate_weight": 1242.0,
+      "total_bases_2plus_brier": 0.2243821956521739,
+      "total_bases_2plus_brier_weight": 1242.0,
+      "total_bases_2plus_logloss": 0.6407150281448132,
+      "total_bases_2plus_logloss_weight": 1242.0,
+      "total_bases_2plus_avg_p": 0.36122141706924304,
+      "total_bases_2plus_avg_p_weight": 1242.0,
+      "total_bases_2plus_emp_rate": 0.3421900161030596,
+      "total_bases_2plus_emp_rate_weight": 1242.0,
+      "total_bases_3plus_brier": 0.1659983518518519,
+      "total_bases_3plus_brier_weight": 1242.0,
+      "total_bases_3plus_logloss": 0.5142439453785541,
+      "total_bases_3plus_logloss_weight": 1242.0,
+      "total_bases_3plus_avg_p": 0.1911843800322061,
+      "total_bases_3plus_avg_p_weight": 1242.0,
+      "total_bases_3plus_emp_rate": 0.21175523349436393,
+      "total_bases_3plus_emp_rate_weight": 1242.0,
+      "total_bases_4plus_brier": 0.1302603405797101,
+      "total_bases_4plus_brier_weight": 1242.0,
+      "total_bases_4plus_logloss": 0.4312249617418593,
+      "total_bases_4plus_logloss_weight": 1242.0,
+      "total_bases_4plus_avg_p": 0.11728099838969402,
+      "total_bases_4plus_avg_p_weight": 1242.0,
+      "total_bases_4plus_emp_rate": 0.1537842190016103,
+      "total_bases_4plus_emp_rate_weight": 1242.0,
+      "total_bases_5plus_brier": 0.06722220128824474,
+      "total_bases_5plus_brier_weight": 1242.0,
+      "total_bases_5plus_logloss": 0.2607061510107369,
+      "total_bases_5plus_logloss_weight": 1242.0,
+      "total_bases_5plus_avg_p": 0.05746537842190016,
+      "total_bases_5plus_avg_p_weight": 1242.0,
+      "total_bases_5plus_emp_rate": 0.07246376811594203,
+      "total_bases_5plus_emp_rate_weight": 1242.0,
+      "sb_1plus_brier": 0.05120801690821258,
+      "sb_1plus_brier_weight": 1242.0,
+      "sb_1plus_logloss": 0.2717823474408867,
+      "sb_1plus_logloss_weight": 1242.0,
+      "sb_1plus_avg_p": 0.050818840579710145,
+      "sb_1plus_avg_p_weight": 1242.0,
+      "sb_1plus_emp_rate": 0.05636070853462158,
+      "sb_1plus_emp_rate_weight": 1242.0
+    }
+  },
+  "leaders": {
+    "best_moneyline_brier_day": {
+      "date": "2026-06-21",
+      "value": 0.19448100000000001,
+      "games": 1
+    },
+    "worst_total_mae_day": {
+      "date": "2026-06-19",
+      "value": 4.146071428571429,
+      "games": 14
+    }
+  },
+  "months": [
+    {
+      "month": "2026-06",
+      "label": "Jun 2026",
+      "days": 8,
+      "games": 69,
+      "segments": {
+        "full": {
+          "brier_home_win": 0.25196108695652175,
+          "brier_home_win_weight": 69.0,
+          "mae_total_runs": 3.4395797101449284,
+          "mae_total_runs_weight": 69.0,
+          "mae_run_margin": 4.084304347826087,
+          "mae_run_margin_weight": 69.0
+        },
+        "first5": {
+          "brier_home_win": 0.26228,
+          "brier_home_win_weight": 69.0,
+          "mae_total_runs": 2.857478260869565,
+          "mae_total_runs_weight": 69.0,
+          "mae_run_margin": 3.1062318840579706,
+          "mae_run_margin_weight": 69.0
+        },
+        "first3": {
+          "brier_home_win": 0.2601816956521739,
+          "brier_home_win_weight": 69.0,
+          "mae_total_runs": 2.126188405797101,
+          "mae_total_runs_weight": 69.0,
+          "mae_run_margin": 2.142391304347826,
+          "mae_run_margin_weight": 69.0
+        }
+      },
+      "full_game": {
+        "totals": {
+          "mae": 3.4395797101449284,
+          "mae_weight": 69.0,
+          "rmse": 4.698114800928462,
+          "rmse_weight": 69.0,
+          "avg_nll_exact_total": 2.9888351362732943,
+          "avg_nll_exact_total_weight": 69.0
+        },
+        "moneyline": {
+          "brier": 0.25196108695652175,
+          "brier_weight": 69.0,
+          "logloss": 0.6971491445907637,
+          "logloss_weight": 69.0,
+          "accuracy": 0.5072463768115942,
+          "accuracy_weight": 69.0
+        },
+        "runline_fav_minus_1_5": {
+          "brier": 0.23892466666666667,
+          "brier_weight": 69.0,
+          "logloss": 0.6707571875462992,
+          "logloss_weight": 69.0,
+          "accuracy": 0.6086956521739131,
+          "accuracy_weight": 69.0
+        },
+        "pitcher_props_starters": {
+          "so_mae": 2.2489354838709676,
+          "so_mae_weight": 124.0,
+          "so_rmse": 2.710942440451245,
+          "so_rmse_weight": 124.0,
+          "outs_mae": 5.657048387096773,
+          "outs_mae_weight": 124.0,
+          "outs_rmse": 7.16933710248706,
+          "outs_rmse_weight": 124.0
+        },
+        "pitcher_props_at_market_lines": {
+          "strikeouts": {},
+          "outs": {}
+        }
+      },
+      "hitter_hr_likelihood_topn": {
+        "hr_brier": 0.11559139452495966,
+        "hr_brier_weight": 1242.0,
+        "hr_logloss": 0.4021888206107591,
+        "hr_logloss_weight": 1242.0,
+        "hr_avg_p": 0.078890499194847,
+        "hr_avg_p_weight": 1242.0,
+        "hr_emp_rate": 0.13043478260869565,
+        "hr_emp_rate_weight": 1242.0
+      },
+      "hitter_props_likelihood_topn": {
+        "hits_1plus_brier": 0.2491343631239936,
+        "hits_1plus_brier_weight": 1242.0,
+        "hits_1plus_logloss": 0.6928349373062678,
+        "hits_1plus_logloss_weight": 1242.0,
+        "hits_1plus_avg_p": 0.651147342995169,
+        "hits_1plus_avg_p_weight": 1242.0,
+        "hits_1plus_emp_rate": 0.571658615136876,
+        "hits_1plus_emp_rate_weight": 1242.0,
+        "hits_2plus_brier": 0.16627564573268927,
+        "hits_2plus_brier_weight": 1242.0,
+        "hits_2plus_logloss": 0.5150729838236903,
+        "hits_2plus_logloss_weight": 1242.0,
+        "hits_2plus_avg_p": 0.25981803542673104,
+        "hits_2plus_avg_p_weight": 1242.0,
+        "hits_2plus_emp_rate": 0.20531400966183574,
+        "hits_2plus_emp_rate_weight": 1242.0,
+        "hits_3plus_brier": 0.04744575764895329,
+        "hits_3plus_brier_weight": 1242.0,
+        "hits_3plus_logloss": 0.19816237944810083,
+        "hits_3plus_logloss_weight": 1242.0,
+        "hits_3plus_avg_p": 0.06542270531400966,
+        "hits_3plus_avg_p_weight": 1242.0,
+        "hits_3plus_emp_rate": 0.0499194847020934,
+        "hits_3plus_emp_rate_weight": 1242.0,
+        "hits_runs_rbis_2plus_brier": 0.0,
+        "hits_runs_rbis_2plus_brier_weight": 1242.0,
+        "hits_runs_rbis_2plus_logloss": 9.999778782803771e-13,
+        "hits_runs_rbis_2plus_logloss_weight": 1242.0,
+        "hits_runs_rbis_2plus_avg_p": 0.0,
+        "hits_runs_rbis_2plus_avg_p_weight": 1242.0,
+        "hits_runs_rbis_2plus_emp_rate": 0.0,
+        "hits_runs_rbis_2plus_emp_rate_weight": 1242.0,
+        "hits_runs_rbis_3plus_brier": 0.0,
+        "hits_runs_rbis_3plus_brier_weight": 1242.0,
+        "hits_runs_rbis_3plus_logloss": 9.999778782803771e-13,
+        "hits_runs_rbis_3plus_logloss_weight": 1242.0,
+        "hits_runs_rbis_3plus_avg_p": 0.0,
+        "hits_runs_rbis_3plus_avg_p_weight": 1242.0,
+        "hits_runs_rbis_3plus_emp_rate": 0.0,
+        "hits_runs_rbis_3plus_emp_rate_weight": 1242.0,
+        "hits_runs_rbis_4plus_brier": 0.0,
+        "hits_runs_rbis_4plus_brier_weight": 1242.0,
+        "hits_runs_rbis_4plus_logloss": 9.999778782803771e-13,
+        "hits_runs_rbis_4plus_logloss_weight": 1242.0,
+        "hits_runs_rbis_4plus_avg_p": 0.0,
+        "hits_runs_rbis_4plus_avg_p_weight": 1242.0,
+        "hits_runs_rbis_4plus_emp_rate": 0.0,
+        "hits_runs_rbis_4plus_emp_rate_weight": 1242.0,
+        "hits_runs_rbis_5plus_brier": 0.0,
+        "hits_runs_rbis_5plus_brier_weight": 1242.0,
+        "hits_runs_rbis_5plus_logloss": 9.999778782803771e-13,
+        "hits_runs_rbis_5plus_logloss_weight": 1242.0,
+        "hits_runs_rbis_5plus_avg_p": 0.0,
+        "hits_runs_rbis_5plus_avg_p_weight": 1242.0,
+        "hits_runs_rbis_5plus_emp_rate": 0.0,
+        "hits_runs_rbis_5plus_emp_rate_weight": 1242.0,
+        "doubles_1plus_brier": 0.1295033003220612,
+        "doubles_1plus_brier_weight": 1242.0,
+        "doubles_1plus_logloss": 0.43111924683281033,
+        "doubles_1plus_logloss_weight": 1242.0,
+        "doubles_1plus_avg_p": 0.14818276972624791,
+        "doubles_1plus_avg_p_weight": 1242.0,
+        "doubles_1plus_emp_rate": 0.1497584541062802,
+        "doubles_1plus_emp_rate_weight": 1242.0,
+        "triples_1plus_brier": 0.011269121578099839,
+        "triples_1plus_brier_weight": 1242.0,
+        "triples_1plus_logloss": 0.06313744894599574,
+        "triples_1plus_logloss_weight": 1242.0,
+        "triples_1plus_avg_p": 0.01445169082125601,
+        "triples_1plus_avg_p_weight": 1242.0,
+        "triples_1plus_emp_rate": 0.011272141706924315,
+        "triples_1plus_emp_rate_weight": 1242.0,
+        "runs_1plus_brier": 0.2280825740740741,
+        "runs_1plus_brier_weight": 1242.0,
+        "runs_1plus_logloss": 0.6484119312511246,
+        "runs_1plus_logloss_weight": 1242.0,
+        "runs_1plus_avg_p": 0.38157407407407407,
+        "runs_1plus_avg_p_weight": 1242.0,
+        "runs_1plus_emp_rate": 0.35990338164251207,
+        "runs_1plus_emp_rate_weight": 1242.0,
+        "runs_2plus_brier": 0.0688933639291465,
+        "runs_2plus_brier_weight": 1242.0,
+        "runs_2plus_logloss": 0.26681987266560875,
+        "runs_2plus_logloss_weight": 1242.0,
+        "runs_2plus_avg_p": 0.08059259259259262,
+        "runs_2plus_avg_p_weight": 1242.0,
+        "runs_2plus_emp_rate": 0.07407407407407407,
+        "runs_2plus_emp_rate_weight": 1242.0,
+        "runs_3plus_brier": 0.015090506441223834,
+        "runs_3plus_brier_weight": 1242.0,
+        "runs_3plus_logloss": 0.08120686521674107,
+        "runs_3plus_logloss_weight": 1242.0,
+        "runs_3plus_avg_p": 0.011071658615136854,
+        "runs_3plus_avg_p_weight": 1242.0,
+        "runs_3plus_emp_rate": 0.015297906602254429,
+        "runs_3plus_emp_rate_weight": 1242.0,
+        "rbi_1plus_brier": 0.199797227858293,
+        "rbi_1plus_brier_weight": 1242.0,
+        "rbi_1plus_logloss": 0.5888877332142853,
+        "rbi_1plus_logloss_weight": 1242.0,
+        "rbi_1plus_avg_p": 0.2991119162640902,
+        "rbi_1plus_avg_p_weight": 1242.0,
+        "rbi_1plus_emp_rate": 0.27616747181964574,
+        "rbi_1plus_emp_rate_weight": 1242.0,
+        "rbi_2plus_brier": 0.09907776167471813,
+        "rbi_2plus_brier_weight": 1242.0,
+        "rbi_2plus_logloss": 0.34989961651196255,
+        "rbi_2plus_logloss_weight": 1242.0,
+        "rbi_2plus_avg_p": 0.107768115942029,
+        "rbi_2plus_avg_p_weight": 1242.0,
+        "rbi_2plus_emp_rate": 0.1111111111111111,
+        "rbi_2plus_emp_rate_weight": 1242.0,
+        "rbi_3plus_brier": 0.03357070450885667,
+        "rbi_3plus_brier_weight": 1242.0,
+        "rbi_3plus_logloss": 0.15142607353347212,
+        "rbi_3plus_logloss_weight": 1242.0,
+        "rbi_3plus_avg_p": 0.03993156199677938,
+        "rbi_3plus_avg_p_weight": 1242.0,
+        "rbi_3plus_emp_rate": 0.03462157809983897,
+        "rbi_3plus_emp_rate_weight": 1242.0,
+        "rbi_4plus_brier": 0.015069396135265698,
+        "rbi_4plus_brier_weight": 1242.0,
+        "rbi_4plus_logloss": 0.07860320507067894,
+        "rbi_4plus_logloss_weight": 1242.0,
+        "rbi_4plus_avg_p": 0.013328502415458911,
+        "rbi_4plus_avg_p_weight": 1242.0,
+        "rbi_4plus_emp_rate": 0.015297906602254429,
+        "rbi_4plus_emp_rate_weight": 1242.0,
+        "total_bases_1plus_brier": 0.2491343631239936,
+        "total_bases_1plus_brier_weight": 1242.0,
+        "total_bases_1plus_logloss": 0.6928349373062678,
+        "total_bases_1plus_logloss_weight": 1242.0,
+        "total_bases_1plus_avg_p": 0.651147342995169,
+        "total_bases_1plus_avg_p_weight": 1242.0,
+        "total_bases_1plus_emp_rate": 0.571658615136876,
+        "total_bases_1plus_emp_rate_weight": 1242.0,
+        "total_bases_2plus_brier": 0.2243821956521739,
+        "total_bases_2plus_brier_weight": 1242.0,
+        "total_bases_2plus_logloss": 0.6407150281448132,
+        "total_bases_2plus_logloss_weight": 1242.0,
+        "total_bases_2plus_avg_p": 0.36122141706924304,
+        "total_bases_2plus_avg_p_weight": 1242.0,
+        "total_bases_2plus_emp_rate": 0.3421900161030596,
+        "total_bases_2plus_emp_rate_weight": 1242.0,
+        "total_bases_3plus_brier": 0.1659983518518519,
+        "total_bases_3plus_brier_weight": 1242.0,
+        "total_bases_3plus_logloss": 0.5142439453785541,
+        "total_bases_3plus_logloss_weight": 1242.0,
+        "total_bases_3plus_avg_p": 0.1911843800322061,
+        "total_bases_3plus_avg_p_weight": 1242.0,
+        "total_bases_3plus_emp_rate": 0.21175523349436393,
+        "total_bases_3plus_emp_rate_weight": 1242.0,
+        "total_bases_4plus_brier": 0.1302603405797101,
+        "total_bases_4plus_brier_weight": 1242.0,
+        "total_bases_4plus_logloss": 0.4312249617418593,
+        "total_bases_4plus_logloss_weight": 1242.0,
+        "total_bases_4plus_avg_p": 0.11728099838969402,
+        "total_bases_4plus_avg_p_weight": 1242.0,
+        "total_bases_4plus_emp_rate": 0.1537842190016103,
+        "total_bases_4plus_emp_rate_weight": 1242.0,
+        "total_bases_5plus_brier": 0.06722220128824474,
+        "total_bases_5plus_brier_weight": 1242.0,
+        "total_bases_5plus_logloss": 0.2607061510107369,
+        "total_bases_5plus_logloss_weight": 1242.0,
+        "total_bases_5plus_avg_p": 0.05746537842190016,
+        "total_bases_5plus_avg_p_weight": 1242.0,
+        "total_bases_5plus_emp_rate": 0.07246376811594203,
+        "total_bases_5plus_emp_rate_weight": 1242.0,
+        "sb_1plus_brier": 0.05120801690821258,
+        "sb_1plus_brier_weight": 1242.0,
+        "sb_1plus_logloss": 0.2717823474408867,
+        "sb_1plus_logloss_weight": 1242.0,
+        "sb_1plus_avg_p": 0.050818840579710145,
+        "sb_1plus_avg_p_weight": 1242.0,
+        "sb_1plus_emp_rate": 0.05636070853462158,
+        "sb_1plus_emp_rate_weight": 1242.0
+      }
+    }
+  ],
+  "days": [
+    {
+      "date": "2026-06-14",
+      "month": "2026-06",
+      "games": 14,
+      "cards_available": true,
+      "cards_url": "/?date=2026-06-14",
+      "legacy_cards_available": true,
+      "legacy_cards_url": "/?date=2026-06-14",
+      "betting_cards": {
+        "available": true,
+        "available_profiles": [
+          "retuned"
+        ],
+        "default_profile": "retuned",
+        "profiles": {
+          "retuned": {
+            "available": true,
+            "card_path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_14_locked_policy.json",
+            "selected_counts": {
+              "totals": 0,
+              "ml": 0,
+              "pitcher_props": 0,
+              "hitter_props": 0,
+              "hitter_home_runs": 0,
+              "hitter_hits": 0,
+              "hitter_strikeouts": 0,
+              "hitter_total_bases": 0,
+              "hitter_runs": 0,
+              "hitter_rbis": 0,
+              "combined": 0
+            },
+            "playable_counts": {
+              "totals": 0,
+              "ml": 0,
+              "pitcher_props": 0,
+              "hitter_props": 0,
+              "hitter_home_runs": 0,
+              "hitter_hits": 0,
+              "hitter_strikeouts": 0,
+              "hitter_total_bases": 0,
+              "hitter_runs": 0,
+              "hitter_rbis": 0,
+              "combined": 0
+            },
+            "results": {
+              "combined": {
+                "n": 0,
+                "wins": 0,
+                "losses": 0,
+                "stake_u": 0.0,
+                "profit_u": 0.0,
+                "roi": null
+              }
+            }
+          }
+        }
+      },
+      "report_path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/eval/batches/season_2026_ui_daily_live/sim_vs_actual_2026-06-14.json",
+      "aggregate": {
+        "full": {
+          "games": 14,
+          "brier_home_win": 0.2719943571428572,
+          "mae_total_runs": 3.5923571428571432,
+          "mae_run_margin": 4.761928571428571
+        },
+        "first5": {
+          "games": 14,
+          "brier_home_win": 0.281864,
+          "mae_total_runs": 2.964,
+          "mae_run_margin": 2.790857142857143
+        },
+        "first3": {
+          "games": 14,
+          "brier_home_win": 0.22359542857142856,
+          "mae_total_runs": 1.9081428571428574,
+          "mae_run_margin": 1.426142857142857
+        }
+      },
+      "full_game": {
+        "totals": {
+          "games": 14,
+          "mae": 3.5923571428571432,
+          "rmse": 6.646446574781789,
+          "avg_nll_exact_total": 3.419512189200145
+        },
+        "moneyline": {
+          "games": 14,
+          "brier": 0.2719943571428572,
+          "logloss": 0.7376430554987168,
+          "accuracy": 0.42857142857142855
+        },
+        "runline_fav_minus_1_5": {
+          "games": 14,
+          "brier": 0.2532605,
+          "logloss": 0.6998589849837293,
+          "accuracy": 0.5714285714285714
+        },
+        "pitcher_props_starters": {
+          "starters": 28,
+          "so_mae": 2.4413571428571426,
+          "so_rmse": 2.7963305164345034,
+          "outs_mae": 5.377178571428572,
+          "outs_rmse": 6.947739002725995,
+          "pitches_n": 28,
+          "pitches_mae": 15.34282142857143,
+          "pitches_rmse": 24.11293576737243,
+          "pitches_bias": 8.072464285714286
+        },
+        "pitcher_props_at_market_lines": {
+          "lines_meta": {
+            "source": null,
+            "path": null,
+            "pitchers": 0
+          },
+          "strikeouts": {
+            "n": 0,
+            "n_accuracy": 0,
+            "n_edge": 0,
+            "pushes": 0,
+            "brier": null,
+            "logloss": null,
+            "accuracy": null,
+            "avg_edge_vs_no_vig": null
+          },
+          "outs": {
+            "n": 0,
+            "n_accuracy": 0,
+            "n_edge": 0,
+            "pushes": 0,
+            "brier": null,
+            "logloss": null,
+            "accuracy": null,
+            "avg_edge_vs_no_vig": null
+          }
+        }
+      }
+    },
+    {
+      "date": "2026-06-15",
+      "month": "2026-06",
+      "games": 10,
+      "cards_available": true,
+      "cards_url": "/?date=2026-06-15",
+      "legacy_cards_available": true,
+      "legacy_cards_url": "/?date=2026-06-15",
+      "betting_cards": {
+        "available": true,
+        "available_profiles": [
+          "retuned"
+        ],
+        "default_profile": "retuned",
+        "profiles": {
+          "retuned": {
+            "available": true,
+            "card_path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_15_locked_policy.json",
+            "selected_counts": {
+              "totals": 0,
+              "ml": 0,
+              "pitcher_props": 0,
+              "hitter_props": 0,
+              "hitter_home_runs": 0,
+              "hitter_hits": 0,
+              "hitter_strikeouts": 0,
+              "hitter_total_bases": 0,
+              "hitter_runs": 0,
+              "hitter_rbis": 0,
+              "combined": 0
+            },
+            "playable_counts": {
+              "totals": 0,
+              "ml": 0,
+              "pitcher_props": 0,
+              "hitter_props": 0,
+              "hitter_home_runs": 0,
+              "hitter_hits": 0,
+              "hitter_strikeouts": 0,
+              "hitter_total_bases": 0,
+              "hitter_runs": 0,
+              "hitter_rbis": 0,
+              "combined": 0
+            },
+            "results": {
+              "combined": {
+                "n": 0,
+                "wins": 0,
+                "losses": 0,
+                "stake_u": 0.0,
+                "profit_u": 0.0,
+                "roi": null
+              }
+            }
+          }
+        }
+      },
+      "report_path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/eval/batches/season_2026_ui_daily_live/sim_vs_actual_2026-06-15.json",
+      "aggregate": {
+        "full": {
+          "games": 10,
+          "brier_home_win": 0.2436395,
+          "mae_total_runs": 2.3116,
+          "mae_run_margin": 4.680200000000001
+        },
+        "first5": {
+          "games": 10,
+          "brier_home_win": 0.25067169999999994,
+          "mae_total_runs": 2.5985000000000005,
+          "mae_run_margin": 3.0571
+        },
+        "first3": {
+          "games": 10,
+          "brier_home_win": 0.24910090000000001,
+          "mae_total_runs": 2.5691,
+          "mae_run_margin": 2.0847
+        }
+      },
+      "full_game": {
+        "totals": {
+          "games": 10,
+          "mae": 2.3116,
+          "rmse": 2.987115029589587,
+          "avg_nll_exact_total": 2.679798168936168
+        },
+        "moneyline": {
+          "games": 10,
+          "brier": 0.2436395,
+          "logloss": 0.680360069620447,
+          "accuracy": 0.6
+        },
+        "runline_fav_minus_1_5": {
+          "games": 10,
+          "brier": 0.2327782,
+          "logloss": 0.6577162458691145,
+          "accuracy": 0.6
+        },
+        "pitcher_props_starters": {
+          "starters": 17,
+          "so_mae": 2.4090588235294113,
+          "so_rmse": 2.864642160180282,
+          "outs_mae": 5.309882352941175,
+          "outs_rmse": 6.786873567669389,
+          "pitches_n": 17,
+          "pitches_mae": 13.378529411764703,
+          "pitches_rmse": 19.004609247418344,
+          "pitches_bias": 4.733823529411763
+        },
+        "pitcher_props_at_market_lines": {
+          "lines_meta": {
+            "source": null,
+            "path": null,
+            "pitchers": 0
+          },
+          "strikeouts": {
+            "n": 0,
+            "n_accuracy": 0,
+            "n_edge": 0,
+            "pushes": 0,
+            "brier": null,
+            "logloss": null,
+            "accuracy": null,
+            "avg_edge_vs_no_vig": null
+          },
+          "outs": {
+            "n": 0,
+            "n_accuracy": 0,
+            "n_edge": 0,
+            "pushes": 0,
+            "brier": null,
+            "logloss": null,
+            "accuracy": null,
+            "avg_edge_vs_no_vig": null
+          }
+        }
+      }
+    },
+    {
+      "date": "2026-06-16",
+      "month": "2026-06",
+      "games": 15,
+      "cards_available": true,
+      "cards_url": "/?date=2026-06-16",
+      "legacy_cards_available": true,
+      "legacy_cards_url": "/?date=2026-06-16",
+      "betting_cards": {
+        "available": true,
+        "available_profiles": [
+          "retuned"
+        ],
+        "default_profile": "retuned",
+        "profiles": {
+          "retuned": {
+            "available": true,
+            "card_path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_16_locked_policy.json",
+            "selected_counts": {
+              "totals": 0,
+              "ml": 0,
+              "pitcher_props": 0,
+              "hitter_props": 0,
+              "hitter_home_runs": 0,
+              "hitter_hits": 0,
+              "hitter_strikeouts": 0,
+              "hitter_total_bases": 0,
+              "hitter_runs": 0,
+              "hitter_rbis": 0,
+              "combined": 0
+            },
+            "playable_counts": {
+              "totals": 0,
+              "ml": 0,
+              "pitcher_props": 0,
+              "hitter_props": 0,
+              "hitter_home_runs": 0,
+              "hitter_hits": 0,
+              "hitter_strikeouts": 0,
+              "hitter_total_bases": 0,
+              "hitter_runs": 0,
+              "hitter_rbis": 0,
+              "combined": 0
+            },
+            "results": {
+              "combined": {
+                "n": 0,
+                "wins": 0,
+                "losses": 0,
+                "stake_u": 0.0,
+                "profit_u": 0.0,
+                "roi": null
+              }
+            }
+          }
+        }
+      },
+      "report_path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/eval/batches/season_2026_ui_daily_live/sim_vs_actual_2026-06-16.json",
+      "aggregate": {
+        "full": {
+          "games": 15,
+          "brier_home_win": 0.25548099999999996,
+          "mae_total_runs": 3.1260666666666665,
+          "mae_run_margin": 3.6582000000000003
+        },
+        "first5": {
+          "games": 15,
+          "brier_home_win": 0.2757372,
+          "mae_total_runs": 2.6151333333333335,
+          "mae_run_margin": 3.4926
+        },
+        "first3": {
+          "games": 15,
+          "brier_home_win": 0.2967734,
+          "mae_total_runs": 1.718933333333333,
+          "mae_run_margin": 2.4262666666666663
+        }
+      },
+      "full_game": {
+        "totals": {
+          "games": 15,
+          "mae": 3.1260666666666665,
+          "rmse": 3.7680635256499238,
+          "avg_nll_exact_total": 2.7281346182158828
+        },
+        "moneyline": {
+          "games": 15,
+          "brier": 0.25548099999999996,
+          "logloss": 0.7044940443381996,
+          "accuracy": 0.5333333333333333
+        },
+        "runline_fav_minus_1_5": {
+          "games": 15,
+          "brier": 0.2229107333333333,
+          "logloss": 0.6383268473301021,
+          "accuracy": 0.7333333333333333
+        },
+        "pitcher_props_starters": {
+          "starters": 29,
+          "so_mae": 1.7489655172413792,
+          "so_rmse": 2.12878505093949,
+          "outs_mae": 4.988896551724137,
+          "outs_rmse": 6.5959706404482406,
+          "pitches_n": 29,
+          "pitches_mae": 9.864862068965518,
+          "pitches_rmse": 16.821429584784465,
+          "pitches_bias": 6.294103448275863
+        },
+        "pitcher_props_at_market_lines": {
+          "lines_meta": {
+            "source": null,
+            "path": null,
+            "pitchers": 0
+          },
+          "strikeouts": {
+            "n": 0,
+            "n_accuracy": 0,
+            "n_edge": 0,
+            "pushes": 0,
+            "brier": null,
+            "logloss": null,
+            "accuracy": null,
+            "avg_edge_vs_no_vig": null
+          },
+          "outs": {
+            "n": 0,
+            "n_accuracy": 0,
+            "n_edge": 0,
+            "pushes": 0,
+            "brier": null,
+            "logloss": null,
+            "accuracy": null,
+            "avg_edge_vs_no_vig": null
+          }
+        }
+      }
+    },
+    {
+      "date": "2026-06-17",
+      "month": "2026-06",
+      "games": 15,
+      "cards_available": true,
+      "cards_url": "/?date=2026-06-17",
+      "legacy_cards_available": true,
+      "legacy_cards_url": "/?date=2026-06-17",
+      "betting_cards": {
+        "available": true,
+        "available_profiles": [
+          "retuned"
+        ],
+        "default_profile": "retuned",
+        "profiles": {
+          "retuned": {
+            "available": true,
+            "card_path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_17_locked_policy.json",
+            "selected_counts": {
+              "totals": 0,
+              "ml": 0,
+              "pitcher_props": 0,
+              "hitter_props": 0,
+              "hitter_home_runs": 0,
+              "hitter_hits": 0,
+              "hitter_strikeouts": 0,
+              "hitter_total_bases": 0,
+              "hitter_runs": 0,
+              "hitter_rbis": 0,
+              "combined": 0
+            },
+            "playable_counts": {
+              "totals": 0,
+              "ml": 0,
+              "pitcher_props": 0,
+              "hitter_props": 0,
+              "hitter_home_runs": 0,
+              "hitter_hits": 0,
+              "hitter_strikeouts": 0,
+              "hitter_total_bases": 0,
+              "hitter_runs": 0,
+              "hitter_rbis": 0,
+              "combined": 0
+            },
+            "results": {
+              "combined": {
+                "n": 0,
+                "wins": 0,
+                "losses": 0,
+                "stake_u": 0.0,
+                "profit_u": 0.0,
+                "roi": null
+              }
+            }
+          }
+        }
+      },
+      "report_path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/eval/batches/season_2026_ui_daily_live/sim_vs_actual_2026-06-17.json",
+      "aggregate": {
+        "full": {
+          "games": 15,
+          "brier_home_win": 0.23298273333333336,
+          "mae_total_runs": 3.6799333333333335,
+          "mae_run_margin": 4.1774000000000004
+        },
+        "first5": {
+          "games": 15,
+          "brier_home_win": 0.23192700000000002,
+          "mae_total_runs": 3.3264666666666676,
+          "mae_run_margin": 3.8019333333333334
+        },
+        "first3": {
+          "games": 15,
+          "brier_home_win": 0.23071306666666666,
+          "mae_total_runs": 2.6662666666666666,
+          "mae_run_margin": 2.7802666666666664
+        }
+      },
+      "full_game": {
+        "totals": {
+          "games": 15,
+          "mae": 3.6799333333333335,
+          "rmse": 4.288070389658578,
+          "avg_nll_exact_total": 2.964763298468
+        },
+        "moneyline": {
+          "games": 15,
+          "brier": 0.23298273333333336,
+          "logloss": 0.6586655515916646,
+          "accuracy": 0.6
+        },
+        "runline_fav_minus_1_5": {
+          "games": 15,
+          "brier": 0.25069026666666666,
+          "logloss": 0.6945077829061167,
+          "accuracy": 0.4666666666666667
+        },
+        "pitcher_props_starters": {
+          "starters": 28,
+          "so_mae": 2.282035714285714,
+          "so_rmse": 2.782043191869704,
+          "outs_mae": 6.681571428571428,
+          "outs_rmse": 8.231774652441079,
+          "pitches_n": 28,
+          "pitches_mae": 13.649178571428568,
+          "pitches_rmse": 22.489887278984494,
+          "pitches_bias": 10.312392857142855
+        },
+        "pitcher_props_at_market_lines": {
+          "lines_meta": {
+            "source": null,
+            "path": null,
+            "pitchers": 0
+          },
+          "strikeouts": {
+            "n": 0,
+            "n_accuracy": 0,
+            "n_edge": 0,
+            "pushes": 0,
+            "brier": null,
+            "logloss": null,
+            "accuracy": null,
+            "avg_edge_vs_no_vig": null
+          },
+          "outs": {
+            "n": 0,
+            "n_accuracy": 0,
+            "n_edge": 0,
+            "pushes": 0,
+            "brier": null,
+            "logloss": null,
+            "accuracy": null,
+            "avg_edge_vs_no_vig": null
+          }
+        }
+      }
+    },
+    {
+      "date": "2026-06-19",
+      "month": "2026-06",
+      "games": 14,
+      "cards_available": true,
+      "cards_url": "/?date=2026-06-19",
+      "legacy_cards_available": true,
+      "legacy_cards_url": "/?date=2026-06-19",
+      "betting_cards": {
+        "available": true,
+        "available_profiles": [
+          "retuned"
+        ],
+        "default_profile": "retuned",
+        "profiles": {
+          "retuned": {
+            "available": true,
+            "card_path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_19_locked_policy.json",
+            "selected_counts": {
+              "totals": 0,
+              "ml": 0,
+              "pitcher_props": 0,
+              "hitter_props": 0,
+              "hitter_home_runs": 0,
+              "hitter_hits": 0,
+              "hitter_strikeouts": 0,
+              "hitter_total_bases": 0,
+              "hitter_runs": 0,
+              "hitter_rbis": 0,
+              "combined": 0
+            },
+            "playable_counts": {
+              "totals": 0,
+              "ml": 0,
+              "pitcher_props": 0,
+              "hitter_props": 0,
+              "hitter_home_runs": 0,
+              "hitter_hits": 0,
+              "hitter_strikeouts": 0,
+              "hitter_total_bases": 0,
+              "hitter_runs": 0,
+              "hitter_rbis": 0,
+              "combined": 0
+            },
+            "results": {
+              "combined": {
+                "n": 0,
+                "wins": 0,
+                "losses": 0,
+                "stake_u": 0.0,
+                "profit_u": 0.0,
+                "roi": null
+              }
+            }
+          }
+        }
+      },
+      "report_path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/eval/batches/season_2026_ui_daily_live/sim_vs_actual_2026-06-19.json",
+      "aggregate": {
+        "full": {
+          "games": 14,
+          "brier_home_win": 0.2585401428571429,
+          "mae_total_runs": 4.146071428571429,
+          "mae_run_margin": 3.457642857142857
+        },
+        "first5": {
+          "games": 14,
+          "brier_home_win": 0.2799039285714286,
+          "mae_total_runs": 2.8505,
+          "mae_run_margin": 2.417357142857143
+        },
+        "first3": {
+          "games": 14,
+          "brier_home_win": 0.2808350714285714,
+          "mae_total_runs": 1.9115000000000002,
+          "mae_run_margin": 1.9697857142857145
+        }
+      },
+      "full_game": {
+        "totals": {
+          "games": 14,
+          "mae": 4.146071428571429,
+          "rmse": 5.472822156542533,
+          "avg_nll_exact_total": 3.1255041218416753
+        },
+        "moneyline": {
+          "games": 14,
+          "brier": 0.2585401428571429,
+          "logloss": 0.7102634113429424,
+          "accuracy": 0.35714285714285715
+        },
+        "runline_fav_minus_1_5": {
+          "games": 14,
+          "brier": 0.2269809285714286,
+          "logloss": 0.6470622949021632,
+          "accuracy": 0.7142857142857143
+        },
+        "pitcher_props_starters": {
+          "starters": 20,
+          "so_mae": 2.6553999999999998,
+          "so_rmse": 3.3772165017955245,
+          "outs_mae": 5.845000000000001,
+          "outs_rmse": 7.263439123445588,
+          "pitches_n": 20,
+          "pitches_mae": 14.018049999999997,
+          "pitches_rmse": 22.65016448615771,
+          "pitches_bias": 10.98645
+        },
+        "pitcher_props_at_market_lines": {
+          "lines_meta": {
+            "source": null,
+            "path": null,
+            "pitchers": 0
+          },
+          "strikeouts": {
+            "n": 0,
+            "n_accuracy": 0,
+            "n_edge": 0,
+            "pushes": 0,
+            "brier": null,
+            "logloss": null,
+            "accuracy": null,
+            "avg_edge_vs_no_vig": null
+          },
+          "outs": {
+            "n": 0,
+            "n_accuracy": 0,
+            "n_edge": 0,
+            "pushes": 0,
+            "brier": null,
+            "logloss": null,
+            "accuracy": null,
+            "avg_edge_vs_no_vig": null
+          }
+        }
+      }
+    },
+    {
+      "date": "2026-06-20",
+      "month": "2026-06",
+      "games": 14,
+      "cards_available": true,
+      "legacy_cards_available": true,
+      "cards_url": "/?date=2026-06-20",
+      "legacy_cards_url": "/?date=2026-06-20",
+      "betting_cards": {
+        "available": true,
+        "available_profiles": [
+          "retuned"
+        ],
+        "default_profile": "retuned",
+        "profiles": {
+          "retuned": {
+            "available": true,
+            "card_path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_20_locked_policy.json",
+            "selected_counts": {
+              "totals": 0,
+              "ml": 0,
+              "pitcher_props": 0,
+              "hitter_props": 0,
+              "hitter_home_runs": 0,
+              "hitter_hits": 0,
+              "hitter_strikeouts": 0,
+              "hitter_total_bases": 0,
+              "hitter_runs": 0,
+              "hitter_rbis": 0,
+              "combined": 0
+            },
+            "playable_counts": {
+              "totals": 0,
+              "ml": 0,
+              "pitcher_props": 0,
+              "hitter_props": 0,
+              "hitter_home_runs": 0,
+              "hitter_hits": 0,
+              "hitter_strikeouts": 0,
+              "hitter_total_bases": 0,
+              "hitter_runs": 0,
+              "hitter_rbis": 0,
+              "combined": 0
+            },
+            "results": {
+              "combined": {
+                "n": 0,
+                "wins": 0,
+                "losses": 0,
+                "stake_u": 0.0,
+                "profit_u": 0.0,
+                "roi": null
+              }
+            }
+          }
+        }
+      },
+      "full_game": {
+        "moneyline": {},
+        "totals": {},
+        "runline_fav_minus_1_5": {},
+        "pitcher_props_starters": {},
+        "pitcher_props_at_market_lines": {}
+      },
+      "aggregate": {
+        "full": {
+          "games": 14
+        },
+        "first5": {
+          "games": 14
+        },
+        "first3": {
+          "games": 14
+        }
+      },
+      "cap_profile": null,
+      "card_path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_20_locked_policy.json",
+      "selected_counts": {
+        "totals": 0,
+        "ml": 0,
+        "pitcher_props": 0,
+        "hitter_props": 0,
+        "hitter_home_runs": 0,
+        "hitter_hits": 0,
+        "hitter_strikeouts": 0,
+        "hitter_total_bases": 0,
+        "hitter_runs": 0,
+        "hitter_rbis": 0,
+        "combined": 0
+      },
+      "results": {
+        "combined": {
+          "n": 0,
+          "wins": 0,
+          "losses": 0,
+          "stake_u": 0.0,
+          "profit_u": 0.0,
+          "roi": null
+        }
+      },
+      "profit_u": 0.0,
+      "roi": null,
+      "settled_n": 0,
+      "unresolved_n": 0,
+      "source_kind": null,
+      "_betting_payload_found": false,
+      "report_path": null
+    },
+    {
+      "date": "2026-06-21",
+      "month": "2026-06",
+      "games": 1,
+      "cards_available": false,
+      "cards_url": null,
+      "legacy_cards_available": false,
+      "legacy_cards_url": null,
+      "betting_cards": {
+        "available": false,
+        "available_profiles": [],
+        "default_profile": null,
+        "profiles": {}
+      },
+      "report_path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/eval/batches/season_2026_ui_daily_live/sim_vs_actual_2026-06-21.json",
+      "aggregate": {
+        "full": {
+          "games": 1,
+          "brier_home_win": 0.19448100000000001,
+          "mae_total_runs": 3.787000000000001,
+          "mae_run_margin": 2.407
+        },
+        "first5": {
+          "games": 1,
+          "brier_home_win": 0.11088900000000002,
+          "mae_total_runs": 0.6539999999999999,
+          "mae_run_margin": 1.4260000000000002
+        },
+        "first3": {
+          "games": 1,
+          "brier_home_win": 0.4872039999999999,
+          "mae_total_runs": 1.763,
+          "mae_run_margin": 1.337
+        }
+      },
+      "full_game": {
+        "totals": {
+          "games": 1,
+          "mae": 3.787000000000001,
+          "rmse": 3.787000000000001,
+          "avg_nll_exact_total": 2.4079456086518722
+        },
+        "moneyline": {
+          "games": 1,
+          "brier": 0.19448100000000001,
+          "logloss": 0.581605805827038,
+          "accuracy": 1.0
+        },
+        "runline_fav_minus_1_5": {
+          "games": 1,
+          "brier": 0.33062499999999995,
+          "logloss": 0.8556661100577202,
+          "accuracy": 0.0
+        },
+        "pitcher_props_starters": {
+          "starters": 2,
+          "so_mae": 0.9155000000000002,
+          "so_rmse": 0.9921927736080324,
+          "outs_mae": 5.9915,
+          "outs_rmse": 6.021318335713534,
+          "pitches_n": 2,
+          "pitches_mae": 4.936499999999995,
+          "pitches_rmse": 4.937543366898153,
+          "pitches_bias": 0.10150000000000148
+        },
+        "pitcher_props_at_market_lines": {
+          "lines_meta": {
+            "source": null,
+            "path": null,
+            "pitchers": 0
+          },
+          "strikeouts": {
+            "n": 0,
+            "n_accuracy": 0,
+            "n_edge": 0,
+            "pushes": 0,
+            "brier": null,
+            "logloss": null,
+            "accuracy": null,
+            "avg_edge_vs_no_vig": null
+          },
+          "outs": {
+            "n": 0,
+            "n_accuracy": 0,
+            "n_edge": 0,
+            "pushes": 0,
+            "brier": null,
+            "logloss": null,
+            "accuracy": null,
+            "avg_edge_vs_no_vig": null
+          }
+        }
+      }
+    },
+    {
+      "date": "2026-06-22",
+      "month": "2026-06",
+      "games": 13,
+      "cards_available": true,
+      "legacy_cards_available": true,
+      "cards_url": "/?date=2026-06-22",
+      "legacy_cards_url": "/?date=2026-06-22",
+      "betting_cards": {
+        "available": true,
+        "available_profiles": [
+          "retuned"
+        ],
+        "default_profile": "retuned",
+        "profiles": {
+          "retuned": {
+            "available": true,
+            "card_path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_22_locked_policy.json",
+            "selected_counts": {
+              "totals": 0,
+              "ml": 1,
+              "pitcher_props": 1,
+              "hitter_props": 10,
+              "hitter_home_runs": 0,
+              "hitter_hits": 4,
+              "hitter_strikeouts": 0,
+              "hitter_total_bases": 6,
+              "hitter_runs": 0,
+              "hitter_rbis": 0,
+              "combined": 12
+            },
+            "playable_counts": {
+              "totals": 0,
+              "ml": 0,
+              "pitcher_props": 16,
+              "hitter_props": 11,
+              "hitter_home_runs": 0,
+              "hitter_hits": 6,
+              "hitter_strikeouts": 0,
+              "hitter_total_bases": 5,
+              "hitter_runs": 0,
+              "hitter_rbis": 0,
+              "combined": 27
+            },
+            "results": {
+              "combined": {
+                "n": 0,
+                "wins": 0,
+                "losses": 0,
+                "stake_u": 0.0,
+                "profit_u": 0.0,
+                "roi": null
+              }
+            }
+          }
+        }
+      },
+      "full_game": {
+        "moneyline": {},
+        "totals": {},
+        "runline_fav_minus_1_5": {},
+        "pitcher_props_starters": {},
+        "pitcher_props_at_market_lines": {}
+      },
+      "aggregate": {
+        "full": {
+          "games": 13
+        },
+        "first5": {
+          "games": 13
+        },
+        "first3": {
+          "games": 13
+        }
+      },
+      "cap_profile": "nototals_p1_tbheavy11_r1_nohr",
+      "card_path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_22_locked_policy.json",
+      "selected_counts": {
+        "totals": 0,
+        "ml": 1,
+        "pitcher_props": 1,
+        "hitter_props": 10,
+        "hitter_home_runs": 0,
+        "hitter_hits": 4,
+        "hitter_strikeouts": 0,
+        "hitter_total_bases": 6,
+        "hitter_runs": 0,
+        "hitter_rbis": 0,
+        "combined": 12
+      },
+      "results": {
+        "combined": {
+          "n": 0,
+          "wins": 0,
+          "losses": 0,
+          "stake_u": 0.0,
+          "profit_u": 0.0,
+          "roi": null
+        }
+      },
+      "profit_u": 0.0,
+      "roi": null,
+      "settled_n": 0,
+      "unresolved_n": 12,
+      "source_kind": "canonical_daily_fallback",
+      "_betting_payload_found": true,
+      "report_path": null
+    }
+  ],
+  "found": true,
+  "artifactDate": "2026-06-22"
+}

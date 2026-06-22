@@ -1,0 +1,1672 @@
+{
+  "date": "2026-05-30",
+  "home": "POR",
+  "away": "IND",
+  "market_total": null,
+  "market_home_spread": null,
+  "quarters": [
+    {
+      "q": 1,
+      "home_pts_mu": 19.7696625,
+      "home_pts_sigma": 6.0,
+      "away_pts_mu": 19.7696625,
+      "away_pts_sigma": 6.0,
+      "corr": 0.25
+    },
+    {
+      "q": 2,
+      "home_pts_mu": 19.7696625,
+      "home_pts_sigma": 6.0,
+      "away_pts_mu": 19.7696625,
+      "away_pts_sigma": 6.0,
+      "corr": 0.25
+    },
+    {
+      "q": 3,
+      "home_pts_mu": 20.5765875,
+      "home_pts_sigma": 6.0,
+      "away_pts_mu": 20.5765875,
+      "away_pts_sigma": 6.0,
+      "corr": 0.25
+    },
+    {
+      "q": 4,
+      "home_pts_mu": 20.5765875,
+      "home_pts_sigma": 6.0,
+      "away_pts_mu": 20.5765875,
+      "away_pts_sigma": 6.0,
+      "corr": 0.25
+    }
+  ],
+  "players": {
+    "home": [
+      {
+        "team": "POR",
+        "opponent": "IND",
+        "player_name": "Carla Leite",
+        "player_id": 5208982,
+        "pts_mean": 13.941428571428572,
+        "reb_mean": 2.621128571428572,
+        "ast_mean": 5.529585714285714,
+        "threes_mean": 0.1495571428571428,
+        "pra_mean": 22.09214285714286,
+        "stl_mean": 0.4718571428571429,
+        "blk_mean": 0.0,
+        "tov_mean": 2.595214285714286,
+        "pts_sd": 3.485357142857143,
+        "reb_sd": 1.0,
+        "ast_sd": 1.3823964285714285,
+        "threes_sd": 1.0,
+        "pra_sd": 5.523035714285715,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "team": "POR",
+        "opponent": "IND",
+        "player_name": "Bridget Carleton",
+        "player_id": 3906972,
+        "pts_mean": 15.718220689655174,
+        "reb_mean": 2.6241793103448274,
+        "ast_mean": 2.1154206896551724,
+        "threes_mean": 3.121131034482759,
+        "pra_mean": 20.45782068965517,
+        "stl_mean": 2.262206896551724,
+        "blk_mean": 0.3231724137931034,
+        "tov_mean": 0.8079310344827586,
+        "pts_sd": 3.9295551724137936,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 5.114455172413792,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "team": "POR",
+        "opponent": "IND",
+        "player_name": "Sug Sutton",
+        "player_id": 4068159,
+        "pts_mean": 12.07624347826087,
+        "reb_mean": 1.4535652173913045,
+        "ast_mean": 5.190121739130435,
+        "threes_mean": 0.5094260869565216,
+        "pra_mean": 18.71993043478261,
+        "stl_mean": 0.6757101449275361,
+        "blk_mean": 0.0,
+        "tov_mean": 2.027130434782608,
+        "pts_sd": 3.0190608695652177,
+        "reb_sd": 1.0,
+        "ast_sd": 1.2975304347826087,
+        "threes_sd": 1.0,
+        "pra_sd": 4.679982608695653,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "team": "POR",
+        "opponent": "IND",
+        "player_name": "Emily Engstler",
+        "player_id": 4398729,
+        "pts_mean": 11.037007299270073,
+        "reb_mean": 4.336160583941606,
+        "ast_mean": 0.5375620437956203,
+        "threes_mean": 1.2152992700729923,
+        "pra_mean": 15.9107299270073,
+        "stl_mean": 1.1423114355231143,
+        "blk_mean": 1.9582481751824807,
+        "tov_mean": 2.1214355231143545,
+        "pts_sd": 2.759251824817518,
+        "reb_sd": 1.0840401459854014,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 3.977682481751825,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "team": "POR",
+        "opponent": "IND",
+        "player_name": "Sarah Ashlee Barker",
+        "player_id": 4703794,
+        "pts_mean": 10.422895238095238,
+        "reb_mean": 3.5387047619047625,
+        "ast_mean": 1.399047619047619,
+        "threes_mean": 1.012133333333333,
+        "pra_mean": 15.36064761904762,
+        "stl_mean": 0.7858730158730161,
+        "blk_mean": 0.1571746031746032,
+        "tov_mean": 1.2573968253968255,
+        "pts_sd": 2.6057238095238096,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 3.840161904761905,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "team": "POR",
+        "opponent": "IND",
+        "player_name": "Megan Gustafson",
+        "player_id": 3934218,
+        "pts_mean": 10.51354382022472,
+        "reb_mean": 3.696514606741573,
+        "ast_mean": 0.2584134831460674,
+        "threes_mean": 1.0448269662921348,
+        "pra_mean": 14.46847191011236,
+        "stl_mean": 0.1953445692883895,
+        "blk_mean": 0.5860337078651685,
+        "tov_mean": 0.5860337078651685,
+        "pts_sd": 2.62838595505618,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 3.61711797752809,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "team": "POR",
+        "opponent": "IND",
+        "player_name": "Luisa Geiselsoder",
+        "player_id": 4682797,
+        "pts_mean": 5.778463309352517,
+        "reb_mean": 3.9377841726618703,
+        "ast_mean": 1.209105035971223,
+        "threes_mean": 0.3727654676258993,
+        "pra_mean": 10.925352517985612,
+        "stl_mean": 0.3106378896882494,
+        "blk_mean": 0.6212757793764988,
+        "tov_mean": 1.087232613908873,
+        "pts_sd": 1.4446158273381293,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 2.731338129496403,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "team": "POR",
+        "opponent": "IND",
+        "player_name": "Jordan Harrison",
+        "player_id": 5108051,
+        "pts_mean": 5.1,
+        "reb_mean": 0.7533333333333334,
+        "ast_mean": 3.933333333333333,
+        "threes_mean": 0.0,
+        "pra_mean": 9.786666666666669,
+        "stl_mean": 0.2722206666666666,
+        "blk_mean": 0.2227259999999999,
+        "tov_mean": 0.74242,
+        "pts_sd": 1.275,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 2.446666666666667,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "team": "POR",
+        "opponent": "IND",
+        "player_name": "Teja Oblak",
+        "player_id": 5346554,
+        "pts_mean": 2.16,
+        "reb_mean": 0.72,
+        "ast_mean": 6.48,
+        "threes_mean": 0.72,
+        "pra_mean": 9.36,
+        "stl_mean": 0.305932,
+        "blk_mean": 0.250308,
+        "tov_mean": 0.8343599999999999,
+        "pts_sd": 1.0,
+        "reb_sd": 1.0,
+        "ast_sd": 1.62,
+        "threes_sd": 1.0,
+        "pra_sd": 2.34,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "team": "POR",
+        "opponent": "IND",
+        "player_name": "Serah Williams",
+        "player_id": 5108550,
+        "pts_mean": 5.442647272727273,
+        "reb_mean": 3.165614545454545,
+        "ast_mean": 0.2945163636363637,
+        "threes_mean": 0.0,
+        "pra_mean": 8.902778181818181,
+        "stl_mean": 0.9550545454545456,
+        "blk_mean": 0.7162909090909091,
+        "tov_mean": 0.0,
+        "pts_sd": 1.3606618181818182,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 2.2256945454545454,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "team": "POR",
+        "opponent": "IND",
+        "player_name": "Haley Jones",
+        "player_id": 4595910,
+        "pts_mean": 5.359779310344827,
+        "reb_mean": 2.390675862068965,
+        "ast_mean": 1.067034482758621,
+        "threes_mean": 0.0,
+        "pra_mean": 8.817489655172412,
+        "stl_mean": 0.4286896551724137,
+        "blk_mean": 0.0,
+        "tov_mean": 1.2860689655172413,
+        "pts_sd": 1.3399448275862067,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 2.204372413793103,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "team": "POR",
+        "opponent": "IND",
+        "player_name": "Nyadiew Puoch",
+        "player_id": 5209202,
+        "pts_mean": 5.14692,
+        "reb_mean": 2.4826933333333336,
+        "ast_mean": 0.8135333333333332,
+        "threes_mean": 0.7116266666666666,
+        "pra_mean": 8.443146666666667,
+        "stl_mean": 1.1889111111111113,
+        "blk_mean": 0.1698444444444444,
+        "tov_mean": 1.0190666666666666,
+        "pts_sd": 1.28673,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 2.110786666666667,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "team": "POR",
+        "opponent": "IND",
+        "player_name": "Frieda Buhner",
+        "player_id": 5105406,
+        "pts_mean": 2.9594249999999995,
+        "reb_mean": 1.548725,
+        "ast_mean": 0.4246749999999999,
+        "threes_mean": 0.4246749999999999,
+        "pra_mean": 4.932824999999999,
+        "stl_mean": 0.0,
+        "blk_mean": 0.0,
+        "tov_mean": 0.4555833333333333,
+        "pts_sd": 1.0,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 1.2332062499999998,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "team": "POR",
+        "opponent": "IND",
+        "player_name": "Holly Winterburn",
+        "player_id": 4433690,
+        "pts_mean": 1.664,
+        "reb_mean": 0.8,
+        "ast_mean": 1.192,
+        "threes_mean": 0.0,
+        "pra_mean": 3.6560000000000006,
+        "stl_mean": 0.3333333333333333,
+        "blk_mean": 0.0,
+        "tov_mean": 0.6666666666666666,
+        "pts_sd": 1.0,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 1.0,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "team": "POR",
+        "opponent": "IND",
+        "player_name": "Kamiah Smalls",
+        "player_id": 4068346,
+        "pts_mean": 1.18,
+        "reb_mean": 0.0,
+        "ast_mean": 0.92,
+        "threes_mean": 0.24,
+        "pra_mean": 2.1,
+        "stl_mean": 0.2298999999999999,
+        "blk_mean": 0.1880999999999999,
+        "tov_mean": 0.6269999999999999,
+        "pts_sd": 1.0,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 1.0,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "team": "POR",
+        "opponent": "IND",
+        "player_name": "Chloe Bibby",
+        "player_id": 4280877,
+        "pts_mean": 0.0,
+        "reb_mean": 0.7599999999999999,
+        "ast_mean": 0.0,
+        "threes_mean": 0.0,
+        "pra_mean": 0.7599999999999999,
+        "stl_mean": 0.2675199999999999,
+        "blk_mean": 0.2188799999999999,
+        "tov_mean": 0.7295999999999999,
+        "pts_sd": 1.0,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 1.0,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "team": "POR",
+        "opponent": "IND",
+        "player_name": "Karlie Samuelson",
+        "player_id": 3056730,
+        "pts_mean": 0.0,
+        "reb_mean": 0.0,
+        "ast_mean": 0.0,
+        "threes_mean": 0.0,
+        "pra_mean": 0.0,
+        "stl_mean": 0.176,
+        "blk_mean": 0.144,
+        "tov_mean": 0.48,
+        "pts_sd": 1.0,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 1.0,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "team": "POR",
+        "opponent": "IND",
+        "player_name": "Iyana Martin",
+        "player_id": 5345329,
+        "pts_mean": 0.0,
+        "reb_mean": 0.0,
+        "ast_mean": 0.0,
+        "threes_mean": 0.0,
+        "pra_mean": 0.0,
+        "stl_mean": 0.176,
+        "blk_mean": 0.144,
+        "tov_mean": 0.48,
+        "pts_sd": 1.0,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 1.0,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    ],
+    "away": [
+      {
+        "team": "IND",
+        "opponent": "POR",
+        "player_name": "Aliyah Boston",
+        "player_id": 4432831,
+        "pts_mean": 17.741999999999997,
+        "reb_mean": 10.150125,
+        "ast_mean": 2.6105,
+        "threes_mean": 1.080375,
+        "pra_mean": 30.502624999999995,
+        "stl_mean": 1.6649999999999998,
+        "blk_mean": 0.8324999999999999,
+        "tov_mean": 2.08125,
+        "pts_sd": 4.435499999999999,
+        "reb_sd": 2.53753125,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 7.625656249999999,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "team": "IND",
+        "opponent": "POR",
+        "player_name": "Caitlin Clark",
+        "player_id": 4433403,
+        "pts_mean": 19.64535612903226,
+        "reb_mean": 3.0960490322580645,
+        "ast_mean": 7.657554838709678,
+        "threes_mean": 2.9433083870967742,
+        "pra_mean": 30.39896,
+        "stl_mean": 0.8788064516129033,
+        "blk_mean": 0.8788064516129033,
+        "tov_mean": 4.569793548387097,
+        "pts_sd": 4.911339032258065,
+        "reb_sd": 1.0,
+        "ast_sd": 1.9143887096774195,
+        "threes_sd": 1.0,
+        "pra_sd": 7.59974,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.1424483870967743,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "team": "IND",
+        "opponent": "POR",
+        "player_name": "Kelsey Mitchell",
+        "player_id": 3142191,
+        "pts_mean": 20.9778,
+        "reb_mean": 0.6535,
+        "ast_mean": 2.5151000000000003,
+        "threes_mean": 1.4004,
+        "pra_mean": 24.146400000000003,
+        "stl_mean": 0.4935,
+        "blk_mean": 0.0,
+        "tov_mean": 1.645,
+        "pts_sd": 5.24445,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 6.036600000000001,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "team": "IND",
+        "opponent": "POR",
+        "player_name": "Lexie Hull",
+        "player_id": 4398829,
+        "pts_mean": 8.266682352941176,
+        "reb_mean": 4.372833613445378,
+        "ast_mean": 1.3809546218487396,
+        "threes_mean": 1.803939495798319,
+        "pra_mean": 14.020470588235296,
+        "stl_mean": 0.7432829131652661,
+        "blk_mean": 0.1858207282913165,
+        "tov_mean": 1.1149243697478992,
+        "pts_sd": 2.066670588235294,
+        "reb_sd": 1.0932084033613445,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 3.505117647058824,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "team": "IND",
+        "opponent": "POR",
+        "player_name": "Sophie Cunningham",
+        "player_id": 3907781,
+        "pts_mean": 9.216374468085109,
+        "reb_mean": 2.013353191489362,
+        "ast_mean": 1.2185191489361702,
+        "threes_mean": 1.338204255319149,
+        "pra_mean": 12.44824680851064,
+        "stl_mean": 0.5215744680851064,
+        "blk_mean": 0.1738581560283688,
+        "tov_mean": 0.6954326241134753,
+        "pts_sd": 2.304093617021277,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 3.11206170212766,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "team": "IND",
+        "opponent": "POR",
+        "player_name": "Justine Pissott",
+        "player_id": 4682855,
+        "pts_mean": 8.0,
+        "reb_mean": 1.0,
+        "ast_mean": 1.0,
+        "threes_mean": 2.0,
+        "pra_mean": 10.0,
+        "stl_mean": 0.2199999999999999,
+        "blk_mean": 0.18,
+        "tov_mean": 0.6,
+        "pts_sd": 2.0,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 2.5,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "team": "IND",
+        "opponent": "POR",
+        "player_name": "Myisha Hines-Allen",
+        "player_id": 3142055,
+        "pts_mean": 4.094783783783784,
+        "reb_mean": 2.817756756756757,
+        "ast_mean": 2.618351351351351,
+        "threes_mean": 0.0,
+        "pra_mean": 9.530891891891892,
+        "stl_mean": 0.8770270270270272,
+        "blk_mean": 0.4385135135135136,
+        "tov_mean": 1.461711711711712,
+        "pts_sd": 1.023695945945946,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 2.382722972972973,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "team": "IND",
+        "opponent": "POR",
+        "player_name": "Monique Billings",
+        "player_id": 3142255,
+        "pts_mean": 4.518873043478261,
+        "reb_mean": 3.9748034782608697,
+        "ast_mean": 0.7552973913043477,
+        "threes_mean": 0.1872278260869564,
+        "pra_mean": 9.248973913043478,
+        "stl_mean": 1.045495652173913,
+        "blk_mean": 0.4480695652173912,
+        "tov_mean": 0.8961391304347824,
+        "pts_sd": 1.1297182608695653,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 2.3122434782608696,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "team": "IND",
+        "opponent": "POR",
+        "player_name": "Raven Johnson",
+        "player_id": 4433797,
+        "pts_mean": 5.131200000000001,
+        "reb_mean": 2.4608799999999995,
+        "ast_mean": 1.63808,
+        "threes_mean": 0.60752,
+        "pra_mean": 9.23016,
+        "stl_mean": 0.1996,
+        "blk_mean": 0.3992,
+        "tov_mean": 1.7964,
+        "pts_sd": 1.2828000000000002,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 2.30754,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "team": "IND",
+        "opponent": "POR",
+        "player_name": "Kayana Traylor",
+        "player_id": 4398947,
+        "pts_mean": 5.886666666666667,
+        "reb_mean": 0.7266666666666666,
+        "ast_mean": 0.7933333333333332,
+        "threes_mean": 1.2066666666666666,
+        "pra_mean": 7.406666666666666,
+        "stl_mean": 0.2449333333333333,
+        "blk_mean": 0.2003999999999999,
+        "tov_mean": 0.6679999999999999,
+        "pts_sd": 1.4716666666666667,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 1.8516666666666666,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "team": "IND",
+        "opponent": "POR",
+        "player_name": "Makayla Timpson",
+        "player_id": 4433546,
+        "pts_mean": 2.4173170731707314,
+        "reb_mean": 4.004682926829268,
+        "ast_mean": 0.3259024390243902,
+        "threes_mean": 0.0,
+        "pra_mean": 6.74790243902439,
+        "stl_mean": 0.3354471544715447,
+        "blk_mean": 0.0,
+        "tov_mean": 0.1677235772357723,
+        "pts_sd": 1.0,
+        "reb_sd": 1.001170731707317,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 1.6869756097560975,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "team": "IND",
+        "opponent": "POR",
+        "player_name": "Jessica Timmons",
+        "player_id": 4433811,
+        "pts_mean": 3.466666666666666,
+        "reb_mean": 0.9333333333333332,
+        "ast_mean": 0.7933333333333332,
+        "threes_mean": 0.0666666666666666,
+        "pra_mean": 5.1933333333333325,
+        "stl_mean": 0.2783733333333333,
+        "blk_mean": 0.2277599999999999,
+        "tov_mean": 0.7591999999999999,
+        "pts_sd": 1.0,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 1.2983333333333331,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "team": "IND",
+        "opponent": "POR",
+        "player_name": "Megan McConnell",
+        "player_id": 4433510,
+        "pts_mean": 0.0,
+        "reb_mean": 2.66,
+        "ast_mean": 2.4466666666666668,
+        "threes_mean": 0.0,
+        "pra_mean": 5.1066666666666665,
+        "stl_mean": 0.2488933333333333,
+        "blk_mean": 0.2036399999999999,
+        "tov_mean": 0.6788,
+        "pts_sd": 1.0,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 1.2766666666666666,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "team": "IND",
+        "opponent": "POR",
+        "player_name": "Tyasha Harris",
+        "player_id": 4065760,
+        "pts_mean": 1.1301810810810808,
+        "reb_mean": 0.6459297297297297,
+        "ast_mean": 1.5318594594594592,
+        "threes_mean": 0.0783216216216216,
+        "pra_mean": 3.30797027027027,
+        "stl_mean": 0.261072072072072,
+        "blk_mean": 0.130536036036036,
+        "tov_mean": 0.5221441441441441,
+        "pts_sd": 1.0,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 1.0,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "team": "IND",
+        "opponent": "POR",
+        "player_name": "Damiris Dantas",
+        "player_id": 2955898,
+        "pts_mean": 2.2851891891891896,
+        "reb_mean": 0.5632972972972974,
+        "ast_mean": 0.1368243243243243,
+        "threes_mean": 0.5792972972972974,
+        "pra_mean": 2.9853108108108115,
+        "stl_mean": 0.2280405405405405,
+        "blk_mean": 0.4560810810810811,
+        "tov_mean": 0.6841216216216217,
+        "pts_sd": 1.0,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 1.0,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "team": "IND",
+        "opponent": "POR",
+        "player_name": "Grace VanSlooten",
+        "player_id": 5105731,
+        "pts_mean": 1.22,
+        "reb_mean": 0.5599999999999999,
+        "ast_mean": 0.6,
+        "threes_mean": 0.02,
+        "pra_mean": 2.38,
+        "stl_mean": 0.1298,
+        "blk_mean": 0.1062,
+        "tov_mean": 0.354,
+        "pts_sd": 1.0,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 1.0,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "team": "IND",
+        "opponent": "POR",
+        "player_name": "Shatori Walker-Kimbrough",
+        "player_id": 3058893,
+        "pts_mean": 0.0,
+        "reb_mean": 0.0,
+        "ast_mean": 0.0,
+        "threes_mean": 0.0,
+        "pra_mean": 0.0,
+        "stl_mean": 0.1374999999999999,
+        "blk_mean": 0.1124999999999999,
+        "tov_mean": 0.375,
+        "pts_sd": 1.0,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 1.0,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    ]
+  },
+  "home_team_total_pts_mean": 108.50057398935925,
+  "away_team_total_pts_mean": 113.99909045409493,
+  "excluded_player_keys_by_team": {
+    "POR": [],
+    "IND": []
+  },
+  "pregame_context": {
+    "home_injuries_out": 0,
+    "away_injuries_out": 0,
+    "home_pace": 79.5,
+    "away_pace": 79.5,
+    "home_b2b": false,
+    "away_b2b": false
+  },
+  "n_sims": 150
+}

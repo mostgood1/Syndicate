@@ -1,11 +1,11 @@
 {
   "meta": {
     "season": 2026,
-    "generated_at": "2026-06-21T12:39:36.103697",
+    "generated_at": "2026-06-22T03:49:15.170229",
     "title": "MLB 2026 Betting Card Recap",
-    "batch_dir": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/eval/batches/season_2026_ui_daily_live",
-    "cards_dir": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/eval/seasons/2026/locked_cards_retuned",
-    "day_payload_dir": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/eval/seasons/2026/betting_day_payloads_retuned",
+    "batch_dir": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/eval/batches/season_2026_ui_daily_live",
+    "cards_dir": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/eval/seasons/2026/locked_cards_retuned",
+    "day_payload_dir": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/eval/seasons/2026/betting_day_payloads_retuned",
     "source_mode": "season_eval_batch_reconstruction",
     "prefer_canonical_daily": true,
     "cap_profile": "nototals_p1_tbheavy11_r1_nohr",
@@ -393,9 +393,9 @@
     {
       "date": "2026-06-14",
       "month": "2026-06",
-      "card_path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/eval/seasons/2026/locked_cards_retuned/daily_summary_2026_06_14_locked_policy.json",
-      "report_path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/eval/batches/season_2026_ui_daily_live/sim_vs_actual_2026-06-14.json",
-      "payload_path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/eval/seasons/2026/betting_day_payloads_retuned/season_betting_day_2026_06_14.json",
+      "card_path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/eval/seasons/2026/locked_cards_retuned/daily_summary_2026_06_14_locked_policy.json",
+      "report_path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/eval/batches/season_2026_ui_daily_live/sim_vs_actual_2026-06-14.json",
+      "payload_path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/eval/seasons/2026/betting_day_payloads_retuned/season_betting_day_2026_06_14.json",
       "cap_profile": "nototals_p1_tbheavy11_r1_nohr",
       "selected_counts": {
         "totals": 0,
@@ -512,9 +512,9 @@
     {
       "date": "2026-06-15",
       "month": "2026-06",
-      "card_path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/eval/seasons/2026/locked_cards_retuned/daily_summary_2026_06_15_locked_policy.json",
-      "report_path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/eval/batches/season_2026_ui_daily_live/sim_vs_actual_2026-06-15.json",
-      "payload_path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/eval/seasons/2026/betting_day_payloads_retuned/season_betting_day_2026_06_15.json",
+      "card_path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/eval/seasons/2026/locked_cards_retuned/daily_summary_2026_06_15_locked_policy.json",
+      "report_path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/eval/batches/season_2026_ui_daily_live/sim_vs_actual_2026-06-15.json",
+      "payload_path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/eval/seasons/2026/betting_day_payloads_retuned/season_betting_day_2026_06_15.json",
       "cap_profile": "nototals_p1_tbheavy11_r1_nohr",
       "selected_counts": {
         "totals": 0,
@@ -631,9 +631,9 @@
     {
       "date": "2026-06-16",
       "month": "2026-06",
-      "card_path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/eval/seasons/2026/locked_cards_retuned/daily_summary_2026_06_16_locked_policy.json",
-      "report_path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/eval/batches/season_2026_ui_daily_live/sim_vs_actual_2026-06-16.json",
-      "payload_path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/eval/seasons/2026/betting_day_payloads_retuned/season_betting_day_2026_06_16.json",
+      "card_path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/eval/seasons/2026/locked_cards_retuned/daily_summary_2026_06_16_locked_policy.json",
+      "report_path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/eval/batches/season_2026_ui_daily_live/sim_vs_actual_2026-06-16.json",
+      "payload_path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/eval/seasons/2026/betting_day_payloads_retuned/season_betting_day_2026_06_16.json",
       "cap_profile": "nototals_p1_tbheavy11_r1_nohr",
       "selected_counts": {
         "totals": 0,
@@ -750,9 +750,9 @@
     {
       "date": "2026-06-17",
       "month": "2026-06",
-      "card_path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/eval/seasons/2026/locked_cards_retuned/daily_summary_2026_06_17_locked_policy.json",
-      "report_path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/eval/batches/season_2026_ui_daily_live/sim_vs_actual_2026-06-17.json",
-      "payload_path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/eval/seasons/2026/betting_day_payloads_retuned/season_betting_day_2026_06_17.json",
+      "card_path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/eval/seasons/2026/locked_cards_retuned/daily_summary_2026_06_17_locked_policy.json",
+      "report_path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/eval/batches/season_2026_ui_daily_live/sim_vs_actual_2026-06-17.json",
+      "payload_path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/eval/seasons/2026/betting_day_payloads_retuned/season_betting_day_2026_06_17.json",
       "cap_profile": "nototals_p1_tbheavy11_r1_nohr",
       "selected_counts": {
         "totals": 0,
@@ -869,9 +869,9 @@
     {
       "date": "2026-06-19",
       "month": "2026-06",
-      "card_path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/eval/seasons/2026/locked_cards_retuned/daily_summary_2026_06_19_locked_policy.json",
-      "report_path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/eval/batches/season_2026_ui_daily_live/sim_vs_actual_2026-06-19.json",
-      "payload_path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/eval/seasons/2026/betting_day_payloads_retuned/season_betting_day_2026_06_19.json",
+      "card_path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/eval/seasons/2026/locked_cards_retuned/daily_summary_2026_06_19_locked_policy.json",
+      "report_path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/eval/batches/season_2026_ui_daily_live/sim_vs_actual_2026-06-19.json",
+      "payload_path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/eval/seasons/2026/betting_day_payloads_retuned/season_betting_day_2026_06_19.json",
       "cap_profile": "nototals_p1_tbheavy11_r1_nohr",
       "selected_counts": {
         "totals": 0,
@@ -986,11 +986,11 @@
       "roi": null
     },
     {
-      "date": "2026-06-20",
+      "date": "2026-06-21",
       "month": "2026-06",
-      "card_path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/eval/seasons/2026/locked_cards_retuned/daily_summary_2026_06_20_locked_policy.json",
-      "report_path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/eval/batches/season_2026_ui_daily_live/sim_vs_actual_2026-06-20.json",
-      "payload_path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/eval/seasons/2026/betting_day_payloads_retuned/season_betting_day_2026_06_20.json",
+      "card_path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/eval/seasons/2026/locked_cards_retuned/daily_summary_2026_06_21_locked_policy.json",
+      "report_path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/eval/batches/season_2026_ui_daily_live/sim_vs_actual_2026-06-21.json",
+      "payload_path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/eval/seasons/2026/betting_day_payloads_retuned/season_betting_day_2026_06_21.json",
       "cap_profile": "nototals_p1_tbheavy11_r1_nohr",
       "selected_counts": {
         "totals": 0,
@@ -1098,8 +1098,8 @@
       "settled_n": 0,
       "unresolved_n": 0,
       "warnings": [
-        "Missing game lines: data/market/oddsapi/oddsapi_game_lines_2026_06_20.json",
-        "Missing hitter lines: data/market/oddsapi/oddsapi_hitter_props_2026_06_20.json"
+        "Missing game lines: data/market/oddsapi/oddsapi_game_lines_2026_06_21.json",
+        "Missing hitter lines: data/market/oddsapi/oddsapi_hitter_props_2026_06_21.json"
       ],
       "profit_u": 0.0,
       "roi": null

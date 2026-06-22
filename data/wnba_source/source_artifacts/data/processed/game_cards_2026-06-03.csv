@@ -1,0 +1,3 @@
+date,game_id,home_team,visitor_team,commence_time,home_ml,away_ml,home_spread,away_spread,total,bookmaker,home_tri,away_tri
+2026-06-03,1,New York Liberty,Toronto Tempo,2026-06-03T23:38:00Z,-426.6253672758832,426.6253672758831,-9.5,9.5,162.5,oddsapi_consensus,NYL,TOR
+2026-06-03,2,Seattle Storm,Phoenix Mercury,2026-06-04T02:00:00Z,233.24705443890923,-233.2470544389092,7.5,-7.5,160.5,oddsapi_consensus,SEA,PHX

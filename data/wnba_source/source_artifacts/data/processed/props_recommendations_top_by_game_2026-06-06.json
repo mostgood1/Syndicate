@@ -1,0 +1,260 @@
+{
+  "date": "2026-06-06",
+  "data": [
+    {
+      "game_key": "IND@NYL",
+      "game_id": "2",
+      "player": "Marine Johannes",
+      "team": "NYL",
+      "team_tricode": "NYL",
+      "opponent": "IND",
+      "score": 61.90989170634019,
+      "score_adj": 61.90989170634019,
+      "tier": "High",
+      "model": {
+        "pts": 5.662857142857142,
+        "reb": 2.9871428571428567,
+        "ast": 4.917142857142858,
+        "threes": 1.342857142857143,
+        "stl": 0.5697559999999999,
+        "blk": 0.4661639999999999,
+        "tov": 1.55388,
+        "pra": 13.567142857142857,
+        "pr": 8.649999999999999,
+        "pa": 10.58,
+        "ra": 7.904285714285715
+      },
+      "top_play": {
+        "market": "threes",
+        "side": "UNDER",
+        "line": 2.5,
+        "price": -118.0,
+        "edge": 0.3351085881352359,
+        "ev": 0.6190989170634019,
+        "ev_pct": 61.90989170634019,
+        "book": "fanduel",
+        "p_win": 1.0,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 61.9%",
+        "Regular price range (-150 to +150)",
+        "Consensus: 3 books aligned",
+        "Best line available"
+      ],
+      "basketball_summary": "model 1.3 vs line 2.5 (-1.2)"
+    },
+    {
+      "game_key": "WSH@ATL",
+      "game_id": "1",
+      "player": "Naz Hillmon",
+      "team": "ATL",
+      "team_tricode": "ATL",
+      "opponent": "WSH",
+      "score": 41.37690446453608,
+      "score_adj": 41.37690446453608,
+      "tier": "High",
+      "model": {
+        "pts": 5.356626217228464,
+        "reb": 4.008136329588015,
+        "ast": 0.6942449438202247,
+        "threes": 0.0826666666666666,
+        "stl": 0.0,
+        "blk": 0.0,
+        "tov": 1.642687265917603,
+        "pra": 10.059007490636704,
+        "pr": 9.364762546816479,
+        "pa": 6.050871161048689,
+        "ra": 4.70238127340824
+      },
+      "top_play": {
+        "market": "pts",
+        "side": "UNDER",
+        "line": 8.5,
+        "price": -104.0,
+        "edge": 0.21094108158390945,
+        "ev": 0.4137690446453608,
+        "ev_pct": 41.37690446453608,
+        "book": "fanduel",
+        "p_win": 0.9235729662139882,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 41.4%",
+        "Regular price range (-150 to +150)",
+        "Consensus: 3 books aligned",
+        "Best line available"
+      ],
+      "basketball_summary": "model 5.4 vs line 8.5 (-3.1)"
+    },
+    {
+      "game_key": "IND@NYL",
+      "game_id": "2",
+      "player": "Lexie Hull",
+      "team": "IND",
+      "team_tricode": "IND",
+      "opponent": "NYL",
+      "score": 39.49823897018469,
+      "score_adj": 39.49823897018469,
+      "tier": "High",
+      "model": {
+        "pts": 9.58576,
+        "reb": 4.834308571428571,
+        "ast": 1.5299714285714288,
+        "threes": 1.8435085714285715,
+        "stl": 0.0,
+        "blk": 0.3244666666666666,
+        "tov": 0.9734,
+        "pra": 15.95004,
+        "pr": 14.420068571428573,
+        "pa": 11.11573142857143,
+        "ra": 6.36428
+      },
+      "top_play": {
+        "market": "pts",
+        "side": "OVER",
+        "line": 6.5,
+        "price": 105.0,
+        "edge": 0.19267433643992526,
+        "ev": 0.39498238970184685,
+        "ev_pct": 39.49823897018469,
+        "book": "williamhill_us",
+        "p_win": 0.8827872677506273,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 39.5%",
+        "Regular price range (-150 to +150)",
+        "Consensus: 3 books aligned",
+        "Best line available"
+      ],
+      "basketball_summary": "model 9.6 vs line 6.5 (+3.1)"
+    },
+    {
+      "game_key": "IND@NYL",
+      "game_id": "2",
+      "player": "Jonquel Jones",
+      "team": "NYL",
+      "team_tricode": "NYL",
+      "opponent": "IND",
+      "score": 34.00499668129618,
+      "score_adj": 34.00499668129618,
+      "tier": "High",
+      "model": {
+        "pts": 12.695,
+        "reb": 7.555,
+        "ast": 2.41,
+        "threes": 0.6749999999999999,
+        "stl": 0.6129859999999999,
+        "blk": 0.5015339999999999,
+        "tov": 1.6717799999999998,
+        "pra": 22.66,
+        "pr": 20.25,
+        "pa": 15.105,
+        "ra": 9.965
+      },
+      "top_play": {
+        "market": "threes",
+        "side": "UNDER",
+        "line": 1.5,
+        "price": -146.0,
+        "edge": 0.20181827298655453,
+        "ev": 0.34004996681296173,
+        "ev_pct": 34.00499668129618,
+        "book": "draftkings",
+        "p_win": 0.9335459017723113,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 34.0%",
+        "Regular price range (-150 to +150)",
+        "Best line available"
+      ],
+      "basketball_summary": "model 0.7 vs line 1.5 (-0.8)"
+    },
+    {
+      "game_key": "WSH@ATL",
+      "game_id": "1",
+      "player": "Jordin Canada",
+      "team": "ATL",
+      "team_tricode": "ATL",
+      "opponent": "WSH",
+      "score": 16.912523390063416,
+      "score_adj": 16.912523390063416,
+      "tier": "High",
+      "model": {
+        "pts": 10.379329331306993,
+        "reb": 4.870108662613982,
+        "ast": 8.137228723404256,
+        "threes": 0.4413977203647416,
+        "stl": 3.535148682877406,
+        "blk": 0.321377152988855,
+        "tov": 1.2855086119554202,
+        "pra": 23.386666717325227,
+        "pr": 15.249437993920974,
+        "pa": 18.516558054711247,
+        "ra": 13.007337386018238
+      },
+      "top_play": {
+        "market": "ra",
+        "side": "OVER",
+        "line": 9.5,
+        "price": -111.0,
+        "edge": 0.08897109461123409,
+        "ev": 0.16912523390063416,
+        "ev_pct": 16.912523390063416,
+        "book": "draftkings",
+        "p_win": 0.6951915846115346,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 16.9%",
+        "Regular price range (-150 to +150)",
+        "Best line available"
+      ],
+      "basketball_summary": "model 13.0 vs line 9.5 (+3.5)"
+    },
+    {
+      "game_key": "WSH@ATL",
+      "game_id": "1",
+      "player": "Sonia Citron",
+      "team": "WSH",
+      "team_tricode": "WSH",
+      "opponent": "ATL",
+      "score": 13.047287651869976,
+      "score_adj": 13.047287651869976,
+      "tier": "High",
+      "model": {
+        "pts": 17.677142857142854,
+        "reb": 3.965714285714285,
+        "ast": 2.03,
+        "threes": 0.75,
+        "stl": 0.6791431428571428,
+        "blk": 0.5556625714285713,
+        "tov": 1.8522085714285712,
+        "pra": 23.67285714285714,
+        "pr": 21.64285714285714,
+        "pa": 19.707142857142856,
+        "ra": 5.995714285714285
+      },
+      "top_play": {
+        "market": "pr",
+        "side": "OVER",
+        "line": 17.5,
+        "price": -106.0,
+        "edge": 0.06713652869408826,
+        "ev": 0.13047287651869977,
+        "ev_pct": 13.047287651869976,
+        "book": "fanduel",
+        "p_win": 0.6450359833148163,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 13.0%",
+        "Regular price range (-150 to +150)",
+        "Best line available"
+      ],
+      "basketball_summary": "model 21.6 vs line 17.5 (+4.1)"
+    }
+  ]
+}
