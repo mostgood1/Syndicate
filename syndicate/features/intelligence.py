@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 CENTRAL DECISION ENGINE RULES
 
@@ -19,8 +20,6 @@ Constraints:
 - State-driven execution
 - Avoid redundant computation
 """
-
-from __future__ import annotations
 
 from difflib import SequenceMatcher
 from datetime import date
