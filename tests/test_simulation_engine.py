@@ -40,3 +40,63 @@ class SimulationEngineTests(unittest.TestCase):
         self.assertEqual(result["iterations"], 50)
         self.assertIn("outcome_distribution", result)
         self.assertIn("home", result["expected_values"]["team_score"])
+
+    def test_mlb_advanced_inputs_reduce_uncertainty_when_present(self) -> None:
+        base_context = {
+            "sport": "mlb",
+            "team_projections": {"home": 5.4, "away": 4.8},
+            "player_projections": [{"player": "Starter", "stat": "hits", "projection": 1.2}],
+            "model_probability": 0.58,
+            "confidence": 0.55,
+            "edge": 0.03,
+            "seed": 19,
+        }
+        advanced_context = {
+            **base_context,
+            "matchup_modifiers": {
+                "advanced": {
+                    "available": True,
+                    "page": {
+                        "lineup_health": {"healthy": True},
+                        "marketAvailability": {
+                            "gameLines": {"available": True},
+                            "pitcherProps": {"available": True},
+                            "hitterProps": {"available": True},
+                            "warnings": [],
+                        },
+                        "hrTargets": {
+                            "rows": 2,
+                            "topRows": [{
+                                "player": "Slugger",
+                                "batter_xwoba": 0.356,
+                                "batter_hardhit_rate": 0.47,
+                                "batter_barrel_rate": 0.09,
+                                "batter_launch_angle_mean": 18.2,
+                                "pitcher_xwoba_allowed": 0.301,
+                                "pitch_mix_score": 1.08,
+                            }],
+                        },
+                        "workflow": {"mode": "daily_update"},
+                    },
+                    "game": {
+                        "run_projection_rows": [{"label": "Q1", "value": 1.0}],
+                        "segment_overview_cards": [{"title": "First 5", "value": "Edge"}],
+                        "first1BetSignal": {"market": "first1", "value": 0.31},
+                        "gameLens": [{"label": "Live lens"}],
+                        "props": [{"market": "hitter_props"}],
+                        "liveProps": [{"market": "pitcher_props"}],
+                        "snapshotAvailable": True,
+                        "simContextAvailable": True,
+                    },
+                }
+            },
+        }
+
+        baseline = run_monte_carlo(base_context, iterations=100)
+        advanced = run_monte_carlo(advanced_context, iterations=100)
+
+        self.assertIn("advanced", advanced["inputs"])
+        self.assertTrue(advanced["inputs"]["advanced"]["available"])
+        self.assertEqual(advanced["inputs"]["advanced"]["page"]["hrTargets"]["topRows"][0]["batter_xwoba"], 0.356)
+        self.assertLess(advanced["inputs"]["advanced_std_dev_scale"], 1.0)
+        self.assertLess(advanced["std_dev"]["team_score"]["home"], baseline["std_dev"]["team_score"]["home"])

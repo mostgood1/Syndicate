@@ -298,6 +298,8 @@ class OpsRefreshApiTests(unittest.TestCase):
         self.assertEqual(payload["status"]["daily_update"]["checkpoint"]["currentStage"], "refresh_gate")
         self.assertEqual(payload["status"]["daily_update"]["run_state"]["currentStage"], "refresh_gate")
         self.assertEqual(payload["status"]["daily_update"]["trace"]["trace"]["inputFingerprintCount"], 3)
+        self.assertTrue(payload["status"]["daily_update"]["simulation_contract_exists"])
+        self.assertEqual(payload["status"]["daily_update"]["simulation_contract"]["scope"], "daily_update")
 
     def test_plan_endpoint_returns_dry_run_payload(self) -> None:
         with patch.dict(os.environ, {"ADMIN_TOKEN": "secret-token"}, clear=False), patch(

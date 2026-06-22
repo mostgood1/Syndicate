@@ -140,6 +140,89 @@ def _modifier_shift(modifiers: Mapping[str, Any], key: str, *, default: float = 
     return default
 
 
+def _advanced_payload(context: Mapping[str, Any]) -> dict[str, Any]:
+    advanced = _copy_mapping(context.get("advanced"))
+    if advanced:
+        return advanced
+    modifiers = _copy_mapping(context.get("matchup_modifiers"))
+    return _copy_mapping(modifiers.get("advanced"))
+
+
+def _advanced_std_dev_scale(advanced: Mapping[str, Any]) -> float:
+    if not isinstance(advanced, Mapping) or not advanced:
+        return 1.0
+
+    page = _copy_mapping(advanced.get("page"))
+    game = _copy_mapping(advanced.get("game"))
+    scale = 1.0
+
+    lineup_health = _copy_mapping(page.get("lineup_health") or page.get("lineupHealth"))
+    if lineup_health:
+        if bool(lineup_health.get("healthy")):
+            scale *= 0.97
+        else:
+            scale *= 1.06
+
+    market_availability = _copy_mapping(page.get("marketAvailability"))
+    market_warnings = market_availability.get("warnings") if isinstance(market_availability.get("warnings"), list) else []
+    if market_warnings:
+        scale *= min(1.12, 1.0 + (0.02 * len(market_warnings)))
+    else:
+        game_lines = _copy_mapping(market_availability.get("gameLines"))
+        pitcher_props = _copy_mapping(market_availability.get("pitcherProps"))
+        hitter_props = _copy_mapping(market_availability.get("hitterProps"))
+        if bool(game_lines.get("available")) and bool(pitcher_props.get("available")) and bool(hitter_props.get("available")):
+            scale *= 0.96
+        else:
+            scale *= 1.03
+
+    hr_targets = _copy_mapping(page.get("hrTargets"))
+    if int(hr_targets.get("rows") or 0) > 0 and isinstance(hr_targets.get("topRows"), list) and hr_targets.get("topRows"):
+        scale *= 0.98
+        top_rows = [row for row in hr_targets.get("topRows") if isinstance(row, Mapping)]
+        if top_rows:
+            top_row = top_rows[0]
+            batter_xwoba = _coerce_float(top_row.get("batter_xwoba"))
+            batter_hardhit_rate = _coerce_float(top_row.get("batter_hardhit_rate"))
+            batter_barrel_rate = _coerce_float(top_row.get("batter_barrel_rate"))
+            batter_launch_angle = _coerce_float(top_row.get("batter_launch_angle_mean") or top_row.get("launch_angle_mean") or top_row.get("la_mean"))
+            pitcher_xwoba_allowed = _coerce_float(top_row.get("pitcher_xwoba_allowed"))
+            pitch_mix_score = _coerce_float(top_row.get("pitch_mix_score"))
+
+            if batter_xwoba is not None:
+                scale *= 0.98 if batter_xwoba >= 0.34 else 1.01
+            if batter_hardhit_rate is not None:
+                scale *= 0.985 if batter_hardhit_rate >= 0.40 else 1.01
+            if batter_barrel_rate is not None:
+                scale *= 0.985 if batter_barrel_rate >= 0.07 else 1.01
+            if batter_launch_angle is not None:
+                scale *= 0.99 if 5.0 <= batter_launch_angle <= 30.0 else 1.01
+            if pitcher_xwoba_allowed is not None:
+                scale *= 0.985 if pitcher_xwoba_allowed <= 0.32 else 1.01
+            if pitch_mix_score is not None:
+                scale *= 0.985 if pitch_mix_score >= 1.0 else 1.01
+
+    if isinstance(page.get("workflow"), Mapping):
+        scale *= 0.99
+
+    if isinstance(game.get("run_projection_rows"), list) and game.get("run_projection_rows"):
+        scale *= 0.97
+    if isinstance(game.get("segment_overview_cards"), list) and game.get("segment_overview_cards"):
+        scale *= 0.98
+    if isinstance(game.get("gameLens"), list) and game.get("gameLens"):
+        scale *= 0.99
+    if isinstance(game.get("first1BetSignal"), Mapping) and game.get("first1BetSignal"):
+        scale *= 0.99
+    if isinstance(game.get("props"), list) and game.get("props"):
+        scale *= 0.99
+    if isinstance(game.get("liveProps"), list) and game.get("liveProps"):
+        scale *= 0.99
+    if bool(game.get("snapshotAvailable")) and bool(game.get("simContextAvailable")):
+        scale *= 0.98
+
+    return _clamp(scale, 0.85, 1.10)
+
+
 def _baseline_std_dev(stat_name: str, projection_value: float | None, context: Mapping[str, Any]) -> float:
     stat = str(stat_name or "").strip().lower()
     sport = str(context.get("sport") or "").strip().lower()
@@ -203,6 +286,8 @@ class SimulationEngine:
         team_projections = _copy_mapping(context.get("team_projections"))
         player_projections = _coerce_sequence(context.get("player_projections"))
         matchup_modifiers = _copy_mapping(context.get("matchup_modifiers"))
+        advanced_payload = _advanced_payload(context)
+        advanced_std_dev_scale = _advanced_std_dev_scale(advanced_payload)
 
         home_projection = _coerce_float(team_projections.get("home"))
         away_projection = _coerce_float(team_projections.get("away"))
@@ -227,8 +312,8 @@ class SimulationEngine:
         outcome_counts = {"win": 0, "loss": 0, "push": 0}
 
         team_std_dev = {
-            "home": _baseline_std_dev("team_score", home_projection, context),
-            "away": _baseline_std_dev("team_score", away_projection, context),
+            "home": _baseline_std_dev("team_score", home_projection, context) * advanced_std_dev_scale,
+            "away": _baseline_std_dev("team_score", away_projection, context) * advanced_std_dev_scale,
         }
         margin_bias = (win_probability - 0.5) * ((team_std_dev["home"] + team_std_dev["away"]) / 2.0)
         confidence = _clamp(_coerce_float(context.get("confidence")) or 0.5, 0.0, 1.0)
@@ -250,7 +335,7 @@ class SimulationEngine:
             combined_scale = _modifier_scale(stat_modifiers, stat_name, default=_modifier_scale(player_modifiers, stat_name, default=1.0))
             combined_shift = _modifier_shift(stat_modifiers, stat_name, default=_modifier_shift(player_modifiers, stat_name, default=0.0))
             adjusted_mean = (projection_value * combined_scale) + combined_shift
-            adjusted_std_dev = _baseline_std_dev(stat_name, projection_value, context)
+            adjusted_std_dev = _baseline_std_dev(stat_name, projection_value, context) * advanced_std_dev_scale
             adjusted_std_dev *= max(0.5, min(2.0, combined_scale))
 
             stat_bucket = player_stat_values.setdefault(player_name, {})
@@ -350,6 +435,8 @@ class SimulationEngine:
             "line": context.get("current_line") or context.get("line"),
             "odds": context.get("odds"),
             "iterations": iteration_count,
+            "advanced": advanced_payload,
+            "advanced_std_dev_scale": round(advanced_std_dev_scale, 4),
         }
 
         return SimulationResult(

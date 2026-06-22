@@ -301,6 +301,32 @@ class AskTheSyndicateApiTests(unittest.TestCase):
         self.assertTrue(payload["context_awareness"]["multi_sport"])
         self.assertEqual(payload["engine"]["routing_context"]["sport"], "nba")
 
+    def test_adapter_carries_daily_update_simulation_contract(self) -> None:
+        result = IntelligenceResult.from_raw(
+            {
+                "query_type": "bet_analysis",
+                "summary": "Snapshot summary",
+                "daily_update": {
+                    "simulation_contract": {
+                        "scope": "daily_update",
+                        "sport_count": 7,
+                        "advanced_by_sport": {"mlb": {"available": True}},
+                    }
+                },
+            }
+        )
+
+        payload = build_syndicate_query_response(
+            question="Who stands out today?",
+            context={"sport": "mlb"},
+            decision=RouteDecision(intent="bet_analysis", handler_name="handle_bet_analysis", matched_terms=("stand out",), score=0.8),
+            result=result,
+        )
+
+        self.assertEqual(payload["daily_update"]["simulation_contract"]["scope"], "daily_update")
+        self.assertEqual(payload["simulation_contract"]["advanced_by_sport"]["mlb"]["available"], True)
+        self.assertEqual(payload["engine"]["simulation_contract"]["sport_count"], 7)
+
     def test_query_route_returns_comparison_schema_for_compare_prompts(self) -> None:
         app = Flask(__name__)
         app.register_blueprint(ask_the_syndicate_bp)

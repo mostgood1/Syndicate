@@ -96,6 +96,7 @@ from syndicate.features.wnba.sources import live_snapshot_path as wnba_live_snap
 from syndicate.features.wnba.sources import processed_path as wnba_processed_path
 from syndicate.features.shared.intelligence_evaluation import build_intelligence_evaluation_bundle
 from syndicate.features.intelligence_board import build_intelligence_board_contract
+from syndicate.features.shared.simulation_adapter import build_simulation_engine_context_from_candidate
 
 
 ENABLE_PREDICTION_TRACKING = True
@@ -3102,6 +3103,11 @@ def _advanced_input_specs_for_sport(sport: dict[str, Any]) -> list[dict[str, Any
                 "path": _mlb_repo_artifact_path("data", "statcast", "features", "player_features_latest.json"),
             },
             {
+                "label": "Daily-update simulation contract",
+                "metrics": ["Source mode", "Freshness", "Source paths", "Advanced by sport", "HR targets"],
+                "path": _repo_root() / "reports" / "daily_update" / "latest" / "unified_daily_update_latest_simulation_contract.json",
+            },
+            {
                 "label": "Live lens and betting-day synthesis",
                 "metrics": ["Live projection delta", "Hit pace", "Ladder viability", "Board edge", "Sim confidence"],
                 "path": _mlb_repo_artifact_path("data", "live_lens", f"live_lens_report_{context_label.replace('-', '_')}.json") if re.fullmatch(r"\d{4}-\d{2}-\d{2}", context_label) else _mlb_repo_artifact_path("data", "live_lens"),
@@ -3310,6 +3316,12 @@ def build_intelligence_status(*, selected_date: str | None = None, force_refresh
 
     readiness_gate = _build_readiness_gate(overview, tracked)
 
+    daily_update_latest_dir = Path(__file__).resolve().parents[2] / "reports" / "daily_update" / "latest"
+    simulation_contract_path = daily_update_latest_dir / "unified_daily_update_latest_simulation_contract.json"
+    simulation_contract = None
+    if simulation_contract_path.exists():
+        simulation_contract = read_json_file(simulation_contract_path)
+
     return {
         "selected_date": _effective_date(selected_date),
         "sports": sports_status,
@@ -3323,7 +3335,12 @@ def build_intelligence_status(*, selected_date: str | None = None, force_refresh
         },
         "readiness_gate": readiness_gate,
         "refresh_status": refresh_status,
-        "daily_update": refresh_status.get("daily_update") if isinstance(refresh_status, dict) else {},
+        "daily_update": {
+            **(refresh_status.get("daily_update") if isinstance(refresh_status, dict) and isinstance(refresh_status.get("daily_update"), dict) else {}),
+            "simulation_contract_path": str(simulation_contract_path),
+            "simulation_contract_exists": simulation_contract is not None,
+            "simulation_contract": simulation_contract,
+        },
         "local_only": True,
     }
 
@@ -4415,22 +4432,8 @@ def _apply_advanced_context_to_candidates(
         candidate["market_focuses"] = market_focuses
         candidate["market_fit"] = market_fit
         candidate["mlb_statcast_profile"] = statcast_profile
-        candidate["simulation"] = _SIMULATION_ENGINE.run_simulation(
-            {
-                "sport": candidate.get("sport"),
-                "market": candidate.get("market"),
-                "selection": candidate.get("pick") or candidate.get("name"),
-                "line": candidate.get("line"),
-                "current_line": (candidate.get("market_data") or {}).get("current_line"),
-                "opening_line": (candidate.get("market_data") or {}).get("opening_line"),
-                "movement_history": (candidate.get("market_data") or {}).get("movement_history"),
-                "movement": candidate.get("movement"),
-                "odds": candidate.get("odds"),
-                "confidence": candidate.get("confidence"),
-                "edge": candidate.get("edge"),
-                "model_probability": candidate.get("model_probability") or candidate.get("fair_probability"),
-            }
-        )
+        simulation_context = build_simulation_engine_context_from_candidate(candidate)
+        candidate["simulation"] = _SIMULATION_ENGINE.run_simulation(simulation_context)
         candidate["advanced_signals"] = inferred_signals + existing_signals
         signal_contributions, signal_contributions_top_positive, signal_contributions_top_negative = _candidate_signal_contributions(candidate)
         candidate["signal_contributions"] = signal_contributions
@@ -5980,6 +5983,12 @@ def score_candidate(
         _safe_text(scored_candidate.get("sport_slug"), "sport").lower(): [dict(item) for item in (advanced_context or []) if isinstance(item, dict)]
     }
     _apply_advanced_context_to_candidates([scored_candidate], advanced_by_sport, preferences or {})
+    readiness_bonus = 0.0
+    if advanced_context and _safe_text(scored_candidate.get("sport_slug"), "").lower() == "mlb":
+        readiness = scored_candidate.get("advanced_gate") if isinstance(scored_candidate.get("advanced_gate"), dict) else {}
+        readiness_ratio = _numeric_hint(readiness.get("ratio"))
+        if readiness_ratio is not None:
+            readiness_bonus = max(0.0, min(0.05, float(readiness_ratio) * 0.05))
 
     edge_value = _numeric_hint(scored_candidate.get("edge"))
     if edge_value is None:
@@ -5994,6 +6003,7 @@ def score_candidate(
     confidence_value = _numeric_hint(scored_candidate.get("source_strength"))
     if confidence_value is None:
         confidence_value = 0.5
+    confidence_value = max(0.0, min(1.0, float(confidence_value) + float(readiness_bonus)))
 
     tier_penalty = {"tier_1": 0.0, "tier_2": 0.2}.get(_safe_text(scored_candidate.get("tier"), "tier_2"), 0.2)
     scored_candidate["score"] = round(float(edge_value) * float(confidence_value) - float(tier_penalty), 4)

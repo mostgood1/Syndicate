@@ -88,6 +88,23 @@ jobs:
       - name: Run active-sport gate regression
         run: python -m unittest tests.test_migration_gate.MigrationGateRuntimeDependencyTests.test_evaluate_active_sport_advanced_readiness_skips_out_of_season_and_no_games
 
+      - name: Run daily update contract regressions
+        run: >
+          python -m unittest
+          tests.test_daily_update_root_launcher
+          tests.test_daily_update_workflow
+          tests.test_daily_update_odds_passthrough
+          tests.test_unified_daily_update_dynamic_sim_execution_decision
+          tests.test_unified_daily_update_plan_driven_artifact_generation
+          tests.test_daily_update_simulation_contract
+          tests.test_daily_update_simulation_contract_scaffold
+          tests.test_unified_daily_update_run_state_scaffold
+          tests.test_unified_daily_update_sim_trace_scaffold
+          tests.test_unified_daily_update_status_artifact_scaffold
+          tests.test_wnba_cards_merge_aliases
+          tests.test_game_board_simulation_contract
+          tests.test_simulation_adapter
+
       - name: Run daily pipeline
         shell: pwsh
         run: |

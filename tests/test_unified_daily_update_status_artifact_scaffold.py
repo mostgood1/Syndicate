@@ -23,3 +23,7 @@ class UnifiedDailyUpdateStatusArtifactScaffoldTests(unittest.TestCase):
         self.assertIn("replayContext = $null", content)
         self.assertIn("$Manifest.statusArtifact.state.replayContext = $Manifest.replayContext", content)
         self.assertIn("function Write-RunCheckpoint", content)
+        self.assertIn("simulationContractPath = $null", content)
+        self.assertIn("simulationContractRunPath = $null", content)
+        self.assertIn("simulationContractSportCount = 0", content)
+        self.assertIn("simulationContractAdvancedBySport = $null", content)

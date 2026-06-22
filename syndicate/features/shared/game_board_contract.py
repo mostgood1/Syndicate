@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from syndicate.features.shared.simulation_adapter import build_simulation_contract_from_context
+
 
 def _safe_float(value: Any) -> float | None:
     try:
@@ -416,6 +418,11 @@ def apply_game_board_contract(
     out.setdefault("page_shell_class", f"syndicate-{normalized_sport}-cards-shell")
     out.setdefault("cards_grid_class", "mlb-cards-grid")
     out.setdefault("cards_stylesheet", f"{normalized_sport}/cards.css")
+    out["simulation_contract"] = build_simulation_contract_from_context(
+        out,
+        sport=normalized_sport,
+        selection=out.get("control_value") or out.get("date") or out.get("requested_date"),
+    )
     resolved_surface = str(surface or f"{normalized_sport}_dense_board_v1").strip() or f"{normalized_sport}_dense_board_v1"
     out["board_contract"] = {
         "schema": schema,

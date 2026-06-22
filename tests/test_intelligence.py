@@ -998,6 +998,35 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertEqual(scored.get("tier"), "tier_2")
         self.assertAlmostEqual(float(scored.get("score") or 0.0), 0.3, places=4)
 
+    def test_score_candidate_rewards_mlb_daily_update_readiness(self) -> None:
+        candidate = {
+            "sport_slug": "mlb",
+            "candidate_type": "prop",
+            "pick": "Over 4.5",
+            "market": "outs recorded",
+            "projection": 13.1,
+            "odds": "+110",
+            "edge": 1.0,
+            "source_strength": 0.5,
+            "detail": "Daily top props fallback",
+        }
+        advanced_context = [
+            {
+                "label": "Daily-update simulation contract",
+                "metrics": ["Source mode", "Freshness", "Source paths", "Advanced by sport", "HR targets"],
+                "path": "reports/daily_update/latest/unified_daily_update_latest_simulation_contract.json",
+                "exists": True,
+                "tracked": True,
+                "inside_repo": True,
+            }
+        ]
+
+        baseline = score_candidate(candidate)
+        boosted = score_candidate(candidate, advanced_context=advanced_context)
+
+        self.assertEqual(boosted.get("advanced_gate", {}).get("ready"), True)
+        self.assertGreater(float(boosted.get("score") or 0.0), float(baseline.get("score") or 0.0))
+
     def test_score_candidate_sets_scoring_mode_by_available_inputs(self) -> None:
         candidates = [
             {
@@ -2543,6 +2572,22 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertIsNotNone(pbp_row)
         self.assertTrue((pbp_row or {}).get("exists"))
         self.assertIn("Recent scoring run", (pbp_row or {}).get("metrics") or [])
+
+    def test_advanced_input_rows_include_mlb_daily_update_simulation_contract(self) -> None:
+        rows = _advanced_input_rows_for_sport(
+            {
+                "slug": "mlb",
+                "name": "MLB",
+                "context_label": "2026-06-22",
+            },
+            set(),
+        )
+
+        contract_row = next((row for row in rows if row.get("label") == "Daily-update simulation contract"), None)
+        self.assertIsNotNone(contract_row)
+        self.assertTrue((contract_row or {}).get("inside_repo"))
+        self.assertIn("Source mode", (contract_row or {}).get("metrics") or [])
+        self.assertIn("HR targets", (contract_row or {}).get("metrics") or [])
 
     def test_advanced_input_rows_include_ncaab_pbp_recap(self) -> None:
         rows = _advanced_input_rows_for_sport(

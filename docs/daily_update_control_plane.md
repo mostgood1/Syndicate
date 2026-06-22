@@ -1,6 +1,6 @@
 # Daily Update Control Plane
 
-This document maps the current daily update path end to end: the GitHub Action entrypoint, the script wrappers, the unified runner, the emitted artifacts, and the gaps that still prevent one fully consistent all-sports contract.
+This document maps the current daily update path end to end and summarizes the remaining parity gaps. For the operational GitHub Actions contract, see [Daily update GitHub Actions workflow](daily_update_workflow.md).
 
 ## Entry points
 
@@ -12,7 +12,7 @@ This document maps the current daily update path end to end: the GitHub Action e
 ## End-to-end flow
 
 1. GitHub Actions triggers on schedule or workflow dispatch.
-2. The workflow checks out the repo, installs Python dependencies, resolves the run date, base URL, and event simulation force window, then runs the smoke and gate regression checks.
+2. The workflow checks out the repo, installs Python dependencies, resolves the run date, base URL, and event simulation force window, then runs the smoke, gate, and daily-update/WNBA contract regression checks.
 3. The workflow invokes `scripts/daily_update_in_season.ps1` with `-RefreshOdds`, all odds sports, and `-SkipGitPush` so the workflow step owns the final commit and push.
 4. `scripts/daily_update_in_season.ps1` forwards the selected switches into `scripts/unified_daily_update.ps1`.
 5. `scripts/unified_daily_update.ps1` creates the timestamped run directory under `reports/daily_update/<date>/<stamp>/` and the rolling latest directory under `reports/daily_update/latest/`.
@@ -47,14 +47,19 @@ The unified runner writes both run-scoped and latest-scoped artifacts:
 - `reports/daily_update/latest/unified_daily_update_latest_checkpoint.json`
 - `reports/daily_update/latest/unified_daily_update_latest_run_state.json`
 - `reports/daily_update/latest/unified_daily_update_latest_run_trace.json`
+- `reports/daily_update/latest/unified_daily_update_latest_simulation_contract.json`
 
 The workflow also publishes the daily update log as a GitHub Actions artifact.
+
+The latest simulation contract artifact is the canonical cross-sport reference for daily-update debugging. When you are reasoning about MLB or WNBA sim usage gaps, compare against that file first before trusting route-level fallbacks or older stage snapshots. The latest run-state and run-trace files now carry the same contract path and the structured `advanced_by_sport` payload reference so you can audit the normalized inputs without leaving the control plane.
 
 ## Current sport contract shape
 
 The daily update system is not fully uniform yet. The current contract looks like this:
 
 - MLB, NBA, WNBA, and NHL are the strongest local mirror-first contracts.
+- WNBA source cards now preserve the merged sim artifact fields that matter for runtime use, including `sim.players`, `sim.quarters`, and `sim.pregame_context`, so the default board no longer depends on the separate sim-detail endpoint for player-level context.
+- MLB now preserves the structured advanced simulation payload in the normalized contract, including page-level slate inputs and per-game signals such as lineup health, HR targets, live-lens rows, run projections, and first-inning markers.
 - NFL and NCAAF have local mirror support, but their published contract is narrower than the older mirror-first sports.
 - NCAAB still depends on source-app subprocess/API behavior and does not yet have the same stable local artifact contract.
 - The publish path still relies on sport-aware allowlists for force-published artifact roots, so new files can be missed until the allowlist is updated.
@@ -67,6 +72,7 @@ The daily update system is not fully uniform yet. The current contract looks lik
 4. The daily update root is still more of a bridge than a full state-aware execution controller, even though it already carries run-state, checkpoint, and trace scaffolding.
 5. The latest artifact contract has two generations in the tree, so the unified latest files must be treated as canonical when both exist.
 6. Cross-sport intelligence and advanced-input paths still depend on exact artifact paths in a few places, so broad parity needs explicit validation before a sport can be treated as complete.
+7. WNBA publish parity should be checked against the latest run-state and trace artifacts, because the default board now consumes the richer merged sim payload and stale control-plane snapshots can hide that improvement.
 
 ## Operational notes
 

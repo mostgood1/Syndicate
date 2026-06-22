@@ -52,6 +52,8 @@ $runStatePath = Join-Path $runDir 'unified_daily_update_run_state.json'
 $latestRunStatePath = Join-Path $latestDir 'unified_daily_update_latest_run_state.json'
 $runTracePath = Join-Path $runDir 'unified_daily_update_run_trace.json'
 $latestRunTracePath = Join-Path $latestDir 'unified_daily_update_latest_run_trace.json'
+$runSimulationContractPath = Join-Path $runDir 'unified_daily_update_simulation_contract.json'
+$latestSimulationContractPath = Join-Path $latestDir 'unified_daily_update_latest_simulation_contract.json'
 
 $runtimePolicy = [ordered]@{
     MLB = [ordered]@{
@@ -332,6 +334,10 @@ function Write-RunStateArtifact {
         replayContext = $Manifest.replayContext
         stageDecisions = @($Manifest.stageDecisions)
         runTrace = $Manifest.runTrace
+        simulationContractPath = $Manifest.simulationContractPath
+        simulationContractRunPath = $Manifest.simulationContractRunPath
+        simulationContractSportCount = $Manifest.simulationContractSportCount
+        simulationContractAdvancedBySport = $Manifest.simulationContractAdvancedBySport
     }
 
     $runStateArtifact | ConvertTo-Json -Depth 8 | Set-Content -Path $runStatePath -Encoding utf8
@@ -359,10 +365,43 @@ function Write-RunTraceArtifact {
         runStatePath = $runStatePath
         latestRunStatePath = $latestRunStatePath
         trace = $Manifest.runTrace
+        simulationContractPath = $Manifest.simulationContractPath
+        simulationContractRunPath = $Manifest.simulationContractRunPath
+        simulationContractSportCount = $Manifest.simulationContractSportCount
+        simulationContractAdvancedBySport = $Manifest.simulationContractAdvancedBySport
     }
 
     $runTraceArtifact | ConvertTo-Json -Depth 8 | Set-Content -Path $runTracePath -Encoding utf8
     $runTraceArtifact | ConvertTo-Json -Depth 8 | Set-Content -Path $latestRunTracePath -Encoding utf8
+}
+
+function Write-SimulationContractArtifact {
+    param(
+        [psobject]$Manifest,
+        [string[]]$ActiveSports
+    )
+
+    if ($null -eq $Manifest -or -not $ActiveSports) {
+        return
+    }
+
+    $helperScript = Join-Path $PSScriptRoot 'build_daily_update_simulation_contract.py'
+    if (-not (Test-Path -LiteralPath $helperScript)) {
+        throw "Simulation contract helper not found: $helperScript"
+    }
+
+    $activeSportArg = @($ActiveSports | ForEach-Object { [string]$_ } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }) -join ','
+    & $python $helperScript --date $Manifest.date --sports $activeSportArg --run-output $runSimulationContractPath --latest-output $latestSimulationContractPath
+
+    if ($LASTEXITCODE -ne 0) {
+        throw "Daily-update simulation contract generation failed with exit code $LASTEXITCODE"
+    }
+
+    $simulationContract = Get-Content -LiteralPath $latestSimulationContractPath -Raw | ConvertFrom-Json
+    $Manifest | Add-Member -NotePropertyName simulationContractPath -NotePropertyValue $latestSimulationContractPath -Force
+    $Manifest | Add-Member -NotePropertyName simulationContractRunPath -NotePropertyValue $runSimulationContractPath -Force
+    $Manifest | Add-Member -NotePropertyName simulationContractSportCount -NotePropertyValue @($simulationContract.sports).Count -Force
+    $Manifest | Add-Member -NotePropertyName simulationContractAdvancedBySport -NotePropertyValue $simulationContract.advanced_by_sport -Force
 }
 
 function Get-RunTraceSnapshot {
@@ -4070,6 +4109,10 @@ $runManifest = [ordered]@{
         completedStages = @()
         failedStage = $null
         lastUpdatedAt = $null
+        simulationContractPath = $null
+        simulationContractRunPath = $null
+        simulationContractSportCount = 0
+        simulationContractAdvancedBySport = $null
     }
     eventSimExecution = @()
     artifactUpdates = @()
@@ -4179,7 +4222,7 @@ try {
         throw 'Cannot push git updates when -SkipRefreshGate is set. Run the gate or pass -SkipGitPush.'
     }
 
-    $shouldRunArtifactGeneration = if ($SkipGitPush) { $false } else { Get-RunPlanDecisionValue -Plan $runManifest.runPlan -Key 'artifactGeneration' -Fallback $true }
+    $shouldRunArtifactGeneration = Get-RunPlanDecisionValue -Plan $runManifest.runPlan -Key 'artifactGeneration' -Fallback ([bool](-not $SkipGitPush))
     if ($shouldRunArtifactGeneration) {
         foreach ($repo in $publishRepos) {
             $result = Invoke-GitPublish -Name $repo.Name -RepoPath $repo.RepoPath -CommitMessage "$CommitMessagePrefix $Date (pre-source publish)" -RemoteName $GitRemote -ForceIncludePaths (& $resolveForcedPublishArtifactPaths) -DryRun ([bool]$DryRun)
@@ -4545,6 +4588,11 @@ try {
                 $stageDecision.status = if ($DryRun) { 'dry_run' } else { 'skipped' }
             }
         }
+    }
+
+    if (-not $DryRun) {
+        $activeContractSports = @($activeSports.GetEnumerator() | Where-Object { $_.Value } | ForEach-Object { $_.Key.ToString().ToLowerInvariant() })
+        Write-SimulationContractArtifact -Manifest $runManifest -ActiveSports $activeContractSports
     }
 
     $runManifest.overallStatus = if ($DryRun) { 'dry_run' } else { 'ok' }

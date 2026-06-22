@@ -545,6 +545,8 @@ def load_latest_refresh_status() -> dict[str, Any]:
     daily_update_run_state = read_json_file(daily_update_run_state_path)
     daily_update_trace_path = daily_update_latest_dir / "unified_daily_update_latest_run_trace.json"
     daily_update_trace = read_json_file(daily_update_trace_path)
+    daily_update_simulation_contract_path = daily_update_latest_dir / "unified_daily_update_latest_simulation_contract.json"
+    daily_update_simulation_contract = read_json_file(daily_update_simulation_contract_path)
     daily_update_runtime = {
         "elapsed_seconds": _elapsed_seconds(
             started_at=(daily_update_manifest or {}).get("generatedAt"),
@@ -584,6 +586,9 @@ def load_latest_refresh_status() -> dict[str, Any]:
             "trace_path": str(daily_update_trace_path),
             "trace_exists": path_exists(daily_update_trace_path),
             "trace": daily_update_trace,
+            "simulation_contract_path": str(daily_update_simulation_contract_path),
+            "simulation_contract_exists": path_exists(daily_update_simulation_contract_path),
+            "simulation_contract": daily_update_simulation_contract,
         },
     }
 

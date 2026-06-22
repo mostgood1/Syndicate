@@ -138,6 +138,23 @@ class WnbaCardsMergeAliasTests(unittest.TestCase):
         self.assertEqual(len(payload["games"]), 4)
         self.assertEqual([game.get("event_id") for game in payload["games"]], ["401857012", "401857013", "401857014", "401857015"])
 
+    def test_source_cards_payload_keeps_full_sim_player_rows(self) -> None:
+        payload = build_source_cards_payload("2026-06-22", allow_stored_date_fallback=False)
+
+        games = payload.get("games") or []
+        self.assertGreaterEqual(len(games), 1)
+
+        first_game = games[0]
+        sim = first_game.get("sim") if isinstance(first_game, dict) else {}
+        self.assertTrue(sim.get("players_loaded"))
+        self.assertGreater(len((sim.get("players") or {}).get("away") or []), 0)
+        self.assertGreater(len((sim.get("players") or {}).get("home") or []), 0)
+        self.assertIn("pregame_context", sim)
+        self.assertGreater(len(sim.get("pregame_context") or {}), 0)
+        self.assertIn("quarters", sim)
+        self.assertGreaterEqual(int((sim.get("players_summary") or {}).get("away") or 0), 0)
+        self.assertGreaterEqual(int((sim.get("players_summary") or {}).get("home") or 0), 0)
+
 
 if __name__ == "__main__":
     unittest.main()

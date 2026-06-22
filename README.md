@@ -11,6 +11,8 @@ Workspace Copilot skills for intelligence planning, advanced-data analysis, live
 
 The current intelligence / betting board assessment lives in [docs/intelligence_betting_board_assessment.md](c:/Users/tempadmin/OneDrive/Coding/Syndicate/docs/intelligence_betting_board_assessment.md).
 
+The canonical cross-sport daily-update simulation reference lives in [docs/daily_update_workflow.md](c:/Users/tempadmin/OneDrive/Coding/Syndicate/docs/daily_update_workflow.md) and the generated latest simulation contract under [reports/daily_update/latest/unified_daily_update_latest_simulation_contract.json](c:/Users/tempadmin/OneDrive/Coding/Syndicate/reports/daily_update/latest/unified_daily_update_latest_simulation_contract.json).
+
 ## Core principles
 
 - This is not seven apps inside one UI.
@@ -37,6 +39,12 @@ The current intelligence / betting board assessment lives in [docs/intelligence_
 - Presentation parity: reuse the MLB-derived dense board structure as the default Syndicate game-board shell unless the source sport has a stronger proven surface.
 - Service parity: game-board APIs should serve the same `game_board_v1` shape with a `board_contract` block so modules expose a consistent transport contract.
 - Live lens is part of the main integration contract, not a sidecar feature. Live and pregame boards should share the same surface grammar and service contract.
+
+## Daily Update Reference
+
+The daily-update simulation contract is the preferred cross-sport reference when you are reasoning about how MLB, NBA, WNBA, NHL, NFL, NCAAF, and NCAAB consume available data in the sim engine.
+
+Use the generated latest contract at [reports/daily_update/latest/unified_daily_update_latest_simulation_contract.json](c:/Users/tempadmin/OneDrive/Coding/Syndicate/reports/daily_update/latest/unified_daily_update_latest_simulation_contract.json) together with [docs/daily_update_workflow.md](c:/Users/tempadmin/OneDrive/Coding/Syndicate/docs/daily_update_workflow.md) when you need the authoritative source-mode, freshness, and source-path reference for a run.
 
 ## Current state
 

@@ -145,11 +145,12 @@ def _merge_sim_indexes(cards_sim_index: dict[tuple[str, str], dict[str, Any]], r
             continue
         existing_sim = existing.get("sim") if isinstance(existing.get("sim"), dict) else {}
         merged_sim = dict(existing_sim)
-        raw_quarters = raw_sim.get("quarters") if isinstance(raw_sim.get("quarters"), list) else []
-        if raw_quarters:
-            merged_sim["quarters"] = [dict(item) for item in raw_quarters if isinstance(item, dict)]
-        if not isinstance(merged_sim.get("players_summary"), dict) and isinstance(raw_sim.get("players_summary"), dict):
-            merged_sim["players_summary"] = dict(raw_sim.get("players_summary") or {})
+        for field_name in ("quarters", "players_summary", "players", "missing_prop_players", "injuries", "pregame_context"):
+            if field_name in merged_sim:
+                continue
+            raw_value = raw_sim.get(field_name)
+            if raw_value is not None:
+                merged_sim[field_name] = deepcopy(raw_value)
         merged_game = dict(existing)
         merged_game["sim"] = merged_sim
         merged[key] = merged_game
@@ -845,13 +846,19 @@ def _source_sim_score(sim_game: dict[str, Any] | None, row: dict[str, str]) -> d
     }
 
 
-def _source_sim_stub(game_id: str, sim_game: dict[str, Any] | None, row: dict[str, str]) -> dict[str, Any]:
-    players_summary = dict((sim_game or {}).get("players_summary") or {}) if isinstance(sim_game, dict) else {}
+def _source_sim_payload(game_id: str, sim_game: dict[str, Any] | None, row: dict[str, str]) -> dict[str, Any]:
+    sim = sim_game.get("sim") if isinstance((sim_game or {}).get("sim"), dict) else {}
+    players_summary = dict(sim.get("players_summary") or {}) if isinstance(sim, dict) else {}
+    players = sim.get("players") if isinstance(sim.get("players"), dict) else {}
+    missing_prop_players = sim.get("missing_prop_players") if isinstance(sim.get("missing_prop_players"), dict) else {}
+    injuries = sim.get("injuries") if isinstance(sim.get("injuries"), dict) else {}
+    pregame_context = sim.get("pregame_context") if isinstance(sim.get("pregame_context"), dict) else {}
+    quarters = sim.get("quarters") if isinstance(sim.get("quarters"), list) else []
     score = _source_sim_score(sim_game, row)
     periods = _source_sim_periods(sim_game)
     return {
         "game_id": game_id,
-        "players_loaded": False,
+        "players_loaded": bool(players.get("away") or players.get("home")),
         "players_summary": {
             "away": int(players_summary.get("away") or 0),
             "home": int(players_summary.get("home") or 0),
@@ -860,9 +867,20 @@ def _source_sim_stub(game_id: str, sim_game: dict[str, Any] | None, row: dict[st
             "injured_away": int(players_summary.get("injured_away") or 0),
             "injured_home": int(players_summary.get("injured_home") or 0),
         },
-        "players": {"away": [], "home": []},
-        "missing_prop_players": {"away": [], "home": []},
-        "injuries": {"away": [], "home": []},
+        "players": {
+            "away": [dict(item) for item in (players.get("away") or []) if isinstance(item, dict)],
+            "home": [dict(item) for item in (players.get("home") or []) if isinstance(item, dict)],
+        },
+        "missing_prop_players": {
+            "away": [dict(item) for item in (missing_prop_players.get("away") or []) if isinstance(item, dict)],
+            "home": [dict(item) for item in (missing_prop_players.get("home") or []) if isinstance(item, dict)],
+        },
+        "injuries": {
+            "away": [dict(item) for item in (injuries.get("away") or []) if isinstance(item, dict)],
+            "home": [dict(item) for item in (injuries.get("home") or []) if isinstance(item, dict)],
+        },
+        "pregame_context": dict(pregame_context),
+        "quarters": [dict(item) for item in quarters if isinstance(item, dict)],
         "score": score,
         "periods": periods,
         "market": {
@@ -889,7 +907,7 @@ def _source_game_from_row(
     sim_game = sim_index.get((away_tri, home_tri))
     props_game = props_index.get((away_tri, home_tri)) if isinstance(props_index.get((away_tri, home_tri)), dict) else {}
     game_id = str(row.get("game_id") or idx)
-    sim_payload = _source_sim_stub(game_id, sim_game, row)
+    sim_payload = _source_sim_payload(game_id, sim_game, row)
     score = sim_payload.get("score") if isinstance(sim_payload.get("score"), dict) else {}
     betting = _source_betting(
         {
@@ -969,20 +987,7 @@ def build_source_cards_sim_detail_payload(selected_date: str, away_tri: str, hom
                     "home_tri": home_key,
                     "away_tri": away_key,
                     "sim": {
-                        "players_loaded": True,
-                        "players_summary": dict(sim_detail.get("players_summary") or {}),
-                        "players": {
-                            "home": [dict(item) for item in ((sim_detail.get("sim") or {}).get("players", {}).get("home") or sim_detail.get("players", {}).get("home") or []) if isinstance(item, dict)],
-                            "away": [dict(item) for item in ((sim_detail.get("sim") or {}).get("players", {}).get("away") or sim_detail.get("players", {}).get("away") or []) if isinstance(item, dict)],
-                        },
-                        "missing_prop_players": {
-                            "home": [dict(item) for item in ((sim_detail.get("sim") or {}).get("missing_prop_players", {}).get("home") or sim_detail.get("missing_prop_players", {}).get("home") or []) if isinstance(item, dict)],
-                            "away": [dict(item) for item in ((sim_detail.get("sim") or {}).get("missing_prop_players", {}).get("away") or sim_detail.get("missing_prop_players", {}).get("away") or []) if isinstance(item, dict)],
-                        },
-                        "injuries": {
-                            "home": [dict(item) for item in ((sim_detail.get("sim") or {}).get("injuries", {}).get("home") or sim_detail.get("injuries", {}).get("home") or []) if isinstance(item, dict)],
-                            "away": [dict(item) for item in ((sim_detail.get("sim") or {}).get("injuries", {}).get("away") or sim_detail.get("injuries", {}).get("away") or []) if isinstance(item, dict)],
-                        },
+                        **_source_sim_payload(f"{away_key}@{home_key}", sim_detail, {}),
                     },
                 }
             ],
@@ -1360,7 +1365,7 @@ def _games_from_live_state_fallback(selected_date: str, ttl: int = 12) -> tuple[
         away_pts, home_pts = _repair_final_score_from_periods(away_pts, home_pts, away_lines, bool(row.get("final")))
         game_id = str(row.get("game_id") or f"{away_tri}@{home_tri}")
         sim_game = sim_index.get((away_tri, home_tri)) if isinstance(sim_index, dict) else None
-        sim_payload = _source_sim_stub(game_id, sim_game if isinstance(sim_game, dict) else None, {})
+        sim_payload = _source_sim_payload(game_id, sim_game if isinstance(sim_game, dict) else None, {})
         score = sim_payload.get("score") if isinstance(sim_payload.get("score"), dict) else {}
         sim_away = _safe_float(score.get("away_mean"))
         sim_home = _safe_float(score.get("home_mean"))

@@ -258,6 +258,8 @@ def build_syndicate_query_response(*, question: str, context: dict[str, Any], de
     structured_response = _mapping_or_empty(_result_value(result, "structured_response", {}))
     routing_context = _mapping_or_empty(pipeline_context.get("routing_context")) or _mapping_or_empty(context)
     board_contract = build_intelligence_board_contract(_result_payload(result))
+    daily_update = _mapping_or_empty(_result_value(result, "daily_update", {}))
+    simulation_contract = _mapping_or_empty(daily_update.get("simulation_contract"))
     if decision.intent in {"matchup_analysis", "comparison"}:
         schema = _matchup_analysis_schema(question, result)
     elif decision.intent == "market_summary":
@@ -286,6 +288,8 @@ def build_syndicate_query_response(*, question: str, context: dict[str, Any], de
         "schema": schema,
         "structured_response": schema,
         "board_contract": board_contract,
+        "daily_update": daily_update,
+        "simulation_contract": simulation_contract,
         "engine": {
             "selected_date": _result_value(result, "selected_date", None),
             "query_type": _result_value(result, "query_type", None),
@@ -299,5 +303,7 @@ def build_syndicate_query_response(*, question: str, context: dict[str, Any], de
             "readiness_gate": _mapping_or_empty(_result_value(result, "readiness_gate", {})),
             "local_only": _result_value(result, "local_only", None),
             "board_contract": board_contract,
+            "daily_update": daily_update,
+            "simulation_contract": simulation_contract,
         },
     }

@@ -218,6 +218,9 @@ def _pitch_mix_context(selected_date: str, row: dict[str, Any]) -> dict[str, Any
     if pitcher_feature_id is not None and isinstance(statcast_payload.get("pitchers"), dict):
         pitcher_feature = statcast_payload["pitchers"].get(str(pitcher_feature_id)) or {}
 
+    batter_overall = batter_feature.get("overall") if isinstance(batter_feature.get("overall"), dict) else {}
+    pitcher_overall = pitcher_feature.get("overall") if isinstance(pitcher_feature.get("overall"), dict) else {}
+
     batter_vs_pitch_type = batter_profile.get("vs_pitch_type") if isinstance(batter_profile.get("vs_pitch_type"), dict) else {}
     if not batter_vs_pitch_type and isinstance(batter_feature.get("vs_pitch_type"), dict):
         batter_vs_pitch_type = batter_feature.get("vs_pitch_type")
@@ -270,6 +273,34 @@ def _pitch_mix_context(selected_date: str, row: dict[str, Any]) -> dict[str, Any
                 f"({_format_num(pitch_mix_score)}x)."
             )
 
+    batter_launch_angle_mean = _safe_float(batter_overall.get("la_mean"))
+    batter_hardhit_rate = _safe_float(batter_overall.get("hardhit_rate"))
+    batter_barrel_rate = _safe_float(batter_overall.get("barrel_rate"))
+    batter_xwoba = _safe_float(batter_overall.get("xwoba"))
+    pitcher_launch_angle_mean = _safe_float(pitcher_overall.get("la_mean"))
+    pitcher_hardhit_rate = _safe_float(pitcher_overall.get("hardhit_rate"))
+    pitcher_barrel_rate = _safe_float(pitcher_overall.get("barrel_rate"))
+    pitcher_xwoba_allowed = _safe_float(pitcher_overall.get("xwoba"))
+
+    if batter_xwoba is not None and batter_xwoba >= 0.340:
+        pitch_mix_reason = (
+            f"{pitch_mix_reason} Batter xwOBA is strong at {_format_num(batter_xwoba)}."
+            if pitch_mix_reason
+            else f"Batter xwOBA is strong at {_format_num(batter_xwoba)}."
+        )
+    if batter_hardhit_rate is not None and batter_hardhit_rate >= 0.40:
+        pitch_mix_reason = (
+            f"{pitch_mix_reason} Hard-hit rate sits at {_format_pct(batter_hardhit_rate)}."
+            if pitch_mix_reason
+            else f"Hard-hit rate sits at {_format_pct(batter_hardhit_rate)}."
+        )
+    if batter_launch_angle_mean is not None:
+        pitch_mix_reason = (
+            f"{pitch_mix_reason} Launch angle averages {_format_num(batter_launch_angle_mean)} degrees."
+            if pitch_mix_reason
+            else f"Launch angle averages {_format_num(batter_launch_angle_mean)} degrees."
+        )
+
     return {
         "opponent_pitch_mix": pitch_mix,
         "opponent_primary_pitch_type": primary_pitch_type,
@@ -279,6 +310,14 @@ def _pitch_mix_context(selected_date: str, row: dict[str, Any]) -> dict[str, Any
         "batter_vs_primary_pitch_type_mult": batter_primary_mult,
         "batter_vs_primary_pitch_type_hr_mult": batter_primary_hr_mult,
         "pitcher_primary_pitch_type_hr_mult": pitcher_primary_hr_mult,
+        "batter_launch_angle_mean": batter_launch_angle_mean,
+        "batter_hardhit_rate": batter_hardhit_rate,
+        "batter_barrel_rate": batter_barrel_rate,
+        "batter_xwoba": batter_xwoba,
+        "pitcher_launch_angle_mean": pitcher_launch_angle_mean,
+        "pitcher_hardhit_rate": pitcher_hardhit_rate,
+        "pitcher_barrel_rate": pitcher_barrel_rate,
+        "pitcher_xwoba_allowed": pitcher_xwoba_allowed,
         "pitch_mix_score": pitch_mix_score,
         "pitch_mix_breakdown": pitch_mix_breakdown,
         "pitch_mix_reason": pitch_mix_reason,
