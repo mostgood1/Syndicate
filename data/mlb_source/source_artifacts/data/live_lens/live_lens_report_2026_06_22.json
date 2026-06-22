@@ -1,8 +1,8 @@
 {
   "date": "2026-06-22",
-  "generatedAt": "2026-06-22T06:49:42-05:00",
-  "dataRoot": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data",
-  "liveLensDir": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/live_lens",
+  "generatedAt": "2026-06-22T15:42:26-05:00",
+  "dataRoot": "data",
+  "liveLensDir": "data/live_lens",
   "optimizationRegime": {
     "date": "2026-06-22",
     "kind": "forward_tuned_live",
@@ -19,27 +19,28 @@
     "live": 0,
     "final": 0,
     "pregame": 13,
-    "props": 17,
+    "props": 0,
     "archivedLiveProps": 0
   },
   "performance": {
     "marketsRefreshed": false,
     "marketRefreshMs": 0.0,
-    "totalMs": 9325.8,
-    "snapshotLoadMs": 1.7,
-    "simContextLoadMs": 47.9,
-    "propEvalMs": 0.2,
-    "gameLensMs": 1.9,
+    "totalMs": 3020.0,
+    "snapshotLoadMs": 3.3,
+    "simContextLoadMs": 1.4,
+    "propEvalMs": 0.1,
+    "gameLensMs": 1.8,
     "gameCount": 13,
     "liveGameCount": 0,
-    "feedFetchCount": 13
+    "feedFetchCount": 13,
+    "persistMs": 0.0
   },
   "games": [
     {
       "gamePk": 824261,
       "status": {
         "abstract": "Preview",
-        "detailed": "Scheduled"
+        "detailed": "Pre-Game"
       },
       "startTime": "5:10 PM",
       "matchup": {
@@ -61,219 +62,7 @@
         },
         "liveText": ""
       },
-      "predictions": {
-        "full": {
-          "home_win_prob": 0.433,
-          "away_win_prob": 0.567,
-          "tie_prob": 0.0,
-          "away_runs_mean": 4.431,
-          "home_runs_mean": 3.776,
-          "total_runs_dist": {
-            "6": 59,
-            "11": 76,
-            "8": 75,
-            "5": 97,
-            "9": 92,
-            "3": 96,
-            "1": 36,
-            "4": 69,
-            "12": 51,
-            "13": 45,
-            "15": 25,
-            "7": 110,
-            "19": 9,
-            "10": 50,
-            "16": 16,
-            "2": 27,
-            "18": 7,
-            "14": 25,
-            "17": 15,
-            "22": 4,
-            "25": 3,
-            "20": 6,
-            "26": 3,
-            "21": 2,
-            "24": 1,
-            "23": 1
-          },
-          "run_margin_dist": {
-            "-2": 114,
-            "1": 140,
-            "-4": 57,
-            "-3": 104,
-            "3": 75,
-            "-6": 36,
-            "5": 25,
-            "-8": 15,
-            "-1": 144,
-            "2": 90,
-            "-5": 32,
-            "-7": 26,
-            "4": 38,
-            "-11": 4,
-            "11": 7,
-            "8": 8,
-            "-9": 17,
-            "6": 18,
-            "-10": 8,
-            "7": 19,
-            "-15": 4,
-            "-12": 4,
-            "12": 2,
-            "13": 1,
-            "9": 7,
-            "10": 1,
-            "15": 1,
-            "-13": 1,
-            "20": 1,
-            "-16": 1
-          }
-        },
-        "first1": {
-          "home_win_prob": 0.193,
-          "away_win_prob": 0.209,
-          "tie_prob": 0.598,
-          "away_runs_mean": 0.452,
-          "home_runs_mean": 0.432,
-          "total_runs_dist": {
-            "0": 576,
-            "5": 21,
-            "1": 186,
-            "3": 61,
-            "2": 117,
-            "4": 31,
-            "8": 1,
-            "6": 5,
-            "7": 2
-          },
-          "run_margin_dist": {
-            "0": 598,
-            "-5": 6,
-            "1": 104,
-            "-1": 113,
-            "-3": 18,
-            "2": 48,
-            "-4": 9,
-            "-2": 59,
-            "4": 12,
-            "5": 9,
-            "-6": 3,
-            "3": 19,
-            "-7": 1,
-            "6": 1
-          }
-        },
-        "first5": {
-          "home_win_prob": 0.369,
-          "away_win_prob": 0.467,
-          "tie_prob": 0.164,
-          "away_runs_mean": 2.382,
-          "home_runs_mean": 2.101,
-          "total_runs_dist": {
-            "3": 141,
-            "8": 50,
-            "2": 145,
-            "6": 83,
-            "4": 114,
-            "1": 116,
-            "5": 90,
-            "9": 39,
-            "0": 74,
-            "13": 9,
-            "7": 53,
-            "10": 30,
-            "11": 22,
-            "12": 18,
-            "15": 6,
-            "16": 3,
-            "19": 2,
-            "18": 1,
-            "14": 3,
-            "17": 1
-          },
-          "run_margin_dist": {
-            "1": 123,
-            "-2": 118,
-            "0": 164,
-            "4": 34,
-            "2": 90,
-            "-5": 29,
-            "-4": 52,
-            "-3": 68,
-            "-1": 149,
-            "3": 58,
-            "-8": 10,
-            "-6": 18,
-            "6": 24,
-            "5": 19,
-            "7": 6,
-            "8": 4,
-            "-9": 6,
-            "-7": 13,
-            "-15": 1,
-            "-10": 1,
-            "10": 3,
-            "12": 1,
-            "9": 4,
-            "11": 1,
-            "14": 1,
-            "-13": 1,
-            "15": 1,
-            "-12": 1
-          }
-        },
-        "first3": {
-          "home_win_prob": 0.326,
-          "away_win_prob": 0.385,
-          "tie_prob": 0.289,
-          "away_runs_mean": 1.363,
-          "home_runs_mean": 1.3,
-          "total_runs_dist": {
-            "1": 179,
-            "7": 28,
-            "2": 177,
-            "5": 58,
-            "3": 134,
-            "0": 216,
-            "4": 111,
-            "6": 40,
-            "9": 14,
-            "11": 8,
-            "10": 8,
-            "14": 1,
-            "8": 18,
-            "12": 4,
-            "15": 1,
-            "17": 1,
-            "13": 2
-          },
-          "run_margin_dist": {
-            "1": 127,
-            "-3": 50,
-            "0": 289,
-            "5": 14,
-            "-2": 120,
-            "-1": 152,
-            "2": 78,
-            "3": 49,
-            "-5": 18,
-            "-4": 25,
-            "4": 31,
-            "9": 4,
-            "-6": 10,
-            "-8": 1,
-            "6": 14,
-            "-14": 1,
-            "-9": 4,
-            "7": 3,
-            "-7": 3,
-            "10": 1,
-            "8": 4,
-            "11": 1,
-            "-10": 1
-          }
-        }
-      },
+      "predictions": null,
       "gameMarkets": {
         "totals": null,
         "ml": null
@@ -284,10 +73,10 @@
           "label": "F1",
           "closed": false,
           "projection": {
-            "away": 0.49,
-            "home": 0.42,
-            "total": 0.91,
-            "homeMargin": -0.07,
+            "away": null,
+            "home": null,
+            "total": null,
+            "homeMargin": null,
             "closed": false
           },
           "actualSegment": {
@@ -303,33 +92,33 @@
             "outs": 0,
             "outsRecorded": 0,
             "remainingOuts": 54,
-            "label": "Scheduled"
+            "label": "Pre-Game"
           },
           "baselineHomeWinProb": null,
-          "modelHomeWinProb": 0.4886269620182933,
+          "modelHomeWinProb": null,
           "source": "segment_projection",
           "markets": {
             "moneyline": {
-              "homeOdds": "+320",
-              "awayOdds": "+290",
-              "drawOdds": "-140",
+              "homeOdds": null,
+              "awayOdds": null,
+              "drawOdds": null,
               "marketHomeProb": null,
               "pick": null,
               "edge": null,
               "reason": "Pregame moneyline recommendations are suppressed while that surface is under re-evaluation."
             },
             "spread": {
-              "homeLine": 1.5,
-              "homeOdds": "-1250",
-              "awayOdds": "+710",
+              "homeLine": null,
+              "homeOdds": null,
+              "awayOdds": null,
               "pick": null,
               "edge": null,
-              "reason": "F1 currently sits at home 0, away 0. The projected side was there, but the attached spread price was already too expensive to keep it realistic."
+              "reason": "F1 currently sits at home 0, away 0."
             },
             "total": {
-              "line": 0.5,
-              "overOdds": "-111",
-              "underOdds": "-115",
+              "line": null,
+              "overOdds": null,
+              "underOdds": null,
               "pick": null,
               "edge": null,
               "reason": "Pregame totals recommendations are suppressed while that surface is under re-evaluation."
@@ -341,10 +130,10 @@
           "label": "F3",
           "closed": false,
           "projection": {
-            "away": 1.47,
-            "home": 1.27,
-            "total": 2.73,
-            "homeMargin": -0.2,
+            "away": null,
+            "home": null,
+            "total": null,
+            "homeMargin": null,
             "closed": false
           },
           "actualSegment": {
@@ -360,28 +149,28 @@
             "outs": 0,
             "outsRecorded": 0,
             "remainingOuts": 54,
-            "label": "Scheduled"
+            "label": "Pre-Game"
           },
           "baselineHomeWinProb": null,
-          "modelHomeWinProb": 0.4675456936126812,
+          "modelHomeWinProb": null,
           "source": "segment_projection",
           "markets": {
             "moneyline": {
-              "homeOdds": "+164",
-              "awayOdds": "+142",
-              "drawOdds": "+270",
+              "homeOdds": null,
+              "awayOdds": null,
+              "drawOdds": null,
               "marketHomeProb": null,
               "pick": null,
               "edge": null,
               "reason": "Pregame moneyline recommendations are suppressed while that surface is under re-evaluation."
             },
             "spread": {
-              "homeLine": 0.5,
-              "homeOdds": "-180",
-              "awayOdds": "+132",
+              "homeLine": null,
+              "homeOdds": null,
+              "awayOdds": null,
               "pick": null,
               "edge": null,
-              "reason": "F3 currently sits at home 0, away 0. The projected side was there, but the attached spread price was already too expensive to keep it realistic."
+              "reason": "F3 currently sits at home 0, away 0."
             },
             "total": {
               "line": null,
@@ -398,10 +187,10 @@
           "label": "F5",
           "closed": false,
           "projection": {
-            "away": 2.44,
-            "home": 2.11,
-            "total": 4.56,
-            "homeMargin": -0.33,
+            "away": null,
+            "home": null,
+            "total": null,
+            "homeMargin": null,
             "closed": false
           },
           "actualSegment": {
@@ -417,15 +206,15 @@
             "outs": 0,
             "outsRecorded": 0,
             "remainingOuts": 54,
-            "label": "Scheduled"
+            "label": "Pre-Game"
           },
           "baselineHomeWinProb": null,
-          "modelHomeWinProb": 0.4465796666797305,
+          "modelHomeWinProb": null,
           "source": "segment_projection",
           "markets": {
             "moneyline": {
-              "homeOdds": "+102",
-              "awayOdds": "-128",
+              "homeOdds": null,
+              "awayOdds": null,
               "drawOdds": null,
               "marketHomeProb": null,
               "pick": null,
@@ -433,17 +222,17 @@
               "reason": "Pregame moneyline recommendations are suppressed while that surface is under re-evaluation."
             },
             "spread": {
-              "homeLine": 0.5,
-              "homeOdds": "-146",
-              "awayOdds": "+110",
+              "homeLine": null,
+              "homeOdds": null,
+              "awayOdds": null,
               "pick": null,
               "edge": null,
-              "reason": "F5 currently sits at home 0, away 0. The projected cover cushion was only 0.17 runs, so the spread lane stayed below threshold."
+              "reason": "F5 currently sits at home 0, away 0."
             },
             "total": {
-              "line": 4.5,
-              "overOdds": "-102",
-              "underOdds": "-130",
+              "line": null,
+              "overOdds": null,
+              "underOdds": null,
               "pick": null,
               "edge": null,
               "reason": "Pregame totals recommendations are suppressed while that surface is under re-evaluation."
@@ -455,10 +244,10 @@
           "label": "Full Game",
           "closed": false,
           "projection": {
-            "away": 4.4,
-            "home": 3.8,
-            "total": 8.2,
-            "homeMargin": -0.6,
+            "away": null,
+            "home": null,
+            "total": null,
+            "homeMargin": null,
             "closed": false
           },
           "actualSegment": {
@@ -474,15 +263,15 @@
             "outs": 0,
             "outsRecorded": 0,
             "remainingOuts": 54,
-            "label": "Scheduled"
+            "label": "Pre-Game"
           },
           "baselineHomeWinProb": null,
-          "modelHomeWinProb": 0.40371730070321216,
+          "modelHomeWinProb": null,
           "source": "segment_projection",
           "markets": {
             "moneyline": {
-              "homeOdds": "+106",
-              "awayOdds": "-124",
+              "homeOdds": null,
+              "awayOdds": null,
               "drawOdds": null,
               "marketHomeProb": null,
               "pick": null,
@@ -490,17 +279,17 @@
               "reason": "Pregame moneyline recommendations are suppressed while that surface is under re-evaluation."
             },
             "spread": {
-              "homeLine": 1.5,
-              "homeOdds": "-166",
-              "awayOdds": "+138",
+              "homeLine": null,
+              "homeOdds": null,
+              "awayOdds": null,
               "pick": null,
               "edge": null,
               "reason": "Pregame full-game spread recommendations are suppressed while that surface is under re-evaluation."
             },
             "total": {
-              "line": 8.0,
-              "overOdds": "-118",
-              "underOdds": "-104",
+              "line": null,
+              "overOdds": null,
+              "underOdds": null,
               "pick": null,
               "edge": null,
               "reason": "Pregame totals recommendations are suppressed while that surface is under re-evaluation."
@@ -508,100 +297,18 @@
           }
         }
       ],
-      "props": [
-        {
-          "tier": "playable",
-          "market": "pitcher_props",
-          "prop": "outs",
-          "playerName": "Framber Valdez",
-          "teamSide": "home",
-          "selection": "over",
-          "line": 17.5,
-          "actual": null,
-          "modelMean": 20.586,
-          "liveProjection": 20.586,
-          "liveEdge": 3.086,
-          "delta": null,
-          "status": "pending",
-          "edge": 0.26003950369491835,
-          "odds": -145,
-          "modelProbOver": 0.813,
-          "outsMean": 20.586,
-          "marketLabel": "outs"
-        },
-        {
-          "tier": "playable",
-          "market": "pitcher_props",
-          "prop": "strikeouts",
-          "playerName": "Framber Valdez",
-          "teamSide": "home",
-          "selection": "over",
-          "line": 4.5,
-          "actual": null,
-          "modelMean": 5.3,
-          "liveProjection": 5.3,
-          "liveEdge": 0.8,
-          "delta": null,
-          "status": "pending",
-          "edge": 0.08598480655585505,
-          "odds": -147,
-          "modelProbOver": 0.645,
-          "outsMean": null,
-          "marketLabel": "strikeouts"
-        }
-      ],
+      "props": [],
       "liveProps": [],
       "archivedLiveProps": [],
-      "trackedProps": [
-        {
-          "tier": "playable",
-          "market": "pitcher_props",
-          "prop": "outs",
-          "playerName": "Framber Valdez",
-          "teamSide": "home",
-          "selection": "over",
-          "line": 17.5,
-          "actual": null,
-          "modelMean": 20.586,
-          "liveProjection": 20.586,
-          "liveEdge": 3.086,
-          "delta": null,
-          "status": "pending",
-          "edge": 0.26003950369491835,
-          "odds": -145,
-          "modelProbOver": 0.813,
-          "outsMean": 20.586,
-          "marketLabel": "outs"
-        },
-        {
-          "tier": "playable",
-          "market": "pitcher_props",
-          "prop": "strikeouts",
-          "playerName": "Framber Valdez",
-          "teamSide": "home",
-          "selection": "over",
-          "line": 4.5,
-          "actual": null,
-          "modelMean": 5.3,
-          "liveProjection": 5.3,
-          "liveEdge": 0.8,
-          "delta": null,
-          "status": "pending",
-          "edge": 0.08598480655585505,
-          "odds": -147,
-          "modelProbOver": 0.645,
-          "outsMean": null,
-          "marketLabel": "strikeouts"
-        }
-      ],
-      "simContextAvailable": true,
+      "trackedProps": [],
+      "simContextAvailable": false,
       "snapshotAvailable": true
     },
     {
       "gamePk": 822964,
       "status": {
         "abstract": "Preview",
-        "detailed": "Scheduled"
+        "detailed": "Pre-Game"
       },
       "startTime": "5:40 PM",
       "matchup": {
@@ -623,213 +330,7 @@
         },
         "liveText": ""
       },
-      "predictions": {
-        "full": {
-          "home_win_prob": 0.577,
-          "away_win_prob": 0.423,
-          "tie_prob": 0.0,
-          "away_runs_mean": 3.606,
-          "home_runs_mean": 4.15,
-          "total_runs_dist": {
-            "8": 71,
-            "2": 36,
-            "7": 102,
-            "6": 88,
-            "3": 76,
-            "5": 117,
-            "10": 57,
-            "4": 76,
-            "11": 61,
-            "9": 95,
-            "12": 44,
-            "13": 42,
-            "19": 4,
-            "23": 1,
-            "15": 20,
-            "20": 4,
-            "1": 39,
-            "17": 12,
-            "16": 18,
-            "22": 4,
-            "18": 5,
-            "14": 27,
-            "21": 1
-          },
-          "run_margin_dist": {
-            "-2": 81,
-            "-3": 69,
-            "6": 30,
-            "1": 167,
-            "-4": 55,
-            "2": 112,
-            "4": 71,
-            "3": 80,
-            "5": 44,
-            "7": 27,
-            "-1": 110,
-            "-8": 12,
-            "-7": 13,
-            "11": 5,
-            "-5": 38,
-            "-6": 33,
-            "10": 2,
-            "8": 24,
-            "18": 1,
-            "9": 8,
-            "-10": 3,
-            "-9": 5,
-            "16": 1,
-            "-12": 1,
-            "-11": 2,
-            "13": 1,
-            "12": 2,
-            "-16": 1,
-            "14": 1,
-            "15": 1
-          }
-        },
-        "first1": {
-          "home_win_prob": 0.222,
-          "away_win_prob": 0.174,
-          "tie_prob": 0.604,
-          "away_runs_mean": 0.366,
-          "home_runs_mean": 0.503,
-          "total_runs_dist": {
-            "1": 185,
-            "0": 590,
-            "3": 61,
-            "2": 106,
-            "4": 31,
-            "8": 1,
-            "5": 13,
-            "6": 8,
-            "7": 2,
-            "10": 1,
-            "11": 1,
-            "9": 1
-          },
-          "run_margin_dist": {
-            "-1": 101,
-            "0": 604,
-            "3": 33,
-            "2": 62,
-            "1": 101,
-            "4": 18,
-            "8": 1,
-            "-4": 5,
-            "-2": 43,
-            "-3": 18,
-            "-5": 3,
-            "-7": 1,
-            "6": 2,
-            "5": 5,
-            "-6": 2,
-            "-9": 1
-          }
-        },
-        "first5": {
-          "home_win_prob": 0.48,
-          "away_win_prob": 0.356,
-          "tie_prob": 0.164,
-          "away_runs_mean": 1.993,
-          "home_runs_mean": 2.431,
-          "total_runs_dist": {
-            "6": 94,
-            "0": 78,
-            "3": 139,
-            "4": 122,
-            "8": 56,
-            "2": 136,
-            "1": 106,
-            "10": 25,
-            "7": 73,
-            "9": 26,
-            "5": 93,
-            "11": 14,
-            "15": 5,
-            "12": 13,
-            "17": 2,
-            "14": 5,
-            "13": 10,
-            "16": 2,
-            "18": 1
-          },
-          "run_margin_dist": {
-            "-4": 35,
-            "0": 164,
-            "1": 135,
-            "4": 53,
-            "-2": 92,
-            "-6": 20,
-            "2": 116,
-            "-1": 105,
-            "5": 33,
-            "8": 10,
-            "9": 3,
-            "-5": 15,
-            "3": 80,
-            "-3": 65,
-            "6": 29,
-            "11": 3,
-            "7": 13,
-            "15": 2,
-            "-11": 1,
-            "-8": 9,
-            "-7": 9,
-            "10": 2,
-            "-9": 4,
-            "-12": 1,
-            "12": 1
-          }
-        },
-        "first3": {
-          "home_win_prob": 0.418,
-          "away_win_prob": 0.326,
-          "tie_prob": 0.256,
-          "away_runs_mean": 1.181,
-          "home_runs_mean": 1.465,
-          "total_runs_dist": {
-            "3": 129,
-            "0": 200,
-            "1": 196,
-            "2": 175,
-            "5": 78,
-            "6": 45,
-            "4": 98,
-            "8": 24,
-            "7": 28,
-            "9": 12,
-            "10": 5,
-            "12": 3,
-            "11": 6,
-            "13": 1
-          },
-          "run_margin_dist": {
-            "-1": 125,
-            "0": 256,
-            "3": 72,
-            "2": 112,
-            "-2": 87,
-            "6": 10,
-            "4": 34,
-            "1": 150,
-            "8": 7,
-            "-4": 28,
-            "-3": 51,
-            "-5": 15,
-            "-6": 13,
-            "5": 19,
-            "9": 3,
-            "7": 7,
-            "-7": 5,
-            "10": 2,
-            "12": 1,
-            "-11": 1,
-            "11": 1,
-            "-9": 1
-          }
-        }
-      },
+      "predictions": null,
       "gameMarkets": {
         "totals": null,
         "ml": null
@@ -840,10 +341,10 @@
           "label": "F1",
           "closed": false,
           "projection": {
-            "away": 0.4,
-            "home": 0.47,
-            "total": 0.87,
-            "homeMargin": 0.07,
+            "away": null,
+            "home": null,
+            "total": null,
+            "homeMargin": null,
             "closed": false
           },
           "actualSegment": {
@@ -859,33 +360,33 @@
             "outs": 0,
             "outsRecorded": 0,
             "remainingOuts": 54,
-            "label": "Scheduled"
+            "label": "Pre-Game"
           },
           "baselineHomeWinProb": null,
-          "modelHomeWinProb": 0.5113730379817067,
+          "modelHomeWinProb": null,
           "source": "segment_projection",
           "markets": {
             "moneyline": {
-              "homeOdds": "+270",
-              "awayOdds": "+420",
-              "drawOdds": "-160",
+              "homeOdds": null,
+              "awayOdds": null,
+              "drawOdds": null,
               "marketHomeProb": null,
               "pick": null,
               "edge": null,
               "reason": "Pregame moneyline recommendations are suppressed while that surface is under re-evaluation."
             },
             "spread": {
-              "homeLine": -1.5,
-              "homeOdds": "+630",
-              "awayOdds": "-1000",
+              "homeLine": null,
+              "homeOdds": null,
+              "awayOdds": null,
               "pick": null,
               "edge": null,
-              "reason": "F1 currently sits at home 0, away 0. The projected side was there, but the attached spread price was already too expensive to keep it realistic."
+              "reason": "F1 currently sits at home 0, away 0."
             },
             "total": {
-              "line": 0.5,
-              "overOdds": "+108",
-              "underOdds": "-138",
+              "line": null,
+              "overOdds": null,
+              "underOdds": null,
               "pick": null,
               "edge": null,
               "reason": "Pregame totals recommendations are suppressed while that surface is under re-evaluation."
@@ -897,10 +398,10 @@
           "label": "F3",
           "closed": false,
           "projection": {
-            "away": 1.2,
-            "home": 1.4,
-            "total": 2.6,
-            "homeMargin": 0.2,
+            "away": null,
+            "home": null,
+            "total": null,
+            "homeMargin": null,
             "closed": false
           },
           "actualSegment": {
@@ -916,28 +417,28 @@
             "outs": 0,
             "outsRecorded": 0,
             "remainingOuts": 54,
-            "label": "Scheduled"
+            "label": "Pre-Game"
           },
           "baselineHomeWinProb": null,
-          "modelHomeWinProb": 0.5324543063873187,
+          "modelHomeWinProb": null,
           "source": "segment_projection",
           "markets": {
             "moneyline": {
-              "homeOdds": "+126",
-              "awayOdds": "+220",
-              "drawOdds": "+235",
+              "homeOdds": null,
+              "awayOdds": null,
+              "drawOdds": null,
               "marketHomeProb": null,
               "pick": null,
               "edge": null,
               "reason": "Pregame moneyline recommendations are suppressed while that surface is under re-evaluation."
             },
             "spread": {
-              "homeLine": -0.5,
-              "homeOdds": "+116",
-              "awayOdds": "-156",
+              "homeLine": null,
+              "homeOdds": null,
+              "awayOdds": null,
               "pick": null,
               "edge": null,
-              "reason": "F3 currently sits at home 0, away 0. The projected side was there, but the attached spread price was already too expensive to keep it realistic."
+              "reason": "F3 currently sits at home 0, away 0."
             },
             "total": {
               "line": null,
@@ -954,10 +455,10 @@
           "label": "F5",
           "closed": false,
           "projection": {
-            "away": 2.0,
-            "home": 2.33,
-            "total": 4.33,
-            "homeMargin": 0.33,
+            "away": null,
+            "home": null,
+            "total": null,
+            "homeMargin": null,
             "closed": false
           },
           "actualSegment": {
@@ -973,15 +474,15 @@
             "outs": 0,
             "outsRecorded": 0,
             "remainingOuts": 54,
-            "label": "Scheduled"
+            "label": "Pre-Game"
           },
           "baselineHomeWinProb": null,
-          "modelHomeWinProb": 0.5534203333202695,
+          "modelHomeWinProb": null,
           "source": "segment_projection",
           "markets": {
             "moneyline": {
-              "homeOdds": "-174",
-              "awayOdds": "+138",
+              "homeOdds": null,
+              "awayOdds": null,
               "drawOdds": null,
               "marketHomeProb": null,
               "pick": null,
@@ -989,17 +490,17 @@
               "reason": "Pregame moneyline recommendations are suppressed while that surface is under re-evaluation."
             },
             "spread": {
-              "homeLine": -0.5,
-              "homeOdds": "-114",
-              "awayOdds": "-114",
+              "homeLine": null,
+              "homeOdds": null,
+              "awayOdds": null,
               "pick": null,
               "edge": null,
-              "reason": "F5 currently sits at home 0, away 0. The projected cover cushion was only 0.17 runs, so the spread lane stayed below threshold."
+              "reason": "F5 currently sits at home 0, away 0."
             },
             "total": {
-              "line": 3.5,
-              "overOdds": "-130",
-              "underOdds": "-102",
+              "line": null,
+              "overOdds": null,
+              "underOdds": null,
               "pick": null,
               "edge": null,
               "reason": "Pregame totals recommendations are suppressed while that surface is under re-evaluation."
@@ -1011,10 +512,10 @@
           "label": "Full Game",
           "closed": false,
           "projection": {
-            "away": 3.6,
-            "home": 4.2,
-            "total": 7.8,
-            "homeMargin": 0.6,
+            "away": null,
+            "home": null,
+            "total": null,
+            "homeMargin": null,
             "closed": false
           },
           "actualSegment": {
@@ -1030,15 +531,15 @@
             "outs": 0,
             "outsRecorded": 0,
             "remainingOuts": 54,
-            "label": "Scheduled"
+            "label": "Pre-Game"
           },
           "baselineHomeWinProb": null,
-          "modelHomeWinProb": 0.5962826992967879,
+          "modelHomeWinProb": null,
           "source": "segment_projection",
           "markets": {
             "moneyline": {
-              "homeOdds": "-174",
-              "awayOdds": "+146",
+              "homeOdds": null,
+              "awayOdds": null,
               "drawOdds": null,
               "marketHomeProb": null,
               "pick": null,
@@ -1046,17 +547,17 @@
               "reason": "Pregame moneyline recommendations are suppressed while that surface is under re-evaluation."
             },
             "spread": {
-              "homeLine": -1.5,
-              "homeOdds": "+128",
-              "awayOdds": "-154",
+              "homeLine": null,
+              "homeOdds": null,
+              "awayOdds": null,
               "pick": null,
               "edge": null,
               "reason": "Pregame full-game spread recommendations are suppressed while that surface is under re-evaluation."
             },
             "total": {
-              "line": 7.5,
-              "overOdds": "+102",
-              "underOdds": "-124",
+              "line": null,
+              "overOdds": null,
+              "underOdds": null,
               "pick": null,
               "edge": null,
               "reason": "Pregame totals recommendations are suppressed while that surface is under re-evaluation."
@@ -1068,14 +569,14 @@
       "liveProps": [],
       "archivedLiveProps": [],
       "trackedProps": [],
-      "simContextAvailable": true,
+      "simContextAvailable": false,
       "snapshotAvailable": true
     },
     {
       "gamePk": 823851,
       "status": {
         "abstract": "Preview",
-        "detailed": "Scheduled"
+        "detailed": "Pre-Game"
       },
       "startTime": "5:40 PM",
       "matchup": {
@@ -1097,221 +598,7 @@
         },
         "liveText": ""
       },
-      "predictions": {
-        "full": {
-          "home_win_prob": 0.593,
-          "away_win_prob": 0.407,
-          "tie_prob": 0.0,
-          "away_runs_mean": 3.882,
-          "home_runs_mean": 4.738,
-          "total_runs_dist": {
-            "10": 66,
-            "9": 96,
-            "6": 82,
-            "2": 23,
-            "7": 110,
-            "20": 4,
-            "17": 18,
-            "11": 76,
-            "21": 6,
-            "13": 41,
-            "3": 68,
-            "5": 94,
-            "19": 9,
-            "4": 62,
-            "8": 71,
-            "14": 31,
-            "15": 28,
-            "1": 28,
-            "16": 15,
-            "18": 14,
-            "12": 44,
-            "25": 3,
-            "22": 3,
-            "24": 3,
-            "23": 2,
-            "31": 1,
-            "28": 1,
-            "26": 1
-          },
-          "run_margin_dist": {
-            "2": 107,
-            "1": 157,
-            "-4": 50,
-            "-1": 122,
-            "7": 27,
-            "4": 70,
-            "-2": 78,
-            "11": 11,
-            "-5": 26,
-            "-3": 60,
-            "3": 83,
-            "6": 36,
-            "-6": 24,
-            "9": 18,
-            "10": 14,
-            "5": 42,
-            "15": 3,
-            "-14": 1,
-            "8": 21,
-            "-10": 4,
-            "-11": 2,
-            "-8": 9,
-            "-7": 16,
-            "-12": 4,
-            "-9": 10,
-            "13": 3,
-            "14": 1,
-            "-18": 1
-          }
-        },
-        "first1": {
-          "home_win_prob": 0.21,
-          "away_win_prob": 0.199,
-          "tie_prob": 0.591,
-          "away_runs_mean": 0.461,
-          "home_runs_mean": 0.495,
-          "total_runs_dist": {
-            "0": 572,
-            "2": 117,
-            "1": 185,
-            "3": 52,
-            "8": 6,
-            "6": 8,
-            "4": 33,
-            "5": 19,
-            "9": 1,
-            "7": 7
-          },
-          "run_margin_dist": {
-            "0": 591,
-            "-2": 46,
-            "1": 101,
-            "2": 66,
-            "-3": 22,
-            "-6": 4,
-            "6": 3,
-            "-1": 109,
-            "4": 13,
-            "-4": 10,
-            "3": 16,
-            "-5": 4,
-            "-7": 3,
-            "-8": 1,
-            "5": 8,
-            "8": 2,
-            "7": 1
-          }
-        },
-        "first5": {
-          "home_win_prob": 0.494,
-          "away_win_prob": 0.333,
-          "tie_prob": 0.173,
-          "away_runs_mean": 2.183,
-          "home_runs_mean": 2.823,
-          "total_runs_dist": {
-            "3": 127,
-            "9": 44,
-            "0": 63,
-            "1": 100,
-            "2": 121,
-            "5": 100,
-            "13": 20,
-            "7": 77,
-            "11": 24,
-            "14": 8,
-            "6": 78,
-            "4": 121,
-            "8": 46,
-            "10": 37,
-            "15": 4,
-            "17": 4,
-            "12": 16,
-            "25": 1,
-            "20": 4,
-            "21": 2,
-            "16": 2,
-            "23": 1
-          },
-          "run_margin_dist": {
-            "3": 65,
-            "1": 146,
-            "0": 173,
-            "2": 106,
-            "-3": 69,
-            "7": 30,
-            "-5": 20,
-            "-1": 104,
-            "-6": 12,
-            "6": 25,
-            "4": 53,
-            "-2": 76,
-            "5": 35,
-            "10": 7,
-            "9": 9,
-            "-4": 23,
-            "-7": 13,
-            "-9": 5,
-            "-8": 4,
-            "8": 14,
-            "-11": 3,
-            "13": 2,
-            "-10": 3,
-            "11": 2,
-            "-13": 1
-          }
-        },
-        "first3": {
-          "home_win_prob": 0.432,
-          "away_win_prob": 0.316,
-          "tie_prob": 0.252,
-          "away_runs_mean": 1.312,
-          "home_runs_mean": 1.677,
-          "total_runs_dist": {
-            "3": 151,
-            "5": 62,
-            "0": 178,
-            "1": 178,
-            "2": 168,
-            "4": 102,
-            "9": 16,
-            "6": 48,
-            "8": 28,
-            "13": 8,
-            "12": 7,
-            "7": 36,
-            "11": 6,
-            "10": 8,
-            "15": 3,
-            "17": 1
-          },
-          "run_margin_dist": {
-            "3": 57,
-            "5": 25,
-            "0": 252,
-            "1": 162,
-            "-2": 77,
-            "4": 33,
-            "2": 117,
-            "-5": 11,
-            "-1": 130,
-            "-6": 11,
-            "7": 15,
-            "-3": 45,
-            "9": 9,
-            "-4": 33,
-            "-8": 2,
-            "-7": 4,
-            "8": 4,
-            "-9": 1,
-            "11": 1,
-            "6": 8,
-            "-11": 1,
-            "-10": 1,
-            "10": 1
-          }
-        }
-      },
+      "predictions": null,
       "gameMarkets": {
         "totals": null,
         "ml": null
@@ -1322,10 +609,10 @@
           "label": "F1",
           "closed": false,
           "projection": {
-            "away": 0.43,
-            "home": 0.52,
-            "total": 0.96,
-            "homeMargin": 0.09,
+            "away": null,
+            "home": null,
+            "total": null,
+            "homeMargin": null,
             "closed": false
           },
           "actualSegment": {
@@ -1341,33 +628,33 @@
             "outs": 0,
             "outsRecorded": 0,
             "remainingOuts": 54,
-            "label": "Scheduled"
+            "label": "Pre-Game"
           },
           "baselineHomeWinProb": null,
-          "modelHomeWinProb": 0.5146208305596934,
+          "modelHomeWinProb": null,
           "source": "segment_projection",
           "markets": {
             "moneyline": {
-              "homeOdds": "+300",
-              "awayOdds": "+310",
-              "drawOdds": "-140",
+              "homeOdds": null,
+              "awayOdds": null,
+              "drawOdds": null,
               "marketHomeProb": null,
               "pick": null,
               "edge": null,
               "reason": "Pregame moneyline recommendations are suppressed while that surface is under re-evaluation."
             },
             "spread": {
-              "homeLine": -1.5,
-              "homeOdds": "+680",
-              "awayOdds": "-1200",
+              "homeLine": null,
+              "homeOdds": null,
+              "awayOdds": null,
               "pick": null,
               "edge": null,
-              "reason": "F1 currently sits at home 0, away 0. The projected side was there, but the attached spread price was already too expensive to keep it realistic."
+              "reason": "F1 currently sits at home 0, away 0."
             },
             "total": {
-              "line": 0.5,
-              "overOdds": "-111",
-              "underOdds": "-115",
+              "line": null,
+              "overOdds": null,
+              "underOdds": null,
               "pick": null,
               "edge": null,
               "reason": "Pregame totals recommendations are suppressed while that surface is under re-evaluation."
@@ -1379,10 +666,10 @@
           "label": "F3",
           "closed": false,
           "projection": {
-            "away": 1.3,
-            "home": 1.57,
-            "total": 2.87,
-            "homeMargin": 0.27,
+            "away": null,
+            "home": null,
+            "total": null,
+            "homeMargin": null,
             "closed": false
           },
           "actualSegment": {
@@ -1398,28 +685,28 @@
             "outs": 0,
             "outsRecorded": 0,
             "remainingOuts": 54,
-            "label": "Scheduled"
+            "label": "Pre-Game"
           },
           "baselineHomeWinProb": null,
-          "modelHomeWinProb": 0.5437627323603996,
+          "modelHomeWinProb": null,
           "source": "segment_projection",
           "markets": {
             "moneyline": {
-              "homeOdds": "+138",
-              "awayOdds": "+164",
-              "drawOdds": "+285",
+              "homeOdds": null,
+              "awayOdds": null,
+              "drawOdds": null,
               "marketHomeProb": null,
               "pick": null,
               "edge": null,
               "reason": "Pregame moneyline recommendations are suppressed while that surface is under re-evaluation."
             },
             "spread": {
-              "homeLine": -0.5,
-              "homeOdds": "+128",
-              "awayOdds": "-174",
+              "homeLine": null,
+              "homeOdds": null,
+              "awayOdds": null,
               "pick": null,
               "edge": null,
-              "reason": "F3 currently sits at home 0, away 0. The projected side was there, but the attached spread price was already too expensive to keep it realistic."
+              "reason": "F3 currently sits at home 0, away 0."
             },
             "total": {
               "line": null,
@@ -1436,10 +723,10 @@
           "label": "F5",
           "closed": false,
           "projection": {
-            "away": 2.17,
-            "home": 2.61,
-            "total": 4.78,
-            "homeMargin": 0.44,
+            "away": null,
+            "home": null,
+            "total": null,
+            "homeMargin": null,
             "closed": false
           },
           "actualSegment": {
@@ -1455,15 +742,15 @@
             "outs": 0,
             "outsRecorded": 0,
             "remainingOuts": 54,
-            "label": "Scheduled"
+            "label": "Pre-Game"
           },
           "baselineHomeWinProb": null,
-          "modelHomeWinProb": 0.5710165859158207,
+          "modelHomeWinProb": null,
           "source": "segment_projection",
           "markets": {
             "moneyline": {
-              "homeOdds": "-124",
-              "awayOdds": "+100",
+              "homeOdds": null,
+              "awayOdds": null,
               "drawOdds": null,
               "marketHomeProb": null,
               "pick": null,
@@ -1471,17 +758,17 @@
               "reason": "Pregame moneyline recommendations are suppressed while that surface is under re-evaluation."
             },
             "spread": {
-              "homeLine": -0.5,
-              "homeOdds": "+112",
-              "awayOdds": "-148",
+              "homeLine": null,
+              "homeOdds": null,
+              "awayOdds": null,
               "pick": null,
               "edge": null,
-              "reason": "F5 currently sits at home 0, away 0. The projected cover cushion was only 0.06 runs, so the spread lane stayed below threshold."
+              "reason": "F5 currently sits at home 0, away 0."
             },
             "total": {
-              "line": 4.5,
-              "overOdds": "-118",
-              "underOdds": "-112",
+              "line": null,
+              "overOdds": null,
+              "underOdds": null,
               "pick": null,
               "edge": null,
               "reason": "Pregame totals recommendations are suppressed while that surface is under re-evaluation."
@@ -1493,10 +780,10 @@
           "label": "Full Game",
           "closed": false,
           "projection": {
-            "away": 3.9,
-            "home": 4.7,
-            "total": 8.6,
-            "homeMargin": 0.8,
+            "away": null,
+            "home": null,
+            "total": null,
+            "homeMargin": null,
             "closed": false
           },
           "actualSegment": {
@@ -1512,15 +799,15 @@
             "outs": 0,
             "outsRecorded": 0,
             "remainingOuts": 54,
-            "label": "Scheduled"
+            "label": "Pre-Game"
           },
           "baselineHomeWinProb": null,
-          "modelHomeWinProb": 0.6271477663131956,
+          "modelHomeWinProb": null,
           "source": "segment_projection",
           "markets": {
             "moneyline": {
-              "homeOdds": "-124",
-              "awayOdds": "+106",
+              "homeOdds": null,
+              "awayOdds": null,
               "drawOdds": null,
               "marketHomeProb": null,
               "pick": null,
@@ -1528,17 +815,17 @@
               "reason": "Pregame moneyline recommendations are suppressed while that surface is under re-evaluation."
             },
             "spread": {
-              "homeLine": 1.5,
-              "homeOdds": "-210",
-              "awayOdds": "+172",
+              "homeLine": null,
+              "homeOdds": null,
+              "awayOdds": null,
               "pick": null,
               "edge": null,
               "reason": "Pregame full-game spread recommendations are suppressed while that surface is under re-evaluation."
             },
             "total": {
-              "line": 8.5,
-              "overOdds": "-106",
-              "underOdds": "-114",
+              "line": null,
+              "overOdds": null,
+              "underOdds": null,
               "pick": null,
               "edge": null,
               "reason": "Pregame totals recommendations are suppressed while that surface is under re-evaluation."
@@ -1546,60 +833,18 @@
           }
         }
       ],
-      "props": [
-        {
-          "tier": "playable",
-          "market": "pitcher_props",
-          "prop": "outs",
-          "playerName": "Tyler Phillips",
-          "teamSide": "home",
-          "selection": "over",
-          "line": 15.5,
-          "actual": null,
-          "modelMean": 20.665,
-          "liveProjection": 20.665,
-          "liveEdge": 5.165,
-          "delta": null,
-          "status": "pending",
-          "edge": 0.5163846153846154,
-          "odds": 140,
-          "modelProbOver": 0.901,
-          "outsMean": 20.665,
-          "marketLabel": "outs"
-        }
-      ],
+      "props": [],
       "liveProps": [],
       "archivedLiveProps": [],
-      "trackedProps": [
-        {
-          "tier": "playable",
-          "market": "pitcher_props",
-          "prop": "outs",
-          "playerName": "Tyler Phillips",
-          "teamSide": "home",
-          "selection": "over",
-          "line": 15.5,
-          "actual": null,
-          "modelMean": 20.665,
-          "liveProjection": 20.665,
-          "liveEdge": 5.165,
-          "delta": null,
-          "status": "pending",
-          "edge": 0.5163846153846154,
-          "odds": 140,
-          "modelProbOver": 0.901,
-          "outsMean": 20.665,
-          "marketLabel": "outs"
-        }
-      ],
-      "simContextAvailable": true,
+      "trackedProps": [],
+      "simContextAvailable": false,
       "snapshotAvailable": true
     },
     {
       "gamePk": 822720,
       "status": {
         "abstract": "Preview",
-        "detailed": "Scheduled"
+        "detailed": "Pre-Game"
       },
       "startTime": "5:45 PM",
       "matchup": {
@@ -1621,217 +866,7 @@
         },
         "liveText": ""
       },
-      "predictions": {
-        "full": {
-          "home_win_prob": 0.431,
-          "away_win_prob": 0.569,
-          "tie_prob": 0.0,
-          "away_runs_mean": 4.347,
-          "home_runs_mean": 3.633,
-          "total_runs_dist": {
-            "5": 112,
-            "9": 89,
-            "4": 75,
-            "3": 74,
-            "14": 25,
-            "12": 41,
-            "6": 76,
-            "10": 71,
-            "7": 100,
-            "13": 43,
-            "15": 27,
-            "8": 88,
-            "1": 27,
-            "11": 58,
-            "2": 43,
-            "16": 16,
-            "17": 10,
-            "22": 2,
-            "18": 5,
-            "33": 1,
-            "19": 6,
-            "24": 1,
-            "20": 3,
-            "27": 1,
-            "25": 1,
-            "23": 2,
-            "28": 1,
-            "21": 1,
-            "32": 1
-          },
-          "run_margin_dist": {
-            "-1": 118,
-            "3": 76,
-            "2": 93,
-            "-3": 85,
-            "4": 48,
-            "-6": 34,
-            "-4": 79,
-            "1": 134,
-            "7": 12,
-            "-2": 131,
-            "6": 13,
-            "8": 12,
-            "-5": 53,
-            "-8": 18,
-            "5": 25,
-            "9": 3,
-            "10": 8,
-            "-10": 7,
-            "12": 3,
-            "-7": 16,
-            "-11": 5,
-            "-9": 19,
-            "-14": 1,
-            "11": 2,
-            "-12": 1,
-            "13": 2,
-            "-17": 1,
-            "-13": 1
-          }
-        },
-        "first1": {
-          "home_win_prob": 0.186,
-          "away_win_prob": 0.214,
-          "tie_prob": 0.6,
-          "away_runs_mean": 0.469,
-          "home_runs_mean": 0.389,
-          "total_runs_dist": {
-            "0": 580,
-            "2": 104,
-            "1": 199,
-            "3": 66,
-            "5": 14,
-            "4": 25,
-            "8": 2,
-            "9": 2,
-            "6": 7,
-            "7": 1
-          },
-          "run_margin_dist": {
-            "0": 600,
-            "2": 44,
-            "1": 103,
-            "3": 27,
-            "-1": 110,
-            "-3": 29,
-            "-5": 9,
-            "-2": 54,
-            "5": 2,
-            "4": 8,
-            "8": 1,
-            "-4": 6,
-            "-6": 5,
-            "9": 1,
-            "-7": 1
-          }
-        },
-        "first5": {
-          "home_win_prob": 0.346,
-          "away_win_prob": 0.465,
-          "tie_prob": 0.189,
-          "away_runs_mean": 2.358,
-          "home_runs_mean": 2.02,
-          "total_runs_dist": {
-            "5": 89,
-            "4": 131,
-            "2": 131,
-            "3": 133,
-            "8": 59,
-            "6": 89,
-            "10": 23,
-            "1": 119,
-            "7": 54,
-            "0": 81,
-            "11": 19,
-            "13": 5,
-            "9": 42,
-            "17": 2,
-            "12": 13,
-            "14": 3,
-            "19": 1,
-            "22": 2,
-            "21": 1,
-            "16": 2,
-            "15": 1
-          },
-          "run_margin_dist": {
-            "-1": 159,
-            "0": 189,
-            "-3": 68,
-            "-2": 100,
-            "1": 107,
-            "-6": 24,
-            "2": 96,
-            "10": 2,
-            "3": 47,
-            "6": 14,
-            "7": 13,
-            "4": 42,
-            "9": 3,
-            "-4": 53,
-            "-5": 37,
-            "11": 2,
-            "5": 15,
-            "8": 4,
-            "-10": 3,
-            "-7": 10,
-            "-11": 1,
-            "-12": 1,
-            "-8": 4,
-            "12": 1,
-            "-9": 4,
-            "-14": 1
-          }
-        },
-        "first3": {
-          "home_win_prob": 0.304,
-          "away_win_prob": 0.384,
-          "tie_prob": 0.312,
-          "away_runs_mean": 1.41,
-          "home_runs_mean": 1.188,
-          "total_runs_dist": {
-            "5": 60,
-            "4": 109,
-            "1": 177,
-            "3": 136,
-            "2": 162,
-            "0": 230,
-            "7": 31,
-            "10": 7,
-            "6": 50,
-            "8": 16,
-            "11": 7,
-            "9": 10,
-            "13": 2,
-            "15": 1,
-            "14": 1,
-            "16": 1
-          },
-          "run_margin_dist": {
-            "-1": 148,
-            "0": 312,
-            "1": 119,
-            "-3": 59,
-            "2": 81,
-            "5": 13,
-            "7": 5,
-            "-2": 91,
-            "6": 6,
-            "3": 46,
-            "-4": 38,
-            "4": 30,
-            "-6": 13,
-            "-5": 28,
-            "-7": 4,
-            "-8": 1,
-            "8": 3,
-            "-9": 1,
-            "11": 1,
-            "-10": 1
-          }
-        }
-      },
+      "predictions": null,
       "gameMarkets": {
         "totals": null,
         "ml": null
@@ -1842,10 +877,10 @@
           "label": "F1",
           "closed": false,
           "projection": {
-            "away": 0.48,
-            "home": 0.4,
-            "total": 0.88,
-            "homeMargin": -0.08,
+            "away": null,
+            "home": null,
+            "total": null,
+            "homeMargin": null,
             "closed": false
           },
           "actualSegment": {
@@ -1861,10 +896,10 @@
             "outs": 0,
             "outsRecorded": 0,
             "remainingOuts": 54,
-            "label": "Scheduled"
+            "label": "Pre-Game"
           },
           "baselineHomeWinProb": null,
-          "modelHomeWinProb": 0.4870029285414583,
+          "modelHomeWinProb": null,
           "source": "segment_projection",
           "markets": {
             "moneyline": {
@@ -1882,7 +917,7 @@
               "awayOdds": null,
               "pick": null,
               "edge": null,
-              "reason": "F1 currently sits at home 0, away 0. No tracked f1 spread is attached yet."
+              "reason": "F1 currently sits at home 0, away 0."
             },
             "total": {
               "line": null,
@@ -1899,10 +934,10 @@
           "label": "F3",
           "closed": false,
           "projection": {
-            "away": 1.43,
-            "home": 1.2,
-            "total": 2.63,
-            "homeMargin": -0.23,
+            "away": null,
+            "home": null,
+            "total": null,
+            "homeMargin": null,
             "closed": false
           },
           "actualSegment": {
@@ -1918,10 +953,10 @@
             "outs": 0,
             "outsRecorded": 0,
             "remainingOuts": 54,
-            "label": "Scheduled"
+            "label": "Pre-Game"
           },
           "baselineHomeWinProb": null,
-          "modelHomeWinProb": 0.46269445648329866,
+          "modelHomeWinProb": null,
           "source": "segment_projection",
           "markets": {
             "moneyline": {
@@ -1939,7 +974,7 @@
               "awayOdds": null,
               "pick": null,
               "edge": null,
-              "reason": "F3 currently sits at home 0, away 0. No tracked f3 spread is attached yet."
+              "reason": "F3 currently sits at home 0, away 0."
             },
             "total": {
               "line": null,
@@ -1956,10 +991,10 @@
           "label": "F5",
           "closed": false,
           "projection": {
-            "away": 2.39,
-            "home": 2.0,
-            "total": 4.39,
-            "homeMargin": -0.39,
+            "away": null,
+            "home": null,
+            "total": null,
+            "homeMargin": null,
             "closed": false
           },
           "actualSegment": {
@@ -1975,10 +1010,10 @@
             "outs": 0,
             "outsRecorded": 0,
             "remainingOuts": 54,
-            "label": "Scheduled"
+            "label": "Pre-Game"
           },
           "baselineHomeWinProb": null,
-          "modelHomeWinProb": 0.4369622181338762,
+          "modelHomeWinProb": null,
           "source": "segment_projection",
           "markets": {
             "moneyline": {
@@ -1996,7 +1031,7 @@
               "awayOdds": null,
               "pick": null,
               "edge": null,
-              "reason": "F5 currently sits at home 0, away 0. No tracked f5 spread is attached yet."
+              "reason": "F5 currently sits at home 0, away 0."
             },
             "total": {
               "line": null,
@@ -2013,10 +1048,10 @@
           "label": "Full Game",
           "closed": false,
           "projection": {
-            "away": 4.3,
-            "home": 3.6,
-            "total": 7.9,
-            "homeMargin": -0.7,
+            "away": null,
+            "home": null,
+            "total": null,
+            "homeMargin": null,
             "closed": false
           },
           "actualSegment": {
@@ -2032,10 +1067,10 @@
             "outs": 0,
             "outsRecorded": 0,
             "remainingOuts": 54,
-            "label": "Scheduled"
+            "label": "Pre-Game"
           },
           "baselineHomeWinProb": null,
-          "modelHomeWinProb": 0.3881726309982629,
+          "modelHomeWinProb": null,
           "source": "segment_projection",
           "markets": {
             "moneyline": {
@@ -2070,14 +1105,14 @@
       "liveProps": [],
       "archivedLiveProps": [],
       "trackedProps": [],
-      "simContextAvailable": true,
+      "simContextAvailable": false,
       "snapshotAvailable": true
     },
     {
       "gamePk": 822800,
       "status": {
         "abstract": "Preview",
-        "detailed": "Scheduled"
+        "detailed": "Pre-Game"
       },
       "startTime": "6:07 PM",
       "matchup": {
@@ -2099,206 +1134,7 @@
         },
         "liveText": ""
       },
-      "predictions": {
-        "full": {
-          "home_win_prob": 0.467,
-          "away_win_prob": 0.533,
-          "tie_prob": 0.0,
-          "away_runs_mean": 4.252,
-          "home_runs_mean": 3.738,
-          "total_runs_dist": {
-            "3": 89,
-            "9": 88,
-            "5": 131,
-            "6": 75,
-            "7": 96,
-            "1": 34,
-            "4": 70,
-            "14": 29,
-            "8": 76,
-            "12": 43,
-            "22": 2,
-            "10": 63,
-            "13": 38,
-            "15": 15,
-            "11": 56,
-            "16": 22,
-            "21": 3,
-            "19": 9,
-            "17": 20,
-            "18": 6,
-            "2": 25,
-            "20": 7,
-            "23": 1,
-            "26": 1,
-            "28": 1
-          },
-          "run_margin_dist": {
-            "1": 144,
-            "-5": 46,
-            "4": 55,
-            "-3": 93,
-            "-1": 120,
-            "2": 101,
-            "5": 32,
-            "-6": 27,
-            "-2": 106,
-            "3": 77,
-            "-8": 11,
-            "-7": 24,
-            "-9": 18,
-            "13": 1,
-            "-4": 68,
-            "12": 2,
-            "9": 9,
-            "-10": 10,
-            "-11": 2,
-            "7": 13,
-            "8": 9,
-            "6": 18,
-            "-14": 3,
-            "-12": 4,
-            "10": 5,
-            "-16": 1,
-            "11": 1
-          }
-        },
-        "first1": {
-          "home_win_prob": 0.169,
-          "away_win_prob": 0.212,
-          "tie_prob": 0.619,
-          "away_runs_mean": 0.467,
-          "home_runs_mean": 0.399,
-          "total_runs_dist": {
-            "0": 605,
-            "1": 179,
-            "3": 58,
-            "2": 90,
-            "4": 37,
-            "5": 16,
-            "6": 6,
-            "9": 2,
-            "7": 5,
-            "8": 2
-          },
-          "run_margin_dist": {
-            "0": 619,
-            "-1": 114,
-            "3": 24,
-            "2": 45,
-            "1": 80,
-            "-2": 45,
-            "-3": 31,
-            "4": 15,
-            "-6": 1,
-            "-4": 15,
-            "5": 5,
-            "-5": 5,
-            "-7": 1
-          }
-        },
-        "first5": {
-          "home_win_prob": 0.355,
-          "away_win_prob": 0.49,
-          "tie_prob": 0.155,
-          "away_runs_mean": 2.445,
-          "home_runs_mean": 1.955,
-          "total_runs_dist": {
-            "1": 147,
-            "5": 96,
-            "4": 126,
-            "0": 72,
-            "2": 116,
-            "3": 126,
-            "9": 36,
-            "7": 65,
-            "11": 16,
-            "8": 55,
-            "6": 79,
-            "12": 11,
-            "10": 29,
-            "13": 12,
-            "14": 7,
-            "16": 4,
-            "15": 2,
-            "20": 1
-          },
-          "run_margin_dist": {
-            "-1": 150,
-            "1": 126,
-            "3": 46,
-            "-2": 110,
-            "0": 155,
-            "4": 41,
-            "5": 24,
-            "-3": 89,
-            "2": 84,
-            "-7": 15,
-            "-4": 50,
-            "-5": 28,
-            "7": 11,
-            "-6": 23,
-            "-8": 15,
-            "9": 4,
-            "-11": 4,
-            "6": 14,
-            "-10": 3,
-            "-12": 1,
-            "8": 3,
-            "10": 1,
-            "-9": 1,
-            "-13": 1,
-            "11": 1
-          }
-        },
-        "first3": {
-          "home_win_prob": 0.306,
-          "away_win_prob": 0.41,
-          "tie_prob": 0.284,
-          "away_runs_mean": 1.506,
-          "home_runs_mean": 1.196,
-          "total_runs_dist": {
-            "0": 226,
-            "2": 147,
-            "5": 72,
-            "1": 190,
-            "4": 92,
-            "9": 14,
-            "3": 125,
-            "6": 55,
-            "7": 33,
-            "8": 28,
-            "11": 7,
-            "10": 6,
-            "12": 2,
-            "16": 1,
-            "14": 1,
-            "13": 1
-          },
-          "run_margin_dist": {
-            "0": 284,
-            "3": 46,
-            "-2": 102,
-            "-1": 148,
-            "4": 29,
-            "2": 77,
-            "5": 16,
-            "-3": 74,
-            "-6": 16,
-            "1": 121,
-            "-5": 20,
-            "-4": 33,
-            "6": 10,
-            "-8": 5,
-            "-9": 2,
-            "-7": 9,
-            "7": 4,
-            "9": 2,
-            "8": 1,
-            "-10": 1
-          }
-        }
-      },
+      "predictions": null,
       "gameMarkets": {
         "totals": null,
         "ml": null
@@ -2309,10 +1145,10 @@
           "label": "F1",
           "closed": false,
           "projection": {
-            "away": 0.48,
-            "home": 0.41,
-            "total": 0.89,
-            "homeMargin": -0.07,
+            "away": null,
+            "home": null,
+            "total": null,
+            "homeMargin": null,
             "closed": false
           },
           "actualSegment": {
@@ -2328,33 +1164,33 @@
             "outs": 0,
             "outsRecorded": 0,
             "remainingOuts": 54,
-            "label": "Scheduled"
+            "label": "Pre-Game"
           },
           "baselineHomeWinProb": null,
-          "modelHomeWinProb": 0.4886269620182933,
+          "modelHomeWinProb": null,
           "source": "segment_projection",
           "markets": {
             "moneyline": {
-              "homeOdds": "+410",
-              "awayOdds": "+340",
-              "drawOdds": "-185",
+              "homeOdds": null,
+              "awayOdds": null,
+              "drawOdds": null,
               "marketHomeProb": null,
               "pick": null,
               "edge": null,
               "reason": "Pregame moneyline recommendations are suppressed while that surface is under re-evaluation."
             },
             "spread": {
-              "homeLine": 1.5,
-              "homeOdds": "-1800",
-              "awayOdds": "+880",
+              "homeLine": null,
+              "homeOdds": null,
+              "awayOdds": null,
               "pick": null,
               "edge": null,
-              "reason": "F1 currently sits at home 0, away 0. The projected side was there, but the attached spread price was already too expensive to keep it realistic."
+              "reason": "F1 currently sits at home 0, away 0."
             },
             "total": {
-              "line": 0.5,
-              "overOdds": "+112",
-              "underOdds": "-142",
+              "line": null,
+              "overOdds": null,
+              "underOdds": null,
               "pick": null,
               "edge": null,
               "reason": "Pregame totals recommendations are suppressed while that surface is under re-evaluation."
@@ -2366,10 +1202,10 @@
           "label": "F3",
           "closed": false,
           "projection": {
-            "away": 1.43,
-            "home": 1.23,
-            "total": 2.67,
-            "homeMargin": -0.2,
+            "away": null,
+            "home": null,
+            "total": null,
+            "homeMargin": null,
             "closed": false
           },
           "actualSegment": {
@@ -2385,28 +1221,28 @@
             "outs": 0,
             "outsRecorded": 0,
             "remainingOuts": 54,
-            "label": "Scheduled"
+            "label": "Pre-Game"
           },
           "baselineHomeWinProb": null,
-          "modelHomeWinProb": 0.4675456936126812,
+          "modelHomeWinProb": null,
           "source": "segment_projection",
           "markets": {
             "moneyline": {
-              "homeOdds": "+160",
-              "awayOdds": "+176",
-              "drawOdds": "+220",
+              "homeOdds": null,
+              "awayOdds": null,
+              "drawOdds": null,
               "marketHomeProb": null,
               "pick": null,
               "edge": null,
               "reason": "Pregame moneyline recommendations are suppressed while that surface is under re-evaluation."
             },
             "spread": {
-              "homeLine": -0.5,
-              "homeOdds": "+150",
-              "awayOdds": "-205",
+              "homeLine": null,
+              "homeOdds": null,
+              "awayOdds": null,
               "pick": null,
               "edge": null,
-              "reason": "F3 currently sits at home 0, away 0. The projected side was there, but the attached spread price was already too expensive to keep it realistic."
+              "reason": "F3 currently sits at home 0, away 0."
             },
             "total": {
               "line": null,
@@ -2423,10 +1259,10 @@
           "label": "F5",
           "closed": false,
           "projection": {
-            "away": 2.39,
-            "home": 2.06,
-            "total": 4.44,
-            "homeMargin": -0.33,
+            "away": null,
+            "home": null,
+            "total": null,
+            "homeMargin": null,
             "closed": false
           },
           "actualSegment": {
@@ -2442,15 +1278,15 @@
             "outs": 0,
             "outsRecorded": 0,
             "remainingOuts": 54,
-            "label": "Scheduled"
+            "label": "Pre-Game"
           },
           "baselineHomeWinProb": null,
-          "modelHomeWinProb": 0.4465796666797305,
+          "modelHomeWinProb": null,
           "source": "segment_projection",
           "markets": {
             "moneyline": {
-              "homeOdds": "-122",
-              "awayOdds": "-102",
+              "homeOdds": null,
+              "awayOdds": null,
               "drawOdds": null,
               "marketHomeProb": null,
               "pick": null,
@@ -2458,17 +1294,17 @@
               "reason": "Pregame moneyline recommendations are suppressed while that surface is under re-evaluation."
             },
             "spread": {
-              "homeLine": -0.5,
-              "homeOdds": "+118",
-              "awayOdds": "-158",
+              "homeLine": null,
+              "homeOdds": null,
+              "awayOdds": null,
               "pick": null,
               "edge": null,
-              "reason": "F5 currently sits at home 0, away 0. The projected side was there, but the attached spread price was already too expensive to keep it realistic."
+              "reason": "F5 currently sits at home 0, away 0."
             },
             "total": {
-              "line": 3.5,
-              "overOdds": "-114",
-              "underOdds": "-114",
+              "line": null,
+              "overOdds": null,
+              "underOdds": null,
               "pick": null,
               "edge": null,
               "reason": "Pregame totals recommendations are suppressed while that surface is under re-evaluation."
@@ -2480,10 +1316,10 @@
           "label": "Full Game",
           "closed": false,
           "projection": {
-            "away": 4.3,
-            "home": 3.7,
-            "total": 8.0,
-            "homeMargin": -0.6,
+            "away": null,
+            "home": null,
+            "total": null,
+            "homeMargin": null,
             "closed": false
           },
           "actualSegment": {
@@ -2499,15 +1335,15 @@
             "outs": 0,
             "outsRecorded": 0,
             "remainingOuts": 54,
-            "label": "Scheduled"
+            "label": "Pre-Game"
           },
           "baselineHomeWinProb": null,
-          "modelHomeWinProb": 0.40371730070321216,
+          "modelHomeWinProb": null,
           "source": "segment_projection",
           "markets": {
             "moneyline": {
-              "homeOdds": "-126",
-              "awayOdds": "+108",
+              "homeOdds": null,
+              "awayOdds": null,
               "drawOdds": null,
               "marketHomeProb": null,
               "pick": null,
@@ -2515,17 +1351,17 @@
               "reason": "Pregame moneyline recommendations are suppressed while that surface is under re-evaluation."
             },
             "spread": {
-              "homeLine": -1.5,
-              "homeOdds": "+176",
-              "awayOdds": "-215",
+              "homeLine": null,
+              "homeOdds": null,
+              "awayOdds": null,
               "pick": null,
               "edge": null,
               "reason": "Pregame full-game spread recommendations are suppressed while that surface is under re-evaluation."
             },
             "total": {
-              "line": 7.0,
-              "overOdds": "-118",
-              "underOdds": "-104",
+              "line": null,
+              "overOdds": null,
+              "underOdds": null,
               "pick": null,
               "edge": null,
               "reason": "Pregame totals recommendations are suppressed while that surface is under re-evaluation."
@@ -2537,14 +1373,14 @@
       "liveProps": [],
       "archivedLiveProps": [],
       "trackedProps": [],
-      "simContextAvailable": true,
+      "simContextAvailable": false,
       "snapshotAvailable": true
     },
     {
       "gamePk": 823613,
       "status": {
         "abstract": "Preview",
-        "detailed": "Scheduled"
+        "detailed": "Pre-Game"
       },
       "startTime": "6:10 PM",
       "matchup": {
@@ -2566,294 +1402,10 @@
         },
         "liveText": ""
       },
-      "predictions": {
-        "full": {
-          "home_win_prob": 0.36,
-          "away_win_prob": 0.64,
-          "tie_prob": 0.0,
-          "away_runs_mean": 5.967,
-          "home_runs_mean": 4.397,
-          "total_runs_dist": {
-            "17": 26,
-            "18": 19,
-            "10": 69,
-            "6": 56,
-            "14": 37,
-            "12": 60,
-            "22": 7,
-            "4": 26,
-            "9": 107,
-            "20": 6,
-            "5": 58,
-            "8": 80,
-            "15": 44,
-            "29": 3,
-            "16": 26,
-            "3": 55,
-            "7": 83,
-            "11": 88,
-            "19": 20,
-            "21": 10,
-            "25": 3,
-            "13": 57,
-            "1": 17,
-            "2": 15,
-            "26": 3,
-            "24": 8,
-            "30": 3,
-            "27": 5,
-            "23": 7,
-            "28": 1,
-            "31": 1
-          },
-          "run_margin_dist": {
-            "-1": 115,
-            "-18": 1,
-            "2": 76,
-            "-8": 33,
-            "-4": 82,
-            "-10": 13,
-            "-2": 97,
-            "4": 33,
-            "7": 14,
-            "-5": 60,
-            "-9": 28,
-            "-6": 41,
-            "-3": 106,
-            "1": 113,
-            "3": 47,
-            "-7": 45,
-            "-17": 1,
-            "-13": 2,
-            "6": 23,
-            "10": 2,
-            "-11": 8,
-            "5": 33,
-            "-12": 3,
-            "-16": 2,
-            "12": 2,
-            "11": 4,
-            "9": 3,
-            "8": 7,
-            "16": 1,
-            "13": 1,
-            "-15": 3,
-            "15": 1
-          }
-        },
-        "first1": {
-          "home_win_prob": 0.186,
-          "away_win_prob": 0.305,
-          "tie_prob": 0.509,
-          "away_runs_mean": 0.817,
-          "home_runs_mean": 0.448,
-          "total_runs_dist": {
-            "1": 197,
-            "10": 3,
-            "2": 123,
-            "3": 98,
-            "0": 487,
-            "7": 8,
-            "5": 33,
-            "4": 30,
-            "16": 1,
-            "8": 4,
-            "6": 13,
-            "13": 1,
-            "9": 2
-          },
-          "run_margin_dist": {
-            "1": 108,
-            "-10": 1,
-            "2": 45,
-            "-3": 59,
-            "0": 509,
-            "-1": 129,
-            "3": 18,
-            "-2": 71,
-            "-4": 15,
-            "-16": 1,
-            "8": 1,
-            "-6": 7,
-            "-5": 18,
-            "4": 7,
-            "-7": 2,
-            "6": 3,
-            "5": 3,
-            "-11": 1,
-            "-8": 1,
-            "9": 1
-          }
-        },
-        "first5": {
-          "home_win_prob": 0.303,
-          "away_win_prob": 0.573,
-          "tie_prob": 0.124,
-          "away_runs_mean": 3.87,
-          "home_runs_mean": 2.415,
-          "total_runs_dist": {
-            "8": 70,
-            "17": 5,
-            "5": 110,
-            "4": 96,
-            "3": 99,
-            "13": 24,
-            "6": 93,
-            "15": 12,
-            "10": 44,
-            "1": 60,
-            "2": 97,
-            "0": 34,
-            "7": 88,
-            "11": 33,
-            "16": 11,
-            "9": 55,
-            "12": 31,
-            "18": 6,
-            "19": 6,
-            "14": 19,
-            "20": 2,
-            "22": 1,
-            "23": 2,
-            "26": 1,
-            "21": 1
-          },
-          "run_margin_dist": {
-            "0": 124,
-            "-17": 1,
-            "5": 21,
-            "-2": 103,
-            "-1": 112,
-            "-11": 3,
-            "2": 73,
-            "-4": 65,
-            "1": 95,
-            "-8": 31,
-            "-5": 56,
-            "-3": 85,
-            "-7": 41,
-            "-16": 2,
-            "3": 56,
-            "4": 30,
-            "8": 5,
-            "-6": 44,
-            "-9": 14,
-            "-12": 5,
-            "-18": 1,
-            "6": 9,
-            "-10": 8,
-            "7": 7,
-            "10": 2,
-            "12": 1,
-            "13": 1,
-            "9": 2,
-            "-14": 2,
-            "11": 1
-          }
-        },
-        "first3": {
-          "home_win_prob": 0.298,
-          "away_win_prob": 0.495,
-          "tie_prob": 0.207,
-          "away_runs_mean": 2.331,
-          "home_runs_mean": 1.425,
-          "total_runs_dist": {
-            "8": 37,
-            "11": 13,
-            "4": 112,
-            "3": 121,
-            "2": 166,
-            "9": 27,
-            "6": 73,
-            "1": 137,
-            "0": 125,
-            "7": 59,
-            "5": 91,
-            "10": 14,
-            "17": 3,
-            "12": 8,
-            "13": 6,
-            "18": 1,
-            "15": 2,
-            "14": 4,
-            "19": 1
-          },
-          "run_margin_dist": {
-            "0": 207,
-            "-11": 3,
-            "4": 21,
-            "-3": 81,
-            "-2": 121,
-            "2": 80,
-            "3": 44,
-            "1": 125,
-            "5": 15,
-            "-9": 3,
-            "-1": 128,
-            "-6": 26,
-            "-5": 44,
-            "-4": 51,
-            "-17": 1,
-            "9": 1,
-            "-8": 16,
-            "-10": 5,
-            "-7": 13,
-            "-12": 2,
-            "6": 7,
-            "8": 3,
-            "-13": 1,
-            "7": 1,
-            "12": 1
-          }
-        }
-      },
+      "predictions": null,
       "gameMarkets": {
         "totals": null,
-        "ml": {
-          "date": "2026-06-22",
-          "game_pk": 823613,
-          "away": "Chicago Cubs",
-          "home": "New York Mets",
-          "away_abbr": "CHC",
-          "home_abbr": "NYM",
-          "double_header": "N",
-          "game_number": 1,
-          "event_id": "da1236e8e0bc448283c6e1e28d578e43",
-          "commence_time": "2026-06-22T23:11:00Z",
-          "market": "ml",
-          "selection": "away",
-          "edge": 0.13109052031361368,
-          "model_prob": 0.36,
-          "selected_side_model_prob": 0.64,
-          "selected_side_market_prob": 0.5089094796863863,
-          "market_no_vig_prob": 0.4910905203136137,
-          "odds": "-112",
-          "stake_u": 1.0,
-          "sim_sample_size": 1000,
-          "baseball_reasons": [
-            "Across his last 5 starts, Shota Imanaga has allowed about 3.8 earned runs per outing.",
-            "The projected lineup is mostly 4 left-handed and 5 right-handed, and the power risk also comes in lighter than baseline."
-          ],
-          "explanation_diagnostic": {
-            "status": "supported",
-            "flag_sparse_support": false,
-            "support_min_reasons": 2,
-            "baseball_reasons_n": 2,
-            "reason_sentences_n": 4,
-            "market": "ml",
-            "subject": "CHC @ NYM",
-            "supporting_reasons": [
-              "Across his last 5 starts, Shota Imanaga has allowed about 3.8 earned runs per outing.",
-              "The projected lineup is mostly 4 left-handed and 5 right-handed, and the power risk also comes in lighter than baseline."
-            ]
-          },
-          "reasons": [
-            "The model lands on the away side in 64.0% of sims, while the market is pricing it closer to 50.9%. Across his last 5 starts, Shota Imanaga has allowed about 3.8 earned runs per outing. The projected lineup is mostly 4 left-handed and 5 right-handed, and the power risk also comes in lighter than baseline. CHC wins this matchup in about 64.0% of model runs."
-          ],
-          "reason_summary": "The model lands on the away side in 64.0% of sims, while the market is pricing it closer to 50.9%. Across his last 5 starts, Shota Imanaga has allowed about 3.8 earned runs per outing. The projected lineup is mostly 4 left-handed and 5 right-handed, and the power risk also comes in lighter than baseline. CHC wins this matchup in about 64.0% of model runs.",
-          "rank": 1,
-          "recommendation_tier": "official"
-        }
+        "ml": null
       },
       "gameLens": [
         {
@@ -2861,10 +1413,10 @@
           "label": "F1",
           "closed": false,
           "projection": {
-            "away": 0.67,
-            "home": 0.49,
-            "total": 1.16,
-            "homeMargin": -0.18,
+            "away": null,
+            "home": null,
+            "total": null,
+            "homeMargin": null,
             "closed": false
           },
           "actualSegment": {
@@ -2880,33 +1432,33 @@
             "outs": 0,
             "outsRecorded": 0,
             "remainingOuts": 54,
-            "label": "Scheduled"
+            "label": "Pre-Game"
           },
           "baselineHomeWinProb": null,
-          "modelHomeWinProb": 0.47078332132468187,
+          "modelHomeWinProb": null,
           "source": "segment_projection",
           "markets": {
             "moneyline": {
-              "homeOdds": "+320",
-              "awayOdds": "+280",
-              "drawOdds": "-130",
+              "homeOdds": null,
+              "awayOdds": null,
+              "drawOdds": null,
               "marketHomeProb": null,
               "pick": null,
               "edge": null,
               "reason": "Pregame moneyline recommendations are suppressed while that surface is under re-evaluation."
             },
             "spread": {
-              "homeLine": -1.5,
-              "homeOdds": "+790",
-              "awayOdds": "-1500",
+              "homeLine": null,
+              "homeOdds": null,
+              "awayOdds": null,
               "pick": null,
               "edge": null,
-              "reason": "F1 currently sits at home 0, away 0. The projected side was there, but the attached spread price was already too expensive to keep it realistic."
+              "reason": "F1 currently sits at home 0, away 0."
             },
             "total": {
-              "line": 0.5,
-              "overOdds": "-111",
-              "underOdds": "-115",
+              "line": null,
+              "overOdds": null,
+              "underOdds": null,
               "pick": null,
               "edge": null,
               "reason": "Pregame totals recommendations are suppressed while that surface is under re-evaluation."
@@ -2918,10 +1470,10 @@
           "label": "F3",
           "closed": false,
           "projection": {
-            "away": 2.0,
-            "home": 1.47,
-            "total": 3.47,
-            "homeMargin": -0.53,
+            "away": null,
+            "home": null,
+            "total": null,
+            "homeMargin": null,
             "closed": false
           },
           "actualSegment": {
@@ -2937,28 +1489,28 @@
             "outs": 0,
             "outsRecorded": 0,
             "remainingOuts": 54,
-            "label": "Scheduled"
+            "label": "Pre-Game"
           },
           "baselineHomeWinProb": null,
-          "modelHomeWinProb": 0.4147167890800654,
+          "modelHomeWinProb": null,
           "source": "segment_projection",
           "markets": {
             "moneyline": {
-              "homeOdds": "+172",
-              "awayOdds": "+132",
-              "drawOdds": "+290",
+              "homeOdds": null,
+              "awayOdds": null,
+              "drawOdds": null,
               "marketHomeProb": null,
               "pick": null,
               "edge": null,
               "reason": "Pregame moneyline recommendations are suppressed while that surface is under re-evaluation."
             },
             "spread": {
-              "homeLine": 0.5,
-              "homeOdds": "-164",
-              "awayOdds": "+120",
+              "homeLine": null,
+              "homeOdds": null,
+              "awayOdds": null,
               "pick": null,
               "edge": null,
-              "reason": "F3 currently sits at home 0, away 0. The projected cover cushion was only 0.03 runs, so the spread lane stayed below threshold."
+              "reason": "F3 currently sits at home 0, away 0."
             },
             "total": {
               "line": null,
@@ -2975,10 +1527,10 @@
           "label": "F5",
           "closed": false,
           "projection": {
-            "away": 3.33,
-            "home": 2.44,
-            "total": 5.78,
-            "homeMargin": -0.89,
+            "away": null,
+            "home": null,
+            "total": null,
+            "homeMargin": null,
             "closed": false
           },
           "actualSegment": {
@@ -2994,15 +1546,15 @@
             "outs": 0,
             "outsRecorded": 0,
             "remainingOuts": 54,
-            "label": "Scheduled"
+            "label": "Pre-Game"
           },
           "baselineHomeWinProb": null,
-          "modelHomeWinProb": 0.35927781663032105,
+          "modelHomeWinProb": null,
           "source": "segment_projection",
           "markets": {
             "moneyline": {
-              "homeOdds": "+108",
-              "awayOdds": "-135",
+              "homeOdds": null,
+              "awayOdds": null,
               "drawOdds": null,
               "marketHomeProb": null,
               "pick": null,
@@ -3010,17 +1562,17 @@
               "reason": "Pregame moneyline recommendations are suppressed while that surface is under re-evaluation."
             },
             "spread": {
-              "homeLine": 0.5,
-              "homeOdds": "-138",
-              "awayOdds": "+104",
+              "homeLine": null,
+              "homeOdds": null,
+              "awayOdds": null,
               "pick": null,
               "edge": null,
-              "reason": "F5 currently sits at home 0, away 0. The projected cover cushion was only 0.39 runs, so the spread lane stayed below threshold."
+              "reason": "F5 currently sits at home 0, away 0."
             },
             "total": {
-              "line": 4.5,
-              "overOdds": "-122",
-              "underOdds": "-108",
+              "line": null,
+              "overOdds": null,
+              "underOdds": null,
               "pick": null,
               "edge": null,
               "reason": "Pregame totals recommendations are suppressed while that surface is under re-evaluation."
@@ -3032,10 +1584,10 @@
           "label": "Full Game",
           "closed": false,
           "projection": {
-            "away": 6.0,
-            "home": 4.4,
-            "total": 10.4,
-            "homeMargin": -1.6,
+            "away": null,
+            "home": null,
+            "total": null,
+            "homeMargin": null,
             "closed": false
           },
           "actualSegment": {
@@ -3051,15 +1603,15 @@
             "outs": 0,
             "outsRecorded": 0,
             "remainingOuts": 54,
-            "label": "Scheduled"
+            "label": "Pre-Game"
           },
           "baselineHomeWinProb": null,
-          "modelHomeWinProb": 0.261149993915751,
+          "modelHomeWinProb": null,
           "source": "segment_projection",
           "markets": {
             "moneyline": {
-              "homeOdds": "-104",
-              "awayOdds": "-112",
+              "homeOdds": null,
+              "awayOdds": null,
               "drawOdds": null,
               "marketHomeProb": null,
               "pick": null,
@@ -3067,17 +1619,17 @@
               "reason": "Pregame moneyline recommendations are suppressed while that surface is under re-evaluation."
             },
             "spread": {
-              "homeLine": 1.5,
-              "homeOdds": "-166",
-              "awayOdds": "+138",
+              "homeLine": null,
+              "homeOdds": null,
+              "awayOdds": null,
               "pick": null,
               "edge": null,
               "reason": "Pregame full-game spread recommendations are suppressed while that surface is under re-evaluation."
             },
             "total": {
-              "line": 8.5,
-              "overOdds": "-115",
-              "underOdds": "-105",
+              "line": null,
+              "overOdds": null,
+              "underOdds": null,
               "pick": null,
               "edge": null,
               "reason": "Pregame totals recommendations are suppressed while that surface is under re-evaluation."
@@ -3085,100 +1637,18 @@
           }
         }
       ],
-      "props": [
-        {
-          "tier": "playable",
-          "market": "pitcher_props",
-          "prop": "strikeouts",
-          "playerName": "Kodai Senga",
-          "teamSide": "home",
-          "selection": "over",
-          "line": 4.5,
-          "actual": null,
-          "modelMean": 4.925,
-          "liveProjection": 4.925,
-          "liveEdge": 0.425,
-          "delta": null,
-          "status": "pending",
-          "edge": 0.029719794344473027,
-          "odds": -120,
-          "modelProbOver": 0.549,
-          "outsMean": null,
-          "marketLabel": "strikeouts"
-        },
-        {
-          "tier": "playable",
-          "market": "pitcher_props",
-          "prop": "strikeouts",
-          "playerName": "Shota Imanaga",
-          "teamSide": "away",
-          "selection": "over",
-          "line": 5.5,
-          "actual": null,
-          "modelMean": 5.702,
-          "liveProjection": 5.702,
-          "liveEdge": 0.202,
-          "delta": null,
-          "status": "pending",
-          "edge": 0.09410112284898015,
-          "odds": 126,
-          "modelProbOver": 0.516,
-          "outsMean": null,
-          "marketLabel": "strikeouts"
-        }
-      ],
+      "props": [],
       "liveProps": [],
       "archivedLiveProps": [],
-      "trackedProps": [
-        {
-          "tier": "playable",
-          "market": "pitcher_props",
-          "prop": "strikeouts",
-          "playerName": "Kodai Senga",
-          "teamSide": "home",
-          "selection": "over",
-          "line": 4.5,
-          "actual": null,
-          "modelMean": 4.925,
-          "liveProjection": 4.925,
-          "liveEdge": 0.425,
-          "delta": null,
-          "status": "pending",
-          "edge": 0.029719794344473027,
-          "odds": -120,
-          "modelProbOver": 0.549,
-          "outsMean": null,
-          "marketLabel": "strikeouts"
-        },
-        {
-          "tier": "playable",
-          "market": "pitcher_props",
-          "prop": "strikeouts",
-          "playerName": "Shota Imanaga",
-          "teamSide": "away",
-          "selection": "over",
-          "line": 5.5,
-          "actual": null,
-          "modelMean": 5.702,
-          "liveProjection": 5.702,
-          "liveEdge": 0.202,
-          "delta": null,
-          "status": "pending",
-          "edge": 0.09410112284898015,
-          "odds": 126,
-          "modelProbOver": 0.516,
-          "outsMean": null,
-          "marketLabel": "strikeouts"
-        }
-      ],
-      "simContextAvailable": true,
+      "trackedProps": [],
+      "simContextAvailable": false,
       "snapshotAvailable": true
     },
     {
       "gamePk": 824502,
       "status": {
         "abstract": "Preview",
-        "detailed": "Scheduled"
+        "detailed": "Pre-Game"
       },
       "startTime": "6:10 PM",
       "matchup": {
@@ -3200,211 +1670,7 @@
         },
         "liveText": ""
       },
-      "predictions": {
-        "full": {
-          "home_win_prob": 0.342,
-          "away_win_prob": 0.658,
-          "tie_prob": 0.0,
-          "away_runs_mean": 5.216,
-          "home_runs_mean": 3.37,
-          "total_runs_dist": {
-            "7": 106,
-            "13": 47,
-            "10": 62,
-            "5": 95,
-            "15": 31,
-            "3": 71,
-            "6": 78,
-            "11": 75,
-            "9": 93,
-            "8": 75,
-            "4": 54,
-            "12": 40,
-            "18": 11,
-            "14": 28,
-            "16": 18,
-            "1": 30,
-            "2": 31,
-            "17": 22,
-            "21": 5,
-            "23": 2,
-            "24": 3,
-            "19": 12,
-            "20": 6,
-            "22": 3,
-            "26": 1,
-            "27": 1
-          },
-          "run_margin_dist": {
-            "-7": 45,
-            "-1": 127,
-            "-4": 86,
-            "-5": 62,
-            "-3": 97,
-            "1": 129,
-            "2": 76,
-            "-2": 107,
-            "6": 9,
-            "-8": 20,
-            "-9": 18,
-            "9": 1,
-            "5": 35,
-            "-10": 12,
-            "8": 5,
-            "3": 46,
-            "4": 28,
-            "-14": 4,
-            "-6": 52,
-            "7": 8,
-            "-12": 5,
-            "-15": 4,
-            "16": 1,
-            "-13": 5,
-            "-11": 10,
-            "10": 2,
-            "12": 1,
-            "-16": 2,
-            "-17": 2,
-            "13": 1
-          }
-        },
-        "first1": {
-          "home_win_prob": 0.13,
-          "away_win_prob": 0.246,
-          "tie_prob": 0.624,
-          "away_runs_mean": 0.598,
-          "home_runs_mean": 0.33,
-          "total_runs_dist": {
-            "0": 602,
-            "4": 30,
-            "3": 68,
-            "1": 161,
-            "9": 2,
-            "2": 98,
-            "6": 10,
-            "5": 18,
-            "7": 9,
-            "8": 2
-          },
-          "run_margin_dist": {
-            "0": 624,
-            "-4": 12,
-            "-3": 36,
-            "-1": 122,
-            "2": 37,
-            "1": 69,
-            "-2": 57,
-            "-6": 5,
-            "5": 6,
-            "3": 12,
-            "4": 6,
-            "-5": 10,
-            "-8": 1,
-            "-7": 3
-          }
-        },
-        "first5": {
-          "home_win_prob": 0.258,
-          "away_win_prob": 0.581,
-          "tie_prob": 0.161,
-          "away_runs_mean": 3.018,
-          "home_runs_mean": 1.708,
-          "total_runs_dist": {
-            "1": 94,
-            "7": 66,
-            "8": 59,
-            "3": 128,
-            "4": 98,
-            "9": 36,
-            "2": 146,
-            "10": 29,
-            "0": 74,
-            "6": 98,
-            "11": 32,
-            "5": 97,
-            "13": 12,
-            "12": 13,
-            "15": 4,
-            "23": 1,
-            "14": 7,
-            "17": 2,
-            "16": 4
-          },
-          "run_margin_dist": {
-            "-1": 132,
-            "-7": 24,
-            "-6": 36,
-            "-3": 111,
-            "-4": 65,
-            "-5": 42,
-            "1": 76,
-            "0": 161,
-            "2": 73,
-            "-2": 130,
-            "6": 11,
-            "5": 19,
-            "3": 51,
-            "4": 23,
-            "-8": 12,
-            "-10": 6,
-            "-13": 3,
-            "10": 3,
-            "-9": 10,
-            "-12": 6,
-            "-11": 3,
-            "7": 1,
-            "-14": 1,
-            "8": 1
-          }
-        },
-        "first3": {
-          "home_win_prob": 0.244,
-          "away_win_prob": 0.488,
-          "tie_prob": 0.268,
-          "away_runs_mean": 1.776,
-          "home_runs_mean": 0.991,
-          "total_runs_dist": {
-            "0": 199,
-            "4": 95,
-            "6": 49,
-            "9": 17,
-            "1": 183,
-            "2": 183,
-            "3": 117,
-            "13": 3,
-            "7": 45,
-            "5": 80,
-            "8": 12,
-            "10": 5,
-            "11": 8,
-            "12": 2,
-            "14": 2
-          },
-          "run_margin_dist": {
-            "0": 268,
-            "-4": 52,
-            "-5": 29,
-            "1": 106,
-            "-2": 117,
-            "-6": 16,
-            "-1": 163,
-            "3": 37,
-            "2": 61,
-            "-3": 82,
-            "5": 11,
-            "-9": 7,
-            "4": 20,
-            "-8": 6,
-            "10": 1,
-            "-7": 14,
-            "7": 2,
-            "6": 4,
-            "9": 2,
-            "-14": 1,
-            "-10": 1
-          }
-        }
-      },
+      "predictions": null,
       "gameMarkets": {
         "totals": null,
         "ml": null
@@ -3415,10 +1681,10 @@
           "label": "F1",
           "closed": false,
           "projection": {
-            "away": 0.58,
-            "home": 0.38,
-            "total": 0.96,
-            "homeMargin": -0.2,
+            "away": null,
+            "home": null,
+            "total": null,
+            "homeMargin": null,
             "closed": false
           },
           "actualSegment": {
@@ -3434,33 +1700,33 @@
             "outs": 0,
             "outsRecorded": 0,
             "remainingOuts": 54,
-            "label": "Scheduled"
+            "label": "Pre-Game"
           },
           "baselineHomeWinProb": null,
-          "modelHomeWinProb": 0.4675456936126812,
+          "modelHomeWinProb": null,
           "source": "segment_projection",
           "markets": {
             "moneyline": {
-              "homeOdds": "+340",
-              "awayOdds": "+250",
-              "drawOdds": "-125",
+              "homeOdds": null,
+              "awayOdds": null,
+              "drawOdds": null,
               "marketHomeProb": null,
               "pick": null,
               "edge": null,
               "reason": "Pregame moneyline recommendations are suppressed while that surface is under re-evaluation."
             },
             "spread": {
-              "homeLine": 1.5,
-              "homeOdds": "-900",
-              "awayOdds": "+570",
+              "homeLine": null,
+              "homeOdds": null,
+              "awayOdds": null,
               "pick": null,
               "edge": null,
-              "reason": "F1 currently sits at home 0, away 0. The projected side was there, but the attached spread price was already too expensive to keep it realistic."
+              "reason": "F1 currently sits at home 0, away 0."
             },
             "total": {
-              "line": 0.5,
-              "overOdds": "-136",
-              "underOdds": "+106",
+              "line": null,
+              "overOdds": null,
+              "underOdds": null,
               "pick": null,
               "edge": null,
               "reason": "Pregame totals recommendations are suppressed while that surface is under re-evaluation."
@@ -3472,10 +1738,10 @@
           "label": "F3",
           "closed": false,
           "projection": {
-            "away": 1.73,
-            "home": 1.13,
-            "total": 2.87,
-            "homeMargin": -0.6,
+            "away": null,
+            "home": null,
+            "total": null,
+            "homeMargin": null,
             "closed": false
           },
           "actualSegment": {
@@ -3491,28 +1757,28 @@
             "outs": 0,
             "outsRecorded": 0,
             "remainingOuts": 54,
-            "label": "Scheduled"
+            "label": "Pre-Game"
           },
           "baselineHomeWinProb": null,
-          "modelHomeWinProb": 0.40371730070321216,
+          "modelHomeWinProb": null,
           "source": "segment_projection",
           "markets": {
             "moneyline": {
-              "homeOdds": "+164",
-              "awayOdds": "+124",
-              "drawOdds": "+320",
+              "homeOdds": null,
+              "awayOdds": null,
+              "drawOdds": null,
               "marketHomeProb": null,
               "pick": null,
               "edge": null,
               "reason": "Pregame moneyline recommendations are suppressed while that surface is under re-evaluation."
             },
             "spread": {
-              "homeLine": 0.5,
-              "homeOdds": "-154",
-              "awayOdds": "+116",
+              "homeLine": null,
+              "homeOdds": null,
+              "awayOdds": null,
               "pick": null,
               "edge": null,
-              "reason": "F3 currently sits at home 0, away 0. The projected cover cushion was only 0.10 runs, so the spread lane stayed below threshold."
+              "reason": "F3 currently sits at home 0, away 0."
             },
             "total": {
               "line": null,
@@ -3529,10 +1795,10 @@
           "label": "F5",
           "closed": false,
           "projection": {
-            "away": 2.89,
-            "home": 1.89,
-            "total": 4.78,
-            "homeMargin": -1.0,
+            "away": null,
+            "home": null,
+            "total": null,
+            "homeMargin": null,
             "closed": false
           },
           "actualSegment": {
@@ -3548,15 +1814,15 @@
             "outs": 0,
             "outsRecorded": 0,
             "remainingOuts": 54,
-            "label": "Scheduled"
+            "label": "Pre-Game"
           },
           "baselineHomeWinProb": null,
-          "modelHomeWinProb": 0.34298953732650117,
+          "modelHomeWinProb": null,
           "source": "segment_projection",
           "markets": {
             "moneyline": {
-              "homeOdds": "+112",
-              "awayOdds": "-140",
+              "homeOdds": null,
+              "awayOdds": null,
               "drawOdds": null,
               "marketHomeProb": null,
               "pick": null,
@@ -3564,17 +1830,17 @@
               "reason": "Pregame moneyline recommendations are suppressed while that surface is under re-evaluation."
             },
             "spread": {
-              "homeLine": 0.5,
-              "homeOdds": "-128",
-              "awayOdds": "-104",
+              "homeLine": null,
+              "homeOdds": null,
+              "awayOdds": null,
               "pick": null,
               "edge": null,
-              "reason": "F5 currently sits at home 0, away 0. The projected cover cushion was only 0.50 runs, so the spread lane stayed below threshold."
+              "reason": "F5 currently sits at home 0, away 0."
             },
             "total": {
-              "line": 5.5,
-              "overOdds": "+102",
-              "underOdds": "-136",
+              "line": null,
+              "overOdds": null,
+              "underOdds": null,
               "pick": null,
               "edge": null,
               "reason": "Pregame totals recommendations are suppressed while that surface is under re-evaluation."
@@ -3586,10 +1852,10 @@
           "label": "Full Game",
           "closed": false,
           "projection": {
-            "away": 5.2,
-            "home": 3.4,
-            "total": 8.6,
-            "homeMargin": -1.8,
+            "away": null,
+            "home": null,
+            "total": null,
+            "homeMargin": null,
             "closed": false
           },
           "actualSegment": {
@@ -3605,15 +1871,15 @@
             "outs": 0,
             "outsRecorded": 0,
             "remainingOuts": 54,
-            "label": "Scheduled"
+            "label": "Pre-Game"
           },
           "baselineHomeWinProb": null,
-          "modelHomeWinProb": 0.23685498427314453,
+          "modelHomeWinProb": null,
           "source": "segment_projection",
           "markets": {
             "moneyline": {
-              "homeOdds": "+136",
-              "awayOdds": "-162",
+              "homeOdds": null,
+              "awayOdds": null,
               "drawOdds": null,
               "marketHomeProb": null,
               "pick": null,
@@ -3621,17 +1887,17 @@
               "reason": "Pregame moneyline recommendations are suppressed while that surface is under re-evaluation."
             },
             "spread": {
-              "homeLine": 1.5,
-              "homeOdds": "-122",
-              "awayOdds": "+102",
+              "homeLine": null,
+              "homeOdds": null,
+              "awayOdds": null,
               "pick": null,
               "edge": null,
               "reason": "Pregame full-game spread recommendations are suppressed while that surface is under re-evaluation."
             },
             "total": {
-              "line": 9.5,
-              "overOdds": "-108",
-              "underOdds": "-112",
+              "line": null,
+              "overOdds": null,
+              "underOdds": null,
               "pick": null,
               "edge": null,
               "reason": "Pregame totals recommendations are suppressed while that surface is under re-evaluation."
@@ -3639,60 +1905,18 @@
           }
         }
       ],
-      "props": [
-        {
-          "tier": "playable",
-          "market": "pitcher_props",
-          "prop": "strikeouts",
-          "playerName": "Brady Singer",
-          "teamSide": "home",
-          "selection": "over",
-          "line": 4.5,
-          "actual": null,
-          "modelMean": 5.244,
-          "liveProjection": 5.244,
-          "liveEdge": 0.744,
-          "delta": null,
-          "status": "pending",
-          "edge": 0.14666400970369087,
-          "odds": -106,
-          "modelProbOver": 0.638,
-          "outsMean": null,
-          "marketLabel": "strikeouts"
-        }
-      ],
+      "props": [],
       "liveProps": [],
       "archivedLiveProps": [],
-      "trackedProps": [
-        {
-          "tier": "playable",
-          "market": "pitcher_props",
-          "prop": "strikeouts",
-          "playerName": "Brady Singer",
-          "teamSide": "home",
-          "selection": "over",
-          "line": 4.5,
-          "actual": null,
-          "modelMean": 5.244,
-          "liveProjection": 5.244,
-          "liveEdge": 0.744,
-          "delta": null,
-          "status": "pending",
-          "edge": 0.14666400970369087,
-          "odds": -106,
-          "modelProbOver": 0.638,
-          "outsMean": null,
-          "marketLabel": "strikeouts"
-        }
-      ],
-      "simContextAvailable": true,
+      "trackedProps": [],
+      "simContextAvailable": false,
       "snapshotAvailable": true
     },
     {
       "gamePk": 823692,
       "status": {
         "abstract": "Preview",
-        "detailed": "Scheduled"
+        "detailed": "Pre-Game"
       },
       "startTime": "6:40 PM",
       "matchup": {
@@ -3714,217 +1938,7 @@
         },
         "liveText": ""
       },
-      "predictions": {
-        "full": {
-          "home_win_prob": 0.505,
-          "away_win_prob": 0.495,
-          "tie_prob": 0.0,
-          "away_runs_mean": 4.132,
-          "home_runs_mean": 3.946,
-          "total_runs_dist": {
-            "12": 35,
-            "2": 30,
-            "9": 78,
-            "5": 122,
-            "3": 89,
-            "8": 62,
-            "7": 93,
-            "6": 82,
-            "10": 68,
-            "16": 15,
-            "11": 69,
-            "13": 43,
-            "4": 82,
-            "20": 5,
-            "19": 7,
-            "14": 23,
-            "27": 1,
-            "22": 4,
-            "15": 17,
-            "17": 16,
-            "1": 30,
-            "25": 1,
-            "23": 7,
-            "21": 3,
-            "18": 16,
-            "26": 1,
-            "24": 1
-          },
-          "run_margin_dist": {
-            "8": 12,
-            "2": 101,
-            "-5": 44,
-            "1": 157,
-            "-2": 112,
-            "3": 70,
-            "-1": 118,
-            "5": 39,
-            "-4": 50,
-            "4": 61,
-            "-3": 78,
-            "6": 32,
-            "-10": 9,
-            "-9": 15,
-            "-6": 25,
-            "9": 6,
-            "-7": 18,
-            "-8": 10,
-            "7": 15,
-            "13": 1,
-            "-11": 4,
-            "-13": 6,
-            "14": 4,
-            "-12": 3,
-            "11": 4,
-            "10": 3,
-            "-18": 1,
-            "-14": 1,
-            "-17": 1
-          }
-        },
-        "first1": {
-          "home_win_prob": 0.207,
-          "away_win_prob": 0.181,
-          "tie_prob": 0.612,
-          "away_runs_mean": 0.421,
-          "home_runs_mean": 0.469,
-          "total_runs_dist": {
-            "0": 590,
-            "1": 182,
-            "5": 21,
-            "2": 109,
-            "3": 51,
-            "4": 31,
-            "6": 10,
-            "7": 4,
-            "11": 1,
-            "9": 1
-          },
-          "run_margin_dist": {
-            "0": 612,
-            "1": 105,
-            "-1": 93,
-            "-2": 50,
-            "2": 50,
-            "3": 33,
-            "-4": 12,
-            "5": 5,
-            "-3": 16,
-            "4": 10,
-            "-6": 3,
-            "6": 3,
-            "7": 1,
-            "-5": 6,
-            "-9": 1
-          }
-        },
-        "first5": {
-          "home_win_prob": 0.444,
-          "away_win_prob": 0.394,
-          "tie_prob": 0.162,
-          "away_runs_mean": 2.286,
-          "home_runs_mean": 2.327,
-          "total_runs_dist": {
-            "6": 90,
-            "1": 106,
-            "8": 42,
-            "3": 149,
-            "0": 73,
-            "4": 146,
-            "5": 96,
-            "2": 106,
-            "12": 12,
-            "7": 57,
-            "13": 13,
-            "9": 46,
-            "11": 23,
-            "15": 7,
-            "16": 3,
-            "14": 8,
-            "10": 19,
-            "18": 1,
-            "17": 2,
-            "22": 1
-          },
-          "run_margin_dist": {
-            "4": 49,
-            "1": 150,
-            "-4": 38,
-            "-1": 118,
-            "0": 162,
-            "3": 63,
-            "-3": 61,
-            "-2": 89,
-            "-8": 7,
-            "2": 108,
-            "5": 28,
-            "-7": 20,
-            "-9": 6,
-            "-5": 32,
-            "9": 5,
-            "7": 8,
-            "13": 2,
-            "-6": 18,
-            "6": 20,
-            "-11": 2,
-            "11": 4,
-            "8": 5,
-            "10": 2,
-            "-10": 3
-          }
-        },
-        "first3": {
-          "home_win_prob": 0.375,
-          "away_win_prob": 0.344,
-          "tie_prob": 0.281,
-          "away_runs_mean": 1.323,
-          "home_runs_mean": 1.429,
-          "total_runs_dist": {
-            "2": 159,
-            "1": 177,
-            "0": 213,
-            "3": 134,
-            "5": 70,
-            "4": 105,
-            "7": 35,
-            "6": 55,
-            "9": 15,
-            "13": 1,
-            "11": 7,
-            "8": 15,
-            "10": 8,
-            "14": 3,
-            "15": 1,
-            "16": 1,
-            "12": 1
-          },
-          "run_margin_dist": {
-            "2": 92,
-            "1": 149,
-            "-1": 142,
-            "-2": 85,
-            "0": 281,
-            "3": 53,
-            "5": 19,
-            "7": 7,
-            "-4": 34,
-            "-6": 11,
-            "-5": 15,
-            "4": 34,
-            "11": 1,
-            "-3": 44,
-            "-8": 4,
-            "6": 14,
-            "14": 1,
-            "-9": 1,
-            "-7": 7,
-            "10": 2,
-            "9": 2,
-            "-10": 1,
-            "8": 1
-          }
-        }
-      },
+      "predictions": null,
       "gameMarkets": {
         "totals": null,
         "ml": null
@@ -3935,10 +1949,10 @@
           "label": "F1",
           "closed": false,
           "projection": {
-            "away": 0.46,
-            "home": 0.43,
-            "total": 0.89,
-            "homeMargin": -0.02,
+            "away": null,
+            "home": null,
+            "total": null,
+            "homeMargin": null,
             "closed": false
           },
           "actualSegment": {
@@ -3954,33 +1968,33 @@
             "outs": 0,
             "outsRecorded": 0,
             "remainingOuts": 54,
-            "label": "Scheduled"
+            "label": "Pre-Game"
           },
           "baselineHomeWinProb": null,
-          "modelHomeWinProb": 0.4967500457700599,
+          "modelHomeWinProb": null,
           "source": "segment_projection",
           "markets": {
             "moneyline": {
-              "homeOdds": "+310",
-              "awayOdds": "+240",
-              "drawOdds": "-110",
+              "homeOdds": null,
+              "awayOdds": null,
+              "drawOdds": null,
               "marketHomeProb": null,
               "pick": null,
               "edge": null,
               "reason": "Pregame moneyline recommendations are suppressed while that surface is under re-evaluation."
             },
             "spread": {
-              "homeLine": 1.5,
-              "homeOdds": "-1050",
-              "awayOdds": "+630",
+              "homeLine": null,
+              "homeOdds": null,
+              "awayOdds": null,
               "pick": null,
               "edge": null,
-              "reason": "F1 currently sits at home 0, away 0. The projected side was there, but the attached spread price was already too expensive to keep it realistic."
+              "reason": "F1 currently sits at home 0, away 0."
             },
             "total": {
-              "line": 0.5,
-              "overOdds": "-138",
-              "underOdds": "+108",
+              "line": null,
+              "overOdds": null,
+              "underOdds": null,
               "pick": null,
               "edge": null,
               "reason": "Pregame totals recommendations are suppressed while that surface is under re-evaluation."
@@ -3992,10 +2006,10 @@
           "label": "F3",
           "closed": false,
           "projection": {
-            "away": 1.37,
-            "home": 1.3,
-            "total": 2.67,
-            "homeMargin": -0.07,
+            "away": null,
+            "home": null,
+            "total": null,
+            "homeMargin": null,
             "closed": false
           },
           "actualSegment": {
@@ -4011,28 +2025,28 @@
             "outs": 0,
             "outsRecorded": 0,
             "remainingOuts": 54,
-            "label": "Scheduled"
+            "label": "Pre-Game"
           },
           "baselineHomeWinProb": null,
-          "modelHomeWinProb": 0.4886269620182933,
+          "modelHomeWinProb": null,
           "source": "segment_projection",
           "markets": {
             "moneyline": {
-              "homeOdds": "+172",
-              "awayOdds": "+122",
-              "drawOdds": "+310",
+              "homeOdds": null,
+              "awayOdds": null,
+              "drawOdds": null,
               "marketHomeProb": null,
               "pick": null,
               "edge": null,
               "reason": "Pregame moneyline recommendations are suppressed while that surface is under re-evaluation."
             },
             "spread": {
-              "homeLine": 0.5,
-              "homeOdds": "-152",
-              "awayOdds": "+114",
+              "homeLine": null,
+              "homeOdds": null,
+              "awayOdds": null,
               "pick": null,
               "edge": null,
-              "reason": "F3 currently sits at home 0, away 0. The projected side was there, but the attached spread price was already too expensive to keep it realistic."
+              "reason": "F3 currently sits at home 0, away 0."
             },
             "total": {
               "line": null,
@@ -4049,10 +2063,10 @@
           "label": "F5",
           "closed": false,
           "projection": {
-            "away": 2.28,
-            "home": 2.17,
-            "total": 4.44,
-            "homeMargin": -0.11,
+            "away": null,
+            "home": null,
+            "total": null,
+            "homeMargin": null,
             "closed": false
           },
           "actualSegment": {
@@ -4068,15 +2082,15 @@
             "outs": 0,
             "outsRecorded": 0,
             "remainingOuts": 54,
-            "label": "Scheduled"
+            "label": "Pre-Game"
           },
           "baselineHomeWinProb": null,
-          "modelHomeWinProb": 0.48213261123136775,
+          "modelHomeWinProb": null,
           "source": "segment_projection",
           "markets": {
             "moneyline": {
-              "homeOdds": "+116",
-              "awayOdds": "-145",
+              "homeOdds": null,
+              "awayOdds": null,
               "drawOdds": null,
               "marketHomeProb": null,
               "pick": null,
@@ -4084,17 +2098,17 @@
               "reason": "Pregame moneyline recommendations are suppressed while that surface is under re-evaluation."
             },
             "spread": {
-              "homeLine": 0.5,
-              "homeOdds": "-128",
-              "awayOdds": "-104",
+              "homeLine": null,
+              "homeOdds": null,
+              "awayOdds": null,
               "pick": null,
               "edge": null,
-              "reason": "F5 currently sits at home 0, away 0. The projected cover cushion was only 0.39 runs, so the spread lane stayed below threshold."
+              "reason": "F5 currently sits at home 0, away 0."
             },
             "total": {
-              "line": 5.5,
-              "overOdds": "+112",
-              "underOdds": "-148",
+              "line": null,
+              "overOdds": null,
+              "underOdds": null,
               "pick": null,
               "edge": null,
               "reason": "Pregame totals recommendations are suppressed while that surface is under re-evaluation."
@@ -4106,10 +2120,10 @@
           "label": "Full Game",
           "closed": false,
           "projection": {
-            "away": 4.1,
-            "home": 3.9,
-            "total": 8.0,
-            "homeMargin": -0.2,
+            "away": null,
+            "home": null,
+            "total": null,
+            "homeMargin": null,
             "closed": false
           },
           "actualSegment": {
@@ -4125,15 +2139,15 @@
             "outs": 0,
             "outsRecorded": 0,
             "remainingOuts": 54,
-            "label": "Scheduled"
+            "label": "Pre-Game"
           },
           "baselineHomeWinProb": null,
-          "modelHomeWinProb": 0.4675456936126812,
+          "modelHomeWinProb": null,
           "source": "segment_projection",
           "markets": {
             "moneyline": {
-              "homeOdds": "+134",
-              "awayOdds": "-158",
+              "homeOdds": null,
+              "awayOdds": null,
               "drawOdds": null,
               "marketHomeProb": null,
               "pick": null,
@@ -4141,17 +2155,17 @@
               "reason": "Pregame moneyline recommendations are suppressed while that surface is under re-evaluation."
             },
             "spread": {
-              "homeLine": 1.5,
-              "homeOdds": "-125",
-              "awayOdds": "+104",
+              "homeLine": null,
+              "homeOdds": null,
+              "awayOdds": null,
               "pick": null,
               "edge": null,
               "reason": "Pregame full-game spread recommendations are suppressed while that surface is under re-evaluation."
             },
             "total": {
-              "line": 9.5,
-              "overOdds": "+100",
-              "underOdds": "-122",
+              "line": null,
+              "overOdds": null,
+              "underOdds": null,
               "pick": null,
               "edge": null,
               "reason": "Pregame totals recommendations are suppressed while that surface is under re-evaluation."
@@ -4159,140 +2173,18 @@
           }
         }
       ],
-      "props": [
-        {
-          "tier": "playable",
-          "market": "pitcher_props",
-          "prop": "outs",
-          "playerName": "Eric Lauer",
-          "teamSide": "away",
-          "selection": "over",
-          "line": 16.5,
-          "actual": null,
-          "modelMean": 21.151,
-          "liveProjection": 21.151,
-          "liveEdge": 4.651,
-          "delta": null,
-          "status": "pending",
-          "edge": 0.38452132701421793,
-          "odds": -125,
-          "modelProbOver": 0.894,
-          "outsMean": 21.151,
-          "marketLabel": "outs"
-        },
-        {
-          "tier": "playable",
-          "market": "pitcher_props",
-          "prop": "outs",
-          "playerName": "Zebby Matthews",
-          "teamSide": "home",
-          "selection": "over",
-          "line": 16.5,
-          "actual": null,
-          "modelMean": 20.787,
-          "liveProjection": 20.787,
-          "liveEdge": 4.287,
-          "delta": null,
-          "status": "pending",
-          "edge": 0.391478672985782,
-          "odds": -115,
-          "modelProbOver": 0.882,
-          "outsMean": 20.787,
-          "marketLabel": "outs"
-        },
-        {
-          "tier": "playable",
-          "market": "pitcher_props",
-          "prop": "strikeouts",
-          "playerName": "Eric Lauer",
-          "teamSide": "away",
-          "selection": "over",
-          "line": 3.5,
-          "actual": null,
-          "modelMean": 5.416,
-          "liveProjection": 5.416,
-          "liveEdge": 1.916,
-          "delta": null,
-          "status": "pending",
-          "edge": 0.26299115603284906,
-          "odds": -132,
-          "modelProbOver": 0.805,
-          "outsMean": null,
-          "marketLabel": "strikeouts"
-        }
-      ],
+      "props": [],
       "liveProps": [],
       "archivedLiveProps": [],
-      "trackedProps": [
-        {
-          "tier": "playable",
-          "market": "pitcher_props",
-          "prop": "outs",
-          "playerName": "Eric Lauer",
-          "teamSide": "away",
-          "selection": "over",
-          "line": 16.5,
-          "actual": null,
-          "modelMean": 21.151,
-          "liveProjection": 21.151,
-          "liveEdge": 4.651,
-          "delta": null,
-          "status": "pending",
-          "edge": 0.38452132701421793,
-          "odds": -125,
-          "modelProbOver": 0.894,
-          "outsMean": 21.151,
-          "marketLabel": "outs"
-        },
-        {
-          "tier": "playable",
-          "market": "pitcher_props",
-          "prop": "outs",
-          "playerName": "Zebby Matthews",
-          "teamSide": "home",
-          "selection": "over",
-          "line": 16.5,
-          "actual": null,
-          "modelMean": 20.787,
-          "liveProjection": 20.787,
-          "liveEdge": 4.287,
-          "delta": null,
-          "status": "pending",
-          "edge": 0.391478672985782,
-          "odds": -115,
-          "modelProbOver": 0.882,
-          "outsMean": 20.787,
-          "marketLabel": "outs"
-        },
-        {
-          "tier": "playable",
-          "market": "pitcher_props",
-          "prop": "strikeouts",
-          "playerName": "Eric Lauer",
-          "teamSide": "away",
-          "selection": "over",
-          "line": 3.5,
-          "actual": null,
-          "modelMean": 5.416,
-          "liveProjection": 5.416,
-          "liveEdge": 1.916,
-          "delta": null,
-          "status": "pending",
-          "edge": 0.26299115603284906,
-          "odds": -132,
-          "modelProbOver": 0.805,
-          "outsMean": null,
-          "marketLabel": "strikeouts"
-        }
-      ],
-      "simContextAvailable": true,
+      "trackedProps": [],
+      "simContextAvailable": false,
       "snapshotAvailable": true
     },
     {
       "gamePk": 824585,
       "status": {
         "abstract": "Preview",
-        "detailed": "Scheduled"
+        "detailed": "Pre-Game"
       },
       "startTime": "6:40 PM",
       "matchup": {
@@ -4314,220 +2206,7 @@
         },
         "liveText": ""
       },
-      "predictions": {
-        "full": {
-          "home_win_prob": 0.583,
-          "away_win_prob": 0.417,
-          "tie_prob": 0.0,
-          "away_runs_mean": 3.619,
-          "home_runs_mean": 4.385,
-          "total_runs_dist": {
-            "10": 69,
-            "7": 105,
-            "8": 81,
-            "4": 64,
-            "11": 66,
-            "2": 31,
-            "9": 87,
-            "3": 100,
-            "16": 14,
-            "20": 2,
-            "5": 96,
-            "15": 16,
-            "12": 42,
-            "14": 22,
-            "13": 40,
-            "1": 35,
-            "6": 80,
-            "19": 13,
-            "17": 16,
-            "25": 3,
-            "21": 5,
-            "18": 8,
-            "22": 2,
-            "31": 1,
-            "27": 1,
-            "28": 1
-          },
-          "run_margin_dist": {
-            "6": 36,
-            "5": 51,
-            "2": 110,
-            "-2": 87,
-            "-6": 25,
-            "-4": 48,
-            "-7": 14,
-            "-5": 27,
-            "4": 57,
-            "-1": 130,
-            "1": 164,
-            "-8": 8,
-            "3": 89,
-            "11": 7,
-            "-3": 63,
-            "8": 25,
-            "14": 3,
-            "7": 17,
-            "10": 5,
-            "17": 1,
-            "9": 11,
-            "13": 2,
-            "12": 3,
-            "-10": 5,
-            "-9": 5,
-            "-11": 2,
-            "-12": 2,
-            "-16": 1,
-            "23": 1,
-            "16": 1
-          }
-        },
-        "first1": {
-          "home_win_prob": 0.244,
-          "away_win_prob": 0.184,
-          "tie_prob": 0.572,
-          "away_runs_mean": 0.388,
-          "home_runs_mean": 0.564,
-          "total_runs_dist": {
-            "0": 548,
-            "2": 109,
-            "1": 214,
-            "3": 61,
-            "5": 21,
-            "8": 5,
-            "7": 3,
-            "4": 36,
-            "6": 2,
-            "15": 1
-          },
-          "run_margin_dist": {
-            "0": 572,
-            "2": 62,
-            "-1": 113,
-            "1": 129,
-            "-3": 20,
-            "3": 26,
-            "5": 5,
-            "-2": 41,
-            "8": 4,
-            "6": 1,
-            "-5": 5,
-            "4": 15,
-            "7": 1,
-            "-4": 5,
-            "15": 1
-          }
-        },
-        "first5": {
-          "home_win_prob": 0.484,
-          "away_win_prob": 0.334,
-          "tie_prob": 0.182,
-          "away_runs_mean": 1.886,
-          "home_runs_mean": 2.53,
-          "total_runs_dist": {
-            "8": 40,
-            "3": 135,
-            "1": 113,
-            "5": 111,
-            "4": 126,
-            "10": 29,
-            "6": 80,
-            "9": 34,
-            "15": 1,
-            "2": 135,
-            "12": 17,
-            "13": 8,
-            "7": 56,
-            "0": 82,
-            "16": 6,
-            "11": 17,
-            "17": 2,
-            "18": 1,
-            "22": 1,
-            "19": 2,
-            "14": 3,
-            "21": 1
-          },
-          "run_margin_dist": {
-            "4": 53,
-            "3": 78,
-            "-1": 115,
-            "-4": 32,
-            "-3": 53,
-            "-6": 19,
-            "-2": 81,
-            "1": 139,
-            "2": 101,
-            "6": 31,
-            "11": 3,
-            "0": 182,
-            "8": 10,
-            "13": 2,
-            "-5": 19,
-            "7": 12,
-            "5": 42,
-            "10": 5,
-            "-7": 8,
-            "9": 6,
-            "-10": 1,
-            "-8": 3,
-            "-11": 1,
-            "-12": 1,
-            "15": 1,
-            "-9": 1,
-            "14": 1
-          }
-        },
-        "first3": {
-          "home_win_prob": 0.401,
-          "away_win_prob": 0.305,
-          "tie_prob": 0.294,
-          "away_runs_mean": 1.146,
-          "home_runs_mean": 1.482,
-          "total_runs_dist": {
-            "8": 22,
-            "3": 136,
-            "1": 192,
-            "2": 175,
-            "5": 68,
-            "4": 96,
-            "0": 211,
-            "7": 29,
-            "12": 8,
-            "6": 41,
-            "11": 5,
-            "9": 8,
-            "15": 2,
-            "16": 1,
-            "10": 6
-          },
-          "run_margin_dist": {
-            "4": 31,
-            "3": 63,
-            "-1": 136,
-            "0": 294,
-            "-2": 72,
-            "-5": 14,
-            "-4": 24,
-            "1": 146,
-            "2": 107,
-            "-3": 44,
-            "6": 17,
-            "-6": 5,
-            "5": 21,
-            "12": 1,
-            "-7": 5,
-            "9": 3,
-            "11": 1,
-            "-8": 4,
-            "8": 2,
-            "7": 6,
-            "10": 2,
-            "-12": 1,
-            "15": 1
-          }
-        }
-      },
+      "predictions": null,
       "gameMarkets": {
         "totals": null,
         "ml": null
@@ -4538,10 +2217,10 @@
           "label": "F1",
           "closed": false,
           "projection": {
-            "away": 0.4,
-            "home": 0.49,
-            "total": 0.89,
-            "homeMargin": 0.09,
+            "away": null,
+            "home": null,
+            "total": null,
+            "homeMargin": null,
             "closed": false
           },
           "actualSegment": {
@@ -4557,33 +2236,33 @@
             "outs": 0,
             "outsRecorded": 0,
             "remainingOuts": 54,
-            "label": "Scheduled"
+            "label": "Pre-Game"
           },
           "baselineHomeWinProb": null,
-          "modelHomeWinProb": 0.5146208305596934,
+          "modelHomeWinProb": null,
           "source": "segment_projection",
           "markets": {
             "moneyline": {
-              "homeOdds": "+310",
-              "awayOdds": "+320",
-              "drawOdds": "-145",
+              "homeOdds": null,
+              "awayOdds": null,
+              "drawOdds": null,
               "marketHomeProb": null,
               "pick": null,
               "edge": null,
               "reason": "Pregame moneyline recommendations are suppressed while that surface is under re-evaluation."
             },
             "spread": {
-              "homeLine": -1.5,
-              "homeOdds": "+710",
-              "awayOdds": "-1250",
+              "homeLine": null,
+              "homeOdds": null,
+              "awayOdds": null,
               "pick": null,
               "edge": null,
-              "reason": "F1 currently sits at home 0, away 0. The projected side was there, but the attached spread price was already too expensive to keep it realistic."
+              "reason": "F1 currently sits at home 0, away 0."
             },
             "total": {
-              "line": 0.5,
-              "overOdds": "-104",
-              "underOdds": "-122",
+              "line": null,
+              "overOdds": null,
+              "underOdds": null,
               "pick": null,
               "edge": null,
               "reason": "Pregame totals recommendations are suppressed while that surface is under re-evaluation."
@@ -4595,10 +2274,10 @@
           "label": "F3",
           "closed": false,
           "projection": {
-            "away": 1.2,
-            "home": 1.47,
-            "total": 2.67,
-            "homeMargin": 0.27,
+            "away": null,
+            "home": null,
+            "total": null,
+            "homeMargin": null,
             "closed": false
           },
           "actualSegment": {
@@ -4614,28 +2293,28 @@
             "outs": 0,
             "outsRecorded": 0,
             "remainingOuts": 54,
-            "label": "Scheduled"
+            "label": "Pre-Game"
           },
           "baselineHomeWinProb": null,
-          "modelHomeWinProb": 0.5437627323603996,
+          "modelHomeWinProb": null,
           "source": "segment_projection",
           "markets": {
             "moneyline": {
-              "homeOdds": "+164",
-              "awayOdds": "+144",
-              "drawOdds": "+270",
+              "homeOdds": null,
+              "awayOdds": null,
+              "drawOdds": null,
               "marketHomeProb": null,
               "pick": null,
               "edge": null,
               "reason": "Pregame moneyline recommendations are suppressed while that surface is under re-evaluation."
             },
             "spread": {
-              "homeLine": 0.5,
-              "homeOdds": "-182",
-              "awayOdds": "+134",
+              "homeLine": null,
+              "homeOdds": null,
+              "awayOdds": null,
               "pick": null,
               "edge": null,
-              "reason": "F3 currently sits at home 0, away 0. The projected side was there, but the attached spread price was already too expensive to keep it realistic."
+              "reason": "F3 currently sits at home 0, away 0."
             },
             "total": {
               "line": null,
@@ -4652,10 +2331,10 @@
           "label": "F5",
           "closed": false,
           "projection": {
-            "away": 2.0,
-            "home": 2.44,
-            "total": 4.44,
-            "homeMargin": 0.44,
+            "away": null,
+            "home": null,
+            "total": null,
+            "homeMargin": null,
             "closed": false
           },
           "actualSegment": {
@@ -4671,15 +2350,15 @@
             "outs": 0,
             "outsRecorded": 0,
             "remainingOuts": 54,
-            "label": "Scheduled"
+            "label": "Pre-Game"
           },
           "baselineHomeWinProb": null,
-          "modelHomeWinProb": 0.5710165859158207,
+          "modelHomeWinProb": null,
           "source": "segment_projection",
           "markets": {
             "moneyline": {
-              "homeOdds": "+102",
-              "awayOdds": "-128",
+              "homeOdds": null,
+              "awayOdds": null,
               "drawOdds": null,
               "marketHomeProb": null,
               "pick": null,
@@ -4687,17 +2366,17 @@
               "reason": "Pregame moneyline recommendations are suppressed while that surface is under re-evaluation."
             },
             "spread": {
-              "homeLine": 0.5,
-              "homeOdds": "-146",
-              "awayOdds": "+110",
-              "pick": "home",
-              "edge": 0.94,
-              "reason": "The home side still projects to cover with about 0.94 runs of cushion off a +0.44 margin forecast. At the moment they are tied game with 54 outs left. Both starters are still shaping the run environment."
+              "homeLine": null,
+              "homeOdds": null,
+              "awayOdds": null,
+              "pick": null,
+              "edge": null,
+              "reason": "F5 currently sits at home 0, away 0."
             },
             "total": {
-              "line": 4.5,
-              "overOdds": "+102",
-              "underOdds": "-136",
+              "line": null,
+              "overOdds": null,
+              "underOdds": null,
               "pick": null,
               "edge": null,
               "reason": "Pregame totals recommendations are suppressed while that surface is under re-evaluation."
@@ -4709,10 +2388,10 @@
           "label": "Full Game",
           "closed": false,
           "projection": {
-            "away": 3.6,
-            "home": 4.4,
-            "total": 8.0,
-            "homeMargin": 0.8,
+            "away": null,
+            "home": null,
+            "total": null,
+            "homeMargin": null,
             "closed": false
           },
           "actualSegment": {
@@ -4728,15 +2407,15 @@
             "outs": 0,
             "outsRecorded": 0,
             "remainingOuts": 54,
-            "label": "Scheduled"
+            "label": "Pre-Game"
           },
           "baselineHomeWinProb": null,
-          "modelHomeWinProb": 0.6271477663131956,
+          "modelHomeWinProb": null,
           "source": "segment_projection",
           "markets": {
             "moneyline": {
-              "homeOdds": "+102",
-              "awayOdds": "-120",
+              "homeOdds": null,
+              "awayOdds": null,
               "drawOdds": null,
               "marketHomeProb": null,
               "pick": null,
@@ -4744,17 +2423,17 @@
               "reason": "Pregame moneyline recommendations are suppressed while that surface is under re-evaluation."
             },
             "spread": {
-              "homeLine": 1.5,
-              "homeOdds": "-170",
-              "awayOdds": "+140",
+              "homeLine": null,
+              "homeOdds": null,
+              "awayOdds": null,
               "pick": null,
               "edge": null,
               "reason": "Pregame full-game spread recommendations are suppressed while that surface is under re-evaluation."
             },
             "total": {
-              "line": 7.5,
-              "overOdds": "-124",
-              "underOdds": "+102",
+              "line": null,
+              "overOdds": null,
+              "underOdds": null,
               "pick": null,
               "edge": null,
               "reason": "Pregame totals recommendations are suppressed while that surface is under re-evaluation."
@@ -4762,60 +2441,18 @@
           }
         }
       ],
-      "props": [
-        {
-          "tier": "playable",
-          "market": "pitcher_props",
-          "prop": "outs",
-          "playerName": "Anthony Kay",
-          "teamSide": "home",
-          "selection": "over",
-          "line": 15.5,
-          "actual": null,
-          "modelMean": 21.659,
-          "liveProjection": 21.659,
-          "liveEdge": 6.159,
-          "delta": null,
-          "status": "pending",
-          "edge": 0.4586532951289399,
-          "odds": -105,
-          "modelProbOver": 0.93,
-          "outsMean": 21.659,
-          "marketLabel": "outs"
-        }
-      ],
+      "props": [],
       "liveProps": [],
       "archivedLiveProps": [],
-      "trackedProps": [
-        {
-          "tier": "playable",
-          "market": "pitcher_props",
-          "prop": "outs",
-          "playerName": "Anthony Kay",
-          "teamSide": "home",
-          "selection": "over",
-          "line": 15.5,
-          "actual": null,
-          "modelMean": 21.659,
-          "liveProjection": 21.659,
-          "liveEdge": 6.159,
-          "delta": null,
-          "status": "pending",
-          "edge": 0.4586532951289399,
-          "odds": -105,
-          "modelProbOver": 0.93,
-          "outsMean": 21.659,
-          "marketLabel": "outs"
-        }
-      ],
-      "simContextAvailable": true,
+      "trackedProps": [],
+      "simContextAvailable": false,
       "snapshotAvailable": true
     },
     {
       "gamePk": 823040,
       "status": {
         "abstract": "Preview",
-        "detailed": "Scheduled"
+        "detailed": "Pre-Game"
       },
       "startTime": "6:45 PM",
       "matchup": {
@@ -4837,210 +2474,7 @@
         },
         "liveText": ""
       },
-      "predictions": {
-        "full": {
-          "home_win_prob": 0.557,
-          "away_win_prob": 0.443,
-          "tie_prob": 0.0,
-          "away_runs_mean": 4.168,
-          "home_runs_mean": 4.309,
-          "total_runs_dist": {
-            "9": 100,
-            "15": 25,
-            "7": 103,
-            "12": 60,
-            "5": 110,
-            "11": 71,
-            "4": 61,
-            "6": 67,
-            "10": 72,
-            "21": 2,
-            "13": 43,
-            "8": 67,
-            "18": 11,
-            "3": 64,
-            "2": 25,
-            "17": 16,
-            "23": 2,
-            "1": 32,
-            "14": 33,
-            "16": 12,
-            "20": 10,
-            "19": 10,
-            "27": 1,
-            "22": 3
-          },
-          "run_margin_dist": {
-            "-3": 66,
-            "-7": 17,
-            "-10": 10,
-            "1": 164,
-            "-1": 117,
-            "3": 80,
-            "-4": 55,
-            "-2": 79,
-            "5": 47,
-            "-5": 41,
-            "4": 58,
-            "8": 16,
-            "2": 124,
-            "-6": 23,
-            "-9": 10,
-            "12": 1,
-            "6": 29,
-            "7": 23,
-            "10": 7,
-            "-14": 1,
-            "-12": 5,
-            "-8": 12,
-            "-13": 3,
-            "11": 4,
-            "9": 4,
-            "-11": 3,
-            "-16": 1
-          }
-        },
-        "first1": {
-          "home_win_prob": 0.254,
-          "away_win_prob": 0.218,
-          "tie_prob": 0.528,
-          "away_runs_mean": 0.515,
-          "home_runs_mean": 0.586,
-          "total_runs_dist": {
-            "1": 212,
-            "4": 37,
-            "0": 511,
-            "2": 111,
-            "3": 86,
-            "5": 17,
-            "8": 3,
-            "9": 1,
-            "6": 11,
-            "7": 11
-          },
-          "run_margin_dist": {
-            "-1": 107,
-            "-4": 13,
-            "0": 528,
-            "-2": 50,
-            "1": 125,
-            "3": 41,
-            "2": 57,
-            "-3": 35,
-            "4": 18,
-            "-5": 5,
-            "5": 7,
-            "-7": 2,
-            "6": 1,
-            "-6": 6,
-            "7": 5
-          }
-        },
-        "first5": {
-          "home_win_prob": 0.492,
-          "away_win_prob": 0.354,
-          "tie_prob": 0.154,
-          "away_runs_mean": 2.272,
-          "home_runs_mean": 2.785,
-          "total_runs_dist": {
-            "4": 139,
-            "14": 11,
-            "1": 91,
-            "8": 77,
-            "2": 119,
-            "11": 20,
-            "6": 97,
-            "7": 71,
-            "0": 50,
-            "9": 43,
-            "3": 117,
-            "5": 87,
-            "10": 38,
-            "12": 17,
-            "18": 3,
-            "19": 1,
-            "15": 6,
-            "16": 2,
-            "13": 9,
-            "17": 2
-          },
-          "run_margin_dist": {
-            "-4": 47,
-            "-1": 94,
-            "-8": 9,
-            "2": 105,
-            "3": 73,
-            "0": 154,
-            "-2": 93,
-            "1": 128,
-            "-5": 24,
-            "10": 4,
-            "6": 40,
-            "4": 65,
-            "-6": 23,
-            "-7": 7,
-            "8": 10,
-            "-3": 51,
-            "12": 2,
-            "7": 17,
-            "5": 43,
-            "-14": 1,
-            "9": 3,
-            "11": 2,
-            "-11": 4,
-            "-13": 1
-          }
-        },
-        "first3": {
-          "home_win_prob": 0.434,
-          "away_win_prob": 0.337,
-          "tie_prob": 0.229,
-          "away_runs_mean": 1.4,
-          "home_runs_mean": 1.663,
-          "total_runs_dist": {
-            "1": 176,
-            "11": 13,
-            "0": 165,
-            "3": 132,
-            "2": 174,
-            "7": 47,
-            "5": 87,
-            "4": 93,
-            "8": 24,
-            "6": 55,
-            "9": 17,
-            "10": 12,
-            "13": 2,
-            "14": 1,
-            "12": 1,
-            "17": 1
-          },
-          "run_margin_dist": {
-            "-1": 130,
-            "-3": 52,
-            "0": 229,
-            "2": 116,
-            "-2": 89,
-            "1": 153,
-            "-5": 12,
-            "4": 30,
-            "8": 4,
-            "3": 75,
-            "-6": 13,
-            "5": 29,
-            "-4": 25,
-            "6": 13,
-            "7": 10,
-            "-7": 8,
-            "-8": 3,
-            "9": 2,
-            "10": 2,
-            "-9": 3,
-            "-10": 1,
-            "-11": 1
-          }
-        }
-      },
+      "predictions": null,
       "gameMarkets": {
         "totals": null,
         "ml": null
@@ -5051,10 +2485,10 @@
           "label": "F1",
           "closed": false,
           "projection": {
-            "away": 0.47,
-            "home": 0.48,
-            "total": 0.94,
-            "homeMargin": 0.01,
+            "away": null,
+            "home": null,
+            "total": null,
+            "homeMargin": null,
             "closed": false
           },
           "actualSegment": {
@@ -5070,33 +2504,33 @@
             "outs": 0,
             "outsRecorded": 0,
             "remainingOuts": 54,
-            "label": "Scheduled"
+            "label": "Pre-Game"
           },
           "baselineHomeWinProb": null,
-          "modelHomeWinProb": 0.50162499427867,
+          "modelHomeWinProb": null,
           "source": "segment_projection",
           "markets": {
             "moneyline": {
-              "homeOdds": "+250",
-              "awayOdds": "+340",
-              "drawOdds": "-125",
+              "homeOdds": null,
+              "awayOdds": null,
+              "drawOdds": null,
               "marketHomeProb": null,
               "pick": null,
               "edge": null,
               "reason": "Pregame moneyline recommendations are suppressed while that surface is under re-evaluation."
             },
             "spread": {
-              "homeLine": -1.5,
-              "homeOdds": "+540",
-              "awayOdds": "-850",
+              "homeLine": null,
+              "homeOdds": null,
+              "awayOdds": null,
               "pick": null,
               "edge": null,
-              "reason": "F1 currently sits at home 0, away 0. The projected side was there, but the attached spread price was already too expensive to keep it realistic."
+              "reason": "F1 currently sits at home 0, away 0."
             },
             "total": {
-              "line": 0.5,
-              "overOdds": "-115",
-              "underOdds": "-111",
+              "line": null,
+              "overOdds": null,
+              "underOdds": null,
               "pick": null,
               "edge": null,
               "reason": "Pregame totals recommendations are suppressed while that surface is under re-evaluation."
@@ -5108,10 +2542,10 @@
           "label": "F3",
           "closed": false,
           "projection": {
-            "away": 1.4,
-            "home": 1.43,
-            "total": 2.83,
-            "homeMargin": 0.03,
+            "away": null,
+            "home": null,
+            "total": null,
+            "homeMargin": null,
             "closed": false
           },
           "actualSegment": {
@@ -5127,28 +2561,28 @@
             "outs": 0,
             "outsRecorded": 0,
             "remainingOuts": 54,
-            "label": "Scheduled"
+            "label": "Pre-Game"
           },
           "baselineHomeWinProb": null,
-          "modelHomeWinProb": 0.5048748455293113,
+          "modelHomeWinProb": null,
           "source": "segment_projection",
           "markets": {
             "moneyline": {
-              "homeOdds": "+116",
-              "awayOdds": "+186",
-              "drawOdds": "+310",
+              "homeOdds": null,
+              "awayOdds": null,
+              "drawOdds": null,
               "marketHomeProb": null,
               "pick": null,
               "edge": null,
               "reason": "Pregame moneyline recommendations are suppressed while that surface is under re-evaluation."
             },
             "spread": {
-              "homeLine": -0.5,
-              "homeOdds": "+106",
-              "awayOdds": "-140",
+              "homeLine": null,
+              "homeOdds": null,
+              "awayOdds": null,
               "pick": null,
               "edge": null,
-              "reason": "F3 currently sits at home 0, away 0. The projected cover cushion was only 0.47 runs, so the spread lane stayed below threshold."
+              "reason": "F3 currently sits at home 0, away 0."
             },
             "total": {
               "line": null,
@@ -5165,10 +2599,10 @@
           "label": "F5",
           "closed": false,
           "projection": {
-            "away": 2.33,
-            "home": 2.39,
-            "total": 4.72,
-            "homeMargin": 0.06,
+            "away": null,
+            "home": null,
+            "total": null,
+            "homeMargin": null,
             "closed": false
           },
           "actualSegment": {
@@ -5184,15 +2618,15 @@
             "outs": 0,
             "outsRecorded": 0,
             "remainingOuts": 54,
-            "label": "Scheduled"
+            "label": "Pre-Game"
           },
           "baselineHomeWinProb": null,
-          "modelHomeWinProb": 0.5097487643754381,
+          "modelHomeWinProb": null,
           "source": "segment_projection",
           "markets": {
             "moneyline": {
-              "homeOdds": "-164",
-              "awayOdds": "+130",
+              "homeOdds": null,
+              "awayOdds": null,
               "drawOdds": null,
               "marketHomeProb": null,
               "pick": null,
@@ -5200,17 +2634,17 @@
               "reason": "Pregame moneyline recommendations are suppressed while that surface is under re-evaluation."
             },
             "spread": {
-              "homeLine": -0.5,
-              "homeOdds": "-118",
-              "awayOdds": "-112",
+              "homeLine": null,
+              "homeOdds": null,
+              "awayOdds": null,
               "pick": null,
               "edge": null,
-              "reason": "F5 currently sits at home 0, away 0. The projected cover cushion was only 0.44 runs, so the spread lane stayed below threshold."
+              "reason": "F5 currently sits at home 0, away 0."
             },
             "total": {
-              "line": 4.5,
-              "overOdds": "-132",
-              "underOdds": "+100",
+              "line": null,
+              "overOdds": null,
+              "underOdds": null,
               "pick": null,
               "edge": null,
               "reason": "Pregame totals recommendations are suppressed while that surface is under re-evaluation."
@@ -5222,10 +2656,10 @@
           "label": "Full Game",
           "closed": false,
           "projection": {
-            "away": 4.2,
-            "home": 4.3,
-            "total": 8.5,
-            "homeMargin": 0.1,
+            "away": null,
+            "home": null,
+            "total": null,
+            "homeMargin": null,
             "closed": false
           },
           "actualSegment": {
@@ -5241,15 +2675,15 @@
             "outs": 0,
             "outsRecorded": 0,
             "remainingOuts": 54,
-            "label": "Scheduled"
+            "label": "Pre-Game"
           },
           "baselineHomeWinProb": null,
-          "modelHomeWinProb": 0.5162442810620724,
+          "modelHomeWinProb": null,
           "source": "segment_projection",
           "markets": {
             "moneyline": {
-              "homeOdds": "-142",
-              "awayOdds": "+120",
+              "homeOdds": null,
+              "awayOdds": null,
               "drawOdds": null,
               "marketHomeProb": null,
               "pick": null,
@@ -5257,17 +2691,17 @@
               "reason": "Pregame moneyline recommendations are suppressed while that surface is under re-evaluation."
             },
             "spread": {
-              "homeLine": -1.5,
-              "homeOdds": "+146",
-              "awayOdds": "-176",
+              "homeLine": null,
+              "homeOdds": null,
+              "awayOdds": null,
               "pick": null,
               "edge": null,
               "reason": "Pregame full-game spread recommendations are suppressed while that surface is under re-evaluation."
             },
             "total": {
-              "line": 8.5,
-              "overOdds": "-124",
-              "underOdds": "+102",
+              "line": null,
+              "overOdds": null,
+              "underOdds": null,
               "pick": null,
               "edge": null,
               "reason": "Pregame totals recommendations are suppressed while that surface is under re-evaluation."
@@ -5275,93 +2709,11 @@
           }
         }
       ],
-      "props": [
-        {
-          "tier": "playable",
-          "market": "pitcher_props",
-          "prop": "strikeouts",
-          "playerName": "Andre Pallante",
-          "teamSide": "home",
-          "selection": "over",
-          "line": 3.5,
-          "actual": null,
-          "modelMean": 5.4,
-          "liveProjection": 5.4,
-          "liveEdge": 1.9,
-          "delta": null,
-          "status": "pending",
-          "edge": 0.32171979434447295,
-          "odds": -120,
-          "modelProbOver": 0.841,
-          "outsMean": null,
-          "marketLabel": "strikeouts"
-        },
-        {
-          "tier": "playable",
-          "market": "pitcher_props",
-          "prop": "strikeouts",
-          "playerName": "Merrill Kelly",
-          "teamSide": "away",
-          "selection": "over",
-          "line": 3.5,
-          "actual": null,
-          "modelMean": 5.238,
-          "liveProjection": 5.238,
-          "liveEdge": 1.738,
-          "delta": null,
-          "status": "pending",
-          "edge": 0.24877390659747967,
-          "odds": -140,
-          "modelProbOver": 0.804,
-          "outsMean": null,
-          "marketLabel": "strikeouts"
-        }
-      ],
+      "props": [],
       "liveProps": [],
       "archivedLiveProps": [],
-      "trackedProps": [
-        {
-          "tier": "playable",
-          "market": "pitcher_props",
-          "prop": "strikeouts",
-          "playerName": "Andre Pallante",
-          "teamSide": "home",
-          "selection": "over",
-          "line": 3.5,
-          "actual": null,
-          "modelMean": 5.4,
-          "liveProjection": 5.4,
-          "liveEdge": 1.9,
-          "delta": null,
-          "status": "pending",
-          "edge": 0.32171979434447295,
-          "odds": -120,
-          "modelProbOver": 0.841,
-          "outsMean": null,
-          "marketLabel": "strikeouts"
-        },
-        {
-          "tier": "playable",
-          "market": "pitcher_props",
-          "prop": "strikeouts",
-          "playerName": "Merrill Kelly",
-          "teamSide": "away",
-          "selection": "over",
-          "line": 3.5,
-          "actual": null,
-          "modelMean": 5.238,
-          "liveProjection": 5.238,
-          "liveEdge": 1.738,
-          "delta": null,
-          "status": "pending",
-          "edge": 0.24877390659747967,
-          "odds": -140,
-          "modelProbOver": 0.804,
-          "outsMean": null,
-          "marketLabel": "strikeouts"
-        }
-      ],
-      "simContextAvailable": true,
+      "trackedProps": [],
+      "simContextAvailable": false,
       "snapshotAvailable": true
     },
     {
@@ -5390,227 +2742,7 @@
         },
         "liveText": ""
       },
-      "predictions": {
-        "full": {
-          "home_win_prob": 0.489,
-          "away_win_prob": 0.511,
-          "tie_prob": 0.0,
-          "away_runs_mean": 4.738,
-          "home_runs_mean": 4.542,
-          "total_runs_dist": {
-            "3": 62,
-            "6": 78,
-            "12": 45,
-            "5": 82,
-            "15": 32,
-            "16": 21,
-            "13": 43,
-            "11": 86,
-            "9": 92,
-            "1": 21,
-            "18": 13,
-            "7": 102,
-            "8": 79,
-            "17": 30,
-            "4": 48,
-            "24": 3,
-            "20": 15,
-            "10": 64,
-            "14": 37,
-            "2": 17,
-            "19": 14,
-            "22": 3,
-            "29": 2,
-            "23": 3,
-            "25": 2,
-            "27": 1,
-            "31": 1,
-            "21": 3,
-            "30": 1
-          },
-          "run_margin_dist": {
-            "-1": 121,
-            "1": 136,
-            "-4": 62,
-            "3": 70,
-            "-2": 103,
-            "-3": 75,
-            "2": 94,
-            "-12": 7,
-            "5": 46,
-            "-7": 25,
-            "8": 12,
-            "4": 56,
-            "-5": 39,
-            "-6": 32,
-            "-18": 2,
-            "13": 2,
-            "-8": 17,
-            "-13": 5,
-            "9": 12,
-            "7": 20,
-            "6": 23,
-            "-11": 7,
-            "-10": 5,
-            "-9": 10,
-            "18": 2,
-            "14": 2,
-            "10": 3,
-            "11": 6,
-            "12": 4,
-            "15": 1,
-            "-15": 1
-          }
-        },
-        "first1": {
-          "home_win_prob": 0.193,
-          "away_win_prob": 0.223,
-          "tie_prob": 0.584,
-          "away_runs_mean": 0.479,
-          "home_runs_mean": 0.444,
-          "total_runs_dist": {
-            "1": 210,
-            "0": 562,
-            "2": 109,
-            "3": 55,
-            "4": 24,
-            "5": 24,
-            "10": 1,
-            "9": 3,
-            "6": 8,
-            "7": 3,
-            "8": 1
-          },
-          "run_margin_dist": {
-            "1": 105,
-            "0": 584,
-            "-2": 58,
-            "-1": 124,
-            "-3": 21,
-            "2": 41,
-            "-4": 10,
-            "3": 31,
-            "5": 5,
-            "-5": 7,
-            "-10": 1,
-            "9": 1,
-            "6": 2,
-            "4": 6,
-            "7": 1,
-            "-6": 2,
-            "8": 1
-          }
-        },
-        "first5": {
-          "home_win_prob": 0.446,
-          "away_win_prob": 0.396,
-          "tie_prob": 0.158,
-          "away_runs_mean": 2.324,
-          "home_runs_mean": 2.541,
-          "total_runs_dist": {
-            "2": 127,
-            "3": 149,
-            "0": 63,
-            "5": 103,
-            "6": 89,
-            "9": 37,
-            "10": 33,
-            "1": 87,
-            "8": 56,
-            "4": 116,
-            "16": 3,
-            "15": 6,
-            "14": 9,
-            "19": 2,
-            "11": 26,
-            "7": 62,
-            "12": 19,
-            "13": 7,
-            "17": 4,
-            "18": 1,
-            "26": 1
-          },
-          "run_margin_dist": {
-            "0": 158,
-            "-3": 74,
-            "1": 130,
-            "-1": 120,
-            "-7": 15,
-            "6": 19,
-            "8": 10,
-            "-6": 21,
-            "4": 53,
-            "-4": 44,
-            "2": 107,
-            "-2": 87,
-            "-13": 1,
-            "-14": 1,
-            "12": 4,
-            "5": 31,
-            "-10": 3,
-            "-9": 3,
-            "3": 68,
-            "9": 5,
-            "-11": 2,
-            "-5": 20,
-            "7": 9,
-            "-8": 5,
-            "17": 2,
-            "11": 1,
-            "10": 5,
-            "13": 2
-          }
-        },
-        "first3": {
-          "home_win_prob": 0.362,
-          "away_win_prob": 0.37,
-          "tie_prob": 0.268,
-          "away_runs_mean": 1.385,
-          "home_runs_mean": 1.442,
-          "total_runs_dist": {
-            "2": 173,
-            "0": 187,
-            "5": 60,
-            "3": 121,
-            "7": 51,
-            "9": 17,
-            "1": 203,
-            "8": 18,
-            "11": 9,
-            "4": 96,
-            "14": 2,
-            "6": 51,
-            "10": 6,
-            "12": 4,
-            "16": 1,
-            "20": 1
-          },
-          "run_margin_dist": {
-            "0": 268,
-            "-2": 99,
-            "-3": 48,
-            "-1": 157,
-            "1": 140,
-            "-7": 8,
-            "7": 9,
-            "2": 84,
-            "6": 14,
-            "-11": 2,
-            "4": 31,
-            "3": 58,
-            "-9": 3,
-            "5": 19,
-            "-5": 16,
-            "-4": 27,
-            "-6": 9,
-            "14": 1,
-            "10": 1,
-            "8": 4,
-            "-10": 1,
-            "9": 1
-          }
-        }
-      },
+      "predictions": null,
       "gameMarkets": {
         "totals": null,
         "ml": null
@@ -5621,10 +2753,10 @@
           "label": "F1",
           "closed": false,
           "projection": {
-            "away": 0.52,
-            "home": 0.5,
-            "total": 1.02,
-            "homeMargin": -0.02,
+            "away": null,
+            "home": null,
+            "total": null,
+            "homeMargin": null,
             "closed": false
           },
           "actualSegment": {
@@ -5643,30 +2775,30 @@
             "label": "Scheduled"
           },
           "baselineHomeWinProb": null,
-          "modelHomeWinProb": 0.4967500457700599,
+          "modelHomeWinProb": null,
           "source": "segment_projection",
           "markets": {
             "moneyline": {
-              "homeOdds": "+260",
-              "awayOdds": "+240",
-              "drawOdds": "+100",
+              "homeOdds": null,
+              "awayOdds": null,
+              "drawOdds": null,
               "marketHomeProb": null,
               "pick": null,
               "edge": null,
               "reason": "Pregame moneyline recommendations are suppressed while that surface is under re-evaluation."
             },
             "spread": {
-              "homeLine": 1.5,
-              "homeOdds": "-750",
-              "awayOdds": "+490",
+              "homeLine": null,
+              "homeOdds": null,
+              "awayOdds": null,
               "pick": null,
               "edge": null,
-              "reason": "F1 currently sits at home 0, away 0. The projected side was there, but the attached spread price was already too expensive to keep it realistic."
+              "reason": "F1 currently sits at home 0, away 0."
             },
             "total": {
-              "line": 0.5,
-              "overOdds": "-150",
-              "underOdds": "+118",
+              "line": null,
+              "overOdds": null,
+              "underOdds": null,
               "pick": null,
               "edge": null,
               "reason": "Pregame totals recommendations are suppressed while that surface is under re-evaluation."
@@ -5678,10 +2810,10 @@
           "label": "F3",
           "closed": false,
           "projection": {
-            "away": 1.57,
-            "home": 1.5,
-            "total": 3.07,
-            "homeMargin": -0.07,
+            "away": null,
+            "home": null,
+            "total": null,
+            "homeMargin": null,
             "closed": false
           },
           "actualSegment": {
@@ -5700,25 +2832,25 @@
             "label": "Scheduled"
           },
           "baselineHomeWinProb": null,
-          "modelHomeWinProb": 0.4886269620182933,
+          "modelHomeWinProb": null,
           "source": "segment_projection",
           "markets": {
             "moneyline": {
-              "homeOdds": "+126",
-              "awayOdds": "+138",
-              "drawOdds": "+410",
+              "homeOdds": null,
+              "awayOdds": null,
+              "drawOdds": null,
               "marketHomeProb": null,
               "pick": null,
               "edge": null,
               "reason": "Pregame moneyline recommendations are suppressed while that surface is under re-evaluation."
             },
             "spread": {
-              "homeLine": -0.5,
-              "homeOdds": "+118",
-              "awayOdds": "-158",
+              "homeLine": null,
+              "homeOdds": null,
+              "awayOdds": null,
               "pick": null,
               "edge": null,
-              "reason": "F3 currently sits at home 0, away 0. The projected side was there, but the attached spread price was already too expensive to keep it realistic."
+              "reason": "F3 currently sits at home 0, away 0."
             },
             "total": {
               "line": null,
@@ -5735,10 +2867,10 @@
           "label": "F5",
           "closed": false,
           "projection": {
-            "away": 2.61,
-            "home": 2.5,
-            "total": 5.11,
-            "homeMargin": -0.11,
+            "away": null,
+            "home": null,
+            "total": null,
+            "homeMargin": null,
             "closed": false
           },
           "actualSegment": {
@@ -5757,12 +2889,12 @@
             "label": "Scheduled"
           },
           "baselineHomeWinProb": null,
-          "modelHomeWinProb": 0.48213261123136775,
+          "modelHomeWinProb": null,
           "source": "segment_projection",
           "markets": {
             "moneyline": {
-              "homeOdds": "-112",
-              "awayOdds": "-112",
+              "homeOdds": null,
+              "awayOdds": null,
               "drawOdds": null,
               "marketHomeProb": null,
               "pick": null,
@@ -5770,17 +2902,17 @@
               "reason": "Pregame moneyline recommendations are suppressed while that surface is under re-evaluation."
             },
             "spread": {
-              "homeLine": -0.5,
-              "homeOdds": "+114",
-              "awayOdds": "-152",
+              "homeLine": null,
+              "homeOdds": null,
+              "awayOdds": null,
               "pick": null,
               "edge": null,
-              "reason": "F5 currently sits at home 0, away 0. The projected side was there, but the attached spread price was already too expensive to keep it realistic."
+              "reason": "F5 currently sits at home 0, away 0."
             },
             "total": {
-              "line": 6.5,
-              "overOdds": "-118",
-              "underOdds": "-112",
+              "line": null,
+              "overOdds": null,
+              "underOdds": null,
               "pick": null,
               "edge": null,
               "reason": "Pregame totals recommendations are suppressed while that surface is under re-evaluation."
@@ -5792,10 +2924,10 @@
           "label": "Full Game",
           "closed": false,
           "projection": {
-            "away": 4.7,
-            "home": 4.5,
-            "total": 9.2,
-            "homeMargin": -0.2,
+            "away": null,
+            "home": null,
+            "total": null,
+            "homeMargin": null,
             "closed": false
           },
           "actualSegment": {
@@ -5814,12 +2946,12 @@
             "label": "Scheduled"
           },
           "baselineHomeWinProb": null,
-          "modelHomeWinProb": 0.4675456936126812,
+          "modelHomeWinProb": null,
           "source": "segment_projection",
           "markets": {
             "moneyline": {
-              "homeOdds": "+106",
-              "awayOdds": "-124",
+              "homeOdds": null,
+              "awayOdds": null,
               "drawOdds": null,
               "marketHomeProb": null,
               "pick": null,
@@ -5827,17 +2959,17 @@
               "reason": "Pregame moneyline recommendations are suppressed while that surface is under re-evaluation."
             },
             "spread": {
-              "homeLine": 1.5,
-              "homeOdds": "-138",
-              "awayOdds": "+115",
+              "homeLine": null,
+              "homeOdds": null,
+              "awayOdds": null,
               "pick": null,
               "edge": null,
               "reason": "Pregame full-game spread recommendations are suppressed while that surface is under re-evaluation."
             },
             "total": {
-              "line": 11.5,
-              "overOdds": "-122",
-              "underOdds": "+100",
+              "line": null,
+              "overOdds": null,
+              "underOdds": null,
               "pick": null,
               "edge": null,
               "reason": "Pregame totals recommendations are suppressed while that surface is under re-evaluation."
@@ -5845,93 +2977,11 @@
           }
         }
       ],
-      "props": [
-        {
-          "tier": "official",
-          "market": "pitcher_props",
-          "prop": "outs",
-          "playerName": "Jake Bennett",
-          "teamSide": "away",
-          "selection": "over",
-          "line": 14.5,
-          "actual": null,
-          "modelMean": 20.179,
-          "liveProjection": 20.179,
-          "liveEdge": 5.679,
-          "delta": null,
-          "status": "pending",
-          "edge": 0.4188265152780096,
-          "odds": -143,
-          "modelProbOver": 0.968,
-          "outsMean": 20.179,
-          "marketLabel": "outs"
-        },
-        {
-          "tier": "playable",
-          "market": "pitcher_props",
-          "prop": "strikeouts",
-          "playerName": "Jake Bennett",
-          "teamSide": "away",
-          "selection": "over",
-          "line": 3.5,
-          "actual": null,
-          "modelMean": 5.138,
-          "liveProjection": 5.138,
-          "liveEdge": 1.638,
-          "delta": null,
-          "status": "pending",
-          "edge": 0.29523012552301253,
-          "odds": -110,
-          "modelProbOver": 0.79,
-          "outsMean": null,
-          "marketLabel": "strikeouts"
-        }
-      ],
+      "props": [],
       "liveProps": [],
       "archivedLiveProps": [],
-      "trackedProps": [
-        {
-          "tier": "official",
-          "market": "pitcher_props",
-          "prop": "outs",
-          "playerName": "Jake Bennett",
-          "teamSide": "away",
-          "selection": "over",
-          "line": 14.5,
-          "actual": null,
-          "modelMean": 20.179,
-          "liveProjection": 20.179,
-          "liveEdge": 5.679,
-          "delta": null,
-          "status": "pending",
-          "edge": 0.4188265152780096,
-          "odds": -143,
-          "modelProbOver": 0.968,
-          "outsMean": 20.179,
-          "marketLabel": "outs"
-        },
-        {
-          "tier": "playable",
-          "market": "pitcher_props",
-          "prop": "strikeouts",
-          "playerName": "Jake Bennett",
-          "teamSide": "away",
-          "selection": "over",
-          "line": 3.5,
-          "actual": null,
-          "modelMean": 5.138,
-          "liveProjection": 5.138,
-          "liveEdge": 1.638,
-          "delta": null,
-          "status": "pending",
-          "edge": 0.29523012552301253,
-          "odds": -110,
-          "modelProbOver": 0.79,
-          "outsMean": null,
-          "marketLabel": "strikeouts"
-        }
-      ],
-      "simContextAvailable": true,
+      "trackedProps": [],
+      "simContextAvailable": false,
       "snapshotAvailable": true
     },
     {
@@ -5960,227 +3010,7 @@
         },
         "liveText": ""
       },
-      "predictions": {
-        "full": {
-          "home_win_prob": 0.633,
-          "away_win_prob": 0.367,
-          "tie_prob": 0.0,
-          "away_runs_mean": 3.791,
-          "home_runs_mean": 4.662,
-          "total_runs_dist": {
-            "17": 16,
-            "10": 75,
-            "3": 75,
-            "2": 44,
-            "1": 34,
-            "4": 64,
-            "8": 67,
-            "6": 79,
-            "5": 88,
-            "12": 38,
-            "9": 80,
-            "15": 34,
-            "7": 101,
-            "11": 68,
-            "18": 17,
-            "13": 36,
-            "24": 3,
-            "16": 16,
-            "14": 34,
-            "20": 5,
-            "19": 8,
-            "23": 1,
-            "22": 6,
-            "21": 8,
-            "31": 1,
-            "26": 1,
-            "27": 1
-          },
-          "run_margin_dist": {
-            "-3": 49,
-            "4": 62,
-            "-1": 95,
-            "2": 151,
-            "1": 163,
-            "-6": 25,
-            "3": 89,
-            "-2": 87,
-            "11": 7,
-            "-5": 25,
-            "5": 54,
-            "6": 34,
-            "-10": 6,
-            "-4": 35,
-            "-8": 9,
-            "10": 8,
-            "-7": 14,
-            "12": 5,
-            "15": 1,
-            "7": 26,
-            "-11": 3,
-            "8": 19,
-            "-14": 1,
-            "20": 1,
-            "9": 11,
-            "-9": 13,
-            "14": 2,
-            "-16": 1,
-            "-13": 1,
-            "-12": 2,
-            "-18": 1
-          }
-        },
-        "first1": {
-          "home_win_prob": 0.219,
-          "away_win_prob": 0.179,
-          "tie_prob": 0.602,
-          "away_runs_mean": 0.432,
-          "home_runs_mean": 0.521,
-          "total_runs_dist": {
-            "0": 576,
-            "2": 115,
-            "1": 182,
-            "3": 51,
-            "4": 39,
-            "5": 16,
-            "7": 5,
-            "6": 9,
-            "8": 1,
-            "9": 5,
-            "10": 1
-          },
-          "run_margin_dist": {
-            "0": 602,
-            "-2": 50,
-            "-1": 87,
-            "3": 27,
-            "4": 19,
-            "1": 112,
-            "2": 50,
-            "-3": 22,
-            "-5": 5,
-            "-4": 12,
-            "6": 5,
-            "8": 1,
-            "5": 4,
-            "-7": 1,
-            "9": 1,
-            "-6": 1,
-            "-8": 1
-          }
-        },
-        "first5": {
-          "home_win_prob": 0.522,
-          "away_win_prob": 0.301,
-          "tie_prob": 0.177,
-          "away_runs_mean": 1.92,
-          "home_runs_mean": 2.777,
-          "total_runs_dist": {
-            "8": 56,
-            "3": 130,
-            "2": 124,
-            "0": 74,
-            "6": 94,
-            "1": 93,
-            "5": 114,
-            "4": 121,
-            "7": 64,
-            "9": 36,
-            "13": 11,
-            "10": 33,
-            "11": 17,
-            "14": 9,
-            "12": 13,
-            "15": 3,
-            "16": 2,
-            "19": 1,
-            "20": 1,
-            "17": 2,
-            "18": 2
-          },
-          "run_margin_dist": {
-            "2": 108,
-            "1": 142,
-            "-2": 82,
-            "0": 177,
-            "-6": 7,
-            "-1": 99,
-            "3": 79,
-            "4": 66,
-            "5": 45,
-            "-3": 41,
-            "8": 17,
-            "-4": 29,
-            "10": 5,
-            "7": 22,
-            "-7": 10,
-            "11": 3,
-            "-5": 18,
-            "6": 27,
-            "-8": 3,
-            "9": 5,
-            "-11": 1,
-            "17": 1,
-            "-10": 5,
-            "-9": 4,
-            "-12": 2,
-            "13": 1,
-            "12": 1
-          }
-        },
-        "first3": {
-          "home_win_prob": 0.429,
-          "away_win_prob": 0.295,
-          "tie_prob": 0.276,
-          "away_runs_mean": 1.136,
-          "home_runs_mean": 1.642,
-          "total_runs_dist": {
-            "5": 57,
-            "1": 205,
-            "2": 166,
-            "0": 189,
-            "8": 20,
-            "4": 124,
-            "3": 119,
-            "6": 48,
-            "7": 32,
-            "10": 19,
-            "9": 7,
-            "13": 2,
-            "17": 1,
-            "11": 6,
-            "15": 1,
-            "12": 1,
-            "14": 3
-          },
-          "run_margin_dist": {
-            "5": 20,
-            "-1": 136,
-            "-2": 81,
-            "0": 276,
-            "1": 162,
-            "-6": 7,
-            "2": 101,
-            "3": 55,
-            "4": 48,
-            "6": 21,
-            "-3": 33,
-            "9": 5,
-            "-8": 4,
-            "10": 2,
-            "-4": 22,
-            "11": 2,
-            "8": 5,
-            "-7": 2,
-            "7": 6,
-            "15": 1,
-            "-5": 7,
-            "-10": 2,
-            "-9": 1,
-            "12": 1
-          }
-        }
-      },
+      "predictions": null,
       "gameMarkets": {
         "totals": null,
         "ml": null
@@ -6191,10 +3021,10 @@
           "label": "F1",
           "closed": false,
           "projection": {
-            "away": 0.42,
-            "home": 0.52,
-            "total": 0.94,
-            "homeMargin": 0.1,
+            "away": null,
+            "home": null,
+            "total": null,
+            "homeMargin": null,
             "closed": false
           },
           "actualSegment": {
@@ -6213,30 +3043,30 @@
             "label": "Scheduled"
           },
           "baselineHomeWinProb": null,
-          "modelHomeWinProb": 0.5162442810620724,
+          "modelHomeWinProb": null,
           "source": "segment_projection",
           "markets": {
             "moneyline": {
-              "homeOdds": "+400",
-              "awayOdds": "+240",
-              "drawOdds": "-140",
+              "homeOdds": null,
+              "awayOdds": null,
+              "drawOdds": null,
               "marketHomeProb": null,
               "pick": null,
               "edge": null,
               "reason": "Pregame moneyline recommendations are suppressed while that surface is under re-evaluation."
             },
             "spread": {
-              "homeLine": 1.5,
-              "homeOdds": "-800",
-              "awayOdds": "+520",
+              "homeLine": null,
+              "homeOdds": null,
+              "awayOdds": null,
               "pick": null,
               "edge": null,
-              "reason": "F1 currently sits at home 0, away 0. The projected side was there, but the attached spread price was already too expensive to keep it realistic."
+              "reason": "F1 currently sits at home 0, away 0."
             },
             "total": {
-              "line": 0.5,
-              "overOdds": "-106",
-              "underOdds": "-120",
+              "line": null,
+              "overOdds": null,
+              "underOdds": null,
               "pick": null,
               "edge": null,
               "reason": "Pregame totals recommendations are suppressed while that surface is under re-evaluation."
@@ -6248,10 +3078,10 @@
           "label": "F3",
           "closed": false,
           "projection": {
-            "away": 1.27,
-            "home": 1.57,
-            "total": 2.83,
-            "homeMargin": 0.3,
+            "away": null,
+            "home": null,
+            "total": null,
+            "homeMargin": null,
             "closed": false
           },
           "actualSegment": {
@@ -6270,25 +3100,25 @@
             "label": "Scheduled"
           },
           "baselineHomeWinProb": null,
-          "modelHomeWinProb": 0.5485961085831343,
+          "modelHomeWinProb": null,
           "source": "segment_projection",
           "markets": {
             "moneyline": {
-              "homeOdds": "+210",
-              "awayOdds": "+108",
-              "drawOdds": "+290",
+              "homeOdds": null,
+              "awayOdds": null,
+              "drawOdds": null,
               "marketHomeProb": null,
               "pick": null,
               "edge": null,
               "reason": "Pregame moneyline recommendations are suppressed while that surface is under re-evaluation."
             },
             "spread": {
-              "homeLine": 0.5,
-              "homeOdds": "-132",
-              "awayOdds": "+100",
-              "pick": "home",
-              "edge": 0.8,
-              "reason": "The home side still projects to cover with about 0.80 runs of cushion off a +0.30 margin forecast. At the moment they are tied game with 54 outs left. Both starters are still shaping the run environment."
+              "homeLine": null,
+              "homeOdds": null,
+              "awayOdds": null,
+              "pick": null,
+              "edge": null,
+              "reason": "F3 currently sits at home 0, away 0."
             },
             "total": {
               "line": null,
@@ -6305,10 +3135,10 @@
           "label": "F5",
           "closed": false,
           "projection": {
-            "away": 2.11,
-            "home": 2.61,
-            "total": 4.72,
-            "homeMargin": 0.5,
+            "away": null,
+            "home": null,
+            "total": null,
+            "homeMargin": null,
             "closed": false
           },
           "actualSegment": {
@@ -6327,12 +3157,12 @@
             "label": "Scheduled"
           },
           "baselineHomeWinProb": null,
-          "modelHomeWinProb": 0.5805423048206596,
+          "modelHomeWinProb": null,
           "source": "segment_projection",
           "markets": {
             "moneyline": {
-              "homeOdds": "+140",
-              "awayOdds": "-176",
+              "homeOdds": null,
+              "awayOdds": null,
               "drawOdds": null,
               "marketHomeProb": null,
               "pick": null,
@@ -6340,17 +3170,17 @@
               "reason": "Pregame moneyline recommendations are suppressed while that surface is under re-evaluation."
             },
             "spread": {
-              "homeLine": 0.5,
-              "homeOdds": "-106",
-              "awayOdds": "-125",
-              "pick": "home",
-              "edge": 1.0,
-              "reason": "The home side still projects to cover with about 1.00 runs of cushion off a +0.50 margin forecast. At the moment they are tied game with 54 outs left. Both starters are still shaping the run environment."
+              "homeLine": null,
+              "homeOdds": null,
+              "awayOdds": null,
+              "pick": null,
+              "edge": null,
+              "reason": "F5 currently sits at home 0, away 0."
             },
             "total": {
-              "line": 4.5,
-              "overOdds": "-130",
-              "underOdds": "-102",
+              "line": null,
+              "overOdds": null,
+              "underOdds": null,
               "pick": null,
               "edge": null,
               "reason": "Pregame totals recommendations are suppressed while that surface is under re-evaluation."
@@ -6362,10 +3192,10 @@
           "label": "Full Game",
           "closed": false,
           "projection": {
-            "away": 3.8,
-            "home": 4.7,
-            "total": 8.5,
-            "homeMargin": 0.9,
+            "away": null,
+            "home": null,
+            "total": null,
+            "homeMargin": null,
             "closed": false
           },
           "actualSegment": {
@@ -6384,12 +3214,12 @@
             "label": "Scheduled"
           },
           "baselineHomeWinProb": null,
-          "modelHomeWinProb": 0.6422170929574377,
+          "modelHomeWinProb": null,
           "source": "segment_projection",
           "markets": {
             "moneyline": {
-              "homeOdds": "+136",
-              "awayOdds": "-162",
+              "homeOdds": null,
+              "awayOdds": null,
               "drawOdds": null,
               "marketHomeProb": null,
               "pick": null,
@@ -6397,17 +3227,17 @@
               "reason": "Pregame moneyline recommendations are suppressed while that surface is under re-evaluation."
             },
             "spread": {
-              "homeLine": 1.5,
-              "homeOdds": "-125",
-              "awayOdds": "+104",
+              "homeLine": null,
+              "homeOdds": null,
+              "awayOdds": null,
               "pick": null,
               "edge": null,
               "reason": "Pregame full-game spread recommendations are suppressed while that surface is under re-evaluation."
             },
             "total": {
-              "line": 8.5,
-              "overOdds": "-124",
-              "underOdds": "+102",
+              "line": null,
+              "overOdds": null,
+              "underOdds": null,
               "pick": null,
               "edge": null,
               "reason": "Pregame totals recommendations are suppressed while that surface is under re-evaluation."
@@ -6415,53 +3245,11 @@
           }
         }
       ],
-      "props": [
-        {
-          "tier": "playable",
-          "market": "pitcher_props",
-          "prop": "outs",
-          "playerName": "Kyle Bradish",
-          "teamSide": "away",
-          "selection": "over",
-          "line": 17.5,
-          "actual": null,
-          "modelMean": 19.792,
-          "liveProjection": 19.792,
-          "liveEdge": 2.292,
-          "delta": null,
-          "status": "pending",
-          "edge": 0.2209885931558936,
-          "odds": -130,
-          "modelProbOver": 0.74,
-          "outsMean": 19.792,
-          "marketLabel": "outs"
-        }
-      ],
+      "props": [],
       "liveProps": [],
       "archivedLiveProps": [],
-      "trackedProps": [
-        {
-          "tier": "playable",
-          "market": "pitcher_props",
-          "prop": "outs",
-          "playerName": "Kyle Bradish",
-          "teamSide": "away",
-          "selection": "over",
-          "line": 17.5,
-          "actual": null,
-          "modelMean": 19.792,
-          "liveProjection": 19.792,
-          "liveEdge": 2.292,
-          "delta": null,
-          "status": "pending",
-          "edge": 0.2209885931558936,
-          "odds": -130,
-          "modelProbOver": 0.74,
-          "outsMean": 19.792,
-          "marketLabel": "outs"
-        }
-      ],
-      "simContextAvailable": true,
+      "trackedProps": [],
+      "simContextAvailable": false,
       "snapshotAvailable": true
     },
     {
@@ -6490,213 +3278,7 @@
         },
         "liveText": ""
       },
-      "predictions": {
-        "full": {
-          "home_win_prob": 0.5,
-          "away_win_prob": 0.5,
-          "tie_prob": 0.0,
-          "away_runs_mean": 4.016,
-          "home_runs_mean": 4.065,
-          "total_runs_dist": {
-            "1": 34,
-            "4": 74,
-            "7": 105,
-            "12": 46,
-            "13": 43,
-            "5": 117,
-            "9": 89,
-            "11": 72,
-            "6": 76,
-            "8": 69,
-            "17": 9,
-            "21": 3,
-            "3": 76,
-            "2": 31,
-            "18": 12,
-            "14": 24,
-            "10": 60,
-            "15": 25,
-            "19": 8,
-            "16": 12,
-            "23": 1,
-            "25": 1,
-            "30": 1,
-            "20": 7,
-            "27": 2,
-            "22": 2,
-            "26": 1
-          },
-          "run_margin_dist": {
-            "-1": 147,
-            "2": 114,
-            "-3": 75,
-            "-4": 47,
-            "1": 150,
-            "-5": 43,
-            "-2": 108,
-            "5": 41,
-            "9": 9,
-            "4": 51,
-            "3": 61,
-            "17": 1,
-            "-6": 25,
-            "-16": 2,
-            "-12": 3,
-            "8": 16,
-            "7": 21,
-            "-7": 19,
-            "6": 15,
-            "-10": 5,
-            "-8": 12,
-            "11": 2,
-            "10": 10,
-            "13": 1,
-            "12": 4,
-            "-13": 2,
-            "16": 2,
-            "-9": 9,
-            "15": 1,
-            "-11": 3,
-            "14": 1
-          }
-        },
-        "first1": {
-          "home_win_prob": 0.221,
-          "away_win_prob": 0.206,
-          "tie_prob": 0.573,
-          "away_runs_mean": 0.461,
-          "home_runs_mean": 0.444,
-          "total_runs_dist": {
-            "0": 553,
-            "8": 2,
-            "1": 223,
-            "2": 112,
-            "3": 48,
-            "5": 19,
-            "6": 6,
-            "4": 32,
-            "7": 4,
-            "11": 1
-          },
-          "run_margin_dist": {
-            "0": 573,
-            "-4": 12,
-            "1": 138,
-            "2": 52,
-            "3": 14,
-            "-2": 57,
-            "-1": 102,
-            "-3": 28,
-            "6": 1,
-            "4": 8,
-            "-5": 5,
-            "5": 7,
-            "-6": 2,
-            "11": 1
-          }
-        },
-        "first5": {
-          "home_win_prob": 0.436,
-          "away_win_prob": 0.393,
-          "tie_prob": 0.171,
-          "away_runs_mean": 2.23,
-          "home_runs_mean": 2.392,
-          "total_runs_dist": {
-            "0": 61,
-            "2": 144,
-            "5": 94,
-            "8": 60,
-            "4": 135,
-            "7": 65,
-            "6": 85,
-            "9": 26,
-            "3": 134,
-            "11": 18,
-            "1": 101,
-            "12": 12,
-            "17": 3,
-            "14": 5,
-            "13": 13,
-            "10": 33,
-            "16": 5,
-            "15": 4,
-            "19": 1,
-            "21": 1
-          },
-          "run_margin_dist": {
-            "0": 171,
-            "2": 116,
-            "-1": 118,
-            "-4": 50,
-            "-2": 98,
-            "-3": 68,
-            "3": 59,
-            "5": 26,
-            "4": 45,
-            "8": 10,
-            "1": 136,
-            "-14": 1,
-            "-7": 5,
-            "7": 11,
-            "-9": 4,
-            "6": 21,
-            "-8": 7,
-            "-5": 24,
-            "-11": 2,
-            "-6": 16,
-            "9": 5,
-            "10": 5,
-            "13": 2
-          }
-        },
-        "first3": {
-          "home_win_prob": 0.385,
-          "away_win_prob": 0.34,
-          "tie_prob": 0.275,
-          "away_runs_mean": 1.298,
-          "home_runs_mean": 1.41,
-          "total_runs_dist": {
-            "0": 186,
-            "2": 180,
-            "1": 199,
-            "8": 24,
-            "7": 35,
-            "3": 132,
-            "4": 102,
-            "5": 63,
-            "17": 1,
-            "9": 8,
-            "6": 54,
-            "13": 1,
-            "11": 5,
-            "10": 6,
-            "14": 2,
-            "12": 2
-          },
-          "run_margin_dist": {
-            "0": 275,
-            "2": 109,
-            "1": 154,
-            "-4": 32,
-            "-1": 136,
-            "3": 55,
-            "-2": 82,
-            "5": 17,
-            "-3": 60,
-            "-5": 13,
-            "4": 25,
-            "6": 13,
-            "-6": 13,
-            "7": 6,
-            "-9": 1,
-            "8": 3,
-            "10": 2,
-            "9": 1,
-            "-7": 1,
-            "-8": 2
-          }
-        }
-      },
+      "predictions": null,
       "gameMarkets": {
         "totals": null,
         "ml": null
@@ -6707,10 +3289,10 @@
           "label": "F1",
           "closed": false,
           "projection": {
-            "away": 0.44,
-            "home": 0.46,
-            "total": 0.9,
-            "homeMargin": 0.01,
+            "away": null,
+            "home": null,
+            "total": null,
+            "homeMargin": null,
             "closed": false
           },
           "actualSegment": {
@@ -6729,30 +3311,30 @@
             "label": "Scheduled"
           },
           "baselineHomeWinProb": null,
-          "modelHomeWinProb": 0.50162499427867,
+          "modelHomeWinProb": null,
           "source": "segment_projection",
           "markets": {
             "moneyline": {
-              "homeOdds": "+320",
-              "awayOdds": "+320",
-              "drawOdds": "-150",
+              "homeOdds": null,
+              "awayOdds": null,
+              "drawOdds": null,
               "marketHomeProb": null,
               "pick": null,
               "edge": null,
               "reason": "Pregame moneyline recommendations are suppressed while that surface is under re-evaluation."
             },
             "spread": {
-              "homeLine": 1.5,
-              "homeOdds": "-1800",
-              "awayOdds": "+880",
+              "homeLine": null,
+              "homeOdds": null,
+              "awayOdds": null,
               "pick": null,
               "edge": null,
-              "reason": "F1 currently sits at home 0, away 0. The projected side was there, but the attached spread price was already too expensive to keep it realistic."
+              "reason": "F1 currently sits at home 0, away 0."
             },
             "total": {
-              "line": 0.5,
-              "overOdds": "+100",
-              "underOdds": "-128",
+              "line": null,
+              "overOdds": null,
+              "underOdds": null,
               "pick": null,
               "edge": null,
               "reason": "Pregame totals recommendations are suppressed while that surface is under re-evaluation."
@@ -6764,10 +3346,10 @@
           "label": "F3",
           "closed": false,
           "projection": {
-            "away": 1.33,
-            "home": 1.37,
-            "total": 2.7,
-            "homeMargin": 0.03,
+            "away": null,
+            "home": null,
+            "total": null,
+            "homeMargin": null,
             "closed": false
           },
           "actualSegment": {
@@ -6786,25 +3368,25 @@
             "label": "Scheduled"
           },
           "baselineHomeWinProb": null,
-          "modelHomeWinProb": 0.5048748455293113,
+          "modelHomeWinProb": null,
           "source": "segment_projection",
           "markets": {
             "moneyline": {
-              "homeOdds": "+138",
-              "awayOdds": "+172",
-              "drawOdds": "+270",
+              "homeOdds": null,
+              "awayOdds": null,
+              "drawOdds": null,
               "marketHomeProb": null,
               "pick": null,
               "edge": null,
               "reason": "Pregame moneyline recommendations are suppressed while that surface is under re-evaluation."
             },
             "spread": {
-              "homeLine": -0.5,
-              "homeOdds": "+128",
-              "awayOdds": "-174",
+              "homeLine": null,
+              "homeOdds": null,
+              "awayOdds": null,
               "pick": null,
               "edge": null,
-              "reason": "F3 currently sits at home 0, away 0. The projected side was there, but the attached spread price was already too expensive to keep it realistic."
+              "reason": "F3 currently sits at home 0, away 0."
             },
             "total": {
               "line": null,
@@ -6821,10 +3403,10 @@
           "label": "F5",
           "closed": false,
           "projection": {
-            "away": 2.22,
-            "home": 2.28,
-            "total": 4.5,
-            "homeMargin": 0.06,
+            "away": null,
+            "home": null,
+            "total": null,
+            "homeMargin": null,
             "closed": false
           },
           "actualSegment": {
@@ -6843,12 +3425,12 @@
             "label": "Scheduled"
           },
           "baselineHomeWinProb": null,
-          "modelHomeWinProb": 0.5097487643754381,
+          "modelHomeWinProb": null,
           "source": "segment_projection",
           "markets": {
             "moneyline": {
-              "homeOdds": "-120",
-              "awayOdds": "-104",
+              "homeOdds": null,
+              "awayOdds": null,
               "drawOdds": null,
               "marketHomeProb": null,
               "pick": null,
@@ -6856,17 +3438,17 @@
               "reason": "Pregame moneyline recommendations are suppressed while that surface is under re-evaluation."
             },
             "spread": {
-              "homeLine": -0.5,
-              "homeOdds": "+116",
-              "awayOdds": "-154",
+              "homeLine": null,
+              "homeOdds": null,
+              "awayOdds": null,
               "pick": null,
               "edge": null,
-              "reason": "F5 currently sits at home 0, away 0. The projected side was there, but the attached spread price was already too expensive to keep it realistic."
+              "reason": "F5 currently sits at home 0, away 0."
             },
             "total": {
-              "line": 4.5,
-              "overOdds": "+104",
-              "underOdds": "-138",
+              "line": null,
+              "overOdds": null,
+              "underOdds": null,
               "pick": null,
               "edge": null,
               "reason": "Pregame totals recommendations are suppressed while that surface is under re-evaluation."
@@ -6878,10 +3460,10 @@
           "label": "Full Game",
           "closed": false,
           "projection": {
-            "away": 4.0,
-            "home": 4.1,
-            "total": 8.1,
-            "homeMargin": 0.1,
+            "away": null,
+            "home": null,
+            "total": null,
+            "homeMargin": null,
             "closed": false
           },
           "actualSegment": {
@@ -6900,12 +3482,12 @@
             "label": "Scheduled"
           },
           "baselineHomeWinProb": null,
-          "modelHomeWinProb": 0.5162442810620724,
+          "modelHomeWinProb": null,
           "source": "segment_projection",
           "markets": {
             "moneyline": {
-              "homeOdds": "-110",
-              "awayOdds": "-106",
+              "homeOdds": null,
+              "awayOdds": null,
               "drawOdds": null,
               "marketHomeProb": null,
               "pick": null,
@@ -6913,17 +3495,17 @@
               "reason": "Pregame moneyline recommendations are suppressed while that surface is under re-evaluation."
             },
             "spread": {
-              "homeLine": 1.5,
-              "homeOdds": "-184",
-              "awayOdds": "+152",
+              "homeLine": null,
+              "homeOdds": null,
+              "awayOdds": null,
               "pick": null,
               "edge": null,
               "reason": "Pregame full-game spread recommendations are suppressed while that surface is under re-evaluation."
             },
             "total": {
-              "line": 7.5,
-              "overOdds": "-104",
-              "underOdds": "-118",
+              "line": null,
+              "overOdds": null,
+              "underOdds": null,
               "pick": null,
               "edge": null,
               "reason": "Pregame totals recommendations are suppressed while that surface is under re-evaluation."
@@ -6931,93 +3513,11 @@
           }
         }
       ],
-      "props": [
-        {
-          "tier": "playable",
-          "market": "pitcher_props",
-          "prop": "outs",
-          "playerName": "Michael King",
-          "teamSide": "home",
-          "selection": "over",
-          "line": 17.5,
-          "actual": null,
-          "modelMean": 20.851,
-          "liveProjection": 20.851,
-          "liveEdge": 3.351,
-          "delta": null,
-          "status": "pending",
-          "edge": 0.2905384615384615,
-          "odds": -140,
-          "modelProbOver": 0.829,
-          "outsMean": 20.851,
-          "marketLabel": "outs"
-        },
-        {
-          "tier": "playable",
-          "market": "pitcher_props",
-          "prop": "strikeouts",
-          "playerName": "Grant Holmes",
-          "teamSide": "away",
-          "selection": "over",
-          "line": 3.5,
-          "actual": null,
-          "modelMean": 5.459,
-          "liveProjection": 5.459,
-          "liveEdge": 1.959,
-          "delta": null,
-          "status": "pending",
-          "edge": 0.31638775510204076,
-          "odds": -130,
-          "modelProbOver": 0.847,
-          "outsMean": null,
-          "marketLabel": "strikeouts"
-        }
-      ],
+      "props": [],
       "liveProps": [],
       "archivedLiveProps": [],
-      "trackedProps": [
-        {
-          "tier": "playable",
-          "market": "pitcher_props",
-          "prop": "outs",
-          "playerName": "Michael King",
-          "teamSide": "home",
-          "selection": "over",
-          "line": 17.5,
-          "actual": null,
-          "modelMean": 20.851,
-          "liveProjection": 20.851,
-          "liveEdge": 3.351,
-          "delta": null,
-          "status": "pending",
-          "edge": 0.2905384615384615,
-          "odds": -140,
-          "modelProbOver": 0.829,
-          "outsMean": 20.851,
-          "marketLabel": "outs"
-        },
-        {
-          "tier": "playable",
-          "market": "pitcher_props",
-          "prop": "strikeouts",
-          "playerName": "Grant Holmes",
-          "teamSide": "away",
-          "selection": "over",
-          "line": 3.5,
-          "actual": null,
-          "modelMean": 5.459,
-          "liveProjection": 5.459,
-          "liveEdge": 1.959,
-          "delta": null,
-          "status": "pending",
-          "edge": 0.31638775510204076,
-          "odds": -130,
-          "modelProbOver": 0.847,
-          "outsMean": null,
-          "marketLabel": "strikeouts"
-        }
-      ],
-      "simContextAvailable": true,
+      "trackedProps": [],
+      "simContextAvailable": false,
       "snapshotAvailable": true
     }
   ]

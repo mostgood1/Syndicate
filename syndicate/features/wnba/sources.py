@@ -86,34 +86,25 @@ def _dated_fallback_candidates(roots: list[Path], subdir: tuple[str, ...], filen
 
 def processed_path(filename: str) -> Path:
     roots = _source_roots()
-    candidates: list[Path] = []
     for root in roots:
         candidate = root / "data" / "processed" / filename
         try:
             if candidate.exists() and candidate.is_file():
-                candidates.append(candidate)
+                return candidate
         except OSError:
             continue
-    best = _best_existing_path(candidates)
-    if best is not None:
-        return best
-    dated_candidates = _dated_fallback_candidates(roots, ("data", "processed"), filename)
-    best = _best_existing_path(dated_candidates)
-    if best is not None:
-        return best
     return roots[0] / "data" / "processed" / filename
 
 
 def live_snapshot_path(filename: str) -> Path:
     roots = _source_roots()
-    candidates = [root / "data" / "processed" / "live_snapshots" / filename for root in roots]
-    best = _best_existing_path(candidates)
-    if best is not None:
-        return best
-    dated_candidates = _dated_fallback_candidates(roots, ("data", "processed", "live_snapshots"), filename)
-    best = _best_existing_path(dated_candidates)
-    if best is not None:
-        return best
+    for root in roots:
+        candidate = root / "data" / "processed" / "live_snapshots" / filename
+        try:
+            if candidate.exists() and candidate.is_file():
+                return candidate
+        except OSError:
+            continue
     return roots[0] / "data" / "processed" / "live_snapshots" / filename
 
 

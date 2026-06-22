@@ -930,6 +930,10 @@ def _source_sim_payload(game_id: str, sim_game: dict[str, Any] | None, row: dict
     }
 
 
+def _source_sim_stub(game_id: str, sim_game: dict[str, Any] | None, row: dict[str, str]) -> dict[str, Any]:
+    return _source_sim_payload(game_id, sim_game, row)
+
+
 def _wnba_advanced_simulation_contract(sim_payload: dict[str, Any] | None) -> dict[str, Any]:
     sim = sim_payload if isinstance(sim_payload, dict) else {}
     players = sim.get("players") if isinstance(sim.get("players"), dict) else {}
@@ -1112,6 +1116,9 @@ def _source_game_from_row(
 def build_source_cards_payload(selected_date: str, *, allow_stored_date_fallback: bool = False) -> dict[str, Any]:
     requested_date = str(selected_date or "").strip() or parse_iso_date(selected_date).isoformat()
     resolved_date = _resolved_source_cards_date(selected_date, allow_stored_date_fallback=allow_stored_date_fallback)
+    parsed_date = parse_iso_date(resolved_date)
+    prev_date = (parsed_date - timedelta(days=1)).isoformat()
+    next_date = (parsed_date + timedelta(days=1)).isoformat()
     bundle = _artifact_bundle(resolved_date)
     rows = bundle["rows"]
     rec_index = bundle["recommendations"]
@@ -1137,6 +1144,22 @@ def build_source_cards_payload(selected_date: str, *, allow_stored_date_fallback
         "players_included": False,
         "pregame_portfolio": {"enabled": False, "selected": 0, "candidates": 0},
         "games": games,
+        "module_links": build_module_links(resolved_date, "Cards"),
+        "route_path": "/wnba/cards",
+        "control_label": "Date",
+        "control_type": "date",
+        "control_name": "date",
+        "control_value": resolved_date,
+        "prev_date": prev_date,
+        "next_date": next_date,
+        "board_contract": {
+            "schema": "game_board_v1",
+            "surface": "wnba_dense_board_v1",
+            "sport": "wnba",
+            "module": "cards",
+            "source_kind": "artifact_backed",
+            "live_lens_integrated": True,
+        },
     }
 
 
@@ -3344,6 +3367,8 @@ def build_live_state_payload(selected_date: str, ttl: int = 12, *, allow_stored_
     if isinstance(public_payload, dict) and isinstance(public_payload.get("games"), list) and bool(public_payload.get("games")):
         context_for_event_ids = build_cards_page_context(selected_date, allow_stored_date_fallback=allow_stored_date_fallback)
         context_games = context_for_event_ids.get("games") if isinstance(context_for_event_ids.get("games"), list) else []
+        if not context_games:
+            return _attach_odds_refresh_timestamp(public_payload)
         games_by_matchup: dict[tuple[str, str], dict[str, Any]] = {}
         for cards_game in context_games:
             if not isinstance(cards_game, dict):
@@ -3371,21 +3396,21 @@ def build_live_state_payload(selected_date: str, ttl: int = 12, *, allow_stored_
                 continue
             away_tri = _canonical_wnba_tri(game.get("away"))
             home_tri = _canonical_wnba_tri(game.get("home"))
-            event_id = str(game.get("event_id") or "").strip()
             cards_game = games_by_matchup.get((away_tri, home_tri)) if away_tri and home_tri else None
-            if isinstance(cards_game, dict):
-                event_id = str(cards_game.get("event_id") or "").strip()
-                if event_id:
-                    game["event_id"] = event_id
-                cards_state = _cards_context_live_state_snapshot(cards_game)
-                if _live_state_row_needs_cards_override(game, cards_state):
-                    game["away_pts"] = cards_state.get("away_pts")
-                    game["home_pts"] = cards_state.get("home_pts")
-                    game["status"] = cards_state.get("status")
-                    game["period"] = cards_state.get("period")
-                    game["clock"] = cards_state.get("clock")
-                    game["in_progress"] = bool(cards_state.get("in_progress"))
-                    game["final"] = bool(cards_state.get("final"))
+            if not isinstance(cards_game, dict):
+                continue
+            event_id = str(cards_game.get("event_id") or "").strip()
+            if event_id:
+                game["event_id"] = event_id
+            cards_state = _cards_context_live_state_snapshot(cards_game)
+            if _live_state_row_needs_cards_override(game, cards_state):
+                game["away_pts"] = cards_state.get("away_pts")
+                game["home_pts"] = cards_state.get("home_pts")
+                game["status"] = cards_state.get("status")
+                game["period"] = cards_state.get("period")
+                game["clock"] = cards_state.get("clock")
+                game["in_progress"] = bool(cards_state.get("in_progress"))
+                game["final"] = bool(cards_state.get("final"))
             period_rows = []
             for candidate_key in ("periods", "linescores"):
                 candidate_rows = game.get(candidate_key)

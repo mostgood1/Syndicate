@@ -261,7 +261,7 @@ def build_live_lens_snapshot(selected_date: str, *, limit: int = 50) -> dict[str
         }
         empty_state = {
             "eyebrow": "WNBA live lens",
-            "title": "No stored WNBA live-lens rows were available for this date",
+            "title": "No stored WNBA live-lens snapshot was available for this date",
             "body": "The background worker only writes saved WNBA cards and props snapshot artifacts, and none were available for the requested date.",
             "list_items": [f"Requested date: {resolved_date}"],
         }
@@ -273,7 +273,7 @@ def build_live_lens_snapshot(selected_date: str, *, limit: int = 50) -> dict[str
         intro_body="WNBA live lens now serves a stored snapshot that is rebuilt in the background from local WNBA artifacts.",
         aria_label="WNBA live lens board",
         source_path=source_path,
-        source_title="WNBA live lens snapshot" if rank_cards else "WNBA live lens unavailable",
+        source_title="WNBA live lens snapshot",
         rank_cards=rank_cards,
         using_sample_data=False,
         header_stats=[
