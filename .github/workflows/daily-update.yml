@@ -124,25 +124,29 @@ jobs:
 
           $forceWindowMinutes = [int]$env:EVENT_SIM_FORCE_WINDOW_MINUTES
           $forceRebuildToday = [string]$env:DAILY_UPDATE_FORCE_REBUILD_TODAY -eq 'True' -or [string]$env:DAILY_UPDATE_FORCE_REBUILD_TODAY -eq 'true'
-          $dailyUpdateArgs = @(
-            '-Date', $env:DATE,
-            '-RefreshOdds',
-            '-OddsPhase', 'all',
-            '-OddsSports', 'all',
-            '-OddsRegions', 'us',
-            '-SkipGitPush',
-            '-EventSimForceWindowMinutes', $forceWindowMinutes
-          )
-          if ($forceRebuildToday) {
-            $dailyUpdateArgs += '-ForceRebuildToday'
-          }
 
           if ([string]::IsNullOrWhiteSpace($env:BASE_URL)) {
-            & ./scripts/daily_update_in_season.ps1 @dailyUpdateArgs 2>&1 | Tee-Object -FilePath daily-update.log
+            & ./scripts/daily_update_in_season.ps1 `
+              -Date $env:DATE `
+              -RefreshOdds `
+              -OddsPhase all `
+              -OddsSports all `
+              -OddsRegions us `
+              -SkipGitPush `
+              $(if ($forceRebuildToday) { '-ForceRebuildToday' }) `
+              -EventSimForceWindowMinutes $forceWindowMinutes 2>&1 | Tee-Object -FilePath daily-update.log
           }
           else {
-            $dailyUpdateArgs = @('-BaseUrl', $env:BASE_URL) + $dailyUpdateArgs
-            & ./scripts/daily_update_in_season.ps1 @dailyUpdateArgs 2>&1 | Tee-Object -FilePath daily-update.log
+            & ./scripts/daily_update_in_season.ps1 `
+              -Date $env:DATE `
+              -BaseUrl $env:BASE_URL `
+              -RefreshOdds `
+              -OddsPhase all `
+              -OddsSports all `
+              -OddsRegions us `
+              -SkipGitPush `
+              $(if ($forceRebuildToday) { '-ForceRebuildToday' }) `
+              -EventSimForceWindowMinutes $forceWindowMinutes 2>&1 | Tee-Object -FilePath daily-update.log
           }
 
           $exitCode = $LASTEXITCODE
