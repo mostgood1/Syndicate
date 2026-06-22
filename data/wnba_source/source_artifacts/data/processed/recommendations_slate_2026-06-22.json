@@ -76,16 +76,16 @@
         {
           "market": "PROPS",
           "team": "CON",
-          "display_pick": "Le\u00efla Lacan UNDER 11.5",
-          "selection": "UNDER 11.5",
-          "price": -101.0,
-          "score": 38.67634935623913,
-          "ev_pct": 38.67634935623913,
-          "win_prob": 0.5024875621890548,
-          "p_win": 0.5024875621890548,
+          "display_pick": "Le\u00efla Lacan UNDER 17.5",
+          "selection": "UNDER 17.5",
+          "price": -118.0,
+          "score": 18.098285169439954,
+          "ev_pct": 18.098285169439954,
+          "win_prob": 0.5412844036697247,
+          "p_win": 0.5412844036697247,
           "basketball_summary": "Prop projection -",
           "top_play_reasons": [
-            "EV 38.7%",
+            "EV 18.1%",
             "Regular price range (-150 to +150)",
             "Best line available"
           ],
@@ -96,15 +96,16 @@
           "team": "CHI",
           "display_pick": "Kamilla Cardoso OVER 20.5",
           "selection": "OVER 20.5",
-          "price": -108.0,
-          "score": 11.054784605519641,
-          "ev_pct": 11.054784605519641,
-          "win_prob": 0.5192307692307693,
-          "p_win": 0.5192307692307693,
+          "price": -106.0,
+          "score": 11.354628442652427,
+          "ev_pct": 11.354628442652427,
+          "win_prob": 0.5145631067961165,
+          "p_win": 0.5145631067961165,
           "basketball_summary": "Prop projection -",
           "top_play_reasons": [
-            "EV 11.1%",
-            "Regular price range (-150 to +150)"
+            "EV 11.4%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
           ],
           "matchup": "CHI @ CON"
         },
@@ -122,7 +123,7 @@
           "top_play_reasons": [
             "EV 9.3%",
             "Regular price range (-150 to +150)",
-            "Consensus: 4 books aligned",
+            "Consensus: 5 books aligned",
             "Best line available"
           ],
           "matchup": "CHI @ CON"

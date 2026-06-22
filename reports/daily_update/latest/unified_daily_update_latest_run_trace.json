@@ -3,21 +3,23 @@
     "date":  "2026-06-22",
     "runMode":  "standard",
     "overallStatus":  "ok",
-    "generatedAt":  "2026-06-22T03:49:08.1971554+00:00",
-    "updatedAt":  "2026-06-22T04:14:54.3483240+00:00",
-    "runManifestPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-06-22\\20260622_034907\\unified_daily_update_run.json",
+    "generatedAt":  "2026-06-22T11:38:21.7299380+00:00",
+    "updatedAt":  "2026-06-22T11:59:42.0241495+00:00",
+    "runManifestPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-06-22\\20260622_113821\\unified_daily_update_run.json",
     "latestManifestPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest.json",
-    "runCheckpointPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-06-22\\20260622_034907\\unified_daily_update_checkpoint.json",
+    "runCheckpointPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-06-22\\20260622_113821\\unified_daily_update_checkpoint.json",
     "latestCheckpointPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest_checkpoint.json",
-    "runStatePath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-06-22\\20260622_034907\\unified_daily_update_run_state.json",
+    "runStatePath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-06-22\\20260622_113821\\unified_daily_update_run_state.json",
     "latestRunStatePath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest_run_state.json",
     "trace":  {
                   "eventSimExecutionCount":  21,
                   "artifactUpdateCount":  21,
-                  "inputFingerprintCount":  1,
+                  "inputFingerprintCount":  3,
                   "artifactPathCount":  21,
                   "inputFingerprints":  [
-                                            "273bb599414ea4ae1424dde32f327726ccd6fca9e0860fb7b0859d33fe560422"
+                                            "7e51aaee0d90a2cb1cc281f24e44786659bef4a8205fbb5e094f6e32a5f7d050",
+                                            "637389523396e8a8c17280d561a792e156d0979e397b009537c6294bb4f85241",
+                                            "128e1753fbd7a75e6b61eec751ff416120d5fa89e62795da1e172e4c175c9832"
                                         ],
                   "artifactPaths":  [
                                         "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_0_NYM_at_CIN_pk824503_g1.json",

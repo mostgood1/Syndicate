@@ -45,48 +45,6 @@
       "basketball_summary": "model 0.9 vs line 1.5 (-0.6)"
     },
     {
-      "game_key": "CHI@CON",
-      "game_id": "03ea0237c41b5baa0d98630880a8e39a0",
-      "player": "Le\u00efla Lacan",
-      "team": "CON",
-      "team_tricode": "CON",
-      "opponent": "CHI",
-      "score": 38.67634935623913,
-      "score_adj": 38.67634935623913,
-      "tier": "High",
-      "model": {
-        "pts": 0.0,
-        "reb": 0.0,
-        "ast": 0.0,
-        "threes": 0.0,
-        "stl": 0.176,
-        "blk": 0.144,
-        "tov": 0.48,
-        "pra": 0.0,
-        "pr": 0.0,
-        "pa": 0.0,
-        "ra": 0.0
-      },
-      "top_play": {
-        "market": "pts",
-        "side": "UNDER",
-        "line": 11.5,
-        "price": -101.0,
-        "edge": 0.19434384502388813,
-        "ev": 0.38676349356239126,
-        "ev_pct": 38.67634935623913,
-        "book": "draftkings",
-        "p_win": 0.889251055751446,
-        "snapshot_ts": null
-      },
-      "top_play_reasons": [
-        "EV 38.7%",
-        "Regular price range (-150 to +150)",
-        "Best line available"
-      ],
-      "basketball_summary": "model 0.0 vs line 11.5 (-11.5)"
-    },
-    {
       "game_key": "TOR@ATL",
       "game_id": "00a92d998dd4bc264b1437723be92121c",
       "player": "Isabelle Harrison",
@@ -124,7 +82,7 @@
       "top_play_reasons": [
         "EV 38.0%",
         "Regular price range (-150 to +150)",
-        "Consensus: 4 books aligned",
+        "Consensus: 3 books aligned",
         "Best line available"
       ],
       "basketball_summary": "model 0.0 vs line 11.5 (-11.5)"
@@ -214,6 +172,48 @@
         "Best line available"
       ],
       "basketball_summary": "model 5.5 vs line 10.5 (-5.0)"
+    },
+    {
+      "game_key": "CHI@CON",
+      "game_id": "03ea0237c41b5baa0d98630880a8e39a0",
+      "player": "Le\u00efla Lacan",
+      "team": "CON",
+      "team_tricode": "CON",
+      "opponent": "CHI",
+      "score": 18.098285169439954,
+      "score_adj": 18.098285169439954,
+      "tier": "High",
+      "model": {
+        "pts": 0.0,
+        "reb": 0.0,
+        "ast": 0.0,
+        "threes": 0.0,
+        "stl": 0.176,
+        "blk": 0.144,
+        "tov": 0.48,
+        "pra": 0.0,
+        "pr": 0.0,
+        "pa": 0.0,
+        "ra": 0.0
+      },
+      "top_play": {
+        "market": "pa",
+        "side": "UNDER",
+        "line": 17.5,
+        "price": -118.0,
+        "edge": 0.09796319495384931,
+        "ev": 0.18098285169439954,
+        "ev_pct": 18.098285169439954,
+        "book": "draftkings",
+        "p_win": 0.7222672553641243,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 18.1%",
+        "Regular price range (-150 to +150)",
+        "Best line available"
+      ],
+      "basketball_summary": "model 0.0 vs line 17.5 (-17.5)"
     },
     {
       "game_key": "CHI@CON",
