@@ -2108,6 +2108,12 @@
     return value == null || value === "" ? "-" : String(value);
   }
 
+  function cardScoreValue(card, side) {
+    const score = card?.score || card?.matchup?.score || {};
+    const value = score?.[side];
+    return value == null ? null : value;
+  }
+
   function linescoreSummaryMarkup(rows, options = {}) {
     const compactClass = options.compact ? " is-compact" : "";
     return `
@@ -3439,10 +3445,10 @@
       badgeNode.className = status.className || "";
     }
     if (signalNode) signalNode.innerHTML = first1SignalMarkup(card, { compact: true });
-    if (awayRuns) awayRuns.textContent = linescoreValue(snapshot?.teams?.away?.totals?.R);
+    if (awayRuns) awayRuns.textContent = linescoreValue(snapshot?.teams?.away?.totals?.R ?? cardScoreValue(card, "away"));
     if (awayHits) awayHits.textContent = linescoreValue(snapshot?.teams?.away?.totals?.H);
     if (awayErrors) awayErrors.textContent = linescoreValue(snapshot?.teams?.away?.totals?.E);
-    if (homeRuns) homeRuns.textContent = linescoreValue(snapshot?.teams?.home?.totals?.R);
+    if (homeRuns) homeRuns.textContent = linescoreValue(snapshot?.teams?.home?.totals?.R ?? cardScoreValue(card, "home"));
     if (homeHits) homeHits.textContent = linescoreValue(snapshot?.teams?.home?.totals?.H);
     if (homeErrors) homeErrors.textContent = linescoreValue(snapshot?.teams?.home?.totals?.E);
     if (detailNode) detailNode.textContent = statusDetailText(snapshot, card) || card.startTime || "";
@@ -3522,8 +3528,8 @@
       }
     }
     if (statusDetail) statusDetail.textContent = statusDetailText(snapshot, card) || card.startTime || "";
-    if (awayScore) awayScore.textContent = snapshot?.teams?.away?.totals?.R ?? "-";
-    if (homeScore) homeScore.textContent = snapshot?.teams?.home?.totals?.R ?? "-";
+    if (awayScore) awayScore.textContent = snapshot?.teams?.away?.totals?.R ?? linescoreValue(cardScoreValue(card, "away"));
+    if (homeScore) homeScore.textContent = snapshot?.teams?.home?.totals?.R ?? linescoreValue(cardScoreValue(card, "home"));
     if (liveLine) liveLine.textContent = liveSummary(snapshot, card);
     if (simLine) simLine.textContent = simSummary(sim, card);
     if (probableCopy) probableCopy.textContent = `Probables: ${starterText(card)}`;

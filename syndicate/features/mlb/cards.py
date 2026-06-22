@@ -2118,6 +2118,10 @@ def _merge_live_lens_row_into_game(game: dict[str, Any], live_lens_row: dict[str
         if isinstance(value, (dict, list)) and not value:
             continue
         merged[key] = value
+    matchup = merged.get("matchup") if isinstance(merged.get("matchup"), dict) else {}
+    matchup_score = matchup.get("score") if isinstance(matchup.get("score"), dict) else {}
+    if "score" not in merged and isinstance(matchup_score, dict) and matchup_score:
+        merged["score"] = dict(matchup_score)
     summary = str(live_lens_row.get("summary") or "").strip()
     if summary:
         merged["summary"] = summary
@@ -2127,9 +2131,6 @@ def _merge_live_lens_row_into_game(game: dict[str, Any], live_lens_row: dict[str
     start_time = str(live_lens_row.get("startTime") or "").strip()
     if start_time:
         merged["startTime"] = start_time
-    summary = str(live_lens_row.get("summary") or "").strip()
-    if summary:
-        merged["summary"] = summary
     return merged
 
 
@@ -2141,6 +2142,8 @@ def _trim_source_cards_games(games: list[dict[str, Any]]) -> list[dict[str, Any]
         "away",
         "home",
         "metrics",
+        "matchup",
+        "score",
         "status",
         "detail",
         "summary",
