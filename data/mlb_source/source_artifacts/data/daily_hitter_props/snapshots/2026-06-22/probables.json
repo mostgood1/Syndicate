@@ -2,7 +2,7 @@
   "date": "2026-06-22",
   "season": 2026,
   "spring_mode": false,
-  "generated_at": "2026-06-22T11:45:47.451316",
+  "generated_at": "2026-06-22T21:42:07.362441",
   "games": [
     {
       "idx": 0,
@@ -143,7 +143,7 @@
         "team_id": 146,
         "abbr": "MIA"
       },
-      "away_probable_id": 677958,
+      "away_probable_id": 641302,
       "home_probable_id": 663969,
       "away_source": "feed_gameData_probablePitchers",
       "home_source": "feed_gameData_probablePitchers",
@@ -151,8 +151,8 @@
       "home_confidence": 0.75,
       "away_validation": {
         "status": "ok",
-        "selected_id": 677958,
-        "selected_name": "Kumar Rocker",
+        "selected_id": 641302,
+        "selected_name": "Tyler Alexander",
         "selected_source": "feed_gameData_probablePitchers",
         "override_reason": "",
         "roster_team_ids": [
@@ -186,13 +186,13 @@
         "rejected_candidates": []
       },
       "raw": {
-        "away_schedule_id": 677958,
+        "away_schedule_id": 641302,
         "home_schedule_id": 663969,
-        "away_schedule_name": "Kumar Rocker",
+        "away_schedule_name": "Tyler Alexander",
         "home_schedule_name": "Tyler Phillips",
-        "away_feed_id": 677958,
+        "away_feed_id": 641302,
         "home_feed_id": 663969,
-        "away_feed_name": "Kumar Rocker",
+        "away_feed_name": "Tyler Alexander",
         "home_feed_name": "Tyler Phillips"
       }
     },
@@ -207,23 +207,27 @@
         "team_id": 120,
         "abbr": "WSH"
       },
-      "away_probable_id": null,
+      "away_probable_id": 641835,
       "home_probable_id": 656492,
-      "away_source": "none",
+      "away_source": "feed_gameData_probablePitchers",
       "home_source": "feed_gameData_probablePitchers",
-      "away_confidence": 0.0,
+      "away_confidence": 0.75,
       "home_confidence": 0.75,
       "away_validation": {
-        "status": "none",
-        "selected_id": null,
-        "selected_name": "",
-        "selected_source": "none",
+        "status": "ok",
+        "selected_id": 641835,
+        "selected_name": "Tim Mayza",
+        "selected_source": "feed_gameData_probablePitchers",
         "override_reason": "",
-        "roster_team_ids": [],
-        "registry_team_ids": [],
-        "on_expected_team": false,
+        "roster_team_ids": [
+          143
+        ],
+        "registry_team_ids": [
+          143
+        ],
+        "on_expected_team": true,
         "on_opponent_team": false,
-        "on_expected_registry_team": false,
+        "on_expected_registry_team": true,
         "on_opponent_registry_team": false,
         "rejected_candidates": []
       },
@@ -246,13 +250,13 @@
         "rejected_candidates": []
       },
       "raw": {
-        "away_schedule_id": null,
+        "away_schedule_id": 641835,
         "home_schedule_id": 656492,
-        "away_schedule_name": "",
+        "away_schedule_name": "Tim Mayza",
         "home_schedule_name": "Foster Griffin",
-        "away_feed_id": null,
+        "away_feed_id": 641835,
         "home_feed_id": 656492,
-        "away_feed_name": "",
+        "away_feed_name": "Tim Mayza",
         "home_feed_name": "Foster Griffin"
       }
     },
@@ -268,11 +272,11 @@
         "abbr": "TOR"
       },
       "away_probable_id": 686613,
-      "home_probable_id": null,
+      "home_probable_id": 656302,
       "away_source": "feed_gameData_probablePitchers",
-      "home_source": "none",
+      "home_source": "feed_gameData_probablePitchers",
       "away_confidence": 0.75,
-      "home_confidence": 0.0,
+      "home_confidence": 0.75,
       "away_validation": {
         "status": "ok",
         "selected_id": 686613,
@@ -292,28 +296,32 @@
         "rejected_candidates": []
       },
       "home_validation": {
-        "status": "none",
-        "selected_id": null,
-        "selected_name": "",
-        "selected_source": "none",
+        "status": "ok",
+        "selected_id": 656302,
+        "selected_name": "Dylan Cease",
+        "selected_source": "feed_gameData_probablePitchers",
         "override_reason": "",
-        "roster_team_ids": [],
-        "registry_team_ids": [],
-        "on_expected_team": false,
+        "roster_team_ids": [
+          141
+        ],
+        "registry_team_ids": [
+          141
+        ],
+        "on_expected_team": true,
         "on_opponent_team": false,
-        "on_expected_registry_team": false,
+        "on_expected_registry_team": true,
         "on_opponent_registry_team": false,
         "rejected_candidates": []
       },
       "raw": {
         "away_schedule_id": 686613,
-        "home_schedule_id": null,
+        "home_schedule_id": 656302,
         "away_schedule_name": "Hunter Brown",
-        "home_schedule_name": "",
+        "home_schedule_name": "Dylan Cease",
         "away_feed_id": 686613,
-        "home_feed_id": null,
+        "home_feed_id": 656302,
         "away_feed_name": "Hunter Brown",
-        "home_feed_name": ""
+        "home_feed_name": "Dylan Cease"
       }
     },
     {
@@ -391,23 +399,27 @@
         "team_id": 113,
         "abbr": "CIN"
       },
-      "away_probable_id": null,
+      "away_probable_id": 605540,
       "home_probable_id": 663903,
-      "away_source": "none",
+      "away_source": "feed_gameData_probablePitchers",
       "home_source": "feed_gameData_probablePitchers",
-      "away_confidence": 0.0,
+      "away_confidence": 0.75,
       "home_confidence": 0.75,
       "away_validation": {
-        "status": "none",
-        "selected_id": null,
-        "selected_name": "",
-        "selected_source": "none",
+        "status": "ok",
+        "selected_id": 605540,
+        "selected_name": "Brandon Woodruff",
+        "selected_source": "feed_gameData_probablePitchers",
         "override_reason": "",
-        "roster_team_ids": [],
-        "registry_team_ids": [],
-        "on_expected_team": false,
+        "roster_team_ids": [
+          158
+        ],
+        "registry_team_ids": [
+          158
+        ],
+        "on_expected_team": true,
         "on_opponent_team": false,
-        "on_expected_registry_team": false,
+        "on_expected_registry_team": true,
         "on_opponent_registry_team": false,
         "rejected_candidates": []
       },
@@ -430,13 +442,13 @@
         "rejected_candidates": []
       },
       "raw": {
-        "away_schedule_id": null,
+        "away_schedule_id": 605540,
         "home_schedule_id": 663903,
-        "away_schedule_name": "",
+        "away_schedule_name": "Brandon Woodruff",
         "home_schedule_name": "Brady Singer",
-        "away_feed_id": null,
+        "away_feed_id": 605540,
         "home_feed_id": 663903,
-        "away_feed_name": "",
+        "away_feed_name": "Brandon Woodruff",
         "home_feed_name": "Brady Singer"
       }
     },

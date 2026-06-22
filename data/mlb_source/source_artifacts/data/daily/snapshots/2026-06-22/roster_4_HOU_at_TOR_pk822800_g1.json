@@ -1602,16 +1602,16 @@
   },
   "weather": {
     "source": "statsapi_live_feed",
-    "condition": "",
-    "temperature_f": null,
-    "wind_speed_mph": null,
+    "condition": "Roof Closed",
+    "temperature_f": 72.0,
+    "wind_speed_mph": 0.0,
     "wind_direction": "unknown",
-    "wind_raw": "",
+    "wind_raw": "0 mph, None",
     "is_dome": null,
     "multipliers": {
-      "hr_mult": 1.0,
-      "inplay_hit_mult": 1.0,
-      "xb_share_mult": 1.0
+      "hr_mult": 1.006,
+      "inplay_hit_mult": 1.003,
+      "xb_share_mult": 1.0016
     }
   },
   "park": {
@@ -1631,8 +1631,8 @@
   },
   "umpire": {
     "source": "statsapi_live_feed",
-    "home_plate_umpire_id": null,
-    "home_plate_umpire_name": "",
+    "home_plate_umpire_id": 427344,
+    "home_plate_umpire_name": "Bill Miller",
     "called_strike_mult": 1.0,
     "multipliers": {
       "called_strike_mult": 1.0

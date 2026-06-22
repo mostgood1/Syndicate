@@ -39,8 +39,7 @@
       "use_closer_in_9th_only": true,
       "pinch_hit_aggressiveness": 0.15
     },
-    "confirmed_lineup_ids": [],
-    "projected_lineup_ids": [
+    "confirmed_lineup_ids": [
       592885,
       694192,
       668930,
@@ -48,24 +47,25 @@
       641343,
       669003,
       686217,
-      806198,
+      687401,
       666152
     ],
-    "lineup_source": "projected_rotowire_today_lineup",
-    "lineup_confidence": 0.72,
+    "projected_lineup_ids": [],
+    "lineup_source": "confirmed_feed_live",
+    "lineup_confidence": 1.0,
     "probable_pitcher": {
-      "id": null,
-      "source": "none",
-      "confidence": 0.0,
-      "raw_schedule_id": null,
-      "raw_feed_id": null
+      "id": 605540,
+      "source": "feed_gameData_probablePitchers",
+      "confidence": 0.75,
+      "raw_schedule_id": 605540,
+      "raw_feed_id": 605540
     },
     "starter": {
-      "id": 694819,
-      "name": "Jacob Misiorowski",
+      "id": 605540,
+      "name": "Brandon Woodruff",
       "role": "SP",
-      "selection_source": "heuristic",
-      "requested_id": null
+      "selection_source": "probable",
+      "requested_id": 605540
     },
     "bullpen": [
       {
@@ -322,30 +322,30 @@
         "vs_pitcher_history": {}
       },
       {
-        "id": 806198,
-        "name": "Cooper Pratt",
+        "id": 687401,
+        "name": "Joey Ortiz",
         "pos": "SS",
         "bat": "R",
         "throw": "R",
-        "k_rate": 0.2222222222222222,
-        "bb_rate": 0.05555555555555555,
+        "k_rate": 0.16089743589743588,
+        "bb_rate": 0.10598290598290598,
         "hbp_rate": 0.0,
-        "hr_rate": 0.0,
-        "inplay_hit_rate": 0.46153846153846156,
-        "xb_hit_share": 0.05,
+        "hr_rate": 0.004722222222222222,
+        "inplay_hit_rate": 0.2462406947890819,
+        "xb_hit_share": 0.15625,
         "vs_pitch_type": {},
         "vs_pitch_type_hr": {},
         "platoon_mult_vs_lhp": {
-          "k": 1.1571428571428573,
-          "bb": 1.1925000000000001,
-          "hr": 1.0,
-          "inplay": 1.0458333333333334
+          "k": 1.0810756972111555,
+          "bb": 1.0088709677419354,
+          "hr": 0.78,
+          "inplay": 1.0326748539369657
         },
         "platoon_mult_vs_rhp": {
-          "k": 1.1571428571428573,
-          "bb": 0.8075,
-          "hr": 1.0,
-          "inplay": 0.9266666666666666
+          "k": 0.9735275115753204,
+          "bb": 1.0577811682650393,
+          "hr": 1.275,
+          "inplay": 0.9463526533537114
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -440,6 +440,35 @@
         "vs_pitcher_history": {}
       },
       {
+        "id": 806198,
+        "name": "Cooper Pratt",
+        "pos": "SS",
+        "bat": "R",
+        "throw": "R",
+        "k_rate": 0.2222222222222222,
+        "bb_rate": 0.05555555555555555,
+        "hbp_rate": 0.0,
+        "hr_rate": 0.0,
+        "inplay_hit_rate": 0.46153846153846156,
+        "xb_hit_share": 0.05,
+        "vs_pitch_type": {},
+        "vs_pitch_type_hr": {},
+        "platoon_mult_vs_lhp": {
+          "k": 1.1571428571428573,
+          "bb": 1.1925000000000001,
+          "hr": 1.0,
+          "inplay": 1.0458333333333334
+        },
+        "platoon_mult_vs_rhp": {
+          "k": 1.1571428571428573,
+          "bb": 0.8075,
+          "hr": 1.0,
+          "inplay": 0.9266666666666666
+        },
+        "statcast_quality_mult": {},
+        "vs_pitcher_history": {}
+      },
+      {
         "id": 596142,
         "name": "Gary S\u00e1nchez",
         "pos": "C",
@@ -467,76 +496,48 @@
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
-      },
-      {
-        "id": 687401,
-        "name": "Joey Ortiz",
-        "pos": "SS",
-        "bat": "R",
-        "throw": "R",
-        "k_rate": 0.16089743589743588,
-        "bb_rate": 0.10598290598290598,
-        "hbp_rate": 0.0,
-        "hr_rate": 0.004722222222222222,
-        "inplay_hit_rate": 0.2462406947890819,
-        "xb_hit_share": 0.15625,
-        "vs_pitch_type": {},
-        "vs_pitch_type_hr": {},
-        "platoon_mult_vs_lhp": {
-          "k": 1.0810756972111555,
-          "bb": 1.0088709677419354,
-          "hr": 0.78,
-          "inplay": 1.0326748539369657
-        },
-        "platoon_mult_vs_rhp": {
-          "k": 0.9735275115753204,
-          "bb": 1.0577811682650393,
-          "hr": 1.275,
-          "inplay": 0.9463526533537114
-        },
-        "statcast_quality_mult": {},
-        "vs_pitcher_history": {}
       }
     ],
     "starter_profile": {
-      "id": 694819,
-      "name": "Jacob Misiorowski",
+      "id": 605540,
+      "name": "Brandon Woodruff",
       "throw": "R",
       "role": "SP",
       "leverage_skill": 0.5,
-      "stamina_pitches": 94,
-      "availability_mult": 0.6966666666666667,
+      "stamina_pitches": 83,
+      "availability_mult": 1.0,
       "platoon_mult_vs_lhb": {
-        "k": 1.1220564771109363,
-        "bb": 1.154137842967164,
-        "hr": 1.0479365568216816,
-        "inplay": 0.9788880608278933
+        "k": 1.037205882352941,
+        "bb": 1.1490546218487394,
+        "hr": 0.9393382352941176,
+        "inplay": 0.912933001938348
       },
       "platoon_mult_vs_rhb": {
-        "k": 0.8592423684048891,
-        "bb": 0.8927665119563073,
-        "hr": 1.1549745824255628,
-        "inplay": 1.0438392261927223
+        "k": 0.9522641509433962,
+        "bb": 0.8087601078167115,
+        "hr": 1.0778301886792452,
+        "inplay": 1.1065231663852937
       },
       "statcast_quality_mult": {},
       "arsenal_source": "statsapi_pitchArsenal",
-      "arsenal_sample_size": 1368,
+      "arsenal_sample_size": 415,
       "statcast_splits_found": false,
       "statcast_splits_source": "",
       "statcast_splits_n_pitches": 0,
       "statcast_splits_start_date": "",
       "statcast_splits_end_date": "",
-      "k_rate": 0.3899105116034745,
-      "bb_rate": 0.06134270116128548,
-      "hbp_rate": 0.019830028328611898,
-      "hr_rate": 0.009631728045325779,
-      "inplay_hit_rate": 0.24698042870456666,
+      "k_rate": 0.2066115702479339,
+      "bb_rate": 0.05785123966942149,
+      "hbp_rate": 0.008264462809917356,
+      "hr_rate": 0.03305785123966942,
+      "inplay_hit_rate": 0.272267620020429,
       "arsenal": {
-        "FF": 0.6374268961754386,
-        "CU": 0.10453216937280697,
-        "CH": 0.02046783587719298,
-        "SL": 0.1308479492149123,
-        "FC": 0.10672514935964911
+        "FF": 0.42409638339277106,
+        "OTHER": 0.012048192096385536,
+        "CU": 0.048192770385542164,
+        "CH": 0.20963855167710843,
+        "SI": 0.18554217148433738,
+        "FC": 0.12048193096385545
       },
       "pitch_type_whiff_mult": {},
       "pitch_type_inplay_mult": {},
@@ -904,8 +905,7 @@
       "use_closer_in_9th_only": true,
       "pinch_hit_aggressiveness": 0.15
     },
-    "confirmed_lineup_ids": [],
-    "projected_lineup_ids": [
+    "confirmed_lineup_ids": [
       694362,
       668709,
       701398,
@@ -914,10 +914,11 @@
       553993,
       682622,
       663886,
-      695490
+      680574
     ],
-    "lineup_source": "projected_rotowire_today_lineup",
-    "lineup_confidence": 0.72,
+    "projected_lineup_ids": [],
+    "lineup_source": "confirmed_feed_live",
+    "lineup_confidence": 1.0,
     "probable_pitcher": {
       "id": 663903,
       "source": "feed_gameData_probablePitchers",
@@ -1210,30 +1211,30 @@
         "vs_pitcher_history": {}
       },
       {
-        "id": 695490,
-        "name": "Edwin Arroyo",
+        "id": 680574,
+        "name": "Matt McLain",
         "pos": "2B",
-        "bat": "S",
+        "bat": "R",
         "throw": "R",
-        "k_rate": 0.23636363636363636,
-        "bb_rate": 0.039510489510489515,
-        "hbp_rate": 0.038461538461538464,
-        "hr_rate": 0.0,
-        "inplay_hit_rate": 0.3385714285714286,
-        "xb_hit_share": 0.16666666666666666,
+        "k_rate": 0.2653453260520398,
+        "bb_rate": 0.123938323160938,
+        "hbp_rate": 0.01060070671378092,
+        "hr_rate": 0.03221008673305493,
+        "inplay_hit_rate": 0.24655172413793103,
+        "xb_hit_share": 0.26,
         "vs_pitch_type": {},
         "vs_pitch_type_hr": {},
         "platoon_mult_vs_lhp": {
-          "k": 0.9153846153846155,
-          "bb": 0.8075,
-          "hr": 1.0,
-          "inplay": 0.8561181434599155
+          "k": 0.8177496288069257,
+          "bb": 1.1925000000000001,
+          "hr": 1.275,
+          "inplay": 0.9783400809716599
         },
         "platoon_mult_vs_rhp": {
-          "k": 1.0594322344322344,
-          "bb": 1.112873999157185,
-          "hr": 1.0,
-          "inplay": 1.0516565088295047
+          "k": 1.0221222114964184,
+          "bb": 0.8917611100855649,
+          "hr": 0.8363211861909496,
+          "inplay": 0.991289592760181
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -1270,6 +1271,35 @@
         "vs_pitcher_history": {}
       },
       {
+        "id": 695490,
+        "name": "Edwin Arroyo",
+        "pos": "2B",
+        "bat": "S",
+        "throw": "R",
+        "k_rate": 0.23636363636363636,
+        "bb_rate": 0.039510489510489515,
+        "hbp_rate": 0.038461538461538464,
+        "hr_rate": 0.0,
+        "inplay_hit_rate": 0.3385714285714286,
+        "xb_hit_share": 0.16666666666666666,
+        "vs_pitch_type": {},
+        "vs_pitch_type_hr": {},
+        "platoon_mult_vs_lhp": {
+          "k": 0.9153846153846155,
+          "bb": 0.8075,
+          "hr": 1.0,
+          "inplay": 0.8561181434599155
+        },
+        "platoon_mult_vs_rhp": {
+          "k": 1.0594322344322344,
+          "bb": 1.112873999157185,
+          "hr": 1.0,
+          "inplay": 1.0516565088295047
+        },
+        "statcast_quality_mult": {},
+        "vs_pitcher_history": {}
+      },
+      {
         "id": 624431,
         "name": "Jose Trevino",
         "pos": "C",
@@ -1294,35 +1324,6 @@
           "bb": 1.1414285714285715,
           "hr": 1.0,
           "inplay": 0.8075
-        },
-        "statcast_quality_mult": {},
-        "vs_pitcher_history": {}
-      },
-      {
-        "id": 680574,
-        "name": "Matt McLain",
-        "pos": "2B",
-        "bat": "R",
-        "throw": "R",
-        "k_rate": 0.2653453260520398,
-        "bb_rate": 0.123938323160938,
-        "hbp_rate": 0.01060070671378092,
-        "hr_rate": 0.03221008673305493,
-        "inplay_hit_rate": 0.24655172413793103,
-        "xb_hit_share": 0.26,
-        "vs_pitch_type": {},
-        "vs_pitch_type_hr": {},
-        "platoon_mult_vs_lhp": {
-          "k": 0.8177496288069257,
-          "bb": 1.1925000000000001,
-          "hr": 1.275,
-          "inplay": 0.9783400809716599
-        },
-        "platoon_mult_vs_rhp": {
-          "k": 1.0221222114964184,
-          "bb": 0.8917611100855649,
-          "hr": 0.8363211861909496,
-          "inplay": 0.991289592760181
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -1708,16 +1709,16 @@
   },
   "weather": {
     "source": "statsapi_live_feed",
-    "condition": "",
-    "temperature_f": null,
-    "wind_speed_mph": null,
-    "wind_direction": "unknown",
-    "wind_raw": "",
+    "condition": "Partly Cloudy",
+    "temperature_f": 74.0,
+    "wind_speed_mph": 11.0,
+    "wind_direction": "out",
+    "wind_raw": "11 mph, Out To RF",
     "is_dome": null,
     "multipliers": {
-      "hr_mult": 1.0,
-      "inplay_hit_mult": 1.0,
-      "xb_share_mult": 1.0
+      "hr_mult": 1.03224,
+      "inplay_hit_mult": 1.006,
+      "xb_share_mult": 1.0032
     }
   },
   "park": {
@@ -1737,8 +1738,8 @@
   },
   "umpire": {
     "source": "statsapi_live_feed",
-    "home_plate_umpire_id": null,
-    "home_plate_umpire_name": "",
+    "home_plate_umpire_id": 658325,
+    "home_plate_umpire_name": "Tyler Jones",
     "called_strike_mult": 1.0,
     "multipliers": {
       "called_strike_mult": 1.0

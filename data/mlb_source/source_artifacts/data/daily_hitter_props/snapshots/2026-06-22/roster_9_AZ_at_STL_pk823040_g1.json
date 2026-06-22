@@ -39,20 +39,20 @@
       "use_closer_in_9th_only": true,
       "pinch_hit_aggressiveness": 0.15
     },
-    "confirmed_lineup_ids": [],
-    "projected_lineup_ids": [
+    "confirmed_lineup_ids": [
       606466,
       672695,
       682998,
-      672515,
       656976,
       571448,
-      545121,
-      678489,
-      694371
+      680728,
+      666971,
+      694371,
+      694374
     ],
-    "lineup_source": "projected_rotowire_today_lineup",
-    "lineup_confidence": 0.72,
+    "projected_lineup_ids": [],
+    "lineup_source": "confirmed_feed_live",
+    "lineup_confidence": 1.0,
     "probable_pitcher": {
       "id": 518876,
       "source": "feed_gameData_probablePitchers",
@@ -218,35 +218,6 @@
         "vs_pitcher_history": {}
       },
       {
-        "id": 672515,
-        "name": "Gabriel Moreno",
-        "pos": "C",
-        "bat": "R",
-        "throw": "R",
-        "k_rate": 0.1679507122973637,
-        "bb_rate": 0.10806860979204191,
-        "hbp_rate": 0.015228426395939087,
-        "hr_rate": 0.03314638938922548,
-        "inplay_hit_rate": 0.2931107288082577,
-        "xb_hit_share": 0.2553191489361702,
-        "vs_pitch_type": {},
-        "vs_pitch_type_hr": {},
-        "platoon_mult_vs_lhp": {
-          "k": 1.0394586491822457,
-          "bb": 0.8075,
-          "hr": 1.1137223663085094,
-          "inplay": 0.8944162055219419
-        },
-        "platoon_mult_vs_rhp": {
-          "k": 1.0292110687353888,
-          "bb": 1.0385653780433344,
-          "hr": 0.9015118138153124,
-          "inplay": 1.0445105675629058
-        },
-        "statcast_quality_mult": {},
-        "vs_pitcher_history": {}
-      },
-      {
         "id": 656976,
         "name": "Pavin Smith",
         "pos": "DH",
@@ -300,6 +271,153 @@
           "bb": 0.9627240701390508,
           "hr": 1.1229078229229836,
           "inplay": 1.0497880167092712
+        },
+        "statcast_quality_mult": {},
+        "vs_pitcher_history": {}
+      },
+      {
+        "id": 680728,
+        "name": "Adrian Del Castillo",
+        "pos": "DH",
+        "bat": "L",
+        "throw": "R",
+        "k_rate": 0.30472191116088093,
+        "bb_rate": 0.0860488988428518,
+        "hbp_rate": 0.0,
+        "hr_rate": 0.028060843598357595,
+        "inplay_hit_rate": 0.22376137512639027,
+        "xb_hit_share": 0.16666666666666666,
+        "vs_pitch_type": {},
+        "vs_pitch_type_hr": {},
+        "platoon_mult_vs_lhp": {
+          "k": 1.1925000000000001,
+          "bb": 0.8075,
+          "hr": 0.78,
+          "inplay": 0.896904654315409
+        },
+        "platoon_mult_vs_rhp": {
+          "k": 0.9720855582220193,
+          "bb": 1.0310649604164408,
+          "hr": 1.0979426792030718,
+          "inplay": 1.03991414369634
+        },
+        "statcast_quality_mult": {},
+        "vs_pitcher_history": {}
+      },
+      {
+        "id": 666971,
+        "name": "Lourdes Gurriel Jr.",
+        "pos": "LF",
+        "bat": "R",
+        "throw": "R",
+        "k_rate": 0.1780701754385965,
+        "bb_rate": 0.06491228070175438,
+        "hbp_rate": 0.0,
+        "hr_rate": 0.010087719298245614,
+        "inplay_hit_rate": 0.2515327695560254,
+        "xb_hit_share": 0.17391304347826086,
+        "vs_pitch_type": {},
+        "vs_pitch_type_hr": {},
+        "platoon_mult_vs_lhp": {
+          "k": 0.8618226600985222,
+          "bb": 1.1925000000000001,
+          "hr": 0.78,
+          "inplay": 0.9253464830938176
+        },
+        "platoon_mult_vs_rhp": {
+          "k": 1.0383180858550316,
+          "bb": 0.9543436293436294,
+          "hr": 1.0990683229813665,
+          "inplay": 1.0400332536180403
+        },
+        "statcast_quality_mult": {},
+        "vs_pitcher_history": {}
+      },
+      {
+        "id": 694371,
+        "name": "Tommy Troy",
+        "pos": "LF",
+        "bat": "R",
+        "throw": "R",
+        "k_rate": 0.19719267139479904,
+        "bb_rate": 0.11040189125295508,
+        "hbp_rate": 0.0,
+        "hr_rate": 0.02680260047281324,
+        "inplay_hit_rate": 0.2538125,
+        "xb_hit_share": 0.2,
+        "vs_pitch_type": {},
+        "vs_pitch_type_hr": {},
+        "platoon_mult_vs_lhp": {
+          "k": 0.8075,
+          "bb": 0.8075,
+          "hr": 1.275,
+          "inplay": 1.1925000000000001
+        },
+        "platoon_mult_vs_rhp": {
+          "k": 1.0476750658303184,
+          "bb": 1.0727248394004283,
+          "hr": 0.8164356591589226,
+          "inplay": 0.8075
+        },
+        "statcast_quality_mult": {},
+        "vs_pitcher_history": {}
+      },
+      {
+        "id": 694374,
+        "name": "Tim Tawa",
+        "pos": "LF",
+        "bat": "R",
+        "throw": "R",
+        "k_rate": 0.24359737939249554,
+        "bb_rate": 0.1308814770696843,
+        "hbp_rate": 0.0,
+        "hr_rate": 0.011643835616438355,
+        "inplay_hit_rate": 0.2002659574468085,
+        "xb_hit_share": 0.2,
+        "vs_pitch_type": {},
+        "vs_pitch_type_hr": {},
+        "platoon_mult_vs_lhp": {
+          "k": 0.8841969155538838,
+          "bb": 1.0965038942854646,
+          "hr": 0.78,
+          "inplay": 0.9346496367471292
+        },
+        "platoon_mult_vs_rhp": {
+          "k": 1.0264656921396245,
+          "bb": 0.8970505651973956,
+          "hr": 1.275,
+          "inplay": 0.9992695883134131
+        },
+        "statcast_quality_mult": {},
+        "vs_pitcher_history": {}
+      }
+    ],
+    "bench": [
+      {
+        "id": 672515,
+        "name": "Gabriel Moreno",
+        "pos": "C",
+        "bat": "R",
+        "throw": "R",
+        "k_rate": 0.1679507122973637,
+        "bb_rate": 0.10806860979204191,
+        "hbp_rate": 0.015228426395939087,
+        "hr_rate": 0.03314638938922548,
+        "inplay_hit_rate": 0.2931107288082577,
+        "xb_hit_share": 0.2553191489361702,
+        "vs_pitch_type": {},
+        "vs_pitch_type_hr": {},
+        "platoon_mult_vs_lhp": {
+          "k": 1.0394586491822457,
+          "bb": 0.8075,
+          "hr": 1.1137223663085094,
+          "inplay": 0.8944162055219419
+        },
+        "platoon_mult_vs_rhp": {
+          "k": 1.0292110687353888,
+          "bb": 1.0385653780433344,
+          "hr": 0.9015118138153124,
+          "inplay": 1.0445105675629058
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -363,95 +481,6 @@
         "vs_pitcher_history": {}
       },
       {
-        "id": 694371,
-        "name": "Tommy Troy",
-        "pos": "LF",
-        "bat": "R",
-        "throw": "R",
-        "k_rate": 0.19719267139479904,
-        "bb_rate": 0.11040189125295508,
-        "hbp_rate": 0.0,
-        "hr_rate": 0.02680260047281324,
-        "inplay_hit_rate": 0.2538125,
-        "xb_hit_share": 0.2,
-        "vs_pitch_type": {},
-        "vs_pitch_type_hr": {},
-        "platoon_mult_vs_lhp": {
-          "k": 0.8075,
-          "bb": 0.8075,
-          "hr": 1.275,
-          "inplay": 1.1925000000000001
-        },
-        "platoon_mult_vs_rhp": {
-          "k": 1.0476750658303184,
-          "bb": 1.0727248394004283,
-          "hr": 0.8164356591589226,
-          "inplay": 0.8075
-        },
-        "statcast_quality_mult": {},
-        "vs_pitcher_history": {}
-      }
-    ],
-    "bench": [
-      {
-        "id": 680728,
-        "name": "Adrian Del Castillo",
-        "pos": "DH",
-        "bat": "L",
-        "throw": "R",
-        "k_rate": 0.30472191116088093,
-        "bb_rate": 0.0860488988428518,
-        "hbp_rate": 0.0,
-        "hr_rate": 0.028060843598357595,
-        "inplay_hit_rate": 0.22376137512639027,
-        "xb_hit_share": 0.16666666666666666,
-        "vs_pitch_type": {},
-        "vs_pitch_type_hr": {},
-        "platoon_mult_vs_lhp": {
-          "k": 1.1925000000000001,
-          "bb": 0.8075,
-          "hr": 0.78,
-          "inplay": 0.896904654315409
-        },
-        "platoon_mult_vs_rhp": {
-          "k": 0.9720855582220193,
-          "bb": 1.0310649604164408,
-          "hr": 1.0979426792030718,
-          "inplay": 1.03991414369634
-        },
-        "statcast_quality_mult": {},
-        "vs_pitcher_history": {}
-      },
-      {
-        "id": 666971,
-        "name": "Lourdes Gurriel Jr.",
-        "pos": "LF",
-        "bat": "R",
-        "throw": "R",
-        "k_rate": 0.1780701754385965,
-        "bb_rate": 0.06491228070175438,
-        "hbp_rate": 0.0,
-        "hr_rate": 0.010087719298245614,
-        "inplay_hit_rate": 0.2515327695560254,
-        "xb_hit_share": 0.17391304347826086,
-        "vs_pitch_type": {},
-        "vs_pitch_type_hr": {},
-        "platoon_mult_vs_lhp": {
-          "k": 0.8618226600985222,
-          "bb": 1.1925000000000001,
-          "hr": 0.78,
-          "inplay": 0.9253464830938176
-        },
-        "platoon_mult_vs_rhp": {
-          "k": 1.0383180858550316,
-          "bb": 0.9543436293436294,
-          "hr": 1.0990683229813665,
-          "inplay": 1.0400332536180403
-        },
-        "statcast_quality_mult": {},
-        "vs_pitcher_history": {}
-      },
-      {
         "id": 694410,
         "name": "LuJames Groover",
         "pos": "1B",
@@ -476,35 +505,6 @@
           "bb": 1.1925000000000001,
           "hr": 1.0,
           "inplay": 1.0720825852782765
-        },
-        "statcast_quality_mult": {},
-        "vs_pitcher_history": {}
-      },
-      {
-        "id": 694374,
-        "name": "Tim Tawa",
-        "pos": "LF",
-        "bat": "R",
-        "throw": "R",
-        "k_rate": 0.24359737939249554,
-        "bb_rate": 0.1308814770696843,
-        "hbp_rate": 0.0,
-        "hr_rate": 0.011643835616438355,
-        "inplay_hit_rate": 0.2002659574468085,
-        "xb_hit_share": 0.2,
-        "vs_pitch_type": {},
-        "vs_pitch_type_hr": {},
-        "platoon_mult_vs_lhp": {
-          "k": 0.8841969155538838,
-          "bb": 1.0965038942854646,
-          "hr": 0.78,
-          "inplay": 0.9346496367471292
-        },
-        "platoon_mult_vs_rhp": {
-          "k": 1.0264656921396245,
-          "bb": 0.8970505651973956,
-          "hr": 1.275,
-          "inplay": 0.9992695883134131
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -994,8 +994,7 @@
       "use_closer_in_9th_only": true,
       "pinch_hit_aggressiveness": 0.15
     },
-    "confirmed_lineup_ids": [],
-    "projected_lineup_ids": [
+    "confirmed_lineup_ids": [
       802139,
       671056,
       676475,
@@ -1006,8 +1005,9 @@
       691458,
       701675
     ],
-    "lineup_source": "projected_rotowire_today_lineup",
-    "lineup_confidence": 0.72,
+    "projected_lineup_ids": [],
+    "lineup_source": "confirmed_feed_live",
+    "lineup_confidence": 1.0,
     "probable_pitcher": {
       "id": 669467,
       "source": "feed_gameData_probablePitchers",
@@ -1850,16 +1850,16 @@
   },
   "weather": {
     "source": "statsapi_live_feed",
-    "condition": "",
-    "temperature_f": null,
-    "wind_speed_mph": null,
-    "wind_direction": "unknown",
-    "wind_raw": "",
+    "condition": "Partly Cloudy",
+    "temperature_f": 75.0,
+    "wind_speed_mph": 8.0,
+    "wind_direction": "in",
+    "wind_raw": "8 mph, In From LF",
     "is_dome": null,
     "multipliers": {
-      "hr_mult": 1.0,
-      "inplay_hit_mult": 1.0,
-      "xb_share_mult": 1.0
+      "hr_mult": 1.015,
+      "inplay_hit_mult": 1.0075,
+      "xb_share_mult": 1.004
     }
   },
   "park": {
@@ -1879,8 +1879,8 @@
   },
   "umpire": {
     "source": "statsapi_live_feed",
-    "home_plate_umpire_id": null,
-    "home_plate_umpire_name": "",
+    "home_plate_umpire_id": 608158,
+    "home_plate_umpire_name": "Nate Tomlinson",
     "called_strike_mult": 1.0,
     "multipliers": {
       "called_strike_mult": 1.0

@@ -899,20 +899,20 @@
       "use_closer_in_9th_only": true,
       "pinch_hit_aggressiveness": 0.15
     },
-    "confirmed_lineup_ids": [],
-    "projected_lineup_ids": [
+    "confirmed_lineup_ids": [
       687263,
-      685133,
-      666176,
       694384,
+      666176,
+      624585,
+      685133,
       694203,
-      695681,
       622268,
       681351,
       642350
     ],
-    "lineup_source": "projected_rotowire_today_lineup",
-    "lineup_confidence": 0.72,
+    "projected_lineup_ids": [],
+    "lineup_source": "confirmed_feed_live",
+    "lineup_confidence": 1.0,
     "probable_pitcher": {
       "id": 691951,
       "source": "feed_gameData_probablePitchers",
@@ -1008,30 +1008,30 @@
         "vs_pitcher_history": {}
       },
       {
-        "id": 685133,
-        "name": "Wade Meckler",
-        "pos": "LF",
+        "id": 694384,
+        "name": "Nolan Schanuel",
+        "pos": "1B",
         "bat": "L",
         "throw": "R",
-        "k_rate": 0.22331932773109242,
-        "bb_rate": 0.09859943977591035,
-        "hbp_rate": 0.0,
-        "hr_rate": 0.020238095238095236,
-        "inplay_hit_rate": 0.35116796440489434,
-        "xb_hit_share": 0.2727272727272727,
+        "k_rate": 0.1511181332036947,
+        "bb_rate": 0.08087019931939718,
+        "hbp_rate": 0.02066115702479339,
+        "hr_rate": 0.02344433641225085,
+        "inplay_hit_rate": 0.2655758606034849,
+        "xb_hit_share": 0.21818181818181817,
         "vs_pitch_type": {},
         "vs_pitch_type_hr": {},
         "platoon_mult_vs_lhp": {
-          "k": 1.1925000000000001,
-          "bb": 1.1925000000000001,
-          "hr": 0.78,
-          "inplay": 0.8075
+          "k": 1.1219144776728822,
+          "bb": 0.9731555339760931,
+          "hr": 1.1718407305499063,
+          "inplay": 0.8641942710833733
         },
         "platoon_mult_vs_rhp": {
-          "k": 0.9009427212380587,
-          "bb": 0.9213908450704226,
-          "hr": 1.2155343827671916,
-          "inplay": 1.0523854194585902
+          "k": 0.9846212181107207,
+          "bb": 0.9495100861127668,
+          "hr": 0.8476241312351178,
+          "inplay": 1.0743369527359672
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -1066,30 +1066,30 @@
         "vs_pitcher_history": {}
       },
       {
-        "id": 694384,
-        "name": "Nolan Schanuel",
-        "pos": "1B",
+        "id": 685133,
+        "name": "Wade Meckler",
+        "pos": "LF",
         "bat": "L",
         "throw": "R",
-        "k_rate": 0.1511181332036947,
-        "bb_rate": 0.08087019931939718,
-        "hbp_rate": 0.02066115702479339,
-        "hr_rate": 0.02344433641225085,
-        "inplay_hit_rate": 0.2655758606034849,
-        "xb_hit_share": 0.21818181818181817,
+        "k_rate": 0.22331932773109242,
+        "bb_rate": 0.09859943977591035,
+        "hbp_rate": 0.0,
+        "hr_rate": 0.020238095238095236,
+        "inplay_hit_rate": 0.35116796440489434,
+        "xb_hit_share": 0.2727272727272727,
         "vs_pitch_type": {},
         "vs_pitch_type_hr": {},
         "platoon_mult_vs_lhp": {
-          "k": 1.1219144776728822,
-          "bb": 0.9731555339760931,
-          "hr": 1.1718407305499063,
-          "inplay": 0.8641942710833733
+          "k": 1.1925000000000001,
+          "bb": 1.1925000000000001,
+          "hr": 0.78,
+          "inplay": 0.8075
         },
         "platoon_mult_vs_rhp": {
-          "k": 0.9846212181107207,
-          "bb": 0.9495100861127668,
-          "hr": 0.8476241312351178,
-          "inplay": 1.0743369527359672
+          "k": 0.9009427212380587,
+          "bb": 0.9213908450704226,
+          "hr": 1.2155343827671916,
+          "inplay": 1.0523854194585902
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -1119,35 +1119,6 @@
           "bb": 0.8441666666666666,
           "hr": 0.78,
           "inplay": 1.0705128205128207
-        },
-        "statcast_quality_mult": {},
-        "vs_pitcher_history": {}
-      },
-      {
-        "id": 695681,
-        "name": "Christian Moore",
-        "pos": "2B",
-        "bat": "R",
-        "throw": "R",
-        "k_rate": 0.7777777777777778,
-        "bb_rate": 0.0,
-        "hbp_rate": 0.0,
-        "hr_rate": 0.0,
-        "inplay_hit_rate": 0.5,
-        "xb_hit_share": 0.05,
-        "vs_pitch_type": {},
-        "vs_pitch_type_hr": {},
-        "platoon_mult_vs_lhp": {
-          "k": 0.9551020408163265,
-          "bb": 1.0,
-          "hr": 1.0,
-          "inplay": 1.0
-        },
-        "platoon_mult_vs_rhp": {
-          "k": 1.157142857142857,
-          "bb": 1.0,
-          "hr": 1.0,
-          "inplay": 0.8075
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -1235,6 +1206,35 @@
           "bb": 0.8331918136294361,
           "hr": 0.78,
           "inplay": 1.0986198097889122
+        },
+        "statcast_quality_mult": {},
+        "vs_pitcher_history": {}
+      },
+      {
+        "id": 695681,
+        "name": "Christian Moore",
+        "pos": "2B",
+        "bat": "R",
+        "throw": "R",
+        "k_rate": 0.7777777777777778,
+        "bb_rate": 0.0,
+        "hbp_rate": 0.0,
+        "hr_rate": 0.0,
+        "inplay_hit_rate": 0.5,
+        "xb_hit_share": 0.05,
+        "vs_pitch_type": {},
+        "vs_pitch_type_hr": {},
+        "platoon_mult_vs_lhp": {
+          "k": 0.9551020408163265,
+          "bb": 1.0,
+          "hr": 1.0,
+          "inplay": 1.0
+        },
+        "platoon_mult_vs_rhp": {
+          "k": 1.157142857142857,
+          "bb": 1.0,
+          "hr": 1.0,
+          "inplay": 0.8075
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -1749,16 +1749,16 @@
   },
   "weather": {
     "source": "statsapi_live_feed",
-    "condition": "",
-    "temperature_f": null,
-    "wind_speed_mph": null,
-    "wind_direction": "unknown",
-    "wind_raw": "",
+    "condition": "Clear",
+    "temperature_f": 74.0,
+    "wind_speed_mph": 8.0,
+    "wind_direction": "out",
+    "wind_raw": "8 mph, Out To CF",
     "is_dome": null,
     "multipliers": {
-      "hr_mult": 1.0,
-      "inplay_hit_mult": 1.0,
-      "xb_share_mult": 1.0
+      "hr_mult": 1.012,
+      "inplay_hit_mult": 1.006,
+      "xb_share_mult": 1.0032
     }
   },
   "park": {
@@ -1778,8 +1778,8 @@
   },
   "umpire": {
     "source": "statsapi_live_feed",
-    "home_plate_umpire_id": null,
-    "home_plate_umpire_name": "",
+    "home_plate_umpire_id": 596805,
+    "home_plate_umpire_name": "John Libka",
     "called_strike_mult": 1.0,
     "multipliers": {
       "called_strike_mult": 1.0

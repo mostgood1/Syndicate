@@ -9,9 +9,9 @@
     "officialDate": "2026-06-22",
     "status": {
       "abstractGameState": "Preview",
-      "codedGameState": "S",
-      "detailedState": "Scheduled",
-      "statusCode": "S",
+      "codedGameState": "P",
+      "detailedState": "Pre-Game",
+      "statusCode": "P",
       "startTimeTBD": false,
       "abstractGameCode": "P"
     },
@@ -70,6 +70,7 @@
           "ties": 0,
           "pct": ".605"
         },
+        "score": 0,
         "probablePitcher": {
           "id": 543037,
           "fullName": "Gerrit Cole",
@@ -138,6 +139,7 @@
           "ties": 0,
           "pct": ".429"
         },
+        "score": 0,
         "probablePitcher": {
           "id": 664285,
           "fullName": "Framber Valdez",
@@ -189,9 +191,9 @@
     "officialDate": "2026-06-22",
     "status": {
       "abstractGameState": "Preview",
-      "codedGameState": "S",
-      "detailedState": "Scheduled",
-      "statusCode": "S",
+      "codedGameState": "P",
+      "detailedState": "Pre-Game",
+      "statusCode": "P",
       "startTimeTBD": false,
       "abstractGameCode": "P"
     },
@@ -250,6 +252,7 @@
           "ties": 0,
           "pct": ".410"
         },
+        "score": 0,
         "probablePitcher": {
           "id": 608379,
           "fullName": "Michael Wacha",
@@ -318,6 +321,7 @@
           "ties": 0,
           "pct": ".581"
         },
+        "score": 0,
         "probablePitcher": {
           "id": 656876,
           "fullName": "Drew Rasmussen",
@@ -369,9 +373,9 @@
     "officialDate": "2026-06-22",
     "status": {
       "abstractGameState": "Preview",
-      "codedGameState": "S",
-      "detailedState": "Scheduled",
-      "statusCode": "S",
+      "codedGameState": "P",
+      "detailedState": "Pre-Game",
+      "statusCode": "P",
       "startTimeTBD": false,
       "abstractGameCode": "P"
     },
@@ -430,10 +434,11 @@
           "ties": 0,
           "pct": ".481"
         },
+        "score": 0,
         "probablePitcher": {
-          "id": 677958,
-          "fullName": "Kumar Rocker",
-          "link": "/api/v1/people/677958"
+          "id": 641302,
+          "fullName": "Tyler Alexander",
+          "link": "/api/v1/people/641302"
         },
         "splitSquad": false,
         "seriesNumber": 26,
@@ -498,6 +503,7 @@
           "ties": 0,
           "pct": ".513"
         },
+        "score": 0,
         "probablePitcher": {
           "id": 663969,
           "fullName": "Tyler Phillips",
@@ -549,10 +555,11 @@
     "officialDate": "2026-06-22",
     "status": {
       "abstractGameState": "Preview",
-      "codedGameState": "S",
-      "detailedState": "Scheduled",
-      "statusCode": "S",
+      "codedGameState": "P",
+      "detailedState": "Delayed Start",
+      "statusCode": "PR",
       "startTimeTBD": false,
+      "reason": "Rain",
       "abstractGameCode": "P"
     },
     "teams": {
@@ -609,6 +616,12 @@
           "losses": 35,
           "ties": 0,
           "pct": ".545"
+        },
+        "score": 0,
+        "probablePitcher": {
+          "id": 641835,
+          "fullName": "Tim Mayza",
+          "link": "/api/v1/people/641835"
         },
         "splitSquad": false,
         "seriesNumber": 26,
@@ -673,6 +686,7 @@
           "ties": 0,
           "pct": ".513"
         },
+        "score": 0,
         "probablePitcher": {
           "id": 656492,
           "fullName": "Foster Griffin",
@@ -724,9 +738,9 @@
     "officialDate": "2026-06-22",
     "status": {
       "abstractGameState": "Preview",
-      "codedGameState": "S",
-      "detailedState": "Scheduled",
-      "statusCode": "S",
+      "codedGameState": "P",
+      "detailedState": "Pre-Game",
+      "statusCode": "P",
       "startTimeTBD": false,
       "abstractGameCode": "P"
     },
@@ -785,6 +799,7 @@
           "ties": 0,
           "pct": ".468"
         },
+        "score": 0,
         "probablePitcher": {
           "id": 686613,
           "fullName": "Hunter Brown",
@@ -853,6 +868,12 @@
           "ties": 0,
           "pct": ".494"
         },
+        "score": 0,
+        "probablePitcher": {
+          "id": 656302,
+          "fullName": "Dylan Cease",
+          "link": "/api/v1/people/656302"
+        },
         "splitSquad": false,
         "seriesNumber": 26,
         "springLeague": {
@@ -899,9 +920,9 @@
     "officialDate": "2026-06-22",
     "status": {
       "abstractGameState": "Preview",
-      "codedGameState": "S",
-      "detailedState": "Scheduled",
-      "statusCode": "S",
+      "codedGameState": "P",
+      "detailedState": "Pre-Game",
+      "statusCode": "P",
       "startTimeTBD": false,
       "abstractGameCode": "P"
     },
@@ -960,6 +981,7 @@
           "ties": 0,
           "pct": ".519"
         },
+        "score": 0,
         "probablePitcher": {
           "id": 684007,
           "fullName": "Shota Imanaga",
@@ -1028,6 +1050,7 @@
           "ties": 0,
           "pct": ".442"
         },
+        "score": 0,
         "probablePitcher": {
           "id": 673540,
           "fullName": "Kodai Senga",
@@ -1079,9 +1102,9 @@
     "officialDate": "2026-06-22",
     "status": {
       "abstractGameState": "Preview",
-      "codedGameState": "S",
-      "detailedState": "Scheduled",
-      "statusCode": "S",
+      "codedGameState": "P",
+      "detailedState": "Pre-Game",
+      "statusCode": "P",
       "startTimeTBD": false,
       "abstractGameCode": "P"
     },
@@ -1139,6 +1162,12 @@
           "losses": 29,
           "ties": 0,
           "pct": ".613"
+        },
+        "score": 0,
+        "probablePitcher": {
+          "id": 605540,
+          "fullName": "Brandon Woodruff",
+          "link": "/api/v1/people/605540"
         },
         "splitSquad": false,
         "seriesNumber": 26,
@@ -1203,6 +1232,7 @@
           "ties": 0,
           "pct": ".487"
         },
+        "score": 0,
         "probablePitcher": {
           "id": 663903,
           "fullName": "Brady Singer",
@@ -1254,9 +1284,9 @@
     "officialDate": "2026-06-22",
     "status": {
       "abstractGameState": "Preview",
-      "codedGameState": "S",
-      "detailedState": "Scheduled",
-      "statusCode": "S",
+      "codedGameState": "P",
+      "detailedState": "Pre-Game",
+      "statusCode": "P",
       "startTimeTBD": false,
       "abstractGameCode": "P"
     },
@@ -1315,6 +1345,7 @@
           "ties": 0,
           "pct": ".628"
         },
+        "score": 0,
         "probablePitcher": {
           "id": 641778,
           "fullName": "Eric Lauer",
@@ -1383,6 +1414,7 @@
           "ties": 0,
           "pct": ".481"
         },
+        "score": 0,
         "probablePitcher": {
           "id": 805673,
           "fullName": "Zebby Matthews",
@@ -1434,9 +1466,9 @@
     "officialDate": "2026-06-22",
     "status": {
       "abstractGameState": "Preview",
-      "codedGameState": "S",
-      "detailedState": "Scheduled",
-      "statusCode": "S",
+      "codedGameState": "P",
+      "detailedState": "Pre-Game",
+      "statusCode": "P",
       "startTimeTBD": false,
       "abstractGameCode": "P"
     },
@@ -1495,6 +1527,7 @@
           "ties": 0,
           "pct": ".526"
         },
+        "score": 0,
         "probablePitcher": {
           "id": 668909,
           "fullName": "Gavin Williams",
@@ -1563,6 +1596,7 @@
           "ties": 0,
           "pct": ".513"
         },
+        "score": 0,
         "probablePitcher": {
           "id": 641743,
           "fullName": "Anthony Kay",
@@ -1614,9 +1648,9 @@
     "officialDate": "2026-06-22",
     "status": {
       "abstractGameState": "Preview",
-      "codedGameState": "S",
-      "detailedState": "Scheduled",
-      "statusCode": "S",
+      "codedGameState": "P",
+      "detailedState": "Pre-Game",
+      "statusCode": "P",
       "startTimeTBD": false,
       "abstractGameCode": "P"
     },
@@ -1675,6 +1709,7 @@
           "ties": 0,
           "pct": ".506"
         },
+        "score": 0,
         "probablePitcher": {
           "id": 518876,
           "fullName": "Merrill Kelly",
@@ -1743,6 +1778,7 @@
           "ties": 0,
           "pct": ".547"
         },
+        "score": 0,
         "probablePitcher": {
           "id": 669467,
           "fullName": "Andre Pallante",
@@ -1794,9 +1830,9 @@
     "officialDate": "2026-06-22",
     "status": {
       "abstractGameState": "Preview",
-      "codedGameState": "S",
-      "detailedState": "Scheduled",
-      "statusCode": "S",
+      "codedGameState": "P",
+      "detailedState": "Pre-Game",
+      "statusCode": "P",
       "startTimeTBD": false,
       "abstractGameCode": "P"
     },
@@ -1855,6 +1891,7 @@
           "ties": 0,
           "pct": ".413"
         },
+        "score": 0,
         "probablePitcher": {
           "id": 687562,
           "fullName": "Jake Bennett",
@@ -1923,6 +1960,7 @@
           "ties": 0,
           "pct": ".385"
         },
+        "score": 0,
         "probablePitcher": {
           "id": 663372,
           "fullName": "Ryan Feltner",
@@ -1974,9 +2012,9 @@
     "officialDate": "2026-06-22",
     "status": {
       "abstractGameState": "Preview",
-      "codedGameState": "S",
-      "detailedState": "Scheduled",
-      "statusCode": "S",
+      "codedGameState": "P",
+      "detailedState": "Pre-Game",
+      "statusCode": "P",
       "startTimeTBD": false,
       "abstractGameCode": "P"
     },

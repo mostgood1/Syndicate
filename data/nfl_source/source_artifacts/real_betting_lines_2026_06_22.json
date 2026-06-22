@@ -238,8 +238,8 @@
     },
     "Buffalo Bills @ Houston Texans": {
       "moneyline": {
-        "home": -105,
-        "away": -115
+        "home": -108,
+        "away": -112
       },
       "total_runs": {
         "line": 45.5,
@@ -255,11 +255,11 @@
           "outcomes": [
             {
               "name": "Buffalo Bills",
-              "price": -115
+              "price": -112
             },
             {
               "name": "Houston Texans",
-              "price": -105
+              "price": -108
             }
           ]
         },
@@ -946,8 +946,8 @@
     },
     "Detroit Lions @ Buffalo Bills": {
       "moneyline": {
-        "home": -155,
-        "away": 130
+        "home": -162,
+        "away": 136
       },
       "total_runs": {
         "line": 52.5,
@@ -963,11 +963,11 @@
           "outcomes": [
             {
               "name": "Buffalo Bills",
-              "price": -155
+              "price": -162
             },
             {
               "name": "Detroit Lions",
-              "price": 130
+              "price": 136
             }
           ]
         },
@@ -1064,8 +1064,8 @@
     },
     "New Orleans Saints @ Baltimore Ravens": {
       "moneyline": {
-        "home": -380,
-        "away": 300
+        "home": -375,
+        "away": 295
       },
       "total_runs": {
         "line": 46.5,
@@ -1081,11 +1081,11 @@
           "outcomes": [
             {
               "name": "Baltimore Ravens",
-              "price": -380
+              "price": -375
             },
             {
               "name": "New Orleans Saints",
-              "price": 300
+              "price": 295
             }
           ]
         },
@@ -1418,8 +1418,8 @@
     },
     "Philadelphia Eagles @ Tennessee Titans": {
       "moneyline": {
-        "home": 180,
-        "away": -218
+        "home": 185,
+        "away": -225
       },
       "total_runs": {
         "line": 42.5,
@@ -1435,11 +1435,11 @@
           "outcomes": [
             {
               "name": "Philadelphia Eagles",
-              "price": -218
+              "price": -225
             },
             {
               "name": "Tennessee Titans",
-              "price": 180
+              "price": 185
             }
           ]
         },
@@ -1595,8 +1595,8 @@
     },
     "Seattle Seahawks @ Arizona Cardinals": {
       "moneyline": {
-        "home": 390,
-        "away": -520
+        "home": 370,
+        "away": -485
       },
       "total_runs": {
         "line": 44.5,
@@ -1612,11 +1612,11 @@
           "outcomes": [
             {
               "name": "Arizona Cardinals",
-              "price": 390
+              "price": 370
             },
             {
               "name": "Seattle Seahawks",
-              "price": -520
+              "price": -485
             }
           ]
         },
@@ -1831,8 +1831,8 @@
     },
     "New York Giants @ Los Angeles Rams": {
       "moneyline": {
-        "home": -395,
-        "away": 310
+        "home": -410,
+        "away": 320
       },
       "total_runs": {
         "line": 47.5,
@@ -1848,11 +1848,11 @@
           "outcomes": [
             {
               "name": "Los Angeles Rams",
-              "price": -395
+              "price": -410
             },
             {
               "name": "New York Giants",
-              "price": 310
+              "price": 320
             }
           ]
         },
@@ -2657,8 +2657,8 @@
     },
     "Las Vegas Raiders @ New Orleans Saints": {
       "moneyline": {
-        "home": -166,
-        "away": 140
+        "home": -170,
+        "away": 142
       },
       "total_runs": {
         "line": 42.5,
@@ -2674,11 +2674,11 @@
           "outcomes": [
             {
               "name": "Las Vegas Raiders",
-              "price": 140
+              "price": 142
             },
             {
               "name": "New Orleans Saints",
-              "price": -166
+              "price": -170
             }
           ]
         },
@@ -3070,8 +3070,8 @@
     },
     "New England Patriots @ Buffalo Bills": {
       "moneyline": {
-        "home": -162,
-        "away": 136
+        "home": -166,
+        "away": 140
       },
       "total_runs": {
         "line": 49.5,
@@ -3087,11 +3087,11 @@
           "outcomes": [
             {
               "name": "Buffalo Bills",
-              "price": -162
+              "price": -166
             },
             {
               "name": "New England Patriots",
-              "price": 136
+              "price": 140
             }
           ]
         },
@@ -3424,8 +3424,8 @@
     },
     "Miami Dolphins @ Minnesota Vikings": {
       "moneyline": {
-        "home": -395,
-        "away": 310
+        "home": -375,
+        "away": 295
       },
       "total_runs": {
         "line": 43.5,
@@ -3441,11 +3441,11 @@
           "outcomes": [
             {
               "name": "Miami Dolphins",
-              "price": 310
+              "price": 295
             },
             {
               "name": "Minnesota Vikings",
-              "price": -395
+              "price": -375
             }
           ]
         },
@@ -3896,8 +3896,8 @@
     },
     "Cincinnati Bengals @ Miami Dolphins": {
       "moneyline": {
-        "home": 200,
-        "away": -245
+        "home": 205,
+        "away": -250
       },
       "total_runs": {
         "line": 49.5,
@@ -3913,11 +3913,11 @@
           "outcomes": [
             {
               "name": "Cincinnati Bengals",
-              "price": -245
+              "price": -250
             },
             {
               "name": "Miami Dolphins",
-              "price": 200
+              "price": 205
             }
           ]
         },
@@ -4132,8 +4132,8 @@
     },
     "Las Vegas Raiders @ New England Patriots": {
       "moneyline": {
-        "home": -425,
-        "away": 330
+        "home": -410,
+        "away": 320
       },
       "total_runs": {
         "line": 44.5,
@@ -4149,11 +4149,11 @@
           "outcomes": [
             {
               "name": "Las Vegas Raiders",
-              "price": 330
+              "price": 320
             },
             {
               "name": "New England Patriots",
-              "price": -425
+              "price": -410
             }
           ]
         },
@@ -4427,5 +4427,5 @@
     }
   },
   "source": "odds_api",
-  "fetched_at": "2026-06-22T11:59:11.182226+00:00"
+  "fetched_at": "2026-06-22T21:54:36.600462+00:00"
 }

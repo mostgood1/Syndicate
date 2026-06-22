@@ -3,11 +3,11 @@
     "date":  "2026-06-22",
     "runMode":  "standard",
     "overallStatus":  "ok",
-    "generatedAt":  "2026-06-22T11:38:21.7299380+00:00",
-    "updatedAt":  "2026-06-22T11:59:42.0264473+00:00",
-    "runDir":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-06-22\\20260622_113821",
+    "generatedAt":  "2026-06-22T21:34:47.8091645+00:00",
+    "updatedAt":  "2026-06-22T21:55:08.9432153+00:00",
+    "runDir":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-06-22\\20260622_213447",
     "latestDir":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest",
-    "lastUpdatedAt":  "2026-06-22T11:59:42.0200959+00:00",
+    "lastUpdatedAt":  "2026-06-22T21:55:08.9294052+00:00",
     "currentStage":  "completed",
     "completedStages":  [
                             "source_update",
@@ -153,9 +153,9 @@
                   "inputFingerprintCount":  3,
                   "artifactPathCount":  21,
                   "inputFingerprints":  [
-                                            "7e51aaee0d90a2cb1cc281f24e44786659bef4a8205fbb5e094f6e32a5f7d050",
-                                            "637389523396e8a8c17280d561a792e156d0979e397b009537c6294bb4f85241",
-                                            "128e1753fbd7a75e6b61eec751ff416120d5fa89e62795da1e172e4c175c9832"
+                                            "cd86e137fa96c9a9f44decfa5d6b302fb76f5488c2a0241023ab0a8bdf421549",
+                                            "3634783abbb1e61c12d1d4f11e67f2f375d21451c8c2b06694fbf88cb5a4f1aa",
+                                            "c8b7bdfc4e3b33c833f65ea3f6cf33d3442afafef3d6c835b7a19156d0f03c1c"
                                         ],
                   "artifactPaths":  [
                                         "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_0_NYM_at_CIN_pk824503_g1.json",
