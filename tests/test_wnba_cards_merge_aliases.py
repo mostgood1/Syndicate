@@ -40,7 +40,7 @@ class WnbaCardsMergeAliasTests(unittest.TestCase):
             "syndicate.features.wnba.cards._games_from_live_state_fallback",
             return_value=(live_games, "espn_live_fetch"),
         ):
-            merged_games, _, supplemented_count = _supplement_games_with_live_state(processed_games, "2026-05-30")
+            merged_games, _, supplemented_count, _ = _supplement_games_with_live_state(processed_games, "2026-05-30")
 
         self.assertEqual(len(merged_games), 1)
         self.assertEqual(supplemented_count, 0)
@@ -77,7 +77,7 @@ class WnbaCardsMergeAliasTests(unittest.TestCase):
             "syndicate.features.wnba.cards._games_from_live_state_fallback",
             return_value=(live_games, "espn_live_fetch"),
         ):
-            merged_games, _, supplemented_count = _supplement_games_with_live_state(processed_games, "2026-05-30")
+            merged_games, _, supplemented_count, _ = _supplement_games_with_live_state(processed_games, "2026-05-30")
 
         self.assertEqual(len(merged_games), 1)
         self.assertEqual(supplemented_count, 0)
@@ -103,6 +103,40 @@ class WnbaCardsMergeAliasTests(unittest.TestCase):
         self.assertEqual(payload["date"], "2026-06-11")
         self.assertTrue(payload["lookahead_applied"])
         self.assertEqual(len(payload["games"]), 1)
+
+    def test_source_cards_payload_uses_live_supplement_for_today(self) -> None:
+        artifact_bundle = {
+            "rows": [
+                {"away_tri": "CHI", "home_tri": "CON", "gamePk": "1", "commence_time": "2026-06-22T18:00:00Z"},
+                {"away_tri": "TOR", "home_tri": "ATL", "gamePk": "2", "commence_time": "2026-06-22T20:00:00Z"},
+            ],
+            "recommendations": {},
+            "sim": {},
+            "props": {},
+        }
+
+        live_games = [
+            {"gamePk": "401857012", "event_id": "401857012", "away_tri": "CHI", "home_tri": "CON", "status": "Scheduled", "detail": "Scheduled", "live_state": {"event_id": "401857012", "away": "CHI", "home": "CON"}},
+            {"gamePk": "401857013", "event_id": "401857013", "away_tri": "TOR", "home_tri": "ATL", "status": "Scheduled", "detail": "Scheduled", "live_state": {"event_id": "401857013", "away": "TOR", "home": "ATL"}},
+            {"gamePk": "401857014", "event_id": "401857014", "away_tri": "PHX", "home_tri": "IND", "status": "Scheduled", "detail": "Scheduled", "live_state": {"event_id": "401857014", "away": "PHX", "home": "IND"}},
+            {"gamePk": "401857015", "event_id": "401857015", "away_tri": "DAL", "home_tri": "SEA", "status": "Scheduled", "detail": "Scheduled", "live_state": {"event_id": "401857015", "away": "DAL", "home": "SEA"}},
+        ]
+
+        with patch("syndicate.features.wnba.cards.central_today_iso", return_value="2026-06-22"), patch(
+            "syndicate.features.wnba.cards._resolved_source_cards_date",
+            return_value="2026-06-22",
+        ), patch(
+            "syndicate.features.wnba.cards._artifact_bundle",
+            return_value=artifact_bundle,
+        ), patch(
+            "syndicate.features.wnba.cards._games_from_live_state_fallback",
+            return_value=(live_games, "espn_scoreboard_fallback"),
+        ):
+            payload = build_source_cards_payload("2026-06-22")
+
+        self.assertEqual(payload["date"], "2026-06-22")
+        self.assertEqual(len(payload["games"]), 4)
+        self.assertEqual([game.get("event_id") for game in payload["games"]], ["401857012", "401857013", "401857014", "401857015"])
 
 
 if __name__ == "__main__":

@@ -941,6 +941,8 @@ def build_source_cards_payload(selected_date: str, *, allow_stored_date_fallback
         )
         for idx, row in enumerate(rows, start=1)
     ]
+    if resolved_date == central_today_iso():
+        games, _, _, _ = _supplement_games_with_live_state(games, resolved_date)
     return {
         "date": resolved_date,
         "requested_date": requested_date,
