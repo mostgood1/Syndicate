@@ -107,7 +107,7 @@ jobs:
           $forceWindowMinutes = [int]$env:EVENT_SIM_FORCE_WINDOW_MINUTES
 
           if ([string]::IsNullOrWhiteSpace($env:BASE_URL)) {
-            & ./daily_update_in_season.ps1 `
+            & ./scripts/daily_update_in_season.ps1 `
               -Date $env:DATE `
               -RefreshOdds `
               -OddsPhase all `
@@ -117,7 +117,7 @@ jobs:
               -EventSimForceWindowMinutes $forceWindowMinutes 2>&1 | Tee-Object -FilePath daily-update.log
           }
           else {
-            & ./daily_update_in_season.ps1 `
+            & ./scripts/daily_update_in_season.ps1 `
               -Date $env:DATE `
               -BaseUrl $env:BASE_URL `
               -RefreshOdds `
@@ -156,19 +156,18 @@ jobs:
           Write-Host 'Pipeline output changes detected:'
           Write-Host $status
 
-          git commit -m "Update daily pipeline outputs" || true
-          $branch = $env:GITHUB_REF_NAME
-          Write-Host "Preparing to push commit to origin/$branch"
-
-          # Verify at least one published artifact tree is present in HEAD; fail loudly if missing.
-          $filesInHead = git --no-pager show --name-only --pretty=format:'' HEAD
-          Write-Host 'Files included in HEAD commit:'
-          Write-Host $filesInHead
-          $artifactTreePresent = ($filesInHead | Select-String -Pattern '^data/[^/]+_source/(source_artifacts|manifests)/' -Quiet)
+          $stagedFiles = @(& git diff --cached --name-only --relative)
+          Write-Host 'Files staged for commit:'
+          Write-Host ($stagedFiles -join "`n")
+          $artifactTreePresent = ($stagedFiles | Select-String -Pattern '^data/[^/]+_source/(source_artifacts|manifests)/' -Quiet)
           if (-not $artifactTreePresent) {
-            Write-Error 'ERROR: artifacts not found in HEAD commit; failing workflow to indicate Stage 2 failure.'
+            Write-Error 'ERROR: artifacts not found in staged pipeline outputs; failing workflow to indicate Stage 2 failure.'
             exit 1
           }
+
+          git commit -m "Update daily pipeline outputs"
+          $branch = $env:GITHUB_REF_NAME
+          Write-Host "Preparing to push commit to origin/$branch"
 
           # Ensure push uses the available GitHub token if needed
           if ($env:GITHUB_TOKEN) {
