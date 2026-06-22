@@ -41,6 +41,8 @@ from syndicate.features.shared.manifest import publish_sport_manifest
 
 _PUBLISH_MANIFEST_LOCK = Lock()
 
+_DEFAULT_INTERVAL_MARKETS = "h2h,spreads,totals,spreads_h1,totals_h1,spreads_h2,totals_h2"
+
 
 @dataclass(frozen=True)
 class RefreshStep:
@@ -192,6 +194,15 @@ def _build_nba_payload(args: argparse.Namespace, *, env_key: str) -> dict[str, s
     return {env_key: _json_payload(payload)}
 
 
+def _effective_markets(slug: str, requested_markets: str) -> str:
+    cleaned = str(requested_markets or "").strip()
+    if cleaned:
+        return cleaned
+    if slug in {"nba", "wnba", "ncaab"}:
+        return _DEFAULT_INTERVAL_MARKETS
+    return ""
+
+
 def _local_source_artifact_root(slug: str) -> Path:
     data_root = str(os.environ.get("SYNDICATE_DATA_ROOT") or "").strip()
     if data_root:
@@ -231,6 +242,7 @@ def _build_nba_steps(args: argparse.Namespace) -> list[RefreshStep]:
     payload = _build_nba_payload(args, env_key="NBA_BETTING_ODDSAPI_PROPS_JOB")["NBA_BETTING_ODDSAPI_PROPS_JOB"]
     payload_data = json.loads(payload)
     artifact_root = _local_source_artifact_root("nba")
+    markets = _effective_markets("nba", args.markets)
     command = [
         python_exe,
         "scripts/refresh_nba_oddsapi_props.py",
@@ -251,8 +263,8 @@ def _build_nba_steps(args: argparse.Namespace) -> list[RefreshStep]:
     ]
     if args.bookmakers:
         command.extend(["--bookmakers", str(args.bookmakers)])
-    if args.markets:
-        command.extend(["--markets", str(args.markets)])
+    if markets:
+        command.extend(["--markets", markets])
     return [
         RefreshStep(
             name="nba_oddsapi_props_job",
@@ -270,6 +282,7 @@ def _build_wnba_steps(args: argparse.Namespace) -> list[RefreshStep]:
     payload = _build_nba_payload(args, env_key="WNBA_BETTING_ODDSAPI_PROPS_JOB")["WNBA_BETTING_ODDSAPI_PROPS_JOB"]
     payload_data = json.loads(payload)
     artifact_root = _local_source_artifact_root("wnba")
+    markets = _effective_markets("wnba", args.markets)
     command = [
         python_exe,
         "scripts/refresh_wnba_oddsapi_props.py",
@@ -290,8 +303,8 @@ def _build_wnba_steps(args: argparse.Namespace) -> list[RefreshStep]:
     ]
     if args.bookmakers:
         command.extend(["--bookmakers", str(args.bookmakers)])
-    if args.markets:
-        command.extend(["--markets", str(args.markets)])
+    if markets:
+        command.extend(["--markets", markets])
     return [
         RefreshStep(
             name="wnba_oddsapi_props_job",
@@ -352,6 +365,7 @@ def _build_nfl_steps(args: argparse.Namespace) -> list[RefreshStep]:
 def _build_ncaab_steps(args: argparse.Namespace) -> list[RefreshStep]:
     python_exe = _venv_python(REPO_ROOT)
     raw_outputs_root = REPO_ROOT / "data" / "ncaab_source" / "raw_outputs" / "by_date" / args.date
+    markets = _effective_markets("ncaab", args.markets)
     return [
         RefreshStep(
             name="ncaab_odds_history_snapshot",
@@ -368,6 +382,8 @@ def _build_ncaab_steps(args: argparse.Namespace) -> list[RefreshStep]:
                 str(raw_outputs_root),
                 "--mode",
                 "current",
+                "--markets",
+                markets,
             ),
             description="Refresh NCAAB current-day odds snapshot with full-game and derivative markets.",
         )

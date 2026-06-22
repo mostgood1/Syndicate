@@ -125,3 +125,24 @@ class RefreshOddsSourcesTests(unittest.TestCase):
         self.assertTrue(summary["ok"])
         self.assertEqual(summary["publish_parity"]["totalForcedPublishPaths"], 3)
         mocked_publish_parity.assert_called_once()
+
+    def test_interval_market_defaults_are_forwarded_for_basketball_sports(self) -> None:
+        module = self._load_module()
+        args = argparse.Namespace(
+            date="2026-06-07",
+            regions="us",
+            bookmakers="",
+            markets="",
+        )
+
+        nba_steps = module._build_nba_steps(args)
+        wnba_steps = module._build_wnba_steps(args)
+        ncaab_steps = module._build_ncaab_steps(args)
+
+        expected_markets = "h2h,spreads,totals,spreads_h1,totals_h1,spreads_h2,totals_h2"
+        self.assertIn("--markets", nba_steps[0].command)
+        self.assertIn(expected_markets, nba_steps[0].command)
+        self.assertIn("--markets", wnba_steps[0].command)
+        self.assertIn(expected_markets, wnba_steps[0].command)
+        self.assertIn("--markets", ncaab_steps[0].command)
+        self.assertIn(expected_markets, ncaab_steps[0].command)
