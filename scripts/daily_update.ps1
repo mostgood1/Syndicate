@@ -1,3 +1,15 @@
+<#
+Context: Syndicate Simulation System
+See: docs/ai_context/architecture.md
+
+Role:
+- Daily update wrapper that launches the unified runner and reconciliation.
+
+Constraints:
+- State-driven execution
+- Avoid redundant computation
+#>
+
 param(
     [string]$Date,
     [string]$BaseUrl,

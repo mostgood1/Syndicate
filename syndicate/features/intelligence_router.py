@@ -1,3 +1,15 @@
+"""
+Context: Syndicate Simulation System
+See: docs/ai_context/architecture.md
+
+Role:
+- Routes intelligence requests to the correct analysis and response builders.
+
+Constraints:
+- State-driven execution
+- Avoid redundant computation
+"""
+
 from __future__ import annotations
 
 

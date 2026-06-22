@@ -8,6 +8,18 @@ CENTRAL DECISION ENGINE RULES
 - Scoring must be centralized and sport-agnostic
 """
 
+"""
+Context: Syndicate Simulation System
+See: docs/ai_context/architecture.md
+
+Role:
+- Serves the core intelligence layer and cached response state.
+
+Constraints:
+- State-driven execution
+- Avoid redundant computation
+"""
+
 from __future__ import annotations
 
 from difflib import SequenceMatcher

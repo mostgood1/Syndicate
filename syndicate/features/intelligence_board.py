@@ -1,3 +1,15 @@
+"""
+Context: Syndicate Simulation System
+See: docs/ai_context/architecture.md
+
+Role:
+- Builds intelligence board payloads for UI presentation and summaries.
+
+Constraints:
+- State-driven execution
+- Avoid redundant computation
+"""
+
 from __future__ import annotations
 
 from typing import Any, Mapping

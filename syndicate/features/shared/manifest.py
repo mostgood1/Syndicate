@@ -1,3 +1,15 @@
+"""
+Context: Syndicate Simulation System
+See: docs/ai_context/architecture.md
+
+Role:
+- Publishes per-sport artifact manifests and metadata.
+
+Constraints:
+- State-driven execution
+- Avoid redundant computation
+"""
+
 from __future__ import annotations
 
 from datetime import datetime, timezone

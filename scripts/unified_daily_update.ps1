@@ -1,3 +1,15 @@
+<#
+Context: Syndicate Simulation System
+See: docs/ai_context/architecture.md
+
+Role:
+- Main orchestration controller for planning, state updates, simulation, artifact generation, and publish.
+
+Constraints:
+- State-driven execution
+- Avoid redundant computation
+#>
+
 param(
     [string]$Date,
     [string]$BaseUrl,

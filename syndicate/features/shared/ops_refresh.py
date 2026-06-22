@@ -1,3 +1,15 @@
+"""
+Context: Syndicate Simulation System
+See: docs/ai_context/architecture.md
+
+Role:
+- Builds and tracks refresh plans, runtime state, and launch metadata.
+
+Constraints:
+- State-driven execution
+- Avoid redundant computation
+"""
+
 from __future__ import annotations
 
 import argparse

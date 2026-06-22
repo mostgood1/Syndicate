@@ -1,3 +1,15 @@
+<#
+Context: Syndicate Simulation System
+See: docs/ai_context/architecture.md
+
+Role:
+- In-season orchestration wrapper for refresh, gate, and publish flow.
+
+Constraints:
+- State-driven execution
+- Avoid redundant computation
+#>
+
 param(
     [string]$Date,
     [string]$BaseUrl,

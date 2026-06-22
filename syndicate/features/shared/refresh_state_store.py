@@ -1,3 +1,15 @@
+"""
+Context: Syndicate Simulation System
+See: docs/ai_context/architecture.md
+
+Role:
+- Reads and writes refresh state, manifests, and latest reports across filesystem or key-value storage.
+
+Constraints:
+- State-driven execution
+- Avoid redundant computation
+"""
+
 from __future__ import annotations
 
 from functools import lru_cache

@@ -1,3 +1,15 @@
+<#
+Context: Syndicate Simulation System
+See: docs/ai_context/architecture.md
+
+Role:
+- Runs mirror refreshes and then the migration gate.
+
+Constraints:
+- State-driven execution
+- Avoid redundant computation
+#>
+
 param(
     [string]$Date = (Get-Date).ToString('yyyy-MM-dd'),
     [string]$BaseUrl,

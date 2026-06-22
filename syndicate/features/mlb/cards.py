@@ -4320,6 +4320,42 @@ def build_cards_page_context(selected_date: str) -> dict[str, Any]:
         actual_games=actual_games,
         first1_signals_by_game=_rfi_targets_signal_index(rfi_targets),
     ) if summary else []
+    
+    # ✅ FALLBACK: use live data if summary produced no games
+    
+    if not games:
+        live_lens_report = load_json_file(live_lens_path)
+        live_games = (
+            live_lens_report.get("games")
+            if isinstance((live_lens_report or {}).get("games"), list)
+            else []
+        )
+
+        if live_games:
+            print("⚠️ FALLBACK: transforming live lens games into card format")
+
+            games = []
+            for lg in live_games:
+                try:
+                    games.append({
+                        "gamePk": lg.get("gamePk"),
+
+                        "home": {
+                            "abbr": lg.get("homeTeam", "UNK"),
+                        },
+                        "away": {
+                            "abbr": lg.get("awayTeam", "UNK"),
+                        },
+                        
+                        "detail": lg.get("status", "Live"),
+
+                        # keep raw data for later use if needed
+                        "live": lg,
+                    })
+                except Exception as e:
+                    print("⚠️ Skipping bad live game:", e)
+
+
     latest_live_odds_refreshed_at = None
     live_lens_report = None
     if not isinstance(live_lens_report, dict):
