@@ -1756,6 +1756,57 @@ def _fetch_current_feed_live(game_pk: int) -> dict[str, Any] | None:
     except (OSError, ValueError, URLError):
         return None
 
+def _game_from_live_lens_row(row: dict[str, Any], *, selected_date: str) -> dict[str, Any]:
+    matchup = row.get("matchup") if isinstance(row.get("matchup"), dict) else {}
+    away = matchup.get("away") if isinstance(matchup.get("away"), dict) else {}
+    home = matchup.get("home") if isinstance(matchup.get("home"), dict) else {}
+    status = row.get("status") if isinstance(row.get("status"), dict) else {}
+    score = matchup.get("score") if isinstance(matchup.get("score"), dict) else {}
+    game_pk = int(row.get("gamePk") or 0)
+    start_time = str(row.get("startTime") or row.get("detail") or selected_date).strip() or selected_date
+    detailed_status = str(status.get("detailed") or status.get("detailedState") or start_time).strip() or start_time
+    summary = str(row.get("summary") or matchup.get("liveText") or detailed_status).strip() or detailed_status
+    return {
+        "gamePk": game_pk,
+        "card_variant": "mlb_main",
+        "gameType": str(row.get("gameType") or "MLB").strip() or "MLB",
+        "away": _team_display(str((away or {}).get("abbr") or row.get("awayTeam") or "AWY"), str((away or {}).get("name") or (away or {}).get("abbr") or row.get("awayTeam") or "Away")),
+        "home": _team_display(str((home or {}).get("abbr") or row.get("homeTeam") or "HME"), str((home or {}).get("name") or (home or {}).get("abbr") or row.get("homeTeam") or "Home")),
+        "status": {
+            "abstract": str(status.get("abstract") or status.get("abstractGameState") or "Live").strip() or "Live",
+            "detailed": detailed_status,
+        },
+        "status_badge": str(row.get("status_badge") or status.get("abstract") or status.get("abstractGameState") or "Live lens").strip() or "Live lens",
+        "detail_label": str(row.get("detail_label") or "First pitch").strip() or "First pitch",
+        "detail": detailed_status,
+        "startTime": start_time,
+        "gameDate": selected_date,
+        "officialDate": selected_date,
+        "summary": summary,
+        "hero_note": str(row.get("hero_note") or "").strip(),
+        "metrics": row.get("metrics") if isinstance(row.get("metrics"), list) else [],
+        "panels": row.get("panels") if isinstance(row.get("panels"), list) else [],
+        "score": dict(score) if isinstance(score, dict) else {},
+        "matchup": dict(matchup) if isinstance(matchup, dict) else {},
+        "predictions": row.get("predictions") if isinstance(row.get("predictions"), dict) else {},
+        "markets": row.get("markets") if isinstance(row.get("markets"), dict) else (row.get("gameMarkets") if isinstance(row.get("gameMarkets"), dict) else {}),
+        "gameMarkets": row.get("gameMarkets") if isinstance(row.get("gameMarkets"), dict) else {},
+        "gameLens": row.get("gameLens") if isinstance(row.get("gameLens"), list) else [],
+        "market_tiles": row.get("market_tiles") if isinstance(row.get("market_tiles"), list) else [],
+        "probable": row.get("probable") if isinstance(row.get("probable"), dict) else {},
+        "props": row.get("props") if isinstance(row.get("props"), list) else [],
+        "liveProps": row.get("liveProps") if isinstance(row.get("liveProps"), list) else [],
+        "trackedProps": row.get("trackedProps") if isinstance(row.get("trackedProps"), list) else [],
+        "archivedLiveProps": row.get("archivedLiveProps") if isinstance(row.get("archivedLiveProps"), list) else [],
+        "prop_groups": row.get("prop_groups") if isinstance(row.get("prop_groups"), list) else [],
+        "prop_lens": row.get("prop_lens") if isinstance(row.get("prop_lens"), dict) else {},
+        "first1BetSignal": row.get("first1BetSignal") if isinstance(row.get("first1BetSignal"), dict) else {},
+        "snapshotAvailable": bool(row.get("snapshotAvailable")),
+        "simContextAvailable": bool(row.get("simContextAvailable")),
+        "href": f"/mlb/game/{game_pk}?date={selected_date}",
+        "href_label": "Open game detail",
+    }
+
 
 def source_cards_api_payload(context: dict[str, Any]) -> dict[str, Any]:
     games = context.get("games") if isinstance(context.get("games"), list) else []
@@ -4337,21 +4388,7 @@ def build_cards_page_context(selected_date: str) -> dict[str, Any]:
             games = []
             for lg in live_games:
                 try:
-                    games.append({
-                        "gamePk": lg.get("gamePk"),
-
-                        "home": {
-                            "abbr": lg.get("homeTeam", "UNK"),
-                        },
-                        "away": {
-                            "abbr": lg.get("awayTeam", "UNK"),
-                        },
-                        
-                        "detail": lg.get("status", "Live"),
-
-                        # keep raw data for later use if needed
-                        "live": lg,
-                    })
+                    games.append(_game_from_live_lens_row(lg, selected_date=resolved_date))
                 except Exception as e:
                     print("⚠️ Skipping bad live game:", e)
 
