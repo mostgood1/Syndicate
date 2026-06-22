@@ -188,7 +188,10 @@ class WnbaLiveSnapshotLocalTests(unittest.TestCase):
                     }
                 ]
             },
-        ), patch("syndicate.features.wnba.cards._public_scoreboard_live_state_payload", return_value=None):
+        ), patch("syndicate.features.wnba.cards._remote_live_snapshot_payload", return_value=None), patch(
+            "syndicate.features.wnba.cards._public_scoreboard_live_state_payload",
+            return_value=None,
+        ):
             _local_live_state_payload.cache_clear()
             payload = build_live_state_payload("2026-05-21", ttl=12)
             _local_live_state_payload.cache_clear()
@@ -251,7 +254,7 @@ class WnbaLiveSnapshotLocalTests(unittest.TestCase):
         self.assertEqual(game.get("clock"), "3:27")
         self.assertEqual(game.get("period"), 4)
 
-    def test_live_state_payload_filters_public_rows_to_requested_slate(self) -> None:
+    def test_live_state_payload_preserves_public_rows_when_cards_context_is_incomplete(self) -> None:
         with patch("syndicate.features.wnba.cards.central_today_iso", return_value="2026-05-21"), patch(
             "syndicate.features.wnba.cards._remote_live_snapshot_payload",
             return_value=None,
@@ -311,8 +314,8 @@ class WnbaLiveSnapshotLocalTests(unittest.TestCase):
         ):
             payload = build_live_state_payload("2026-05-21", ttl=12)
 
-        self.assertEqual([game.get("event_id") for game in payload.get("games") or []], ["evt-1"])
-        self.assertEqual(len(payload.get("games") or []), 1)
+        self.assertEqual([game.get("event_id") for game in payload.get("games") or []], ["evt-1", "evt-999"])
+        self.assertEqual(len(payload.get("games") or []), 2)
 
     def test_live_lines_payload_merges_partial_local_snapshot_with_artifact(self) -> None:
         with patch("syndicate.features.wnba.cards.build_cards_page_context", return_value={"date": "2026-05-21"}), patch(

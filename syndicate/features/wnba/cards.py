@@ -1296,22 +1296,38 @@ def _games_from_artifacts(selected_date: str) -> tuple[list[dict[str, Any]], str
 
 
 def _games_from_live_state_fallback(selected_date: str, ttl: int = 12) -> tuple[list[dict[str, Any]], str]:
-    payload = _local_live_state_payload(selected_date)
+    is_today = str(selected_date).strip() == central_today_iso()
+    should_try_remote = _remote_source_fallback_enabled() or is_today
+    candidate_payloads: list[dict[str, Any] | None] = []
+    if is_today:
+        if should_try_remote:
+            candidate_payloads.append(_remote_live_snapshot_payload("live_state", selected_date=selected_date))
+        candidate_payloads.append(_public_scoreboard_live_state_payload(selected_date))
+        candidate_payloads.append(_local_live_state_payload(selected_date))
+    else:
+        candidate_payloads.append(_local_live_state_payload(selected_date))
+        if should_try_remote:
+            candidate_payloads.append(_remote_live_snapshot_payload("live_state", selected_date=selected_date))
+        candidate_payloads.append(_public_scoreboard_live_state_payload(selected_date))
+
+    payload: dict[str, Any] | None = None
     source_path = None
-    if isinstance(payload, dict):
-        try:
-            source_path = str(live_snapshot_path(f"live_state_{selected_date}.jsonl"))
-        except FileNotFoundError:
-            source_path = None
-    if (
-        not isinstance(payload, dict)
-        or not isinstance(payload.get("games"), list)
-        or not payload.get("games")
-    ) and not _render_web_dyno():
-        public_payload = _public_scoreboard_live_state_payload(selected_date)
-        if isinstance(public_payload, dict) and isinstance(public_payload.get("games"), list) and public_payload.get("games"):
-            payload = public_payload
-            source_path = "espn_scoreboard_fallback"
+    for candidate_payload in candidate_payloads:
+        if isinstance(candidate_payload, dict) and isinstance(candidate_payload.get("games"), list) and bool(candidate_payload.get("games")):
+            payload = candidate_payload
+            source_name = str(candidate_payload.get("source") or "").strip().lower()
+            if source_name:
+                source_path = source_name
+            elif is_today:
+                source_path = "espn_scoreboard_fallback"
+            else:
+                try:
+                    source_path = str(live_snapshot_path(f"live_state_{selected_date}.jsonl"))
+                except FileNotFoundError:
+                    source_path = None
+            break
+    if payload is None:
+        payload = {}
     rows = payload.get("games") if isinstance((payload or {}).get("games"), list) else []
     sim_index = _artifact_bundle(selected_date).get("sim", {})
     games: list[dict[str, Any]] = []
@@ -1509,6 +1525,8 @@ def build_cards_page_context(selected_date: str, *, allow_stored_date_fallback: 
     next_date = (parsed_date + timedelta(days=1)).isoformat()
 
     games, cards_path, recs_path = _games_from_artifacts(resolved_date)
+    if not allow_stored_date_fallback and resolved_date == central_today_iso() and resolved_date not in str(cards_path):
+        games = []
     source_title = "WNBA processed game cards"
     had_artifact_games = bool(games)
     games, live_source_path, supplemented_count, updated_count = _supplement_games_with_live_state(games, resolved_date)
@@ -3144,13 +3162,9 @@ def build_live_state_payload(selected_date: str, ttl: int = 12, *, allow_stored_
         context_for_event_ids = build_cards_page_context(selected_date, allow_stored_date_fallback=allow_stored_date_fallback)
         context_games = context_for_event_ids.get("games") if isinstance(context_for_event_ids.get("games"), list) else []
         games_by_matchup: dict[tuple[str, str], dict[str, Any]] = {}
-        allowed_event_ids: set[str] = set()
         for cards_game in context_games:
             if not isinstance(cards_game, dict):
                 continue
-            event_id = str(cards_game.get("event_id") or "").strip()
-            if event_id:
-                allowed_event_ids.add(event_id)
             away_tri = _canonical_wnba_tri(
                 str(
                     cards_game.get("away_tri")
@@ -3175,14 +3189,7 @@ def build_live_state_payload(selected_date: str, ttl: int = 12, *, allow_stored_
             away_tri = _canonical_wnba_tri(game.get("away"))
             home_tri = _canonical_wnba_tri(game.get("home"))
             event_id = str(game.get("event_id") or "").strip()
-            if allowed_event_ids and event_id and event_id not in allowed_event_ids:
-                if not (away_tri and home_tri and (away_tri, home_tri) in games_by_matchup):
-                    continue
-            elif allowed_event_ids and not event_id and not (away_tri and home_tri and (away_tri, home_tri) in games_by_matchup):
-                continue
             cards_game = games_by_matchup.get((away_tri, home_tri)) if away_tri and home_tri else None
-            if not isinstance(cards_game, dict) and len(context_games) == 1 and isinstance(context_games[0], dict):
-                cards_game = context_games[0]
             if isinstance(cards_game, dict):
                 event_id = str(cards_game.get("event_id") or "").strip()
                 if event_id:
