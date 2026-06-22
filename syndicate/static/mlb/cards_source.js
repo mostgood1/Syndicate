@@ -1332,14 +1332,22 @@
       const spread = row.markets.spread;
       const total = row.markets.total;
       const primaryCard = primaryMarketCard(row);
-      const marketLine = [
-        selectedPickLabel('total', total) ? `Total lane ${selectedPickLabel('total', total)}${selectedOdds('total', total) != null ? ` ${formatOdds(selectedOdds('total', total))}` : ''}` : (total.line != null ? `Total ${formatLine(total.line)}` : null),
-        selectedPickLabel('spread', spread) ? `Run line ${selectedPickLabel('spread', spread)}${selectedOdds('spread', spread) != null ? ` ${formatOdds(selectedOdds('spread', spread))}` : ''}` : (spread.homeLine != null ? `Home ${formatSigned(spread.homeLine, 1)}` : null),
-        ml.homeOdds || ml.awayOdds ? `${card?.away?.abbr || 'Away'} ${formatOdds(ml.awayOdds)} / ${card?.home?.abbr || 'Home'} ${formatOdds(ml.homeOdds)}` : null,
-      ].filter(Boolean).join(' | ');
-      const marketProbText = marketLine
+      const hasSegmentMarket = !!(selectedPickLabel('total', total) || selectedPickLabel('spread', spread) || ml?.pick);
+      const marketLine = row.key === 'full'
+        ? [
+            selectedPickLabel('total', total) ? `Total lane ${selectedPickLabel('total', total)}${selectedOdds('total', total) != null ? ` ${formatOdds(selectedOdds('total', total))}` : ''}` : (total.line != null ? `Total ${formatLine(total.line)}` : null),
+            selectedPickLabel('spread', spread) ? `Run line ${selectedPickLabel('spread', spread)}${selectedOdds('spread', spread) != null ? ` ${formatOdds(selectedOdds('spread', spread))}` : ''}` : (spread.homeLine != null ? `Home ${formatSigned(spread.homeLine, 1)}` : null),
+            ml.homeOdds || ml.awayOdds ? `${card?.away?.abbr || 'Away'} ${formatOdds(ml.awayOdds)} / ${card?.home?.abbr || 'Home'} ${formatOdds(ml.homeOdds)}` : null,
+          ].filter(Boolean).join(' | ')
+        : (hasSegmentMarket
+          ? [
+              selectedPickLabel('total', total) ? `Total lane ${selectedPickLabel('total', total)}${selectedOdds('total', total) != null ? ` ${formatOdds(selectedOdds('total', total))}` : ''}` : null,
+              selectedPickLabel('spread', spread) ? `Run line ${selectedPickLabel('spread', spread)}${selectedOdds('spread', spread) != null ? ` ${formatOdds(selectedOdds('spread', spread))}` : ''}` : null,
+            ].filter(Boolean).join(' | ')
+          : 'Model only');
+      const marketProbText = row.key === 'full'
         ? formatPercent(ml.marketHomeProb, 1)
-        : formatPercent(row.baselineHomeWinProb ?? row.modelHomeWinProb, 1);
+        : formatPercent(row.modelHomeWinProb ?? row.baselineHomeWinProb, 1);
       const trackedClosedBlocks = row.closed
         ? [
             { shortLabel: 'ML', marketType: 'moneyline', market: ml },
