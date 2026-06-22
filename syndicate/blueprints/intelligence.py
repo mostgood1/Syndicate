@@ -13,6 +13,7 @@ from flask import redirect
 from pipeline.intelligence_state import read_latest_intelligence_board_snapshot_response
 from pipeline.intelligence_state import read_latest_intelligence_state_response
 from pipeline.intelligence_state import queue_intelligence_state_refresh
+from pipeline.intelligence_state import _INTELLIGENCE_STATE_SERVICE
 from syndicate.features.intelligence import _market_focus_labels
 from syndicate.features.intelligence import _parlay_request_summary
 from syndicate.features.intelligence import _query_preferences
@@ -856,7 +857,10 @@ def intelligence_query_api():
         response = jsonify({"ok": False, "error": "question is required."})
         response.status_code = 400
         return _no_cache_response(response)
-    state_payload = read_latest_intelligence_state(dict(payload)) or _empty_default_intelligence_response()
+    force_refresh = _query_bool(payload.get("force_refresh"))
+    state_payload = read_latest_intelligence_state(dict(payload))
+    if force_refresh or not isinstance(state_payload, dict) or not _response_has_content(state_payload):
+        state_payload = _INTELLIGENCE_STATE_SERVICE._compute_response(dict(payload), force_refresh=True) or _empty_default_intelligence_response()
     response = dict(state_payload)
     response.setdefault("ok", True)
     response.setdefault("response", dict(response))

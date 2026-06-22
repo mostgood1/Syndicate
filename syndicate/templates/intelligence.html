@@ -2123,7 +2123,7 @@ function scheduleIntelligencePolling() {
     }
   } else {
     renderEmptyState();
-    void loadIntelligence();
+    void loadIntelligence({ forceRefresh: true });
   }
   window.setInterval(() => {
     void loadIntelligence({ background: true });

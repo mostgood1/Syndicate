@@ -885,6 +885,19 @@ def _source_interval_models(periods: dict[str, dict[str, float | None]]) -> dict
     }
 
 
+def _source_mode(context: dict[str, Any] | None) -> str:
+    source_title = str((context or {}).get("source_title") or "").strip().lower()
+    if not source_title:
+        return "unknown"
+    if "live" in source_title:
+        return "live"
+    if "fallback" in source_title or "unavailable" in source_title:
+        return "fallback"
+    if "processed" in source_title or "cards" in source_title or "props" in source_title:
+        return "processed"
+    return "unknown"
+
+
 def _source_sim_payload(game_id: str, sim_game: dict[str, Any] | None, row: dict[str, str]) -> dict[str, Any]:
     sim = sim_game.get("sim") if isinstance((sim_game or {}).get("sim"), dict) else {}
     players_summary = dict(sim.get("players_summary") or {}) if isinstance(sim, dict) else {}
