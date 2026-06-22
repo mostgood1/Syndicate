@@ -1,16 +1,17 @@
 ﻿{
     "scope":  "daily_update",
     "date":  "2026-06-21",
-    "runMode":  "standard",
-    "overallStatus":  "error",
-    "generatedAt":  "2026-06-21T15:20:43.6314338-05:00",
-    "updatedAt":  "2026-06-21T15:20:46.2246711-05:00",
-    "runDir":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-06-21\\20260621_152041",
+    "runMode":  "dry_run",
+    "overallStatus":  "dry_run",
+    "generatedAt":  "2026-06-21T15:21:53.7748541-05:00",
+    "updatedAt":  "2026-06-21T15:21:57.4919860-05:00",
+    "runDir":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-06-21\\20260621_152151",
     "latestDir":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\latest",
-    "lastUpdatedAt":  "2026-06-21T15:20:46.1981218-05:00",
-    "currentStage":  "failed",
+    "lastUpdatedAt":  "2026-06-21T15:21:57.4606956-05:00",
+    "currentStage":  "completed",
     "completedStages":  [
-
+                            "source_update",
+                            "refresh_gate"
                         ],
     "failedStage":  "",
     "stageDecisions":  [
@@ -20,7 +21,7 @@
                                "workflow":  "vendored_daily_update",
                                "name":  "MLB vendored daily update",
                                "decision":  "planned",
-                               "status":  "pending"
+                               "status":  "dry_run"
                            },
                            {
                                "stage":  "source_update",
@@ -28,7 +29,7 @@
                                "workflow":  "syndicate_refresh",
                                "name":  "MLB current-day live-lens refresh",
                                "decision":  "planned",
-                               "status":  "pending"
+                               "status":  "dry_run"
                            },
                            {
                                "stage":  "source_update",
@@ -36,7 +37,7 @@
                                "workflow":  "vendored_daily_update",
                                "name":  "WNBA vendored daily update",
                                "decision":  "planned",
-                               "status":  "pending"
+                               "status":  "dry_run"
                            },
                            {
                                "stage":  "source_update",
@@ -44,7 +45,7 @@
                                "workflow":  "syndicate_mirror",
                                "name":  "WNBA source mirror refresh",
                                "decision":  "planned",
-                               "status":  "pending"
+                               "status":  "dry_run"
                            },
                            {
                                "stage":  "source_update",
@@ -52,7 +53,7 @@
                                "workflow":  "vendored_daily_update",
                                "name":  "NHL vendored daily update",
                                "decision":  "planned",
-                               "status":  "pending"
+                               "status":  "dry_run"
                            },
                            {
                                "stage":  "source_update",
@@ -60,7 +61,7 @@
                                "workflow":  null,
                                "name":  "NFL local odds refresh",
                                "decision":  "planned",
-                               "status":  "pending"
+                               "status":  "dry_run"
                            },
                            {
                                "stage":  "source_update",
@@ -68,7 +69,7 @@
                                "workflow":  null,
                                "name":  "NCAAF local odds refresh",
                                "decision":  "planned",
-                               "status":  "pending"
+                               "status":  "dry_run"
                            },
                            {
                                "stage":  "source_update",
@@ -76,37 +77,37 @@
                                "workflow":  "syndicate_mirror",
                                "name":  "NCAAB source mirror export",
                                "decision":  "planned",
-                               "status":  "pending"
+                               "status":  "dry_run"
                            },
                            {
                                "stage":  "sim_execution",
                                "decision":  "planned",
-                               "status":  "pending"
+                               "status":  "dry_run"
                            },
                            {
                                "stage":  "event_sim_execution",
                                "decision":  "planned",
-                               "status":  "pending"
+                               "status":  "dry_run"
                            },
                            {
                                "stage":  "refresh_gate",
                                "decision":  "planned",
-                               "status":  "pending"
+                               "status":  "dry_run"
                            },
                            {
                                "stage":  "artifact_generation",
-                               "decision":  "planned",
-                               "status":  "pending"
+                               "decision":  "skipped",
+                               "status":  "dry_run"
                            },
                            {
                                "stage":  "manifest_generation",
                                "decision":  "planned",
-                               "status":  "pending"
+                               "status":  "dry_run"
                            },
                            {
                                "stage":  "git_publish",
                                "decision":  "planned",
-                               "status":  "pending"
+                               "status":  "dry_run"
                            }
                        ],
     "provenance":  {
@@ -165,8 +166,8 @@
                   "inputFingerprintCount":  2,
                   "artifactPathCount":  21,
                   "inputFingerprints":  [
-                                            "002a54be991b3c054a2c578093d3865a1d81c4fadb5ba76c4dc750d66b04fdf4",
-                                            "273bb599414ea4ae1424dde32f327726ccd6fca9e0860fb7b0859d33fe560422"
+                                            "8cad1c191da7973c09dd7752666b057b09a4b0636cde04201516bd52c085f24f",
+                                            "8c3ab5185cacedabe9e7fb2177e8fc61b576289f9a21c6641dfd1c3b744548a0"
                                         ],
                   "artifactPaths":  [
                                         "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_0_NYM_at_CIN_pk824503_g1.json",
