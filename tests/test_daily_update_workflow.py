@@ -25,3 +25,11 @@ class DailyUpdateWorkflowTests(unittest.TestCase):
         self.assertIn("tests.test_daily_update_simulation_contract_scaffold", content)
         self.assertIn("tests.test_wnba_cards_merge_aliases", content)
         self.assertIn("tests.test_game_board_simulation_contract", content)
+
+    def test_workflow_forces_today_rebuild_on_retries(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        workflow_path = repo_root / ".github" / "workflows" / "daily-update.yml"
+        content = workflow_path.read_text(encoding="utf-8")
+
+        self.assertIn("DAILY_UPDATE_FORCE_REBUILD_TODAY", content)
+        self.assertIn("-ForceRebuildToday", content)

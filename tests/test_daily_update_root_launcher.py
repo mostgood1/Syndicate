@@ -36,6 +36,13 @@ class DailyUpdateRootLauncherTests(unittest.TestCase):
 
         self.assertIn("[int]$EventSimForceWindowMinutes = 30", content)
 
+    def test_root_wrapper_preserves_force_rebuild_today_switch(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        script_path = repo_root / "daily_update_in_season.ps1"
+        content = script_path.read_text(encoding="utf-8")
+
+        self.assertIn("[switch]$ForceRebuildToday", content)
+
     def test_in_season_wrapper_syncs_source_artifacts_for_active_sports(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]
         script_path = repo_root / "scripts" / "daily_update_in_season.ps1"

@@ -33,6 +33,7 @@ jobs:
       DAILY_UPDATE_DATE: ${{ github.event.inputs.date || '' }}
       DAILY_UPDATE_BASE_URL: ${{ github.event.inputs.base_url || '' }}
       DAILY_UPDATE_FORCE_WINDOW_MINUTES: ${{ github.event.inputs.event_sim_force_window_minutes || 30 }}
+      DAILY_UPDATE_FORCE_REBUILD_TODAY: ${{ github.run_attempt > 1 }}
 
     steps:
       - name: Check out repository
@@ -122,27 +123,26 @@ jobs:
           $env:PATH = "$pythonDir;$env:PATH"
 
           $forceWindowMinutes = [int]$env:EVENT_SIM_FORCE_WINDOW_MINUTES
+          $forceRebuildToday = [string]$env:DAILY_UPDATE_FORCE_REBUILD_TODAY -eq 'True' -or [string]$env:DAILY_UPDATE_FORCE_REBUILD_TODAY -eq 'true'
+          $dailyUpdateArgs = @(
+            '-Date', $env:DATE,
+            '-RefreshOdds',
+            '-OddsPhase', 'all',
+            '-OddsSports', 'all',
+            '-OddsRegions', 'us',
+            '-SkipGitPush',
+            '-EventSimForceWindowMinutes', $forceWindowMinutes
+          )
+          if ($forceRebuildToday) {
+            $dailyUpdateArgs += '-ForceRebuildToday'
+          }
 
           if ([string]::IsNullOrWhiteSpace($env:BASE_URL)) {
-            & ./scripts/daily_update_in_season.ps1 `
-              -Date $env:DATE `
-              -RefreshOdds `
-              -OddsPhase all `
-              -OddsSports all `
-              -OddsRegions us `
-              -SkipGitPush `
-              -EventSimForceWindowMinutes $forceWindowMinutes 2>&1 | Tee-Object -FilePath daily-update.log
+            & ./scripts/daily_update_in_season.ps1 @dailyUpdateArgs 2>&1 | Tee-Object -FilePath daily-update.log
           }
           else {
-            & ./scripts/daily_update_in_season.ps1 `
-              -Date $env:DATE `
-              -BaseUrl $env:BASE_URL `
-              -RefreshOdds `
-              -OddsPhase all `
-              -OddsSports all `
-              -OddsRegions us `
-              -SkipGitPush `
-              -EventSimForceWindowMinutes $forceWindowMinutes 2>&1 | Tee-Object -FilePath daily-update.log
+            $dailyUpdateArgs = @('-BaseUrl', $env:BASE_URL) + $dailyUpdateArgs
+            & ./scripts/daily_update_in_season.ps1 @dailyUpdateArgs 2>&1 | Tee-Object -FilePath daily-update.log
           }
 
           $exitCode = $LASTEXITCODE

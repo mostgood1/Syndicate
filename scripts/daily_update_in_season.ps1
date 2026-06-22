@@ -28,6 +28,7 @@ param(
     [switch]$SkipGitPush,
     [switch]$DryRun,
     [switch]$IncludeOffSeasonSports,
+    [switch]$ForceRebuildToday,
     [switch]$ForceMLB,
     [switch]$ForceNBA,
     [switch]$ForceNHL,
@@ -278,6 +279,7 @@ if ($SkipSourceUpdates) { $dailyArgs += '-SkipSourceUpdates' }
 if ($SkipRefreshGate) { $dailyArgs += '-SkipRefreshGate' }
 if ($SkipGitPush) { $dailyArgs += '-SkipGitPush' }
 if ($DryRun) { $dailyArgs += '-WhatIf' }
+if ($ForceRebuildToday) { $dailyArgs += '-ForceRebuildToday' }
 
 if (-not $activeSports.MLB) { $dailyArgs += '-SkipMLB' }
 if (-not $activeSports.NBA) { $dailyArgs += '-SkipNBA' }

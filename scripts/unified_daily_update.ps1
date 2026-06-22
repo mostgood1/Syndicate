@@ -15,6 +15,7 @@ param(
     [string]$BaseUrl,
     [int]$EventSimForceWindowMinutes = 30,
     [switch]$SkipGitPush,
+    [switch]$ForceRebuildToday,
     [switch]$DryRun
 )
 
@@ -542,6 +543,10 @@ function Set-RunReplayContext {
         return
     }
 
+    if ([bool]$ReplayContext.forceRebuildToday) {
+        return
+    }
+
     if (-not [bool]$ReplayContext.resumeEligible) {
         return
     }
@@ -854,8 +859,13 @@ function Get-SimExecutionDecision {
         [string]$LatestManifestPath,
         [string]$LatestCheckpointPath,
         [object[]]$SourceSteps,
-        [bool]$SkipSourceUpdates
+        [bool]$SkipSourceUpdates,
+        [bool]$ForceRebuildToday
     )
+
+    if ($ForceRebuildToday) {
+        return $true
+    }
 
     if ($SkipSourceUpdates) {
         return $false
@@ -4027,7 +4037,7 @@ if (-not $SkipNCAAB) {
 
 $publishRepos += [pscustomobject]@{ Name = 'Syndicate'; RepoPath = $repoRoot; CommitMessage = "$CommitMessagePrefix $Date (Syndicate mirror + gate)" }
 
-$simExecutionDecision = Get-SimExecutionDecision -RepoRoot $repoRoot -DateValue $Date -LatestManifestPath $latestManifestPath -LatestCheckpointPath $latestCheckpointPath -SourceSteps $sourceSteps -SkipSourceUpdates ([bool]$SkipSourceUpdates)
+$simExecutionDecision = Get-SimExecutionDecision -RepoRoot $repoRoot -DateValue $Date -LatestManifestPath $latestManifestPath -LatestCheckpointPath $latestCheckpointPath -SourceSteps $sourceSteps -SkipSourceUpdates ([bool]$SkipSourceUpdates) -ForceRebuildToday ([bool]$ForceRebuildToday)
 $latestManifest = $null
 $latestEventSimExecutionPlan = @()
 $latestCheckpoint = $null
@@ -4103,6 +4113,7 @@ $runManifest = [ordered]@{
         latestCheckpointCompletedStages = if ($null -ne $latestCheckpoint) { @($latestCheckpoint.completedStages) } else { @() }
         resumeEligible = [bool]($null -ne $latestCheckpoint -and -not [string]::IsNullOrWhiteSpace([string]$latestCheckpoint.currentStage) -and [string]$latestCheckpoint.currentStage -ne 'queued' -and [string]$latestCheckpoint.currentStage -ne 'completed')
         resumedFromCheckpoint = [bool]($null -ne $latestCheckpoint -and $null -eq $latestManifest)
+        forceRebuildToday = [bool]$ForceRebuildToday
     }
     runState = [ordered]@{
         currentStage = 'queued'
@@ -4239,9 +4250,9 @@ try {
     }
 
     $shouldRunSimExecution = Get-RunPlanDecisionValue -Plan $runManifest.runPlan -Key 'simExecution' -Fallback ([bool](-not $SkipSourceUpdates))
-    $simExecutionNoOpDecision = Get-SimExecutionNoOpDecision -RepoRoot $repoRoot -DateValue $Date -LatestEventSimExecutionPlan $latestEventSimExecutionPlan
+    $simExecutionNoOpDecision = if ($ForceRebuildToday) { $null } else { Get-SimExecutionNoOpDecision -RepoRoot $repoRoot -DateValue $Date -LatestEventSimExecutionPlan $latestEventSimExecutionPlan }
     $artifactGenerationFallbackToFullPublish = $false
-    if ($simExecutionNoOpDecision -eq $false) {
+    if (-not $ForceRebuildToday -and $simExecutionNoOpDecision -eq $false) {
         Write-Host 'Sim stage no-op: all planned event fingerprints are unchanged; skipping simulation stage.' -ForegroundColor Yellow
         $shouldRunSimExecution = $false
         foreach ($stageDecision in @($runManifest.stageDecisions | Where-Object { [string]$_.stage -eq 'sim_execution' -or [string]$_.stage -eq 'event_sim_execution' })) {
@@ -4268,7 +4279,37 @@ try {
             )
             $stepEventDecisions = @()
             $stepShouldRunSim = $null
-            if ($stepEventPlans.Count -gt 0) {
+            if ($ForceRebuildToday -and $stepEventPlans.Count -gt 0) {
+                $stepShouldRunSim = $true
+                foreach ($eventPlan in $stepEventPlans) {
+                    $eventStartTimeUtc = Get-EventSimExecutionStartTimeUtc -EventPlan $eventPlan
+                    $currentTimeUtc = [DateTimeOffset]::UtcNow
+                    $timeToStartMinutes = $null
+                    if ($null -ne $currentTimeUtc -and $null -ne $eventStartTimeUtc) {
+                        $timeToStartMinutes = [math]::Round(($eventStartTimeUtc - $currentTimeUtc).TotalMinutes, 2)
+                    }
+
+                    $stepEventDecisions += @([ordered]@{
+                        sport = [string]$step.Sport
+                        workflow = [string]$step.Workflow
+                        eventKey = [string]$eventPlan.eventKey
+                        artifactPath = [string]$eventPlan.artifactPath
+                        inputFingerprint = [string](Get-EventInputFingerprint -RepoRoot $repoRoot -DateValue $Date -Sport $step.Sport -Workflow $step.Workflow)
+                        previousInputFingerprint = [string]$eventPlan.inputFingerprint
+                        eventStartTimeUtc = if ($null -ne $eventStartTimeUtc) { [string]$eventStartTimeUtc.UtcDateTime.ToString('o') } else { $null }
+                        timeToStartMinutes = $timeToStartMinutes
+                        policyId = 'policy:forced-rebuild'
+                        policySource = 'rerun'
+                        policySelectionMode = 'forced'
+                        isExploratory = $false
+                        policyKeyParameters = [ordered]@{ forceRebuildToday = $true }
+                        forceWithinMinutes = [int]$EventSimForceWindowMinutes
+                        decision = 'planned'
+                        status = if ($DryRun) { 'dry_run' } else { 'pending' }
+                    })
+                }
+            }
+            elseif ($stepEventPlans.Count -gt 0) {
                 $stepShouldRunSim = $false
                 foreach ($eventPlan in $stepEventPlans) {
                     $previousInputFingerprint = [string]$eventPlan.inputFingerprint

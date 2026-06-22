@@ -17,6 +17,7 @@ class UnifiedDailyUpdateReplayContextScaffoldTests(unittest.TestCase):
         self.assertIn("resumeEligible = [bool]($null -ne $latestCheckpoint", content)
         self.assertIn("[string]$latestCheckpoint.currentStage -ne 'completed'", content)
         self.assertIn("resumedFromCheckpoint = [bool]($null -ne $latestCheckpoint -and $null -eq $latestManifest)", content)
+        self.assertIn("forceRebuildToday = [bool]$ForceRebuildToday", content)
         self.assertIn("replayContext = $Manifest.replayContext", content)
         self.assertIn("$runManifest.replayContext.latestCheckpointLoaded -and", content)
         self.assertIn("$sourceUpdateAlreadyCompleted = [bool](", content)

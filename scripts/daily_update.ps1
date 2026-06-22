@@ -24,6 +24,7 @@ param(
     [switch]$SkipRefreshGate,
     [switch]$SkipGitPush,
     [switch]$WhatIf,
+    [switch]$ForceRebuildToday,
     [switch]$SkipNFL,
     [switch]$SkipNCAAF,
     [switch]$SkipNCAAB,
@@ -67,6 +68,7 @@ if ($SkipMLB) { $unifiedArgs += '-SkipMLB' }
 if ($SkipNBA) { $unifiedArgs += '-SkipNBA' }
 if ($SkipNHL) { $unifiedArgs += '-SkipNHL' }
 if ($SkipWNBA) { $unifiedArgs += '-SkipWNBA' }
+if ($ForceRebuildToday) { $unifiedArgs += '-ForceRebuildToday' }
 
 Push-Location $repoRoot
 try {

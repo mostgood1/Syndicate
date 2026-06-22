@@ -16,6 +16,7 @@ param(
     [switch]$SkipGitPush,
     [switch]$DryRun,
     [switch]$IncludeOffSeasonSports,
+    [switch]$ForceRebuildToday,
     [switch]$ForceMLB,
     [switch]$ForceNBA,
     [switch]$ForceNHL,

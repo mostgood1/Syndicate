@@ -26,3 +26,11 @@ class UnifiedDailyUpdateSimNoOpDetectionTests(unittest.TestCase):
         self.assertIn("if (@($oddsHistoryDecisions | Where-Object { [bool]$_.runSimulation -or [bool]$_.priorityScoring }).Count -gt 0) {", content)
         self.assertIn("return $true", content)
         self.assertIn("if ($shouldRunSimExecution) {", content)
+
+    def test_force_rebuild_today_disables_sim_noop_short_circuit(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        script_path = repo_root / "scripts" / "unified_daily_update.ps1"
+        content = script_path.read_text(encoding="utf-8")
+
+        self.assertIn("if ($ForceRebuildToday) {", content)
+        self.assertIn("$simExecutionNoOpDecision = if ($ForceRebuildToday) { $null } else { Get-SimExecutionNoOpDecision", content)
