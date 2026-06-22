@@ -753,6 +753,20 @@ class BasketballPropsPredictionsTests(unittest.TestCase):
             used_meta = processed_root / "props_player_calibration_used_2026-05-22.json"
             self.assertTrue(used_meta.exists())
 
+    def test_league_quarter_lengths_differ_between_nba_and_wnba(self) -> None:
+        nba = smart_sim_module._NBA_LEAGUE_LOCAL
+        wnba = smart_sim_module._WNBA_LEAGUE_LOCAL
+
+        self.assertEqual(float(nba.quarter_minutes), 12.0)
+        self.assertEqual(float(wnba.quarter_minutes), 10.0)
+        self.assertGreater(float(nba.regulation_team_minutes), float(wnba.regulation_team_minutes))
+        self.assertEqual(smart_sim_module._quarter_splits_local(league=nba), [0.245, 0.245, 0.255, 0.255])
+        self.assertEqual(smart_sim_module._quarter_splits_local(league=wnba), [0.2425, 0.2475, 0.2525, 0.2575])
+        self.assertLess(
+            float(smart_sim_module._quarter_duration_scale_local(league=wnba)),
+            float(smart_sim_module._quarter_duration_scale_local(league=nba)),
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -3083,6 +3083,24 @@ class HomeBoardTests(unittest.TestCase):
         html = payload.get("html") or ""
         self.assertIn('class="sport-stack"', html)
 
+    def test_home_loader_preserves_wnba_payload_when_cards_date_rewrites(self) -> None:
+        from syndicate.blueprints import home as home_module
+
+        with patch(
+            "syndicate.features.wnba.cards.build_cards_page_context",
+            return_value={
+                "requested_date": "2026-05-20",
+                "date": "2026-05-19",
+                "games": [{"game_id": "wnba-1", "home_team": "LVA", "away_team": "SEA"}],
+                "source_title": "WNBA cards",
+                "source_path": "data/wnba_source/source_artifacts/data/processed/game_cards_2026-05-19.csv",
+            },
+        ):
+            games = home_module._load_home_games("wnba", context_label="2026-05-20")
+
+        self.assertEqual(len(games), 1)
+        self.assertEqual(games[0].get("game_id"), "wnba-1")
+
     def test_home_payload_force_refresh_bypasses_cached_html(self) -> None:
         from syndicate.blueprints import home as home_module
 
@@ -5213,6 +5231,77 @@ class ArchiveRouteTests(unittest.TestCase):
         self.assertEqual((stub.get("periods") or {}).get("q1", {}).get("away_mean"), 21.4)
         self.assertEqual((stub.get("periods") or {}).get("q1", {}).get("home_mean"), 19.8)
         self.assertEqual((stub.get("periods") or {}).get("q4", {}).get("total_mean"), 42.9)
+
+    def test_wnba_source_sim_payload_includes_quarter_and_half_intervals(self) -> None:
+        from syndicate.features.wnba.cards import _source_sim_payload
+
+        sim_game = {
+            "sim": {
+                "quarters": [
+                    {"q": 1, "away_pts_mu": 21.4, "home_pts_mu": 19.8},
+                    {"q": 2, "away_pts_mu": 20.1, "home_pts_mu": 21.3},
+                    {"q": 3, "away_pts_mu": 22.3, "home_pts_mu": 20.6},
+                    {"q": 4, "away_pts_mu": 20.8, "home_pts_mu": 22.1},
+                ]
+            }
+        }
+
+        payload = _source_sim_payload("game-1", sim_game, {"total": "170.5", "home_spread": "-4.5"})
+
+        self.assertEqual((payload.get("intervals") or {}).get("quarters", {}).get("q1", {}).get("away_mean"), 21.4)
+        self.assertEqual((payload.get("intervals") or {}).get("quarters", {}).get("q4", {}).get("home_mean"), 22.1)
+        self.assertEqual((payload.get("intervals") or {}).get("halves", {}).get("h1", {}).get("total_mean"), 82.6)
+        self.assertEqual((payload.get("intervals") or {}).get("halves", {}).get("h2", {}).get("margin_mean"), -0.4)
+
+    def test_wnba_advanced_game_contract_includes_intervals_and_coverage(self) -> None:
+        from syndicate.features.wnba.cards import _wnba_advanced_game_contract
+
+        game = {
+            "game_id": "game-1",
+            "event_id": "401000001",
+            "away_tri": "PHX",
+            "away_name": "Phoenix Mercury",
+            "home_tri": "NYL",
+            "home_name": "New York Liberty",
+            "status": "Scheduled",
+            "detail": "Scheduled",
+            "betting": {"home_ml": -145, "away_ml": 125, "home_spread": -3.5, "total": 164.5, "p_home_win": 0.61},
+            "prop_recommendations": {"away": [{"player": "A1"}], "home": [{"player": "H1"}]},
+            "game_market_recommendations": [{"market_label": "Spread"}],
+            "sim": {
+                "score": {"away_mean": 78.4, "home_mean": 83.1},
+                "periods": {
+                    "q1": {"away_mean": 19.4, "home_mean": 20.1},
+                    "q2": {"away_mean": 19.6, "home_mean": 20.4},
+                    "q3": {"away_mean": 20.0, "home_mean": 20.6},
+                    "q4": {"away_mean": 19.4, "home_mean": 22.0},
+                },
+                "intervals": {
+                    "quarters": {"q1": {"away_mean": 19.4, "home_mean": 20.1}},
+                    "halves": {"h1": {"away_mean": 39.0, "home_mean": 40.5}},
+                },
+                "quarters": [{"q": 1, "away_pts_mu": 19.4, "home_pts_mu": 20.1}],
+                "players_summary": {"away": 2, "home": 2, "missing_away": 0, "missing_home": 0, "injured_away": 0, "injured_home": 1},
+                "players": {
+                    "away": [{"player_name": "A1", "pts_mean": 18.4}],
+                    "home": [{"player_name": "H1", "pts_mean": 20.1}],
+                },
+                "missing_prop_players": {"away": [], "home": []},
+                "injuries": {"away": [], "home": [{"player": "H2"}]},
+                "pregame_context": {"pace_proj": 79.5},
+            },
+            "live_state": {"in_progress": False, "final": False, "status": "Scheduled"},
+        }
+
+        contract = _wnba_advanced_game_contract(game)
+
+        self.assertEqual(contract["game_id"], "game-1")
+        self.assertEqual(contract["simulation"]["intervals"]["quarters"]["q1"]["away_mean"], 19.4)
+        self.assertEqual(contract["simulation"]["intervals"]["halves"]["h1"]["home_mean"], 40.5)
+        self.assertTrue(contract["coverage"]["has_intervals"])
+        self.assertTrue(contract["coverage"]["has_players"])
+        self.assertTrue(contract["coverage"]["has_injuries"])
+        self.assertEqual(contract["props"]["game_market_recommendations"][0]["market_label"], "Spread")
 
     def test_wnba_cards_parity_script_treats_missing_metrics_as_missing_not_zero(self) -> None:
         script = self.client.get("/wnba/cards-parity.js").get_data(as_text=True)

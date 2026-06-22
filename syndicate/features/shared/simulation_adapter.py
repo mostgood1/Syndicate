@@ -86,6 +86,7 @@ def _advanced_context(game: dict[str, Any], context: dict[str, Any]) -> dict[str
         "latest_live_odds_refreshed_at",
         "source_path",
         "source_title",
+        "wnba_advanced_contract",
     )
     game_keys = (
         "run_projection_rows",

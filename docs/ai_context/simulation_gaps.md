@@ -28,7 +28,7 @@ Daily-update implication:
 
 ## WNBA
 
-WNBA is closer to the target state than most sports because it already has processed cards, smart-sim indexes, live snapshots, player lens, live lines, and play-by-play state.
+WNBA is closer to the target state than most sports because it already has processed cards, smart-sim indexes, live snapshots, player lens, live lines, play-by-play state, and a shared basketball simulation engine that now emits quarter and half interval summaries in the source sim payload.
 
 What daily update already produces or preserves:
 
@@ -38,17 +38,23 @@ What daily update already produces or preserves:
 - live player boxscore and player lens data
 - live lines and play-by-play slices
 - props and betting-card surfaces
+- shared player-log features with rolling minutes, points, rebounds, assists, threes, and usage-per-minute inputs
+- quarter-level sim means in `sim.quarters` plus derived `periods` / `intervals` summaries for q1-q4 and h1-h2
+- WNBA quarter logic is explicitly 10-minute based, so its quarter and half intervals should be interpreted separately from the NBA's 12-minute quarters even when the same shared engine produces them
 
 Where the data is still underused:
 
 - current-day precedence is still more complex than it should be, so stale processed artifacts can survive longer than they should before the live scoreboard wins
 - live lines and live player context are available, but they are not yet consistently collapsed into one simulation-ready slate input
 - evaluation history is still not a first-class adapter feature, so confidence shaping remains weaker than the available data would allow
+- interval models are present as a derived contract, but they are not yet a dedicated WNBA-specific modeling layer with half-specific calibration and reporting
+- pace, rotation, possession, and matchup-pressure analytics are present in the shared basketball feature layer, but they are not yet surfaced as a first-class WNBA interval contract the way player logs and quarter means are
 - source cards now preserve richer sim payload fields, but the sim engine itself still needs the same explicit source-mode and freshness contract that the board already wants
 
 Daily-update implication:
 
 - WNBA is the clearest proof that preserving rich artifacts is necessary but not sufficient; the daily job still needs a tighter source-selection rule so simulation meaning does not drift between source cards, live state, and props routes
+- WNBA also needs an explicit interval-contract owner so quarter and half reasoning can be calibrated, audited, and surfaced consistently rather than inferred piecemeal from the same shared basketball sim output
 
 ## NBA/WNBA
 
@@ -69,6 +75,7 @@ The daily-update execution path is where the sim engine still loses the most val
 2. Current-day source selection is explicit in some routes, but not yet reported consistently in the simulation payloads that would make daily-update runs auditable.
 3. Evaluation and calibration signals are present in the repository, but they are not yet consistently fed back into adapter scoring rules.
 4. Display enrichment can still obscure whether a field was used for simulation or only for board rendering.
+5. WNBA quarter and half intervals are now derivable from the shared payload, but they are still not a dedicated calibration layer with model-specific interval features.
 
 ## Highest-Value Fixes
 
@@ -77,3 +84,4 @@ The daily-update execution path is where the sim engine still loses the most val
 3. Keep live-state supplements, market enrichment, and presentation-only fields separate from simulation inputs.
 4. Feed evaluation and calibration history into the adapter layer so confidence and fallback choice improve over time.
 5. Add parity tests that prove the daily-update job is selecting the richest available source for the requested slate.
+6. Promote WNBA quarter and half intervals into a first-class modeling surface with explicit calibration, not just a derived display contract.

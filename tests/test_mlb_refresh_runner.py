@@ -63,6 +63,66 @@ class MlbRefreshRunnerTests(unittest.TestCase):
         self.assertEqual(odds_module.calls[0]["date"], "2026-05-22")
         self.assertEqual(odds_module.calls[0]["regions"], "us,eu")
 
+    def test_reconcile_module_resolves_daily_sims_directory(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        module_path = repo_root / "vendor" / "mlb_bettingv2" / "tools" / "eval" / "reconcile_daily_sim_artifacts.py"
+        spec = importlib.util.spec_from_file_location("test_mlb_reconcile_daily_sim_artifacts", module_path)
+        assert spec is not None and spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = module
+
+        try:
+            spec.loader.exec_module(module)
+
+            with tempfile.TemporaryDirectory() as tmp_dir:
+                root = Path(tmp_dir)
+                expected = root / "data" / "daily" / "sims" / "2026-06-21"
+                expected.mkdir(parents=True, exist_ok=True)
+
+                module._ROOT = root
+
+                resolved = module._resolve_sim_dir("", "2026-06-21")
+
+            self.assertEqual(resolved, expected.resolve())
+        finally:
+            sys.modules.pop(spec.name, None)
+
+    def test_reconcile_module_missing_sim_dir_writes_empty_report(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        module_path = repo_root / "vendor" / "mlb_bettingv2" / "tools" / "eval" / "reconcile_daily_sim_artifacts.py"
+        spec = importlib.util.spec_from_file_location("test_mlb_reconcile_daily_sim_artifacts_missing_dir", module_path)
+        assert spec is not None and spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = module
+
+        try:
+            spec.loader.exec_module(module)
+
+            with tempfile.TemporaryDirectory() as tmp_dir:
+                out_path = Path(tmp_dir) / "sim_vs_actual.json"
+                argv = [
+                    "reconcile_daily_sim_artifacts.py",
+                    "--date",
+                    "2026-06-21",
+                    "--season",
+                    "2026",
+                    "--sim-dir",
+                    str(Path(tmp_dir) / "missing" / "data" / "daily" / "sims" / "2026-06-21"),
+                    "--out",
+                    str(out_path),
+                ]
+
+                with patch.object(sys, "argv", argv):
+                    rc = module.main()
+
+                payload = json.loads(out_path.read_text(encoding="utf-8"))
+
+            self.assertEqual(rc, 0)
+            self.assertEqual(payload["aggregate"]["full"]["games"], 0)
+            self.assertIn("sim_dir_missing", payload["meta"]["warnings"][0])
+        finally:
+            sys.modules.pop(spec.name, None)
+
     def test_live_lens_report_refresh_default_is_thirty_seconds(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]
         module_path = repo_root / "vendor" / "mlb_bettingv2" / "tools" / "web" / "flask_frontend.py"

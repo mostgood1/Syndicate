@@ -32,6 +32,12 @@ class GameBoardSimulationContractTests(unittest.TestCase):
                         "live_state": {"status": "Scheduled", "final": False},
                     }
                 ],
+                "wnba_advanced_contract": {
+                    "available": True,
+                    "sport": "wnba",
+                    "game_count": 1,
+                    "coverage": {"games_with_intervals": 1},
+                },
             },
             sport="wnba",
             module="cards",
@@ -44,6 +50,7 @@ class GameBoardSimulationContractTests(unittest.TestCase):
         self.assertEqual((simulation_contract.get("games") or [])[0].get("event_id"), "401000001")
         self.assertEqual((simulation_contract.get("selection") or {}).get("kind"), "date")
         self.assertTrue((simulation_contract.get("freshness") or {}).get("is_current_day"))
+        self.assertEqual(((simulation_contract.get("advanced") or {}).get("page") or {}).get("wnba_advanced_contract", {}).get("coverage", {}).get("games_with_intervals"), 1)
 
 
 if __name__ == "__main__":

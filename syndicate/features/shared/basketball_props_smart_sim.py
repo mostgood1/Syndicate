@@ -211,6 +211,7 @@ class LeagueConfigBridgeLocal:
     name: str
     season_start_month: int
     regulation_team_minutes: float
+    quarter_minutes: float
     baseline_pace: float
     baseline_off_rating: float
     baseline_def_rating: float
@@ -224,6 +225,7 @@ _NBA_LEAGUE_LOCAL = LeagueConfigBridgeLocal(
     name="NBA",
     season_start_month=10,
     regulation_team_minutes=240.0,
+    quarter_minutes=12.0,
     baseline_pace=100.0,
     baseline_off_rating=110.6,
     baseline_def_rating=110.6,
@@ -236,6 +238,7 @@ _WNBA_LEAGUE_LOCAL = LeagueConfigBridgeLocal(
     name="WNBA",
     season_start_month=5,
     regulation_team_minutes=200.0,
+    quarter_minutes=10.0,
     baseline_pace=79.5,
     baseline_off_rating=101.5,
     baseline_def_rating=101.5,
@@ -746,6 +749,14 @@ def _high_pace_corr_threshold_local(*, league) -> float:
     return float(getattr(league, "baseline_pace") + 6.0)
 
 
+def _quarter_duration_scale_local(*, league) -> float:
+    try:
+        quarter_minutes = float(getattr(league, "quarter_minutes", 12.0))
+        return max(0.75, min(1.0, quarter_minutes / 12.0))
+    except Exception:
+        return 1.0
+
+
 def _safe_float_local(value, default=None):
     try:
         import numpy as np
@@ -773,7 +784,13 @@ def _adjustments_local(ctx: TeamContextLocal) -> float:
     return adj
 
 
-def _quarter_splits_local() -> list[float]:
+def _quarter_splits_local(*, league: Any | None = None) -> list[float]:
+    try:
+        code = str(getattr(league, "code", "") or "").strip().lower()
+        if code == "wnba":
+            return [0.2425, 0.2475, 0.2525, 0.2575]
+    except Exception:
+        pass
     return [0.245, 0.245, 0.255, 0.255]
 
 
@@ -873,7 +890,7 @@ def _quarter_splits_for_team_local(*, processed_root: Path, team_tri: str, is_ho
             return split
     except Exception:
         pass
-    return _quarter_splits_local()
+    return _quarter_splits_local(league=league)
 
 
 def _target_quarter_total_sd_local(*, processed_root: Path, quarter: int) -> float | None:
@@ -1113,6 +1130,10 @@ def _simulate_quarters_local(*, processed_root: Path, inp: GameInputsLocal, leag
                     a_sig_q = float(a_sig_q) * scale
         except Exception:
             pass
+        duration_scale = _quarter_duration_scale_local(league=league)
+        if duration_scale < 1.0:
+            h_sig_q = float(h_sig_q) * float(duration_scale)
+            a_sig_q = float(a_sig_q) * float(duration_scale)
         quarters.append(QuarterResultLocal(q=quarter_idx, home_pts_mu=h_mu_q, home_pts_sigma=h_sig_q, away_pts_mu=a_mu_q, away_pts_sigma=a_sig_q, corr=corr_q))
     total_samples = []
     margin_samples = []

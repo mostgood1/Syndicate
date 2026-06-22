@@ -738,14 +738,72 @@ def main() -> int:
     args = _parse_args()
     season = int(args.season) if int(args.season or 0) > 0 else int(str(args.date).split("-")[0])
     sim_dir = _resolve_sim_dir(str(args.sim_dir), str(args.date))
+    out_path = Path(str(args.out)).resolve() if str(args.out).strip() else (_ROOT / "data" / "eval" / f"sim_vs_actual_{str(args.date)}.json").resolve()
+
     if not sim_dir.exists() or not sim_dir.is_dir():
-        raise SystemExit(
-            f"Sim dir not found: {sim_dir}. Tried source-bundle and local mirror locations for {str(args.date)}."
-        )
+        report = {
+            "meta": {
+                "date": str(args.date),
+                "season": int(season),
+                "sims_per_game": 0,
+                "jobs": 0,
+                "use_raw": True,
+                "skipped_games": 0,
+                "generated_at": datetime.now().isoformat(),
+                "tool": "tools/eval/reconcile_daily_sim_artifacts.py",
+                "source_sim_dir": str(sim_dir),
+                "prop_lines_source": str(args.prop_lines_source),
+                "market_push_policy": str(args.market_push_policy),
+                "warnings": [f"sim_dir_missing:{sim_dir}"],
+            },
+            "assessment": {},
+            "aggregate": {
+                "full": {"games": 0, "brier_home_win": None, "mae_total_runs": None, "mae_run_margin": None},
+                "first1": {"games": 0, "brier_home_win": None, "mae_total_runs": None, "mae_run_margin": None},
+                "first5": {"games": 0, "brier_home_win": None, "mae_total_runs": None, "mae_run_margin": None},
+                "first3": {"games": 0, "brier_home_win": None, "mae_total_runs": None, "mae_run_margin": None},
+            },
+            "games": [],
+            "failures": [],
+            "failures_n": 0,
+        }
+        _write_json(out_path, report)
+        print(f"Wrote: {out_path}")
+        print("Aggregate (full):", report["aggregate"]["full"])
+        return 0
 
     sim_paths = sorted(path for path in sim_dir.glob("sim_*.json") if path.is_file())
     if not sim_paths:
-        raise SystemExit(f"No sim_*.json artifacts found under: {sim_dir}")
+        report = {
+            "meta": {
+                "date": str(args.date),
+                "season": int(season),
+                "sims_per_game": 0,
+                "jobs": 0,
+                "use_raw": True,
+                "skipped_games": 0,
+                "generated_at": datetime.now().isoformat(),
+                "tool": "tools/eval/reconcile_daily_sim_artifacts.py",
+                "source_sim_dir": str(sim_dir),
+                "prop_lines_source": str(args.prop_lines_source),
+                "market_push_policy": str(args.market_push_policy),
+                "warnings": [f"sim_dir_empty:{sim_dir}"],
+            },
+            "assessment": {},
+            "aggregate": {
+                "full": {"games": 0, "brier_home_win": None, "mae_total_runs": None, "mae_run_margin": None},
+                "first1": {"games": 0, "brier_home_win": None, "mae_total_runs": None, "mae_run_margin": None},
+                "first5": {"games": 0, "brier_home_win": None, "mae_total_runs": None, "mae_run_margin": None},
+                "first3": {"games": 0, "brier_home_win": None, "mae_total_runs": None, "mae_run_margin": None},
+            },
+            "games": [],
+            "failures": [],
+            "failures_n": 0,
+        }
+        _write_json(out_path, report)
+        print(f"Wrote: {out_path}")
+        print("Aggregate (full):", report["aggregate"]["full"])
+        return 0
 
     so_prob_calibration = _load_jsonish(str(args.so_prob_calibration))
     outs_prob_calibration = _load_jsonish(str(args.outs_prob_calibration))
@@ -838,7 +896,6 @@ def main() -> int:
     report["assessment"] = _build_assessment(results)
     ((report.get("assessment") or {}).get("full_game") or {}).get("pitcher_props_at_market_lines", {}).update({"lines_meta": market_meta})
 
-    out_path = Path(str(args.out)).resolve() if str(args.out).strip() else (_ROOT / "data" / "eval" / f"sim_vs_actual_{str(args.date)}.json").resolve()
     _write_json(out_path, report)
 
     print(f"Wrote: {out_path}")

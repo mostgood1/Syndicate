@@ -201,6 +201,11 @@ def _safe_float(value: Any) -> float | None:
         return None
 
 
+def _safe_text(value: Any, fallback: str = "") -> str:
+    text = str(value or "").strip()
+    return text or fallback
+
+
 def _parse_utc_datetime(value: Any) -> datetime | None:
     text = str(value or "").strip()
     if not text:
@@ -846,6 +851,40 @@ def _source_sim_score(sim_game: dict[str, Any] | None, row: dict[str, str]) -> d
     }
 
 
+def _source_interval_summary(periods: dict[str, dict[str, float | None]], keys: tuple[str, ...]) -> dict[str, float | None] | None:
+    selected = [periods.get(key) for key in keys if isinstance(periods.get(key), dict)]
+    if not selected:
+        return None
+    away_values = [_safe_float(period.get("away_mean")) for period in selected]
+    home_values = [_safe_float(period.get("home_mean")) for period in selected]
+    away_mean = _sum_valid(away_values)
+    home_mean = _sum_valid(home_values)
+    if away_mean is None or home_mean is None:
+        return None
+    total_mean = round(away_mean + home_mean, 3)
+    margin_mean = round(home_mean - away_mean, 3)
+    return {
+        "away_mean": away_mean,
+        "home_mean": home_mean,
+        "total_mean": total_mean,
+        "margin_mean": margin_mean,
+        "p_home_win": _margin_win_prob(margin_mean),
+    }
+
+
+def _source_interval_models(periods: dict[str, dict[str, float | None]]) -> dict[str, Any]:
+    quarter_periods = {key: dict(value) for key, value in periods.items() if key in {"q1", "q2", "q3", "q4"} and isinstance(value, dict)}
+    half_periods = {
+        "h1": _source_interval_summary(periods, ("q1", "q2")),
+        "h2": _source_interval_summary(periods, ("q3", "q4")),
+    }
+    half_periods = {key: value for key, value in half_periods.items() if isinstance(value, dict)}
+    return {
+        "quarters": quarter_periods,
+        "halves": half_periods,
+    }
+
+
 def _source_sim_payload(game_id: str, sim_game: dict[str, Any] | None, row: dict[str, str]) -> dict[str, Any]:
     sim = sim_game.get("sim") if isinstance((sim_game or {}).get("sim"), dict) else {}
     players_summary = dict(sim.get("players_summary") or {}) if isinstance(sim, dict) else {}
@@ -883,10 +922,140 @@ def _source_sim_payload(game_id: str, sim_game: dict[str, Any] | None, row: dict
         "quarters": [dict(item) for item in quarters if isinstance(item, dict)],
         "score": score,
         "periods": periods,
+        "intervals": _source_interval_models(periods),
         "market": {
             "market_home_spread": _safe_float(row.get("home_spread")),
             "market_total": _safe_float(row.get("total")),
         },
+    }
+
+
+def _wnba_advanced_simulation_contract(sim_payload: dict[str, Any] | None) -> dict[str, Any]:
+    sim = sim_payload if isinstance(sim_payload, dict) else {}
+    players = sim.get("players") if isinstance(sim.get("players"), dict) else {}
+    periods = _source_sim_periods({"sim": sim})
+    intervals = sim.get("intervals") if isinstance(sim.get("intervals"), dict) else {}
+    if not intervals:
+        intervals = _source_interval_models(periods)
+    players_summary = dict(sim.get("players_summary") or {}) if isinstance(sim.get("players_summary"), dict) else {}
+    if not players_summary:
+        players_summary = {
+            "away": len(players.get("away") or []),
+            "home": len(players.get("home") or []),
+            "missing_away": 0,
+            "missing_home": 0,
+            "injured_away": 0,
+            "injured_home": 0,
+        }
+    return {
+        "score": dict(sim.get("score") or {}),
+        "periods": periods,
+        "intervals": intervals,
+        "quarters": [dict(item) for item in (sim.get("quarters") or []) if isinstance(item, dict)],
+        "players_summary": players_summary,
+        "players": {
+            "away": [dict(item) for item in (players.get("away") or []) if isinstance(item, dict)],
+            "home": [dict(item) for item in (players.get("home") or []) if isinstance(item, dict)],
+        },
+        "missing_prop_players": {
+            "away": [dict(item) for item in (sim.get("missing_prop_players", {}).get("away") or []) if isinstance(item, dict)] if isinstance(sim.get("missing_prop_players"), dict) else [],
+            "home": [dict(item) for item in (sim.get("missing_prop_players", {}).get("home") or []) if isinstance(item, dict)] if isinstance(sim.get("missing_prop_players"), dict) else [],
+        },
+        "injuries": {
+            "away": [dict(item) for item in (sim.get("injuries", {}).get("away") or []) if isinstance(item, dict)] if isinstance(sim.get("injuries"), dict) else [],
+            "home": [dict(item) for item in (sim.get("injuries", {}).get("home") or []) if isinstance(item, dict)] if isinstance(sim.get("injuries"), dict) else [],
+        },
+        "pregame_context": dict(sim.get("pregame_context") or {}),
+    }
+
+
+def _wnba_advanced_game_contract(game: dict[str, Any]) -> dict[str, Any]:
+    sim = game.get("sim") if isinstance(game.get("sim"), dict) else {}
+    betting = game.get("betting") if isinstance(game.get("betting"), dict) else {}
+    prop_recommendations = game.get("prop_recommendations") if isinstance(game.get("prop_recommendations"), dict) else {}
+    game_market_recommendations = game.get("game_market_recommendations") if isinstance(game.get("game_market_recommendations"), list) else []
+    return {
+        "game_id": _safe_text(game.get("game_id") or game.get("gamePk") or "", ""),
+        "event_id": _safe_text(game.get("event_id") or "", ""),
+        "matchup": {
+            "away": {
+                "tri": _safe_text(game.get("away_tri") or ((game.get("away") or {}).get("abbr") if isinstance(game.get("away"), dict) else ""), ""),
+                "name": _safe_text(game.get("away_name") or ((game.get("away") or {}).get("name") if isinstance(game.get("away"), dict) else ""), ""),
+            },
+            "home": {
+                "tri": _safe_text(game.get("home_tri") or ((game.get("home") or {}).get("abbr") if isinstance(game.get("home"), dict) else ""), ""),
+                "name": _safe_text(game.get("home_name") or ((game.get("home") or {}).get("name") if isinstance(game.get("home"), dict) else ""), ""),
+            },
+        },
+        "status": {
+            "status": _safe_text(game.get("status") or "", ""),
+            "detail": _safe_text(game.get("detail") or "", ""),
+            "live": bool((game.get("live_state") or {}).get("in_progress") if isinstance(game.get("live_state"), dict) else False),
+            "final": bool((game.get("live_state") or {}).get("final") if isinstance(game.get("live_state"), dict) else False),
+        },
+        "market": {
+            "home_ml": _safe_float(betting.get("home_ml")),
+            "away_ml": _safe_float(betting.get("away_ml")),
+            "home_spread": _safe_float(betting.get("home_spread")),
+            "total": _safe_float(betting.get("total")),
+            "p_home_win": _safe_float(betting.get("p_home_win")),
+            "p_away_win": _safe_float(betting.get("p_away_win")),
+            "p_home_cover": _safe_float(betting.get("p_home_cover")),
+            "p_total_over": _safe_float(betting.get("p_total_over")),
+        },
+        "simulation": _wnba_advanced_simulation_contract(sim),
+        "props": {
+            "prop_recommendations": {
+                "away": [dict(item) for item in (prop_recommendations.get("away") or []) if isinstance(item, dict)],
+                "home": [dict(item) for item in (prop_recommendations.get("home") or []) if isinstance(item, dict)],
+            },
+            "game_market_recommendations": [dict(item) for item in game_market_recommendations if isinstance(item, dict)],
+        },
+        "coverage": {
+            "has_simulation": bool(sim),
+            "has_periods": bool((sim.get("periods") if isinstance(sim, dict) else None) or (sim.get("quarters") if isinstance(sim, dict) else None)),
+            "has_intervals": bool((sim.get("intervals") if isinstance(sim, dict) else None) or _source_interval_models(_source_sim_periods({"sim": sim}))),
+            "has_players": bool(players := (sim.get("players") if isinstance(sim.get("players"), dict) else {})),
+            "has_injuries": bool((sim.get("injuries") if isinstance(sim.get("injuries"), dict) else None)),
+            "has_pregame_context": bool((sim.get("pregame_context") if isinstance(sim.get("pregame_context"), dict) else None)),
+        },
+    }
+
+
+def _wnba_advanced_contract(*, selected_date: str, requested_date: str, source_title: str, source_path: str, games: list[dict[str, Any]]) -> dict[str, Any]:
+    advanced_games = [_wnba_advanced_game_contract(game) for game in games if isinstance(game, dict)]
+    coverage = {
+        "games_with_sim": sum(1 for game in advanced_games if bool((game.get("coverage") or {}).get("has_simulation"))),
+        "games_with_periods": sum(1 for game in advanced_games if bool((game.get("coverage") or {}).get("has_periods"))),
+        "games_with_intervals": sum(1 for game in advanced_games if bool((game.get("coverage") or {}).get("has_intervals"))),
+        "games_with_players": sum(1 for game in advanced_games if bool((game.get("coverage") or {}).get("has_players"))),
+        "games_with_injuries": sum(1 for game in advanced_games if bool((game.get("coverage") or {}).get("has_injuries"))),
+        "games_with_props": sum(1 for game in advanced_games if bool(((game.get("props") or {}).get("prop_recommendations") or {}).get("away") or ((game.get("props") or {}).get("prop_recommendations") or {}).get("home"))),
+    }
+    return {
+        "available": bool(advanced_games),
+        "sport": "wnba",
+        "selection": {
+            "kind": "date",
+            "requested": _safe_text(requested_date, ""),
+            "resolved": _safe_text(selected_date, ""),
+        },
+        "source": {
+            "title": _safe_text(source_title, ""),
+            "path": _safe_text(source_path, ""),
+            "mode": _source_mode({"source_title": source_title}),
+        },
+        "freshness": {
+            "requested": _safe_text(requested_date, ""),
+            "resolved": _safe_text(selected_date, ""),
+            "selection_kind": "date",
+            "is_current_day": _safe_text(selected_date, "") == central_today_iso(),
+            "is_stale": _safe_text(requested_date, "") != _safe_text(selected_date, ""),
+            "lookahead_applied": bool(_safe_text(requested_date, "") != _safe_text(selected_date, "")),
+        },
+        "coverage": coverage,
+        "game_count": len(advanced_games),
+        "games": advanced_games,
     }
 
 
@@ -1635,6 +1804,13 @@ def build_cards_page_context(selected_date: str, *, allow_stored_date_fallback: 
             },
             "module_links": build_module_links(resolved_date, "Cards"),
             "active_sport_name": "WNBA",
+            "wnba_advanced_contract": _wnba_advanced_contract(
+                selected_date=resolved_date,
+                requested_date=requested_date,
+                source_title=source_title,
+                source_path=str(cards_path),
+                games=games,
+            ),
         },
         sport="wnba",
         module="cards",

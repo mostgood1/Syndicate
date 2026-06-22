@@ -205,16 +205,24 @@ Impact:
 ### WNBA
 WNBA has the same live-state opportunities as NBA, plus a lot of current-day fallback complexity.
 
+Model shape:
+
+* WNBA uses 10-minute regulation quarters and 40 regulation team minutes, while NBA uses 12-minute quarters and 48 regulation team minutes.
+* The shared basketball smart sim now scales WNBA quarter volatility down with that shorter quarter length, so WNBA interval outputs are not just NBA outputs with a different label.
+
 Underused inputs:
 
 * live scoreboard data when processed artifacts are stale or incomplete
 * live player boxscore, live player lens, live lines, and play-by-play state
 * stored sim detail and props artifacts as shared model features
 * evaluation history to decide when today should trust live rows over artifact rows
+* quarter-level sim means and the derived half-interval summaries now exposed in the source sim payload
+* richer basketball context from the shared feature layer, especially rolling minutes, usage-per-minute, and game-shape signals that are still not yet a dedicated WNBA interval feature set
 
 Impact:
 
 * current-day data is available, but the route stack has historically split it across home, source cards, and live-lens paths instead of feeding one unified slate decision
+* quarter and half interval reasoning is available in the payload shape, but it still needs its own calibration and reporting contract if WNBA is going to rely on interval models as a first-class surface
 
 ### NHL
 NHL has scoreboard snapshots, props, and reconciliation-style data, but the board is still mostly treating predictions as the primary artifact.

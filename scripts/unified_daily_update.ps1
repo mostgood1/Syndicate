@@ -4591,7 +4591,20 @@ try {
     }
 
     if (-not $DryRun) {
-        $activeContractSports = @($activeSports.GetEnumerator() | Where-Object { $_.Value } | ForEach-Object { $_.Key.ToString().ToLowerInvariant() })
+        $activeContractSports = @(
+            @($runManifest.sportRuns) |
+                Where-Object { $_ -and ($_.status -in @('ok', 'dry_run')) -and -not [string]::IsNullOrWhiteSpace([string]$_.sport) } |
+                ForEach-Object { [string]$_.sport.ToString().ToLowerInvariant() } |
+                Select-Object -Unique
+        )
+        if ($activeContractSports.Count -eq 0) {
+            $activeContractSports = @(
+                @($sourceSteps) |
+                    Where-Object { $_ -and -not [string]::IsNullOrWhiteSpace([string]$_.Sport) } |
+                    ForEach-Object { [string]$_.Sport.ToString().ToLowerInvariant() } |
+                    Select-Object -Unique
+            )
+        }
         Write-SimulationContractArtifact -Manifest $runManifest -ActiveSports $activeContractSports
     }
 
