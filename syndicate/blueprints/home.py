@@ -61,6 +61,11 @@ _HOME_PAYLOAD_CACHE: dict[str, tuple[float, dict[str, Any]]] = {}
 _BASKETBALL_PLAYER_ID_CACHE: dict[str, dict[tuple[str, str], int]] = {}
 
 
+def _home_selected_date(selected_date: str | None = None) -> str:
+    value = str(selected_date or "").strip()
+    return value or central_today_iso()
+
+
 def _public_version_payload() -> dict[str, str] | None:
     commit = str(
         os.environ.get("RENDER_GIT_COMMIT")
@@ -4238,7 +4243,7 @@ def build_home_overview(
     selected_date: str | None = None,
     force_refresh: bool = False,
 ) -> list[dict[str, Any]]:
-    today_value = str(selected_date or date.today().isoformat()).strip() or date.today().isoformat()
+    today_value = _home_selected_date(selected_date)
     preserve_requested_date = selected_date is not None
     sport_items = [sport for sport in sports if isinstance(sport, dict)]
     if len(sport_items) <= 1:
@@ -4281,7 +4286,7 @@ def build_home_overview(
 
 
 def _home_payload(*, selected_date: str | None = None, cached_only: bool = False, force_refresh: bool = False) -> dict[str, Any]:
-    effective_date = str(selected_date or date.today().isoformat()).strip() or date.today().isoformat()
+    effective_date = _home_selected_date(selected_date)
     cache_key = effective_date
     now = time.monotonic()
     cached = _HOME_PAYLOAD_CACHE.get(cache_key)
@@ -4317,7 +4322,7 @@ def _home_payload(*, selected_date: str | None = None, cached_only: bool = False
 
 
 def _build_light_home_sports(selected_date: str | None = None) -> list[dict[str, Any]]:
-    context_label = str(selected_date or central_today_iso()).strip() or central_today_iso()
+    context_label = _home_selected_date(selected_date)
     today_iso = central_today_iso()
     empty_game_rail = {"title": "", "items": [], "links": [], "empty_summary": "No game rows were surfaced for this slate."}
     empty_prop_rail = {"title": "", "items": [], "links": [], "empty_summary": "No prop rows were surfaced for this slate."}
@@ -4375,21 +4380,22 @@ def _build_light_home_sports(selected_date: str | None = None) -> list[dict[str,
 
 @home_bp.get("/")
 def home():
-    selected_date = request.args.get("date")
-    sports = _build_light_home_sports(selected_date)
+    selected_date = _home_selected_date(request.args.get("date"))
+    refresh_requested = str(request.args.get("refresh") or "").strip().lower() in {"1", "true", "yes", "on"}
+    payload = _home_payload(selected_date=selected_date, force_refresh=refresh_requested or selected_date == central_today_iso())
     return render_template(
         "home.html",
-        selected_home_date=str(selected_date or "").strip(),
-        sports=sports,
-        dashboard={
+        selected_home_date=payload.get("selected_date"),
+        sports=payload.get("sports") or [],
+        dashboard=payload.get("dashboard") or {
             "summary_cards": [],
             "live_watch": [],
             "top_props": [],
             "top_game_bets": [],
             "sport_summaries": [],
         },
-        command_center={},
-        show_command_center=False,
+        command_center=payload.get("command_center") or {},
+        show_command_center=bool(payload.get("command_center")),
     )
 
 
@@ -4401,7 +4407,8 @@ def syndicate():
 @home_bp.get("/api/home")
 def api_home():
     refresh_requested = str(request.args.get("refresh") or "").strip().lower() in {"1", "true", "yes", "on"}
-    payload = _home_payload(selected_date=request.args.get("date"), force_refresh=refresh_requested)
+    selected_date = _home_selected_date(request.args.get("date"))
+    payload = _home_payload(selected_date=selected_date, force_refresh=refresh_requested or selected_date == central_today_iso())
     return jsonify(
         {
             "ok": True,

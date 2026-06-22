@@ -9,6 +9,8 @@ The official phased implementation plan for reaching the world-class target stat
 
 Workspace Copilot skills for intelligence planning, advanced-data analysis, live-lens debugging, readiness, deployment parity, and sport-specific question answering are documented in [docs/syndicate-skills.md](c:/Users/tempadmin/OneDrive/Coding/Syndicate/docs/syndicate-skills.md).
 
+The current intelligence / betting board assessment lives in [docs/intelligence_betting_board_assessment.md](c:/Users/tempadmin/OneDrive/Coding/Syndicate/docs/intelligence_betting_board_assessment.md).
+
 ## Core principles
 
 - This is not seven apps inside one UI.
@@ -243,6 +245,8 @@ GET /api/ops/odds-refresh/plan?date=2026-05-18&sports=mlb,nba&phase=live&skip_mi
 Set `ADMIN_TOKEN` (or `SYNDICATE_ADMIN_TOKEN`) in the environment, then pass it as either `Authorization: Bearer <token>`, `X-Admin-Token: <token>`, or `?admin_token=<token>`. The `status` endpoint reads the stable latest manifests under [reports/refresh_status](c:/Users/mostg/OneDrive/Coding/Syndicate/reports/refresh_status) and [reports/daily_update/latest](c:/Users/mostg/OneDrive/Coding/Syndicate/reports/daily_update/latest); the `plan` endpoint resolves the dry-run command plan without executing any source refreshes.
 
 ## Daily Update
+
+For the end-to-end workflow map, artifact contract, and current sport-parity gaps, see [docs/daily_update_control_plane.md](docs/daily_update_control_plane.md).
 
 To run a scheduled-ready global daily update that refreshes mirrors, runs the migration gate, and snapshots module status against the MLB reference contract:
 

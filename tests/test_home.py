@@ -163,6 +163,47 @@ class HomePageCommandCenterTests(unittest.TestCase):
         self.assertIn("Open sport hub", html)
         self.assertIn("NBA props are active on this slate.", html)
 
+    def test_home_page_defaults_to_current_local_date_and_active_payload(self) -> None:
+        payload = {
+            "selected_date": "2026-06-21",
+            "sports": [
+                {
+                    "slug": "nba",
+                    "name": "NBA",
+                    "home_anchor": "home-sport-nba",
+                    "data_health": "healthy",
+                    "freshness_label": "Live · Polled now",
+                    "games_count": 1,
+                    "props_count": 2,
+                    "overview_stats": [],
+                    "home_rails": {
+                        "compact": {"title": "Compact game rail", "items": [], "links": [], "empty_summary": ""},
+                        "pregame": {"title": "Pregame props", "items": [], "links": [], "empty_summary": ""},
+                        "live": {"title": "Top Live Props", "items": [], "links": [], "empty_summary": ""},
+                    },
+                    "game_bar": {"opportunity_tags": []},
+                    "props_bar": {"opportunity_tags": []},
+                }
+            ],
+            "dashboard": {"summary_cards": [], "live_watch": [], "top_props": [], "top_game_bets": [], "sport_summaries": []},
+            "command_center": {"schema": "home_command_center_v1"},
+            "html": "<section />",
+            "polled_at": 123.0,
+        }
+
+        with patch("syndicate.blueprints.home.central_today_iso", return_value="2026-06-21"):
+            with patch("syndicate.blueprints.home._home_payload", return_value=payload) as mocked_payload:
+                with patch("syndicate.blueprints.home.render_template", return_value="ok") as mocked_render:
+                    response = self.client.get("/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_data(as_text=True), "ok")
+        mocked_payload.assert_called_once_with(selected_date="2026-06-21", force_refresh=True)
+        self.assertEqual(mocked_render.call_args.kwargs["selected_home_date"], "2026-06-21")
+        self.assertEqual(len(mocked_render.call_args.kwargs["sports"]), 1)
+        self.assertEqual(mocked_render.call_args.kwargs["sports"][0]["name"], "NBA")
+        self.assertTrue(mocked_render.call_args.kwargs["show_command_center"])
+
     def test_sport_availability_reason_explains_missing_mlb_and_wnba_lanes(self) -> None:
         mlb_reason = _sport_availability_reason(
             {"slug": "mlb", "name": "MLB"},

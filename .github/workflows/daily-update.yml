@@ -137,11 +137,57 @@ jobs:
       - name: Commit and push pipeline outputs
         shell: pwsh
         run: |
+          $repoRoot = (Get-Location).Path
+
+          function Convert-ToRelativeGitPath {
+            param([string]$FullPath)
+
+            if ([string]::IsNullOrWhiteSpace($FullPath)) {
+              return $null
+            }
+
+            $resolvedPath = (Resolve-Path -LiteralPath $FullPath).Path
+            return $resolvedPath.Substring($repoRoot.Length + 1) -replace '\\', '/'
+          }
+
           git config user.name 'github-actions[bot]'
           git config user.email 'github-actions[bot]@users.noreply.github.com'
 
-          # Stage only the artifact and report roots that the daily pipeline owns.
-          git add -A -f -- data/*_source/source_artifacts data/*_source/manifests reports/intelligence reports/daily_update/latest reports/refresh_status/latest reports/odds_control_plane || true
+          $stageRoots = [System.Collections.Generic.List[string]]::new()
+
+          foreach ($sourceRoot in @(Get-ChildItem -Path 'data' -Directory -ErrorAction SilentlyContinue | Where-Object { $_.Name -like '*_source' })) {
+            foreach ($candidateRoot in @(
+              (Join-Path $sourceRoot.FullName 'source_artifacts'),
+              (Join-Path $sourceRoot.FullName 'manifests')
+            )) {
+              if (Test-Path $candidateRoot) {
+                $relativeRoot = Convert-ToRelativeGitPath -FullPath $candidateRoot
+                if ($relativeRoot) {
+                  $stageRoots.Add($relativeRoot) | Out-Null
+                }
+              }
+            }
+          }
+
+          foreach ($candidateRoot in @(
+            'reports/intelligence',
+            'reports/daily_update/latest',
+            'reports/refresh_status/latest',
+            'reports/odds_control_plane'
+          )) {
+            if (Test-Path $candidateRoot) {
+              $relativeRoot = Convert-ToRelativeGitPath -FullPath $candidateRoot
+              if ($relativeRoot) {
+                $stageRoots.Add($relativeRoot) | Out-Null
+              }
+            }
+          }
+
+          if ($stageRoots.Count -gt 0) {
+            Write-Host 'Staging roots:'
+            Write-Host ($stageRoots -join "`n")
+            git add -A -f -- @stageRoots
+          }
 
           # Show staged files for debugging
           Write-Host 'Staged files:'
