@@ -384,6 +384,11 @@
     return String(card?.oddsRefreshedAt || card?.odds_refreshed_at || lines?.oddsRefreshedAt || lines?.odds_refreshed_at || lines?.retrievedAt || lines?.retrieved_at || lines?.updatedAt || lines?.updated_at || "").trim();
   }
 
+  function gameOddsUpdatedText(card) {
+    const updatedAt = trackedGameLinesUpdatedAt(card);
+    return updatedAt ? `Odds updated ${formatTimestampShort(updatedAt)}` : "Odds updated -";
+  }
+
   function cardFullGamePrediction(card) {
     const row = card?.predictions?.full && typeof card.predictions.full === "object" ? card.predictions.full : null;
     if (!row) return null;
@@ -600,8 +605,17 @@
     return `${awayStarter} vs ${homeStarter}`;
   }
 
+  function starterBadgeList(probable, badgeKey = "ladderBadges") {
+    const sources = [badgeKey, "miniLadderBadges", "pregameLadderBadges", "ladderBadges"];
+    for (const key of sources) {
+      const badges = Array.isArray(probable?.[key]) ? probable[key] : [];
+      if (badges.length) return badges;
+    }
+    return [];
+  }
+
   function starterLadderBadgesMarkup(probable, badgeKey = "ladderBadges") {
-    const badges = Array.isArray(probable?.[badgeKey]) ? probable[badgeKey] : [];
+    const badges = starterBadgeList(probable, badgeKey);
     if (!badges.length) return "";
     return `<div class="cards-starter-ladder-badges">${badges.map((badge) => {
       const label = String(badge?.label || "").trim();
@@ -645,7 +659,7 @@
   function starterLadderStripMarkup(card) {
     const renderRow = (prefix, probable) => {
       const badgeKey = starterMetricBadgeKey(card);
-      const badges = Array.isArray(probable?.[badgeKey]) ? probable[badgeKey] : [];
+      const badges = starterBadgeList(probable, badgeKey);
       if (!badges.length) return "";
       return `
         <div class="cards-strip-starter-line">
@@ -2638,7 +2652,7 @@
         { label: "Sim row", value: simLabel },
         { label: "Model mean", value: modelMean == null ? "-" : `${formatLine(modelMean)} ${metricLabel(selected)}` },
         { label: "Live proj", value: liveProjection == null ? "-" : `${formatLine(liveProjection)} ${metricLabel(selected)}` },
-        { label: "Odds updated", value: freshnessText(selected, 'last_seen_at', { ...detail, oddsRefreshedAt: trackedGameLinesUpdatedAt(card), odds_refreshed_at: trackedGameLinesUpdatedAt(card) }) },
+        { label: "Odds updated", value: gameOddsUpdatedText(card) },
         { label: "Active since", value: freshnessText(selected, 'first_seen_at', { ...detail, oddsRefreshedAt: trackedGameLinesUpdatedAt(card), odds_refreshed_at: trackedGameLinesUpdatedAt(card) }) },
         { label: "Opened at", value: selected?.first_seen_odds != null ? formatOdds(selected.first_seen_odds) : formatOdds(selected?.odds) },
         { label: "Line", value: lineLabel },
