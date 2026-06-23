@@ -449,9 +449,6 @@ def _hydrate_board_response_payload(response_payload: dict[str, object] | None) 
     nested = current.get("response") if isinstance(current.get("response"), dict) else {}
     nested = dict(nested or {})
 
-    if not nested:
-        return current
-
     def _copy_items(key: str) -> list[dict[str, object]]:
         items = nested.get(key) if isinstance(nested.get(key), list) else []
         return [dict(item) for item in items if isinstance(item, dict)]
@@ -463,6 +460,17 @@ def _hydrate_board_response_payload(response_payload: dict[str, object] | None) 
             current["top_opportunities"] = nested_top
         elif nested_recommendations:
             current["top_opportunities"] = nested_recommendations
+
+    if not isinstance(current.get("top_opportunities"), list) or not current.get("top_opportunities"):
+        analysis = current.get("analysis") if isinstance(current.get("analysis"), dict) else None
+        if isinstance(analysis, dict):
+            analysis_recommendations = analysis.get("recommendations")
+            if isinstance(analysis_recommendations, list):
+                normalized_recommendations = [dict(item) for item in analysis_recommendations if isinstance(item, dict)]
+                if normalized_recommendations:
+                    current["top_opportunities"] = normalized_recommendations
+                    if isinstance(nested, dict) and (not isinstance(nested.get("top_opportunities"), list) or not nested.get("top_opportunities")):
+                        nested["top_opportunities"] = list(normalized_recommendations)
 
     if not isinstance(current.get("recommendations"), list) or not current.get("recommendations"):
         nested_recommendations = _copy_items("recommendations")
@@ -821,9 +829,13 @@ def _empty_default_intelligence_response() -> dict[str, object]:
 
 
 def read_latest_intelligence_state(payload: dict[str, object] | None = None) -> dict[str, object]:
+    board_snapshot = read_latest_intelligence_board_snapshot_response(payload, force_refresh=False)
+    if isinstance(board_snapshot, dict) and _response_has_content(board_snapshot):
+        return _hydrate_board_response_payload(board_snapshot)
+
     snapshot = read_latest_intelligence_state_response(payload, force_refresh=False)
     if isinstance(snapshot, dict) and _response_has_content(snapshot):
-        return dict(snapshot)
+        return _hydrate_board_response_payload(snapshot)
     return _empty_default_intelligence_response()
 
 

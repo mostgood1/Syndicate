@@ -860,6 +860,33 @@ class IntelligenceStateTests(unittest.TestCase):
         self.assertEqual(response.headers.get("Pragma"), "no-cache")
         self.assertEqual(response.headers.get("Expires"), "0")
 
+    def test_status_endpoint_hydrates_opportunities_from_analysis_only_state(self) -> None:
+        app = Flask(__name__)
+        app.register_blueprint(intelligence_bp)
+
+        analysis_only_state = {
+            "ok": True,
+            "analysis": {
+                "recommendations": [{"name": "Play 1"}],
+                "picks": [],
+                "top_live_opportunities": [],
+                "portfolio": {},
+                "parlays": [],
+            },
+        }
+
+        with app.test_request_context("/api/intelligence/status?date=2026-06-10", method="GET"):
+            with patch("syndicate.blueprints.intelligence.read_latest_intelligence_board_snapshot_response", return_value=None):
+                with patch("syndicate.blueprints.intelligence.read_latest_intelligence_state_response", return_value=dict(analysis_only_state)):
+                    response = intelligence_status_api()
+
+        payload = response.get_json()
+        self.assertIsNotNone(payload)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual((payload.get("status") or {}).get("top_opportunities", [])[0]["name"], "Play 1")
+        self.assertEqual(payload["candidate_count"], 1)
+        self.assertEqual(payload["debug_source"], "snapshot_read")
+
     def test_status_endpoint_forces_state_snapshot_reload(self) -> None:
         app = Flask(__name__)
         app.register_blueprint(intelligence_bp)
