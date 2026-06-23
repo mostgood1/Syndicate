@@ -1059,8 +1059,8 @@ class OpsRefreshApiTests(unittest.TestCase):
         with TemporaryDirectory() as tmp_dir:
             repo_root = Path(tmp_dir)
             reports_root = repo_root / "reports"
-            with patch("syndicate.features.shared.ops_refresh.REPO_ROOT", repo_root), patch(
-                "syndicate.features.shared.ops_refresh.REPORTS_ROOT", reports_root
+            with patch.dict(os.environ, {"SYNDICATE_REPORTS_ROOT": str(reports_root)}, clear=False), patch(
+                "syndicate.features.shared.ops_refresh.REPO_ROOT", repo_root
             ), patch("syndicate.features.shared.ops_refresh.subprocess.Popen") as mocked_popen:
                 mocked_popen.return_value.pid = 2468
                 from syndicate.features.shared import ops_refresh
@@ -1077,8 +1077,8 @@ class OpsRefreshApiTests(unittest.TestCase):
         with TemporaryDirectory() as tmp_dir:
             repo_root = Path(tmp_dir)
             reports_root = repo_root / "reports"
-            with patch("syndicate.features.shared.ops_refresh.REPO_ROOT", repo_root), patch(
-                "syndicate.features.shared.ops_refresh.REPORTS_ROOT", reports_root
+            with patch.dict(os.environ, {"SYNDICATE_REPORTS_ROOT": str(reports_root)}, clear=False), patch(
+                "syndicate.features.shared.ops_refresh.REPO_ROOT", repo_root
             ), patch("syndicate.features.shared.ops_refresh.subprocess.Popen") as mocked_popen:
                 mocked_popen.return_value.pid = 2468
                 from syndicate.features.shared import ops_refresh
@@ -1090,15 +1090,55 @@ class OpsRefreshApiTests(unittest.TestCase):
             self.assertIn("--execution-mode", called_command)
             self.assertIn("ingest", called_command)
 
+    def test_launch_refresh_run_uses_render_live_refresh_defaults_when_args_are_omitted(self) -> None:
+        with TemporaryDirectory() as tmp_dir:
+            repo_root = Path(tmp_dir)
+            reports_root = repo_root / "reports"
+            with patch.dict(
+                os.environ,
+                {
+                    "SYNDICATE_REPORTS_ROOT": str(reports_root),
+                    "SYNDICATE_LIVE_ODDS_REFRESH_MODE": "full",
+                    "SYNDICATE_LIVE_ODDS_REFRESH_PHASE": "live",
+                    "SYNDICATE_LIVE_ODDS_REFRESH_REGIONS": "us",
+                    "SYNDICATE_LIVE_ODDS_REFRESH_EXECUTION_MODE": "source",
+                    "SYNDICATE_LIVE_ODDS_REFRESH_SKIP_MIRROR": "true",
+                },
+                clear=False,
+            ), patch("syndicate.features.shared.ops_refresh.REPO_ROOT", repo_root), patch(
+                "syndicate.features.shared.ops_refresh.subprocess.Popen"
+            ) as mocked_popen:
+                mocked_popen.return_value.pid = 2468
+                from syndicate.features.shared import ops_refresh
+
+                result = ops_refresh.launch_refresh_run(
+                    sports="mlb",
+                    mode=None,
+                    phase=None,
+                    regions=None,
+                    execution_mode=None,
+                    skip_mirror=None,
+                    dry_run=True,
+                )
+
+            self.assertTrue(result["ok"])
+            called_command = mocked_popen.call_args.args[0]
+            self.assertIn("full", called_command)
+            self.assertIn("live", called_command)
+            self.assertIn("source", called_command)
+            self.assertIn("--skip-mirror", called_command)
+
     def test_launch_refresh_run_supports_manifest_only_mode(self) -> None:
         with TemporaryDirectory() as tmp_dir:
             repo_root = Path(tmp_dir)
             reports_root = repo_root / "reports"
-            with patch.dict(os.environ, {"SYNDICATE_REFRESH_LAUNCH_MODE": "manifest_only"}, clear=False), patch(
-                "syndicate.features.shared.ops_refresh.REPO_ROOT", repo_root
-            ), patch(
-                "syndicate.features.shared.ops_refresh.REPORTS_ROOT", reports_root
-            ), patch("syndicate.features.shared.ops_refresh.subprocess.Popen") as mocked_popen:
+            with patch.dict(
+                os.environ,
+                {"SYNDICATE_REPORTS_ROOT": str(reports_root), "SYNDICATE_REFRESH_LAUNCH_MODE": "manifest_only"},
+                clear=False,
+            ), patch("syndicate.features.shared.ops_refresh.REPO_ROOT", repo_root), patch(
+                "syndicate.features.shared.ops_refresh.subprocess.Popen"
+            ) as mocked_popen:
                 from syndicate.features.shared import ops_refresh
 
                 result = ops_refresh.launch_refresh_run(sports="mlb", phase="live", dry_run=True)
@@ -1122,11 +1162,13 @@ class OpsRefreshApiTests(unittest.TestCase):
         with TemporaryDirectory() as tmp_dir:
             repo_root = Path(tmp_dir)
             reports_root = repo_root / "reports"
-            with patch.dict(os.environ, {"RENDER_SERVICE_ID": "svc-123"}, clear=False), patch(
-                "syndicate.features.shared.ops_refresh.REPO_ROOT", repo_root
-            ), patch(
-                "syndicate.features.shared.ops_refresh.REPORTS_ROOT", reports_root
-            ), patch("syndicate.features.shared.ops_refresh.subprocess.Popen") as mocked_popen:
+            with patch.dict(
+                os.environ,
+                {"SYNDICATE_REPORTS_ROOT": str(reports_root), "RENDER_SERVICE_ID": "svc-123"},
+                clear=False,
+            ), patch("syndicate.features.shared.ops_refresh.REPO_ROOT", repo_root), patch(
+                "syndicate.features.shared.ops_refresh.subprocess.Popen"
+            ) as mocked_popen:
                 from syndicate.features.shared import ops_refresh
 
                 result = ops_refresh.launch_refresh_run(sports="mlb", phase="live", dry_run=True)
@@ -1142,11 +1184,13 @@ class OpsRefreshApiTests(unittest.TestCase):
         with TemporaryDirectory() as tmp_dir:
             repo_root = Path(tmp_dir)
             reports_root = repo_root / "reports"
-            with patch.dict(os.environ, {"SYNDICATE_REFRESH_LAUNCH_MODE": "external_runner"}, clear=False), patch(
-                "syndicate.features.shared.ops_refresh.REPO_ROOT", repo_root
-            ), patch(
-                "syndicate.features.shared.ops_refresh.REPORTS_ROOT", reports_root
-            ), patch("syndicate.features.shared.ops_refresh.subprocess.Popen") as mocked_popen:
+            with patch.dict(
+                os.environ,
+                {"SYNDICATE_REPORTS_ROOT": str(reports_root), "SYNDICATE_REFRESH_LAUNCH_MODE": "external_runner"},
+                clear=False,
+            ), patch("syndicate.features.shared.ops_refresh.REPO_ROOT", repo_root), patch(
+                "syndicate.features.shared.ops_refresh.subprocess.Popen"
+            ) as mocked_popen:
                 from syndicate.features.shared import ops_refresh
 
                 result = ops_refresh.launch_refresh_run(sports="mlb", phase="live", dry_run=True)
@@ -1161,11 +1205,13 @@ class OpsRefreshApiTests(unittest.TestCase):
         with TemporaryDirectory() as tmp_dir:
             repo_root = Path(tmp_dir)
             reports_root = repo_root / "reports"
-            with patch.dict(os.environ, {"SYNDICATE_REFRESH_LAUNCH_MODE": "detached_subprocess"}, clear=False), patch(
-                "syndicate.features.shared.ops_refresh.REPO_ROOT", repo_root
-            ), patch(
-                "syndicate.features.shared.ops_refresh.REPORTS_ROOT", reports_root
-            ), patch("syndicate.features.shared.ops_refresh.subprocess.Popen") as mocked_popen:
+            with patch.dict(
+                os.environ,
+                {"SYNDICATE_REPORTS_ROOT": str(reports_root), "SYNDICATE_REFRESH_LAUNCH_MODE": "detached_subprocess"},
+                clear=False,
+            ), patch("syndicate.features.shared.ops_refresh.REPO_ROOT", repo_root), patch(
+                "syndicate.features.shared.ops_refresh.subprocess.Popen"
+            ) as mocked_popen:
                 from syndicate.features.shared import ops_refresh
 
                 result = ops_refresh.launch_refresh_run(sports="mlb", phase="live", dry_run=True, launch_mode="manifest_only")

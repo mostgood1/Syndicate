@@ -958,7 +958,14 @@ def run_intelligence():
     launch_result: dict[str, Any] | None = None
     launched = False
     try:
-        launch_result = launch_refresh_run(date=selected_date, mode="fast")
+        launch_result = launch_refresh_run(
+            date=selected_date,
+            mode=None,
+            phase=None,
+            regions=None,
+            execution_mode=None,
+            skip_mirror=None,
+        )
         launched = True
     except Exception:
         launch_result = load_latest_refresh_status()

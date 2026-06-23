@@ -442,6 +442,44 @@ class AskTheSyndicateApiTests(unittest.TestCase):
         self.assertTrue(payload["context_awareness"]["multi_sport"])
         self.assertEqual(payload["board_contract"]["schema"], "intelligence_board_v1")
 
+    def test_query_route_hydrates_opportunities_from_analysis_only_state(self) -> None:
+        app = Flask(__name__)
+        app.register_blueprint(ask_the_syndicate_bp)
+
+        cached_state = {
+            "analysis": {
+                "recommendations": [{"name": "NBA side", "summary": "Primary NBA angle."}],
+                "picks": [],
+                "top_live_opportunities": [],
+                "portfolio": {},
+                "parlays": [],
+            },
+            "response": {
+                "analysis": {
+                    "recommendations": [{"name": "NBA side", "summary": "Primary NBA angle."}],
+                    "picks": [],
+                    "top_live_opportunities": [],
+                    "portfolio": {},
+                    "parlays": [],
+                }
+            },
+        }
+
+        with patch("syndicate.blueprints.ask_the_syndicate.read_latest_intelligence_board_snapshot_response", return_value=None):
+            with patch("syndicate.blueprints.ask_the_syndicate.read_latest_intelligence_state_response", return_value=dict(cached_state)):
+                response = app.test_client().post(
+                    "/api/syndicate/query",
+                    json={
+                        "question": "What do you think of this spread?",
+                        "context": {"sport": "nba"},
+                    },
+                )
+
+        payload = response.get_json()
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(payload["schema"]["selection"], "NBA side")
+        self.assertEqual(payload["schema"]["recommendation"], "Primary NBA angle.")
+
 
 if __name__ == "__main__":
     unittest.main()

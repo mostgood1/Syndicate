@@ -12,6 +12,7 @@ from flask import jsonify
 from flask import request
 
 from router.query_router import QueryRouter as IntelligenceQueryRouter
+from pipeline.intelligence_state import read_latest_intelligence_board_snapshot_response
 from pipeline.intelligence_state import read_latest_intelligence_state_response
 from syndicate.blueprints.ask_the_syndicate_adapter import build_syndicate_query_response
 from syndicate.blueprints.ask_the_syndicate_router import SyndicateQueryRouter
@@ -190,10 +191,49 @@ def _empty_ask_result(shaped_payload: dict[str, Any], decision: RouteDecision, *
     }
 
 
+def _hydrate_intelligence_snapshot_payload(snapshot: dict[str, Any] | None) -> dict[str, Any]:
+    current = dict(snapshot or {})
+    nested = current.get("response") if isinstance(current.get("response"), dict) else {}
+    nested = dict(nested or {})
+
+    if not isinstance(current.get("top_opportunities"), list) or not current.get("top_opportunities"):
+        nested_top = nested.get("top_opportunities") if isinstance(nested.get("top_opportunities"), list) else []
+        nested_recommendations = nested.get("recommendations") if isinstance(nested.get("recommendations"), list) else []
+        if nested_top:
+            current["top_opportunities"] = [dict(item) for item in nested_top if isinstance(item, dict)]
+        elif nested_recommendations:
+            current["top_opportunities"] = [dict(item) for item in nested_recommendations if isinstance(item, dict)]
+
+    if not isinstance(current.get("recommendations"), list) or not current.get("recommendations"):
+        nested_recommendations = nested.get("recommendations") if isinstance(nested.get("recommendations"), list) else []
+        if nested_recommendations:
+            current["recommendations"] = [dict(item) for item in nested_recommendations if isinstance(item, dict)]
+
+    analysis = current.get("analysis") if isinstance(current.get("analysis"), dict) else None
+    if isinstance(analysis, dict):
+        if not isinstance(current.get("top_opportunities"), list) or not current.get("top_opportunities"):
+            analysis_recommendations = analysis.get("recommendations") if isinstance(analysis.get("recommendations"), list) else []
+            normalized_recommendations = [dict(item) for item in analysis_recommendations if isinstance(item, dict)]
+            if normalized_recommendations:
+                current["top_opportunities"] = normalized_recommendations
+                if isinstance(nested, dict) and (not isinstance(nested.get("top_opportunities"), list) or not nested.get("top_opportunities")):
+                    nested["top_opportunities"] = list(normalized_recommendations)
+        if not isinstance(current.get("recommendations"), list) or not current.get("recommendations"):
+            analysis_recommendations = analysis.get("recommendations") if isinstance(analysis.get("recommendations"), list) else []
+            if analysis_recommendations:
+                current["recommendations"] = [dict(item) for item in analysis_recommendations if isinstance(item, dict)]
+
+    return current
+
+
 def read_latest_intelligence_state(payload: dict[str, Any] | None = None) -> dict[str, Any]:
+    board_snapshot = read_latest_intelligence_board_snapshot_response(payload or {}, force_refresh=False)
+    if isinstance(board_snapshot, dict):
+        return _hydrate_intelligence_snapshot_payload(board_snapshot)
+
     snapshot = read_latest_intelligence_state_response(payload or {}, force_refresh=False)
     if isinstance(snapshot, dict):
-        return dict(snapshot)
+        return _hydrate_intelligence_snapshot_payload(snapshot)
     return {}
 
 

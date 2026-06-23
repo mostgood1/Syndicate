@@ -602,6 +602,18 @@ def _coerce_slug_list(raw: str | None) -> str:
     return text or "all"
 
 
+def _env_text(name: str) -> str | None:
+    value = str(os.environ.get(name) or "").strip()
+    return value or None
+
+
+def _env_bool(name: str) -> bool | None:
+    value = str(os.environ.get(name) or "").strip().lower()
+    if not value:
+        return None
+    return value in {"1", "true", "yes", "on"}
+
+
 def _active_sports_for_date(date_str: str) -> str:
     """Return a comma-separated list of sports whose season overlaps *date_str*.
 
@@ -657,7 +669,7 @@ def launch_refresh_run(
     markets: str | None = None,
     season: int | None = None,
     week: int | None = None,
-    skip_mirror: bool = False,
+    skip_mirror: bool | None = None,
     mirror_only: bool = False,
     execution_mode: str | None = None,
     dry_run: bool = False,
@@ -665,7 +677,8 @@ def launch_refresh_run(
 ) -> dict[str, Any]:
     _assert_no_active_refresh_run()
     selected_date = date or _today_date()
-    effective_skip_mirror = _effective_skip_mirror(skip_mirror=bool(skip_mirror), mirror_only=bool(mirror_only))
+    skip_mirror_value = _env_bool("SYNDICATE_LIVE_ODDS_REFRESH_SKIP_MIRROR") if skip_mirror is None else bool(skip_mirror)
+    effective_skip_mirror = _effective_skip_mirror(skip_mirror=bool(skip_mirror_value), mirror_only=bool(mirror_only))
     # Default to in-season sports for the target date rather than running all sports.
     effective_sports = _coerce_slug_list(sports) if sports else _active_sports_for_date(selected_date)
     run_stamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
@@ -686,6 +699,11 @@ def launch_refresh_run(
     refresh_status_manifest_path = refresh_status_run_dir / "refresh_status_manifest.json"
     refresh_status_latest_path = refresh_status_latest_dir / "refresh_status_latest.json"
 
+    refresh_mode = str(mode or _env_text("SYNDICATE_LIVE_ODDS_REFRESH_MODE") or "fast").strip().lower() or "fast"
+    phase_text = str(phase or _env_text("SYNDICATE_LIVE_ODDS_REFRESH_PHASE") or "all").strip() or "all"
+    regions_text = str(regions or _env_text("SYNDICATE_LIVE_ODDS_REFRESH_REGIONS") or "us").strip() or "us"
+    execution_mode_text = str(execution_mode or _env_text("SYNDICATE_LIVE_ODDS_REFRESH_EXECUTION_MODE") or "source").strip() or "source"
+
     refresh_command = [
         sys.executable,
         str(REPO_ROOT / "scripts" / "refresh_odds_sources.py"),
@@ -694,9 +712,9 @@ def launch_refresh_run(
         "--sports",
         effective_sports,
         "--phase",
-        str(phase or "all").strip() or "all",
+        phase_text,
         "--regions",
-        str(regions or "us").strip() or "us",
+        regions_text,
         "--json",
     ]
     bookmakers_text = str(bookmakers or "").strip()
@@ -705,13 +723,11 @@ def launch_refresh_run(
         refresh_command.extend(["--bookmakers", bookmakers_text])
     if markets_text:
         refresh_command.extend(["--markets", markets_text])
-    refresh_mode = str(mode or "fast").strip().lower() or "fast"
     refresh_command.extend(["--mode", refresh_mode])
     if season is not None:
         refresh_command.extend(["--season", str(season)])
     if week is not None:
         refresh_command.extend(["--week", str(week)])
-    execution_mode_text = str(execution_mode or "source").strip() or "source"
     refresh_command.extend(["--execution-mode", execution_mode_text])
     if effective_skip_mirror:
         refresh_command.append("--skip-mirror")
@@ -755,9 +771,9 @@ def launch_refresh_run(
         "refreshStatusDir": str(refresh_status_run_dir),
         "jsonMode": True,
         "refreshOdds": True,
-        "oddsPhase": str(phase or "all").strip() or "all",
+        "oddsPhase": phase_text,
         "oddsSports": effective_sports,
-        "oddsRegions": str(regions or "us").strip() or "us",
+        "oddsRegions": regions_text,
         "skipMirror": bool(effective_skip_mirror),
         "mirrorOnly": bool(mirror_only),
         "executionMode": execution_mode_text,
@@ -782,9 +798,9 @@ def launch_refresh_run(
         "refreshStatusDir": str(refresh_status_run_dir),
         "latestManifestPath": str(refresh_status_latest_path),
         "refreshOdds": True,
-        "oddsPhase": str(phase or "all").strip() or "all",
+        "oddsPhase": phase_text,
         "oddsSports": effective_sports,
-        "oddsRegions": str(regions or "us").strip() or "us",
+        "oddsRegions": regions_text,
         "runSummaryPath": str(refresh_and_gate_run_path),
         "oddsRefreshPath": str(odds_refresh_path),
         "migrationGateReportPath": str(artifacts_dir / "migration_gate_report.json"),

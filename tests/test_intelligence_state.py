@@ -231,6 +231,32 @@ class IntelligenceStateTests(unittest.TestCase):
         self.assertEqual(payload["response"]["analysis"]["portfolio"], {})
         self.assertEqual(payload["debug_source"], "snapshot_read")
 
+    def test_run_intelligence_uses_render_refresh_profile_defaults(self) -> None:
+        app = Flask(__name__)
+        app.register_blueprint(intelligence_bp)
+
+        with app.test_request_context("/intelligence/run", method="GET"):
+            with patch("syndicate.blueprints.intelligence._latest_available_intelligence_date", return_value="2026-06-22"), patch(
+                "syndicate.blueprints.intelligence.launch_refresh_run"
+            ) as mocked_launch, patch(
+                "syndicate.blueprints.intelligence.queue_intelligence_state_refresh"
+            ) as mocked_queue:
+                mocked_launch.return_value = {"ok": True, "state": "pending_external"}
+                response = intelligence_module.run_intelligence()
+
+        payload = response.get_json()
+        self.assertIsNotNone(payload)
+        self.assertTrue(payload["ok"])
+        self.assertTrue(payload["launched"])
+        mocked_launch.assert_called_once()
+        launch_kwargs = mocked_launch.call_args.kwargs
+        self.assertIsNone(launch_kwargs["mode"])
+        self.assertIsNone(launch_kwargs["phase"])
+        self.assertIsNone(launch_kwargs["regions"])
+        self.assertIsNone(launch_kwargs["execution_mode"])
+        self.assertIsNone(launch_kwargs["skip_mirror"])
+        mocked_queue.assert_called_once()
+
     def test_query_endpoint_exposes_line_move_tracking_fields(self) -> None:
         app = Flask(__name__)
         app.register_blueprint(intelligence_bp)
