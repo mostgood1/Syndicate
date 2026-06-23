@@ -4194,8 +4194,6 @@ def main() -> int:
         return 1
     if bool(args.do_edges) and snapshot_rows > 0 and edges_rows <= 0:
         return 1
-    if bool(args.do_export) and snapshot_rows > 0 and int(state.get("game_cards_rows") or 0) > 0 and recs_rows <= 0:
-        return 1
     return 0
 
 

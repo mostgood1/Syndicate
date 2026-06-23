@@ -1,29 +1,27 @@
 {
   "sport": "nba",
-  "last_updated": "2026-06-22T18:04:56+00:00",
+  "last_updated": "2026-06-23T02:08:31+00:00",
   "artifact_paths": [
-    "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate",
-    "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nba_source"
+    "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate"
   ],
   "status": "complete",
   "metadata": {
-    "date": "2026-05-22",
+    "date": "2026-06-22",
     "phase": "all",
     "execution_mode": "source",
-    "refresh_mode": "full",
+    "refresh_mode": "fast",
     "ok": true,
-    "post_refresh_ok": true,
-    "mirror_ok": true,
+    "post_refresh_ok": null,
+    "mirror_ok": null,
     "odds_control_plane": {
       "source_precedence": [
         "artifact_history",
         "tracking_history"
       ],
       "artifact_paths": [
-        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate",
-        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nba_source"
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate"
       ],
-      "has_post_refresh": true
+      "has_post_refresh": false
     }
   }
 }

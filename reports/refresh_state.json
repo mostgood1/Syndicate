@@ -707,6 +707,36 @@
         "trigger": "syndicate_refresh",
         "source_root": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\source_artifacts"
       }
+    },
+    "wnba_artifact_bundle:C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\wnba_source\\source_artifacts:2026-06-22:1:1": {
+      "inputHash": "bd2cdc0cd538c6e3c367a5f12a2c053693964fbde23f2a9075f18a161d5d6be4",
+      "updatedAt": "2026-06-23T02:23:15.546097",
+      "outputs": [],
+      "metadata": {
+        "date": "2026-06-22",
+        "reused": true,
+        "artifact_root": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\wnba_source\\source_artifacts"
+      }
+    },
+    "nba_artifact_bundle:C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nba_source\\source_artifacts:2026-06-22:1:1": {
+      "inputHash": "32a0b67c1ad7cb86902d7923f201941d16b5397bba53c9091e92713d69e58c54",
+      "updatedAt": "2026-06-23T02:20:05.327805",
+      "outputs": [],
+      "metadata": {
+        "date": "2026-06-22",
+        "reused": false,
+        "artifact_root": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nba_source\\source_artifacts"
+      }
+    },
+    "wnba_artifact_bundle:C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmp17p71dob\\bundle:2026-06-22:1:1": {
+      "inputHash": "8f3f4d95214acba083124023597416a8d3aa7ef1b210edaac9d98c6efa60be86",
+      "updatedAt": "2026-06-23T02:25:32.257064",
+      "outputs": [],
+      "metadata": {
+        "date": "2026-06-22",
+        "reused": false,
+        "artifact_root": "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmp17p71dob\\bundle"
+      }
     }
   }
 }

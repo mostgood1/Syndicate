@@ -1,29 +1,27 @@
 {
   "sport": "wnba",
-  "last_updated": "2026-06-22T18:05:00+00:00",
+  "last_updated": "2026-06-23T02:16:29+00:00",
   "artifact_paths": [
-    "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate",
-    "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\wnba_source"
+    "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate"
   ],
   "status": "complete",
   "metadata": {
-    "date": "2026-05-22",
-    "phase": "all",
+    "date": "2026-06-22",
+    "phase": "live",
     "execution_mode": "source",
-    "refresh_mode": "full",
-    "ok": true,
-    "post_refresh_ok": true,
-    "mirror_ok": true,
+    "refresh_mode": "fast",
+    "ok": false,
+    "post_refresh_ok": null,
+    "mirror_ok": null,
     "odds_control_plane": {
       "source_precedence": [
         "artifact_history",
         "tracking_history"
       ],
       "artifact_paths": [
-        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate",
-        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\wnba_source"
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate"
       ],
-      "has_post_refresh": true
+      "has_post_refresh": false
     }
   }
 }
