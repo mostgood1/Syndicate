@@ -97,7 +97,6 @@ from syndicate.features.wnba.sources import processed_path as wnba_processed_pat
 from syndicate.features.shared.intelligence_evaluation import build_intelligence_evaluation_bundle
 from syndicate.features.intelligence_board import build_intelligence_board_contract
 from syndicate.features.shared.simulation_adapter import build_simulation_engine_context_from_candidate
-from syndicate.features.shared.refresh_state_store import read_json_file
 
 
 ENABLE_PREDICTION_TRACKING = True
@@ -3321,7 +3320,7 @@ def build_intelligence_status(*, selected_date: str | None = None, force_refresh
     simulation_contract_path = daily_update_latest_dir / "unified_daily_update_latest_simulation_contract.json"
     simulation_contract = None
     if simulation_contract_path.exists():
-        simulation_contract = read_json_file(simulation_contract_path)
+        simulation_contract = _read_json_payload(simulation_contract_path)
 
     return {
         "selected_date": _effective_date(selected_date),
@@ -3344,6 +3343,13 @@ def build_intelligence_status(*, selected_date: str | None = None, force_refresh
         },
         "local_only": True,
     }
+
+
+def _read_json_payload(path: Path) -> dict[str, Any] | list[Any] | None:
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return None
 
 
 def _sport_matches_preferences(sport: dict[str, Any], preferences: dict[str, Any]) -> bool:
