@@ -200,6 +200,58 @@ class WnbaLiveSnapshotLocalTests(unittest.TestCase):
         self.assertEqual([game.get("game_id") for game in payload.get("games") or []], ["42"])
         self.assertTrue(((payload.get("games") or [{}])[0]).get("in_progress"))
 
+    def test_live_state_payload_render_skips_remote_and_public_fallbacks(self) -> None:
+        with patch.dict("os.environ", {"RENDER": "1"}, clear=False), patch(
+            "syndicate.features.wnba.cards.central_today_iso",
+            return_value="2026-05-21",
+        ), patch(
+            "syndicate.features.wnba.cards._local_live_state_payload",
+            return_value={
+                "ok": True,
+                "source": "local_snapshot",
+                "games": [
+                    {
+                        "event_id": "evt-1",
+                        "away": "NYL",
+                        "home": "LAS",
+                        "away_pts": 81,
+                        "home_pts": 79,
+                        "status": "Live",
+                        "periods": [],
+                    }
+                ],
+            },
+        ) as local_payload, patch(
+            "syndicate.features.wnba.cards._remote_live_snapshot_payload",
+            side_effect=AssertionError("remote snapshot should not be used on Render"),
+        ) as remote_payload, patch(
+            "syndicate.features.wnba.cards._public_scoreboard_live_state_payload",
+            side_effect=AssertionError("public scoreboard should not be used on Render"),
+        ) as public_payload, patch(
+            "syndicate.features.wnba.cards.build_cards_page_context",
+            return_value={
+                "games": [
+                    {
+                        "event_id": "evt-1",
+                        "away_tri": "NYL",
+                        "home_tri": "LAS",
+                        "away": {"abbr": "NYL", "score": 81},
+                        "home": {"abbr": "LAS", "score": 79},
+                        "live_state": {"in_progress": True, "final": False},
+                        "status": "Live",
+                        "detail": "Q4 01:12",
+                    }
+                ]
+            },
+        ):
+            payload = build_live_state_payload("2026-05-21", ttl=12)
+
+        self.assertEqual(payload.get("source"), "local_snapshot")
+        self.assertEqual([game.get("event_id") for game in payload.get("games") or []], ["evt-1"])
+        self.assertEqual(local_payload.call_count, 1)
+        self.assertEqual(remote_payload.call_count, 0)
+        self.assertEqual(public_payload.call_count, 0)
+
     def test_live_state_payload_repairs_stale_public_scoreboard_with_cards_context(self) -> None:
         with patch("syndicate.features.wnba.cards.central_today_iso", return_value="2026-05-21"), patch(
             "syndicate.features.wnba.cards._remote_live_snapshot_payload",

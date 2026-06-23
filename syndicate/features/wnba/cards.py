@@ -656,7 +656,7 @@ def _artifact_bundle(selected_date: str) -> dict[str, Any]:
     rec_summary = load_json(paths["recommendations"])
 
     # Runtime WNBA fallback if the processed artifacts are empty.
-    if not rows and selected_date == central_today_iso():
+    if not rows and selected_date == central_today_iso() and not _render_web_dyno():
         try:
             rows, _ = _games_from_live_state_fallback(selected_date)
         except Exception:
@@ -1509,7 +1509,7 @@ def _games_from_artifacts(selected_date: str) -> tuple[list[dict[str, Any]], str
 
 def _games_from_live_state_fallback(selected_date: str, ttl: int = 12) -> tuple[list[dict[str, Any]], str]:
     is_today = str(selected_date).strip() == central_today_iso()
-    should_try_remote = _remote_source_fallback_enabled() or is_today
+    should_try_remote = (not _render_web_dyno()) and (_remote_source_fallback_enabled() or is_today)
     candidate_payloads: list[dict[str, Any] | None] = []
     if is_today:
         if should_try_remote:
@@ -3353,18 +3353,21 @@ def build_live_state_payload(selected_date: str, ttl: int = 12, *, allow_stored_
     # Live-state is operationally critical for in-progress scoreboards on WNBA and Home.
     # For today's slate, prefer fresher remote/public live sources ahead of the local snapshot
     # so a stale halftime file does not mask a game that has already advanced.
-    should_try_remote = _remote_source_fallback_enabled() or is_today
+    should_try_remote = (not _render_web_dyno()) and (_remote_source_fallback_enabled() or is_today)
     candidate_payloads: list[dict[str, Any] | None] = []
-    if is_today:
-        if should_try_remote:
-            candidate_payloads.append(_remote_live_snapshot_payload("live_state", selected_date=selected_date))
-        candidate_payloads.append(_public_scoreboard_live_state_payload(selected_date))
+    if _render_web_dyno():
         candidate_payloads.append(_local_live_state_payload(selected_date))
     else:
-        candidate_payloads.append(_local_live_state_payload(selected_date))
-        if should_try_remote:
-            candidate_payloads.append(_remote_live_snapshot_payload("live_state", selected_date=selected_date))
-        candidate_payloads.append(_public_scoreboard_live_state_payload(selected_date))
+        if is_today:
+            if should_try_remote:
+                candidate_payloads.append(_remote_live_snapshot_payload("live_state", selected_date=selected_date))
+            candidate_payloads.append(_public_scoreboard_live_state_payload(selected_date))
+            candidate_payloads.append(_local_live_state_payload(selected_date))
+        else:
+            candidate_payloads.append(_local_live_state_payload(selected_date))
+            if should_try_remote:
+                candidate_payloads.append(_remote_live_snapshot_payload("live_state", selected_date=selected_date))
+            candidate_payloads.append(_public_scoreboard_live_state_payload(selected_date))
 
     for candidate_payload in candidate_payloads:
         if isinstance(candidate_payload, dict) and isinstance(candidate_payload.get("games"), list) and bool(candidate_payload.get("games")):
