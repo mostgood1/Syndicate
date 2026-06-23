@@ -21,8 +21,17 @@ def _safe_text(value: Any, fallback: str = "") -> str:
 
 
 def _safe_float(value: Any) -> float | None:
-    try:
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
         return float(value)
+    text = str(value).strip().replace(",", "")
+    if not text:
+        return None
+    try:
+        return float(text.replace("%", ""))
     except Exception:
         return None
 

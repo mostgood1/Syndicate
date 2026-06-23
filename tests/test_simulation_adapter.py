@@ -145,6 +145,38 @@ class UnifiedSimulationAdapterTests(unittest.TestCase):
         self.assertEqual(game["advanced"]["game"]["first1BetSignal"]["market"], "first1")
         self.assertIn("advanced", game["display"])
 
+        def test_adapter_accepts_percent_string_confidence(self) -> None:
+            fake_context = {
+                "date": "2026-06-22",
+                "requested_date": "2026-06-22",
+                "source_title": "Fake source title",
+                "games": [
+                    {
+                        "gamePk": "game-1",
+                        "event_id": "401000001",
+                        "away_tri": "AWY",
+                        "home_tri": "HME",
+                        "away": {"abbr": "AWY", "score": 101},
+                        "home": {"abbr": "HME", "score": 103},
+                        "status": "Scheduled",
+                        "detail": "Scheduled",
+                        "summary": "Example game",
+                        "betting": {"market": "spread", "confidence": "46.1%", "edge": 0.12},
+                        "sim": {"score": {"away_mean": 100.5, "home_mean": 104.5}},
+                        "live_state": {"status": "Scheduled", "final": False},
+                    }
+                ],
+            }
+
+            with patch.dict(
+                "syndicate.features.shared.simulation_adapter.SPORT_ADAPTERS",
+                {"nba": lambda *args, **kwargs: fake_context},
+                clear=False,
+            ):
+                payload = build_unified_simulation_adapter("nba", "2026-06-22")
+
+            self.assertEqual(payload["games"][0]["engine_context"]["confidence"], 46.1)
+
 
 if __name__ == "__main__":
     unittest.main()
