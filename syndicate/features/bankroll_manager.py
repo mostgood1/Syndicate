@@ -187,7 +187,7 @@ def build_portfolio(
             float(item.get("portfolio_score") or 0.0),
             float(item.get("portfolio_edge") or 0.0),
             float((item.get("bet_size_profile") or {}).get("recommended_bet_size") or 0.0),
-            float(item.get("confidence") or 0.0),
+            float(_safe_float(item.get("confidence")) or 0.0),
         ),
         reverse=True,
     )

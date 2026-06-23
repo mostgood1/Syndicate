@@ -6,6 +6,7 @@ from unittest.mock import patch
 from syndicate.features.intelligence_board import build_intelligence_board_contract
 from syndicate.features.intelligence import collect_all_recommendations
 from syndicate.features.intelligence import run_intelligence_query
+from syndicate.features.intelligence.api.response_builder import build_response
 from syndicate.blueprints.intelligence import _hydrate_board_response_payload
 
 
@@ -202,6 +203,64 @@ class IntelligenceBoardContractTests(unittest.TestCase):
         self.assertEqual(contract["lane_counts"]["pregame"], 1)
         self.assertEqual(contract["cards"][0]["team"], "Las Vegas Aces")
         self.assertEqual(contract["cards"][1]["team"], "Boston Celtics")
+
+    def test_build_response_interleaves_active_sports_in_order(self) -> None:
+        response = build_response(
+            recommendations=[
+                {
+                    "sport": "mlb",
+                    "sport_slug": "mlb",
+                    "team": "New York Yankees",
+                    "name": "Aaron Judge",
+                    "market": "home_runs",
+                    "line": 1.5,
+                    "score": 200.0,
+                    "confidence": "91%",
+                    "edge": 0.16,
+                    "is_live": True,
+                },
+                {
+                    "sport": "mlb",
+                    "sport_slug": "mlb",
+                    "team": "Houston Astros",
+                    "name": "Yordan Alvarez",
+                    "market": "hits",
+                    "line": 1.5,
+                    "score": 190.0,
+                    "confidence": "90%",
+                    "edge": 0.14,
+                    "is_live": True,
+                },
+                {
+                    "sport": "wnba",
+                    "sport_slug": "wnba",
+                    "team": "Las Vegas Aces",
+                    "name": "A'ja Wilson",
+                    "market": "points",
+                    "line": 24.5,
+                    "score": 180.0,
+                    "confidence": "88%",
+                    "edge": 0.12,
+                    "is_live": False,
+                },
+                {
+                    "sport": "wnba",
+                    "sport_slug": "wnba",
+                    "team": "Seattle Storm",
+                    "name": "Nneka Ogwumike",
+                    "market": "rebounds",
+                    "line": 9.5,
+                    "score": 170.0,
+                    "confidence": "87%",
+                    "edge": 0.11,
+                    "is_live": False,
+                },
+            ],
+            parlays=[],
+        )
+
+        ordered_sports = [item.get("sport_slug") for item in response.get("recommendations") or []]
+        self.assertEqual(ordered_sports[:4], ["mlb", "wnba", "mlb", "wnba"])
 
     def test_hydrate_board_response_payload_promotes_nested_recommendations(self) -> None:
         payload = _hydrate_board_response_payload(

@@ -6121,7 +6121,7 @@ def collect_all_recommendations(*, selected_date: str | None = None, force_refre
 
 def rank_global_recommendations(recommendations: list[dict[str, Any]], *, limit: int | None = None) -> list[dict[str, Any]]:
     ranked = sorted(
-        [dict(recommendation) for recommendation in recommendations if isinstance(recommendation, dict)],
+        [dict(recommendation) for recommendation in recommendations if isinstance(recommendation, Mapping)],
         key=lambda recommendation: float(recommendation.get("score") or 0.0),
         reverse=True,
     )
@@ -6142,7 +6142,7 @@ def _build_board_dictionary(recommendations: list[dict[str, Any]]) -> dict[str, 
     }
     by_sport = board["by_sport"]
     for recommendation in recommendations:
-        if not isinstance(recommendation, dict):
+        if not isinstance(recommendation, Mapping):
             continue
         item = dict(recommendation)
         board["top_overall"].append(item)

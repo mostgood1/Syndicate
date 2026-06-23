@@ -1641,6 +1641,47 @@ def _game_bet_candidates_from_game(sport: dict[str, Any], game: dict[str, Any], 
                 detail=game.get("summary"),
                 fallback_epoch=fallback_epoch,
             )
+    if _safe_text(sport.get("slug"), "").lower() == "mlb":
+        markets = game.get("markets") if isinstance(game.get("markets"), dict) else {}
+        for prop_key, market_prefix, name_key in [
+            ("pitcherProps", "Pitcher", "pitcher_name"),
+            ("extraPitcherProps", "Pitcher", "pitcher_name"),
+            ("hitterProps", "Hitter", "player_name"),
+            ("extraHitterProps", "Hitter", "player_name"),
+        ]:
+            prop_rows = markets.get(prop_key) if isinstance(markets.get(prop_key), list) else []
+            for prop in prop_rows:
+                if not isinstance(prop, dict):
+                    continue
+                player_name = _safe_text(prop.get(name_key) or prop.get("player_name") or prop.get("pitcher_name") or prop.get("name"), "")
+                if not player_name:
+                    continue
+                market_label = _display_prop_market_label(prop.get("market_label") or prop.get("prop") or prop.get("prop_market_key") or prop.get("market"))
+                selection = _safe_text(prop.get("selection"), "").upper()
+                pick = f"{selection} {player_name}".strip() if selection else player_name
+                detail = _first_present_text(prop.get("reason_summary"), prop.get("summary"), prop.get("explanation_diagnostic"), game.get("summary"))
+                confidence = prop.get("model_prob")
+                if confidence is None:
+                    confidence = prop.get("selected_side_model_prob")
+                    if confidence is None and selection:
+                        confidence = prop.get("model_prob_over") if selection == "OVER" else prop.get("model_prob_under")
+                projected = _first_present_text(prop.get("projection"), prop.get("mean"), prop.get("modelMean"), prop.get("sim_mean"), prop.get("projected"), prop.get("baseline"))
+                live_projection = _first_present_text(prop.get("live_projection"), prop.get("liveProjection"), prop.get("live_proj"), prop.get("projected_live"))
+                _append_game_bet_candidate(
+                    candidates,
+                    sport=sport,
+                    game=game,
+                    market=f"{market_prefix} {market_label}".strip(),
+                    pick=pick,
+                    line=prop.get("market_line"),
+                    odds=_first_present_text(prop.get("odds"), prop.get("price")),
+                    edge=prop.get("edge"),
+                    confidence=confidence,
+                    projected=projected,
+                    live_projection=live_projection,
+                    detail=detail,
+                    fallback_epoch=fallback_epoch,
+                )
     filtered = [row for row in candidates if row.get("edge") not in {"-", None} or row.get("confidence") not in {"-", None}]
     return sorted(filtered or candidates, key=lambda row: row.get("score", 0.0), reverse=True)
 
