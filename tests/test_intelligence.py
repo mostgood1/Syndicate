@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import tempfile
 import unittest
 from collections import OrderedDict
@@ -1541,12 +1542,13 @@ class IntelligenceBlueprintTests(unittest.TestCase):
             "top_opportunities": [{"recommendation_id": "rec-1", "name": "Jayson Tatum Over 28.5"}],
             "by_sport": {"nba": [{"recommendation_id": "rec-1", "name": "Jayson Tatum Over 28.5"}]},
             "response": {"analysis": {"recommendations": [{"recommendation_id": "rec-1", "name": "Jayson Tatum Over 28.5"}]}},
+            "board_contract": {"schema": "intelligence_board_v1", "cards": [{"name": "Jayson Tatum Over 28.5"}]},
         }
         board_contract = {"schema": "intelligence_board_v1", "cards": [{"name": "Jayson Tatum Over 28.5"}]}
 
         with patch("syndicate.blueprints.intelligence.queue_intelligence_state_refresh") as queue_mock:
-            with patch("syndicate.blueprints.intelligence.read_intelligence_state", return_value=state_response) as state_mock:
-                with patch("syndicate.blueprints.intelligence.run_intelligence_query", return_value=dict(live_result)) as query_mock:
+            with patch("syndicate.blueprints.intelligence.read_latest_intelligence_state_response", return_value=state_response) as state_mock:
+                with patch("syndicate.blueprints.intelligence._INTELLIGENCE_STATE_SERVICE._compute_response", return_value=dict(live_result)) as compute_mock:
                     with patch("syndicate.blueprints.intelligence.build_intelligence_board_contract", return_value=dict(board_contract)):
                         response = self.client.post(
                             "/api/intelligence/query",
@@ -1566,7 +1568,46 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertEqual((payload.get("response") or {}).get("analysis", {}).get("recommendations", [])[0].get("name"), "Jayson Tatum Over 28.5")
         queue_mock.assert_not_called()
         state_mock.assert_called_once()
-        query_mock.assert_called_once()
+        compute_mock.assert_called_once()
+
+    def test_intelligence_query_api_queues_refresh_on_render_instead_of_computing(self) -> None:
+        empty_response = {
+            "ok": True,
+            "top_opportunities": [],
+            "by_sport": {},
+            "analysis": {
+                "recommendations": [],
+                "top_live_opportunities": [],
+                "picks": [],
+                "portfolio": {},
+                "parlays": [],
+            },
+        }
+
+        with patch.dict(os.environ, {"RENDER": "true"}, clear=False):
+            with patch("syndicate.blueprints.intelligence.queue_intelligence_state_refresh") as queue_mock:
+                with patch("syndicate.blueprints.intelligence.read_latest_intelligence_state_response", return_value=None):
+                    with patch("syndicate.blueprints.intelligence._cached_intelligence_response_with_source", return_value=(None, "fallback")) as cached_mock:
+                        with patch("syndicate.blueprints.intelligence._INTELLIGENCE_STATE_SERVICE._compute_response") as compute_mock:
+                            response = self.client.post(
+                                "/api/intelligence/query",
+                                json={
+                                    "question": "Analyze Jayson Tatum tonight",
+                                    "date": "2026-06-04",
+                                    "force_refresh": True,
+                                },
+                            )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json()
+        self.assertEqual((payload.get("response") or {}).get("queued_refresh"), True)
+        self.assertEqual((payload.get("response") or {}).get("execution_source"), "fallback")
+        self.assertEqual((payload.get("response") or {}).get("analysis", {}).get("recommendations"), empty_response["analysis"]["recommendations"])
+        self.assertEqual((payload.get("response") or {}).get("analysis", {}).get("top_live_opportunities"), empty_response["analysis"]["top_live_opportunities"])
+        self.assertEqual((payload.get("response") or {}).get("analysis", {}).get("picks"), empty_response["analysis"]["picks"])
+        queue_mock.assert_called_once()
+        cached_mock.assert_called_once()
+        compute_mock.assert_not_called()
 
     def test_intelligence_query_api_returns_live_recommendations_with_sparse_advanced_signals(self) -> None:
         advanced_rows = [
