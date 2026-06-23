@@ -19,15 +19,18 @@ from syndicate.features.mlb.sources import load_json_file
 from syndicate.features.shared.game_board_contract import apply_game_board_contract
 from syndicate.features.shared.live_lens_contract import attach_live_lens_contract
 
-try:
-    from vendor.mlb_bettingv2.tools.web.flask_frontend import _client as _mlb_vendor_client
-    from vendor.mlb_bettingv2.tools.web.flask_frontend import fetch_game_feed_live
-except Exception:  # pragma: no cover - vendor import is best-effort in tests
-    _mlb_vendor_client = None
-    fetch_game_feed_live = None
-
 
 LIVE_LENS_SNAPSHOT_PATH = Path("/opt/render/project/data/live/mlb_live_lens.json")
+
+
+def _load_vendor_live_frontend() -> tuple[Any | None, Any | None]:
+    try:
+        from vendor.mlb_bettingv2.tools.web.flask_frontend import _client as mlb_vendor_client
+        from vendor.mlb_bettingv2.tools.web.flask_frontend import fetch_game_feed_live
+
+        return mlb_vendor_client, fetch_game_feed_live
+    except Exception:  # pragma: no cover - vendor import is best-effort in tests
+        return None, None
 
 
 def _format_signed_num(value: Any) -> str:
@@ -103,10 +106,11 @@ def _status_bucket_from_row(row: dict[str, Any]) -> str:
 def _refresh_current_date_live_statuses(games: list[dict[str, Any]], selected_date: str) -> None:
     if str(selected_date).strip() != datetime.now().astimezone().date().isoformat():
         return
-    if _mlb_vendor_client is None or fetch_game_feed_live is None:
+    mlb_vendor_client, fetch_game_feed_live = _load_vendor_live_frontend()
+    if mlb_vendor_client is None or fetch_game_feed_live is None:
         return
     try:
-        client = _mlb_vendor_client()
+        client = mlb_vendor_client()
     except Exception:
         return
 
