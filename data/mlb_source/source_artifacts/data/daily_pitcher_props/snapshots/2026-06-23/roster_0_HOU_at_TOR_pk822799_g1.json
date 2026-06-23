@@ -868,18 +868,18 @@
     "lineup_source": "projected_rotowire_default_vs_rhp",
     "lineup_confidence": 0.66,
     "probable_pitcher": {
-      "id": null,
-      "source": "none",
-      "confidence": 0.0,
-      "raw_schedule_id": null,
+      "id": 669456,
+      "source": "schedule_probablePitcher",
+      "confidence": 0.8,
+      "raw_schedule_id": 669456,
       "raw_feed_id": null
     },
     "starter": {
-      "id": 592332,
-      "name": "Kevin Gausman",
+      "id": 669456,
+      "name": "Shane Bieber",
       "role": "SP",
-      "selection_source": "heuristic",
-      "requested_id": null
+      "selection_source": "probable",
+      "requested_id": 669456
     },
     "bullpen": [
       {
@@ -1301,42 +1301,34 @@
       }
     ],
     "starter_profile": {
-      "id": 592332,
-      "name": "Kevin Gausman",
+      "id": 669456,
+      "name": "Shane Bieber",
       "throw": "R",
       "role": "SP",
       "leverage_skill": 0.5,
       "stamina_pitches": 94,
       "availability_mult": 1.0,
-      "platoon_mult_vs_lhb": {
-        "k": 0.9544078682615945,
-        "bb": 1.0014363460379494,
-        "hr": 0.8500848002226006,
-        "inplay": 0.9720186597740521
-      },
-      "platoon_mult_vs_rhb": {
-        "k": 1.0496539884891976,
-        "bb": 0.9025581046794207,
-        "hr": 1.1817413035795425,
-        "inplay": 1.028615070591392
-      },
+      "platoon_mult_vs_lhb": {},
+      "platoon_mult_vs_rhb": {},
       "statcast_quality_mult": {},
-      "arsenal_source": "statsapi_pitchArsenal",
-      "arsenal_sample_size": 1468,
+      "arsenal_source": "default",
+      "arsenal_sample_size": 0,
       "statcast_splits_found": false,
       "statcast_splits_source": "",
       "statcast_splits_n_pitches": 0,
       "statcast_splits_start_date": "",
       "statcast_splits_end_date": "",
-      "k_rate": 0.24669398907103826,
-      "bb_rate": 0.05867030965391621,
-      "hbp_rate": 0.00273224043715847,
-      "hr_rate": 0.03110200364298725,
-      "inplay_hit_rate": 0.3200816761363636,
+      "k_rate": 0.24,
+      "bb_rate": 0.08,
+      "hbp_rate": 0.008,
+      "hr_rate": 0.03,
+      "inplay_hit_rate": 0.0,
       "arsenal": {
-        "FF": 0.5211171630279291,
-        "SL": 0.09059945726498643,
-        "FS": 0.3882833797070845
+        "FF": 0.45,
+        "SL": 0.22,
+        "CH": 0.12,
+        "SI": 0.13,
+        "CU": 0.08
       },
       "pitch_type_whiff_mult": {},
       "pitch_type_inplay_mult": {},

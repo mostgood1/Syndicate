@@ -1,8 +1,188 @@
 {
   "date": "2026-06-23",
   "mode": "live",
-  "retrieved_at": "2026-06-22T21:42:34.950537",
-  "pitcher_props": {},
+  "retrieved_at": "2026-06-23T00:29:18.621729",
+  "pitcher_props": {
+    "casey mize": {
+      "strikeouts": {
+        "line": 5.5,
+        "over_odds": "+104",
+        "under_odds": "-128",
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 5.5,
+            "over_odds": "+104",
+            "under_odds": "-128",
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": []
+      }
+    },
+    "carlos rodon": {
+      "strikeouts": {
+        "line": 5.5,
+        "over_odds": "-154",
+        "under_odds": "+126",
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 5.5,
+            "over_odds": "-154",
+            "under_odds": "+126",
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": []
+      }
+    },
+    "mitch keller": {
+      "earned_runs": {
+        "line": 2.5,
+        "over_odds": "-115",
+        "under_odds": "-125",
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 2.5,
+            "over_odds": "-115",
+            "under_odds": "-125",
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": []
+      },
+      "hits_allowed": {
+        "line": 5.5,
+        "over_odds": "+125",
+        "under_odds": "-180",
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 5.5,
+            "over_odds": "+125",
+            "under_odds": "-180",
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": []
+      },
+      "outs": {
+        "line": 15.5,
+        "over_odds": "-110",
+        "under_odds": "-130",
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 15.5,
+            "over_odds": "-110",
+            "under_odds": "-130",
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": []
+      }
+    },
+    "george kirby": {
+      "outs": {
+        "line": 17.5,
+        "over_odds": "-165",
+        "under_odds": "+115",
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 17.5,
+            "over_odds": "-165",
+            "under_odds": "+115",
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": []
+      }
+    },
+    "zack littell": {
+      "strikeouts": {
+        "line": 3.5,
+        "over_odds": "+128",
+        "under_odds": "-158",
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 3.5,
+            "over_odds": "+128",
+            "under_odds": "-158",
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": []
+      }
+    },
+    "jesus luzardo": {
+      "strikeouts": {
+        "line": 5.5,
+        "over_odds": "-150",
+        "under_odds": "+115",
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 5.5,
+            "over_odds": "-150",
+            "under_odds": "+115",
+            "_src": "oddsapi"
+          },
+          {
+            "line": 6.5,
+            "over_odds": "+128",
+            "under_odds": "-158",
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": [
+          {
+            "line": 6.5,
+            "over_odds": "+128",
+            "under_odds": "-158",
+            "_src": "oddsapi"
+          }
+        ]
+      }
+    },
+    "justin wrobleski": {
+      "strikeouts": {
+        "line": 4.5,
+        "over_odds": "-102",
+        "under_odds": "-120",
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 4.5,
+            "over_odds": "-102",
+            "under_odds": "-120",
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": []
+      }
+    },
+    "joe ryan": {
+      "strikeouts": {
+        "line": 5.5,
+        "over_odds": "-140",
+        "under_odds": "+114",
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 5.5,
+            "over_odds": "-140",
+            "under_odds": "+114",
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": []
+      }
+    }
+  },
   "meta": {
     "markets": [
       "pitcher_strikeouts",
@@ -14,9 +194,14 @@
     "regions": "us",
     "bookmakers": null,
     "counts": {
-      "players": 0,
-      "markets": {},
-      "events_matched": 11
+      "players": 8,
+      "markets": {
+        "earned_runs": 1,
+        "hits_allowed": 1,
+        "outs": 2,
+        "strikeouts": 6
+      },
+      "events_matched": 13
     },
     "warnings": []
   }

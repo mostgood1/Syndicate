@@ -1,0 +1,149 @@
+{
+  "date": "2026-06-23",
+  "mode": "live",
+  "retrieved_at": "2026-06-23T00:41:14.102026",
+  "hitter_props": {
+    "ryan mcmahon": {
+      "batter_hits": {
+        "line": 0.5,
+        "over_odds": "-140",
+        "under_odds": "+105",
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 0.5,
+            "over_odds": "-140",
+            "under_odds": "+105",
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": []
+      }
+    },
+    "jazz chisholm jr.": {
+      "batter_rbis": {
+        "line": 0.5,
+        "over_odds": "+175",
+        "under_odds": "-255",
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 0.5,
+            "over_odds": "+175",
+            "under_odds": "-255",
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": []
+      }
+    },
+    "jahmai jones": {
+      "batter_total_bases": {
+        "line": 0.5,
+        "over_odds": "-105",
+        "under_odds": "-125",
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 0.5,
+            "over_odds": "-105",
+            "under_odds": "-125",
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": []
+      }
+    },
+    "cole young": {
+      "batter_hits_runs_rbis": {
+        "line": 1.5,
+        "over_odds": "-115",
+        "under_odds": "-125",
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 1.5,
+            "over_odds": "-115",
+            "under_odds": "-125",
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": []
+      }
+    },
+    "ryan kreidler": {
+      "batter_hits": {
+        "line": 0.5,
+        "over_odds": "-105",
+        "under_odds": "-125",
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 0.5,
+            "over_odds": "-105",
+            "under_odds": "-125",
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": []
+      }
+    },
+    "royce lewis": {
+      "batter_rbis": {
+        "line": 0.5,
+        "over_odds": "+155",
+        "under_odds": "-225",
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 0.5,
+            "over_odds": "+155",
+            "under_odds": "-225",
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": []
+      }
+    },
+    "ryan ward": {
+      "batter_total_bases": {
+        "line": 0.5,
+        "over_odds": "-145",
+        "under_odds": "+110",
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 0.5,
+            "over_odds": "-145",
+            "under_odds": "+110",
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": []
+      }
+    }
+  },
+  "meta": {
+    "markets": [
+      "batter_hits",
+      "batter_hits_runs_rbis",
+      "batter_total_bases",
+      "batter_home_runs",
+      "batter_rbis",
+      "batter_runs_scored",
+      "batter_strikeouts"
+    ],
+    "regions": "us",
+    "bookmakers": null,
+    "counts": {
+      "players": 7,
+      "markets": {
+        "batter_hits": 2,
+        "batter_hits_runs_rbis": 1,
+        "batter_rbis": 2,
+        "batter_total_bases": 2
+      },
+      "events_matched": 13
+    }
+  }
+}

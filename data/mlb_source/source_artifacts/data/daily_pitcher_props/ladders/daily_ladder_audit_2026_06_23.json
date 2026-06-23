@@ -1,0 +1,231 @@
+{
+  "date": "2026-06-23",
+  "generatedAt": "2026-06-22T19:34:07-05:00",
+  "summary": {
+    "cards": 15,
+    "badges": 9,
+    "sources": {
+      "none": 9
+    },
+    "tones": {
+      "strong": 2,
+      "soft": 1,
+      "solid": 6
+    },
+    "stats": {
+      "hits_allowed": {
+        "badges": 1,
+        "rungWins": 0,
+        "rungLosses": 0
+      },
+      "outs": {
+        "badges": 2,
+        "rungWins": 0,
+        "rungLosses": 0
+      },
+      "strikeouts": {
+        "badges": 6,
+        "rungWins": 0,
+        "rungLosses": 0
+      }
+    },
+    "final": {
+      "badges": 0,
+      "rungWins": 0,
+      "rungLosses": 0,
+      "rungHitRate": null,
+      "mixedBadgeCount": 0
+    },
+    "lossSizeCounts": {},
+    "winSizeCounts": {}
+  },
+  "largestLosses": [],
+  "mixedFinalBadges": [],
+  "rows": [
+    {
+      "gamePk": 823365,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "away",
+      "starter": "George Kirby",
+      "label": "O 19/20",
+      "stat": "outs",
+      "tone": "strong",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 2,
+      "targets": [
+        19,
+        20
+      ],
+      "detail": "Supported ladders: 19/20 Last supported rung: 20"
+    },
+    {
+      "gamePk": 823365,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "home",
+      "starter": "Mitch Keller",
+      "label": "O 17/18",
+      "stat": "outs",
+      "tone": "strong",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 2,
+      "targets": [
+        17,
+        18
+      ],
+      "detail": "Supported ladders: 17/18 Last supported rung: 18"
+    },
+    {
+      "gamePk": 823365,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "home",
+      "starter": "Mitch Keller",
+      "label": "H up to 9",
+      "stat": "hits_allowed",
+      "tone": "soft",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 4,
+      "targets": [
+        6,
+        7,
+        8,
+        9
+      ],
+      "detail": "Supported ladders: 6/7/8/9 Last supported rung: 9"
+    },
+    {
+      "gamePk": 824262,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "away",
+      "starter": "Carlos Rod\u00f3n",
+      "label": "K up to 7",
+      "stat": "strikeouts",
+      "tone": "solid",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 2,
+      "targets": [
+        6,
+        7
+      ],
+      "detail": "Supported ladders: 6/7 Last supported rung: 7"
+    },
+    {
+      "gamePk": 824262,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "home",
+      "starter": "Casey Mize",
+      "label": "K up to 7",
+      "stat": "strikeouts",
+      "tone": "solid",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 2,
+      "targets": [
+        6,
+        7
+      ],
+      "detail": "Supported ladders: 6/7 Last supported rung: 7"
+    },
+    {
+      "gamePk": 822718,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "away",
+      "starter": "Jes\u00fas Luzardo",
+      "label": "K up to 7",
+      "stat": "strikeouts",
+      "tone": "solid",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 2,
+      "targets": [
+        6,
+        7
+      ],
+      "detail": "Supported ladders: 6/7 Last supported rung: 7"
+    },
+    {
+      "gamePk": 822718,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "home",
+      "starter": "Zack Littell",
+      "label": "K up to 7",
+      "stat": "strikeouts",
+      "tone": "solid",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 4,
+      "targets": [
+        4,
+        5,
+        6,
+        7
+      ],
+      "detail": "Supported ladders: 4/5/6/7 Last supported rung: 7"
+    },
+    {
+      "gamePk": 823690,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "away",
+      "starter": "Justin Wrobleski",
+      "label": "K up to 7",
+      "stat": "strikeouts",
+      "tone": "solid",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 3,
+      "targets": [
+        5,
+        6,
+        7
+      ],
+      "detail": "Supported ladders: 5/6/7 Last supported rung: 7"
+    },
+    {
+      "gamePk": 823690,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "home",
+      "starter": "Joe Ryan",
+      "label": "K up to 7",
+      "stat": "strikeouts",
+      "tone": "solid",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 2,
+      "targets": [
+        6,
+        7
+      ],
+      "detail": "Supported ladders: 6/7 Last supported rung: 7"
+    }
+  ]
+}

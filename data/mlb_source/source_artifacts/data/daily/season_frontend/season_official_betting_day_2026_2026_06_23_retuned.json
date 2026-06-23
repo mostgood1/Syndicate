@@ -1,0 +1,323 @@
+{
+  "season": 2026,
+  "date": "2026-06-23",
+  "profile": "retuned",
+  "available_profiles": {
+    "retuned": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/eval/seasons/2026/season_betting_cards_retuned_manifest.json"
+  },
+  "found": true,
+  "games": [
+    {
+      "game_pk": 823365,
+      "game_date": "2026-06-23T22:40:00Z",
+      "start_time": "5:40 PM",
+      "official_date": "2026-06-23",
+      "status": {
+        "abstract": "Preview",
+        "detailed": "Scheduled"
+      },
+      "away": {
+        "id": 136,
+        "abbr": "SEA",
+        "name": "Seattle Mariners"
+      },
+      "home": {
+        "id": 134,
+        "abbr": "PIT",
+        "name": "Pittsburgh Pirates"
+      },
+      "starter_names": {
+        "away": "George Kirby",
+        "home": "Mitch Keller"
+      },
+      "matchup": {
+        "isLive": false,
+        "isFinal": false,
+        "liveText": "",
+        "displayState": "Scheduled",
+        "inning": null,
+        "halfInning": "",
+        "count": {
+          "balls": null,
+          "strikes": null,
+          "outs": null
+        },
+        "batter": "",
+        "pitcher": "",
+        "score": {
+          "away": null,
+          "home": null
+        }
+      },
+      "betting": {
+        "markets": {
+          "totals": null,
+          "ml": {
+            "date": "2026-06-23",
+            "game_pk": 823365,
+            "away": "Seattle Mariners",
+            "home": "Pittsburgh Pirates",
+            "away_abbr": "SEA",
+            "home_abbr": "PIT",
+            "double_header": "N",
+            "game_number": 1,
+            "event_id": "11027b764d42622bddc30dee244472db",
+            "commence_time": "2026-06-23T22:41:00Z",
+            "market": "ml",
+            "selection": "home",
+            "edge": 0.14254230377166155,
+            "model_prob": 0.614,
+            "selected_side_model_prob": 0.614,
+            "selected_side_market_prob": 0.47145769622833844,
+            "market_no_vig_prob": 0.47145769622833844,
+            "odds": "+104",
+            "stake_u": 1.0,
+            "sim_sample_size": 1000,
+            "baseball_reasons": [
+              "Across his last 5 starts, Mitch Keller has allowed about 4.6 earned runs per outing.",
+              "The projected lineup is mostly 4 left-handed, 4 right-handed, and 1 switch-hitting, and the power risk also comes in lighter than baseline."
+            ],
+            "explanation_diagnostic": {
+              "status": "supported",
+              "flag_sparse_support": false,
+              "support_min_reasons": 2,
+              "baseball_reasons_n": 2,
+              "reason_sentences_n": 4,
+              "market": "ml",
+              "subject": "SEA @ PIT",
+              "supporting_reasons": [
+                "Across his last 5 starts, Mitch Keller has allowed about 4.6 earned runs per outing.",
+                "The projected lineup is mostly 4 left-handed, 4 right-handed, and 1 switch-hitting, and the power risk also comes in lighter than baseline."
+              ]
+            },
+            "reasons": [
+              "The model lands on the home side in 61.4% of sims, while the market is pricing it closer to 47.1%. Across his last 5 starts, Mitch Keller has allowed about 4.6 earned runs per outing. The projected lineup is mostly 4 left-handed, 4 right-handed, and 1 switch-hitting, and the power risk also comes in lighter than baseline. PIT wins this matchup in about 61.4% of model runs."
+            ],
+            "reason_summary": "The model lands on the home side in 61.4% of sims, while the market is pricing it closer to 47.1%. Across his last 5 starts, Mitch Keller has allowed about 4.6 earned runs per outing. The projected lineup is mostly 4 left-handed, 4 right-handed, and 1 switch-hitting, and the power risk also comes in lighter than baseline. PIT wins this matchup in about 61.4% of model runs.",
+            "rank": 1,
+            "recommendation_tier": "official"
+          },
+          "pitcherProps": [
+            {
+              "date": "2026-06-23",
+              "game_pk": 823365,
+              "away": "Seattle Mariners",
+              "home": "Pittsburgh Pirates",
+              "away_abbr": "SEA",
+              "home_abbr": "PIT",
+              "double_header": "N",
+              "game_number": 1,
+              "event_id": null,
+              "commence_time": null,
+              "market": "pitcher_props",
+              "pitcher_id": 656605,
+              "pitcher_name": "Mitch Keller",
+              "team": "PIT",
+              "team_side": "home",
+              "prop": "outs",
+              "selection": "over",
+              "edge": 0.4060114068441064,
+              "market_line": 15.5,
+              "model_prob_over": 0.887,
+              "market_prob_over": 0.4809885931558936,
+              "market_prob_under": 0.5190114068441064,
+              "market_prob_mode": "no_vig_two_way",
+              "market_no_vig_prob_over": 0.4809885931558936,
+              "selected_side_market_prob": 0.4809885931558936,
+              "selected_side_model_prob": 0.887,
+              "mean_support": 5.341000000000001,
+              "outs_mean": 20.841,
+              "market_alternates": [],
+              "odds": "-110",
+              "stake_u": 1.0,
+              "sim_sample_size": 1000,
+              "baseball_reasons": [
+                "The projected lineup is mostly 4 left-handed, 4 right-handed, and 1 switch-hitting, and the damage profile is lighter than average.",
+                "His modeled workload cap still reaches roughly 94 pitches, so the deeper-start path is still available if the outing stays efficient."
+              ],
+              "explanation_diagnostic": {
+                "status": "supported",
+                "flag_sparse_support": false,
+                "support_min_reasons": 2,
+                "baseball_reasons_n": 2,
+                "reason_sentences_n": 5,
+                "market": "pitcher_props:outs",
+                "subject": "Mitch Keller",
+                "supporting_reasons": [
+                  "The projected lineup is mostly 4 left-handed, 4 right-handed, and 1 switch-hitting, and the damage profile is lighter than average.",
+                  "His modeled workload cap still reaches roughly 94 pitches, so the deeper-start path is still available if the outing stays efficient."
+                ]
+              },
+              "reasons": [
+                "The model lands on the over side in 88.7% of sims, while the market is pricing it closer to 48.1%. The projected lineup is mostly 4 left-handed, 4 right-handed, and 1 switch-hitting, and the damage profile is lighter than average. His modeled workload cap still reaches roughly 94 pitches, so the deeper-start path is still available if the outing stays efficient. The model baseline sits around 20.8 outs against a line of 15.5. If he stays on his normal starter path, the matchup against SEA gives him a fair shot to reach full workload volume."
+              ],
+              "reason_summary": "The model lands on the over side in 88.7% of sims, while the market is pricing it closer to 48.1%. The projected lineup is mostly 4 left-handed, 4 right-handed, and 1 switch-hitting, and the damage profile is lighter than average. His modeled workload cap still reaches roughly 94 pitches, so the deeper-start path is still available if the outing stays efficient. The model baseline sits around 20.8 outs against a line of 15.5. If he stays on his normal starter path, the matchup against SEA gives him a fair shot to reach full workload volume.",
+              "rank": 1,
+              "recommendation_tier": "official"
+            }
+          ],
+          "hitterProps": [],
+          "extraPitcherProps": [],
+          "extraHitterProps": []
+        },
+        "results": {
+          "combined": {
+            "n": 0,
+            "wins": 0,
+            "losses": 0,
+            "stake_u": 0.0,
+            "profit_u": 0.0,
+            "roi": null
+          }
+        },
+        "playable_results": {
+          "combined": {
+            "n": 0,
+            "wins": 0,
+            "losses": 0,
+            "stake_u": 0.0,
+            "profit_u": 0.0,
+            "roi": null
+          }
+        },
+        "all_results": {
+          "combined": {
+            "n": 0,
+            "wins": 0,
+            "losses": 0,
+            "stake_u": 0.0,
+            "profit_u": 0.0,
+            "roi": null
+          }
+        },
+        "settled_rows": [],
+        "playable_settled_rows": [],
+        "all_settled_rows": [],
+        "unresolved_rows": [
+          {
+            "path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\daily_summary_2026_06_23_locked_policy.json",
+            "date": "2026-06-23",
+            "game_pk": 823365,
+            "market": "ml",
+            "player_name": null,
+            "selection": "home",
+            "market_line": null,
+            "reason": "game not final",
+            "recommendation_tier": "official"
+          },
+          {
+            "path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\daily_summary_2026_06_23_locked_policy.json",
+            "date": "2026-06-23",
+            "game_pk": 823365,
+            "market": "pitcher_props",
+            "player_name": "Mitch Keller",
+            "selection": "over",
+            "market_line": 15.5,
+            "reason": "game not final",
+            "recommendation_tier": "official"
+          }
+        ],
+        "playable_unresolved_rows": [],
+        "all_unresolved_rows": [
+          {
+            "path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\daily_summary_2026_06_23_locked_policy.json",
+            "date": "2026-06-23",
+            "game_pk": 823365,
+            "market": "ml",
+            "player_name": null,
+            "selection": "home",
+            "market_line": null,
+            "reason": "game not final",
+            "recommendation_tier": "official"
+          },
+          {
+            "path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\daily_summary_2026_06_23_locked_policy.json",
+            "date": "2026-06-23",
+            "game_pk": 823365,
+            "market": "pitcher_props",
+            "player_name": "Mitch Keller",
+            "selection": "over",
+            "market_line": 15.5,
+            "reason": "game not final",
+            "recommendation_tier": "official"
+          }
+        ],
+        "counts": {
+          "official": 2,
+          "playable": 0,
+          "pitcher": 1,
+          "hitter": 0,
+          "extra_pitcher": 0,
+          "extra_hitter": 0
+        },
+        "flags": {
+          "hasAnyRecommendations": true,
+          "hasOfficialRecommendations": true,
+          "hasPlayableCandidates": false
+        }
+      }
+    }
+  ],
+  "manifest_source": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/eval/seasons/2026/season_betting_cards_retuned_manifest.json",
+  "card_source": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_23_locked_policy.json",
+  "source_kind": "canonical_daily_fallback",
+  "summary": {
+    "date": "2026-06-23",
+    "month": "2026-06",
+    "card_path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_23_locked_policy.json",
+    "selected_counts": {
+      "totals": 0,
+      "ml": 1,
+      "pitcher_props": 1,
+      "hitter_props": 0,
+      "hitter_home_runs": 0,
+      "hitter_hits": 0,
+      "hitter_strikeouts": 0,
+      "hitter_total_bases": 0,
+      "hitter_runs": 0,
+      "hitter_rbis": 0,
+      "combined": 2
+    },
+    "results": {
+      "combined": {
+        "n": 0,
+        "wins": 0,
+        "losses": 0,
+        "stake_u": 0.0,
+        "profit_u": 0.0,
+        "roi": null
+      }
+    },
+    "profit_u": 0.0,
+    "roi": null,
+    "settled_n": 0,
+    "unresolved_n": 2
+  },
+  "cap_profile": "nototals_p1_tbheavy11_r1_nohr",
+  "selected_counts": {
+    "totals": 0,
+    "ml": 1,
+    "pitcher_props": 1,
+    "hitter_props": 0,
+    "hitter_home_runs": 0,
+    "hitter_hits": 0,
+    "hitter_strikeouts": 0,
+    "hitter_total_bases": 0,
+    "hitter_runs": 0,
+    "hitter_rbis": 0,
+    "combined": 2
+  },
+  "results": {
+    "combined": {
+      "n": 0,
+      "wins": 0,
+      "losses": 0,
+      "stake_u": 0.0,
+      "profit_u": 0.0,
+      "roi": null
+    }
+  },
+  "cards_available": true,
+  "cards_url": "/?date=2026-06-23",
+  "artifactDate": "2026-06-23"
+}

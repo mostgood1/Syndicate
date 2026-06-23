@@ -1,8 +1,77 @@
 {
   "date": "2026-06-23",
   "mode": "live",
-  "retrieved_at": "2026-06-22T21:42:36.280988",
-  "hitter_props": {},
+  "retrieved_at": "2026-06-23T00:29:20.532744",
+  "hitter_props": {
+    "cole young": {
+      "batter_hits_runs_rbis": {
+        "line": 1.5,
+        "over_odds": "-115",
+        "under_odds": "-125",
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 1.5,
+            "over_odds": "-115",
+            "under_odds": "-125",
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": []
+      }
+    },
+    "ryan kreidler": {
+      "batter_hits": {
+        "line": 0.5,
+        "over_odds": "-110",
+        "under_odds": "-120",
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 0.5,
+            "over_odds": "-110",
+            "under_odds": "-120",
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": []
+      }
+    },
+    "royce lewis": {
+      "batter_rbis": {
+        "line": 0.5,
+        "over_odds": "+155",
+        "under_odds": "-225",
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 0.5,
+            "over_odds": "+155",
+            "under_odds": "-225",
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": []
+      }
+    },
+    "ryan ward": {
+      "batter_total_bases": {
+        "line": 0.5,
+        "over_odds": "-130",
+        "under_odds": "+100",
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 0.5,
+            "over_odds": "-130",
+            "under_odds": "+100",
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": []
+      }
+    }
+  },
   "meta": {
     "markets": [
       "batter_hits",
@@ -16,9 +85,14 @@
     "regions": "us",
     "bookmakers": null,
     "counts": {
-      "players": 0,
-      "markets": {},
-      "events_matched": 11
+      "players": 4,
+      "markets": {
+        "batter_hits": 1,
+        "batter_hits_runs_rbis": 1,
+        "batter_rbis": 1,
+        "batter_total_bases": 1
+      },
+      "events_matched": 13
     }
   }
 }

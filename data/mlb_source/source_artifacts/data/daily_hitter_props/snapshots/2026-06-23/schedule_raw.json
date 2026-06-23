@@ -138,6 +138,11 @@
           "ties": 0,
           "pct": ".494"
         },
+        "probablePitcher": {
+          "id": 669456,
+          "fullName": "Shane Bieber",
+          "link": "/api/v1/people/669456"
+        },
         "splitSquad": false,
         "seriesNumber": 26,
         "springLeague": {
@@ -1209,9 +1214,9 @@
           "pct": ".442"
         },
         "probablePitcher": {
-          "id": 690997,
-          "fullName": "Nolan McLean",
-          "link": "/api/v1/people/690997"
+          "id": 673540,
+          "fullName": "Kodai Senga",
+          "link": "/api/v1/people/673540"
         },
         "splitSquad": false,
         "seriesNumber": 26,
@@ -1243,7 +1248,7 @@
     "reverseHomeAwayStatus": false,
     "inningBreakLength": 120,
     "gamesInSeries": 4,
-    "seriesGameNumber": 2,
+    "seriesGameNumber": 1,
     "seriesDescription": "Regular Season",
     "recordSource": "S",
     "ifNecessary": "N",
@@ -2287,6 +2292,11 @@
           "losses": 47,
           "ties": 0,
           "pct": ".405"
+        },
+        "probablePitcher": {
+          "id": 696270,
+          "fullName": "Ryan Johnson",
+          "link": "/api/v1/people/696270"
         },
         "splitSquad": false,
         "seriesNumber": 26,
