@@ -445,10 +445,6 @@ def _rank_card(game: dict[str, Any], selected_date: str, *, live_line: float | N
 def build_live_lens_page_context(selected_date: str) -> dict[str, Any]:
     warn_if_compute_in_request_path("build_live_lens_page_context")
     snapshot = _load_live_lens_snapshot()
-    if not _live_lens_snapshot_is_current(snapshot, selected_date):
-        rebuilt_snapshot = build_live_lens_snapshot(selected_date, limit=50)
-        if validate_live_lens_snapshot(rebuilt_snapshot):
-            snapshot = rebuilt_snapshot
     context = _empty_live_lens_context(selected_date) if snapshot is None else _snapshot_context(selected_date, snapshot)
     return attach_live_lens_contract(context, sport="wnba", module="live_lens")
 

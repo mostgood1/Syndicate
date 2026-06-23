@@ -54,7 +54,7 @@ class WnbaLiveLensWorkerTests(unittest.TestCase):
         self.assertEqual((snapshot.get("empty_state") or {}).get("eyebrow"), "WNBA live lens")
         self.assertEqual((snapshot.get("api_payload") or {}).get("rank_cards"), [])
 
-    def test_page_context_rebuilds_when_persisted_snapshot_is_stale_for_today(self) -> None:
+    def test_page_context_uses_persisted_snapshot_without_request_path_rebuild(self) -> None:
         stale_snapshot = {
             "date": "2026-06-18",
             "rank_cards": [{"title": "Stale", "metrics": [], "summary": "old"}],
@@ -76,9 +76,10 @@ class WnbaLiveLensWorkerTests(unittest.TestCase):
         ) as mocked_rebuild, patch("syndicate.features.wnba.live_lens.central_today_iso", return_value="2026-06-21"):
             context = build_live_lens_page_context("2026-06-21")
 
-        mocked_rebuild.assert_called_once_with("2026-06-21", limit=50)
-        self.assertEqual(context.get("date"), "2026-06-21")
-        self.assertEqual((context.get("rank_cards") or [{}])[0].get("title"), "Fresh")
+        mocked_rebuild.assert_not_called()
+        self.assertEqual(context.get("date"), "2026-06-18")
+        self.assertEqual(context.get("requested_date"), "2026-06-21")
+        self.assertEqual((context.get("rank_cards") or [{}])[0].get("title"), "Stale")
 
     def test_snapshot_validator_rejects_nan_values(self) -> None:
         snapshot = {"rank_cards": [{"title": "Bad", "metrics": [{"label": "Score", "value": float("nan")}] }]}
