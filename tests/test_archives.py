@@ -634,6 +634,33 @@ class DateArchiveHelperTests(unittest.TestCase):
         self.assertEqual(actual.get(824912), live_payload)
         fetch_mock.assert_called_once_with(824912)
 
+    def test_mlb_daily_actual_by_game_refreshes_stale_today_feed_files(self) -> None:
+        from syndicate.features.mlb.cards import _daily_actual_by_game
+
+        stale_payload = {
+            "gameData": {"status": {"abstractGameState": "Preview", "detailedState": "Scheduled"}},
+            "liveData": {"boxscore": {"teams": {"away": {"players": {}}, "home": {"players": {}}}}},
+        }
+        live_payload = {
+            "gameData": {"status": {"abstractGameState": "Live", "detailedState": "In Progress"}},
+            "liveData": {"boxscore": {"teams": {"away": {"players": {}}, "home": {"players": {}}}}},
+        }
+
+        with patch("syndicate.features.mlb.cards.central_today_iso", return_value="2026-06-17"), patch(
+            "syndicate.features.mlb.cards.raw_feed_live_path",
+            return_value=Path("stale.json"),
+        ), patch(
+            "syndicate.features.mlb.cards.load_json_or_gz_file",
+            return_value=stale_payload,
+        ), patch(
+            "syndicate.features.mlb.cards._fetch_current_feed_live",
+            return_value=live_payload,
+        ) as fetch_mock:
+            actual = _daily_actual_by_game("2026-06-17", [824912])
+
+        self.assertEqual(actual.get(824912), live_payload)
+        fetch_mock.assert_called_once_with(824912)
+
     def test_mlb_hr_targets_context_backfills_from_daily_summary_when_artifact_is_sparse(self) -> None:
         from syndicate.features.mlb.hr_targets import build_hr_targets_page_context
 

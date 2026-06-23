@@ -1739,6 +1739,10 @@ def _daily_actual_by_game(selected_date: str, game_pks: list[int]) -> dict[int, 
     for game_pk in game_pks:
         feed_path = raw_feed_live_path(selected_date, int(game_pk))
         payload = load_json_or_gz_file(feed_path)
+        if selected_date == today_iso and isinstance(payload, dict) and not _actual_payload_is_live(payload):
+            live_payload = _fetch_current_feed_live(int(game_pk))
+            if isinstance(live_payload, dict):
+                payload = live_payload
         if not isinstance(payload, dict) and selected_date == today_iso:
             payload = _fetch_current_feed_live(int(game_pk))
         if isinstance(payload, dict):
