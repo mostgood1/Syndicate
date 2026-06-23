@@ -177,7 +177,7 @@ def _resolved_source_cards_date(selected_date: str, *, allow_stored_date_fallbac
     bundle = _artifact_bundle(resolved_date)
     if bundle["rows"]:
         return resolved_date
-    if not (allow_stored_date_fallback or resolved_date == central_today_iso()):
+    if not allow_stored_date_fallback:
         return resolved_date
     fallback_date = None
     dates = available_dates()
@@ -628,19 +628,21 @@ def _artifact_paths(selected_date: str) -> dict[str, Path]:
 
 
 def _artifact_bundle(selected_date: str) -> dict[str, Any]:
-    paths = _artifact_paths(selected_date)
+    csv_name = f"game_cards_{selected_date}.csv"
+    repo_data_root = _repo_root_from(__file__) / "data" / "wnba_source"
+    candidate_roots = list(_wnba_source_roots()) + [repo_data_root]
 
-    rows = _load_csv_rows(paths["cards"])
-
-    # ✅ Existing: search alternate artifact roots
-    if not rows:
-        csv_name = f"game_cards_{selected_date}.csv"
-        repo_data_root = _repo_root_from(__file__) / "data" / "wnba_source"
-        candidate_roots = list(_wnba_source_roots()) + [repo_data_root]
-
+    if selected_date == central_today_iso():
+        paths = {
+            "cards": candidate_roots[0] / "data" / "processed" / csv_name,
+            "recommendations": candidate_roots[0] / "data" / "processed" / f"recommendations_slate_{selected_date}.json",
+            "sim": candidate_roots[0] / "data" / "processed" / f"cards_sim_detail_{selected_date}.json",
+            "props": candidate_roots[0] / "data" / "processed" / f"cards_props_snapshot_{selected_date}.json",
+        }
+        rows = []
         for root in candidate_roots:
             alt_path = root / "data" / "processed" / csv_name
-            if alt_path != paths["cards"] and alt_path.exists():
+            if alt_path.exists():
                 alt_rows = _load_csv_rows(alt_path)
                 if alt_rows:
                     rows = alt_rows
@@ -651,6 +653,25 @@ def _artifact_bundle(selected_date: str) -> dict[str, Any]:
                         "props": root / "data" / "processed" / f"cards_props_snapshot_{selected_date}.json",
                     }
                     break
+    else:
+        paths = _artifact_paths(selected_date)
+        rows = _load_csv_rows(paths["cards"])
+
+        # ✅ Existing: search alternate artifact roots
+        if not rows:
+            for root in candidate_roots:
+                alt_path = root / "data" / "processed" / csv_name
+                if alt_path != paths["cards"] and alt_path.exists():
+                    alt_rows = _load_csv_rows(alt_path)
+                    if alt_rows:
+                        rows = alt_rows
+                        paths = {
+                            "cards": alt_path,
+                            "recommendations": root / "data" / "processed" / f"recommendations_slate_{selected_date}.json",
+                            "sim": root / "data" / "processed" / f"cards_sim_detail_{selected_date}.json",
+                            "props": root / "data" / "processed" / f"cards_props_snapshot_{selected_date}.json",
+                        }
+                        break
 
     # ✅ Existing
     rec_summary = load_json(paths["recommendations"])
