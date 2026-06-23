@@ -146,3 +146,20 @@ class RefreshOddsSourcesTests(unittest.TestCase):
         self.assertIn(expected_markets, wnba_steps[0].command)
         self.assertIn("--markets", ncaab_steps[0].command)
         self.assertIn(expected_markets, ncaab_steps[0].command)
+
+    def test_source_root_helpers_prefer_render_disk(self) -> None:
+        module = self._load_module()
+
+        with patch.dict(module.os.environ, {"SYNDICATE_DATA_ROOT": r"C:\render\data"}, clear=False):
+            self.assertEqual(module._source_repo_root("nfl", "NFL-Betting"), Path(r"C:\render\data\nfl_source"))
+            self.assertEqual(module._basketball_source_root("nba", "nba_betting_repo"), Path(r"C:\render\data\nba_source"))
+
+    def test_validate_source_root_reports_missing_render_disk(self) -> None:
+        module = self._load_module()
+
+        with patch.dict(module.os.environ, {"SYNDICATE_DATA_ROOT": r"C:\render\data"}, clear=False):
+            message = module._validate_source_root(module.REGISTRY["mlb"])
+
+        self.assertIsInstance(message, str)
+        self.assertIn("Render data disk is missing", message)
+        self.assertIn(r"C:\render\data\mlb_source", message)

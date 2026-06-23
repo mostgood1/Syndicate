@@ -37,6 +37,7 @@ from syndicate.features.shared.odds_control_plane import write_odds_control_plan
 from syndicate.features.shared.publish_parity import build_publish_parity_summary
 from syndicate.features.shared.odds_refresh_tracking import sync_sport_post_refresh_tracking
 from syndicate.features.shared.manifest import publish_sport_manifest
+from syndicate.features.shared.refresh_state_store import data_root
 
 
 _PUBLISH_MANIFEST_LOCK = Lock()
@@ -73,10 +74,26 @@ def _source_root_env_var(slug: str) -> str:
     return f"SYNDICATE_SOURCE_ROOT_{slug.upper()}"
 
 
+def _hosted_data_root() -> Path:
+    return data_root()
+
+
+def _hosted_data_source_root(slug: str) -> Path:
+    return _hosted_data_root() / f"{slug}_source"
+
+
+def _render_data_root_text() -> str | None:
+    value = str(os.environ.get("SYNDICATE_DATA_ROOT") or "").strip()
+    return value or None
+
+
 def _source_repo_root(slug: str, source_repo_name: str) -> Path:
     override = str(os.environ.get(_source_root_env_var(slug)) or "").strip()
     if override:
         return Path(override).expanduser().resolve()
+    hosted_root = _hosted_data_source_root(slug)
+    if hosted_root.exists() or _render_data_root_text():
+        return hosted_root.resolve()
     return (WORKSPACE_ROOT / source_repo_name).resolve()
 
 
@@ -204,13 +221,16 @@ def _effective_markets(slug: str, requested_markets: str) -> str:
 
 
 def _local_source_artifact_root(slug: str) -> Path:
-    data_root = str(os.environ.get("SYNDICATE_DATA_ROOT") or "").strip()
-    if data_root:
-        return Path(data_root).expanduser().resolve() / f"{slug}_source"
+    hosted_root = _render_data_root_text()
+    if hosted_root:
+        return Path(hosted_root).expanduser().resolve() / f"{slug}_source"
     return REPO_ROOT / "data" / f"{slug}_source" / "source_artifacts"
 
 
 def _local_source_bundle_root(slug: str) -> Path:
+    hosted_root = _render_data_root_text()
+    if hosted_root:
+        return Path(hosted_root).expanduser().resolve() / f"{slug}_source"
     return REPO_ROOT / "data" / f"{slug}_source"
 
 
@@ -226,6 +246,9 @@ def _basketball_source_root(slug: str, vendor_repo_name: str) -> Path:
     override = str(os.environ.get(_source_root_env_var(slug)) or "").strip()
     if override:
         return Path(override).expanduser().resolve()
+    hosted_root = _hosted_data_source_root(slug)
+    if hosted_root.exists() or _render_data_root_text():
+        return hosted_root.resolve()
     vendor_root = REPO_ROOT / "vendor" / vendor_repo_name
     if vendor_root.exists():
         return vendor_root.resolve()
@@ -233,7 +256,32 @@ def _basketball_source_root(slug: str, vendor_repo_name: str) -> Path:
 
 
 def _local_mlb_bundle_root() -> Path:
+    hosted_root = _render_data_root_text()
+    if hosted_root:
+        return Path(hosted_root).expanduser().resolve() / "mlb_source"
     return REPO_ROOT / "data" / "mlb_source"
+
+
+def _source_root_resolution(spec: SportSpec) -> dict[str, Any]:
+    if spec.slug == "mlb":
+        chosen_root = _local_mlb_bundle_root()
+        origin = "render_data_root" if _render_data_root_text() else "repo_data_root"
+    elif spec.slug in {"nba", "wnba"}:
+        vendor_repo_name = "nba_betting_repo" if spec.slug == "nba" else "wnba_betting_repo"
+        chosen_root = _basketball_source_root(spec.slug, vendor_repo_name)
+        origin = "render_data_root" if _render_data_root_text() else ("vendor_repo" if (REPO_ROOT / "vendor" / vendor_repo_name).exists() else "repo_data_root")
+    else:
+        chosen_root = _source_repo_root(spec.slug, spec.source_repo_name)
+        origin = "sport_env_override" if str(os.environ.get(_source_root_env_var(spec.slug)) or "").strip() else ("render_data_root" if _render_data_root_text() else "workspace_repo")
+
+    return {
+        "root": chosen_root,
+        "root_text": str(chosen_root),
+        "exists": chosen_root.exists(),
+        "origin": origin,
+        "render_data_root": _render_data_root_text(),
+        "source_root_env_var": _source_root_env_var(spec.slug),
+    }
 
 
 def _build_nba_steps(args: argparse.Namespace) -> list[RefreshStep]:
@@ -736,21 +784,24 @@ def _sport_control_plane_metadata(sport_result: dict[str, Any], *, date: str, ph
 
 
 def _validate_source_root(spec: SportSpec) -> str | None:
+    resolution = _source_root_resolution(spec)
+    source_root = resolution["root"] if isinstance(resolution.get("root"), Path) else Path(str(resolution.get("root_text") or ""))
+    if bool(resolution.get("exists")):
+        return None
+    render_data_root = str(resolution.get("render_data_root") or "").strip()
+    origin = str(resolution.get("origin") or "workspace_repo").strip()
+    if render_data_root and origin == "render_data_root":
+        return (
+            f"Render data disk is missing the expected {spec.slug} source root: {source_root}. "
+            f"Verify the mounted disk at {render_data_root} contains {source_root.name} before launching refresh."
+        )
+    if origin == "sport_env_override":
+        return f"Source root override not found for {spec.slug}: {source_root}."
     if spec.slug == "mlb":
-        source_root = _local_mlb_bundle_root()
-        if source_root.exists():
-            return None
         return f"Local MLB bundle root not found: {source_root}."
     if spec.slug in {"nba", "wnba"}:
-        vendor_repo_name = "nba_betting_repo" if spec.slug == "nba" else "wnba_betting_repo"
-        source_root = _basketball_source_root(spec.slug, vendor_repo_name)
-        if source_root.exists():
-            return None
         return f"Local {spec.slug.upper()} source root not found: {source_root}."
-    source_root = _source_repo_root(spec.slug, spec.source_repo_name)
-    if source_root.exists():
-        return None
-    env_var = _source_root_env_var(spec.slug)
+    env_var = str(resolution.get("source_root_env_var") or _source_root_env_var(spec.slug))
     return (
         f"Source repo root not found for {spec.slug}: {source_root}. "
         f"Set {env_var} to an absolute path for this sport or use --execution-mode ingest / --mirror-only."
@@ -867,13 +918,8 @@ def _publish_sport_manifest_threadsafe(*, sport: str, artifact_paths: list[str],
 def _run_sport_refresh(args: argparse.Namespace, sport: str, execution_mode: str) -> dict[str, Any]:
     spec = REGISTRY[sport]
     refresh_mode = str(getattr(args, "mode", "full") or "full").strip().lower() or "full"
-    if spec.slug == "mlb":
-        source_root = _local_mlb_bundle_root()
-    elif spec.slug in {"nba", "wnba"}:
-        vendor_repo_name = "nba_betting_repo" if spec.slug == "nba" else "wnba_betting_repo"
-        source_root = _basketball_source_root(spec.slug, vendor_repo_name)
-    else:
-        source_root = _source_repo_root(spec.slug, spec.source_repo_name)
+    source_root_resolution = _source_root_resolution(spec)
+    source_root = source_root_resolution["root"] if isinstance(source_root_resolution.get("root"), Path) else Path(str(source_root_resolution.get("root_text") or ""))
 
     generation_mode = "source_repo"
     if execution_mode == "source" and spec.slug == "mlb":
@@ -886,6 +932,8 @@ def _run_sport_refresh(args: argparse.Namespace, sport: str, execution_mode: str
     sport_result: dict[str, Any] = {
         "sport": sport,
         "source_repo": str(source_root),
+        "source_root_origin": str(source_root_resolution.get("origin") or "unknown"),
+        "source_root_exists": bool(source_root.exists()),
         "source_root_env_var": _source_root_env_var(spec.slug),
         "notes": spec.notes,
         "generation_mode": generation_mode if execution_mode == "source" else "none",
