@@ -140,41 +140,6 @@ class WnbaCardsMergeAliasTests(unittest.TestCase):
         self.assertEqual(len(payload["games"]), 4)
         self.assertEqual([game.get("event_id") for game in payload["games"]], ["401857012", "401857013", "401857014", "401857015"])
 
-    def test_source_cards_payload_keeps_today_when_exact_file_is_missing(self) -> None:
-        with TemporaryDirectory() as temp_dir:
-            root = Path(temp_dir)
-            processed_root = root / "data" / "processed"
-            processed_root.mkdir(parents=True, exist_ok=True)
-            (processed_root / "game_cards_2026-06-22.csv").write_text(
-                "away_tri,home_tri,gamePk,commence_time\nTOR,ATL,1,2026-06-22T20:00:00Z\n",
-                encoding="utf-8",
-            )
-
-            live_games = [
-                {
-                    "gamePk": "401857013",
-                    "event_id": "401857013",
-                    "away_tri": "TOR",
-                    "home_tri": "ATL",
-                    "status": "Scheduled",
-                    "detail": "Scheduled",
-                    "live_state": {"event_id": "401857013", "away": "TOR", "home": "ATL"},
-                }
-            ]
-
-            with patch("syndicate.features.wnba.cards._wnba_source_roots", return_value=[root]), patch(
-                "syndicate.features.wnba.cards.central_today_iso",
-                return_value="2026-06-23",
-            ), patch(
-                "syndicate.features.wnba.cards._games_from_live_state_fallback",
-                return_value=(live_games, "espn_scoreboard_fallback"),
-            ):
-                payload = build_source_cards_payload("2026-06-23", allow_stored_date_fallback=False)
-
-        self.assertEqual(payload["date"], "2026-06-23")
-        self.assertEqual(payload["requested_date"], "2026-06-23")
-        self.assertEqual([game.get("event_id") for game in payload["games"]], ["401857013"])
-
     def test_source_cards_payload_keeps_full_sim_player_rows(self) -> None:
         payload = build_source_cards_payload("2026-06-22", allow_stored_date_fallback=False)
 

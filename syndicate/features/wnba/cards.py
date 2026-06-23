@@ -177,7 +177,7 @@ def _resolved_source_cards_date(selected_date: str, *, allow_stored_date_fallbac
     bundle = _artifact_bundle(resolved_date)
     if bundle["rows"]:
         return resolved_date
-    if not allow_stored_date_fallback:
+    if not (allow_stored_date_fallback or resolved_date == central_today_iso()):
         return resolved_date
     fallback_date = None
     dates = available_dates()
