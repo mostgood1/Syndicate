@@ -68,7 +68,7 @@ services:
       - key: SYNDICATE_REPORTS_ROOT
         value: /opt/render/project/data/reports
       - key: SYNDICATE_BOOTSTRAP_ON_START
-        value: "1"
+        value: "0"
       - key: SYNDICATE_NBA_SOURCE_APP_FALLBACK
         value: "false"
       - key: SYNDICATE_WNBA_SOURCE_APP_FALLBACK
@@ -86,9 +86,9 @@ services:
       - key: GUNICORN_KEEPALIVE
         value: "5"
       - key: SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP
-        value: "true"
+        value: "false"
       - key: SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP
-        value: "true"
+        value: "false"
       - key: SYNDICATE_LIVE_ODDS_REFRESH_INTERVAL_SECONDS
         value: "30"
       - key: SYNDICATE_LIVE_ODDS_REFRESH_PHASE
