@@ -4266,7 +4266,7 @@ def _build_sport_overview(
         data_warnings.append("No game rows surfaced")
     if props_count <= 0:
         data_warnings.append("No prop rows surfaced")
-    if active_today and slug == "wnba" and (games_count <= 0 or props_count <= 0):
+    if active_today and slug == "wnba" and games_count <= 0:
         _LOGGER.warning(
             "WNBA overview source missing for %s: games=%s pregame=%s live=%s dashboard_games=%s",
             context_label,

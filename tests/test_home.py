@@ -5,6 +5,7 @@ from unittest.mock import patch
 
 from syndicate.app import create_app
 from syndicate.blueprints.home import _home_prop_hero_metrics
+from syndicate.blueprints.home import _build_sport_overview
 from syndicate.blueprints.home import _sport_availability_reason
 
 
@@ -221,6 +222,33 @@ class HomePageCommandCenterTests(unittest.TestCase):
 
         self.assertIn("hitter top-props rows were not present", mlb_reason["props_availability_reason"] or "")
         self.assertIn("live-state feed returned no event IDs", wnba_reason["game_availability_reason"] or "")
+
+    def test_wnba_overview_does_not_warn_when_games_exist_but_props_do_not(self) -> None:
+        sport = {"slug": "wnba", "name": "WNBA", "primary_label": "Open WNBA cards"}
+        with patch("syndicate.blueprints.home.central_today_iso", return_value="2026-06-23"), patch(
+            "syndicate.blueprints.home.build_wnba_module_links",
+            return_value=[{"label": "Cards", "href": "/wnba/cards?date=2026-06-23"}],
+        ), patch(
+            "syndicate.blueprints.home._load_home_game_items",
+            return_value=([{"matchup": "TOR @ ATL", "detail": "Scheduled", "status_badge": "Scheduled", "away_label": "TOR", "home_label": "ATL", "away_score": None, "home_score": None, "has_scores": False, "score_kind": None, "is_projected_score": False, "summary": "", "signals": [], "market_chips": [], "href": "/wnba/cards?date=2026-06-23", "href_label": "Open Cards"}], 1),
+        ), patch(
+            "syndicate.blueprints.home._load_home_games",
+            return_value=[{"event_id": "evt-1", "away": "TOR", "home": "ATL", "status": "Scheduled", "detail": "Scheduled", "shared_is_live": False}],
+        ), patch(
+            "syndicate.blueprints.home._load_home_prop_items",
+            return_value=[],
+        ), patch(
+            "syndicate.blueprints.home._choose_game_bar",
+            return_value={"items": []},
+        ), patch(
+            "syndicate.blueprints.home._choose_props_bar",
+            return_value={"items": []},
+        ), patch("syndicate.blueprints.home._LOGGER.warning") as warning_mock:
+            overview = _build_sport_overview(sport, "2026-06-23", force_refresh=True)
+
+        self.assertEqual(overview["games_count"], 1)
+        self.assertEqual(overview["data_health"], "partial")
+        self.assertEqual(warning_mock.call_count, 0)
 
     def test_home_prop_hero_metrics_prefers_explicit_sim_projection(self) -> None:
         live_box, sim_box = _home_prop_hero_metrics(
