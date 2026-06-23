@@ -25,6 +25,18 @@ def _utc_now() -> str:
 def _default_latest_manifest_path() -> Path:
     return reports_root() / "refresh_status" / "latest" / "refresh_status_latest.json"
 
+def _is_stale_running_external_contract(latest_manifest: dict[str, Any]) -> bool:
+    if str(latest_manifest.get("state") or "").strip().lower() != "running":
+        return False
+    if isinstance(latest_manifest.get("pid"), int) and int(latest_manifest.get("pid") or 0) > 0:
+        return False
+    contract = latest_manifest.get("externalRunner")
+    if not isinstance(contract, dict):
+        return False
+    if str(contract.get("queue_state") or "").strip().lower() != "queued":
+        return False
+    return bool(str(contract.get("command") or "").strip()) or bool(str(contract.get("runStamp") or "").strip())
+
 
 def _claim_external_runner_contract(*, latest_manifest_path: Path, expected_run_stamp: str | None = None) -> dict[str, Any]:
     latest_manifest = read_json_file(latest_manifest_path) or {}
@@ -32,7 +44,7 @@ def _claim_external_runner_contract(*, latest_manifest_path: Path, expected_run_
         raise ValueError(f"Latest refresh manifest not found or invalid: {latest_manifest_path}")
 
     manifest_state = str(latest_manifest.get("state") or "").strip().lower()
-    if manifest_state != "pending_external":
+    if manifest_state != "pending_external" and not _is_stale_running_external_contract(latest_manifest):
         raise ValueError(f"Latest refresh manifest is not queued for an external runner: {manifest_state or 'missing state'}")
 
     contract = latest_manifest.get("externalRunner")

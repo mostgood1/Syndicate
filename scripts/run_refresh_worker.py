@@ -38,9 +38,17 @@ def _default_poll_seconds() -> float:
 
 def _has_pending_external_contract(latest_manifest_path: Path) -> bool:
     payload = read_json_file(latest_manifest_path) or {}
-    if str(payload.get("state") or "").strip().lower() != "pending_external":
+    state = str(payload.get("state") or "").strip().lower()
+    if state == "pending_external":
+        return isinstance(payload.get("externalRunner"), dict)
+    if state != "running":
         return False
-    return isinstance(payload.get("externalRunner"), dict)
+    if isinstance(payload.get("pid"), int) and int(payload.get("pid") or 0) > 0:
+        return False
+    contract = payload.get("externalRunner") if isinstance(payload.get("externalRunner"), dict) else {}
+    if str(contract.get("queue_state") or "").strip().lower() != "queued":
+        return False
+    return bool(str(contract.get("command") or "").strip()) or bool(str(contract.get("runStamp") or "").strip())
 
 
 def _build_runner_command(latest_manifest_path: Path) -> list[str]:

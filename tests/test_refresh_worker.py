@@ -35,6 +35,17 @@ class RefreshWorkerTests(unittest.TestCase):
             latest_manifest_path.write_text(json.dumps({"state": "running", "externalRunner": {}}), encoding="utf-8")
             self.assertFalse(module._has_pending_external_contract(latest_manifest_path))
 
+            latest_manifest_path.write_text(
+                json.dumps(
+                    {
+                        "state": "running",
+                        "externalRunner": {"kind": "external_runner", "queue_state": "queued", "runStamp": "20260522_120000", "command": ["python"]},
+                    }
+                ),
+                encoding="utf-8",
+            )
+            self.assertTrue(module._has_pending_external_contract(latest_manifest_path))
+
     def test_main_run_once_executes_runner_when_pending(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]
         module = self._load_module(repo_root)
