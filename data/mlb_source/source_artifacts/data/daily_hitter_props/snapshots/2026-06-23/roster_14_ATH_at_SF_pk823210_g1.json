@@ -952,8 +952,7 @@
       "use_closer_in_9th_only": true,
       "pinch_hit_aggressiveness": 0.15
     },
-    "confirmed_lineup_ids": [],
-    "projected_lineup_ids": [
+    "confirmed_lineup_ids": [
       650333,
       805811,
       669477,
@@ -964,8 +963,9 @@
       687551,
       691740
     ],
-    "lineup_source": "projected_rotowire_today_lineup",
-    "lineup_confidence": 0.72,
+    "projected_lineup_ids": [],
+    "lineup_source": "confirmed_feed_live",
+    "lineup_confidence": 1.0,
     "probable_pitcher": {
       "id": 592662,
       "source": "feed_gameData_probablePitchers",
@@ -1805,16 +1805,16 @@
   },
   "weather": {
     "source": "statsapi_live_feed",
-    "condition": "",
-    "temperature_f": null,
-    "wind_speed_mph": null,
-    "wind_direction": "unknown",
-    "wind_raw": "",
+    "condition": "Clear",
+    "temperature_f": 61.0,
+    "wind_speed_mph": 10.0,
+    "wind_direction": "out",
+    "wind_raw": "10 mph, Out To CF",
     "is_dome": null,
     "multipliers": {
-      "hr_mult": 1.0,
-      "inplay_hit_mult": 1.0,
-      "xb_share_mult": 1.0
+      "hr_mult": 0.973,
+      "inplay_hit_mult": 0.9865,
+      "xb_share_mult": 0.9928
     }
   },
   "park": {
@@ -1834,8 +1834,8 @@
   },
   "umpire": {
     "source": "statsapi_live_feed",
-    "home_plate_umpire_id": null,
-    "home_plate_umpire_name": "",
+    "home_plate_umpire_id": 511890,
+    "home_plate_umpire_name": "Quinn Wolcott",
     "called_strike_mult": 1.0,
     "multipliers": {
       "called_strike_mult": 1.0

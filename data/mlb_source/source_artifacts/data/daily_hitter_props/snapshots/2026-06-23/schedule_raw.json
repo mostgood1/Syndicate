@@ -8,12 +8,12 @@
     "gameDate": "2026-06-23T20:07:00Z",
     "officialDate": "2026-06-23",
     "status": {
-      "abstractGameState": "Preview",
-      "codedGameState": "S",
-      "detailedState": "Scheduled",
-      "statusCode": "S",
+      "abstractGameState": "Live",
+      "codedGameState": "I",
+      "detailedState": "In Progress",
+      "statusCode": "I",
       "startTimeTBD": false,
-      "abstractGameCode": "P"
+      "abstractGameCode": "L"
     },
     "teams": {
       "away": {
@@ -66,10 +66,11 @@
         },
         "leagueRecord": {
           "wins": 37,
-          "losses": 42,
+          "losses": 43,
           "ties": 0,
-          "pct": ".468"
+          "pct": ".463"
         },
+        "score": 4,
         "probablePitcher": {
           "id": 663567,
           "fullName": "Peter Lambert",
@@ -133,10 +134,16 @@
           "active": true
         },
         "leagueRecord": {
-          "wins": 38,
+          "wins": 39,
           "losses": 39,
           "ties": 0,
-          "pct": ".494"
+          "pct": ".500"
+        },
+        "score": 2,
+        "probablePitcher": {
+          "id": 669456,
+          "fullName": "Shane Bieber",
+          "link": "/api/v1/people/669456"
         },
         "splitSquad": false,
         "seriesNumber": 26,
@@ -184,9 +191,9 @@
     "officialDate": "2026-06-23",
     "status": {
       "abstractGameState": "Preview",
-      "codedGameState": "S",
-      "detailedState": "Scheduled",
-      "statusCode": "S",
+      "codedGameState": "P",
+      "detailedState": "Pre-Game",
+      "statusCode": "P",
       "startTimeTBD": false,
       "abstractGameCode": "P"
     },
@@ -245,6 +252,7 @@
           "ties": 0,
           "pct": ".506"
         },
+        "score": 0,
         "probablePitcher": {
           "id": 669923,
           "fullName": "George Kirby",
@@ -313,6 +321,7 @@
           "ties": 0,
           "pct": ".500"
         },
+        "score": 0,
         "probablePitcher": {
           "id": 656605,
           "fullName": "Mitch Keller",
@@ -364,9 +373,9 @@
     "officialDate": "2026-06-23",
     "status": {
       "abstractGameState": "Preview",
-      "codedGameState": "S",
-      "detailedState": "Scheduled",
-      "statusCode": "S",
+      "codedGameState": "P",
+      "detailedState": "Pre-Game",
+      "statusCode": "P",
       "startTimeTBD": false,
       "abstractGameCode": "P"
     },
@@ -420,11 +429,12 @@
           "active": true
         },
         "leagueRecord": {
-          "wins": 32,
+          "wins": 33,
           "losses": 46,
           "ties": 0,
-          "pct": ".410"
+          "pct": ".418"
         },
+        "score": 0,
         "probablePitcher": {
           "id": 679883,
           "fullName": "Luinder Avila",
@@ -489,10 +499,11 @@
         },
         "leagueRecord": {
           "wins": 43,
-          "losses": 31,
+          "losses": 32,
           "ties": 0,
-          "pct": ".581"
+          "pct": ".573"
         },
+        "score": 0,
         "probablePitcher": {
           "id": 663556,
           "fullName": "Shane McClanahan",
@@ -544,9 +555,9 @@
     "officialDate": "2026-06-23",
     "status": {
       "abstractGameState": "Preview",
-      "codedGameState": "S",
-      "detailedState": "Scheduled",
-      "statusCode": "S",
+      "codedGameState": "P",
+      "detailedState": "Pre-Game",
+      "statusCode": "P",
       "startTimeTBD": false,
       "abstractGameCode": "P"
     },
@@ -600,10 +611,16 @@
           "active": true
         },
         "leagueRecord": {
-          "wins": 37,
+          "wins": 38,
           "losses": 40,
           "ties": 0,
-          "pct": ".481"
+          "pct": ".487"
+        },
+        "score": 0,
+        "probablePitcher": {
+          "id": 615698,
+          "fullName": "Cal Quantrill",
+          "link": "/api/v1/people/615698"
         },
         "splitSquad": false,
         "seriesNumber": 26,
@@ -664,10 +681,11 @@
         },
         "leagueRecord": {
           "wins": 40,
-          "losses": 38,
+          "losses": 39,
           "ties": 0,
-          "pct": ".513"
+          "pct": ".506"
         },
+        "score": 0,
         "probablePitcher": {
           "id": 645261,
           "fullName": "Sandy Alcantara",
@@ -719,9 +737,9 @@
     "officialDate": "2026-06-23",
     "status": {
       "abstractGameState": "Preview",
-      "codedGameState": "S",
-      "detailedState": "Scheduled",
-      "statusCode": "S",
+      "codedGameState": "P",
+      "detailedState": "Pre-Game",
+      "statusCode": "P",
       "startTimeTBD": false,
       "abstractGameCode": "P"
     },
@@ -776,10 +794,11 @@
         },
         "leagueRecord": {
           "wins": 46,
-          "losses": 30,
+          "losses": 31,
           "ties": 0,
-          "pct": ".605"
+          "pct": ".597"
         },
+        "score": 0,
         "probablePitcher": {
           "id": 607074,
           "fullName": "Carlos Rod\u00f3n",
@@ -843,11 +862,12 @@
           "active": true
         },
         "leagueRecord": {
-          "wins": 33,
+          "wins": 34,
           "losses": 44,
           "ties": 0,
-          "pct": ".429"
+          "pct": ".436"
         },
+        "score": 0,
         "probablePitcher": {
           "id": 663554,
           "fullName": "Casey Mize",
@@ -899,9 +919,9 @@
     "officialDate": "2026-06-23",
     "status": {
       "abstractGameState": "Preview",
-      "codedGameState": "S",
-      "detailedState": "Scheduled",
-      "statusCode": "S",
+      "codedGameState": "P",
+      "detailedState": "Pre-Game",
+      "statusCode": "P",
       "startTimeTBD": false,
       "abstractGameCode": "P"
     },
@@ -956,10 +976,11 @@
         },
         "leagueRecord": {
           "wins": 42,
-          "losses": 35,
+          "losses": 36,
           "ties": 0,
-          "pct": ".545"
+          "pct": ".538"
         },
+        "score": 0,
         "probablePitcher": {
           "id": 666200,
           "fullName": "Jes\u00fas Luzardo",
@@ -1023,15 +1044,16 @@
           "active": true
         },
         "leagueRecord": {
-          "wins": 40,
+          "wins": 41,
           "losses": 38,
           "ties": 0,
-          "pct": ".513"
+          "pct": ".519"
         },
+        "score": 0,
         "probablePitcher": {
-          "id": 641793,
-          "fullName": "Zack Littell",
-          "link": "/api/v1/people/641793"
+          "id": 676571,
+          "fullName": "PJ Poulin",
+          "link": "/api/v1/people/676571"
         },
         "splitSquad": false,
         "seriesNumber": 26,
@@ -1079,9 +1101,9 @@
     "officialDate": "2026-06-23",
     "status": {
       "abstractGameState": "Preview",
-      "codedGameState": "S",
-      "detailedState": "Scheduled",
-      "statusCode": "S",
+      "codedGameState": "P",
+      "detailedState": "Pre-Game",
+      "statusCode": "P",
       "startTimeTBD": false,
       "abstractGameCode": "P"
     },
@@ -1140,6 +1162,7 @@
           "ties": 0,
           "pct": ".519"
         },
+        "score": 0,
         "probablePitcher": {
           "id": 665795,
           "fullName": "Edward Cabrera",
@@ -1208,10 +1231,11 @@
           "ties": 0,
           "pct": ".442"
         },
+        "score": 0,
         "probablePitcher": {
-          "id": 690997,
-          "fullName": "Nolan McLean",
-          "link": "/api/v1/people/690997"
+          "id": 673540,
+          "fullName": "Kodai Senga",
+          "link": "/api/v1/people/673540"
         },
         "splitSquad": false,
         "seriesNumber": 26,
@@ -1243,7 +1267,7 @@
     "reverseHomeAwayStatus": false,
     "inningBreakLength": 120,
     "gamesInSeries": 4,
-    "seriesGameNumber": 2,
+    "seriesGameNumber": 1,
     "seriesDescription": "Regular Season",
     "recordSource": "S",
     "ifNecessary": "N",
@@ -1259,9 +1283,9 @@
     "officialDate": "2026-06-23",
     "status": {
       "abstractGameState": "Preview",
-      "codedGameState": "S",
-      "detailedState": "Scheduled",
-      "statusCode": "S",
+      "codedGameState": "P",
+      "detailedState": "Pre-Game",
+      "statusCode": "P",
       "startTimeTBD": false,
       "abstractGameCode": "P"
     },
@@ -1315,11 +1339,12 @@
           "active": true
         },
         "leagueRecord": {
-          "wins": 46,
+          "wins": 47,
           "losses": 29,
           "ties": 0,
-          "pct": ".613"
+          "pct": ".618"
         },
+        "score": 0,
         "probablePitcher": {
           "id": 687075,
           "fullName": "Brandon Sproat",
@@ -1384,10 +1409,11 @@
         },
         "leagueRecord": {
           "wins": 37,
-          "losses": 39,
+          "losses": 40,
           "ties": 0,
-          "pct": ".487"
+          "pct": ".481"
         },
+        "score": 0,
         "probablePitcher": {
           "id": 666157,
           "fullName": "Nick Lodolo",
@@ -1439,9 +1465,9 @@
     "officialDate": "2026-06-23",
     "status": {
       "abstractGameState": "Preview",
-      "codedGameState": "S",
-      "detailedState": "Scheduled",
-      "statusCode": "S",
+      "codedGameState": "P",
+      "detailedState": "Pre-Game",
+      "statusCode": "P",
       "startTimeTBD": false,
       "abstractGameCode": "P"
     },
@@ -1495,11 +1521,12 @@
           "active": true
         },
         "leagueRecord": {
-          "wins": 49,
+          "wins": 50,
           "losses": 29,
           "ties": 0,
-          "pct": ".628"
+          "pct": ".633"
         },
+        "score": 0,
         "probablePitcher": {
           "id": 680736,
           "fullName": "Justin Wrobleski",
@@ -1564,14 +1591,15 @@
         },
         "leagueRecord": {
           "wins": 38,
-          "losses": 41,
+          "losses": 42,
           "ties": 0,
-          "pct": ".481"
+          "pct": ".475"
         },
+        "score": 0,
         "probablePitcher": {
-          "id": 657746,
-          "fullName": "Joe Ryan",
-          "link": "/api/v1/people/657746"
+          "id": 696070,
+          "fullName": "Kendry Rojas",
+          "link": "/api/v1/people/696070"
         },
         "splitSquad": false,
         "seriesNumber": 26,
@@ -1619,9 +1647,9 @@
     "officialDate": "2026-06-23",
     "status": {
       "abstractGameState": "Preview",
-      "codedGameState": "S",
-      "detailedState": "Scheduled",
-      "statusCode": "S",
+      "codedGameState": "P",
+      "detailedState": "Pre-Game",
+      "statusCode": "P",
       "startTimeTBD": false,
       "abstractGameCode": "P"
     },
@@ -1676,10 +1704,11 @@
         },
         "leagueRecord": {
           "wins": 41,
-          "losses": 37,
+          "losses": 38,
           "ties": 0,
-          "pct": ".526"
+          "pct": ".519"
         },
+        "score": 0,
         "probablePitcher": {
           "id": 800048,
           "fullName": "Parker Messick",
@@ -1743,11 +1772,12 @@
           "active": true
         },
         "leagueRecord": {
-          "wins": 39,
+          "wins": 40,
           "losses": 37,
           "ties": 0,
-          "pct": ".513"
+          "pct": ".519"
         },
+        "score": 0,
         "probablePitcher": {
           "id": 680732,
           "fullName": "Sean Burke",
@@ -1799,9 +1829,9 @@
     "officialDate": "2026-06-23",
     "status": {
       "abstractGameState": "Preview",
-      "codedGameState": "S",
-      "detailedState": "Scheduled",
-      "statusCode": "S",
+      "codedGameState": "P",
+      "detailedState": "Pre-Game",
+      "statusCode": "P",
       "startTimeTBD": false,
       "abstractGameCode": "P"
     },
@@ -1856,10 +1886,11 @@
         },
         "leagueRecord": {
           "wins": 39,
-          "losses": 38,
+          "losses": 39,
           "ties": 0,
-          "pct": ".506"
+          "pct": ".500"
         },
+        "score": 0,
         "probablePitcher": {
           "id": 593958,
           "fullName": "Eduardo Rodriguez",
@@ -1923,11 +1954,12 @@
           "active": true
         },
         "leagueRecord": {
-          "wins": 41,
+          "wins": 42,
           "losses": 34,
           "ties": 0,
-          "pct": ".547"
+          "pct": ".553"
         },
+        "score": 0,
         "probablePitcher": {
           "id": 681517,
           "fullName": "Kyle Leahy",
@@ -1979,9 +2011,9 @@
     "officialDate": "2026-06-23",
     "status": {
       "abstractGameState": "Preview",
-      "codedGameState": "S",
-      "detailedState": "Scheduled",
-      "statusCode": "S",
+      "codedGameState": "P",
+      "detailedState": "Pre-Game",
+      "statusCode": "P",
       "startTimeTBD": false,
       "abstractGameCode": "P"
     },
@@ -2036,10 +2068,11 @@
         },
         "leagueRecord": {
           "wins": 31,
-          "losses": 44,
+          "losses": 45,
           "ties": 0,
-          "pct": ".413"
+          "pct": ".408"
         },
+        "score": 0,
         "probablePitcher": {
           "id": 543243,
           "fullName": "Sonny Gray",
@@ -2103,11 +2136,12 @@
           "active": true
         },
         "leagueRecord": {
-          "wins": 30,
+          "wins": 31,
           "losses": 48,
           "ties": 0,
-          "pct": ".385"
+          "pct": ".392"
         },
+        "score": 0,
         "probablePitcher": {
           "id": 807743,
           "fullName": "Sean Sullivan",
@@ -2215,10 +2249,10 @@
           "active": true
         },
         "leagueRecord": {
-          "wins": 37,
+          "wins": 38,
           "losses": 42,
           "ties": 0,
-          "pct": ".468"
+          "pct": ".475"
         },
         "probablePitcher": {
           "id": 669358,
@@ -2284,9 +2318,14 @@
         },
         "leagueRecord": {
           "wins": 32,
-          "losses": 47,
+          "losses": 48,
           "ties": 0,
-          "pct": ".405"
+          "pct": ".400"
+        },
+        "probablePitcher": {
+          "id": 696270,
+          "fullName": "Ryan Johnson",
+          "link": "/api/v1/people/696270"
         },
         "splitSquad": false,
         "seriesNumber": 26,
@@ -2391,9 +2430,9 @@
         },
         "leagueRecord": {
           "wins": 48,
-          "losses": 28,
+          "losses": 29,
           "ties": 0,
-          "pct": ".632"
+          "pct": ".623"
         },
         "probablePitcher": {
           "id": 702275,
@@ -2458,10 +2497,10 @@
           "active": true
         },
         "leagueRecord": {
-          "wins": 39,
+          "wins": 40,
           "losses": 37,
           "ties": 0,
-          "pct": ".513"
+          "pct": ".519"
         },
         "splitSquad": false,
         "seriesNumber": 26,
@@ -2509,9 +2548,9 @@
     "officialDate": "2026-06-23",
     "status": {
       "abstractGameState": "Preview",
-      "codedGameState": "S",
-      "detailedState": "Scheduled",
-      "statusCode": "S",
+      "codedGameState": "P",
+      "detailedState": "Pre-Game",
+      "statusCode": "P",
       "startTimeTBD": false,
       "abstractGameCode": "P"
     },

@@ -1,13 +1,13 @@
 ﻿{
     "scope":  "daily_update",
-    "date":  "2026-06-22",
+    "date":  "2026-06-23",
     "runMode":  "standard",
     "overallStatus":  "ok",
-    "generatedAt":  "2026-06-22T21:34:47.8091645+00:00",
-    "updatedAt":  "2026-06-22T21:55:08.9432153+00:00",
-    "runDir":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-06-22\\20260622_213447",
+    "generatedAt":  "2026-06-23T21:30:22.4561500+00:00",
+    "updatedAt":  "2026-06-23T22:13:33.4517704+00:00",
+    "runDir":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-06-23\\20260623_213021",
     "latestDir":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest",
-    "lastUpdatedAt":  "2026-06-22T21:55:08.9294052+00:00",
+    "lastUpdatedAt":  "2026-06-23T22:13:33.4414322+00:00",
     "currentStage":  "completed",
     "completedStages":  [
                             "source_update",
@@ -150,12 +150,11 @@
     "trace":  {
                   "eventSimExecutionCount":  21,
                   "artifactUpdateCount":  21,
-                  "inputFingerprintCount":  3,
+                  "inputFingerprintCount":  2,
                   "artifactPathCount":  21,
                   "inputFingerprints":  [
-                                            "cd86e137fa96c9a9f44decfa5d6b302fb76f5488c2a0241023ab0a8bdf421549",
-                                            "3634783abbb1e61c12d1d4f11e67f2f375d21451c8c2b06694fbf88cb5a4f1aa",
-                                            "c8b7bdfc4e3b33c833f65ea3f6cf33d3442afafef3d6c835b7a19156d0f03c1c"
+                                            "a9c3165697afe5e76bc33a2a0f769f7b72164284c7022f28e59a4b34e8b3f32b",
+                                            "d07210661eb637c11109e68ce0887fa184f15ac62f35d4178e89f6b767ab9e8f"
                                         ],
                   "artifactPaths":  [
                                         "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_0_NYM_at_CIN_pk824503_g1.json",
@@ -193,7 +192,8 @@
                                                                   "refresh_gate"
                                                               ],
                           "resumeEligible":  false,
-                          "resumedFromCheckpoint":  false
+                          "resumedFromCheckpoint":  false,
+                          "forceRebuildToday":  false
                       },
     "runPlan":  {
                     "simExecution":  true,

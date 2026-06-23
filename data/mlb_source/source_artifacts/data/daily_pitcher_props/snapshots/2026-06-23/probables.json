@@ -2,7 +2,7 @@
   "date": "2026-06-23",
   "season": 2026,
   "spring_mode": false,
-  "generated_at": "2026-06-22T21:45:03.245463",
+  "generated_at": "2026-06-23T21:36:38.428031",
   "games": [
     {
       "idx": 0,
@@ -16,11 +16,11 @@
         "abbr": "TOR"
       },
       "away_probable_id": 663567,
-      "home_probable_id": null,
+      "home_probable_id": 669456,
       "away_source": "feed_gameData_probablePitchers",
-      "home_source": "none",
+      "home_source": "schedule_probablePitcher",
       "away_confidence": 0.75,
-      "home_confidence": 0.0,
+      "home_confidence": 0.8,
       "away_validation": {
         "status": "ok",
         "selected_id": 663567,
@@ -40,24 +40,28 @@
         "rejected_candidates": []
       },
       "home_validation": {
-        "status": "none",
-        "selected_id": null,
-        "selected_name": "",
-        "selected_source": "none",
+        "status": "ok",
+        "selected_id": 669456,
+        "selected_name": "Shane Bieber",
+        "selected_source": "schedule_probablePitcher",
         "override_reason": "",
-        "roster_team_ids": [],
-        "registry_team_ids": [],
-        "on_expected_team": false,
+        "roster_team_ids": [
+          141
+        ],
+        "registry_team_ids": [
+          141
+        ],
+        "on_expected_team": true,
         "on_opponent_team": false,
-        "on_expected_registry_team": false,
+        "on_expected_registry_team": true,
         "on_opponent_registry_team": false,
         "rejected_candidates": []
       },
       "raw": {
         "away_schedule_id": 663567,
-        "home_schedule_id": null,
+        "home_schedule_id": 669456,
         "away_schedule_name": "Peter Lambert",
-        "home_schedule_name": "",
+        "home_schedule_name": "Shane Bieber",
         "away_feed_id": 663567,
         "home_feed_id": null,
         "away_feed_name": "Peter Lambert",
@@ -776,11 +780,11 @@
         "abbr": "LAA"
       },
       "away_probable_id": 669358,
-      "home_probable_id": null,
+      "home_probable_id": 696270,
       "away_source": "feed_gameData_probablePitchers",
-      "home_source": "none",
+      "home_source": "schedule_probablePitcher",
       "away_confidence": 0.75,
-      "home_confidence": 0.0,
+      "home_confidence": 0.8,
       "away_validation": {
         "status": "ok",
         "selected_id": 669358,
@@ -800,24 +804,28 @@
         "rejected_candidates": []
       },
       "home_validation": {
-        "status": "none",
-        "selected_id": null,
-        "selected_name": "",
-        "selected_source": "none",
+        "status": "ok",
+        "selected_id": 696270,
+        "selected_name": "Ryan Johnson",
+        "selected_source": "schedule_probablePitcher",
         "override_reason": "",
-        "roster_team_ids": [],
-        "registry_team_ids": [],
-        "on_expected_team": false,
+        "roster_team_ids": [
+          108
+        ],
+        "registry_team_ids": [
+          108
+        ],
+        "on_expected_team": true,
         "on_opponent_team": false,
-        "on_expected_registry_team": false,
+        "on_expected_registry_team": true,
         "on_opponent_registry_team": false,
         "rejected_candidates": []
       },
       "raw": {
         "away_schedule_id": 669358,
-        "home_schedule_id": null,
+        "home_schedule_id": 696270,
         "away_schedule_name": "Shane Baz",
-        "home_schedule_name": "",
+        "home_schedule_name": "Ryan Johnson",
         "away_feed_id": 669358,
         "home_feed_id": null,
         "away_feed_name": "Shane Baz",

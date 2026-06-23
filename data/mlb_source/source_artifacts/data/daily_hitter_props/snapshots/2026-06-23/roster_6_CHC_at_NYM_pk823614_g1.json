@@ -39,8 +39,7 @@
       "use_closer_in_9th_only": true,
       "pinch_hit_aggressiveness": 0.15
     },
-    "confirmed_lineup_ids": [],
-    "projected_lineup_ids": [
+    "confirmed_lineup_ids": [
       691718,
       608324,
       683737,
@@ -51,8 +50,9 @@
       608348,
       621020
     ],
-    "lineup_source": "projected_rotowire_default_vs_rhp",
-    "lineup_confidence": 0.66,
+    "projected_lineup_ids": [],
+    "lineup_source": "confirmed_feed_live",
+    "lineup_confidence": 1.0,
     "probable_pitcher": {
       "id": 665795,
       "source": "feed_gameData_probablePitchers",
@@ -902,8 +902,7 @@
       "use_closer_in_9th_only": true,
       "pinch_hit_aggressiveness": 0.15
     },
-    "confirmed_lineup_ids": [],
-    "projected_lineup_ids": [
+    "confirmed_lineup_ids": [
       701807,
       666182,
       665742,
@@ -914,21 +913,22 @@
       669004,
       682626
     ],
-    "lineup_source": "projected_rotowire_default_vs_rhp",
-    "lineup_confidence": 0.66,
+    "projected_lineup_ids": [],
+    "lineup_source": "confirmed_feed_live",
+    "lineup_confidence": 1.0,
     "probable_pitcher": {
-      "id": 690997,
+      "id": 673540,
       "source": "feed_gameData_probablePitchers",
       "confidence": 0.75,
-      "raw_schedule_id": 690997,
-      "raw_feed_id": 690997
+      "raw_schedule_id": 673540,
+      "raw_feed_id": 673540
     },
     "starter": {
-      "id": 690997,
-      "name": "Nolan McLean",
+      "id": 673540,
+      "name": "Kodai Senga",
       "role": "SP",
       "selection_source": "probable",
-      "requested_id": 690997
+      "requested_id": 673540
     },
     "bullpen": [
       {
@@ -1350,46 +1350,45 @@
       }
     ],
     "starter_profile": {
-      "id": 690997,
-      "name": "Nolan McLean",
+      "id": 673540,
+      "name": "Kodai Senga",
       "throw": "R",
       "role": "SP",
       "leverage_skill": 0.5,
-      "stamina_pitches": 95,
+      "stamina_pitches": 94,
       "availability_mult": 1.0,
       "platoon_mult_vs_lhb": {
-        "k": 0.9810242897451592,
-        "bb": 1.0276596352826846,
-        "hr": 1.0340549402047123,
-        "inplay": 1.0654146050296092
+        "k": 0.9061507936507937,
+        "bb": 1.0647058823529414,
+        "hr": 0.9476190476190476,
+        "inplay": 1.0405695611577965
       },
       "platoon_mult_vs_rhb": {
-        "k": 1.0585803320624096,
-        "bb": 0.9090052237111061,
-        "hr": 0.9140868984329334,
-        "inplay": 0.9245547137927217
+        "k": 1.0844642857142859,
+        "bb": 0.9417647058823531,
+        "hr": 1.0471428571428572,
+        "inplay": 0.9618269530034236
       },
       "statcast_quality_mult": {},
       "arsenal_source": "statsapi_pitchArsenal",
-      "arsenal_sample_size": 1400,
+      "arsenal_sample_size": 449,
       "statcast_splits_found": false,
       "statcast_splits_source": "",
       "statcast_splits_n_pitches": 0,
       "statcast_splits_start_date": "",
       "statcast_splits_end_date": "",
-      "k_rate": 0.27478661553686295,
-      "bb_rate": 0.09715487382483919,
-      "hbp_rate": 0.02616279069767442,
-      "hr_rate": 0.024022761009401285,
-      "inplay_hit_rate": 0.28300704150218714,
+      "k_rate": 0.24561403508771928,
+      "bb_rate": 0.14912280701754382,
+      "hbp_rate": 0.008771929824561403,
+      "hr_rate": 0.06140350877192982,
+      "inplay_hit_rate": 0.41086956521739126,
       "arsenal": {
-        "FF": 0.18142856731485724,
-        "OTHER": 0.17500000021,
-        "CU": 0.11499999829800005,
-        "CH": 0.07357142891114285,
-        "SI": 0.3442857249045713,
-        "SL": 0.002142856968285717,
-        "FC": 0.10857142339314295
+        "FF": 0.37416482037416476,
+        "OTHER": 0.30957683030957683,
+        "CU": 0.004454343004454343,
+        "SI": 0.04231625804231626,
+        "SL": 0.026726058026726056,
+        "FC": 0.24276169024276165
       },
       "pitch_type_whiff_mult": {},
       "pitch_type_inplay_mult": {},
@@ -1657,16 +1656,16 @@
   },
   "weather": {
     "source": "statsapi_live_feed",
-    "condition": "",
-    "temperature_f": null,
-    "wind_speed_mph": null,
-    "wind_direction": "unknown",
-    "wind_raw": "",
+    "condition": "Overcast",
+    "temperature_f": 71.0,
+    "wind_speed_mph": 9.0,
+    "wind_direction": "in",
+    "wind_raw": "9 mph, In From LF",
     "is_dome": null,
     "multipliers": {
-      "hr_mult": 1.0,
-      "inplay_hit_mult": 1.0,
-      "xb_share_mult": 1.0
+      "hr_mult": 1.003,
+      "inplay_hit_mult": 1.0015,
+      "xb_share_mult": 1.0008
     }
   },
   "park": {
@@ -1686,8 +1685,8 @@
   },
   "umpire": {
     "source": "statsapi_live_feed",
-    "home_plate_umpire_id": null,
-    "home_plate_umpire_name": "",
+    "home_plate_umpire_id": 608093,
+    "home_plate_umpire_name": "Junior Valentine",
     "called_strike_mult": 1.0,
     "multipliers": {
       "called_strike_mult": 1.0

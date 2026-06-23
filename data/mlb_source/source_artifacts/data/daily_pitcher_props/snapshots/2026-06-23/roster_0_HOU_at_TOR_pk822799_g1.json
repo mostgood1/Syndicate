@@ -545,7 +545,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 27,
-        "availability_mult": 1.0,
+        "availability_mult": 0.6833333333333333,
         "platoon_mult_vs_lhb": {
           "k": 1.0177079470296915,
           "bb": 1.102137267637871,
@@ -631,7 +631,7 @@
         "role": "SU",
         "leverage_skill": 0.7,
         "stamina_pitches": 25,
-        "availability_mult": 0.945,
+        "availability_mult": 0.7253333333333333,
         "platoon_mult_vs_lhb": {
           "k": 0.993529411764706,
           "bb": 1.0801790281329924,
@@ -674,7 +674,7 @@
         "role": "SU",
         "leverage_skill": 0.7,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.8416666666666667,
         "platoon_mult_vs_lhb": {
           "k": 0.8553445850914205,
           "bb": 0.8075,
@@ -868,18 +868,18 @@
     "lineup_source": "projected_rotowire_default_vs_rhp",
     "lineup_confidence": 0.66,
     "probable_pitcher": {
-      "id": null,
-      "source": "none",
-      "confidence": 0.0,
-      "raw_schedule_id": null,
+      "id": 669456,
+      "source": "schedule_probablePitcher",
+      "confidence": 0.8,
+      "raw_schedule_id": 669456,
       "raw_feed_id": null
     },
     "starter": {
-      "id": 592332,
-      "name": "Kevin Gausman",
+      "id": 669456,
+      "name": "Shane Bieber",
       "role": "SP",
-      "selection_source": "heuristic",
-      "requested_id": null
+      "selection_source": "probable",
+      "requested_id": 669456
     },
     "bullpen": [
       {
@@ -1301,42 +1301,34 @@
       }
     ],
     "starter_profile": {
-      "id": 592332,
-      "name": "Kevin Gausman",
+      "id": 669456,
+      "name": "Shane Bieber",
       "throw": "R",
       "role": "SP",
       "leverage_skill": 0.5,
       "stamina_pitches": 94,
       "availability_mult": 1.0,
-      "platoon_mult_vs_lhb": {
-        "k": 0.9544078682615945,
-        "bb": 1.0014363460379494,
-        "hr": 0.8500848002226006,
-        "inplay": 0.9720186597740521
-      },
-      "platoon_mult_vs_rhb": {
-        "k": 1.0496539884891976,
-        "bb": 0.9025581046794207,
-        "hr": 1.1817413035795425,
-        "inplay": 1.028615070591392
-      },
+      "platoon_mult_vs_lhb": {},
+      "platoon_mult_vs_rhb": {},
       "statcast_quality_mult": {},
       "arsenal_source": "statsapi_pitchArsenal",
-      "arsenal_sample_size": 1468,
+      "arsenal_sample_size": 75,
       "statcast_splits_found": false,
       "statcast_splits_source": "",
       "statcast_splits_n_pitches": 0,
       "statcast_splits_start_date": "",
       "statcast_splits_end_date": "",
-      "k_rate": 0.24669398907103826,
-      "bb_rate": 0.05867030965391621,
-      "hbp_rate": 0.00273224043715847,
-      "hr_rate": 0.03110200364298725,
-      "inplay_hit_rate": 0.3200816761363636,
+      "k_rate": 0.10526315789473682,
+      "bb_rate": 0.0,
+      "hbp_rate": 0.0,
+      "hr_rate": 0.15789473684210525,
+      "inplay_hit_rate": 0.5294117647058824,
       "arsenal": {
-        "FF": 0.5211171630279291,
-        "SL": 0.09059945726498643,
-        "FS": 0.3882833797070845
+        "FF": 0.31999999872000007,
+        "CH": 0.2133333391466667,
+        "KC": 0.09333333362666668,
+        "SL": 0.1733333293066667,
+        "FC": 0.19999999920000003
       },
       "pitch_type_whiff_mult": {},
       "pitch_type_inplay_mult": {},
@@ -1436,7 +1428,7 @@
         "role": "CL",
         "leverage_skill": 0.85,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.9,
         "platoon_mult_vs_lhb": {
           "k": 0.9327974276527332,
           "bb": 0.9285911602209945,
@@ -1522,7 +1514,7 @@
         "role": "SU",
         "leverage_skill": 0.7,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.8416666666666667,
         "platoon_mult_vs_lhb": {
           "k": 0.9890065632458235,
           "bb": 1.1414844177145982,
@@ -1563,7 +1555,7 @@
         "role": "LR",
         "leverage_skill": 0.35,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.95,
         "platoon_mult_vs_lhb": {
           "k": 1.0237480808463204,
           "bb": 1.054424060641813,
@@ -1603,16 +1595,16 @@
   },
   "weather": {
     "source": "statsapi_live_feed",
-    "condition": "",
-    "temperature_f": null,
-    "wind_speed_mph": null,
-    "wind_direction": "unknown",
-    "wind_raw": "",
+    "condition": "Partly Cloudy",
+    "temperature_f": 76.0,
+    "wind_speed_mph": 14.0,
+    "wind_direction": "cross",
+    "wind_raw": "14 mph, R To L",
     "is_dome": null,
     "multipliers": {
-      "hr_mult": 1.0,
-      "inplay_hit_mult": 1.0,
-      "xb_share_mult": 1.0
+      "hr_mult": 1.018,
+      "inplay_hit_mult": 1.009,
+      "xb_share_mult": 1.0048
     }
   },
   "park": {
@@ -1632,8 +1624,8 @@
   },
   "umpire": {
     "source": "statsapi_live_feed",
-    "home_plate_umpire_id": null,
-    "home_plate_umpire_name": "",
+    "home_plate_umpire_id": 665281,
+    "home_plate_umpire_name": "Brian Walsh",
     "called_strike_mult": 1.0,
     "multipliers": {
       "called_strike_mult": 1.0

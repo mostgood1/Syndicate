@@ -44,7 +44,7 @@
         691740
       ],
       "away_lineup_source": "projected_rotowire_today_lineup",
-      "home_lineup_source": "projected_rotowire_today_lineup"
+      "home_lineup_source": "confirmed_feed_live"
     }
   },
   "away": {
