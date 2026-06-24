@@ -3,22 +3,23 @@
     "date":  "2026-06-24",
     "runMode":  "standard",
     "overallStatus":  "ok",
-    "generatedAt":  "2026-06-24T00:54:06.5391692+00:00",
-    "updatedAt":  "2026-06-24T01:14:13.1338087+00:00",
-    "runManifestPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-06-24\\20260624_005405\\unified_daily_update_run.json",
+    "generatedAt":  "2026-06-24T07:13:34.1018169+00:00",
+    "updatedAt":  "2026-06-24T08:01:47.4475952+00:00",
+    "runManifestPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-06-24\\20260624_071333\\unified_daily_update_run.json",
     "latestManifestPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest.json",
-    "runCheckpointPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-06-24\\20260624_005405\\unified_daily_update_checkpoint.json",
+    "runCheckpointPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-06-24\\20260624_071333\\unified_daily_update_checkpoint.json",
     "latestCheckpointPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest_checkpoint.json",
-    "runStatePath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-06-24\\20260624_005405\\unified_daily_update_run_state.json",
+    "runStatePath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-06-24\\20260624_071333\\unified_daily_update_run_state.json",
     "latestRunStatePath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest_run_state.json",
     "trace":  {
                   "eventSimExecutionCount":  21,
                   "artifactUpdateCount":  21,
-                  "inputFingerprintCount":  2,
+                  "inputFingerprintCount":  3,
                   "artifactPathCount":  21,
                   "inputFingerprints":  [
-                                            "a9c3165697afe5e76bc33a2a0f769f7b72164284c7022f28e59a4b34e8b3f32b",
-                                            "d73e1bc0ae0969cacf8806e0778d5e31885fa9ae7db5b4cb99ceca0160167a66"
+                                            "64f2a843ff28025b6ac93ab687cdec5edbb936c3485120bf302c08d5a99ab8f4",
+                                            "f5165f49b8ee669230870cef2090ede22885ddbdce515e11cc35e7faaebbe879",
+                                            "1e38f92d742b3758f0c4464f494d1e469a1b8d987529e357b7f4c0bcf31120cc"
                                         ],
                   "artifactPaths":  [
                                         "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_0_NYM_at_CIN_pk824503_g1.json",
@@ -46,7 +47,7 @@
                   "simExecutionDecision":  true
               },
     "simulationContractPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest_simulation_contract.json",
-    "simulationContractRunPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-06-24\\20260624_005405\\unified_daily_update_simulation_contract.json",
+    "simulationContractRunPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-06-24\\20260624_071333\\unified_daily_update_simulation_contract.json",
     "simulationContractSportCount":  4,
     "simulationContractAdvancedBySport":  {
                                               "mlb":  {
@@ -64,66 +65,17 @@
                                                                                                 "rows":  [
                                                                                                              {
                                                                                                                  "rank":  "#1",
-                                                                                                                 "player_name":  "Pete Crow-Armstrong",
-                                                                                                                 "team":  "CHC",
-                                                                                                                 "opponent":  "NYM",
-                                                                                                                 "matchup":  "CHC @ NYM",
-                                                                                                                 "probability":  "16.1%",
-                                                                                                                 "support":  "70",
-                                                                                                                 "summary":  "Expected opportunity is strong at about 5.4 PA. He is tracking toward a premium lineup slot (1).",
-                                                                                                                 "p_hr_1plus":  0.161,
-                                                                                                                 "support_score":  70.0,
-                                                                                                                 "support_label":  "solid",
-                                                                                                                 "pa_mean":  5.407,
-                                                                                                                 "lineup_order":  1,
-                                                                                                                 "opponent_pitcher_name":  "Kodai Senga",
-                                                                                                                 "writeup":  "Expected opportunity is strong at about 5.4 PA. He is tracking toward a premium lineup slot (1).",
-                                                                                                                 "headshot_url":  "https://img.mlbstatic.com/mlb-photos/image/upload/w_180,q_auto:best/v1/people/691718/headshot/67/current",
-                                                                                                                 "team_logo_url":  "https://www.mlbstatic.com/team-logos/112.svg",
-                                                                                                                 "opponent_logo_url":  "https://www.mlbstatic.com/team-logos/121.svg",
-                                                                                                                 "drivers":  [
-                                                                                                                                 "Expected opportunity is strong at about 5.4 PA.",
-                                                                                                                                 "He is tracking toward a premium lineup slot (1)."
-                                                                                                                             ]
-                                                                                                             },
-                                                                                                             {
-                                                                                                                 "rank":  "#2",
-                                                                                                                 "player_name":  "Alex Bregman",
-                                                                                                                 "team":  "CHC",
-                                                                                                                 "opponent":  "NYM",
-                                                                                                                 "matchup":  "CHC @ NYM",
-                                                                                                                 "probability":  "12.6%",
-                                                                                                                 "support":  "81",
-                                                                                                                 "summary":  "Expected opportunity is strong at about 5.3 PA. He is tracking toward a premium lineup slot (2).",
-                                                                                                                 "p_hr_1plus":  0.126,
-                                                                                                                 "support_score":  81.0,
-                                                                                                                 "support_label":  "strong",
-                                                                                                                 "pa_mean":  5.288,
-                                                                                                                 "lineup_order":  2,
-                                                                                                                 "opponent_pitcher_name":  "Kodai Senga",
-                                                                                                                 "writeup":  "Expected opportunity is strong at about 5.3 PA. He is tracking toward a premium lineup slot (2).",
-                                                                                                                 "headshot_url":  "https://img.mlbstatic.com/mlb-photos/image/upload/w_180,q_auto:best/v1/people/608324/headshot/67/current",
-                                                                                                                 "team_logo_url":  "https://www.mlbstatic.com/team-logos/112.svg",
-                                                                                                                 "opponent_logo_url":  "https://www.mlbstatic.com/team-logos/121.svg",
-                                                                                                                 "drivers":  [
-                                                                                                                                 "Expected opportunity is strong at about 5.3 PA.",
-                                                                                                                                 "He is tracking toward a premium lineup slot (2).",
-                                                                                                                                 "The handedness split is leaning toward extra damage in this matchup."
-                                                                                                                             ]
-                                                                                                             },
-                                                                                                             {
-                                                                                                                 "rank":  "#3",
                                                                                                                  "player_name":  "Bryce Harper",
                                                                                                                  "team":  "PHI",
                                                                                                                  "opponent":  "WSH",
                                                                                                                  "matchup":  "PHI @ WSH",
-                                                                                                                 "probability":  "14.6%",
+                                                                                                                 "probability":  "14.8%",
                                                                                                                  "support":  "71",
                                                                                                                  "summary":  "Expected opportunity is strong at about 4.8 PA. He is tracking toward a premium lineup slot (3).",
-                                                                                                                 "p_hr_1plus":  0.146,
+                                                                                                                 "p_hr_1plus":  0.148,
                                                                                                                  "support_score":  71.0,
                                                                                                                  "support_label":  "solid",
-                                                                                                                 "pa_mean":  4.816,
+                                                                                                                 "pa_mean":  4.845,
                                                                                                                  "lineup_order":  3,
                                                                                                                  "opponent_pitcher_name":  "Miles Mikolas",
                                                                                                                  "writeup":  "Expected opportunity is strong at about 4.8 PA. He is tracking toward a premium lineup slot (3).",
@@ -137,18 +89,18 @@
                                                                                                                              ]
                                                                                                              },
                                                                                                              {
-                                                                                                                 "rank":  "#4",
+                                                                                                                 "rank":  "#2",
                                                                                                                  "player_name":  "Ben Rice",
                                                                                                                  "team":  "NYY",
                                                                                                                  "opponent":  "DET",
                                                                                                                  "matchup":  "NYY @ DET",
-                                                                                                                 "probability":  "14.1%",
+                                                                                                                 "probability":  "14.0%",
                                                                                                                  "support":  "69",
                                                                                                                  "summary":  "Expected opportunity is strong at about 5.1 PA. He is tracking toward a premium lineup slot (1).",
-                                                                                                                 "p_hr_1plus":  0.141,
+                                                                                                                 "p_hr_1plus":  0.14,
                                                                                                                  "support_score":  69.0,
                                                                                                                  "support_label":  "solid",
-                                                                                                                 "pa_mean":  5.107,
+                                                                                                                 "pa_mean":  5.088,
                                                                                                                  "lineup_order":  1,
                                                                                                                  "opponent_pitcher_name":  "Tarik Skubal",
                                                                                                                  "writeup":  "Expected opportunity is strong at about 5.1 PA. He is tracking toward a premium lineup slot (1).",
@@ -160,6 +112,56 @@
                                                                                                                                  "He is tracking toward a premium lineup slot (1).",
                                                                                                                                  "The handedness split is leaning toward extra damage in this matchup."
                                                                                                                              ]
+                                                                                                             },
+                                                                                                             {
+                                                                                                                 "rank":  "#3",
+                                                                                                                 "player_name":  "Byron Buxton",
+                                                                                                                 "team":  "MIN",
+                                                                                                                 "opponent":  "LAD",
+                                                                                                                 "matchup":  "LAD @ MIN",
+                                                                                                                 "probability":  "13.2%",
+                                                                                                                 "support":  "71",
+                                                                                                                 "summary":  "Expected opportunity is strong at about 4.6 PA. He is tracking toward a premium lineup slot (2).",
+                                                                                                                 "p_hr_1plus":  0.132,
+                                                                                                                 "support_score":  71.0,
+                                                                                                                 "support_label":  "solid",
+                                                                                                                 "pa_mean":  4.624,
+                                                                                                                 "lineup_order":  2,
+                                                                                                                 "opponent_pitcher_name":  "Shohei Ohtani",
+                                                                                                                 "writeup":  "Expected opportunity is strong at about 4.6 PA. He is tracking toward a premium lineup slot (2).",
+                                                                                                                 "headshot_url":  "https://img.mlbstatic.com/mlb-photos/image/upload/w_180,q_auto:best/v1/people/621439/headshot/67/current",
+                                                                                                                 "team_logo_url":  "https://www.mlbstatic.com/team-logos/142.svg",
+                                                                                                                 "opponent_logo_url":  "https://www.mlbstatic.com/team-logos/119.svg",
+                                                                                                                 "drivers":  [
+                                                                                                                                 "Expected opportunity is strong at about 4.6 PA.",
+                                                                                                                                 "He is tracking toward a premium lineup slot (2).",
+                                                                                                                                 "The handedness split is leaning toward extra damage in this matchup."
+                                                                                                                             ]
+                                                                                                             },
+                                                                                                             {
+                                                                                                                 "rank":  "#4",
+                                                                                                                 "player_name":  "Trea Turner",
+                                                                                                                 "team":  "PHI",
+                                                                                                                 "opponent":  "WSH",
+                                                                                                                 "matchup":  "PHI @ WSH",
+                                                                                                                 "probability":  "11.8%",
+                                                                                                                 "support":  "77",
+                                                                                                                 "summary":  "Expected opportunity is strong at about 4.9 PA. He is tracking toward a premium lineup slot (2).",
+                                                                                                                 "p_hr_1plus":  0.118,
+                                                                                                                 "support_score":  77.0,
+                                                                                                                 "support_label":  "strong",
+                                                                                                                 "pa_mean":  4.949,
+                                                                                                                 "lineup_order":  2,
+                                                                                                                 "opponent_pitcher_name":  "Miles Mikolas",
+                                                                                                                 "writeup":  "Expected opportunity is strong at about 4.9 PA. He is tracking toward a premium lineup slot (2).",
+                                                                                                                 "headshot_url":  "https://img.mlbstatic.com/mlb-photos/image/upload/w_180,q_auto:best/v1/people/607208/headshot/67/current",
+                                                                                                                 "team_logo_url":  "https://www.mlbstatic.com/team-logos/143.svg",
+                                                                                                                 "opponent_logo_url":  "https://www.mlbstatic.com/team-logos/120.svg",
+                                                                                                                 "drivers":  [
+                                                                                                                                 "Expected opportunity is strong at about 4.9 PA.",
+                                                                                                                                 "He is tracking toward a premium lineup slot (2).",
+                                                                                                                                 "The handedness split is leaning toward extra damage in this matchup."
+                                                                                                                             ]
                                                                                                              }
                                                                                                          ]
                                                                                             },
@@ -167,82 +169,82 @@
                                                                                                 {
                                                                                                     "target_id":  "game-823850",
                                                                                                     "label":  "TEX @ MIA",
-                                                                                                    "status":  "2026-06-24"
+                                                                                                    "status":  "11:10 AM"
                                                                                                 },
                                                                                                 {
                                                                                                     "target_id":  "game-823613",
                                                                                                     "label":  "CHC @ NYM",
-                                                                                                    "status":  "2026-06-24"
+                                                                                                    "status":  "12:10 PM"
                                                                                                 },
                                                                                                 {
                                                                                                     "target_id":  "game-823611",
                                                                                                     "label":  "CHC @ NYM",
-                                                                                                    "status":  "2026-06-24"
+                                                                                                    "status":  "6:10 PM"
                                                                                                 },
                                                                                                 {
                                                                                                     "target_id":  "game-824583",
                                                                                                     "label":  "CLE @ CWS",
-                                                                                                    "status":  "2026-06-24"
+                                                                                                    "status":  "1:10 PM"
                                                                                                 },
                                                                                                 {
                                                                                                     "target_id":  "game-824341",
                                                                                                     "label":  "BOS @ COL",
-                                                                                                    "status":  "2026-06-24"
+                                                                                                    "status":  "2:10 PM"
                                                                                                 },
                                                                                                 {
                                                                                                     "target_id":  "game-824018",
                                                                                                     "label":  "BAL @ LAA",
-                                                                                                    "status":  "2026-06-24"
+                                                                                                    "status":  "3:07 PM"
                                                                                                 },
                                                                                                 {
                                                                                                     "target_id":  "game-823367",
                                                                                                     "label":  "SEA @ PIT",
-                                                                                                    "status":  "2026-06-24"
+                                                                                                    "status":  "5:40 PM"
                                                                                                 },
                                                                                                 {
                                                                                                     "target_id":  "game-822965",
                                                                                                     "label":  "KC @ TB",
-                                                                                                    "status":  "2026-06-24"
+                                                                                                    "status":  "5:40 PM"
                                                                                                 },
                                                                                                 {
                                                                                                     "target_id":  "game-824259",
                                                                                                     "label":  "NYY @ DET",
-                                                                                                    "status":  "2026-06-24"
+                                                                                                    "status":  "5:40 PM"
                                                                                                 },
                                                                                                 {
                                                                                                     "target_id":  "game-822719",
                                                                                                     "label":  "PHI @ WSH",
-                                                                                                    "status":  "2026-06-24"
+                                                                                                    "status":  "5:45 PM"
                                                                                                 },
                                                                                                 {
                                                                                                     "target_id":  "game-822798",
                                                                                                     "label":  "HOU @ TOR",
-                                                                                                    "status":  "2026-06-24"
+                                                                                                    "status":  "6:07 PM"
                                                                                                 },
                                                                                                 {
                                                                                                     "target_id":  "game-824500",
                                                                                                     "label":  "MIL @ CIN",
-                                                                                                    "status":  "2026-06-24"
+                                                                                                    "status":  "6:10 PM"
                                                                                                 },
                                                                                                 {
                                                                                                     "target_id":  "game-823691",
                                                                                                     "label":  "LAD @ MIN",
-                                                                                                    "status":  "2026-06-24"
+                                                                                                    "status":  "6:40 PM"
                                                                                                 },
                                                                                                 {
                                                                                                     "target_id":  "game-823041",
                                                                                                     "label":  "AZ @ STL",
-                                                                                                    "status":  "2026-06-24"
+                                                                                                    "status":  "6:45 PM"
                                                                                                 },
                                                                                                 {
                                                                                                     "target_id":  "game-823284",
                                                                                                     "label":  "ATL @ SD",
-                                                                                                    "status":  "2026-06-24"
+                                                                                                    "status":  "7:40 PM"
                                                                                                 },
                                                                                                 {
                                                                                                     "target_id":  "game-823208",
                                                                                                     "label":  "ATH @ SF",
-                                                                                                    "status":  "2026-06-24"
+                                                                                                    "status":  "8:45 PM"
                                                                                                 }
                                                                                             ],
                                                                        "module_links":  [
@@ -405,8 +407,8 @@
                                                                                                         "href":  "/wnba/live-lens?date=2026-06-24"
                                                                                                     }
                                                                                                 ],
-                                                                        "source_path":  "espn_scoreboard_fallback",
-                                                                        "source_title":  "WNBA live scoreboard fallback",
+                                                                        "source_path":  "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\game_cards_2026-06-24.csv | espn_scoreboard_fallback",
+                                                                        "source_title":  "WNBA processed game cards + live scoreboard supplement",
                                                                         "wnba_advanced_contract":  {
                                                                                                        "available":  true,
                                                                                                        "sport":  "wnba",
@@ -416,15 +418,15 @@
                                                                                                                          "resolved":  "2026-06-24"
                                                                                                                      },
                                                                                                        "source":  {
-                                                                                                                      "title":  "WNBA live scoreboard fallback",
-                                                                                                                      "path":  "espn_scoreboard_fallback",
+                                                                                                                      "title":  "WNBA processed game cards + live scoreboard supplement",
+                                                                                                                      "path":  "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\game_cards_2026-06-24.csv | espn_scoreboard_fallback",
                                                                                                                       "mode":  "live"
                                                                                                                   },
                                                                                                        "freshness":  {
                                                                                                                          "requested":  "2026-06-24",
                                                                                                                          "resolved":  "2026-06-24",
                                                                                                                          "selection_kind":  "date",
-                                                                                                                         "is_current_day":  false,
+                                                                                                                         "is_current_day":  true,
                                                                                                                          "is_stale":  false,
                                                                                                                          "lookahead_applied":  false
                                                                                                                      },
@@ -444,11 +446,11 @@
                                                                                                                          "matchup":  {
                                                                                                                                          "away":  {
                                                                                                                                                       "tri":  "PHX",
-                                                                                                                                                      "name":  "PHX"
+                                                                                                                                                      "name":  "Away"
                                                                                                                                                   },
                                                                                                                                          "home":  {
                                                                                                                                                       "tri":  "IND",
-                                                                                                                                                      "name":  "IND"
+                                                                                                                                                      "name":  "Home"
                                                                                                                                                   }
                                                                                                                                      },
                                                                                                                          "status":  {
@@ -532,11 +534,11 @@
                                                                                                                          "matchup":  {
                                                                                                                                          "away":  {
                                                                                                                                                       "tri":  "MIN",
-                                                                                                                                                      "name":  "MIN"
+                                                                                                                                                      "name":  "Away"
                                                                                                                                                   },
                                                                                                                                          "home":  {
                                                                                                                                                       "tri":  "WSH",
-                                                                                                                                                      "name":  "WSH"
+                                                                                                                                                      "name":  "Home"
                                                                                                                                                   }
                                                                                                                                      },
                                                                                                                          "status":  {
@@ -620,11 +622,11 @@
                                                                                                                          "matchup":  {
                                                                                                                                          "away":  {
                                                                                                                                                       "tri":  "POR",
-                                                                                                                                                      "name":  "POR"
+                                                                                                                                                      "name":  "Away"
                                                                                                                                                   },
                                                                                                                                          "home":  {
                                                                                                                                                       "tri":  "CHI",
-                                                                                                                                                      "name":  "CHI"
+                                                                                                                                                      "name":  "Home"
                                                                                                                                                   }
                                                                                                                                      },
                                                                                                                          "status":  {
@@ -708,11 +710,11 @@
                                                                                                                          "matchup":  {
                                                                                                                                          "away":  {
                                                                                                                                                       "tri":  "ATL",
-                                                                                                                                                      "name":  "ATL"
+                                                                                                                                                      "name":  "Away"
                                                                                                                                                   },
                                                                                                                                          "home":  {
                                                                                                                                                       "tri":  "GSV",
-                                                                                                                                                      "name":  "GSV"
+                                                                                                                                                      "name":  "Home"
                                                                                                                                                   }
                                                                                                                                      },
                                                                                                                          "status":  {
