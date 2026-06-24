@@ -141,7 +141,47 @@ class WnbaCardsMergeAliasTests(unittest.TestCase):
         self.assertEqual([game.get("event_id") for game in payload["games"]], ["401857012", "401857013", "401857014", "401857015"])
 
     def test_source_cards_payload_keeps_full_sim_player_rows(self) -> None:
-        payload = build_source_cards_payload("2026-06-22", allow_stored_date_fallback=False)
+        artifact_bundle = {
+            "rows": [
+                {
+                    "away_tri": "LAS",
+                    "home_tri": "CON",
+                    "visitor_team": "Las Vegas Aces",
+                    "home_team": "Connecticut Sun",
+                    "game_id": "1",
+                    "commence_time": "2026-06-22T18:00:00Z",
+                }
+            ],
+            "recommendations": {},
+            "sim": {
+                ("LAS", "CON"): {
+                    "sim": {
+                        "players_summary": {
+                            "away": 4,
+                            "home": 5,
+                            "missing_away": 0,
+                            "missing_home": 0,
+                            "injured_away": 0,
+                            "injured_home": 0,
+                        },
+                        "players": {
+                            "away": [
+                                {"player_name": "Away Player", "pts_mean": 10.5, "reb_mean": 4.2, "ast_mean": 2.1, "pra_mean": 16.8}
+                            ],
+                            "home": [
+                                {"player_name": "Home Player", "pts_mean": 11.3, "reb_mean": 5.1, "ast_mean": 3.0, "pra_mean": 19.4}
+                            ],
+                        },
+                        "pregame_context": {"available": True, "source": "sim"},
+                        "quarters": [{"quarter": 1, "away_mean": 20.0, "home_mean": 22.0}],
+                    }
+                }
+            },
+            "props": {},
+        }
+
+        with patch("syndicate.features.wnba.cards._artifact_bundle", return_value=artifact_bundle):
+            payload = build_source_cards_payload("2026-06-22", allow_stored_date_fallback=False)
 
         games = payload.get("games") or []
         self.assertGreaterEqual(len(games), 1)
