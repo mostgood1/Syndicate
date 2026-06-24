@@ -100,11 +100,27 @@ class WnbaCardsMergeAliasTests(unittest.TestCase):
             "syndicate.features.wnba.cards._artifact_bundle",
             side_effect=lambda selected_date: fallback_bundle if selected_date == "2026-06-11" else empty_bundle,
         ):
-            payload = build_source_cards_payload("2026-06-15")
+            payload = build_source_cards_payload("2026-06-15", allow_stored_date_fallback=True)
 
         self.assertEqual(payload["date"], "2026-06-11")
         self.assertTrue(payload["lookahead_applied"])
         self.assertEqual(len(payload["games"]), 1)
+
+    def test_source_cards_payload_keeps_explicit_today_date_without_stored_fallback(self) -> None:
+        empty_bundle = {"rows": [], "recommendations": {}, "sim": {}, "props": {}}
+
+        with patch("syndicate.features.wnba.cards.central_today_iso", return_value="2026-06-23"), patch(
+            "syndicate.features.wnba.cards.available_dates",
+            return_value=["2026-06-22", "2026-06-23"],
+        ), patch(
+            "syndicate.features.wnba.cards._artifact_bundle",
+            return_value=empty_bundle,
+        ):
+            payload = build_source_cards_payload("2026-06-23", allow_stored_date_fallback=False)
+
+        self.assertEqual(payload["date"], "2026-06-23")
+        self.assertFalse(payload["lookahead_applied"])
+        self.assertEqual(payload["requested_date"], "2026-06-23")
 
     def test_source_cards_payload_uses_live_supplement_for_today(self) -> None:
         artifact_bundle = {
