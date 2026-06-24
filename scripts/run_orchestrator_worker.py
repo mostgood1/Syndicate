@@ -7,9 +7,18 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
+_SUBJOB_TIMEOUT_SECONDS = 120
+
 
 def _run_script(script_name: str) -> None:
-    subprocess.run([sys.executable, str(REPO_ROOT / "scripts" / script_name), "--run-once"], check=False)
+    try:
+        subprocess.run(
+            [sys.executable, str(REPO_ROOT / "scripts" / script_name), "--run-once"],
+            check=False,
+            timeout=_SUBJOB_TIMEOUT_SECONDS,
+        )
+    except subprocess.TimeoutExpired:
+        print(f"{script_name} TIMED OUT AFTER {_SUBJOB_TIMEOUT_SECONDS} SECONDS")
 
 
 def run_live_odds_refresh_job() -> None:
