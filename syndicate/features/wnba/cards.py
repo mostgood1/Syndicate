@@ -1772,7 +1772,7 @@ def build_cards_page_context(selected_date: str, *, allow_stored_date_fallback: 
             cards_path = str(live_source_path)
             recs_path = str(live_source_path)
 
-    if not games and resolved_date == central_today_iso():
+    if not games and allow_stored_date_fallback and resolved_date == central_today_iso():
         live_games, live_source_path = _games_from_live_state_fallback(resolved_date)
         if live_games:
             games = live_games

@@ -5,6 +5,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
+from syndicate.features.wnba.cards import build_cards_page_context
 from syndicate.features.wnba.cards import _supplement_games_with_live_state
 from syndicate.features.wnba.cards import build_source_cards_payload
 
@@ -106,6 +107,39 @@ class WnbaCardsMergeAliasTests(unittest.TestCase):
         self.assertTrue(payload["lookahead_applied"])
         self.assertEqual(len(payload["games"]), 1)
 
+
+    def test_cards_page_context_keeps_explicit_today_empty_without_live_fallback(self) -> None:
+        live_games = [
+            {
+                "gamePk": "401857016",
+                "event_id": "401857016",
+                "away_tri": "LVA",
+                "home_tri": "NYL",
+                "status": "Live",
+                "detail": "Q2",
+                "live_state": {"event_id": "401857016", "away": "LVA", "home": "NYL"},
+            }
+        ]
+
+        with patch("syndicate.features.wnba.cards.central_today_iso", return_value="2026-06-23"), patch(
+            "syndicate.features.wnba.cards.available_dates",
+            return_value=["2026-06-23"],
+        ), patch(
+            "syndicate.features.wnba.cards._games_from_artifacts",
+            return_value=([], "cards_path", "recs_path"),
+        ), patch(
+            "syndicate.features.wnba.cards._supplement_games_with_live_state",
+            return_value=([], None, 0, 0),
+        ), patch(
+            "syndicate.features.wnba.cards._games_from_live_state_fallback",
+            return_value=(live_games, "live_source_path"),
+        ) as mocked_live_fallback:
+            context = build_cards_page_context("2026-06-23", allow_stored_date_fallback=False)
+
+        self.assertEqual(context["date"], "2026-06-23")
+        self.assertFalse(context["lookahead_applied"])
+        self.assertEqual(context["games"], [])
+        mocked_live_fallback.assert_not_called()
     def test_source_cards_payload_keeps_explicit_today_date_without_stored_fallback(self) -> None:
         empty_bundle = {"rows": [], "recommendations": {}, "sim": {}, "props": {}}
 
