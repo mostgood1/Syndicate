@@ -177,15 +177,11 @@ jobs:
           $stageRoots = [System.Collections.Generic.List[string]]::new()
 
           foreach ($sourceRoot in @(Get-ChildItem -Path 'data' -Directory -ErrorAction SilentlyContinue | Where-Object { $_.Name -like '*_source' })) {
-            foreach ($candidateRoot in @(
-              (Join-Path $sourceRoot.FullName 'source_artifacts'),
-              (Join-Path $sourceRoot.FullName 'manifests')
-            )) {
-              if (Test-Path $candidateRoot) {
-                $relativeRoot = Convert-ToRelativeGitPath -FullPath $candidateRoot
-                if ($relativeRoot) {
-                  $stageRoots.Add($relativeRoot) | Out-Null
-                }
+            $candidateRoot = Join-Path $sourceRoot.FullName 'manifests'
+            if (Test-Path $candidateRoot) {
+              $relativeRoot = Convert-ToRelativeGitPath -FullPath $candidateRoot
+              if ($relativeRoot) {
+                $stageRoots.Add($relativeRoot) | Out-Null
               }
             }
           }
@@ -226,7 +222,7 @@ jobs:
           $stagedFiles = @(& git diff --cached --name-only --relative)
           Write-Host 'Files staged for commit:'
           Write-Host ($stagedFiles -join "`n")
-          $artifactTreePresent = ($stagedFiles | Select-String -Pattern '^data/[^/]+_source/(source_artifacts|manifests)/' -Quiet)
+          $artifactTreePresent = ($stagedFiles | Select-String -Pattern '^data/[^/]+_source/manifests/' -Quiet)
           if (-not $artifactTreePresent) {
             Write-Error 'ERROR: artifacts not found in staged pipeline outputs; failing workflow to indicate Stage 2 failure.'
             exit 1

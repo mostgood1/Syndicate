@@ -13,6 +13,8 @@ class DailyUpdateWorkflowTests(unittest.TestCase):
         self.assertIn("git diff --cached --name-only --relative", content)
         self.assertIn("artifacts not found in staged pipeline outputs", content)
         self.assertNotIn("artifacts not found in HEAD commit", content)
+        self.assertNotIn("(Join-Path $sourceRoot.FullName 'source_artifacts')", content)
+        self.assertIn("$candidateRoot = Join-Path $sourceRoot.FullName 'manifests'", content)
 
     def test_workflow_runs_daily_update_contract_regressions(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]
