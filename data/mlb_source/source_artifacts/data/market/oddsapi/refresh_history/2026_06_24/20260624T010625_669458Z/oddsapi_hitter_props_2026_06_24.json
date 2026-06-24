@@ -1,0 +1,451 @@
+{
+  "date": "2026-06-24",
+  "mode": "live",
+  "retrieved_at": "2026-06-24T01:06:31.141868",
+  "hitter_props": {
+    "braxton fulford": {
+      "batter_hits": {
+        "line": 0.5,
+        "over_odds": "-130",
+        "under_odds": "+100",
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 0.5,
+            "over_odds": "-130",
+            "under_odds": "+100",
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": []
+      },
+      "batter_rbis": {
+        "line": 0.5,
+        "over_odds": "+190",
+        "under_odds": "-280",
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 0.5,
+            "over_odds": "+190",
+            "under_odds": "-280",
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": []
+      }
+    },
+    "tj rumfield": {
+      "batter_total_bases": {
+        "line": 1.5,
+        "over_odds": "+120",
+        "under_odds": "-160",
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 1.5,
+            "over_odds": "+120",
+            "under_odds": "-160",
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": []
+      }
+    },
+    "daulton varsho": {
+      "batter_hits_runs_rbis": {
+        "line": 1.5,
+        "over_odds": "-120",
+        "under_odds": "-120",
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 1.5,
+            "over_odds": "-120",
+            "under_odds": "-120",
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": []
+      },
+      "batter_hits": {
+        "line": 0.5,
+        "over_odds": "-200",
+        "under_odds": "+149",
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 0.5,
+            "over_odds": "-200",
+            "under_odds": "+149",
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": []
+      }
+    },
+    "vladimir guerrero jr.": {
+      "batter_hits": {
+        "line": 1.5,
+        "over_odds": "+195",
+        "under_odds": "-265",
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 1.5,
+            "over_odds": "+195",
+            "under_odds": "-265",
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": []
+      }
+    },
+    "george springer": {
+      "batter_hits": {
+        "line": 0.5,
+        "over_odds": "-253",
+        "under_odds": "+187",
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 0.5,
+            "over_odds": "-253",
+            "under_odds": "+187",
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": []
+      }
+    },
+    "alejandro kirk": {
+      "batter_hits": {
+        "line": 0.5,
+        "over_odds": "-235",
+        "under_odds": "+174",
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 0.5,
+            "over_odds": "-235",
+            "under_odds": "+174",
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": []
+      }
+    },
+    "nathan lukes": {
+      "batter_hits": {
+        "line": 0.5,
+        "over_odds": "-234",
+        "under_odds": "+173",
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 0.5,
+            "over_odds": "-234",
+            "under_odds": "+173",
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": []
+      }
+    },
+    "ernie clement": {
+      "batter_hits": {
+        "line": 0.5,
+        "over_odds": "-217",
+        "under_odds": "+161",
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 0.5,
+            "over_odds": "-217",
+            "under_odds": "+161",
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": []
+      }
+    },
+    "jeremy pena": {
+      "batter_hits": {
+        "line": 0.5,
+        "over_odds": "-208",
+        "under_odds": "+155",
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 0.5,
+            "over_odds": "-208",
+            "under_odds": "+155",
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": []
+      }
+    },
+    "yordan alvarez": {
+      "batter_hits": {
+        "line": 0.5,
+        "over_odds": "-197",
+        "under_odds": "+147",
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 0.5,
+            "over_odds": "-197",
+            "under_odds": "+147",
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": []
+      }
+    },
+    "christian walker": {
+      "batter_hits": {
+        "line": 0.5,
+        "over_odds": "-181",
+        "under_odds": "+136",
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 0.5,
+            "over_odds": "-181",
+            "under_odds": "+136",
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": []
+      }
+    },
+    "jose altuve": {
+      "batter_hits": {
+        "line": 0.5,
+        "over_odds": "-162",
+        "under_odds": "+121",
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 0.5,
+            "over_odds": "-162",
+            "under_odds": "+121",
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": []
+      }
+    },
+    "jesus sanchez": {
+      "batter_hits": {
+        "line": 0.5,
+        "over_odds": "-161",
+        "under_odds": "+121",
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 0.5,
+            "over_odds": "-161",
+            "under_odds": "+121",
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": []
+      }
+    },
+    "kazuma okamoto": {
+      "batter_hits": {
+        "line": 0.5,
+        "over_odds": "-159",
+        "under_odds": "+120",
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 0.5,
+            "over_odds": "-159",
+            "under_odds": "+120",
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": []
+      }
+    },
+    "andres gimenez": {
+      "batter_hits": {
+        "line": 0.5,
+        "over_odds": "-149",
+        "under_odds": "+112",
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 0.5,
+            "over_odds": "-149",
+            "under_odds": "+112",
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": []
+      }
+    },
+    "isaac paredes": {
+      "batter_hits": {
+        "line": 0.5,
+        "over_odds": "-148",
+        "under_odds": "+111",
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 0.5,
+            "over_odds": "-148",
+            "under_odds": "+111",
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": []
+      }
+    },
+    "jake meyers": {
+      "batter_hits": {
+        "line": 0.5,
+        "over_odds": "-140",
+        "under_odds": "+105",
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 0.5,
+            "over_odds": "-140",
+            "under_odds": "+105",
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": []
+      }
+    },
+    "cam smith": {
+      "batter_hits": {
+        "line": 0.5,
+        "over_odds": "-130",
+        "under_odds": "-102",
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 0.5,
+            "over_odds": "-130",
+            "under_odds": "-102",
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": []
+      }
+    },
+    "joey loperfido": {
+      "batter_hits": {
+        "line": 0.5,
+        "over_odds": "-124",
+        "under_odds": "-107",
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 0.5,
+            "over_odds": "-124",
+            "under_odds": "-107",
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": []
+      }
+    },
+    "christian vazquez": {
+      "batter_hits": {
+        "line": 0.5,
+        "over_odds": "-115",
+        "under_odds": "-115",
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 0.5,
+            "over_odds": "-115",
+            "under_odds": "-115",
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": []
+      }
+    },
+    "kody clemens": {
+      "batter_hits": {
+        "line": 0.5,
+        "over_odds": "-185",
+        "under_odds": "+140",
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 0.5,
+            "over_odds": "-185",
+            "under_odds": "+140",
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": []
+      }
+    },
+    "alex freeland": {
+      "batter_rbis": {
+        "line": 0.5,
+        "over_odds": "+215",
+        "under_odds": "-320",
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 0.5,
+            "over_odds": "+215",
+            "under_odds": "-320",
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": []
+      }
+    },
+    "josh bell": {
+      "batter_total_bases": {
+        "line": 0.5,
+        "over_odds": "-170",
+        "under_odds": "+130",
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 0.5,
+            "over_odds": "-170",
+            "under_odds": "+130",
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": []
+      }
+    }
+  },
+  "meta": {
+    "markets": [
+      "batter_hits",
+      "batter_hits_runs_rbis",
+      "batter_total_bases",
+      "batter_home_runs",
+      "batter_rbis",
+      "batter_runs_scored",
+      "batter_strikeouts"
+    ],
+    "regions": "us",
+    "bookmakers": null,
+    "counts": {
+      "players": 23,
+      "markets": {
+        "batter_hits": 20,
+        "batter_hits_runs_rbis": 1,
+        "batter_rbis": 2,
+        "batter_total_bases": 2
+      },
+      "events_matched": 14
+    }
+  }
+}

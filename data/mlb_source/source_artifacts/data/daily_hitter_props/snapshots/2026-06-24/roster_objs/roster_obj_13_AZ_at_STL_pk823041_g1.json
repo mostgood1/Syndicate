@@ -19,7 +19,7 @@
       "enable_pitcher_platoon": true,
       "batter_platoon_alpha": 0.55,
       "pitcher_platoon_alpha": 0.55,
-      "away_probable_pitcher_id": null,
+      "away_probable_pitcher_id": 683352,
       "home_probable_pitcher_id": 669461,
       "away_lineup_ids": [
         606466,
@@ -1280,25 +1280,25 @@
       ],
       "pitcher": {
         "player": {
-          "mlbam_id": 593958,
-          "full_name": "Eduardo Rodriguez",
+          "mlbam_id": 683352,
+          "full_name": "Mitch Bratt",
           "primary_position": "P",
           "bat_side": "L",
           "throw_side": "L"
         },
-        "k_rate": 0.18006099960645416,
-        "bb_rate": 0.0958844942935852,
-        "hbp_rate": 0.0,
-        "hr_rate": 0.02643152302243211,
-        "inplay_hit_rate": 0.2822328050295524,
-        "batters_faced": 363.0,
-        "balls_in_play": 263.0,
+        "k_rate": 0.24,
+        "bb_rate": 0.08,
+        "hbp_rate": 0.008,
+        "hr_rate": 0.03,
+        "inplay_hit_rate": 0.0,
+        "batters_faced": 0.0,
+        "balls_in_play": 1.0,
         "arsenal": {
-          "FF": 0.404390936470255,
-          "CU": 0.11827195589235129,
-          "CH": 0.2754957444079319,
-          "SI": 0.07223796115580738,
-          "FC": 0.12960340207365445
+          "FF": 0.45,
+          "SL": 0.22,
+          "CH": 0.12,
+          "SI": 0.13,
+          "CU": 0.08
         },
         "pitch_type_whiff_mult": {},
         "pitch_type_inplay_mult": {},
@@ -1307,122 +1307,20 @@
         "statcast_splits_n_pitches": 0,
         "statcast_splits_start_date": "",
         "statcast_splits_end_date": "",
-        "arsenal_source": "statsapi_pitchArsenal",
-        "arsenal_sample_size": 1412,
-        "stamina_pitches": 95,
+        "arsenal_source": "default",
+        "arsenal_sample_size": 0,
+        "stamina_pitches": 92,
         "role": "SP",
         "availability_mult": 1.0,
-        "platoon_mult_vs_lhb": {
-          "k": 1.0674030634559057,
-          "bb": 0.8161320137042436,
-          "hr": 0.78,
-          "inplay": 0.9866111687351891
-        },
-        "platoon_mult_vs_rhb": {
-          "k": 0.9723343467781914,
-          "bb": 1.0683865361572293,
-          "hr": 1.0688397584784726,
-          "inplay": 1.002479485987532
-        },
-        "venue_mult_home": {
-          "k": 0.9786594214776948,
-          "bb": 0.9321430127564249,
-          "hr": 0.9698493810976515,
-          "inplay": 0.9441288859178801
-        },
-        "venue_mult_away": {
-          "k": 1.0238049464059495,
-          "bb": 1.0945787136101839,
-          "hr": 0.98953241993443,
-          "inplay": 1.078823422459713
-        },
-        "vs_venue_hr_mult": {
-          "119": 0.86,
-          "109": 0.9698493810976515,
-          "121": 1.175,
-          "110": 1.175,
-          "158": 0.86,
-          "115": 0.86,
-          "137": 1.175
-        },
-        "vs_venue_k_mult": {
-          "119": 1.1225,
-          "109": 0.9786594214776948,
-          "121": 0.8832542865573125,
-          "110": 0.8832542865573125,
-          "158": 0.9880496906627718,
-          "115": 1.1225,
-          "137": 1.1165085731146251
-        },
-        "vs_venue_bb_mult": {
-          "119": 1.0150225227536247,
-          "109": 0.9321430127564249,
-          "121": 0.9420180182028998,
-          "110": 1.1225,
-          "158": 1.1225,
-          "115": 0.8775000000000001,
-          "137": 0.9420180182028998
-        },
-        "vs_venue_inplay_mult": {
-          "119": 1.031572608758331,
-          "109": 0.9441288859178801,
-          "121": 0.9600277446161439,
-          "110": 1.0633703261548586,
-          "158": 1.0633703261548586,
-          "115": 1.1225,
-          "137": 1.0876862276933796
-        },
-        "vs_venue_history": {
-          "119": {
-            "bf": 20.0,
-            "k_mult": 1.35,
-            "bb_mult": 1.042921493581785,
-            "hr_mult": 0.6,
-            "inplay_mult": 1.0902074535952313
-          },
-          "109": {
-            "bf": 207.0,
-            "k_mult": 0.9390269185076995,
-            "bb_mult": 0.8061228935897854,
-            "hr_mult": 0.9138553745647184,
-            "inplay_mult": 0.8403682454796574
-          },
-          "121": {
-            "bf": 25.0,
-            "k_mult": 0.6664408187351787,
-            "bb_mult": 0.8343371948654279,
-            "hr_mult": 1.5,
-            "inplay_mult": 0.8857935560461254
-          },
-          "110": {
-            "bf": 25.0,
-            "k_mult": 0.6664408187351787,
-            "bb_mult": 1.35,
-            "hr_mult": 1.5,
-            "inplay_mult": 1.1810580747281672
-          },
-          "158": {
-            "bf": 23.0,
-            "k_mult": 0.9658562590364909,
-            "bb_mult": 1.35,
-            "hr_mult": 0.6,
-            "inplay_mult": 1.1810580747281672
-          },
-          "115": {
-            "bf": 23.0,
-            "k_mult": 1.35,
-            "bb_mult": 0.65,
-            "hr_mult": 0.6,
-            "inplay_mult": 1.35
-          },
-          "137": {
-            "bf": 25.0,
-            "k_mult": 1.3328816374703574,
-            "bb_mult": 0.8343371948654279,
-            "hr_mult": 1.5,
-            "inplay_mult": 1.2505320791239418
-          }
-        },
+        "platoon_mult_vs_lhb": {},
+        "platoon_mult_vs_rhb": {},
+        "venue_mult_home": {},
+        "venue_mult_away": {},
+        "vs_venue_hr_mult": {},
+        "vs_venue_k_mult": {},
+        "vs_venue_bb_mult": {},
+        "vs_venue_inplay_mult": {},
+        "vs_venue_history": {},
         "statcast_quality_mult": {},
         "bb_gb_rate": 0.44,
         "bb_fb_rate": 0.25,

@@ -1,0 +1,1020 @@
+{
+  "date": "2026-06-24",
+  "season": 2026,
+  "spring_mode": false,
+  "generated_at": "2026-06-24T00:57:31.741078",
+  "games": [
+    {
+      "idx": 0,
+      "game_pk": 823850,
+      "away": {
+        "team_id": 140,
+        "abbr": "TEX"
+      },
+      "home": {
+        "team_id": 146,
+        "abbr": "MIA"
+      },
+      "away_probable_id": 594798,
+      "home_probable_id": 691587,
+      "away_source": "feed_gameData_probablePitchers",
+      "home_source": "feed_gameData_probablePitchers",
+      "away_confidence": 0.75,
+      "home_confidence": 0.75,
+      "away_validation": {
+        "status": "ok",
+        "selected_id": 594798,
+        "selected_name": "Jacob deGrom",
+        "selected_source": "feed_gameData_probablePitchers",
+        "override_reason": "",
+        "roster_team_ids": [
+          140
+        ],
+        "registry_team_ids": [
+          140
+        ],
+        "on_expected_team": true,
+        "on_opponent_team": false,
+        "on_expected_registry_team": true,
+        "on_opponent_registry_team": false,
+        "rejected_candidates": []
+      },
+      "home_validation": {
+        "status": "ok",
+        "selected_id": 691587,
+        "selected_name": "Eury P\u00e9rez",
+        "selected_source": "feed_gameData_probablePitchers",
+        "override_reason": "",
+        "roster_team_ids": [
+          146
+        ],
+        "registry_team_ids": [
+          146
+        ],
+        "on_expected_team": true,
+        "on_opponent_team": false,
+        "on_expected_registry_team": true,
+        "on_opponent_registry_team": false,
+        "rejected_candidates": []
+      },
+      "raw": {
+        "away_schedule_id": 594798,
+        "home_schedule_id": 691587,
+        "away_schedule_name": "Jacob deGrom",
+        "home_schedule_name": "Eury P\u00e9rez",
+        "away_feed_id": 594798,
+        "home_feed_id": 691587,
+        "away_feed_name": "Jacob deGrom",
+        "home_feed_name": "Eury P\u00e9rez"
+      }
+    },
+    {
+      "idx": 1,
+      "game_pk": 823613,
+      "away": {
+        "team_id": 112,
+        "abbr": "CHC"
+      },
+      "home": {
+        "team_id": 121,
+        "abbr": "NYM"
+      },
+      "away_probable_id": 684007,
+      "home_probable_id": 673540,
+      "away_source": "feed_gameData_probablePitchers",
+      "home_source": "feed_gameData_probablePitchers",
+      "away_confidence": 0.75,
+      "home_confidence": 0.75,
+      "away_validation": {
+        "status": "ok",
+        "selected_id": 684007,
+        "selected_name": "Shota Imanaga",
+        "selected_source": "feed_gameData_probablePitchers",
+        "override_reason": "",
+        "roster_team_ids": [
+          112
+        ],
+        "registry_team_ids": [
+          112
+        ],
+        "on_expected_team": true,
+        "on_opponent_team": false,
+        "on_expected_registry_team": true,
+        "on_opponent_registry_team": false,
+        "rejected_candidates": []
+      },
+      "home_validation": {
+        "status": "ok",
+        "selected_id": 673540,
+        "selected_name": "Kodai Senga",
+        "selected_source": "feed_gameData_probablePitchers",
+        "override_reason": "",
+        "roster_team_ids": [
+          121
+        ],
+        "registry_team_ids": [
+          121
+        ],
+        "on_expected_team": true,
+        "on_opponent_team": false,
+        "on_expected_registry_team": true,
+        "on_opponent_registry_team": false,
+        "rejected_candidates": []
+      },
+      "raw": {
+        "away_schedule_id": null,
+        "home_schedule_id": null,
+        "away_schedule_name": "",
+        "home_schedule_name": "",
+        "away_feed_id": 684007,
+        "home_feed_id": 673540,
+        "away_feed_name": "Shota Imanaga",
+        "home_feed_name": "Kodai Senga"
+      }
+    },
+    {
+      "idx": 2,
+      "game_pk": 823611,
+      "away": {
+        "team_id": 112,
+        "abbr": "CHC"
+      },
+      "home": {
+        "team_id": 121,
+        "abbr": "NYM"
+      },
+      "away_probable_id": null,
+      "home_probable_id": null,
+      "away_source": "none",
+      "home_source": "none",
+      "away_confidence": 0.0,
+      "home_confidence": 0.0,
+      "away_validation": {
+        "status": "none",
+        "selected_id": null,
+        "selected_name": "",
+        "selected_source": "none",
+        "override_reason": "",
+        "roster_team_ids": [],
+        "registry_team_ids": [],
+        "on_expected_team": false,
+        "on_opponent_team": false,
+        "on_expected_registry_team": false,
+        "on_opponent_registry_team": false,
+        "rejected_candidates": []
+      },
+      "home_validation": {
+        "status": "none",
+        "selected_id": null,
+        "selected_name": "",
+        "selected_source": "none",
+        "override_reason": "",
+        "roster_team_ids": [],
+        "registry_team_ids": [],
+        "on_expected_team": false,
+        "on_opponent_team": false,
+        "on_expected_registry_team": false,
+        "on_opponent_registry_team": false,
+        "rejected_candidates": []
+      },
+      "raw": {
+        "away_schedule_id": null,
+        "home_schedule_id": null,
+        "away_schedule_name": "",
+        "home_schedule_name": "",
+        "away_feed_id": null,
+        "home_feed_id": null,
+        "away_feed_name": "",
+        "home_feed_name": ""
+      }
+    },
+    {
+      "idx": 3,
+      "game_pk": 824583,
+      "away": {
+        "team_id": 114,
+        "abbr": "CLE"
+      },
+      "home": {
+        "team_id": 145,
+        "abbr": "CWS"
+      },
+      "away_probable_id": 676440,
+      "home_probable_id": 607200,
+      "away_source": "feed_gameData_probablePitchers",
+      "home_source": "feed_gameData_probablePitchers",
+      "away_confidence": 0.75,
+      "home_confidence": 0.75,
+      "away_validation": {
+        "status": "ok",
+        "selected_id": 676440,
+        "selected_name": "Tanner Bibee",
+        "selected_source": "feed_gameData_probablePitchers",
+        "override_reason": "",
+        "roster_team_ids": [
+          114
+        ],
+        "registry_team_ids": [
+          114
+        ],
+        "on_expected_team": true,
+        "on_opponent_team": false,
+        "on_expected_registry_team": true,
+        "on_opponent_registry_team": false,
+        "rejected_candidates": []
+      },
+      "home_validation": {
+        "status": "ok",
+        "selected_id": 607200,
+        "selected_name": "Erick Fedde",
+        "selected_source": "feed_gameData_probablePitchers",
+        "override_reason": "",
+        "roster_team_ids": [
+          145
+        ],
+        "registry_team_ids": [
+          145
+        ],
+        "on_expected_team": true,
+        "on_opponent_team": false,
+        "on_expected_registry_team": true,
+        "on_opponent_registry_team": false,
+        "rejected_candidates": []
+      },
+      "raw": {
+        "away_schedule_id": 676440,
+        "home_schedule_id": 607200,
+        "away_schedule_name": "Tanner Bibee",
+        "home_schedule_name": "Erick Fedde",
+        "away_feed_id": 676440,
+        "home_feed_id": 607200,
+        "away_feed_name": "Tanner Bibee",
+        "home_feed_name": "Erick Fedde"
+      }
+    },
+    {
+      "idx": 4,
+      "game_pk": 824341,
+      "away": {
+        "team_id": 111,
+        "abbr": "BOS"
+      },
+      "home": {
+        "team_id": 115,
+        "abbr": "COL"
+      },
+      "away_probable_id": 624133,
+      "home_probable_id": 607536,
+      "away_source": "feed_gameData_probablePitchers",
+      "home_source": "feed_gameData_probablePitchers",
+      "away_confidence": 0.75,
+      "home_confidence": 0.75,
+      "away_validation": {
+        "status": "ok",
+        "selected_id": 624133,
+        "selected_name": "Ranger Suarez",
+        "selected_source": "feed_gameData_probablePitchers",
+        "override_reason": "",
+        "roster_team_ids": [
+          111
+        ],
+        "registry_team_ids": [
+          111
+        ],
+        "on_expected_team": true,
+        "on_opponent_team": false,
+        "on_expected_registry_team": true,
+        "on_opponent_registry_team": false,
+        "rejected_candidates": []
+      },
+      "home_validation": {
+        "status": "ok",
+        "selected_id": 607536,
+        "selected_name": "Kyle Freeland",
+        "selected_source": "feed_gameData_probablePitchers",
+        "override_reason": "",
+        "roster_team_ids": [
+          115
+        ],
+        "registry_team_ids": [
+          115
+        ],
+        "on_expected_team": true,
+        "on_opponent_team": false,
+        "on_expected_registry_team": true,
+        "on_opponent_registry_team": false,
+        "rejected_candidates": []
+      },
+      "raw": {
+        "away_schedule_id": 624133,
+        "home_schedule_id": 607536,
+        "away_schedule_name": "Ranger Suarez",
+        "home_schedule_name": "Kyle Freeland",
+        "away_feed_id": 624133,
+        "home_feed_id": 607536,
+        "away_feed_name": "Ranger Suarez",
+        "home_feed_name": "Kyle Freeland"
+      }
+    },
+    {
+      "idx": 5,
+      "game_pk": 824018,
+      "away": {
+        "team_id": 110,
+        "abbr": "BAL"
+      },
+      "home": {
+        "team_id": 108,
+        "abbr": "LAA"
+      },
+      "away_probable_id": 694346,
+      "home_probable_id": 667755,
+      "away_source": "feed_gameData_probablePitchers",
+      "home_source": "feed_gameData_probablePitchers",
+      "away_confidence": 0.75,
+      "home_confidence": 0.75,
+      "away_validation": {
+        "status": "ok",
+        "selected_id": 694346,
+        "selected_name": "Trey Gibson",
+        "selected_source": "feed_gameData_probablePitchers",
+        "override_reason": "",
+        "roster_team_ids": [
+          110
+        ],
+        "registry_team_ids": [
+          110
+        ],
+        "on_expected_team": true,
+        "on_opponent_team": false,
+        "on_expected_registry_team": true,
+        "on_opponent_registry_team": false,
+        "rejected_candidates": []
+      },
+      "home_validation": {
+        "status": "ok",
+        "selected_id": 667755,
+        "selected_name": "Jos\u00e9 Soriano",
+        "selected_source": "feed_gameData_probablePitchers",
+        "override_reason": "",
+        "roster_team_ids": [
+          108
+        ],
+        "registry_team_ids": [
+          108
+        ],
+        "on_expected_team": true,
+        "on_opponent_team": false,
+        "on_expected_registry_team": true,
+        "on_opponent_registry_team": false,
+        "rejected_candidates": []
+      },
+      "raw": {
+        "away_schedule_id": 694346,
+        "home_schedule_id": 667755,
+        "away_schedule_name": "Trey Gibson",
+        "home_schedule_name": "Jos\u00e9 Soriano",
+        "away_feed_id": 694346,
+        "home_feed_id": 667755,
+        "away_feed_name": "Trey Gibson",
+        "home_feed_name": "Jos\u00e9 Soriano"
+      }
+    },
+    {
+      "idx": 6,
+      "game_pk": 823367,
+      "away": {
+        "team_id": 136,
+        "abbr": "SEA"
+      },
+      "home": {
+        "team_id": 134,
+        "abbr": "PIT"
+      },
+      "away_probable_id": 693433,
+      "home_probable_id": 677952,
+      "away_source": "feed_gameData_probablePitchers",
+      "home_source": "feed_gameData_probablePitchers",
+      "away_confidence": 0.75,
+      "home_confidence": 0.75,
+      "away_validation": {
+        "status": "ok",
+        "selected_id": 693433,
+        "selected_name": "Bryan Woo",
+        "selected_source": "feed_gameData_probablePitchers",
+        "override_reason": "",
+        "roster_team_ids": [
+          136
+        ],
+        "registry_team_ids": [
+          136
+        ],
+        "on_expected_team": true,
+        "on_opponent_team": false,
+        "on_expected_registry_team": true,
+        "on_opponent_registry_team": false,
+        "rejected_candidates": []
+      },
+      "home_validation": {
+        "status": "ok",
+        "selected_id": 677952,
+        "selected_name": "Braxton Ashcraft",
+        "selected_source": "feed_gameData_probablePitchers",
+        "override_reason": "",
+        "roster_team_ids": [
+          134
+        ],
+        "registry_team_ids": [
+          134
+        ],
+        "on_expected_team": true,
+        "on_opponent_team": false,
+        "on_expected_registry_team": true,
+        "on_opponent_registry_team": false,
+        "rejected_candidates": []
+      },
+      "raw": {
+        "away_schedule_id": 693433,
+        "home_schedule_id": 677952,
+        "away_schedule_name": "Bryan Woo",
+        "home_schedule_name": "Braxton Ashcraft",
+        "away_feed_id": 693433,
+        "home_feed_id": 677952,
+        "away_feed_name": "Bryan Woo",
+        "home_feed_name": "Braxton Ashcraft"
+      }
+    },
+    {
+      "idx": 7,
+      "game_pk": 822965,
+      "away": {
+        "team_id": 118,
+        "abbr": "KC"
+      },
+      "home": {
+        "team_id": 139,
+        "abbr": "TB"
+      },
+      "away_probable_id": 702070,
+      "home_probable_id": 643377,
+      "away_source": "feed_gameData_probablePitchers",
+      "home_source": "feed_gameData_probablePitchers",
+      "away_confidence": 0.75,
+      "home_confidence": 0.75,
+      "away_validation": {
+        "status": "ok",
+        "selected_id": 702070,
+        "selected_name": "Noah Cameron",
+        "selected_source": "feed_gameData_probablePitchers",
+        "override_reason": "",
+        "roster_team_ids": [
+          118
+        ],
+        "registry_team_ids": [
+          118
+        ],
+        "on_expected_team": true,
+        "on_opponent_team": false,
+        "on_expected_registry_team": true,
+        "on_opponent_registry_team": false,
+        "rejected_candidates": []
+      },
+      "home_validation": {
+        "status": "ok",
+        "selected_id": 643377,
+        "selected_name": "Griffin Jax",
+        "selected_source": "feed_gameData_probablePitchers",
+        "override_reason": "",
+        "roster_team_ids": [
+          139
+        ],
+        "registry_team_ids": [
+          139
+        ],
+        "on_expected_team": true,
+        "on_opponent_team": false,
+        "on_expected_registry_team": true,
+        "on_opponent_registry_team": false,
+        "rejected_candidates": []
+      },
+      "raw": {
+        "away_schedule_id": 702070,
+        "home_schedule_id": 643377,
+        "away_schedule_name": "Noah Cameron",
+        "home_schedule_name": "Griffin Jax",
+        "away_feed_id": 702070,
+        "home_feed_id": 643377,
+        "away_feed_name": "Noah Cameron",
+        "home_feed_name": "Griffin Jax"
+      }
+    },
+    {
+      "idx": 8,
+      "game_pk": 824259,
+      "away": {
+        "team_id": 147,
+        "abbr": "NYY"
+      },
+      "home": {
+        "team_id": 116,
+        "abbr": "DET"
+      },
+      "away_probable_id": 677960,
+      "home_probable_id": 669373,
+      "away_source": "feed_gameData_probablePitchers",
+      "home_source": "feed_gameData_probablePitchers",
+      "away_confidence": 0.75,
+      "home_confidence": 0.75,
+      "away_validation": {
+        "status": "ok",
+        "selected_id": 677960,
+        "selected_name": "Ryan Weathers",
+        "selected_source": "feed_gameData_probablePitchers",
+        "override_reason": "",
+        "roster_team_ids": [
+          147
+        ],
+        "registry_team_ids": [
+          147
+        ],
+        "on_expected_team": true,
+        "on_opponent_team": false,
+        "on_expected_registry_team": true,
+        "on_opponent_registry_team": false,
+        "rejected_candidates": []
+      },
+      "home_validation": {
+        "status": "ok",
+        "selected_id": 669373,
+        "selected_name": "Tarik Skubal",
+        "selected_source": "feed_gameData_probablePitchers",
+        "override_reason": "",
+        "roster_team_ids": [
+          116
+        ],
+        "registry_team_ids": [
+          116
+        ],
+        "on_expected_team": true,
+        "on_opponent_team": false,
+        "on_expected_registry_team": true,
+        "on_opponent_registry_team": false,
+        "rejected_candidates": []
+      },
+      "raw": {
+        "away_schedule_id": 677960,
+        "home_schedule_id": 669373,
+        "away_schedule_name": "Ryan Weathers",
+        "home_schedule_name": "Tarik Skubal",
+        "away_feed_id": 677960,
+        "home_feed_id": 669373,
+        "away_feed_name": "Ryan Weathers",
+        "home_feed_name": "Tarik Skubal"
+      }
+    },
+    {
+      "idx": 9,
+      "game_pk": 822719,
+      "away": {
+        "team_id": 143,
+        "abbr": "PHI"
+      },
+      "home": {
+        "team_id": 120,
+        "abbr": "WSH"
+      },
+      "away_probable_id": 605400,
+      "home_probable_id": 571945,
+      "away_source": "feed_gameData_probablePitchers",
+      "home_source": "feed_gameData_probablePitchers",
+      "away_confidence": 0.75,
+      "home_confidence": 0.75,
+      "away_validation": {
+        "status": "ok",
+        "selected_id": 605400,
+        "selected_name": "Aaron Nola",
+        "selected_source": "feed_gameData_probablePitchers",
+        "override_reason": "",
+        "roster_team_ids": [
+          143
+        ],
+        "registry_team_ids": [
+          143
+        ],
+        "on_expected_team": true,
+        "on_opponent_team": false,
+        "on_expected_registry_team": true,
+        "on_opponent_registry_team": false,
+        "rejected_candidates": []
+      },
+      "home_validation": {
+        "status": "ok",
+        "selected_id": 571945,
+        "selected_name": "Miles Mikolas",
+        "selected_source": "feed_gameData_probablePitchers",
+        "override_reason": "",
+        "roster_team_ids": [
+          120
+        ],
+        "registry_team_ids": [
+          120
+        ],
+        "on_expected_team": true,
+        "on_opponent_team": false,
+        "on_expected_registry_team": true,
+        "on_opponent_registry_team": false,
+        "rejected_candidates": []
+      },
+      "raw": {
+        "away_schedule_id": 605400,
+        "home_schedule_id": 571945,
+        "away_schedule_name": "Aaron Nola",
+        "home_schedule_name": "Miles Mikolas",
+        "away_feed_id": 605400,
+        "home_feed_id": 571945,
+        "away_feed_name": "Aaron Nola",
+        "home_feed_name": "Miles Mikolas"
+      }
+    },
+    {
+      "idx": 10,
+      "game_pk": 822798,
+      "away": {
+        "team_id": 117,
+        "abbr": "HOU"
+      },
+      "home": {
+        "team_id": 141,
+        "abbr": "TOR"
+      },
+      "away_probable_id": 681347,
+      "home_probable_id": 702056,
+      "away_source": "feed_gameData_probablePitchers",
+      "home_source": "feed_gameData_probablePitchers",
+      "away_confidence": 0.75,
+      "home_confidence": 0.75,
+      "away_validation": {
+        "status": "ok",
+        "selected_id": 681347,
+        "selected_name": "Mike Burrows",
+        "selected_source": "feed_gameData_probablePitchers",
+        "override_reason": "",
+        "roster_team_ids": [
+          117
+        ],
+        "registry_team_ids": [
+          117
+        ],
+        "on_expected_team": true,
+        "on_opponent_team": false,
+        "on_expected_registry_team": true,
+        "on_opponent_registry_team": false,
+        "rejected_candidates": []
+      },
+      "home_validation": {
+        "status": "ok",
+        "selected_id": 702056,
+        "selected_name": "Trey Yesavage",
+        "selected_source": "feed_gameData_probablePitchers",
+        "override_reason": "",
+        "roster_team_ids": [
+          141
+        ],
+        "registry_team_ids": [
+          141
+        ],
+        "on_expected_team": true,
+        "on_opponent_team": false,
+        "on_expected_registry_team": true,
+        "on_opponent_registry_team": false,
+        "rejected_candidates": []
+      },
+      "raw": {
+        "away_schedule_id": 681347,
+        "home_schedule_id": 702056,
+        "away_schedule_name": "Mike Burrows",
+        "home_schedule_name": "Trey Yesavage",
+        "away_feed_id": 681347,
+        "home_feed_id": 702056,
+        "away_feed_name": "Mike Burrows",
+        "home_feed_name": "Trey Yesavage"
+      }
+    },
+    {
+      "idx": 11,
+      "game_pk": 824500,
+      "away": {
+        "team_id": 158,
+        "abbr": "MIL"
+      },
+      "home": {
+        "team_id": 113,
+        "abbr": "CIN"
+      },
+      "away_probable_id": 675660,
+      "home_probable_id": 695076,
+      "away_source": "feed_gameData_probablePitchers",
+      "home_source": "feed_gameData_probablePitchers",
+      "away_confidence": 0.75,
+      "home_confidence": 0.75,
+      "away_validation": {
+        "status": "ok",
+        "selected_id": 675660,
+        "selected_name": "Shane Drohan",
+        "selected_source": "feed_gameData_probablePitchers",
+        "override_reason": "",
+        "roster_team_ids": [
+          158
+        ],
+        "registry_team_ids": [
+          158
+        ],
+        "on_expected_team": true,
+        "on_opponent_team": false,
+        "on_expected_registry_team": true,
+        "on_opponent_registry_team": false,
+        "rejected_candidates": []
+      },
+      "home_validation": {
+        "status": "ok",
+        "selected_id": 695076,
+        "selected_name": "Rhett Lowder",
+        "selected_source": "feed_gameData_probablePitchers",
+        "override_reason": "",
+        "roster_team_ids": [
+          113
+        ],
+        "registry_team_ids": [
+          113
+        ],
+        "on_expected_team": true,
+        "on_opponent_team": false,
+        "on_expected_registry_team": true,
+        "on_opponent_registry_team": false,
+        "rejected_candidates": []
+      },
+      "raw": {
+        "away_schedule_id": 675660,
+        "home_schedule_id": 695076,
+        "away_schedule_name": "Shane Drohan",
+        "home_schedule_name": "Rhett Lowder",
+        "away_feed_id": 675660,
+        "home_feed_id": 695076,
+        "away_feed_name": "Shane Drohan",
+        "home_feed_name": "Rhett Lowder"
+      }
+    },
+    {
+      "idx": 12,
+      "game_pk": 823691,
+      "away": {
+        "team_id": 119,
+        "abbr": "LAD"
+      },
+      "home": {
+        "team_id": 142,
+        "abbr": "MIN"
+      },
+      "away_probable_id": 660271,
+      "home_probable_id": 687570,
+      "away_source": "feed_gameData_probablePitchers",
+      "home_source": "feed_gameData_probablePitchers",
+      "away_confidence": 0.75,
+      "home_confidence": 0.75,
+      "away_validation": {
+        "status": "ok",
+        "selected_id": 660271,
+        "selected_name": "Shohei Ohtani",
+        "selected_source": "feed_gameData_probablePitchers",
+        "override_reason": "",
+        "roster_team_ids": [
+          119
+        ],
+        "registry_team_ids": [
+          119
+        ],
+        "on_expected_team": true,
+        "on_opponent_team": false,
+        "on_expected_registry_team": true,
+        "on_opponent_registry_team": false,
+        "rejected_candidates": []
+      },
+      "home_validation": {
+        "status": "ok",
+        "selected_id": 687570,
+        "selected_name": "Connor Prielipp",
+        "selected_source": "feed_gameData_probablePitchers",
+        "override_reason": "",
+        "roster_team_ids": [
+          142
+        ],
+        "registry_team_ids": [
+          142
+        ],
+        "on_expected_team": true,
+        "on_opponent_team": false,
+        "on_expected_registry_team": true,
+        "on_opponent_registry_team": false,
+        "rejected_candidates": []
+      },
+      "raw": {
+        "away_schedule_id": 660271,
+        "home_schedule_id": 687570,
+        "away_schedule_name": "Shohei Ohtani",
+        "home_schedule_name": "Connor Prielipp",
+        "away_feed_id": 660271,
+        "home_feed_id": 687570,
+        "away_feed_name": "Shohei Ohtani",
+        "home_feed_name": "Connor Prielipp"
+      }
+    },
+    {
+      "idx": 13,
+      "game_pk": 823041,
+      "away": {
+        "team_id": 109,
+        "abbr": "AZ"
+      },
+      "home": {
+        "team_id": 138,
+        "abbr": "STL"
+      },
+      "away_probable_id": null,
+      "home_probable_id": 669461,
+      "away_source": "none",
+      "home_source": "feed_gameData_probablePitchers",
+      "away_confidence": 0.0,
+      "home_confidence": 0.75,
+      "away_validation": {
+        "status": "none",
+        "selected_id": null,
+        "selected_name": "",
+        "selected_source": "none",
+        "override_reason": "",
+        "roster_team_ids": [],
+        "registry_team_ids": [],
+        "on_expected_team": false,
+        "on_opponent_team": false,
+        "on_expected_registry_team": false,
+        "on_opponent_registry_team": false,
+        "rejected_candidates": []
+      },
+      "home_validation": {
+        "status": "ok",
+        "selected_id": 669461,
+        "selected_name": "Matthew Liberatore",
+        "selected_source": "feed_gameData_probablePitchers",
+        "override_reason": "",
+        "roster_team_ids": [
+          138
+        ],
+        "registry_team_ids": [
+          138
+        ],
+        "on_expected_team": true,
+        "on_opponent_team": false,
+        "on_expected_registry_team": true,
+        "on_opponent_registry_team": false,
+        "rejected_candidates": []
+      },
+      "raw": {
+        "away_schedule_id": null,
+        "home_schedule_id": 669461,
+        "away_schedule_name": "",
+        "home_schedule_name": "Matthew Liberatore",
+        "away_feed_id": null,
+        "home_feed_id": 669461,
+        "away_feed_name": "",
+        "home_feed_name": "Matthew Liberatore"
+      }
+    },
+    {
+      "idx": 14,
+      "game_pk": 823284,
+      "away": {
+        "team_id": 144,
+        "abbr": "ATL"
+      },
+      "home": {
+        "team_id": 135,
+        "abbr": "SD"
+      },
+      "away_probable_id": 527048,
+      "home_probable_id": 681190,
+      "away_source": "feed_gameData_probablePitchers",
+      "home_source": "feed_gameData_probablePitchers",
+      "away_confidence": 0.75,
+      "home_confidence": 0.75,
+      "away_validation": {
+        "status": "ok",
+        "selected_id": 527048,
+        "selected_name": "Mart\u00edn P\u00e9rez",
+        "selected_source": "feed_gameData_probablePitchers",
+        "override_reason": "",
+        "roster_team_ids": [
+          144
+        ],
+        "registry_team_ids": [
+          144
+        ],
+        "on_expected_team": true,
+        "on_opponent_team": false,
+        "on_expected_registry_team": true,
+        "on_opponent_registry_team": false,
+        "rejected_candidates": []
+      },
+      "home_validation": {
+        "status": "ok",
+        "selected_id": 681190,
+        "selected_name": "Randy V\u00e1squez",
+        "selected_source": "feed_gameData_probablePitchers",
+        "override_reason": "",
+        "roster_team_ids": [
+          135
+        ],
+        "registry_team_ids": [
+          135
+        ],
+        "on_expected_team": true,
+        "on_opponent_team": false,
+        "on_expected_registry_team": true,
+        "on_opponent_registry_team": false,
+        "rejected_candidates": []
+      },
+      "raw": {
+        "away_schedule_id": 527048,
+        "home_schedule_id": 681190,
+        "away_schedule_name": "Mart\u00edn P\u00e9rez",
+        "home_schedule_name": "Randy V\u00e1squez",
+        "away_feed_id": 527048,
+        "home_feed_id": 681190,
+        "away_feed_name": "Mart\u00edn P\u00e9rez",
+        "home_feed_name": "Randy V\u00e1squez"
+      }
+    },
+    {
+      "idx": 15,
+      "game_pk": 823208,
+      "away": {
+        "team_id": 133,
+        "abbr": "ATH"
+      },
+      "home": {
+        "team_id": 137,
+        "abbr": "SF"
+      },
+      "away_probable_id": 695611,
+      "home_probable_id": 641816,
+      "away_source": "feed_gameData_probablePitchers",
+      "home_source": "feed_gameData_probablePitchers",
+      "away_confidence": 0.75,
+      "home_confidence": 0.75,
+      "away_validation": {
+        "status": "ok",
+        "selected_id": 695611,
+        "selected_name": "Gage Jump",
+        "selected_source": "feed_gameData_probablePitchers",
+        "override_reason": "",
+        "roster_team_ids": [
+          133
+        ],
+        "registry_team_ids": [
+          133
+        ],
+        "on_expected_team": true,
+        "on_opponent_team": false,
+        "on_expected_registry_team": true,
+        "on_opponent_registry_team": false,
+        "rejected_candidates": []
+      },
+      "home_validation": {
+        "status": "ok",
+        "selected_id": 641816,
+        "selected_name": "Tyler Mahle",
+        "selected_source": "feed_gameData_probablePitchers",
+        "override_reason": "",
+        "roster_team_ids": [
+          137
+        ],
+        "registry_team_ids": [
+          137
+        ],
+        "on_expected_team": true,
+        "on_opponent_team": false,
+        "on_expected_registry_team": true,
+        "on_opponent_registry_team": false,
+        "rejected_candidates": []
+      },
+      "raw": {
+        "away_schedule_id": 695611,
+        "home_schedule_id": 641816,
+        "away_schedule_name": "Gage Jump",
+        "home_schedule_name": "Tyler Mahle",
+        "away_feed_id": 695611,
+        "home_feed_id": 641816,
+        "away_feed_name": "Gage Jump",
+        "home_feed_name": "Tyler Mahle"
+      }
+    }
+  ]
+}

@@ -1,8 +1,77 @@
 {
   "date": "2026-06-24",
   "mode": "live",
-  "retrieved_at": "2026-06-23T21:40:21.247184",
-  "hitter_props": {},
+  "retrieved_at": "2026-06-24T00:54:36.162305",
+  "hitter_props": {
+    "daulton varsho": {
+      "batter_hits_runs_rbis": {
+        "line": 1.5,
+        "over_odds": "-120",
+        "under_odds": "-120",
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 1.5,
+            "over_odds": "-120",
+            "under_odds": "-120",
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": []
+      }
+    },
+    "kody clemens": {
+      "batter_hits": {
+        "line": 0.5,
+        "over_odds": "-205",
+        "under_odds": "+155",
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 0.5,
+            "over_odds": "-205",
+            "under_odds": "+155",
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": []
+      }
+    },
+    "alex freeland": {
+      "batter_rbis": {
+        "line": 0.5,
+        "over_odds": "+230",
+        "under_odds": "-350",
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 0.5,
+            "over_odds": "+230",
+            "under_odds": "-350",
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": []
+      }
+    },
+    "josh bell": {
+      "batter_total_bases": {
+        "line": 0.5,
+        "over_odds": "-170",
+        "under_odds": "+130",
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 0.5,
+            "over_odds": "-170",
+            "under_odds": "+130",
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": []
+      }
+    }
+  },
   "meta": {
     "markets": [
       "batter_hits",
@@ -16,8 +85,13 @@
     "regions": "us",
     "bookmakers": null,
     "counts": {
-      "players": 0,
-      "markets": {},
+      "players": 4,
+      "markets": {
+        "batter_hits": 1,
+        "batter_hits_runs_rbis": 1,
+        "batter_rbis": 1,
+        "batter_total_bases": 1
+      },
       "events_matched": 14
     }
   }

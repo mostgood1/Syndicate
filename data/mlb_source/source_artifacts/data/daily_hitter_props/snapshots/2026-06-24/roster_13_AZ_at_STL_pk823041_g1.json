@@ -54,18 +54,18 @@
     "lineup_source": "projected_rotowire_today_lineup",
     "lineup_confidence": 0.72,
     "probable_pitcher": {
-      "id": null,
-      "source": "none",
-      "confidence": 0.0,
-      "raw_schedule_id": null,
+      "id": 683352,
+      "source": "schedule_probablePitcher",
+      "confidence": 0.8,
+      "raw_schedule_id": 683352,
       "raw_feed_id": null
     },
     "starter": {
-      "id": 593958,
-      "name": "Eduardo Rodriguez",
+      "id": 683352,
+      "name": "Mitch Bratt",
       "role": "SP",
-      "selection_source": "heuristic",
-      "requested_id": null
+      "selection_source": "probable",
+      "requested_id": 683352
     },
     "bullpen": [
       {
@@ -511,44 +511,34 @@
       }
     ],
     "starter_profile": {
-      "id": 593958,
-      "name": "Eduardo Rodriguez",
+      "id": 683352,
+      "name": "Mitch Bratt",
       "throw": "L",
       "role": "SP",
       "leverage_skill": 0.5,
-      "stamina_pitches": 95,
+      "stamina_pitches": 92,
       "availability_mult": 1.0,
-      "platoon_mult_vs_lhb": {
-        "k": 1.0674030634559057,
-        "bb": 0.8161320137042436,
-        "hr": 0.78,
-        "inplay": 0.9866111687351891
-      },
-      "platoon_mult_vs_rhb": {
-        "k": 0.9723343467781914,
-        "bb": 1.0683865361572293,
-        "hr": 1.0688397584784726,
-        "inplay": 1.002479485987532
-      },
+      "platoon_mult_vs_lhb": {},
+      "platoon_mult_vs_rhb": {},
       "statcast_quality_mult": {},
-      "arsenal_source": "statsapi_pitchArsenal",
-      "arsenal_sample_size": 1412,
+      "arsenal_source": "default",
+      "arsenal_sample_size": 0,
       "statcast_splits_found": false,
       "statcast_splits_source": "",
       "statcast_splits_n_pitches": 0,
       "statcast_splits_start_date": "",
       "statcast_splits_end_date": "",
-      "k_rate": 0.18006099960645416,
-      "bb_rate": 0.0958844942935852,
-      "hbp_rate": 0.0,
-      "hr_rate": 0.02643152302243211,
-      "inplay_hit_rate": 0.2822328050295524,
+      "k_rate": 0.24,
+      "bb_rate": 0.08,
+      "hbp_rate": 0.008,
+      "hr_rate": 0.03,
+      "inplay_hit_rate": 0.0,
       "arsenal": {
-        "FF": 0.404390936470255,
-        "CU": 0.11827195589235129,
-        "CH": 0.2754957444079319,
-        "SI": 0.07223796115580738,
-        "FC": 0.12960340207365445
+        "FF": 0.45,
+        "SL": 0.22,
+        "CH": 0.12,
+        "SI": 0.13,
+        "CU": 0.08
       },
       "pitch_type_whiff_mult": {},
       "pitch_type_inplay_mult": {},

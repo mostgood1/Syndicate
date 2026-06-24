@@ -1848,10 +1848,10 @@
           "active": true
         },
         "leagueRecord": {
-          "wins": 37,
+          "wins": 38,
           "losses": 43,
           "ties": 0,
-          "pct": ".463"
+          "pct": ".469"
         },
         "probablePitcher": {
           "id": 681347,
@@ -1917,9 +1917,9 @@
         },
         "leagueRecord": {
           "wins": 39,
-          "losses": 39,
+          "losses": 40,
           "ties": 0,
-          "pct": ".500"
+          "pct": ".494"
         },
         "probablePitcher": {
           "id": 702056,
@@ -2282,9 +2282,9 @@
           "pct": ".475"
         },
         "probablePitcher": {
-          "id": 687570,
-          "fullName": "Connor Prielipp",
-          "link": "/api/v1/people/687570"
+          "id": 657746,
+          "fullName": "Joe Ryan",
+          "link": "/api/v1/people/657746"
         },
         "splitSquad": false,
         "seriesNumber": 26,
@@ -2392,6 +2392,11 @@
           "losses": 39,
           "ties": 0,
           "pct": ".500"
+        },
+        "probablePitcher": {
+          "id": 683352,
+          "fullName": "Mitch Bratt",
+          "link": "/api/v1/people/683352"
         },
         "splitSquad": false,
         "seriesNumber": 26,
@@ -2637,9 +2642,9 @@
           "pct": ".519"
         },
         "probablePitcher": {
-          "id": 681190,
-          "fullName": "Randy V\u00e1squez",
-          "link": "/api/v1/people/681190"
+          "id": 676664,
+          "fullName": "JP Sears",
+          "link": "/api/v1/people/676664"
         },
         "splitSquad": false,
         "seriesNumber": 26,

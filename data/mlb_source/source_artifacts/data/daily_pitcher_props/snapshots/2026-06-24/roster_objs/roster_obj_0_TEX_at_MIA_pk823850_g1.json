@@ -3721,7 +3721,7 @@
         "statcast_splits_end_date": "",
         "arsenal_source": "statsapi_pitchArsenal",
         "arsenal_sample_size": 1063,
-        "stamina_pitches": 90,
+        "stamina_pitches": 94,
         "role": "SP",
         "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
@@ -4830,7 +4830,7 @@
           "statcast_splits_end_date": "",
           "arsenal_source": "default",
           "arsenal_sample_size": 0,
-          "stamina_pitches": 21,
+          "stamina_pitches": 25,
           "role": "MR",
           "availability_mult": 1.0,
           "platoon_mult_vs_lhb": {},

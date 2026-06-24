@@ -1,0 +1,427 @@
+{
+  "season": 2026,
+  "date": "2026-06-24",
+  "profile": "retuned",
+  "available_profiles": {
+    "retuned": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/eval/seasons/2026/season_betting_cards_retuned_manifest.json"
+  },
+  "found": true,
+  "games": [
+    {
+      "game_pk": 824018,
+      "game_date": "2026-06-24T20:07:00Z",
+      "start_time": "3:07 PM",
+      "official_date": "2026-06-24",
+      "status": {
+        "abstract": "Preview",
+        "detailed": "Scheduled"
+      },
+      "away": {
+        "id": 110,
+        "abbr": "BAL",
+        "name": "Baltimore Orioles"
+      },
+      "home": {
+        "id": 108,
+        "abbr": "LAA",
+        "name": "Los Angeles Angels"
+      },
+      "starter_names": {
+        "away": "Trey Gibson",
+        "home": "Jos\u00e9 Soriano"
+      },
+      "matchup": {
+        "isLive": false,
+        "isFinal": false,
+        "liveText": "",
+        "displayState": "Scheduled",
+        "inning": null,
+        "halfInning": "",
+        "count": {
+          "balls": null,
+          "strikes": null,
+          "outs": null
+        },
+        "batter": "",
+        "pitcher": "",
+        "score": {
+          "away": null,
+          "home": null
+        }
+      },
+      "betting": {
+        "markets": {
+          "totals": null,
+          "ml": {
+            "date": "2026-06-24",
+            "game_pk": 824018,
+            "away": "Baltimore Orioles",
+            "home": "Los Angeles Angels",
+            "away_abbr": "BAL",
+            "home_abbr": "LAA",
+            "double_header": "N",
+            "game_number": 1,
+            "event_id": "6dcbe8dd9b8e932306789135de65db46",
+            "commence_time": "2026-06-24T20:08:00Z",
+            "market": "ml",
+            "selection": "home",
+            "edge": 0.08660320253387299,
+            "model_prob": 0.602,
+            "selected_side_model_prob": 0.602,
+            "selected_side_market_prob": 0.515396797466127,
+            "market_no_vig_prob": 0.515396797466127,
+            "odds": "-116",
+            "stake_u": 1.0,
+            "sim_sample_size": 1000,
+            "baseball_reasons": [
+              "Across his last 5 starts, Jos\u00e9 Soriano has allowed about 2.6 earned runs per outing.",
+              "The projected lineup is mostly 3 left-handed, 5 right-handed, and 1 switch-hitting, and the power risk also comes in lighter than baseline."
+            ],
+            "explanation_diagnostic": {
+              "status": "supported",
+              "flag_sparse_support": false,
+              "support_min_reasons": 2,
+              "baseball_reasons_n": 2,
+              "reason_sentences_n": 4,
+              "market": "ml",
+              "subject": "BAL @ LAA",
+              "supporting_reasons": [
+                "Across his last 5 starts, Jos\u00e9 Soriano has allowed about 2.6 earned runs per outing.",
+                "The projected lineup is mostly 3 left-handed, 5 right-handed, and 1 switch-hitting, and the power risk also comes in lighter than baseline."
+              ]
+            },
+            "reasons": [
+              "The model lands on the home side in 60.2% of sims, while the market is pricing it closer to 51.5%. Across his last 5 starts, Jos\u00e9 Soriano has allowed about 2.6 earned runs per outing. The projected lineup is mostly 3 left-handed, 5 right-handed, and 1 switch-hitting, and the power risk also comes in lighter than baseline. LAA wins this matchup in about 60.2% of model runs."
+            ],
+            "reason_summary": "The model lands on the home side in 60.2% of sims, while the market is pricing it closer to 51.5%. Across his last 5 starts, Jos\u00e9 Soriano has allowed about 2.6 earned runs per outing. The projected lineup is mostly 3 left-handed, 5 right-handed, and 1 switch-hitting, and the power risk also comes in lighter than baseline. LAA wins this matchup in about 60.2% of model runs.",
+            "rank": 1,
+            "recommendation_tier": "official"
+          },
+          "pitcherProps": [],
+          "hitterProps": [],
+          "extraPitcherProps": [],
+          "extraHitterProps": []
+        },
+        "results": {
+          "combined": {
+            "n": 0,
+            "wins": 0,
+            "losses": 0,
+            "stake_u": 0.0,
+            "profit_u": 0.0,
+            "roi": null
+          }
+        },
+        "playable_results": {
+          "combined": {
+            "n": 0,
+            "wins": 0,
+            "losses": 0,
+            "stake_u": 0.0,
+            "profit_u": 0.0,
+            "roi": null
+          }
+        },
+        "all_results": {
+          "combined": {
+            "n": 0,
+            "wins": 0,
+            "losses": 0,
+            "stake_u": 0.0,
+            "profit_u": 0.0,
+            "roi": null
+          }
+        },
+        "settled_rows": [],
+        "playable_settled_rows": [],
+        "all_settled_rows": [],
+        "unresolved_rows": [
+          {
+            "path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\daily_summary_2026_06_24_locked_policy.json",
+            "date": "2026-06-24",
+            "game_pk": 824018,
+            "market": "ml",
+            "player_name": null,
+            "selection": "home",
+            "market_line": null,
+            "reason": "game not final",
+            "recommendation_tier": "official"
+          }
+        ],
+        "playable_unresolved_rows": [],
+        "all_unresolved_rows": [
+          {
+            "path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\daily_summary_2026_06_24_locked_policy.json",
+            "date": "2026-06-24",
+            "game_pk": 824018,
+            "market": "ml",
+            "player_name": null,
+            "selection": "home",
+            "market_line": null,
+            "reason": "game not final",
+            "recommendation_tier": "official"
+          }
+        ],
+        "counts": {
+          "official": 1,
+          "playable": 0,
+          "pitcher": 0,
+          "hitter": 0,
+          "extra_pitcher": 0,
+          "extra_hitter": 0
+        },
+        "flags": {
+          "hasAnyRecommendations": true,
+          "hasOfficialRecommendations": true,
+          "hasPlayableCandidates": false
+        }
+      }
+    },
+    {
+      "game_pk": 822798,
+      "game_date": "2026-06-24T23:07:00Z",
+      "start_time": "6:07 PM",
+      "official_date": "2026-06-24",
+      "status": {
+        "abstract": "Preview",
+        "detailed": "Scheduled"
+      },
+      "away": {
+        "id": 117,
+        "abbr": "HOU",
+        "name": "Houston Astros"
+      },
+      "home": {
+        "id": 141,
+        "abbr": "TOR",
+        "name": "Toronto Blue Jays"
+      },
+      "starter_names": {
+        "away": "Mike Burrows",
+        "home": "Trey Yesavage"
+      },
+      "matchup": {
+        "isLive": false,
+        "isFinal": false,
+        "liveText": "",
+        "displayState": "Scheduled",
+        "inning": null,
+        "halfInning": "",
+        "count": {
+          "balls": null,
+          "strikes": null,
+          "outs": null
+        },
+        "batter": "",
+        "pitcher": "",
+        "score": {
+          "away": null,
+          "home": null
+        }
+      },
+      "betting": {
+        "markets": {
+          "totals": null,
+          "ml": null,
+          "pitcherProps": [
+            {
+              "date": "2026-06-24",
+              "game_pk": 822798,
+              "away": "Houston Astros",
+              "home": "Toronto Blue Jays",
+              "away_abbr": "HOU",
+              "home_abbr": "TOR",
+              "double_header": "N",
+              "game_number": 1,
+              "event_id": null,
+              "commence_time": null,
+              "market": "pitcher_props",
+              "pitcher_id": 702056,
+              "pitcher_name": "Trey Yesavage",
+              "team": "TOR",
+              "team_side": "home",
+              "prop": "outs",
+              "selection": "over",
+              "edge": 0.31452132701421787,
+              "market_line": 16.5,
+              "model_prob_over": 0.824,
+              "market_prob_over": 0.5094786729857821,
+              "market_prob_under": 0.490521327014218,
+              "market_prob_mode": "no_vig_two_way",
+              "market_no_vig_prob_over": 0.5094786729857821,
+              "selected_side_market_prob": 0.5094786729857821,
+              "selected_side_model_prob": 0.824,
+              "mean_support": 3.7119999999999997,
+              "outs_mean": 20.212,
+              "market_alternates": [],
+              "odds": "-125",
+              "stake_u": 1.0,
+              "sim_sample_size": 1000,
+              "baseball_reasons": [
+                "Across his last 5 starts, he has averaged 17.8 outs.",
+                "His modeled workload cap still reaches roughly 94 pitches, so the deeper-start path is still available if the outing stays efficient."
+              ],
+              "explanation_diagnostic": {
+                "status": "supported",
+                "flag_sparse_support": false,
+                "support_min_reasons": 2,
+                "baseball_reasons_n": 2,
+                "reason_sentences_n": 5,
+                "market": "pitcher_props:outs",
+                "subject": "Trey Yesavage",
+                "supporting_reasons": [
+                  "Across his last 5 starts, he has averaged 17.8 outs.",
+                  "His modeled workload cap still reaches roughly 94 pitches, so the deeper-start path is still available if the outing stays efficient."
+                ]
+              },
+              "reasons": [
+                "The model lands on the over side in 82.4% of sims, while the market is pricing it closer to 50.9%. Across his last 5 starts, he has averaged 17.8 outs. His modeled workload cap still reaches roughly 94 pitches, so the deeper-start path is still available if the outing stays efficient. The model baseline sits around 20.2 outs against a line of 16.5. If he stays on his normal starter path, the matchup against HOU gives him a fair shot to reach full workload volume."
+              ],
+              "reason_summary": "The model lands on the over side in 82.4% of sims, while the market is pricing it closer to 50.9%. Across his last 5 starts, he has averaged 17.8 outs. His modeled workload cap still reaches roughly 94 pitches, so the deeper-start path is still available if the outing stays efficient. The model baseline sits around 20.2 outs against a line of 16.5. If he stays on his normal starter path, the matchup against HOU gives him a fair shot to reach full workload volume.",
+              "rank": 1,
+              "recommendation_tier": "official"
+            }
+          ],
+          "hitterProps": [],
+          "extraPitcherProps": [],
+          "extraHitterProps": []
+        },
+        "results": {
+          "combined": {
+            "n": 0,
+            "wins": 0,
+            "losses": 0,
+            "stake_u": 0.0,
+            "profit_u": 0.0,
+            "roi": null
+          }
+        },
+        "playable_results": {
+          "combined": {
+            "n": 0,
+            "wins": 0,
+            "losses": 0,
+            "stake_u": 0.0,
+            "profit_u": 0.0,
+            "roi": null
+          }
+        },
+        "all_results": {
+          "combined": {
+            "n": 0,
+            "wins": 0,
+            "losses": 0,
+            "stake_u": 0.0,
+            "profit_u": 0.0,
+            "roi": null
+          }
+        },
+        "settled_rows": [],
+        "playable_settled_rows": [],
+        "all_settled_rows": [],
+        "unresolved_rows": [
+          {
+            "path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\daily_summary_2026_06_24_locked_policy.json",
+            "date": "2026-06-24",
+            "game_pk": 822798,
+            "market": "pitcher_props",
+            "player_name": "Trey Yesavage",
+            "selection": "over",
+            "market_line": 16.5,
+            "reason": "game not final",
+            "recommendation_tier": "official"
+          }
+        ],
+        "playable_unresolved_rows": [],
+        "all_unresolved_rows": [
+          {
+            "path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\daily_summary_2026_06_24_locked_policy.json",
+            "date": "2026-06-24",
+            "game_pk": 822798,
+            "market": "pitcher_props",
+            "player_name": "Trey Yesavage",
+            "selection": "over",
+            "market_line": 16.5,
+            "reason": "game not final",
+            "recommendation_tier": "official"
+          }
+        ],
+        "counts": {
+          "official": 1,
+          "playable": 0,
+          "pitcher": 1,
+          "hitter": 0,
+          "extra_pitcher": 0,
+          "extra_hitter": 0
+        },
+        "flags": {
+          "hasAnyRecommendations": true,
+          "hasOfficialRecommendations": true,
+          "hasPlayableCandidates": false
+        }
+      }
+    }
+  ],
+  "manifest_source": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/eval/seasons/2026/season_betting_cards_retuned_manifest.json",
+  "card_source": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_24_locked_policy.json",
+  "source_kind": "canonical_daily_fallback",
+  "summary": {
+    "date": "2026-06-24",
+    "month": "2026-06",
+    "card_path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_24_locked_policy.json",
+    "selected_counts": {
+      "totals": 0,
+      "ml": 1,
+      "pitcher_props": 1,
+      "hitter_props": 0,
+      "hitter_home_runs": 0,
+      "hitter_hits": 0,
+      "hitter_strikeouts": 0,
+      "hitter_total_bases": 0,
+      "hitter_runs": 0,
+      "hitter_rbis": 0,
+      "combined": 2
+    },
+    "results": {
+      "combined": {
+        "n": 0,
+        "wins": 0,
+        "losses": 0,
+        "stake_u": 0.0,
+        "profit_u": 0.0,
+        "roi": null
+      }
+    },
+    "profit_u": 0.0,
+    "roi": null,
+    "settled_n": 0,
+    "unresolved_n": 2
+  },
+  "cap_profile": "nototals_p1_tbheavy11_r1_nohr",
+  "selected_counts": {
+    "totals": 0,
+    "ml": 1,
+    "pitcher_props": 1,
+    "hitter_props": 0,
+    "hitter_home_runs": 0,
+    "hitter_hits": 0,
+    "hitter_strikeouts": 0,
+    "hitter_total_bases": 0,
+    "hitter_runs": 0,
+    "hitter_rbis": 0,
+    "combined": 2
+  },
+  "results": {
+    "combined": {
+      "n": 0,
+      "wins": 0,
+      "losses": 0,
+      "stake_u": 0.0,
+      "profit_u": 0.0,
+      "roi": null
+    }
+  },
+  "cards_available": true,
+  "cards_url": "/?date=2026-06-24",
+  "artifactDate": "2026-06-24"
+}
