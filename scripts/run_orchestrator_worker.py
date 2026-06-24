@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 import time
@@ -11,14 +12,37 @@ _SUBJOB_TIMEOUT_SECONDS = 120
 
 
 def _run_script(script_name: str) -> None:
+    command = [sys.executable, str(REPO_ROOT / "scripts" / script_name), "--run-once"]
+    popen_kwargs: dict[str, object] = {
+        "cwd": str(REPO_ROOT),
+        "stdout": subprocess.DEVNULL,
+        "stderr": subprocess.DEVNULL,
+    }
+    if os.name == "nt":
+        popen_kwargs["creationflags"] = getattr(subprocess, "DETACHED_PROCESS", 0) | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+    else:
+        popen_kwargs["start_new_session"] = True
+
+    process = subprocess.Popen(command, **popen_kwargs)
     try:
-        subprocess.run(
-            [sys.executable, str(REPO_ROOT / "scripts" / script_name), "--run-once"],
-            check=False,
-            timeout=_SUBJOB_TIMEOUT_SECONDS,
-        )
+        process.wait(timeout=_SUBJOB_TIMEOUT_SECONDS)
     except subprocess.TimeoutExpired:
+        try:
+            if os.name == "nt":
+                subprocess.run(["taskkill", "/PID", str(process.pid), "/T", "/F"], capture_output=True, check=False)
+            else:
+                os.killpg(process.pid, 9)
+        except Exception:
+            try:
+                process.kill()
+            except Exception:
+                pass
         print(f"{script_name} TIMED OUT AFTER {_SUBJOB_TIMEOUT_SECONDS} SECONDS")
+    finally:
+        try:
+            process.wait(timeout=5)
+        except Exception:
+            pass
 
 
 def run_live_odds_refresh_job() -> None:
