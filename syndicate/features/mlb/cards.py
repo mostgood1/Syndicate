@@ -4377,9 +4377,7 @@ def build_cards_page_context(selected_date: str) -> dict[str, Any]:
         actual_games=actual_games,
         first1_signals_by_game=_rfi_targets_signal_index(rfi_targets),
     ) if summary else []
-    
-    # ✅ FALLBACK: use live data if summary produced no games
-    
+
     if not games:
         live_lens_report = load_json_file(live_lens_path)
         live_games = (
@@ -4479,7 +4477,7 @@ def build_cards_page_context(selected_date: str) -> dict[str, Any]:
         "scoreboard_items": scoreboard_items,
         "source_path": Path(summary_path).name,
         "using_sample_data": using_sample_data,
-        "source_title": "MLB daily summary artifact" if games else "MLB cards unavailable",
+        "source_title": "MLB daily summary artifact" if summary and games else "MLB cards unavailable",
         "empty_state": {
             "eyebrow": "MLB cards",
             "title": "No game cards were available for this date",
@@ -4496,7 +4494,7 @@ def build_cards_page_context(selected_date: str) -> dict[str, Any]:
         "source_meta_items": [
             f"Date {resolved_date}",
             f"Games {len(games)}",
-            Path(summary_path).name if games else "No data",
+            Path(summary_path).name if summary else "No data",
         ],
         "route_path": "/mlb/cards",
         "intro_title": "MLB Cards",
