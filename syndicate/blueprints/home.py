@@ -143,10 +143,22 @@ def _public_detailed_version_payload() -> dict[str, Any]:
     }
 
 
+def _public_health_version_payload() -> dict[str, str] | None:
+    version = _public_detailed_version_payload()
+    payload: dict[str, str] = {}
+    commit = str(version.get("commit") or "").strip()
+    branch = str(version.get("branch") or "").strip()
+    if commit:
+        payload["commit"] = commit
+    if branch:
+        payload["branch"] = branch
+    return payload or None
+
+
 @home_bp.get("/healthz")
 def healthz():
     payload: dict[str, Any] = {"ok": True, "service": "syndicate"}
-    version = _public_version_payload()
+    version = _public_health_version_payload()
     if version:
         payload["version"] = version
     return jsonify(payload)

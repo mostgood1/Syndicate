@@ -14,16 +14,38 @@ class HomeHealthRouteTests(unittest.TestCase):
         self.client = app.test_client()
 
     def test_healthz_returns_lightweight_ok_payload(self) -> None:
-        response = self.client.get("/healthz")
+        with patch.dict(
+            os.environ,
+            {
+                "RENDER_GIT_COMMIT": "e6aa9a6",
+                "RENDER_GIT_BRANCH": "main",
+            },
+            clear=False,
+        ), patch("syndicate.blueprints.home._git_value", side_effect=["ebb2136d", "main"]):
+            response = self.client.get("/healthz")
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.get_json(), {"ok": True, "service": "syndicate"})
+        self.assertEqual(
+            response.get_json(),
+            {"ok": True, "service": "syndicate", "version": {"commit": "e6aa9a6", "branch": "main"}},
+        )
 
     def test_api_health_alias_returns_same_payload(self) -> None:
-        response = self.client.get("/api/health")
+        with patch.dict(
+            os.environ,
+            {
+                "RENDER_GIT_COMMIT": "e6aa9a6",
+                "RENDER_GIT_BRANCH": "main",
+            },
+            clear=False,
+        ), patch("syndicate.blueprints.home._git_value", side_effect=["ebb2136d", "main"]):
+            response = self.client.get("/api/health")
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.get_json(), {"ok": True, "service": "syndicate"})
+        self.assertEqual(
+            response.get_json(),
+            {"ok": True, "service": "syndicate", "version": {"commit": "e6aa9a6", "branch": "main"}},
+        )
 
     def test_versionz_exposes_public_deploy_and_checkout_metadata(self) -> None:
         with patch.dict(
