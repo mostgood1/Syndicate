@@ -19,6 +19,7 @@ services:
     name: syndicate
     env: python
     plan: standard
+    numInstances: 1
     autoDeploy: true
     buildCommand: pip install -r requirements.txt
     startCommand: bash -lc "exec gunicorn wsgi:application --preload --bind 0.0.0.0:$PORT --workers ${WEB_CONCURRENCY:-1} --threads ${GUNICORN_THREADS:-1} --timeout ${GUNICORN_TIMEOUT:-60} --graceful-timeout ${GUNICORN_GRACEFUL_TIMEOUT:-30} --keep-alive ${GUNICORN_KEEPALIVE:-5}"
