@@ -4387,7 +4387,7 @@ def build_cards_page_context(selected_date: str) -> dict[str, Any]:
         )
 
         if live_games:
-            print("⚠️ FALLBACK: transforming live lens games into card format")
+            print("Hydrating MLB cards from live lens artifacts")
 
             games = []
             for lg in live_games:
