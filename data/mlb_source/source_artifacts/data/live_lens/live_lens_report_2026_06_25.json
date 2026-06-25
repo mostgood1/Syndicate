@@ -1,8 +1,8 @@
 {
   "date": "2026-06-25",
-  "generatedAt": "2026-06-25T13:24:57-05:00",
-  "dataRoot": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data",
-  "liveLensDir": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/live_lens",
+  "generatedAt": "2026-06-25T14:47:43-05:00",
+  "dataRoot": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data",
+  "liveLensDir": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/live_lens",
   "optimizationRegime": {
     "date": "2026-06-25",
     "kind": "forward_tuned_live",

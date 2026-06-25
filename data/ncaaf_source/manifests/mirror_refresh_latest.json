@@ -1,19 +1,19 @@
 ﻿{
     "sport":  "ncaaf",
     "date":  "2026-06-25",
-    "refreshedAtUtc":  "2026-06-25T18:38:06.2427052Z",
+    "refreshedAtUtc":  "2026-06-25T20:14:23.8679420Z",
     "sourceRepo":  null,
-    "sourceArtifactRoot":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\ncaaf_source\\source_artifacts",
+    "sourceArtifactRoot":  "D:\\a\\Syndicate\\Syndicate\\data\\ncaaf_source\\source_artifacts",
     "sourceRootEnvVar":  "SYNDICATE_SOURCE_ROOT_NCAAF",
     "sourceArtifactRootEnvVar":  "SYNDICATE_ARTIFACT_ROOT_NCAAF",
-    "sourceDataRoot":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\ncaaf_source\\source_artifacts",
-    "destinationRoot":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\ncaaf_source\\data",
+    "sourceDataRoot":  "D:\\a\\Syndicate\\Syndicate\\data\\ncaaf_source\\source_artifacts",
+    "destinationRoot":  "D:\\a\\Syndicate\\Syndicate\\data\\ncaaf_source\\data",
     "usedExistingMirrorArtifacts":  false,
     "usedArtifactBundle":  true,
-    "copiedArtifactCount":  82,
+    "copiedArtifactCount":  81,
     "artifactGroups":  {
                            "recommendations":  0,
-                           "summaries":  1,
+                           "summaries":  0,
                            "other":  81
                        },
     "copiedArtifacts":  [
@@ -97,7 +97,6 @@
                             "college_football_schedule_2025_predicted_totals_enhanced_20260131T121810Z.csv",
                             "college_football_schedule_2025_predicted_totals_enhanced_20260201T121622Z.csv",
                             "college_football_schedule_2025_predicted_totals_enhanced_20260202T121620Z.csv",
-                            "college_football_schedule_2025_predicted_totals_enhanced_20260525T111624Z.csv",
-                            "recommendations_summary"
+                            "college_football_schedule_2025_predicted_totals_enhanced_20260525T111624Z.csv"
                         ]
 }

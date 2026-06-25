@@ -1,10 +1,10 @@
 ﻿{
     "sport":  "ncaab",
     "date":  "2026-06-25",
-    "refreshedAtUtc":  "2026-06-25T18:38:07.0002790Z",
+    "refreshedAtUtc":  "2026-06-25T20:14:24.7262671Z",
     "sourceRepo":  null,
     "sourceRootEnvVar":  "SYNDICATE_SOURCE_ROOT_NCAAB",
-    "destinationRoot":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\ncaab_source",
+    "destinationRoot":  "D:\\a\\Syndicate\\Syndicate\\data\\ncaab_source",
     "usedExistingRawOutputs":  true,
     "refreshedRawOutputsFromSource":  false,
     "copiedArtifactCount":  3,

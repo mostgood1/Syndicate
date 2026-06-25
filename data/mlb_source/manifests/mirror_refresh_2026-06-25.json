@@ -1,12 +1,12 @@
 ﻿{
     "sport":  "mlb",
     "date":  "2026-06-25",
-    "refreshedAtUtc":  "2026-06-25T18:38:00.7958736Z",
+    "refreshedAtUtc":  "2026-06-25T20:14:20.7942489Z",
     "sourceRepo":  null,
-    "sourceArtifactRoot":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\source_artifacts",
+    "sourceArtifactRoot":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts",
     "sourceRootEnvVar":  "SYNDICATE_SOURCE_ROOT_MLB",
     "sourceArtifactRootEnvVar":  "SYNDICATE_ARTIFACT_ROOT_MLB",
-    "destinationRoot":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source",
+    "destinationRoot":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source",
     "usedExistingMirrorArtifacts":  false,
     "usedArtifactBundle":  true,
     "missingOddsSnapshots":  [
