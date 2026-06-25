@@ -2,13 +2,13 @@
     "scope":  "daily_update",
     "date":  "2026-06-25",
     "runMode":  "standard",
-    "overallStatus":  "started",
+    "overallStatus":  "ok",
     "generatedAt":  "2026-06-25T13:01:07.2647655-05:00",
-    "updatedAt":  "2026-06-25T13:56:15.2283191-05:00",
+    "updatedAt":  "2026-06-25T13:58:45.4545169-05:00",
     "runDir":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-06-25\\20260625_130105",
     "latestDir":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\latest",
-    "lastUpdatedAt":  "2026-06-25T13:56:15.1804426-05:00",
-    "currentStage":  "queued",
+    "lastUpdatedAt":  "2026-06-25T13:58:45.4388710-05:00",
+    "currentStage":  "completed",
     "completedStages":  [
                             "source_update",
                             "refresh_gate"
