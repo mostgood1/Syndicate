@@ -873,6 +873,36 @@ class IntelligenceStateTests(unittest.TestCase):
         self.assertEqual(payload["debug_source"], "snapshot_read")
         mocked_read.assert_called_once_with({"date": "2026-06-15"})
 
+    def test_status_endpoint_uses_latest_board_snapshot_when_state_is_date_mismatched(self) -> None:
+        app = Flask(__name__)
+        app.register_blueprint(intelligence_bp)
+
+        latest_snapshot = {
+            "ok": True,
+            "top_opportunities": [{"name": "Play 1"}],
+            "by_sport": {"mlb": [{"name": "Play 1"}]},
+            "analysis": {
+                "recommendations": [{"name": "Play 1"}],
+                "picks": [{"name": "Play 1"}],
+                "top_live_opportunities": [{"name": "Play 1"}],
+                "portfolio": {},
+                "parlays": [],
+            },
+            "board_contract": {"schema": "intelligence_board_v1", "top_overall": [], "by_sport": {}, "live": [], "pregame": [], "portfolio": {}, "parlays": []},
+        }
+
+        with app.test_request_context("/api/intelligence/status?date=2026-06-10", method="GET"):
+            with patch("syndicate.blueprints.intelligence.read_latest_intelligence_state", return_value={}):
+                with patch("syndicate.blueprints.intelligence.read_latest_intelligence_board_snapshot_response", return_value=dict(latest_snapshot)) as mocked_snapshot:
+                    response = intelligence_status_api()
+
+        payload = response.get_json()
+        self.assertIsNotNone(payload)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(payload["candidate_count"], 1)
+        self.assertEqual((payload.get("status") or {}).get("top_opportunities", [])[0]["name"], "Play 1")
+        mocked_snapshot.assert_called_once_with({}, force_refresh=False)
+
     def test_status_endpoint_includes_state_debug_fields(self) -> None:
         app = Flask(__name__)
         app.register_blueprint(intelligence_bp)

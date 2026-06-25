@@ -979,6 +979,10 @@ def intelligence_status_api():
         selected_date = str(request.args.get("date") or "").strip() or _latest_available_intelligence_date()
         _ = str(request.args.get("refresh") or request.args.get("force_refresh") or "").strip().lower() in {"1", "true", "yes", "on"}
         status = read_latest_intelligence_state({"date": selected_date})
+        if not (isinstance(status, dict) and _response_has_content(status)):
+            latest_snapshot = read_latest_intelligence_board_snapshot_response({}, force_refresh=False)
+            if isinstance(latest_snapshot, dict) and _response_has_content(latest_snapshot):
+                status = latest_snapshot
         _log_api_state_read(status if isinstance(status, dict) else {})
     except Exception as exc:
         return _api_error_response(exc)
