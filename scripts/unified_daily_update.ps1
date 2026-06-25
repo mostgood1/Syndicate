@@ -3123,17 +3123,6 @@ function Get-ForcedPublishArtifactPaths {
         }
     }
 
-    $forcedPublishArtifactPaths = @()
-    $intelligencePublishArtifactPaths = @()
-    if (-not $SkipGitPush -and -not $DryRun) {
-        $forcedPublishArtifactPaths = @(
-            Get-ForcedPublishArtifactPaths -RepoPath $repoRoot -DateValue $Date -SkipGitPush ([bool]$SkipGitPush) -SkipMLB ([bool]$SkipMLB) -SkipNBA ([bool]$SkipNBA) -SkipNHL ([bool]$SkipNHL) -SkipWNBA ([bool]$SkipWNBA) -SkipNFL ([bool]$SkipNFL) -SkipNCAAF ([bool]$SkipNCAAF) -SkipNCAAB ([bool]$SkipNCAAB)
-        )
-        $intelligencePublishArtifactPaths = @(
-            Get-IntelligencePublishArtifactPaths -RepoPath $repoRoot -DateValue $Date -SkipMLB ([bool]$SkipMLB) -SkipNBA ([bool]$SkipNBA) -SkipNHL ([bool]$SkipNHL) -SkipWNBA ([bool]$SkipWNBA) -SkipNFL ([bool]$SkipNFL) -SkipNCAAF ([bool]$SkipNCAAF) -SkipNCAAB ([bool]$SkipNCAAB)
-        )
-    }
-
     if (-not $SkipMLB) {
         foreach ($rootRelative in @('data/mlb_source/data', 'data/mlb_source/source_artifacts/data')) {
             foreach ($relativePath in @(

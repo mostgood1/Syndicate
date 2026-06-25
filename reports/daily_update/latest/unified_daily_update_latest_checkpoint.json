@@ -2,17 +2,17 @@
     "scope":  "daily_update",
     "date":  "2026-06-25",
     "runMode":  "standard",
-    "overallStatus":  "error",
-    "generatedAt":  "2026-06-25T13:00:09.1628896-05:00",
-    "updatedAt":  "2026-06-25T13:00:11.5896898-05:00",
-    "runDir":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-06-25\\20260625_130007",
+    "overallStatus":  "started",
+    "generatedAt":  "2026-06-25T13:01:07.2647655-05:00",
+    "updatedAt":  "2026-06-25T13:01:07.5189621-05:00",
+    "runDir":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-06-25\\20260625_130105",
     "latestDir":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\latest",
-    "lastUpdatedAt":  "2026-06-25T13:00:11.5765940-05:00",
-    "currentStage":  "failed",
+    "lastUpdatedAt":  "2026-06-25T13:01:07.4563133-05:00",
+    "currentStage":  "queued",
     "completedStages":  [
 
                         ],
-    "failedStage":  "",
+    "failedStage":  null,
     "stageDecisions":  [
                            {
                                "stage":  "source_update",

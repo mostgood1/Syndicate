@@ -1,12 +1,12 @@
 ﻿{
     "date":  "2026-06-25",
-    "generatedAt":  "2026-06-25T13:00:09.1628896-05:00",
-    "lastUpdatedAt":  "2026-06-25T13:00:11.5765940-05:00",
-    "completedAt":  "2026-06-25T13:00:11.5750916-05:00",
+    "generatedAt":  "2026-06-25T13:01:07.2647655-05:00",
+    "lastUpdatedAt":  "2026-06-25T13:01:07.4563133-05:00",
+    "completedAt":  null,
     "runMode":  "standard",
-    "overallStatus":  "error",
-    "error":  "The script failed due to call depth overflow.",
-    "runDir":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-06-25\\20260625_130007",
+    "overallStatus":  "started",
+    "error":  null,
+    "runDir":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-06-25\\20260625_130105",
     "latestDir":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\latest",
     "runtimePolicy":  {
                           "MLB":  {
@@ -904,7 +904,7 @@
                                                ]
                 },
     "publishParity":  {
-                          "generatedAt":  "2026-06-25T18:00:09.2037206Z",
+                          "generatedAt":  "2026-06-25T18:01:07.3124744Z",
                           "date":  "2026-06-25",
                           "totalForcedPublishPaths":  0,
                           "totalIntelligencePublishPaths":  0,
@@ -1025,12 +1025,12 @@
                           "forceRebuildToday":  true
                       },
     "runState":  {
-                     "currentStage":  "failed",
+                     "currentStage":  "queued",
                      "completedStages":  [
 
                                          ],
-                     "failedStage":  "",
-                     "lastUpdatedAt":  "2026-06-25T13:00:11.5765940-05:00",
+                     "failedStage":  null,
+                     "lastUpdatedAt":  "2026-06-25T13:01:07.4563133-05:00",
                      "simulationContractPath":  null,
                      "simulationContractRunPath":  null,
                      "simulationContractSportCount":  0,
@@ -1939,7 +1939,7 @@
                                             "--artifact-root",
                                             "data\\wnba_source\\source_artifacts",
                                             "--log-file",
-                                            "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-06-25\\20260625_130007\\wnba_props_refresh.log",
+                                            "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-06-25\\20260625_130105\\wnba_props_refresh.log",
                                             "--force-refresh",
                                             "--days-ahead",
                                             "0",
@@ -2217,18 +2217,18 @@
     "statusArtifact":  {
                            "format":  "json",
                            "scope":  "daily_update",
-                           "runManifestPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-06-25\\20260625_130007\\unified_daily_update_run.json",
+                           "runManifestPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-06-25\\20260625_130105\\unified_daily_update_run.json",
                            "latestManifestPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest.json",
-                           "runCheckpointPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-06-25\\20260625_130007\\unified_daily_update_checkpoint.json",
+                           "runCheckpointPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-06-25\\20260625_130105\\unified_daily_update_checkpoint.json",
                            "latestCheckpointPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest_checkpoint.json",
                            "state":  {
                                          "runMode":  "standard",
-                                         "overallStatus":  "error",
-                                         "currentStage":  "failed",
+                                         "overallStatus":  "started",
+                                         "currentStage":  "queued",
                                          "completedStages":  [
 
                                                              ],
-                                         "failedStage":  "",
+                                         "failedStage":  null,
                                          "policyPerformance":  [
                                                                    {
                                                                        "policyId":  "sport:mlb:default",
@@ -2317,7 +2317,7 @@
                                                                "forceRebuildToday":  true
                                                            },
                                          "publishParity":  {
-                                                               "generatedAt":  "2026-06-25T18:00:09.2433858Z",
+                                                               "generatedAt":  "2026-06-25T18:01:07.3400323Z",
                                                                "date":  "2026-06-25",
                                                                "totalForcedPublishPaths":  0,
                                                                "totalIntelligencePublishPaths":  0,
@@ -2374,7 +2374,7 @@
                                                                               }
                                                                           ]
                                                            },
-                                         "lastUpdatedAt":  "2026-06-25T13:00:11.5765940-05:00"
+                                         "lastUpdatedAt":  "2026-06-25T13:01:07.4563133-05:00"
                                      }
                        },
     "sportRuns":  [
@@ -2401,8 +2401,8 @@
                         "oddsPhase":  null,
                         "oddsSports":  null,
                         "oddsRegions":  null,
-                        "manifestPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-06-25\\20260625_130007\\migration\\refresh_status_manifest.json",
-                        "runSummaryPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-06-25\\20260625_130007\\migration\\refresh_and_gate_run.json"
+                        "manifestPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-06-25\\20260625_130105\\migration\\refresh_status_manifest.json",
+                        "runSummaryPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-06-25\\20260625_130105\\migration\\refresh_and_gate_run.json"
                     },
     "pushResults":  [
 
