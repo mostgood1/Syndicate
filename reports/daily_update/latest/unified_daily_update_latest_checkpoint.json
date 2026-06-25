@@ -2,18 +2,17 @@
     "scope":  "daily_update",
     "date":  "2026-06-25",
     "runMode":  "standard",
-    "overallStatus":  "ok",
-    "generatedAt":  "2026-06-25T07:12:34.7453184+00:00",
-    "updatedAt":  "2026-06-25T07:51:44.4186382+00:00",
-    "runDir":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-06-25\\20260625_071234",
-    "latestDir":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest",
-    "lastUpdatedAt":  "2026-06-25T07:51:44.4075979+00:00",
-    "currentStage":  "completed",
+    "overallStatus":  "error",
+    "generatedAt":  "2026-06-25T13:00:09.1628896-05:00",
+    "updatedAt":  "2026-06-25T13:00:11.5896898-05:00",
+    "runDir":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-06-25\\20260625_130007",
+    "latestDir":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\latest",
+    "lastUpdatedAt":  "2026-06-25T13:00:11.5765940-05:00",
+    "currentStage":  "failed",
     "completedStages":  [
-                            "source_update",
-                            "refresh_gate"
+
                         ],
-    "failedStage":  null,
+    "failedStage":  "",
     "stageDecisions":  [
                            {
                                "stage":  "source_update",
@@ -65,6 +64,14 @@
                            },
                            {
                                "stage":  "source_update",
+                               "sport":  null,
+                               "workflow":  null,
+                               "name":  "NCAAF local odds refresh",
+                               "decision":  "planned",
+                               "status":  "pending"
+                           },
+                           {
+                               "stage":  "source_update",
                                "sport":  "ncaab",
                                "workflow":  "syndicate_mirror",
                                "name":  "NCAAB source mirror export",
@@ -88,8 +95,8 @@
                            },
                            {
                                "stage":  "artifact_generation",
-                               "decision":  "skipped",
-                               "status":  "skipped"
+                               "decision":  "planned",
+                               "status":  "pending"
                            },
                            {
                                "stage":  "manifest_generation",
@@ -98,12 +105,12 @@
                            },
                            {
                                "stage":  "git_publish",
-                               "decision":  "skipped",
-                               "status":  "skipped"
+                               "decision":  "planned",
+                               "status":  "pending"
                            }
                        ],
     "provenance":  {
-                       "sourceStepCount":  7,
+                       "sourceStepCount":  8,
                        "sourceSteps":  [
                                            {
                                                "sport":  "mlb",
@@ -136,6 +143,11 @@
                                                "name":  "NFL local odds refresh"
                                            },
                                            {
+                                               "sport":  null,
+                                               "workflow":  null,
+                                               "name":  "NCAAF local odds refresh"
+                                           },
+                                           {
                                                "sport":  "ncaab",
                                                "workflow":  "syndicate_mirror",
                                                "name":  "NCAAB source mirror export"
@@ -144,7 +156,7 @@
                        "latestManifestLoaded":  true,
                        "latestEventSimExecutionPlanCount":  21,
                        "latestArtifactUpdateCount":  21,
-                       "oddsHistoryTriggerPlanCount":  7,
+                       "oddsHistoryTriggerPlanCount":  8,
                        "simExecutionDecision":  true
                    },
     "trace":  {
@@ -183,25 +195,24 @@
               },
     "replayContext":  {
                           "latestCheckpointLoaded":  true,
-                          "latestCheckpointPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest_checkpoint.json",
-                          "latestCheckpointStage":  "completed",
+                          "latestCheckpointPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest_checkpoint.json",
+                          "latestCheckpointStage":  "failed",
                           "latestCheckpointFailedStage":  "",
-                          "latestCheckpointCompletedStageCount":  2,
-                          "latestCheckpointCompletedStages":  [
-                                                                  "source_update",
-                                                                  "refresh_gate"
-                                                              ],
-                          "resumeEligible":  false,
+                          "latestCheckpointCompletedStageCount":  0,
+                          "latestCheckpointCompletedStages":  {
+
+                                                              },
+                          "resumeEligible":  true,
                           "resumedFromCheckpoint":  false,
-                          "forceRebuildToday":  false
+                          "forceRebuildToday":  true
                       },
     "runPlan":  {
                     "simExecution":  true,
                     "sourceUpdates":  true,
                     "refreshGate":  true,
-                    "artifactGeneration":  false,
+                    "artifactGeneration":  true,
                     "manifestGeneration":  true,
-                    "publish":  false,
+                    "publish":  true,
                     "refreshOdds":  false,
                     "oddsPhase":  null,
                     "oddsSports":  null,

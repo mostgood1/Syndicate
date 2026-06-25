@@ -3443,6 +3443,10 @@ function Invoke-GitPublish {
 
         foreach ($relativePath in @($ForceIncludePaths | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })) {
             $repoRelativePath = Resolve-RepoRelativePath -BasePath $RepoPath -CandidatePath $relativePath
+            if (-not (Test-Path -LiteralPath (Join-Path $RepoPath $repoRelativePath))) {
+                Write-Host ("    skipping missing forced artifact path: {0}" -f $repoRelativePath) -ForegroundColor DarkYellow
+                continue
+            }
             & git add -f -- $repoRelativePath
             if ($LASTEXITCODE -ne 0) {
                 throw "git add -f failed for $RepoPath path $repoRelativePath with exit code $LASTEXITCODE"

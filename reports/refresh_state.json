@@ -737,6 +737,20 @@
         "reused": false,
         "artifact_root": "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmp17p71dob\\bundle"
       }
+    },
+    "mlb_live_lens:2026-06-25": {
+      "inputHash": "a044796fc1a0edf017601a98a97c405235df3d3f0e2458d31498839798e79eb8",
+      "updatedAt": "2026-06-25T17:47:52.542154",
+      "outputs": [
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\data\\live_lens\\live_lens_report_2026_06_25.json",
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\data\\live_lens\\live_lens_2026_06_25.jsonl",
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\data\\live_lens\\prop_registry\\live_prop_registry_2026_06_25.json"
+      ],
+      "metadata": {
+        "date": "2026-06-25",
+        "trigger": "syndicate_refresh",
+        "source_root": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source"
+      }
     }
   }
 }
