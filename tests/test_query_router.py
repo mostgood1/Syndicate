@@ -31,6 +31,13 @@ class QueryRouterTests(unittest.TestCase):
         self.assertEqual(routed_payload["mode"], "comparison")
         self.assertEqual(routed_payload["query_type"], "comparison")
 
+    def test_routes_generic_board_query_preserves_explicit_recommendation_mode(self) -> None:
+        routed_payload = self.router.route_payload({"question": "top edges today", "mode": "recommendation", "date": "2026-06-25"})
+
+        self.assertEqual(routed_payload["question"], "top edges today")
+        self.assertEqual(routed_payload["mode"], "recommendation")
+        self.assertEqual(routed_payload["query_type"], "explanation")
+
 
 if __name__ == "__main__":
     unittest.main()

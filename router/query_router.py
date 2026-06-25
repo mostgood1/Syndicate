@@ -186,10 +186,14 @@ class QueryRouter:
         routed_payload = dict(payload or {})
         question = str(routed_payload.get("question") or "").strip()
         explicit_date = str(routed_payload.get("selected_date") or routed_payload.get("date") or "").strip()
+        explicit_mode = str(routed_payload.get("mode") or "").strip().lower()
         route = self.route_question(question)
         routed_payload["question"] = route.question
-        routed_payload["mode"] = route.pipeline_mode
         routed_payload["query_type"] = route.query_type
+        if route.query_type in {"game_preview", "player_analysis", "comparison"} or not explicit_mode:
+            routed_payload["mode"] = route.pipeline_mode
+        else:
+            routed_payload["mode"] = explicit_mode
         if not explicit_date and route.selected_date:
             routed_payload["selected_date"] = route.selected_date
             routed_payload["date"] = route.selected_date
