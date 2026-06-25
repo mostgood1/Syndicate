@@ -1,7 +1,7 @@
 ﻿{
     "date":  "2026-06-25",
     "generatedAt":  "2026-06-25T13:01:07.2647655-05:00",
-    "lastUpdatedAt":  "2026-06-25T13:01:07.4563133-05:00",
+    "lastUpdatedAt":  "2026-06-25T13:56:15.1588228-05:00",
     "completedAt":  null,
     "runMode":  "standard",
     "overallStatus":  "started",
@@ -38,17 +38,17 @@
                                                   "eventKey":  "sim_0_NYM_at_CIN_pk824503_g1",
                                                   "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_0_NYM_at_CIN_pk824503_g1.json",
                                                   "inputFingerprint":  "",
-                                                  "previousInputFingerprint":  "64f2a843ff28025b6ac93ab687cdec5edbb936c3485120bf302c08d5a99ab8f4",
+                                                  "previousInputFingerprint":  "",
                                                   "eventStartTimeUtc":  null,
                                                   "timeToStartMinutes":  null,
-                                                  "policyId":  "sport:mlb:default",
-                                                  "policySource":  "sport",
-                                                  "policySelectionMode":  "optimal",
+                                                  "policyId":  "policy:forced-rebuild",
+                                                  "policySource":  "rerun",
+                                                  "policySelectionMode":  "forced",
                                                   "isExploratory":  false,
                                                   "policyKeyParameters":  {
-                                                                              "forceWithinMinutes":  20
+                                                                              "forceRebuildToday":  true
                                                                           },
-                                                  "forceWithinMinutes":  20,
+                                                  "forceWithinMinutes":  30,
                                                   "decision":  "planned",
                                                   "status":  "pending"
                                               },
@@ -58,17 +58,17 @@
                                                   "eventKey":  "sim_10_CLE_at_MIL_pk823774_g1",
                                                   "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_10_CLE_at_MIL_pk823774_g1.json",
                                                   "inputFingerprint":  "",
-                                                  "previousInputFingerprint":  "64f2a843ff28025b6ac93ab687cdec5edbb936c3485120bf302c08d5a99ab8f4",
+                                                  "previousInputFingerprint":  "",
                                                   "eventStartTimeUtc":  null,
                                                   "timeToStartMinutes":  null,
-                                                  "policyId":  "sport:mlb:default",
-                                                  "policySource":  "sport",
-                                                  "policySelectionMode":  "optimal",
+                                                  "policyId":  "policy:forced-rebuild",
+                                                  "policySource":  "rerun",
+                                                  "policySelectionMode":  "forced",
                                                   "isExploratory":  false,
                                                   "policyKeyParameters":  {
-                                                                              "forceWithinMinutes":  20
+                                                                              "forceRebuildToday":  true
                                                                           },
-                                                  "forceWithinMinutes":  20,
+                                                  "forceWithinMinutes":  30,
                                                   "decision":  "planned",
                                                   "status":  "pending"
                                               },
@@ -78,17 +78,17 @@
                                                   "eventKey":  "sim_11_COL_at_CHC_pk824668_g1",
                                                   "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_11_COL_at_CHC_pk824668_g1.json",
                                                   "inputFingerprint":  "",
-                                                  "previousInputFingerprint":  "64f2a843ff28025b6ac93ab687cdec5edbb936c3485120bf302c08d5a99ab8f4",
+                                                  "previousInputFingerprint":  "",
                                                   "eventStartTimeUtc":  null,
                                                   "timeToStartMinutes":  null,
-                                                  "policyId":  "sport:mlb:default",
-                                                  "policySource":  "sport",
-                                                  "policySelectionMode":  "optimal",
+                                                  "policyId":  "policy:forced-rebuild",
+                                                  "policySource":  "rerun",
+                                                  "policySelectionMode":  "forced",
                                                   "isExploratory":  false,
                                                   "policyKeyParameters":  {
-                                                                              "forceWithinMinutes":  20
+                                                                              "forceRebuildToday":  true
                                                                           },
-                                                  "forceWithinMinutes":  20,
+                                                  "forceWithinMinutes":  30,
                                                   "decision":  "planned",
                                                   "status":  "pending"
                                               },
@@ -98,15 +98,15 @@
                                                   "eventKey":  "sim_12_PIT_at_ATH_pk824992_g1",
                                                   "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_12_PIT_at_ATH_pk824992_g1.json",
                                                   "inputFingerprint":  "",
-                                                  "previousInputFingerprint":  "64f2a843ff28025b6ac93ab687cdec5edbb936c3485120bf302c08d5a99ab8f4",
+                                                  "previousInputFingerprint":  "",
                                                   "eventStartTimeUtc":  null,
                                                   "timeToStartMinutes":  null,
-                                                  "policyId":  "sport:mlb:balanced",
-                                                  "policySource":  "sport",
-                                                  "policySelectionMode":  "exploratory",
-                                                  "isExploratory":  true,
+                                                  "policyId":  "policy:forced-rebuild",
+                                                  "policySource":  "rerun",
+                                                  "policySelectionMode":  "forced",
+                                                  "isExploratory":  false,
                                                   "policyKeyParameters":  {
-                                                                              "forceWithinMinutes":  30
+                                                                              "forceRebuildToday":  true
                                                                           },
                                                   "forceWithinMinutes":  30,
                                                   "decision":  "planned",
@@ -118,17 +118,17 @@
                                                   "eventKey":  "sim_13_BAL_at_SEA_pk823127_g1",
                                                   "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_13_BAL_at_SEA_pk823127_g1.json",
                                                   "inputFingerprint":  "",
-                                                  "previousInputFingerprint":  "64f2a843ff28025b6ac93ab687cdec5edbb936c3485120bf302c08d5a99ab8f4",
+                                                  "previousInputFingerprint":  "",
                                                   "eventStartTimeUtc":  null,
                                                   "timeToStartMinutes":  null,
-                                                  "policyId":  "sport:mlb:default",
-                                                  "policySource":  "sport",
-                                                  "policySelectionMode":  "optimal",
+                                                  "policyId":  "policy:forced-rebuild",
+                                                  "policySource":  "rerun",
+                                                  "policySelectionMode":  "forced",
                                                   "isExploratory":  false,
                                                   "policyKeyParameters":  {
-                                                                              "forceWithinMinutes":  20
+                                                                              "forceRebuildToday":  true
                                                                           },
-                                                  "forceWithinMinutes":  20,
+                                                  "forceWithinMinutes":  30,
                                                   "decision":  "planned",
                                                   "status":  "pending"
                                               },
@@ -138,15 +138,15 @@
                                                   "eventKey":  "sim_1_KC_at_WSH_pk822721_g1",
                                                   "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_1_KC_at_WSH_pk822721_g1.json",
                                                   "inputFingerprint":  "",
-                                                  "previousInputFingerprint":  "64f2a843ff28025b6ac93ab687cdec5edbb936c3485120bf302c08d5a99ab8f4",
+                                                  "previousInputFingerprint":  "",
                                                   "eventStartTimeUtc":  null,
                                                   "timeToStartMinutes":  null,
-                                                  "policyId":  "sport:mlb:balanced",
-                                                  "policySource":  "sport",
-                                                  "policySelectionMode":  "exploratory",
-                                                  "isExploratory":  true,
+                                                  "policyId":  "policy:forced-rebuild",
+                                                  "policySource":  "rerun",
+                                                  "policySelectionMode":  "forced",
+                                                  "isExploratory":  false,
                                                   "policyKeyParameters":  {
-                                                                              "forceWithinMinutes":  30
+                                                                              "forceRebuildToday":  true
                                                                           },
                                                   "forceWithinMinutes":  30,
                                                   "decision":  "planned",
@@ -158,17 +158,17 @@
                                                   "eventKey":  "sim_2_MIA_at_PHI_pk823450_g1",
                                                   "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_2_MIA_at_PHI_pk823450_g1.json",
                                                   "inputFingerprint":  "",
-                                                  "previousInputFingerprint":  "64f2a843ff28025b6ac93ab687cdec5edbb936c3485120bf302c08d5a99ab8f4",
+                                                  "previousInputFingerprint":  "",
                                                   "eventStartTimeUtc":  null,
                                                   "timeToStartMinutes":  null,
-                                                  "policyId":  "sport:mlb:default",
-                                                  "policySource":  "sport",
-                                                  "policySelectionMode":  "optimal",
+                                                  "policyId":  "policy:forced-rebuild",
+                                                  "policySource":  "rerun",
+                                                  "policySelectionMode":  "forced",
                                                   "isExploratory":  false,
                                                   "policyKeyParameters":  {
-                                                                              "forceWithinMinutes":  20
+                                                                              "forceRebuildToday":  true
                                                                           },
-                                                  "forceWithinMinutes":  20,
+                                                  "forceWithinMinutes":  30,
                                                   "decision":  "planned",
                                                   "status":  "pending"
                                               },
@@ -178,15 +178,15 @@
                                                   "eventKey":  "sim_3_DET_at_HOU_pk824178_g1",
                                                   "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_3_DET_at_HOU_pk824178_g1.json",
                                                   "inputFingerprint":  "",
-                                                  "previousInputFingerprint":  "64f2a843ff28025b6ac93ab687cdec5edbb936c3485120bf302c08d5a99ab8f4",
+                                                  "previousInputFingerprint":  "",
                                                   "eventStartTimeUtc":  null,
                                                   "timeToStartMinutes":  null,
-                                                  "policyId":  "sport:mlb:balanced",
-                                                  "policySource":  "sport",
-                                                  "policySelectionMode":  "exploratory",
-                                                  "isExploratory":  true,
+                                                  "policyId":  "policy:forced-rebuild",
+                                                  "policySource":  "rerun",
+                                                  "policySelectionMode":  "forced",
+                                                  "isExploratory":  false,
                                                   "policyKeyParameters":  {
-                                                                              "forceWithinMinutes":  30
+                                                                              "forceRebuildToday":  true
                                                                           },
                                                   "forceWithinMinutes":  30,
                                                   "decision":  "planned",
@@ -198,17 +198,17 @@
                                                   "eventKey":  "sim_4_SD_at_STL_pk823044_g1",
                                                   "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_4_SD_at_STL_pk823044_g1.json",
                                                   "inputFingerprint":  "",
-                                                  "previousInputFingerprint":  "64f2a843ff28025b6ac93ab687cdec5edbb936c3485120bf302c08d5a99ab8f4",
+                                                  "previousInputFingerprint":  "",
                                                   "eventStartTimeUtc":  null,
                                                   "timeToStartMinutes":  null,
-                                                  "policyId":  "sport:mlb:default",
-                                                  "policySource":  "sport",
-                                                  "policySelectionMode":  "optimal",
+                                                  "policyId":  "policy:forced-rebuild",
+                                                  "policySource":  "rerun",
+                                                  "policySelectionMode":  "forced",
                                                   "isExploratory":  false,
                                                   "policyKeyParameters":  {
-                                                                              "forceWithinMinutes":  20
+                                                                              "forceRebuildToday":  true
                                                                           },
-                                                  "forceWithinMinutes":  20,
+                                                  "forceWithinMinutes":  30,
                                                   "decision":  "planned",
                                                   "status":  "pending"
                                               },
@@ -218,17 +218,17 @@
                                                   "eventKey":  "sim_5_TB_at_LAD_pk823940_g1",
                                                   "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_5_TB_at_LAD_pk823940_g1.json",
                                                   "inputFingerprint":  "",
-                                                  "previousInputFingerprint":  "64f2a843ff28025b6ac93ab687cdec5edbb936c3485120bf302c08d5a99ab8f4",
+                                                  "previousInputFingerprint":  "",
                                                   "eventStartTimeUtc":  null,
                                                   "timeToStartMinutes":  null,
-                                                  "policyId":  "sport:mlb:default",
-                                                  "policySource":  "sport",
-                                                  "policySelectionMode":  "optimal",
+                                                  "policyId":  "policy:forced-rebuild",
+                                                  "policySource":  "rerun",
+                                                  "policySelectionMode":  "forced",
                                                   "isExploratory":  false,
                                                   "policyKeyParameters":  {
-                                                                              "forceWithinMinutes":  20
+                                                                              "forceRebuildToday":  true
                                                                           },
-                                                  "forceWithinMinutes":  20,
+                                                  "forceWithinMinutes":  30,
                                                   "decision":  "planned",
                                                   "status":  "pending"
                                               },
@@ -238,17 +238,17 @@
                                                   "eventKey":  "sim_6_LAA_at_AZ_pk825072_g1",
                                                   "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_6_LAA_at_AZ_pk825072_g1.json",
                                                   "inputFingerprint":  "",
-                                                  "previousInputFingerprint":  "64f2a843ff28025b6ac93ab687cdec5edbb936c3485120bf302c08d5a99ab8f4",
+                                                  "previousInputFingerprint":  "",
                                                   "eventStartTimeUtc":  null,
                                                   "timeToStartMinutes":  null,
-                                                  "policyId":  "sport:mlb:default",
-                                                  "policySource":  "sport",
-                                                  "policySelectionMode":  "optimal",
+                                                  "policyId":  "policy:forced-rebuild",
+                                                  "policySource":  "rerun",
+                                                  "policySelectionMode":  "forced",
                                                   "isExploratory":  false,
                                                   "policyKeyParameters":  {
-                                                                              "forceWithinMinutes":  20
+                                                                              "forceRebuildToday":  true
                                                                           },
-                                                  "forceWithinMinutes":  20,
+                                                  "forceWithinMinutes":  30,
                                                   "decision":  "planned",
                                                   "status":  "pending"
                                               },
@@ -258,17 +258,17 @@
                                                   "eventKey":  "sim_7_TOR_at_BOS_pk824746_g1",
                                                   "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_7_TOR_at_BOS_pk824746_g1.json",
                                                   "inputFingerprint":  "",
-                                                  "previousInputFingerprint":  "64f2a843ff28025b6ac93ab687cdec5edbb936c3485120bf302c08d5a99ab8f4",
+                                                  "previousInputFingerprint":  "",
                                                   "eventStartTimeUtc":  null,
                                                   "timeToStartMinutes":  null,
-                                                  "policyId":  "sport:mlb:default",
-                                                  "policySource":  "sport",
-                                                  "policySelectionMode":  "optimal",
+                                                  "policyId":  "policy:forced-rebuild",
+                                                  "policySource":  "rerun",
+                                                  "policySelectionMode":  "forced",
                                                   "isExploratory":  false,
                                                   "policyKeyParameters":  {
-                                                                              "forceWithinMinutes":  20
+                                                                              "forceRebuildToday":  true
                                                                           },
-                                                  "forceWithinMinutes":  20,
+                                                  "forceWithinMinutes":  30,
                                                   "decision":  "planned",
                                                   "status":  "pending"
                                               },
@@ -278,17 +278,17 @@
                                                   "eventKey":  "sim_8_CWS_at_NYY_pk823536_g1",
                                                   "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_8_CWS_at_NYY_pk823536_g1.json",
                                                   "inputFingerprint":  "",
-                                                  "previousInputFingerprint":  "64f2a843ff28025b6ac93ab687cdec5edbb936c3485120bf302c08d5a99ab8f4",
+                                                  "previousInputFingerprint":  "",
                                                   "eventStartTimeUtc":  null,
                                                   "timeToStartMinutes":  null,
-                                                  "policyId":  "sport:mlb:default",
-                                                  "policySource":  "sport",
-                                                  "policySelectionMode":  "optimal",
+                                                  "policyId":  "policy:forced-rebuild",
+                                                  "policySource":  "rerun",
+                                                  "policySelectionMode":  "forced",
                                                   "isExploratory":  false,
                                                   "policyKeyParameters":  {
-                                                                              "forceWithinMinutes":  20
+                                                                              "forceRebuildToday":  true
                                                                           },
-                                                  "forceWithinMinutes":  20,
+                                                  "forceWithinMinutes":  30,
                                                   "decision":  "planned",
                                                   "status":  "pending"
                                               },
@@ -298,17 +298,17 @@
                                                   "eventKey":  "sim_9_SF_at_ATL_pk824913_g1",
                                                   "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_9_SF_at_ATL_pk824913_g1.json",
                                                   "inputFingerprint":  "",
-                                                  "previousInputFingerprint":  "64f2a843ff28025b6ac93ab687cdec5edbb936c3485120bf302c08d5a99ab8f4",
+                                                  "previousInputFingerprint":  "",
                                                   "eventStartTimeUtc":  null,
                                                   "timeToStartMinutes":  null,
-                                                  "policyId":  "sport:mlb:default",
-                                                  "policySource":  "sport",
-                                                  "policySelectionMode":  "optimal",
+                                                  "policyId":  "policy:forced-rebuild",
+                                                  "policySource":  "rerun",
+                                                  "policySelectionMode":  "forced",
                                                   "isExploratory":  false,
                                                   "policyKeyParameters":  {
-                                                                              "forceWithinMinutes":  20
+                                                                              "forceRebuildToday":  true
                                                                           },
-                                                  "forceWithinMinutes":  20,
+                                                  "forceWithinMinutes":  30,
                                                   "decision":  "planned",
                                                   "status":  "pending"
                                               },
@@ -317,18 +317,18 @@
                                                   "workflow":  "vendored_daily_update",
                                                   "eventKey":  "smart_sim_2026-06-17_CHI_NYL",
                                                   "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_CHI_NYL.json",
-                                                  "inputFingerprint":  "a9c3165697afe5e76bc33a2a0f769f7b72164284c7022f28e59a4b34e8b3f32b",
-                                                  "previousInputFingerprint":  "f5165f49b8ee669230870cef2090ede22885ddbdce515e11cc35e7faaebbe879",
+                                                  "inputFingerprint":  "1903f17e6870b9413f9b73eb94799335e8e21dcd5c0c7318af6d4ef8594d2f2f",
+                                                  "previousInputFingerprint":  "a9c3165697afe5e76bc33a2a0f769f7b72164284c7022f28e59a4b34e8b3f32b",
                                                   "eventStartTimeUtc":  null,
                                                   "timeToStartMinutes":  null,
-                                                  "policyId":  "sport:wnba:default",
-                                                  "policySource":  "sport",
-                                                  "policySelectionMode":  "optimal",
+                                                  "policyId":  "policy:forced-rebuild",
+                                                  "policySource":  "rerun",
+                                                  "policySelectionMode":  "forced",
                                                   "isExploratory":  false,
                                                   "policyKeyParameters":  {
-                                                                              "forceWithinMinutes":  40
+                                                                              "forceRebuildToday":  true
                                                                           },
-                                                  "forceWithinMinutes":  40,
+                                                  "forceWithinMinutes":  30,
                                                   "decision":  "planned",
                                                   "status":  "pending"
                                               },
@@ -337,18 +337,18 @@
                                                   "workflow":  "vendored_daily_update",
                                                   "eventKey":  "smart_sim_2026-06-17_CON_WSH",
                                                   "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_CON_WSH.json",
-                                                  "inputFingerprint":  "a9c3165697afe5e76bc33a2a0f769f7b72164284c7022f28e59a4b34e8b3f32b",
-                                                  "previousInputFingerprint":  "f5165f49b8ee669230870cef2090ede22885ddbdce515e11cc35e7faaebbe879",
+                                                  "inputFingerprint":  "1903f17e6870b9413f9b73eb94799335e8e21dcd5c0c7318af6d4ef8594d2f2f",
+                                                  "previousInputFingerprint":  "a9c3165697afe5e76bc33a2a0f769f7b72164284c7022f28e59a4b34e8b3f32b",
                                                   "eventStartTimeUtc":  null,
                                                   "timeToStartMinutes":  null,
-                                                  "policyId":  "sport:wnba:default",
-                                                  "policySource":  "sport",
-                                                  "policySelectionMode":  "optimal",
+                                                  "policyId":  "policy:forced-rebuild",
+                                                  "policySource":  "rerun",
+                                                  "policySelectionMode":  "forced",
                                                   "isExploratory":  false,
                                                   "policyKeyParameters":  {
-                                                                              "forceWithinMinutes":  40
+                                                                              "forceRebuildToday":  true
                                                                           },
-                                                  "forceWithinMinutes":  40,
+                                                  "forceWithinMinutes":  30,
                                                   "decision":  "planned",
                                                   "status":  "pending"
                                               },
@@ -357,18 +357,18 @@
                                                   "workflow":  "vendored_daily_update",
                                                   "eventKey":  "smart_sim_2026-06-17_GSV_DAL",
                                                   "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_GSV_DAL.json",
-                                                  "inputFingerprint":  "a9c3165697afe5e76bc33a2a0f769f7b72164284c7022f28e59a4b34e8b3f32b",
-                                                  "previousInputFingerprint":  "f5165f49b8ee669230870cef2090ede22885ddbdce515e11cc35e7faaebbe879",
+                                                  "inputFingerprint":  "1903f17e6870b9413f9b73eb94799335e8e21dcd5c0c7318af6d4ef8594d2f2f",
+                                                  "previousInputFingerprint":  "a9c3165697afe5e76bc33a2a0f769f7b72164284c7022f28e59a4b34e8b3f32b",
                                                   "eventStartTimeUtc":  null,
                                                   "timeToStartMinutes":  null,
-                                                  "policyId":  "sport:wnba:default",
-                                                  "policySource":  "sport",
-                                                  "policySelectionMode":  "optimal",
+                                                  "policyId":  "policy:forced-rebuild",
+                                                  "policySource":  "rerun",
+                                                  "policySelectionMode":  "forced",
                                                   "isExploratory":  false,
                                                   "policyKeyParameters":  {
-                                                                              "forceWithinMinutes":  40
+                                                                              "forceRebuildToday":  true
                                                                           },
-                                                  "forceWithinMinutes":  40,
+                                                  "forceWithinMinutes":  30,
                                                   "decision":  "planned",
                                                   "status":  "pending"
                                               },
@@ -377,18 +377,18 @@
                                                   "workflow":  "vendored_daily_update",
                                                   "eventKey":  "smart_sim_2026-06-17_LAS_MIN",
                                                   "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_LAS_MIN.json",
-                                                  "inputFingerprint":  "a9c3165697afe5e76bc33a2a0f769f7b72164284c7022f28e59a4b34e8b3f32b",
-                                                  "previousInputFingerprint":  "f5165f49b8ee669230870cef2090ede22885ddbdce515e11cc35e7faaebbe879",
+                                                  "inputFingerprint":  "1903f17e6870b9413f9b73eb94799335e8e21dcd5c0c7318af6d4ef8594d2f2f",
+                                                  "previousInputFingerprint":  "a9c3165697afe5e76bc33a2a0f769f7b72164284c7022f28e59a4b34e8b3f32b",
                                                   "eventStartTimeUtc":  null,
                                                   "timeToStartMinutes":  null,
-                                                  "policyId":  "sport:wnba:default",
-                                                  "policySource":  "sport",
-                                                  "policySelectionMode":  "optimal",
+                                                  "policyId":  "policy:forced-rebuild",
+                                                  "policySource":  "rerun",
+                                                  "policySelectionMode":  "forced",
                                                   "isExploratory":  false,
                                                   "policyKeyParameters":  {
-                                                                              "forceWithinMinutes":  40
+                                                                              "forceRebuildToday":  true
                                                                           },
-                                                  "forceWithinMinutes":  40,
+                                                  "forceWithinMinutes":  30,
                                                   "decision":  "planned",
                                                   "status":  "pending"
                                               },
@@ -397,18 +397,18 @@
                                                   "workflow":  "vendored_daily_update",
                                                   "eventKey":  "smart_sim_2026-06-17_PHX_LVA",
                                                   "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_PHX_LVA.json",
-                                                  "inputFingerprint":  "a9c3165697afe5e76bc33a2a0f769f7b72164284c7022f28e59a4b34e8b3f32b",
-                                                  "previousInputFingerprint":  "f5165f49b8ee669230870cef2090ede22885ddbdce515e11cc35e7faaebbe879",
+                                                  "inputFingerprint":  "1903f17e6870b9413f9b73eb94799335e8e21dcd5c0c7318af6d4ef8594d2f2f",
+                                                  "previousInputFingerprint":  "a9c3165697afe5e76bc33a2a0f769f7b72164284c7022f28e59a4b34e8b3f32b",
                                                   "eventStartTimeUtc":  null,
                                                   "timeToStartMinutes":  null,
-                                                  "policyId":  "sport:wnba:default",
-                                                  "policySource":  "sport",
-                                                  "policySelectionMode":  "optimal",
+                                                  "policyId":  "policy:forced-rebuild",
+                                                  "policySource":  "rerun",
+                                                  "policySelectionMode":  "forced",
                                                   "isExploratory":  false,
                                                   "policyKeyParameters":  {
-                                                                              "forceWithinMinutes":  40
+                                                                              "forceRebuildToday":  true
                                                                           },
-                                                  "forceWithinMinutes":  40,
+                                                  "forceWithinMinutes":  30,
                                                   "decision":  "planned",
                                                   "status":  "pending"
                                               },
@@ -417,18 +417,18 @@
                                                   "workflow":  "vendored_daily_update",
                                                   "eventKey":  "smart_sim_2026-06-17_POR_SEA",
                                                   "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_POR_SEA.json",
-                                                  "inputFingerprint":  "a9c3165697afe5e76bc33a2a0f769f7b72164284c7022f28e59a4b34e8b3f32b",
-                                                  "previousInputFingerprint":  "f5165f49b8ee669230870cef2090ede22885ddbdce515e11cc35e7faaebbe879",
+                                                  "inputFingerprint":  "1903f17e6870b9413f9b73eb94799335e8e21dcd5c0c7318af6d4ef8594d2f2f",
+                                                  "previousInputFingerprint":  "a9c3165697afe5e76bc33a2a0f769f7b72164284c7022f28e59a4b34e8b3f32b",
                                                   "eventStartTimeUtc":  null,
                                                   "timeToStartMinutes":  null,
-                                                  "policyId":  "sport:wnba:default",
-                                                  "policySource":  "sport",
-                                                  "policySelectionMode":  "optimal",
+                                                  "policyId":  "policy:forced-rebuild",
+                                                  "policySource":  "rerun",
+                                                  "policySelectionMode":  "forced",
                                                   "isExploratory":  false,
                                                   "policyKeyParameters":  {
-                                                                              "forceWithinMinutes":  40
+                                                                              "forceRebuildToday":  true
                                                                           },
-                                                  "forceWithinMinutes":  40,
+                                                  "forceWithinMinutes":  30,
                                                   "decision":  "planned",
                                                   "status":  "pending"
                                               },
@@ -437,18 +437,18 @@
                                                   "workflow":  "vendored_daily_update",
                                                   "eventKey":  "smart_sim_2026-06-17_bundle",
                                                   "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_bundle.json",
-                                                  "inputFingerprint":  "94362c759d060759984af3eaac58f1123b0ce9b8f126f6f71d8c7009feb9094b",
-                                                  "previousInputFingerprint":  "1e38f92d742b3758f0c4464f494d1e469a1b8d987529e357b7f4c0bcf31120cc",
+                                                  "inputFingerprint":  "6c789e549b0985542ff846978d1b455d23d716f0ded007f84bf624589e446623",
+                                                  "previousInputFingerprint":  "94362c759d060759984af3eaac58f1123b0ce9b8f126f6f71d8c7009feb9094b",
                                                   "eventStartTimeUtc":  null,
                                                   "timeToStartMinutes":  null,
-                                                  "policyId":  "sport:nhl:default",
-                                                  "policySource":  "sport",
-                                                  "policySelectionMode":  "default",
+                                                  "policyId":  "policy:forced-rebuild",
+                                                  "policySource":  "rerun",
+                                                  "policySelectionMode":  "forced",
                                                   "isExploratory":  false,
                                                   "policyKeyParameters":  {
-                                                                              "forceWithinMinutes":  25
+                                                                              "forceRebuildToday":  true
                                                                           },
-                                                  "forceWithinMinutes":  25,
+                                                  "forceWithinMinutes":  30,
                                                   "decision":  "planned",
                                                   "status":  "pending"
                                               }
@@ -460,11 +460,11 @@
                                                 "eventKey":  "sim_0_NYM_at_CIN_pk824503_g1",
                                                 "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_0_NYM_at_CIN_pk824503_g1.json",
                                                 "inputFingerprint":  "",
-                                                "previousInputFingerprint":  "64f2a843ff28025b6ac93ab687cdec5edbb936c3485120bf302c08d5a99ab8f4",
-                                                "policyId":  "sport:mlb:default",
-                                                "policySource":  "sport",
+                                                "previousInputFingerprint":  "",
+                                                "policyId":  "policy:forced-rebuild",
+                                                "policySource":  "rerun",
                                                 "policyKeyParameters":  {
-                                                                            "forceWithinMinutes":  20
+                                                                            "forceRebuildToday":  true
                                                                         },
                                                 "decision":  "planned",
                                                 "status":  "pending"
@@ -475,11 +475,11 @@
                                                 "eventKey":  "sim_10_CLE_at_MIL_pk823774_g1",
                                                 "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_10_CLE_at_MIL_pk823774_g1.json",
                                                 "inputFingerprint":  "",
-                                                "previousInputFingerprint":  "64f2a843ff28025b6ac93ab687cdec5edbb936c3485120bf302c08d5a99ab8f4",
-                                                "policyId":  "sport:mlb:default",
-                                                "policySource":  "sport",
+                                                "previousInputFingerprint":  "",
+                                                "policyId":  "policy:forced-rebuild",
+                                                "policySource":  "rerun",
                                                 "policyKeyParameters":  {
-                                                                            "forceWithinMinutes":  20
+                                                                            "forceRebuildToday":  true
                                                                         },
                                                 "decision":  "planned",
                                                 "status":  "pending"
@@ -490,11 +490,11 @@
                                                 "eventKey":  "sim_11_COL_at_CHC_pk824668_g1",
                                                 "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_11_COL_at_CHC_pk824668_g1.json",
                                                 "inputFingerprint":  "",
-                                                "previousInputFingerprint":  "64f2a843ff28025b6ac93ab687cdec5edbb936c3485120bf302c08d5a99ab8f4",
-                                                "policyId":  "sport:mlb:default",
-                                                "policySource":  "sport",
+                                                "previousInputFingerprint":  "",
+                                                "policyId":  "policy:forced-rebuild",
+                                                "policySource":  "rerun",
                                                 "policyKeyParameters":  {
-                                                                            "forceWithinMinutes":  20
+                                                                            "forceRebuildToday":  true
                                                                         },
                                                 "decision":  "planned",
                                                 "status":  "pending"
@@ -505,11 +505,11 @@
                                                 "eventKey":  "sim_12_PIT_at_ATH_pk824992_g1",
                                                 "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_12_PIT_at_ATH_pk824992_g1.json",
                                                 "inputFingerprint":  "",
-                                                "previousInputFingerprint":  "64f2a843ff28025b6ac93ab687cdec5edbb936c3485120bf302c08d5a99ab8f4",
-                                                "policyId":  "sport:mlb:balanced",
-                                                "policySource":  "sport",
+                                                "previousInputFingerprint":  "",
+                                                "policyId":  "policy:forced-rebuild",
+                                                "policySource":  "rerun",
                                                 "policyKeyParameters":  {
-                                                                            "forceWithinMinutes":  30
+                                                                            "forceRebuildToday":  true
                                                                         },
                                                 "decision":  "planned",
                                                 "status":  "pending"
@@ -520,11 +520,11 @@
                                                 "eventKey":  "sim_13_BAL_at_SEA_pk823127_g1",
                                                 "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_13_BAL_at_SEA_pk823127_g1.json",
                                                 "inputFingerprint":  "",
-                                                "previousInputFingerprint":  "64f2a843ff28025b6ac93ab687cdec5edbb936c3485120bf302c08d5a99ab8f4",
-                                                "policyId":  "sport:mlb:default",
-                                                "policySource":  "sport",
+                                                "previousInputFingerprint":  "",
+                                                "policyId":  "policy:forced-rebuild",
+                                                "policySource":  "rerun",
                                                 "policyKeyParameters":  {
-                                                                            "forceWithinMinutes":  20
+                                                                            "forceRebuildToday":  true
                                                                         },
                                                 "decision":  "planned",
                                                 "status":  "pending"
@@ -535,11 +535,11 @@
                                                 "eventKey":  "sim_1_KC_at_WSH_pk822721_g1",
                                                 "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_1_KC_at_WSH_pk822721_g1.json",
                                                 "inputFingerprint":  "",
-                                                "previousInputFingerprint":  "64f2a843ff28025b6ac93ab687cdec5edbb936c3485120bf302c08d5a99ab8f4",
-                                                "policyId":  "sport:mlb:balanced",
-                                                "policySource":  "sport",
+                                                "previousInputFingerprint":  "",
+                                                "policyId":  "policy:forced-rebuild",
+                                                "policySource":  "rerun",
                                                 "policyKeyParameters":  {
-                                                                            "forceWithinMinutes":  30
+                                                                            "forceRebuildToday":  true
                                                                         },
                                                 "decision":  "planned",
                                                 "status":  "pending"
@@ -550,11 +550,11 @@
                                                 "eventKey":  "sim_2_MIA_at_PHI_pk823450_g1",
                                                 "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_2_MIA_at_PHI_pk823450_g1.json",
                                                 "inputFingerprint":  "",
-                                                "previousInputFingerprint":  "64f2a843ff28025b6ac93ab687cdec5edbb936c3485120bf302c08d5a99ab8f4",
-                                                "policyId":  "sport:mlb:default",
-                                                "policySource":  "sport",
+                                                "previousInputFingerprint":  "",
+                                                "policyId":  "policy:forced-rebuild",
+                                                "policySource":  "rerun",
                                                 "policyKeyParameters":  {
-                                                                            "forceWithinMinutes":  20
+                                                                            "forceRebuildToday":  true
                                                                         },
                                                 "decision":  "planned",
                                                 "status":  "pending"
@@ -565,11 +565,11 @@
                                                 "eventKey":  "sim_3_DET_at_HOU_pk824178_g1",
                                                 "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_3_DET_at_HOU_pk824178_g1.json",
                                                 "inputFingerprint":  "",
-                                                "previousInputFingerprint":  "64f2a843ff28025b6ac93ab687cdec5edbb936c3485120bf302c08d5a99ab8f4",
-                                                "policyId":  "sport:mlb:balanced",
-                                                "policySource":  "sport",
+                                                "previousInputFingerprint":  "",
+                                                "policyId":  "policy:forced-rebuild",
+                                                "policySource":  "rerun",
                                                 "policyKeyParameters":  {
-                                                                            "forceWithinMinutes":  30
+                                                                            "forceRebuildToday":  true
                                                                         },
                                                 "decision":  "planned",
                                                 "status":  "pending"
@@ -580,11 +580,11 @@
                                                 "eventKey":  "sim_4_SD_at_STL_pk823044_g1",
                                                 "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_4_SD_at_STL_pk823044_g1.json",
                                                 "inputFingerprint":  "",
-                                                "previousInputFingerprint":  "64f2a843ff28025b6ac93ab687cdec5edbb936c3485120bf302c08d5a99ab8f4",
-                                                "policyId":  "sport:mlb:default",
-                                                "policySource":  "sport",
+                                                "previousInputFingerprint":  "",
+                                                "policyId":  "policy:forced-rebuild",
+                                                "policySource":  "rerun",
                                                 "policyKeyParameters":  {
-                                                                            "forceWithinMinutes":  20
+                                                                            "forceRebuildToday":  true
                                                                         },
                                                 "decision":  "planned",
                                                 "status":  "pending"
@@ -595,11 +595,11 @@
                                                 "eventKey":  "sim_5_TB_at_LAD_pk823940_g1",
                                                 "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_5_TB_at_LAD_pk823940_g1.json",
                                                 "inputFingerprint":  "",
-                                                "previousInputFingerprint":  "64f2a843ff28025b6ac93ab687cdec5edbb936c3485120bf302c08d5a99ab8f4",
-                                                "policyId":  "sport:mlb:default",
-                                                "policySource":  "sport",
+                                                "previousInputFingerprint":  "",
+                                                "policyId":  "policy:forced-rebuild",
+                                                "policySource":  "rerun",
                                                 "policyKeyParameters":  {
-                                                                            "forceWithinMinutes":  20
+                                                                            "forceRebuildToday":  true
                                                                         },
                                                 "decision":  "planned",
                                                 "status":  "pending"
@@ -610,11 +610,11 @@
                                                 "eventKey":  "sim_6_LAA_at_AZ_pk825072_g1",
                                                 "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_6_LAA_at_AZ_pk825072_g1.json",
                                                 "inputFingerprint":  "",
-                                                "previousInputFingerprint":  "64f2a843ff28025b6ac93ab687cdec5edbb936c3485120bf302c08d5a99ab8f4",
-                                                "policyId":  "sport:mlb:default",
-                                                "policySource":  "sport",
+                                                "previousInputFingerprint":  "",
+                                                "policyId":  "policy:forced-rebuild",
+                                                "policySource":  "rerun",
                                                 "policyKeyParameters":  {
-                                                                            "forceWithinMinutes":  20
+                                                                            "forceRebuildToday":  true
                                                                         },
                                                 "decision":  "planned",
                                                 "status":  "pending"
@@ -625,11 +625,11 @@
                                                 "eventKey":  "sim_7_TOR_at_BOS_pk824746_g1",
                                                 "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_7_TOR_at_BOS_pk824746_g1.json",
                                                 "inputFingerprint":  "",
-                                                "previousInputFingerprint":  "64f2a843ff28025b6ac93ab687cdec5edbb936c3485120bf302c08d5a99ab8f4",
-                                                "policyId":  "sport:mlb:default",
-                                                "policySource":  "sport",
+                                                "previousInputFingerprint":  "",
+                                                "policyId":  "policy:forced-rebuild",
+                                                "policySource":  "rerun",
                                                 "policyKeyParameters":  {
-                                                                            "forceWithinMinutes":  20
+                                                                            "forceRebuildToday":  true
                                                                         },
                                                 "decision":  "planned",
                                                 "status":  "pending"
@@ -640,11 +640,11 @@
                                                 "eventKey":  "sim_8_CWS_at_NYY_pk823536_g1",
                                                 "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_8_CWS_at_NYY_pk823536_g1.json",
                                                 "inputFingerprint":  "",
-                                                "previousInputFingerprint":  "64f2a843ff28025b6ac93ab687cdec5edbb936c3485120bf302c08d5a99ab8f4",
-                                                "policyId":  "sport:mlb:default",
-                                                "policySource":  "sport",
+                                                "previousInputFingerprint":  "",
+                                                "policyId":  "policy:forced-rebuild",
+                                                "policySource":  "rerun",
                                                 "policyKeyParameters":  {
-                                                                            "forceWithinMinutes":  20
+                                                                            "forceRebuildToday":  true
                                                                         },
                                                 "decision":  "planned",
                                                 "status":  "pending"
@@ -655,11 +655,11 @@
                                                 "eventKey":  "sim_9_SF_at_ATL_pk824913_g1",
                                                 "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_9_SF_at_ATL_pk824913_g1.json",
                                                 "inputFingerprint":  "",
-                                                "previousInputFingerprint":  "64f2a843ff28025b6ac93ab687cdec5edbb936c3485120bf302c08d5a99ab8f4",
-                                                "policyId":  "sport:mlb:default",
-                                                "policySource":  "sport",
+                                                "previousInputFingerprint":  "",
+                                                "policyId":  "policy:forced-rebuild",
+                                                "policySource":  "rerun",
                                                 "policyKeyParameters":  {
-                                                                            "forceWithinMinutes":  20
+                                                                            "forceRebuildToday":  true
                                                                         },
                                                 "decision":  "planned",
                                                 "status":  "pending"
@@ -669,12 +669,12 @@
                                                 "workflow":  "vendored_daily_update",
                                                 "eventKey":  "smart_sim_2026-06-17_CHI_NYL",
                                                 "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_CHI_NYL.json",
-                                                "inputFingerprint":  "a9c3165697afe5e76bc33a2a0f769f7b72164284c7022f28e59a4b34e8b3f32b",
-                                                "previousInputFingerprint":  "f5165f49b8ee669230870cef2090ede22885ddbdce515e11cc35e7faaebbe879",
-                                                "policyId":  "sport:wnba:default",
-                                                "policySource":  "sport",
+                                                "inputFingerprint":  "1903f17e6870b9413f9b73eb94799335e8e21dcd5c0c7318af6d4ef8594d2f2f",
+                                                "previousInputFingerprint":  "a9c3165697afe5e76bc33a2a0f769f7b72164284c7022f28e59a4b34e8b3f32b",
+                                                "policyId":  "policy:forced-rebuild",
+                                                "policySource":  "rerun",
                                                 "policyKeyParameters":  {
-                                                                            "forceWithinMinutes":  40
+                                                                            "forceRebuildToday":  true
                                                                         },
                                                 "decision":  "planned",
                                                 "status":  "pending"
@@ -684,12 +684,12 @@
                                                 "workflow":  "vendored_daily_update",
                                                 "eventKey":  "smart_sim_2026-06-17_CON_WSH",
                                                 "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_CON_WSH.json",
-                                                "inputFingerprint":  "a9c3165697afe5e76bc33a2a0f769f7b72164284c7022f28e59a4b34e8b3f32b",
-                                                "previousInputFingerprint":  "f5165f49b8ee669230870cef2090ede22885ddbdce515e11cc35e7faaebbe879",
-                                                "policyId":  "sport:wnba:default",
-                                                "policySource":  "sport",
+                                                "inputFingerprint":  "1903f17e6870b9413f9b73eb94799335e8e21dcd5c0c7318af6d4ef8594d2f2f",
+                                                "previousInputFingerprint":  "a9c3165697afe5e76bc33a2a0f769f7b72164284c7022f28e59a4b34e8b3f32b",
+                                                "policyId":  "policy:forced-rebuild",
+                                                "policySource":  "rerun",
                                                 "policyKeyParameters":  {
-                                                                            "forceWithinMinutes":  40
+                                                                            "forceRebuildToday":  true
                                                                         },
                                                 "decision":  "planned",
                                                 "status":  "pending"
@@ -699,12 +699,12 @@
                                                 "workflow":  "vendored_daily_update",
                                                 "eventKey":  "smart_sim_2026-06-17_GSV_DAL",
                                                 "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_GSV_DAL.json",
-                                                "inputFingerprint":  "a9c3165697afe5e76bc33a2a0f769f7b72164284c7022f28e59a4b34e8b3f32b",
-                                                "previousInputFingerprint":  "f5165f49b8ee669230870cef2090ede22885ddbdce515e11cc35e7faaebbe879",
-                                                "policyId":  "sport:wnba:default",
-                                                "policySource":  "sport",
+                                                "inputFingerprint":  "1903f17e6870b9413f9b73eb94799335e8e21dcd5c0c7318af6d4ef8594d2f2f",
+                                                "previousInputFingerprint":  "a9c3165697afe5e76bc33a2a0f769f7b72164284c7022f28e59a4b34e8b3f32b",
+                                                "policyId":  "policy:forced-rebuild",
+                                                "policySource":  "rerun",
                                                 "policyKeyParameters":  {
-                                                                            "forceWithinMinutes":  40
+                                                                            "forceRebuildToday":  true
                                                                         },
                                                 "decision":  "planned",
                                                 "status":  "pending"
@@ -714,12 +714,12 @@
                                                 "workflow":  "vendored_daily_update",
                                                 "eventKey":  "smart_sim_2026-06-17_LAS_MIN",
                                                 "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_LAS_MIN.json",
-                                                "inputFingerprint":  "a9c3165697afe5e76bc33a2a0f769f7b72164284c7022f28e59a4b34e8b3f32b",
-                                                "previousInputFingerprint":  "f5165f49b8ee669230870cef2090ede22885ddbdce515e11cc35e7faaebbe879",
-                                                "policyId":  "sport:wnba:default",
-                                                "policySource":  "sport",
+                                                "inputFingerprint":  "1903f17e6870b9413f9b73eb94799335e8e21dcd5c0c7318af6d4ef8594d2f2f",
+                                                "previousInputFingerprint":  "a9c3165697afe5e76bc33a2a0f769f7b72164284c7022f28e59a4b34e8b3f32b",
+                                                "policyId":  "policy:forced-rebuild",
+                                                "policySource":  "rerun",
                                                 "policyKeyParameters":  {
-                                                                            "forceWithinMinutes":  40
+                                                                            "forceRebuildToday":  true
                                                                         },
                                                 "decision":  "planned",
                                                 "status":  "pending"
@@ -729,12 +729,12 @@
                                                 "workflow":  "vendored_daily_update",
                                                 "eventKey":  "smart_sim_2026-06-17_PHX_LVA",
                                                 "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_PHX_LVA.json",
-                                                "inputFingerprint":  "a9c3165697afe5e76bc33a2a0f769f7b72164284c7022f28e59a4b34e8b3f32b",
-                                                "previousInputFingerprint":  "f5165f49b8ee669230870cef2090ede22885ddbdce515e11cc35e7faaebbe879",
-                                                "policyId":  "sport:wnba:default",
-                                                "policySource":  "sport",
+                                                "inputFingerprint":  "1903f17e6870b9413f9b73eb94799335e8e21dcd5c0c7318af6d4ef8594d2f2f",
+                                                "previousInputFingerprint":  "a9c3165697afe5e76bc33a2a0f769f7b72164284c7022f28e59a4b34e8b3f32b",
+                                                "policyId":  "policy:forced-rebuild",
+                                                "policySource":  "rerun",
                                                 "policyKeyParameters":  {
-                                                                            "forceWithinMinutes":  40
+                                                                            "forceRebuildToday":  true
                                                                         },
                                                 "decision":  "planned",
                                                 "status":  "pending"
@@ -744,12 +744,12 @@
                                                 "workflow":  "vendored_daily_update",
                                                 "eventKey":  "smart_sim_2026-06-17_POR_SEA",
                                                 "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_POR_SEA.json",
-                                                "inputFingerprint":  "a9c3165697afe5e76bc33a2a0f769f7b72164284c7022f28e59a4b34e8b3f32b",
-                                                "previousInputFingerprint":  "f5165f49b8ee669230870cef2090ede22885ddbdce515e11cc35e7faaebbe879",
-                                                "policyId":  "sport:wnba:default",
-                                                "policySource":  "sport",
+                                                "inputFingerprint":  "1903f17e6870b9413f9b73eb94799335e8e21dcd5c0c7318af6d4ef8594d2f2f",
+                                                "previousInputFingerprint":  "a9c3165697afe5e76bc33a2a0f769f7b72164284c7022f28e59a4b34e8b3f32b",
+                                                "policyId":  "policy:forced-rebuild",
+                                                "policySource":  "rerun",
                                                 "policyKeyParameters":  {
-                                                                            "forceWithinMinutes":  40
+                                                                            "forceRebuildToday":  true
                                                                         },
                                                 "decision":  "planned",
                                                 "status":  "pending"
@@ -759,12 +759,12 @@
                                                 "workflow":  "vendored_daily_update",
                                                 "eventKey":  "smart_sim_2026-06-17_bundle",
                                                 "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_bundle.json",
-                                                "inputFingerprint":  "94362c759d060759984af3eaac58f1123b0ce9b8f126f6f71d8c7009feb9094b",
-                                                "previousInputFingerprint":  "1e38f92d742b3758f0c4464f494d1e469a1b8d987529e357b7f4c0bcf31120cc",
-                                                "policyId":  "sport:nhl:default",
-                                                "policySource":  "sport",
+                                                "inputFingerprint":  "6c789e549b0985542ff846978d1b455d23d716f0ded007f84bf624589e446623",
+                                                "previousInputFingerprint":  "94362c759d060759984af3eaac58f1123b0ce9b8f126f6f71d8c7009feb9094b",
+                                                "policyId":  "policy:forced-rebuild",
+                                                "policySource":  "rerun",
                                                 "policyKeyParameters":  {
-                                                                            "forceWithinMinutes":  25
+                                                                            "forceRebuildToday":  true
                                                                         },
                                                 "decision":  "planned",
                                                 "status":  "pending"
@@ -772,75 +772,21 @@
                                         ],
                     "policyPerformance":  [
                                               {
-                                                  "policyId":  "sport:mlb:default",
-                                                  "policySource":  "sport",
+                                                  "policyId":  "",
+                                                  "policySource":  "rerun",
                                                   "keyParameters":  {
-                                                                        "forceWithinMinutes":  20
+                                                                        "forceRebuildToday":  true
                                                                     },
-                                                  "recordCount":  11,
-                                                  "sampleSize":  11,
+                                                  "recordCount":  21,
+                                                  "sampleSize":  21,
                                                   "exploratoryCount":  0,
                                                   "exploratoryRate":  0,
-                                                  "plannedCount":  11,
-                                                  "skippedCount":  0,
-                                                  "dryRunCount":  0,
-                                                  "withinWindowCount":  0,
-                                                  "averageTimeToStartMinutes":  null,
-                                                  "averageForceWithinMinutes":  20,
-                                                  "roi":  null
-                                              },
-                                              {
-                                                  "policyId":  "sport:mlb:balanced",
-                                                  "policySource":  "sport",
-                                                  "keyParameters":  {
-                                                                        "forceWithinMinutes":  30
-                                                                    },
-                                                  "recordCount":  3,
-                                                  "sampleSize":  3,
-                                                  "exploratoryCount":  3,
-                                                  "exploratoryRate":  1,
-                                                  "plannedCount":  3,
+                                                  "plannedCount":  21,
                                                   "skippedCount":  0,
                                                   "dryRunCount":  0,
                                                   "withinWindowCount":  0,
                                                   "averageTimeToStartMinutes":  null,
                                                   "averageForceWithinMinutes":  30,
-                                                  "roi":  null
-                                              },
-                                              {
-                                                  "policyId":  "sport:wnba:default",
-                                                  "policySource":  "sport",
-                                                  "keyParameters":  {
-                                                                        "forceWithinMinutes":  40
-                                                                    },
-                                                  "recordCount":  6,
-                                                  "sampleSize":  6,
-                                                  "exploratoryCount":  0,
-                                                  "exploratoryRate":  0,
-                                                  "plannedCount":  6,
-                                                  "skippedCount":  0,
-                                                  "dryRunCount":  0,
-                                                  "withinWindowCount":  0,
-                                                  "averageTimeToStartMinutes":  null,
-                                                  "averageForceWithinMinutes":  40,
-                                                  "roi":  null
-                                              },
-                                              {
-                                                  "policyId":  "sport:nhl:default",
-                                                  "policySource":  "sport",
-                                                  "keyParameters":  {
-                                                                        "forceWithinMinutes":  25
-                                                                    },
-                                                  "recordCount":  1,
-                                                  "sampleSize":  1,
-                                                  "exploratoryCount":  0,
-                                                  "exploratoryRate":  0,
-                                                  "plannedCount":  1,
-                                                  "skippedCount":  0,
-                                                  "dryRunCount":  0,
-                                                  "withinWindowCount":  0,
-                                                  "averageTimeToStartMinutes":  null,
-                                                  "averageForceWithinMinutes":  25,
                                                   "roi":  null
                                               }
                                           ],
@@ -1025,12 +971,12 @@
                           "forceRebuildToday":  true
                       },
     "runState":  {
-                     "currentStage":  "queued",
+                     "currentStage":  "refresh_gate",
                      "completedStages":  [
-
+                                             "source_update"
                                          ],
                      "failedStage":  null,
-                     "lastUpdatedAt":  "2026-06-25T13:01:07.4563133-05:00",
+                     "lastUpdatedAt":  "2026-06-25T13:56:15.1588228-05:00",
                      "simulationContractPath":  null,
                      "simulationContractRunPath":  null,
                      "simulationContractSportCount":  0,
@@ -1043,17 +989,17 @@
                                   "eventKey":  "sim_0_NYM_at_CIN_pk824503_g1",
                                   "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_0_NYM_at_CIN_pk824503_g1.json",
                                   "inputFingerprint":  "",
-                                  "previousInputFingerprint":  "64f2a843ff28025b6ac93ab687cdec5edbb936c3485120bf302c08d5a99ab8f4",
+                                  "previousInputFingerprint":  "",
                                   "eventStartTimeUtc":  null,
                                   "timeToStartMinutes":  null,
-                                  "policyId":  "sport:mlb:default",
-                                  "policySource":  "sport",
-                                  "policySelectionMode":  "optimal",
+                                  "policyId":  "policy:forced-rebuild",
+                                  "policySource":  "rerun",
+                                  "policySelectionMode":  "forced",
                                   "isExploratory":  false,
                                   "policyKeyParameters":  {
-                                                              "forceWithinMinutes":  20
+                                                              "forceRebuildToday":  true
                                                           },
-                                  "forceWithinMinutes":  20,
+                                  "forceWithinMinutes":  30,
                                   "decision":  "planned",
                                   "status":  "pending"
                               },
@@ -1063,17 +1009,17 @@
                                   "eventKey":  "sim_10_CLE_at_MIL_pk823774_g1",
                                   "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_10_CLE_at_MIL_pk823774_g1.json",
                                   "inputFingerprint":  "",
-                                  "previousInputFingerprint":  "64f2a843ff28025b6ac93ab687cdec5edbb936c3485120bf302c08d5a99ab8f4",
+                                  "previousInputFingerprint":  "",
                                   "eventStartTimeUtc":  null,
                                   "timeToStartMinutes":  null,
-                                  "policyId":  "sport:mlb:default",
-                                  "policySource":  "sport",
-                                  "policySelectionMode":  "optimal",
+                                  "policyId":  "policy:forced-rebuild",
+                                  "policySource":  "rerun",
+                                  "policySelectionMode":  "forced",
                                   "isExploratory":  false,
                                   "policyKeyParameters":  {
-                                                              "forceWithinMinutes":  20
+                                                              "forceRebuildToday":  true
                                                           },
-                                  "forceWithinMinutes":  20,
+                                  "forceWithinMinutes":  30,
                                   "decision":  "planned",
                                   "status":  "pending"
                               },
@@ -1083,17 +1029,17 @@
                                   "eventKey":  "sim_11_COL_at_CHC_pk824668_g1",
                                   "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_11_COL_at_CHC_pk824668_g1.json",
                                   "inputFingerprint":  "",
-                                  "previousInputFingerprint":  "64f2a843ff28025b6ac93ab687cdec5edbb936c3485120bf302c08d5a99ab8f4",
+                                  "previousInputFingerprint":  "",
                                   "eventStartTimeUtc":  null,
                                   "timeToStartMinutes":  null,
-                                  "policyId":  "sport:mlb:default",
-                                  "policySource":  "sport",
-                                  "policySelectionMode":  "optimal",
+                                  "policyId":  "policy:forced-rebuild",
+                                  "policySource":  "rerun",
+                                  "policySelectionMode":  "forced",
                                   "isExploratory":  false,
                                   "policyKeyParameters":  {
-                                                              "forceWithinMinutes":  20
+                                                              "forceRebuildToday":  true
                                                           },
-                                  "forceWithinMinutes":  20,
+                                  "forceWithinMinutes":  30,
                                   "decision":  "planned",
                                   "status":  "pending"
                               },
@@ -1103,15 +1049,15 @@
                                   "eventKey":  "sim_12_PIT_at_ATH_pk824992_g1",
                                   "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_12_PIT_at_ATH_pk824992_g1.json",
                                   "inputFingerprint":  "",
-                                  "previousInputFingerprint":  "64f2a843ff28025b6ac93ab687cdec5edbb936c3485120bf302c08d5a99ab8f4",
+                                  "previousInputFingerprint":  "",
                                   "eventStartTimeUtc":  null,
                                   "timeToStartMinutes":  null,
-                                  "policyId":  "sport:mlb:balanced",
-                                  "policySource":  "sport",
-                                  "policySelectionMode":  "exploratory",
-                                  "isExploratory":  true,
+                                  "policyId":  "policy:forced-rebuild",
+                                  "policySource":  "rerun",
+                                  "policySelectionMode":  "forced",
+                                  "isExploratory":  false,
                                   "policyKeyParameters":  {
-                                                              "forceWithinMinutes":  30
+                                                              "forceRebuildToday":  true
                                                           },
                                   "forceWithinMinutes":  30,
                                   "decision":  "planned",
@@ -1123,17 +1069,17 @@
                                   "eventKey":  "sim_13_BAL_at_SEA_pk823127_g1",
                                   "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_13_BAL_at_SEA_pk823127_g1.json",
                                   "inputFingerprint":  "",
-                                  "previousInputFingerprint":  "64f2a843ff28025b6ac93ab687cdec5edbb936c3485120bf302c08d5a99ab8f4",
+                                  "previousInputFingerprint":  "",
                                   "eventStartTimeUtc":  null,
                                   "timeToStartMinutes":  null,
-                                  "policyId":  "sport:mlb:default",
-                                  "policySource":  "sport",
-                                  "policySelectionMode":  "optimal",
+                                  "policyId":  "policy:forced-rebuild",
+                                  "policySource":  "rerun",
+                                  "policySelectionMode":  "forced",
                                   "isExploratory":  false,
                                   "policyKeyParameters":  {
-                                                              "forceWithinMinutes":  20
+                                                              "forceRebuildToday":  true
                                                           },
-                                  "forceWithinMinutes":  20,
+                                  "forceWithinMinutes":  30,
                                   "decision":  "planned",
                                   "status":  "pending"
                               },
@@ -1143,15 +1089,15 @@
                                   "eventKey":  "sim_1_KC_at_WSH_pk822721_g1",
                                   "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_1_KC_at_WSH_pk822721_g1.json",
                                   "inputFingerprint":  "",
-                                  "previousInputFingerprint":  "64f2a843ff28025b6ac93ab687cdec5edbb936c3485120bf302c08d5a99ab8f4",
+                                  "previousInputFingerprint":  "",
                                   "eventStartTimeUtc":  null,
                                   "timeToStartMinutes":  null,
-                                  "policyId":  "sport:mlb:balanced",
-                                  "policySource":  "sport",
-                                  "policySelectionMode":  "exploratory",
-                                  "isExploratory":  true,
+                                  "policyId":  "policy:forced-rebuild",
+                                  "policySource":  "rerun",
+                                  "policySelectionMode":  "forced",
+                                  "isExploratory":  false,
                                   "policyKeyParameters":  {
-                                                              "forceWithinMinutes":  30
+                                                              "forceRebuildToday":  true
                                                           },
                                   "forceWithinMinutes":  30,
                                   "decision":  "planned",
@@ -1163,17 +1109,17 @@
                                   "eventKey":  "sim_2_MIA_at_PHI_pk823450_g1",
                                   "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_2_MIA_at_PHI_pk823450_g1.json",
                                   "inputFingerprint":  "",
-                                  "previousInputFingerprint":  "64f2a843ff28025b6ac93ab687cdec5edbb936c3485120bf302c08d5a99ab8f4",
+                                  "previousInputFingerprint":  "",
                                   "eventStartTimeUtc":  null,
                                   "timeToStartMinutes":  null,
-                                  "policyId":  "sport:mlb:default",
-                                  "policySource":  "sport",
-                                  "policySelectionMode":  "optimal",
+                                  "policyId":  "policy:forced-rebuild",
+                                  "policySource":  "rerun",
+                                  "policySelectionMode":  "forced",
                                   "isExploratory":  false,
                                   "policyKeyParameters":  {
-                                                              "forceWithinMinutes":  20
+                                                              "forceRebuildToday":  true
                                                           },
-                                  "forceWithinMinutes":  20,
+                                  "forceWithinMinutes":  30,
                                   "decision":  "planned",
                                   "status":  "pending"
                               },
@@ -1183,15 +1129,15 @@
                                   "eventKey":  "sim_3_DET_at_HOU_pk824178_g1",
                                   "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_3_DET_at_HOU_pk824178_g1.json",
                                   "inputFingerprint":  "",
-                                  "previousInputFingerprint":  "64f2a843ff28025b6ac93ab687cdec5edbb936c3485120bf302c08d5a99ab8f4",
+                                  "previousInputFingerprint":  "",
                                   "eventStartTimeUtc":  null,
                                   "timeToStartMinutes":  null,
-                                  "policyId":  "sport:mlb:balanced",
-                                  "policySource":  "sport",
-                                  "policySelectionMode":  "exploratory",
-                                  "isExploratory":  true,
+                                  "policyId":  "policy:forced-rebuild",
+                                  "policySource":  "rerun",
+                                  "policySelectionMode":  "forced",
+                                  "isExploratory":  false,
                                   "policyKeyParameters":  {
-                                                              "forceWithinMinutes":  30
+                                                              "forceRebuildToday":  true
                                                           },
                                   "forceWithinMinutes":  30,
                                   "decision":  "planned",
@@ -1203,17 +1149,17 @@
                                   "eventKey":  "sim_4_SD_at_STL_pk823044_g1",
                                   "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_4_SD_at_STL_pk823044_g1.json",
                                   "inputFingerprint":  "",
-                                  "previousInputFingerprint":  "64f2a843ff28025b6ac93ab687cdec5edbb936c3485120bf302c08d5a99ab8f4",
+                                  "previousInputFingerprint":  "",
                                   "eventStartTimeUtc":  null,
                                   "timeToStartMinutes":  null,
-                                  "policyId":  "sport:mlb:default",
-                                  "policySource":  "sport",
-                                  "policySelectionMode":  "optimal",
+                                  "policyId":  "policy:forced-rebuild",
+                                  "policySource":  "rerun",
+                                  "policySelectionMode":  "forced",
                                   "isExploratory":  false,
                                   "policyKeyParameters":  {
-                                                              "forceWithinMinutes":  20
+                                                              "forceRebuildToday":  true
                                                           },
-                                  "forceWithinMinutes":  20,
+                                  "forceWithinMinutes":  30,
                                   "decision":  "planned",
                                   "status":  "pending"
                               },
@@ -1223,17 +1169,17 @@
                                   "eventKey":  "sim_5_TB_at_LAD_pk823940_g1",
                                   "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_5_TB_at_LAD_pk823940_g1.json",
                                   "inputFingerprint":  "",
-                                  "previousInputFingerprint":  "64f2a843ff28025b6ac93ab687cdec5edbb936c3485120bf302c08d5a99ab8f4",
+                                  "previousInputFingerprint":  "",
                                   "eventStartTimeUtc":  null,
                                   "timeToStartMinutes":  null,
-                                  "policyId":  "sport:mlb:default",
-                                  "policySource":  "sport",
-                                  "policySelectionMode":  "optimal",
+                                  "policyId":  "policy:forced-rebuild",
+                                  "policySource":  "rerun",
+                                  "policySelectionMode":  "forced",
                                   "isExploratory":  false,
                                   "policyKeyParameters":  {
-                                                              "forceWithinMinutes":  20
+                                                              "forceRebuildToday":  true
                                                           },
-                                  "forceWithinMinutes":  20,
+                                  "forceWithinMinutes":  30,
                                   "decision":  "planned",
                                   "status":  "pending"
                               },
@@ -1243,17 +1189,17 @@
                                   "eventKey":  "sim_6_LAA_at_AZ_pk825072_g1",
                                   "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_6_LAA_at_AZ_pk825072_g1.json",
                                   "inputFingerprint":  "",
-                                  "previousInputFingerprint":  "64f2a843ff28025b6ac93ab687cdec5edbb936c3485120bf302c08d5a99ab8f4",
+                                  "previousInputFingerprint":  "",
                                   "eventStartTimeUtc":  null,
                                   "timeToStartMinutes":  null,
-                                  "policyId":  "sport:mlb:default",
-                                  "policySource":  "sport",
-                                  "policySelectionMode":  "optimal",
+                                  "policyId":  "policy:forced-rebuild",
+                                  "policySource":  "rerun",
+                                  "policySelectionMode":  "forced",
                                   "isExploratory":  false,
                                   "policyKeyParameters":  {
-                                                              "forceWithinMinutes":  20
+                                                              "forceRebuildToday":  true
                                                           },
-                                  "forceWithinMinutes":  20,
+                                  "forceWithinMinutes":  30,
                                   "decision":  "planned",
                                   "status":  "pending"
                               },
@@ -1263,17 +1209,17 @@
                                   "eventKey":  "sim_7_TOR_at_BOS_pk824746_g1",
                                   "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_7_TOR_at_BOS_pk824746_g1.json",
                                   "inputFingerprint":  "",
-                                  "previousInputFingerprint":  "64f2a843ff28025b6ac93ab687cdec5edbb936c3485120bf302c08d5a99ab8f4",
+                                  "previousInputFingerprint":  "",
                                   "eventStartTimeUtc":  null,
                                   "timeToStartMinutes":  null,
-                                  "policyId":  "sport:mlb:default",
-                                  "policySource":  "sport",
-                                  "policySelectionMode":  "optimal",
+                                  "policyId":  "policy:forced-rebuild",
+                                  "policySource":  "rerun",
+                                  "policySelectionMode":  "forced",
                                   "isExploratory":  false,
                                   "policyKeyParameters":  {
-                                                              "forceWithinMinutes":  20
+                                                              "forceRebuildToday":  true
                                                           },
-                                  "forceWithinMinutes":  20,
+                                  "forceWithinMinutes":  30,
                                   "decision":  "planned",
                                   "status":  "pending"
                               },
@@ -1283,17 +1229,17 @@
                                   "eventKey":  "sim_8_CWS_at_NYY_pk823536_g1",
                                   "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_8_CWS_at_NYY_pk823536_g1.json",
                                   "inputFingerprint":  "",
-                                  "previousInputFingerprint":  "64f2a843ff28025b6ac93ab687cdec5edbb936c3485120bf302c08d5a99ab8f4",
+                                  "previousInputFingerprint":  "",
                                   "eventStartTimeUtc":  null,
                                   "timeToStartMinutes":  null,
-                                  "policyId":  "sport:mlb:default",
-                                  "policySource":  "sport",
-                                  "policySelectionMode":  "optimal",
+                                  "policyId":  "policy:forced-rebuild",
+                                  "policySource":  "rerun",
+                                  "policySelectionMode":  "forced",
                                   "isExploratory":  false,
                                   "policyKeyParameters":  {
-                                                              "forceWithinMinutes":  20
+                                                              "forceRebuildToday":  true
                                                           },
-                                  "forceWithinMinutes":  20,
+                                  "forceWithinMinutes":  30,
                                   "decision":  "planned",
                                   "status":  "pending"
                               },
@@ -1303,17 +1249,17 @@
                                   "eventKey":  "sim_9_SF_at_ATL_pk824913_g1",
                                   "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_9_SF_at_ATL_pk824913_g1.json",
                                   "inputFingerprint":  "",
-                                  "previousInputFingerprint":  "64f2a843ff28025b6ac93ab687cdec5edbb936c3485120bf302c08d5a99ab8f4",
+                                  "previousInputFingerprint":  "",
                                   "eventStartTimeUtc":  null,
                                   "timeToStartMinutes":  null,
-                                  "policyId":  "sport:mlb:default",
-                                  "policySource":  "sport",
-                                  "policySelectionMode":  "optimal",
+                                  "policyId":  "policy:forced-rebuild",
+                                  "policySource":  "rerun",
+                                  "policySelectionMode":  "forced",
                                   "isExploratory":  false,
                                   "policyKeyParameters":  {
-                                                              "forceWithinMinutes":  20
+                                                              "forceRebuildToday":  true
                                                           },
-                                  "forceWithinMinutes":  20,
+                                  "forceWithinMinutes":  30,
                                   "decision":  "planned",
                                   "status":  "pending"
                               },
@@ -1322,18 +1268,18 @@
                                   "workflow":  "vendored_daily_update",
                                   "eventKey":  "smart_sim_2026-06-17_CHI_NYL",
                                   "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_CHI_NYL.json",
-                                  "inputFingerprint":  "a9c3165697afe5e76bc33a2a0f769f7b72164284c7022f28e59a4b34e8b3f32b",
-                                  "previousInputFingerprint":  "f5165f49b8ee669230870cef2090ede22885ddbdce515e11cc35e7faaebbe879",
+                                  "inputFingerprint":  "1903f17e6870b9413f9b73eb94799335e8e21dcd5c0c7318af6d4ef8594d2f2f",
+                                  "previousInputFingerprint":  "a9c3165697afe5e76bc33a2a0f769f7b72164284c7022f28e59a4b34e8b3f32b",
                                   "eventStartTimeUtc":  null,
                                   "timeToStartMinutes":  null,
-                                  "policyId":  "sport:wnba:default",
-                                  "policySource":  "sport",
-                                  "policySelectionMode":  "optimal",
+                                  "policyId":  "policy:forced-rebuild",
+                                  "policySource":  "rerun",
+                                  "policySelectionMode":  "forced",
                                   "isExploratory":  false,
                                   "policyKeyParameters":  {
-                                                              "forceWithinMinutes":  40
+                                                              "forceRebuildToday":  true
                                                           },
-                                  "forceWithinMinutes":  40,
+                                  "forceWithinMinutes":  30,
                                   "decision":  "planned",
                                   "status":  "pending"
                               },
@@ -1342,18 +1288,18 @@
                                   "workflow":  "vendored_daily_update",
                                   "eventKey":  "smart_sim_2026-06-17_CON_WSH",
                                   "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_CON_WSH.json",
-                                  "inputFingerprint":  "a9c3165697afe5e76bc33a2a0f769f7b72164284c7022f28e59a4b34e8b3f32b",
-                                  "previousInputFingerprint":  "f5165f49b8ee669230870cef2090ede22885ddbdce515e11cc35e7faaebbe879",
+                                  "inputFingerprint":  "1903f17e6870b9413f9b73eb94799335e8e21dcd5c0c7318af6d4ef8594d2f2f",
+                                  "previousInputFingerprint":  "a9c3165697afe5e76bc33a2a0f769f7b72164284c7022f28e59a4b34e8b3f32b",
                                   "eventStartTimeUtc":  null,
                                   "timeToStartMinutes":  null,
-                                  "policyId":  "sport:wnba:default",
-                                  "policySource":  "sport",
-                                  "policySelectionMode":  "optimal",
+                                  "policyId":  "policy:forced-rebuild",
+                                  "policySource":  "rerun",
+                                  "policySelectionMode":  "forced",
                                   "isExploratory":  false,
                                   "policyKeyParameters":  {
-                                                              "forceWithinMinutes":  40
+                                                              "forceRebuildToday":  true
                                                           },
-                                  "forceWithinMinutes":  40,
+                                  "forceWithinMinutes":  30,
                                   "decision":  "planned",
                                   "status":  "pending"
                               },
@@ -1362,18 +1308,18 @@
                                   "workflow":  "vendored_daily_update",
                                   "eventKey":  "smart_sim_2026-06-17_GSV_DAL",
                                   "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_GSV_DAL.json",
-                                  "inputFingerprint":  "a9c3165697afe5e76bc33a2a0f769f7b72164284c7022f28e59a4b34e8b3f32b",
-                                  "previousInputFingerprint":  "f5165f49b8ee669230870cef2090ede22885ddbdce515e11cc35e7faaebbe879",
+                                  "inputFingerprint":  "1903f17e6870b9413f9b73eb94799335e8e21dcd5c0c7318af6d4ef8594d2f2f",
+                                  "previousInputFingerprint":  "a9c3165697afe5e76bc33a2a0f769f7b72164284c7022f28e59a4b34e8b3f32b",
                                   "eventStartTimeUtc":  null,
                                   "timeToStartMinutes":  null,
-                                  "policyId":  "sport:wnba:default",
-                                  "policySource":  "sport",
-                                  "policySelectionMode":  "optimal",
+                                  "policyId":  "policy:forced-rebuild",
+                                  "policySource":  "rerun",
+                                  "policySelectionMode":  "forced",
                                   "isExploratory":  false,
                                   "policyKeyParameters":  {
-                                                              "forceWithinMinutes":  40
+                                                              "forceRebuildToday":  true
                                                           },
-                                  "forceWithinMinutes":  40,
+                                  "forceWithinMinutes":  30,
                                   "decision":  "planned",
                                   "status":  "pending"
                               },
@@ -1382,18 +1328,18 @@
                                   "workflow":  "vendored_daily_update",
                                   "eventKey":  "smart_sim_2026-06-17_LAS_MIN",
                                   "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_LAS_MIN.json",
-                                  "inputFingerprint":  "a9c3165697afe5e76bc33a2a0f769f7b72164284c7022f28e59a4b34e8b3f32b",
-                                  "previousInputFingerprint":  "f5165f49b8ee669230870cef2090ede22885ddbdce515e11cc35e7faaebbe879",
+                                  "inputFingerprint":  "1903f17e6870b9413f9b73eb94799335e8e21dcd5c0c7318af6d4ef8594d2f2f",
+                                  "previousInputFingerprint":  "a9c3165697afe5e76bc33a2a0f769f7b72164284c7022f28e59a4b34e8b3f32b",
                                   "eventStartTimeUtc":  null,
                                   "timeToStartMinutes":  null,
-                                  "policyId":  "sport:wnba:default",
-                                  "policySource":  "sport",
-                                  "policySelectionMode":  "optimal",
+                                  "policyId":  "policy:forced-rebuild",
+                                  "policySource":  "rerun",
+                                  "policySelectionMode":  "forced",
                                   "isExploratory":  false,
                                   "policyKeyParameters":  {
-                                                              "forceWithinMinutes":  40
+                                                              "forceRebuildToday":  true
                                                           },
-                                  "forceWithinMinutes":  40,
+                                  "forceWithinMinutes":  30,
                                   "decision":  "planned",
                                   "status":  "pending"
                               },
@@ -1402,18 +1348,18 @@
                                   "workflow":  "vendored_daily_update",
                                   "eventKey":  "smart_sim_2026-06-17_PHX_LVA",
                                   "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_PHX_LVA.json",
-                                  "inputFingerprint":  "a9c3165697afe5e76bc33a2a0f769f7b72164284c7022f28e59a4b34e8b3f32b",
-                                  "previousInputFingerprint":  "f5165f49b8ee669230870cef2090ede22885ddbdce515e11cc35e7faaebbe879",
+                                  "inputFingerprint":  "1903f17e6870b9413f9b73eb94799335e8e21dcd5c0c7318af6d4ef8594d2f2f",
+                                  "previousInputFingerprint":  "a9c3165697afe5e76bc33a2a0f769f7b72164284c7022f28e59a4b34e8b3f32b",
                                   "eventStartTimeUtc":  null,
                                   "timeToStartMinutes":  null,
-                                  "policyId":  "sport:wnba:default",
-                                  "policySource":  "sport",
-                                  "policySelectionMode":  "optimal",
+                                  "policyId":  "policy:forced-rebuild",
+                                  "policySource":  "rerun",
+                                  "policySelectionMode":  "forced",
                                   "isExploratory":  false,
                                   "policyKeyParameters":  {
-                                                              "forceWithinMinutes":  40
+                                                              "forceRebuildToday":  true
                                                           },
-                                  "forceWithinMinutes":  40,
+                                  "forceWithinMinutes":  30,
                                   "decision":  "planned",
                                   "status":  "pending"
                               },
@@ -1422,18 +1368,18 @@
                                   "workflow":  "vendored_daily_update",
                                   "eventKey":  "smart_sim_2026-06-17_POR_SEA",
                                   "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_POR_SEA.json",
-                                  "inputFingerprint":  "a9c3165697afe5e76bc33a2a0f769f7b72164284c7022f28e59a4b34e8b3f32b",
-                                  "previousInputFingerprint":  "f5165f49b8ee669230870cef2090ede22885ddbdce515e11cc35e7faaebbe879",
+                                  "inputFingerprint":  "1903f17e6870b9413f9b73eb94799335e8e21dcd5c0c7318af6d4ef8594d2f2f",
+                                  "previousInputFingerprint":  "a9c3165697afe5e76bc33a2a0f769f7b72164284c7022f28e59a4b34e8b3f32b",
                                   "eventStartTimeUtc":  null,
                                   "timeToStartMinutes":  null,
-                                  "policyId":  "sport:wnba:default",
-                                  "policySource":  "sport",
-                                  "policySelectionMode":  "optimal",
+                                  "policyId":  "policy:forced-rebuild",
+                                  "policySource":  "rerun",
+                                  "policySelectionMode":  "forced",
                                   "isExploratory":  false,
                                   "policyKeyParameters":  {
-                                                              "forceWithinMinutes":  40
+                                                              "forceRebuildToday":  true
                                                           },
-                                  "forceWithinMinutes":  40,
+                                  "forceWithinMinutes":  30,
                                   "decision":  "planned",
                                   "status":  "pending"
                               },
@@ -1442,18 +1388,18 @@
                                   "workflow":  "vendored_daily_update",
                                   "eventKey":  "smart_sim_2026-06-17_bundle",
                                   "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_bundle.json",
-                                  "inputFingerprint":  "94362c759d060759984af3eaac58f1123b0ce9b8f126f6f71d8c7009feb9094b",
-                                  "previousInputFingerprint":  "1e38f92d742b3758f0c4464f494d1e469a1b8d987529e357b7f4c0bcf31120cc",
+                                  "inputFingerprint":  "6c789e549b0985542ff846978d1b455d23d716f0ded007f84bf624589e446623",
+                                  "previousInputFingerprint":  "94362c759d060759984af3eaac58f1123b0ce9b8f126f6f71d8c7009feb9094b",
                                   "eventStartTimeUtc":  null,
                                   "timeToStartMinutes":  null,
-                                  "policyId":  "sport:nhl:default",
-                                  "policySource":  "sport",
-                                  "policySelectionMode":  "default",
+                                  "policyId":  "policy:forced-rebuild",
+                                  "policySource":  "rerun",
+                                  "policySelectionMode":  "forced",
                                   "isExploratory":  false,
                                   "policyKeyParameters":  {
-                                                              "forceWithinMinutes":  25
+                                                              "forceRebuildToday":  true
                                                           },
-                                  "forceWithinMinutes":  25,
+                                  "forceWithinMinutes":  30,
                                   "decision":  "planned",
                                   "status":  "pending"
                               }
@@ -1465,11 +1411,11 @@
                                 "eventKey":  "sim_0_NYM_at_CIN_pk824503_g1",
                                 "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_0_NYM_at_CIN_pk824503_g1.json",
                                 "inputFingerprint":  "",
-                                "previousInputFingerprint":  "64f2a843ff28025b6ac93ab687cdec5edbb936c3485120bf302c08d5a99ab8f4",
-                                "policyId":  "sport:mlb:default",
-                                "policySource":  "sport",
+                                "previousInputFingerprint":  "",
+                                "policyId":  "policy:forced-rebuild",
+                                "policySource":  "rerun",
                                 "policyKeyParameters":  {
-                                                            "forceWithinMinutes":  20
+                                                            "forceRebuildToday":  true
                                                         },
                                 "decision":  "planned",
                                 "status":  "pending"
@@ -1480,11 +1426,11 @@
                                 "eventKey":  "sim_10_CLE_at_MIL_pk823774_g1",
                                 "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_10_CLE_at_MIL_pk823774_g1.json",
                                 "inputFingerprint":  "",
-                                "previousInputFingerprint":  "64f2a843ff28025b6ac93ab687cdec5edbb936c3485120bf302c08d5a99ab8f4",
-                                "policyId":  "sport:mlb:default",
-                                "policySource":  "sport",
+                                "previousInputFingerprint":  "",
+                                "policyId":  "policy:forced-rebuild",
+                                "policySource":  "rerun",
                                 "policyKeyParameters":  {
-                                                            "forceWithinMinutes":  20
+                                                            "forceRebuildToday":  true
                                                         },
                                 "decision":  "planned",
                                 "status":  "pending"
@@ -1495,11 +1441,11 @@
                                 "eventKey":  "sim_11_COL_at_CHC_pk824668_g1",
                                 "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_11_COL_at_CHC_pk824668_g1.json",
                                 "inputFingerprint":  "",
-                                "previousInputFingerprint":  "64f2a843ff28025b6ac93ab687cdec5edbb936c3485120bf302c08d5a99ab8f4",
-                                "policyId":  "sport:mlb:default",
-                                "policySource":  "sport",
+                                "previousInputFingerprint":  "",
+                                "policyId":  "policy:forced-rebuild",
+                                "policySource":  "rerun",
                                 "policyKeyParameters":  {
-                                                            "forceWithinMinutes":  20
+                                                            "forceRebuildToday":  true
                                                         },
                                 "decision":  "planned",
                                 "status":  "pending"
@@ -1510,11 +1456,11 @@
                                 "eventKey":  "sim_12_PIT_at_ATH_pk824992_g1",
                                 "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_12_PIT_at_ATH_pk824992_g1.json",
                                 "inputFingerprint":  "",
-                                "previousInputFingerprint":  "64f2a843ff28025b6ac93ab687cdec5edbb936c3485120bf302c08d5a99ab8f4",
-                                "policyId":  "sport:mlb:balanced",
-                                "policySource":  "sport",
+                                "previousInputFingerprint":  "",
+                                "policyId":  "policy:forced-rebuild",
+                                "policySource":  "rerun",
                                 "policyKeyParameters":  {
-                                                            "forceWithinMinutes":  30
+                                                            "forceRebuildToday":  true
                                                         },
                                 "decision":  "planned",
                                 "status":  "pending"
@@ -1525,11 +1471,11 @@
                                 "eventKey":  "sim_13_BAL_at_SEA_pk823127_g1",
                                 "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_13_BAL_at_SEA_pk823127_g1.json",
                                 "inputFingerprint":  "",
-                                "previousInputFingerprint":  "64f2a843ff28025b6ac93ab687cdec5edbb936c3485120bf302c08d5a99ab8f4",
-                                "policyId":  "sport:mlb:default",
-                                "policySource":  "sport",
+                                "previousInputFingerprint":  "",
+                                "policyId":  "policy:forced-rebuild",
+                                "policySource":  "rerun",
                                 "policyKeyParameters":  {
-                                                            "forceWithinMinutes":  20
+                                                            "forceRebuildToday":  true
                                                         },
                                 "decision":  "planned",
                                 "status":  "pending"
@@ -1540,11 +1486,11 @@
                                 "eventKey":  "sim_1_KC_at_WSH_pk822721_g1",
                                 "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_1_KC_at_WSH_pk822721_g1.json",
                                 "inputFingerprint":  "",
-                                "previousInputFingerprint":  "64f2a843ff28025b6ac93ab687cdec5edbb936c3485120bf302c08d5a99ab8f4",
-                                "policyId":  "sport:mlb:balanced",
-                                "policySource":  "sport",
+                                "previousInputFingerprint":  "",
+                                "policyId":  "policy:forced-rebuild",
+                                "policySource":  "rerun",
                                 "policyKeyParameters":  {
-                                                            "forceWithinMinutes":  30
+                                                            "forceRebuildToday":  true
                                                         },
                                 "decision":  "planned",
                                 "status":  "pending"
@@ -1555,11 +1501,11 @@
                                 "eventKey":  "sim_2_MIA_at_PHI_pk823450_g1",
                                 "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_2_MIA_at_PHI_pk823450_g1.json",
                                 "inputFingerprint":  "",
-                                "previousInputFingerprint":  "64f2a843ff28025b6ac93ab687cdec5edbb936c3485120bf302c08d5a99ab8f4",
-                                "policyId":  "sport:mlb:default",
-                                "policySource":  "sport",
+                                "previousInputFingerprint":  "",
+                                "policyId":  "policy:forced-rebuild",
+                                "policySource":  "rerun",
                                 "policyKeyParameters":  {
-                                                            "forceWithinMinutes":  20
+                                                            "forceRebuildToday":  true
                                                         },
                                 "decision":  "planned",
                                 "status":  "pending"
@@ -1570,11 +1516,11 @@
                                 "eventKey":  "sim_3_DET_at_HOU_pk824178_g1",
                                 "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_3_DET_at_HOU_pk824178_g1.json",
                                 "inputFingerprint":  "",
-                                "previousInputFingerprint":  "64f2a843ff28025b6ac93ab687cdec5edbb936c3485120bf302c08d5a99ab8f4",
-                                "policyId":  "sport:mlb:balanced",
-                                "policySource":  "sport",
+                                "previousInputFingerprint":  "",
+                                "policyId":  "policy:forced-rebuild",
+                                "policySource":  "rerun",
                                 "policyKeyParameters":  {
-                                                            "forceWithinMinutes":  30
+                                                            "forceRebuildToday":  true
                                                         },
                                 "decision":  "planned",
                                 "status":  "pending"
@@ -1585,11 +1531,11 @@
                                 "eventKey":  "sim_4_SD_at_STL_pk823044_g1",
                                 "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_4_SD_at_STL_pk823044_g1.json",
                                 "inputFingerprint":  "",
-                                "previousInputFingerprint":  "64f2a843ff28025b6ac93ab687cdec5edbb936c3485120bf302c08d5a99ab8f4",
-                                "policyId":  "sport:mlb:default",
-                                "policySource":  "sport",
+                                "previousInputFingerprint":  "",
+                                "policyId":  "policy:forced-rebuild",
+                                "policySource":  "rerun",
                                 "policyKeyParameters":  {
-                                                            "forceWithinMinutes":  20
+                                                            "forceRebuildToday":  true
                                                         },
                                 "decision":  "planned",
                                 "status":  "pending"
@@ -1600,11 +1546,11 @@
                                 "eventKey":  "sim_5_TB_at_LAD_pk823940_g1",
                                 "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_5_TB_at_LAD_pk823940_g1.json",
                                 "inputFingerprint":  "",
-                                "previousInputFingerprint":  "64f2a843ff28025b6ac93ab687cdec5edbb936c3485120bf302c08d5a99ab8f4",
-                                "policyId":  "sport:mlb:default",
-                                "policySource":  "sport",
+                                "previousInputFingerprint":  "",
+                                "policyId":  "policy:forced-rebuild",
+                                "policySource":  "rerun",
                                 "policyKeyParameters":  {
-                                                            "forceWithinMinutes":  20
+                                                            "forceRebuildToday":  true
                                                         },
                                 "decision":  "planned",
                                 "status":  "pending"
@@ -1615,11 +1561,11 @@
                                 "eventKey":  "sim_6_LAA_at_AZ_pk825072_g1",
                                 "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_6_LAA_at_AZ_pk825072_g1.json",
                                 "inputFingerprint":  "",
-                                "previousInputFingerprint":  "64f2a843ff28025b6ac93ab687cdec5edbb936c3485120bf302c08d5a99ab8f4",
-                                "policyId":  "sport:mlb:default",
-                                "policySource":  "sport",
+                                "previousInputFingerprint":  "",
+                                "policyId":  "policy:forced-rebuild",
+                                "policySource":  "rerun",
                                 "policyKeyParameters":  {
-                                                            "forceWithinMinutes":  20
+                                                            "forceRebuildToday":  true
                                                         },
                                 "decision":  "planned",
                                 "status":  "pending"
@@ -1630,11 +1576,11 @@
                                 "eventKey":  "sim_7_TOR_at_BOS_pk824746_g1",
                                 "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_7_TOR_at_BOS_pk824746_g1.json",
                                 "inputFingerprint":  "",
-                                "previousInputFingerprint":  "64f2a843ff28025b6ac93ab687cdec5edbb936c3485120bf302c08d5a99ab8f4",
-                                "policyId":  "sport:mlb:default",
-                                "policySource":  "sport",
+                                "previousInputFingerprint":  "",
+                                "policyId":  "policy:forced-rebuild",
+                                "policySource":  "rerun",
                                 "policyKeyParameters":  {
-                                                            "forceWithinMinutes":  20
+                                                            "forceRebuildToday":  true
                                                         },
                                 "decision":  "planned",
                                 "status":  "pending"
@@ -1645,11 +1591,11 @@
                                 "eventKey":  "sim_8_CWS_at_NYY_pk823536_g1",
                                 "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_8_CWS_at_NYY_pk823536_g1.json",
                                 "inputFingerprint":  "",
-                                "previousInputFingerprint":  "64f2a843ff28025b6ac93ab687cdec5edbb936c3485120bf302c08d5a99ab8f4",
-                                "policyId":  "sport:mlb:default",
-                                "policySource":  "sport",
+                                "previousInputFingerprint":  "",
+                                "policyId":  "policy:forced-rebuild",
+                                "policySource":  "rerun",
                                 "policyKeyParameters":  {
-                                                            "forceWithinMinutes":  20
+                                                            "forceRebuildToday":  true
                                                         },
                                 "decision":  "planned",
                                 "status":  "pending"
@@ -1660,11 +1606,11 @@
                                 "eventKey":  "sim_9_SF_at_ATL_pk824913_g1",
                                 "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_9_SF_at_ATL_pk824913_g1.json",
                                 "inputFingerprint":  "",
-                                "previousInputFingerprint":  "64f2a843ff28025b6ac93ab687cdec5edbb936c3485120bf302c08d5a99ab8f4",
-                                "policyId":  "sport:mlb:default",
-                                "policySource":  "sport",
+                                "previousInputFingerprint":  "",
+                                "policyId":  "policy:forced-rebuild",
+                                "policySource":  "rerun",
                                 "policyKeyParameters":  {
-                                                            "forceWithinMinutes":  20
+                                                            "forceRebuildToday":  true
                                                         },
                                 "decision":  "planned",
                                 "status":  "pending"
@@ -1674,12 +1620,12 @@
                                 "workflow":  "vendored_daily_update",
                                 "eventKey":  "smart_sim_2026-06-17_CHI_NYL",
                                 "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_CHI_NYL.json",
-                                "inputFingerprint":  "a9c3165697afe5e76bc33a2a0f769f7b72164284c7022f28e59a4b34e8b3f32b",
-                                "previousInputFingerprint":  "f5165f49b8ee669230870cef2090ede22885ddbdce515e11cc35e7faaebbe879",
-                                "policyId":  "sport:wnba:default",
-                                "policySource":  "sport",
+                                "inputFingerprint":  "1903f17e6870b9413f9b73eb94799335e8e21dcd5c0c7318af6d4ef8594d2f2f",
+                                "previousInputFingerprint":  "a9c3165697afe5e76bc33a2a0f769f7b72164284c7022f28e59a4b34e8b3f32b",
+                                "policyId":  "policy:forced-rebuild",
+                                "policySource":  "rerun",
                                 "policyKeyParameters":  {
-                                                            "forceWithinMinutes":  40
+                                                            "forceRebuildToday":  true
                                                         },
                                 "decision":  "planned",
                                 "status":  "pending"
@@ -1689,12 +1635,12 @@
                                 "workflow":  "vendored_daily_update",
                                 "eventKey":  "smart_sim_2026-06-17_CON_WSH",
                                 "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_CON_WSH.json",
-                                "inputFingerprint":  "a9c3165697afe5e76bc33a2a0f769f7b72164284c7022f28e59a4b34e8b3f32b",
-                                "previousInputFingerprint":  "f5165f49b8ee669230870cef2090ede22885ddbdce515e11cc35e7faaebbe879",
-                                "policyId":  "sport:wnba:default",
-                                "policySource":  "sport",
+                                "inputFingerprint":  "1903f17e6870b9413f9b73eb94799335e8e21dcd5c0c7318af6d4ef8594d2f2f",
+                                "previousInputFingerprint":  "a9c3165697afe5e76bc33a2a0f769f7b72164284c7022f28e59a4b34e8b3f32b",
+                                "policyId":  "policy:forced-rebuild",
+                                "policySource":  "rerun",
                                 "policyKeyParameters":  {
-                                                            "forceWithinMinutes":  40
+                                                            "forceRebuildToday":  true
                                                         },
                                 "decision":  "planned",
                                 "status":  "pending"
@@ -1704,12 +1650,12 @@
                                 "workflow":  "vendored_daily_update",
                                 "eventKey":  "smart_sim_2026-06-17_GSV_DAL",
                                 "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_GSV_DAL.json",
-                                "inputFingerprint":  "a9c3165697afe5e76bc33a2a0f769f7b72164284c7022f28e59a4b34e8b3f32b",
-                                "previousInputFingerprint":  "f5165f49b8ee669230870cef2090ede22885ddbdce515e11cc35e7faaebbe879",
-                                "policyId":  "sport:wnba:default",
-                                "policySource":  "sport",
+                                "inputFingerprint":  "1903f17e6870b9413f9b73eb94799335e8e21dcd5c0c7318af6d4ef8594d2f2f",
+                                "previousInputFingerprint":  "a9c3165697afe5e76bc33a2a0f769f7b72164284c7022f28e59a4b34e8b3f32b",
+                                "policyId":  "policy:forced-rebuild",
+                                "policySource":  "rerun",
                                 "policyKeyParameters":  {
-                                                            "forceWithinMinutes":  40
+                                                            "forceRebuildToday":  true
                                                         },
                                 "decision":  "planned",
                                 "status":  "pending"
@@ -1719,12 +1665,12 @@
                                 "workflow":  "vendored_daily_update",
                                 "eventKey":  "smart_sim_2026-06-17_LAS_MIN",
                                 "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_LAS_MIN.json",
-                                "inputFingerprint":  "a9c3165697afe5e76bc33a2a0f769f7b72164284c7022f28e59a4b34e8b3f32b",
-                                "previousInputFingerprint":  "f5165f49b8ee669230870cef2090ede22885ddbdce515e11cc35e7faaebbe879",
-                                "policyId":  "sport:wnba:default",
-                                "policySource":  "sport",
+                                "inputFingerprint":  "1903f17e6870b9413f9b73eb94799335e8e21dcd5c0c7318af6d4ef8594d2f2f",
+                                "previousInputFingerprint":  "a9c3165697afe5e76bc33a2a0f769f7b72164284c7022f28e59a4b34e8b3f32b",
+                                "policyId":  "policy:forced-rebuild",
+                                "policySource":  "rerun",
                                 "policyKeyParameters":  {
-                                                            "forceWithinMinutes":  40
+                                                            "forceRebuildToday":  true
                                                         },
                                 "decision":  "planned",
                                 "status":  "pending"
@@ -1734,12 +1680,12 @@
                                 "workflow":  "vendored_daily_update",
                                 "eventKey":  "smart_sim_2026-06-17_PHX_LVA",
                                 "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_PHX_LVA.json",
-                                "inputFingerprint":  "a9c3165697afe5e76bc33a2a0f769f7b72164284c7022f28e59a4b34e8b3f32b",
-                                "previousInputFingerprint":  "f5165f49b8ee669230870cef2090ede22885ddbdce515e11cc35e7faaebbe879",
-                                "policyId":  "sport:wnba:default",
-                                "policySource":  "sport",
+                                "inputFingerprint":  "1903f17e6870b9413f9b73eb94799335e8e21dcd5c0c7318af6d4ef8594d2f2f",
+                                "previousInputFingerprint":  "a9c3165697afe5e76bc33a2a0f769f7b72164284c7022f28e59a4b34e8b3f32b",
+                                "policyId":  "policy:forced-rebuild",
+                                "policySource":  "rerun",
                                 "policyKeyParameters":  {
-                                                            "forceWithinMinutes":  40
+                                                            "forceRebuildToday":  true
                                                         },
                                 "decision":  "planned",
                                 "status":  "pending"
@@ -1749,12 +1695,12 @@
                                 "workflow":  "vendored_daily_update",
                                 "eventKey":  "smart_sim_2026-06-17_POR_SEA",
                                 "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_POR_SEA.json",
-                                "inputFingerprint":  "a9c3165697afe5e76bc33a2a0f769f7b72164284c7022f28e59a4b34e8b3f32b",
-                                "previousInputFingerprint":  "f5165f49b8ee669230870cef2090ede22885ddbdce515e11cc35e7faaebbe879",
-                                "policyId":  "sport:wnba:default",
-                                "policySource":  "sport",
+                                "inputFingerprint":  "1903f17e6870b9413f9b73eb94799335e8e21dcd5c0c7318af6d4ef8594d2f2f",
+                                "previousInputFingerprint":  "a9c3165697afe5e76bc33a2a0f769f7b72164284c7022f28e59a4b34e8b3f32b",
+                                "policyId":  "policy:forced-rebuild",
+                                "policySource":  "rerun",
                                 "policyKeyParameters":  {
-                                                            "forceWithinMinutes":  40
+                                                            "forceRebuildToday":  true
                                                         },
                                 "decision":  "planned",
                                 "status":  "pending"
@@ -1764,12 +1710,12 @@
                                 "workflow":  "vendored_daily_update",
                                 "eventKey":  "smart_sim_2026-06-17_bundle",
                                 "artifactPath":  "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_bundle.json",
-                                "inputFingerprint":  "94362c759d060759984af3eaac58f1123b0ce9b8f126f6f71d8c7009feb9094b",
-                                "previousInputFingerprint":  "1e38f92d742b3758f0c4464f494d1e469a1b8d987529e357b7f4c0bcf31120cc",
-                                "policyId":  "sport:nhl:default",
-                                "policySource":  "sport",
+                                "inputFingerprint":  "6c789e549b0985542ff846978d1b455d23d716f0ded007f84bf624589e446623",
+                                "previousInputFingerprint":  "94362c759d060759984af3eaac58f1123b0ce9b8f126f6f71d8c7009feb9094b",
+                                "policyId":  "policy:forced-rebuild",
+                                "policySource":  "rerun",
                                 "policyKeyParameters":  {
-                                                            "forceWithinMinutes":  25
+                                                            "forceRebuildToday":  true
                                                         },
                                 "decision":  "planned",
                                 "status":  "pending"
@@ -1777,75 +1723,21 @@
                         ],
     "policyPerformance":  [
                               {
-                                  "policyId":  "sport:mlb:default",
-                                  "policySource":  "sport",
+                                  "policyId":  "",
+                                  "policySource":  "rerun",
                                   "keyParameters":  {
-                                                        "forceWithinMinutes":  20
+                                                        "forceRebuildToday":  true
                                                     },
-                                  "recordCount":  11,
-                                  "sampleSize":  11,
+                                  "recordCount":  21,
+                                  "sampleSize":  21,
                                   "exploratoryCount":  0,
                                   "exploratoryRate":  0,
-                                  "plannedCount":  11,
-                                  "skippedCount":  0,
-                                  "dryRunCount":  0,
-                                  "withinWindowCount":  0,
-                                  "averageTimeToStartMinutes":  null,
-                                  "averageForceWithinMinutes":  20,
-                                  "roi":  null
-                              },
-                              {
-                                  "policyId":  "sport:mlb:balanced",
-                                  "policySource":  "sport",
-                                  "keyParameters":  {
-                                                        "forceWithinMinutes":  30
-                                                    },
-                                  "recordCount":  3,
-                                  "sampleSize":  3,
-                                  "exploratoryCount":  3,
-                                  "exploratoryRate":  1,
-                                  "plannedCount":  3,
+                                  "plannedCount":  21,
                                   "skippedCount":  0,
                                   "dryRunCount":  0,
                                   "withinWindowCount":  0,
                                   "averageTimeToStartMinutes":  null,
                                   "averageForceWithinMinutes":  30,
-                                  "roi":  null
-                              },
-                              {
-                                  "policyId":  "sport:wnba:default",
-                                  "policySource":  "sport",
-                                  "keyParameters":  {
-                                                        "forceWithinMinutes":  40
-                                                    },
-                                  "recordCount":  6,
-                                  "sampleSize":  6,
-                                  "exploratoryCount":  0,
-                                  "exploratoryRate":  0,
-                                  "plannedCount":  6,
-                                  "skippedCount":  0,
-                                  "dryRunCount":  0,
-                                  "withinWindowCount":  0,
-                                  "averageTimeToStartMinutes":  null,
-                                  "averageForceWithinMinutes":  40,
-                                  "roi":  null
-                              },
-                              {
-                                  "policyId":  "sport:nhl:default",
-                                  "policySource":  "sport",
-                                  "keyParameters":  {
-                                                        "forceWithinMinutes":  25
-                                                    },
-                                  "recordCount":  1,
-                                  "sampleSize":  1,
-                                  "exploratoryCount":  0,
-                                  "exploratoryRate":  0,
-                                  "plannedCount":  1,
-                                  "skippedCount":  0,
-                                  "dryRunCount":  0,
-                                  "withinWindowCount":  0,
-                                  "averageTimeToStartMinutes":  null,
-                                  "averageForceWithinMinutes":  25,
                                   "roi":  null
                               }
                           ],
@@ -2224,82 +2116,28 @@
                            "state":  {
                                          "runMode":  "standard",
                                          "overallStatus":  "started",
-                                         "currentStage":  "queued",
+                                         "currentStage":  "refresh_gate",
                                          "completedStages":  [
-
+                                                                 "source_update"
                                                              ],
                                          "failedStage":  null,
                                          "policyPerformance":  [
                                                                    {
-                                                                       "policyId":  "sport:mlb:default",
-                                                                       "policySource":  "sport",
+                                                                       "policyId":  "",
+                                                                       "policySource":  "rerun",
                                                                        "keyParameters":  {
-                                                                                             "forceWithinMinutes":  20
+                                                                                             "forceRebuildToday":  true
                                                                                          },
-                                                                       "recordCount":  11,
-                                                                       "sampleSize":  11,
+                                                                       "recordCount":  21,
+                                                                       "sampleSize":  21,
                                                                        "exploratoryCount":  0,
                                                                        "exploratoryRate":  0,
-                                                                       "plannedCount":  11,
-                                                                       "skippedCount":  0,
-                                                                       "dryRunCount":  0,
-                                                                       "withinWindowCount":  0,
-                                                                       "averageTimeToStartMinutes":  null,
-                                                                       "averageForceWithinMinutes":  20,
-                                                                       "roi":  null
-                                                                   },
-                                                                   {
-                                                                       "policyId":  "sport:mlb:balanced",
-                                                                       "policySource":  "sport",
-                                                                       "keyParameters":  {
-                                                                                             "forceWithinMinutes":  30
-                                                                                         },
-                                                                       "recordCount":  3,
-                                                                       "sampleSize":  3,
-                                                                       "exploratoryCount":  3,
-                                                                       "exploratoryRate":  1,
-                                                                       "plannedCount":  3,
+                                                                       "plannedCount":  21,
                                                                        "skippedCount":  0,
                                                                        "dryRunCount":  0,
                                                                        "withinWindowCount":  0,
                                                                        "averageTimeToStartMinutes":  null,
                                                                        "averageForceWithinMinutes":  30,
-                                                                       "roi":  null
-                                                                   },
-                                                                   {
-                                                                       "policyId":  "sport:wnba:default",
-                                                                       "policySource":  "sport",
-                                                                       "keyParameters":  {
-                                                                                             "forceWithinMinutes":  40
-                                                                                         },
-                                                                       "recordCount":  6,
-                                                                       "sampleSize":  6,
-                                                                       "exploratoryCount":  0,
-                                                                       "exploratoryRate":  0,
-                                                                       "plannedCount":  6,
-                                                                       "skippedCount":  0,
-                                                                       "dryRunCount":  0,
-                                                                       "withinWindowCount":  0,
-                                                                       "averageTimeToStartMinutes":  null,
-                                                                       "averageForceWithinMinutes":  40,
-                                                                       "roi":  null
-                                                                   },
-                                                                   {
-                                                                       "policyId":  "sport:nhl:default",
-                                                                       "policySource":  "sport",
-                                                                       "keyParameters":  {
-                                                                                             "forceWithinMinutes":  25
-                                                                                         },
-                                                                       "recordCount":  1,
-                                                                       "sampleSize":  1,
-                                                                       "exploratoryCount":  0,
-                                                                       "exploratoryRate":  0,
-                                                                       "plannedCount":  1,
-                                                                       "skippedCount":  0,
-                                                                       "dryRunCount":  0,
-                                                                       "withinWindowCount":  0,
-                                                                       "averageTimeToStartMinutes":  null,
-                                                                       "averageForceWithinMinutes":  25,
                                                                        "roi":  null
                                                                    }
                                                                ],
@@ -2374,11 +2212,259 @@
                                                                               }
                                                                           ]
                                                            },
-                                         "lastUpdatedAt":  "2026-06-25T13:01:07.4563133-05:00"
+                                         "lastUpdatedAt":  "2026-06-25T13:56:15.1588228-05:00"
                                      }
                        },
     "sportRuns":  [
+                      {
+                          "sport":  "mlb",
+                          "workflow":  "vendored_daily_update",
+                          "name":  "MLB vendored daily update",
+                          "startedAt":  "2026-06-25T13:01:54.7628262-05:00",
+                          "completedAt":  "2026-06-25T13:24:51.6553625-05:00",
+                          "status":  "ok",
+                          "error":  null,
+                          "workingDirectory":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\vendor\\mlb_bettingv2",
+                          "environmentOverrides":  {
+                                                       "MLB_BETTING_DATA_ROOT":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\source_artifacts\\data",
+                                                       "MLB_LIVE_LENS_DIR":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\live_lens",
+                                                       "ODDS_API_KEY":  "77ae1c35140c82da1675af85dde36a44"
+                                                   },
+                          "runtimePolicy":  {
+                                                "simsPerGame":  1000,
+                                                "workers":  4
+                                            },
+                          "command":  [
+                                          "C:\\Users\\tempadmin\\AppData\\Local\\Programs\\Python\\Python311-arm64\\python.exe",
+                                          "tools\\daily_update.py",
+                                          "--workflow",
+                                          "ui-daily",
+                                          "--date",
+                                          "2026-06-25",
+                                          "--season",
+                                          "2026",
+                                          "--sims",
+                                          "1000",
+                                          "--workers",
+                                          "4",
+                                          "--git-push",
+                                          "off",
+                                          "--validate-render-frontend",
+                                          "off",
+                                          "--build-next-day",
+                                          "on"
+                                      ],
+                          "mirrorManifestPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\manifests\\mirror_refresh_2026-06-25.json",
+                          "mirrorManifestExists":  false
+                      },
+                      {
+                          "sport":  "mlb",
+                          "workflow":  "syndicate_refresh",
+                          "name":  "MLB current-day live-lens refresh",
+                          "startedAt":  "2026-06-25T13:24:51.7161866-05:00",
+                          "completedAt":  "2026-06-25T13:29:00.1350016-05:00",
+                          "status":  "ok",
+                          "error":  null,
+                          "workingDirectory":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate",
+                          "environmentOverrides":  {
+                                                       "MLB_BETTING_DATA_ROOT":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\source_artifacts\\data",
+                                                       "MLB_LIVE_LENS_DIR":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\live_lens",
+                                                       "ODDS_API_KEY":  "77ae1c35140c82da1675af85dde36a44"
+                                                   },
+                          "runtimePolicy":  {
+                                                "simsPerGame":  1000,
+                                                "workers":  4
+                                            },
+                          "command":  [
+                                          "C:\\Users\\tempadmin\\AppData\\Local\\Programs\\Python\\Python311-arm64\\python.exe",
+                                          "scripts\\refresh_mlb_oddsapi.py",
+                                          "--date",
+                                          "2026-06-25",
+                                          "--source-root",
+                                          "data\\mlb_source\\source_artifacts",
+                                          "--artifact-root",
+                                          "data\\mlb_source",
+                                          "--overwrite",
+                                          "on"
+                                      ],
+                          "mirrorManifestPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\manifests\\mirror_refresh_2026-06-25.json",
+                          "mirrorManifestExists":  false
+                      },
+                      {
+                          "sport":  "wnba",
+                          "workflow":  "vendored_daily_update",
+                          "name":  "WNBA vendored daily update",
+                          "startedAt":  "2026-06-25T13:29:00.1998451-05:00",
+                          "completedAt":  "2026-06-25T13:34:12.5049117-05:00",
+                          "status":  "ok",
+                          "error":  null,
+                          "workingDirectory":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate",
+                          "environmentOverrides":  {
+                                                       "REFRESH_PREDICT_PROPS_SMART_SIM_N_SIMS":  "1000",
+                                                       "REFRESH_PREDICT_PROPS_SMART_SIM_WORKERS":  "4",
+                                                       "SYNDICATE_WNBA_SOURCE_APP_FALLBACK":  "0",
+                                                       "APP_TZ":  "America/Chicago",
+                                                       "APP_TZ_OFFSET_HOURS":  "-6",
+                                                       "ODDS_API_KEY":  "77ae1c35140c82da1675af85dde36a44"
+                                                   },
+                          "runtimePolicy":  {
+                                                "smartsimNSims":  1000,
+                                                "smartsimWorkers":  4
+                                            },
+                          "command":  [
+                                          "C:\\Users\\tempadmin\\AppData\\Local\\Programs\\Python\\Python311-arm64\\python.exe",
+                                          "scripts\\refresh_wnba_oddsapi_props.py",
+                                          "--date",
+                                          "2026-06-25",
+                                          "--source-root",
+                                          "vendor\\wnba_betting_repo",
+                                          "--artifact-root",
+                                          "data\\wnba_source\\source_artifacts",
+                                          "--log-file",
+                                          "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-06-25\\20260625_130105\\wnba_props_refresh.log",
+                                          "--force-refresh",
+                                          "--days-ahead",
+                                          "0",
+                                          "--do-edges",
+                                          "--do-export"
+                                      ],
+                          "mirrorManifestPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\wnba_source\\manifests\\mirror_refresh_2026-06-25.json",
+                          "mirrorManifestExists":  false
+                      },
+                      {
+                          "sport":  "wnba",
+                          "workflow":  "syndicate_mirror",
+                          "name":  "WNBA source mirror refresh",
+                          "startedAt":  "2026-06-25T13:34:12.5271229-05:00",
+                          "completedAt":  "2026-06-25T13:34:13.1179721-05:00",
+                          "status":  "ok",
+                          "error":  null,
+                          "workingDirectory":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate",
+                          "environmentOverrides":  {
 
+                                                   },
+                          "runtimePolicy":  {
+                                                "smartsimNSims":  1000,
+                                                "smartsimWorkers":  4
+                                            },
+                          "command":  [
+                                          "powershell.exe",
+                                          "-NoProfile",
+                                          "-ExecutionPolicy",
+                                          "Bypass",
+                                          "-File",
+                                          "scripts\\refresh_wnba_source_mirror.ps1",
+                                          "-Date",
+                                          "2026-06-25"
+                                      ],
+                          "mirrorManifestPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\wnba_source\\manifests\\mirror_refresh_2026-06-25.json",
+                          "mirrorManifestExists":  false
+                      },
+                      {
+                          "sport":  "nhl",
+                          "workflow":  "vendored_daily_update",
+                          "name":  "NHL vendored daily update",
+                          "startedAt":  "2026-06-25T13:34:13.2609872-05:00",
+                          "completedAt":  "2026-06-25T13:37:56.0959406-05:00",
+                          "status":  "ok",
+                          "error":  null,
+                          "workingDirectory":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate",
+                          "environmentOverrides":  {
+                                                       "ODDS_API_KEY":  "77ae1c35140c82da1675af85dde36a44"
+                                                   },
+                          "runtimePolicy":  {
+                                                "gameSimSamples":  1000,
+                                                "propsBoxscoreNSims":  1000
+                                            },
+                          "command":  [
+                                          "C:\\Users\\tempadmin\\AppData\\Local\\Programs\\Python\\Python311-arm64\\python.exe",
+                                          "scripts\\refresh_nhl_oddsapi.py",
+                                          "--date",
+                                          "2026-06-25",
+                                          "--source-root",
+                                          "vendor\\nhl_betting_repo",
+                                          "--artifact-root",
+                                          "data\\nhl_source\\source_artifacts",
+                                          "--days-ahead",
+                                          "1",
+                                          "--props-boxscore-n-sims",
+                                          "1000"
+                                      ],
+                          "mirrorManifestPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nhl_source\\manifests\\mirror_refresh_2026-06-25.json",
+                          "mirrorManifestExists":  false
+                      },
+                      {
+                          "sport":  null,
+                          "workflow":  null,
+                          "name":  "NFL local odds refresh",
+                          "startedAt":  "2026-06-25T13:37:56.2348600-05:00",
+                          "completedAt":  "2026-06-25T13:37:58.7417637-05:00",
+                          "status":  "ok",
+                          "error":  null,
+                          "workingDirectory":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate",
+                          "environmentOverrides":  {
+                                                       "ODDS_API_KEY":  "77ae1c35140c82da1675af85dde36a44"
+                                                   },
+                          "runtimePolicy":  null,
+                          "command":  [
+                                          "C:\\Users\\tempadmin\\AppData\\Local\\Programs\\Python\\Python311-arm64\\python.exe",
+                                          "scripts\\refresh_nfl_oddsapi.py",
+                                          "--artifact-root",
+                                          "data\\nfl_source\\source_artifacts"
+                                      ],
+                          "mirrorManifestPath":  null,
+                          "mirrorManifestExists":  false
+                      },
+                      {
+                          "sport":  null,
+                          "workflow":  null,
+                          "name":  "NCAAF local odds refresh",
+                          "startedAt":  "2026-06-25T13:37:58.7579074-05:00",
+                          "completedAt":  "2026-06-25T13:37:59.2082163-05:00",
+                          "status":  "ok",
+                          "error":  null,
+                          "workingDirectory":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate",
+                          "environmentOverrides":  {
+                                                       "ODDS_API_KEY":  "77ae1c35140c82da1675af85dde36a44"
+                                                   },
+                          "runtimePolicy":  null,
+                          "command":  [
+                                          "C:\\Users\\tempadmin\\AppData\\Local\\Programs\\Python\\Python311-arm64\\python.exe",
+                                          "scripts\\refresh_ncaaf_oddsapi.py",
+                                          "--source-root",
+                                          "C:\\Users\\tempadmin\\OneDrive\\Coding\\NCAAFCompare",
+                                          "--artifact-root",
+                                          "data\\ncaaf_source\\source_artifacts"
+                                      ],
+                          "mirrorManifestPath":  null,
+                          "mirrorManifestExists":  false
+                      },
+                      {
+                          "sport":  "ncaab",
+                          "workflow":  "syndicate_mirror",
+                          "name":  "NCAAB source mirror export",
+                          "startedAt":  "2026-06-25T13:37:59.2257889-05:00",
+                          "completedAt":  "2026-06-25T13:37:59.3826578-05:00",
+                          "status":  "ok",
+                          "error":  null,
+                          "workingDirectory":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate",
+                          "environmentOverrides":  {
+
+                                                   },
+                          "runtimePolicy":  {
+
+                                            },
+                          "command":  [
+                                          "C:\\Users\\tempadmin\\AppData\\Local\\Programs\\Python\\Python311-arm64\\python.exe",
+                                          "scripts\\export_ncaab_source_mirror.py",
+                                          "data\\ncaab_source\\api",
+                                          "2026-06-25",
+                                          "--raw-root",
+                                          "data\\ncaab_source\\raw_outputs"
+                                      ],
+                          "mirrorManifestPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\ncaab_source\\manifests\\mirror_refresh_2026-06-25.json",
+                          "mirrorManifestExists":  false
+                      }
                   ],
     "skipGitPush":  false,
     "gitRemote":  null,
@@ -2402,10 +2488,19 @@
                         "oddsSports":  null,
                         "oddsRegions":  null,
                         "manifestPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-06-25\\20260625_130105\\migration\\refresh_status_manifest.json",
-                        "runSummaryPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-06-25\\20260625_130105\\migration\\refresh_and_gate_run.json"
+                        "runSummaryPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-06-25\\20260625_130105\\migration\\refresh_and_gate_run.json",
+                        "status":  "ok"
                     },
     "pushResults":  [
-
+                        {
+                            "name":  "Syndicate",
+                            "repoPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate",
+                            "remote":  "",
+                            "branch":  "main",
+                            "commitMessage":  " 2026-06-25 (pre-source publish)",
+                            "status":  "pushed",
+                            "commit":  "2832bd41c9adcff12a6f8c1f37e5729d261d7a85"
+                        }
                     ],
     "runTrace":  {
                      "eventSimExecutionCount":  21,
@@ -2413,8 +2508,8 @@
                      "inputFingerprintCount":  2,
                      "artifactPathCount":  21,
                      "inputFingerprints":  [
-                                               "a9c3165697afe5e76bc33a2a0f769f7b72164284c7022f28e59a4b34e8b3f32b",
-                                               "94362c759d060759984af3eaac58f1123b0ce9b8f126f6f71d8c7009feb9094b"
+                                               "1903f17e6870b9413f9b73eb94799335e8e21dcd5c0c7318af6d4ef8594d2f2f",
+                                               "6c789e549b0985542ff846978d1b455d23d716f0ded007f84bf624589e446623"
                                            ],
                      "artifactPaths":  [
                                            "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_0_NYM_at_CIN_pk824503_g1.json",

@@ -1,8 +1,8 @@
 {
   "date": "2026-06-25",
-  "generatedAt": "2026-06-25T12:47:52-05:00",
-  "dataRoot": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data",
-  "liveLensDir": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/live_lens",
+  "generatedAt": "2026-06-25T13:46:05-05:00",
+  "dataRoot": "data",
+  "liveLensDir": "data/live_lens",
   "optimizationRegime": {
     "date": "2026-06-25",
     "kind": "forward_tuned_live",
@@ -16,8 +16,8 @@
   },
   "counts": {
     "games": 9,
-    "live": 2,
-    "final": 0,
+    "live": 1,
+    "final": 1,
     "pregame": 7,
     "props": 0,
     "archivedLiveProps": 0
@@ -25,399 +25,17 @@
   "performance": {
     "marketsRefreshed": false,
     "marketRefreshMs": 0.0,
-    "totalMs": 2313.1,
-    "snapshotLoadMs": 1.5,
-    "simContextLoadMs": 1.0,
-    "propEvalMs": 0.1,
-    "gameLensMs": 1.2,
+    "totalMs": 927.3,
+    "snapshotLoadMs": 1.1,
+    "simContextLoadMs": 0.5,
+    "propEvalMs": 0.2,
+    "gameLensMs": 0.5,
     "gameCount": 9,
-    "liveGameCount": 2,
+    "liveGameCount": 1,
     "feedFetchCount": 9,
     "persistMs": 0.0
   },
   "games": [
-    {
-      "gamePk": 822961,
-      "status": {
-        "abstract": "Live",
-        "detailed": "In Progress"
-      },
-      "startTime": "11:10 AM",
-      "matchup": {
-        "away": {
-          "id": 118,
-          "abbr": "KC",
-          "name": "Kansas City Royals",
-          "logo": "https://www.mlbstatic.com/team-logos/118.svg"
-        },
-        "home": {
-          "id": 139,
-          "abbr": "TB",
-          "name": "Tampa Bay Rays",
-          "logo": "https://www.mlbstatic.com/team-logos/139.svg"
-        },
-        "score": {
-          "away": 0,
-          "home": 6
-        },
-        "liveText": "Bottom 5 | 0-0, 2 out | Richie Palacios vs Seth Lugo"
-      },
-      "predictions": null,
-      "gameMarkets": {
-        "totals": null,
-        "ml": null
-      },
-      "gameLens": [
-        {
-          "key": "live",
-          "label": "Bottom 5",
-          "closed": false,
-          "projection": {
-            "away": null,
-            "home": null,
-            "total": null,
-            "homeMargin": null,
-            "closed": false
-          },
-          "actualSegment": {
-            "away": 0.0,
-            "home": 6.0,
-            "total": 6.0,
-            "homeMargin": 6.0
-          },
-          "progress": {
-            "fraction": 0.5370370370370371,
-            "inning": 5,
-            "half": "bottom",
-            "outs": 2,
-            "outsRecorded": 29,
-            "remainingOuts": 25,
-            "label": "Bottom 5"
-          },
-          "baselineHomeWinProb": null,
-          "modelHomeWinProb": null,
-          "source": "live_projection",
-          "markets": {
-            "moneyline": {
-              "homeOdds": null,
-              "awayOdds": null,
-              "drawOdds": null,
-              "marketHomeProb": null,
-              "pick": null,
-              "edge": null,
-              "reason": "Bottom 5 currently sits at home 6, away 0."
-            },
-            "spread": {
-              "homeLine": null,
-              "homeOdds": null,
-              "awayOdds": null,
-              "pick": null,
-              "edge": null,
-              "reason": "Bottom 5 currently sits at home 6, away 0."
-            },
-            "total": {
-              "line": null,
-              "overOdds": null,
-              "underOdds": null,
-              "pick": null,
-              "edge": null,
-              "reason": "Bottom 5 currently sits at home 6, away 0."
-            }
-          }
-        },
-        {
-          "key": "first1",
-          "label": "F1",
-          "closed": false,
-          "projection": {
-            "away": null,
-            "home": null,
-            "total": null,
-            "homeMargin": null,
-            "closed": false
-          },
-          "actualSegment": {
-            "away": 0.0,
-            "home": 2.0,
-            "total": 2.0,
-            "homeMargin": 2.0
-          },
-          "progress": {
-            "fraction": 0.5370370370370371,
-            "inning": 5,
-            "half": "bottom",
-            "outs": 2,
-            "outsRecorded": 29,
-            "remainingOuts": 25,
-            "label": "Bottom 5"
-          },
-          "baselineHomeWinProb": null,
-          "modelHomeWinProb": null,
-          "source": "segment_projection",
-          "markets": {
-            "moneyline": {
-              "homeOdds": null,
-              "awayOdds": null,
-              "drawOdds": null,
-              "marketHomeProb": null,
-              "pick": null,
-              "edge": null,
-              "reason": "F1 currently sits at home 2, away 0."
-            },
-            "spread": {
-              "homeLine": null,
-              "homeOdds": null,
-              "awayOdds": null,
-              "pick": null,
-              "edge": null,
-              "reason": "F1 currently sits at home 2, away 0."
-            },
-            "total": {
-              "line": null,
-              "overOdds": null,
-              "underOdds": null,
-              "pick": null,
-              "edge": null,
-              "reason": "F1 currently sits at home 2, away 0."
-            }
-          }
-        },
-        {
-          "key": "first3",
-          "label": "F3",
-          "closed": false,
-          "projection": {
-            "away": null,
-            "home": null,
-            "total": null,
-            "homeMargin": null,
-            "closed": false
-          },
-          "actualSegment": {
-            "away": 0.0,
-            "home": 2.0,
-            "total": 2.0,
-            "homeMargin": 2.0
-          },
-          "progress": {
-            "fraction": 0.5370370370370371,
-            "inning": 5,
-            "half": "bottom",
-            "outs": 2,
-            "outsRecorded": 29,
-            "remainingOuts": 25,
-            "label": "Bottom 5"
-          },
-          "baselineHomeWinProb": null,
-          "modelHomeWinProb": null,
-          "source": "segment_projection",
-          "markets": {
-            "moneyline": {
-              "homeOdds": null,
-              "awayOdds": null,
-              "drawOdds": null,
-              "marketHomeProb": null,
-              "pick": null,
-              "edge": null,
-              "reason": "F3 currently sits at home 2, away 0."
-            },
-            "spread": {
-              "homeLine": null,
-              "homeOdds": null,
-              "awayOdds": null,
-              "pick": null,
-              "edge": null,
-              "reason": "F3 currently sits at home 2, away 0."
-            },
-            "total": {
-              "line": null,
-              "overOdds": null,
-              "underOdds": null,
-              "pick": null,
-              "edge": null,
-              "reason": "F3 currently sits at home 2, away 0."
-            }
-          }
-        },
-        {
-          "key": "first5",
-          "label": "F5",
-          "closed": false,
-          "projection": {
-            "away": null,
-            "home": null,
-            "total": null,
-            "homeMargin": null,
-            "closed": false
-          },
-          "actualSegment": {
-            "away": 0.0,
-            "home": 6.0,
-            "total": 6.0,
-            "homeMargin": 6.0
-          },
-          "progress": {
-            "fraction": 0.5370370370370371,
-            "inning": 5,
-            "half": "bottom",
-            "outs": 2,
-            "outsRecorded": 29,
-            "remainingOuts": 25,
-            "label": "Bottom 5"
-          },
-          "baselineHomeWinProb": null,
-          "modelHomeWinProb": null,
-          "source": "segment_projection",
-          "markets": {
-            "moneyline": {
-              "homeOdds": null,
-              "awayOdds": null,
-              "drawOdds": null,
-              "marketHomeProb": null,
-              "pick": null,
-              "edge": null,
-              "reason": "F5 currently sits at home 6, away 0."
-            },
-            "spread": {
-              "homeLine": null,
-              "homeOdds": null,
-              "awayOdds": null,
-              "pick": null,
-              "edge": null,
-              "reason": "F5 currently sits at home 6, away 0."
-            },
-            "total": {
-              "line": null,
-              "overOdds": null,
-              "underOdds": null,
-              "pick": null,
-              "edge": null,
-              "reason": "F5 currently sits at home 6, away 0."
-            }
-          }
-        },
-        {
-          "key": "first7",
-          "label": "F7",
-          "closed": false,
-          "projection": {
-            "away": null,
-            "home": null,
-            "total": null,
-            "homeMargin": null,
-            "closed": false
-          },
-          "actualSegment": {
-            "away": 0.0,
-            "home": 6.0,
-            "total": 6.0,
-            "homeMargin": 6.0
-          },
-          "progress": {
-            "fraction": 0.5370370370370371,
-            "inning": 5,
-            "half": "bottom",
-            "outs": 2,
-            "outsRecorded": 29,
-            "remainingOuts": 25,
-            "label": "Bottom 5"
-          },
-          "baselineHomeWinProb": null,
-          "modelHomeWinProb": null,
-          "source": "segment_projection",
-          "markets": {
-            "moneyline": {
-              "homeOdds": null,
-              "awayOdds": null,
-              "drawOdds": null,
-              "marketHomeProb": null,
-              "pick": null,
-              "edge": null,
-              "reason": "F7 currently sits at home 6, away 0."
-            },
-            "spread": {
-              "homeLine": null,
-              "homeOdds": null,
-              "awayOdds": null,
-              "pick": null,
-              "edge": null,
-              "reason": "F7 currently sits at home 6, away 0."
-            },
-            "total": {
-              "line": null,
-              "overOdds": null,
-              "underOdds": null,
-              "pick": null,
-              "edge": null,
-              "reason": "F7 currently sits at home 6, away 0."
-            }
-          }
-        },
-        {
-          "key": "full",
-          "label": "Full Game",
-          "closed": false,
-          "projection": {
-            "away": null,
-            "home": null,
-            "total": null,
-            "homeMargin": null,
-            "closed": false
-          },
-          "actualSegment": {
-            "away": 0.0,
-            "home": 6.0,
-            "total": 6.0,
-            "homeMargin": 6.0
-          },
-          "progress": {
-            "fraction": 0.5370370370370371,
-            "inning": 5,
-            "half": "bottom",
-            "outs": 2,
-            "outsRecorded": 29,
-            "remainingOuts": 25,
-            "label": "Bottom 5"
-          },
-          "baselineHomeWinProb": null,
-          "modelHomeWinProb": null,
-          "source": "segment_projection",
-          "markets": {
-            "moneyline": {
-              "homeOdds": null,
-              "awayOdds": null,
-              "drawOdds": null,
-              "marketHomeProb": null,
-              "pick": null,
-              "edge": null,
-              "reason": "Full Game currently sits at home 6, away 0."
-            },
-            "spread": {
-              "homeLine": null,
-              "homeOdds": null,
-              "awayOdds": null,
-              "pick": null,
-              "edge": null,
-              "reason": "Full Game currently sits at home 6, away 0."
-            },
-            "total": {
-              "line": null,
-              "overOdds": null,
-              "underOdds": null,
-              "pick": null,
-              "edge": null,
-              "reason": "Full Game currently sits at home 6, away 0."
-            }
-          }
-        }
-      ],
-      "props": [],
-      "liveProps": [],
-      "archivedLiveProps": [],
-      "trackedProps": [],
-      "simContextAvailable": false,
-      "snapshotAvailable": true
-    },
     {
       "gamePk": 823366,
       "status": {
@@ -439,10 +57,10 @@
           "logo": "https://www.mlbstatic.com/team-logos/134.svg"
         },
         "score": {
-          "away": 0,
+          "away": 1,
           "home": 3
         },
-        "liveText": "Bottom 3 | 0-0, 2 out | Bryan Reynolds vs Bryce Miller"
+        "liveText": "Bottom 7 | 1-1, 3 out | Jared Triolo vs Eduard Bazardo"
       },
       "predictions": null,
       "gameMarkets": {
@@ -452,7 +70,7 @@
       "gameLens": [
         {
           "key": "live",
-          "label": "Bottom 3",
+          "label": "Bottom 7",
           "closed": false,
           "projection": {
             "away": null,
@@ -462,19 +80,19 @@
             "closed": false
           },
           "actualSegment": {
-            "away": 0.0,
+            "away": 1.0,
             "home": 3.0,
-            "total": 3.0,
-            "homeMargin": 3.0
+            "total": 4.0,
+            "homeMargin": 2.0
           },
           "progress": {
-            "fraction": 0.3148148148148148,
-            "inning": 3,
+            "fraction": 0.7592592592592593,
+            "inning": 7,
             "half": "bottom",
             "outs": 2,
-            "outsRecorded": 17,
-            "remainingOuts": 37,
-            "label": "Bottom 3"
+            "outsRecorded": 41,
+            "remainingOuts": 13,
+            "label": "Bottom 7"
           },
           "baselineHomeWinProb": null,
           "modelHomeWinProb": null,
@@ -487,7 +105,7 @@
               "marketHomeProb": null,
               "pick": null,
               "edge": null,
-              "reason": "Bottom 3 currently sits at home 3, away 0."
+              "reason": "Bottom 7 currently sits at home 3, away 1."
             },
             "spread": {
               "homeLine": null,
@@ -495,7 +113,7 @@
               "awayOdds": null,
               "pick": null,
               "edge": null,
-              "reason": "Bottom 3 currently sits at home 3, away 0."
+              "reason": "Bottom 7 currently sits at home 3, away 1."
             },
             "total": {
               "line": null,
@@ -503,7 +121,7 @@
               "underOdds": null,
               "pick": null,
               "edge": null,
-              "reason": "Bottom 3 currently sits at home 3, away 0."
+              "reason": "Bottom 7 currently sits at home 3, away 1."
             }
           }
         },
@@ -525,13 +143,13 @@
             "homeMargin": 1.0
           },
           "progress": {
-            "fraction": 0.3148148148148148,
-            "inning": 3,
+            "fraction": 0.7592592592592593,
+            "inning": 7,
             "half": "bottom",
             "outs": 2,
-            "outsRecorded": 17,
-            "remainingOuts": 37,
-            "label": "Bottom 3"
+            "outsRecorded": 41,
+            "remainingOuts": 13,
+            "label": "Bottom 7"
           },
           "baselineHomeWinProb": null,
           "modelHomeWinProb": null,
@@ -582,13 +200,13 @@
             "homeMargin": 3.0
           },
           "progress": {
-            "fraction": 0.3148148148148148,
-            "inning": 3,
+            "fraction": 0.7592592592592593,
+            "inning": 7,
             "half": "bottom",
             "outs": 2,
-            "outsRecorded": 17,
-            "remainingOuts": 37,
-            "label": "Bottom 3"
+            "outsRecorded": 41,
+            "remainingOuts": 13,
+            "label": "Bottom 7"
           },
           "baselineHomeWinProb": null,
           "modelHomeWinProb": null,
@@ -633,19 +251,19 @@
             "closed": false
           },
           "actualSegment": {
-            "away": 0.0,
+            "away": 1.0,
             "home": 3.0,
-            "total": 3.0,
-            "homeMargin": 3.0
+            "total": 4.0,
+            "homeMargin": 2.0
           },
           "progress": {
-            "fraction": 0.3148148148148148,
-            "inning": 3,
+            "fraction": 0.7592592592592593,
+            "inning": 7,
             "half": "bottom",
             "outs": 2,
-            "outsRecorded": 17,
-            "remainingOuts": 37,
-            "label": "Bottom 3"
+            "outsRecorded": 41,
+            "remainingOuts": 13,
+            "label": "Bottom 7"
           },
           "baselineHomeWinProb": null,
           "modelHomeWinProb": null,
@@ -658,7 +276,7 @@
               "marketHomeProb": null,
               "pick": null,
               "edge": null,
-              "reason": "F5 currently sits at home 3, away 0."
+              "reason": "F5 currently sits at home 3, away 1."
             },
             "spread": {
               "homeLine": null,
@@ -666,7 +284,7 @@
               "awayOdds": null,
               "pick": null,
               "edge": null,
-              "reason": "F5 currently sits at home 3, away 0."
+              "reason": "F5 currently sits at home 3, away 1."
             },
             "total": {
               "line": null,
@@ -674,7 +292,7 @@
               "underOdds": null,
               "pick": null,
               "edge": null,
-              "reason": "F5 currently sits at home 3, away 0."
+              "reason": "F5 currently sits at home 3, away 1."
             }
           }
         },
@@ -690,19 +308,19 @@
             "closed": false
           },
           "actualSegment": {
-            "away": 0.0,
+            "away": 1.0,
             "home": 3.0,
-            "total": 3.0,
-            "homeMargin": 3.0
+            "total": 4.0,
+            "homeMargin": 2.0
           },
           "progress": {
-            "fraction": 0.3148148148148148,
-            "inning": 3,
+            "fraction": 0.7592592592592593,
+            "inning": 7,
             "half": "bottom",
             "outs": 2,
-            "outsRecorded": 17,
-            "remainingOuts": 37,
-            "label": "Bottom 3"
+            "outsRecorded": 41,
+            "remainingOuts": 13,
+            "label": "Bottom 7"
           },
           "baselineHomeWinProb": null,
           "modelHomeWinProb": null,
@@ -715,7 +333,7 @@
               "marketHomeProb": null,
               "pick": null,
               "edge": null,
-              "reason": "F7 currently sits at home 3, away 0."
+              "reason": "F7 currently sits at home 3, away 1."
             },
             "spread": {
               "homeLine": null,
@@ -723,7 +341,7 @@
               "awayOdds": null,
               "pick": null,
               "edge": null,
-              "reason": "F7 currently sits at home 3, away 0."
+              "reason": "F7 currently sits at home 3, away 1."
             },
             "total": {
               "line": null,
@@ -731,7 +349,7 @@
               "underOdds": null,
               "pick": null,
               "edge": null,
-              "reason": "F7 currently sits at home 3, away 0."
+              "reason": "F7 currently sits at home 3, away 1."
             }
           }
         },
@@ -747,19 +365,19 @@
             "closed": false
           },
           "actualSegment": {
-            "away": 0.0,
+            "away": 1.0,
             "home": 3.0,
-            "total": 3.0,
-            "homeMargin": 3.0
+            "total": 4.0,
+            "homeMargin": 2.0
           },
           "progress": {
-            "fraction": 0.3148148148148148,
-            "inning": 3,
+            "fraction": 0.7592592592592593,
+            "inning": 7,
             "half": "bottom",
             "outs": 2,
-            "outsRecorded": 17,
-            "remainingOuts": 37,
-            "label": "Bottom 3"
+            "outsRecorded": 41,
+            "remainingOuts": 13,
+            "label": "Bottom 7"
           },
           "baselineHomeWinProb": null,
           "modelHomeWinProb": null,
@@ -772,7 +390,7 @@
               "marketHomeProb": null,
               "pick": null,
               "edge": null,
-              "reason": "Full Game currently sits at home 3, away 0."
+              "reason": "Full Game currently sits at home 3, away 1."
             },
             "spread": {
               "homeLine": null,
@@ -780,7 +398,7 @@
               "awayOdds": null,
               "pick": null,
               "edge": null,
-              "reason": "Full Game currently sits at home 3, away 0."
+              "reason": "Full Game currently sits at home 3, away 1."
             },
             "total": {
               "line": null,
@@ -788,7 +406,7 @@
               "underOdds": null,
               "pick": null,
               "edge": null,
-              "reason": "Full Game currently sits at home 3, away 0."
+              "reason": "Full Game currently sits at home 3, away 1."
             }
           }
         }
@@ -2669,6 +2287,45 @@
           }
         }
       ],
+      "props": [],
+      "liveProps": [],
+      "archivedLiveProps": [],
+      "trackedProps": [],
+      "simContextAvailable": false,
+      "snapshotAvailable": true
+    },
+    {
+      "gamePk": 822961,
+      "status": {
+        "abstract": "Final",
+        "detailed": "Final"
+      },
+      "startTime": "11:10 AM",
+      "matchup": {
+        "away": {
+          "id": 118,
+          "abbr": "KC",
+          "name": "Kansas City Royals",
+          "logo": "https://www.mlbstatic.com/team-logos/118.svg"
+        },
+        "home": {
+          "id": 139,
+          "abbr": "TB",
+          "name": "Tampa Bay Rays",
+          "logo": "https://www.mlbstatic.com/team-logos/139.svg"
+        },
+        "score": {
+          "away": 2,
+          "home": 13
+        },
+        "liveText": ""
+      },
+      "predictions": null,
+      "gameMarkets": {
+        "totals": null,
+        "ml": null
+      },
+      "gameLens": [],
       "props": [],
       "liveProps": [],
       "archivedLiveProps": [],

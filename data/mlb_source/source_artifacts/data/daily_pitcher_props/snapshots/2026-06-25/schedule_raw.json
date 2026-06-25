@@ -8,12 +8,12 @@
     "gameDate": "2026-06-25T16:10:00Z",
     "officialDate": "2026-06-25",
     "status": {
-      "abstractGameState": "Preview",
-      "codedGameState": "S",
-      "detailedState": "Scheduled",
-      "statusCode": "S",
+      "abstractGameState": "Live",
+      "codedGameState": "I",
+      "detailedState": "In Progress",
+      "statusCode": "I",
       "startTimeTBD": false,
-      "abstractGameCode": "P"
+      "abstractGameCode": "L"
     },
     "teams": {
       "away": {
@@ -65,11 +65,12 @@
           "active": true
         },
         "leagueRecord": {
-          "wins": 33,
-          "losses": 46,
+          "wins": 34,
+          "losses": 47,
           "ties": 0,
-          "pct": ".418"
+          "pct": ".420"
         },
+        "score": 0,
         "probablePitcher": {
           "id": 607625,
           "fullName": "Seth Lugo",
@@ -133,15 +134,16 @@
           "active": true
         },
         "leagueRecord": {
-          "wins": 43,
-          "losses": 32,
+          "wins": 44,
+          "losses": 33,
           "ties": 0,
-          "pct": ".573"
+          "pct": ".571"
         },
+        "score": 8,
         "probablePitcher": {
-          "id": 693855,
-          "fullName": "Ian Seymour",
-          "link": "/api/v1/people/693855"
+          "id": 668984,
+          "fullName": "Casey Legumina",
+          "link": "/api/v1/people/668984"
         },
         "splitSquad": false,
         "seriesNumber": 26,
@@ -188,12 +190,12 @@
     "gameDate": "2026-06-25T16:35:00Z",
     "officialDate": "2026-06-25",
     "status": {
-      "abstractGameState": "Preview",
-      "codedGameState": "S",
-      "detailedState": "Scheduled",
-      "statusCode": "S",
+      "abstractGameState": "Live",
+      "codedGameState": "I",
+      "detailedState": "In Progress",
+      "statusCode": "I",
       "startTimeTBD": false,
-      "abstractGameCode": "P"
+      "abstractGameCode": "L"
     },
     "teams": {
       "away": {
@@ -245,11 +247,12 @@
           "active": true
         },
         "leagueRecord": {
-          "wins": 40,
-          "losses": 39,
+          "wins": 41,
+          "losses": 40,
           "ties": 0,
           "pct": ".506"
         },
+        "score": 1,
         "probablePitcher": {
           "id": 682243,
           "fullName": "Bryce Miller",
@@ -313,11 +316,12 @@
           "active": true
         },
         "leagueRecord": {
-          "wins": 39,
-          "losses": 39,
+          "wins": 40,
+          "losses": 40,
           "ties": 0,
           "pct": ".500"
         },
+        "score": 3,
         "probablePitcher": {
           "id": 696149,
           "fullName": "Bubba Chandler",
@@ -369,9 +373,9 @@
     "officialDate": "2026-06-25",
     "status": {
       "abstractGameState": "Preview",
-      "codedGameState": "S",
-      "detailedState": "Scheduled",
-      "statusCode": "S",
+      "codedGameState": "P",
+      "detailedState": "Pre-Game",
+      "statusCode": "P",
       "startTimeTBD": false,
       "abstractGameCode": "P"
     },
@@ -426,10 +430,11 @@
         },
         "leagueRecord": {
           "wins": 38,
-          "losses": 40,
+          "losses": 42,
           "ties": 0,
-          "pct": ".487"
+          "pct": ".475"
         },
+        "score": 0,
         "probablePitcher": {
           "id": 605488,
           "fullName": "Jeffrey Springs",
@@ -493,11 +498,12 @@
           "active": true
         },
         "leagueRecord": {
-          "wins": 31,
+          "wins": 33,
           "losses": 46,
           "ties": 0,
-          "pct": ".403"
+          "pct": ".418"
         },
+        "score": 0,
         "probablePitcher": {
           "id": 694738,
           "fullName": "Landen Roupp",
@@ -605,10 +611,15 @@
           "active": true
         },
         "leagueRecord": {
-          "wins": 38,
+          "wins": 39,
           "losses": 43,
           "ties": 0,
-          "pct": ".469"
+          "pct": ".476"
+        },
+        "probablePitcher": {
+          "id": 837227,
+          "fullName": "Tatsuya Imai",
+          "link": "/api/v1/people/837227"
         },
         "splitSquad": false,
         "seriesNumber": 27,
@@ -669,9 +680,14 @@
         },
         "leagueRecord": {
           "wins": 34,
-          "losses": 44,
+          "losses": 46,
           "ties": 0,
-          "pct": ".436"
+          "pct": ".425"
+        },
+        "probablePitcher": {
+          "id": 675512,
+          "fullName": "Troy Melton",
+          "link": "/api/v1/people/675512"
         },
         "splitSquad": false,
         "seriesNumber": 27,
@@ -775,10 +791,10 @@
           "active": true
         },
         "leagueRecord": {
-          "wins": 42,
+          "wins": 44,
           "losses": 36,
           "ties": 0,
-          "pct": ".538"
+          "pct": ".550"
         },
         "probablePitcher": {
           "id": 650911,
@@ -844,9 +860,9 @@
         },
         "leagueRecord": {
           "wins": 41,
-          "losses": 38,
+          "losses": 40,
           "ties": 0,
-          "pct": ".519"
+          "pct": ".506"
         },
         "probablePitcher": {
           "id": 676917,
@@ -956,9 +972,14 @@
         },
         "leagueRecord": {
           "wins": 38,
-          "losses": 40,
+          "losses": 42,
           "ties": 0,
-          "pct": ".487"
+          "pct": ".475"
+        },
+        "probablePitcher": {
+          "id": 669022,
+          "fullName": "MacKenzie Gore",
+          "link": "/api/v1/people/669022"
         },
         "splitSquad": false,
         "seriesNumber": 27,
@@ -1019,9 +1040,14 @@
         },
         "leagueRecord": {
           "wins": 39,
-          "losses": 40,
+          "losses": 41,
           "ties": 0,
-          "pct": ".494"
+          "pct": ".488"
+        },
+        "probablePitcher": {
+          "id": 592332,
+          "fullName": "Kevin Gausman",
+          "link": "/api/v1/people/592332"
         },
         "splitSquad": false,
         "seriesNumber": 27,
@@ -1125,10 +1151,15 @@
           "active": true
         },
         "leagueRecord": {
-          "wins": 40,
+          "wins": 43,
           "losses": 37,
           "ties": 0,
-          "pct": ".519"
+          "pct": ".538"
+        },
+        "probablePitcher": {
+          "id": 571510,
+          "fullName": "Matthew Boyd",
+          "link": "/api/v1/people/571510"
         },
         "splitSquad": false,
         "seriesNumber": 26,
@@ -1189,9 +1220,9 @@
         },
         "leagueRecord": {
           "wins": 34,
-          "losses": 43,
+          "losses": 46,
           "ties": 0,
-          "pct": ".442"
+          "pct": ".425"
         },
         "probablePitcher": {
           "id": 642547,
@@ -1300,10 +1331,15 @@
           "active": true
         },
         "leagueRecord": {
-          "wins": 46,
+          "wins": 48,
           "losses": 31,
           "ties": 0,
-          "pct": ".597"
+          "pct": ".608"
+        },
+        "probablePitcher": {
+          "id": 693645,
+          "fullName": "Cam Schlittler",
+          "link": "/api/v1/people/693645"
         },
         "splitSquad": false,
         "seriesNumber": 27,
@@ -1363,10 +1399,15 @@
           "active": true
         },
         "leagueRecord": {
-          "wins": 31,
-          "losses": 45,
+          "wins": 32,
+          "losses": 46,
           "ties": 0,
-          "pct": ".408"
+          "pct": ".410"
+        },
+        "probablePitcher": {
+          "id": 813349,
+          "fullName": "Connelly Early",
+          "link": "/api/v1/people/813349"
         },
         "splitSquad": false,
         "seriesNumber": 27,
@@ -1470,10 +1511,10 @@
           "active": true
         },
         "leagueRecord": {
-          "wins": 39,
+          "wins": 41,
           "losses": 39,
           "ties": 0,
-          "pct": ".500"
+          "pct": ".513"
         },
         "probablePitcher": {
           "id": 668678,
@@ -1539,9 +1580,9 @@
         },
         "leagueRecord": {
           "wins": 42,
-          "losses": 34,
+          "losses": 36,
           "ties": 0,
-          "pct": ".553"
+          "pct": ".538"
         },
         "probablePitcher": {
           "id": 700241,

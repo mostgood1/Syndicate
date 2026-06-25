@@ -99,13 +99,16 @@
       }
     },
     "nfl_artifact_bundle": {
-      "inputHash": "730720e829cc8efe2d7d64823e36a014b89b6b6082d4f9458f62de242f8e4100",
-      "updatedAt": "2026-06-20T22:45:45.562668",
+      "inputHash": "da8f3194473f022c520a0a30969a6580b1d9108885f85ecb49c676af6b1c9566",
+      "updatedAt": "2026-06-25T18:37:58.675184",
       "outputs": [
         "data\\nfl_source\\source_artifacts\\current_week.json",
         "data\\nfl_source\\source_artifacts\\real_betting_lines_2026_06_15.json",
         "data\\nfl_source\\source_artifacts\\real_betting_lines_2026_06_16.json",
-        "data\\nfl_source\\source_artifacts\\real_betting_lines_2026_06_20.json",
+        "data\\nfl_source\\source_artifacts\\real_betting_lines_2026_06_22.json",
+        "data\\nfl_source\\source_artifacts\\real_betting_lines_2026_06_23.json",
+        "data\\nfl_source\\source_artifacts\\real_betting_lines_2026_06_24.json",
+        "data\\nfl_source\\source_artifacts\\real_betting_lines_2026_06_25.json",
         "data\\nfl_source\\source_artifacts\\oddsapi_player_props_2026_wk1.csv"
       ],
       "metadata": {
@@ -283,17 +286,14 @@
       }
     },
     "ncaaf_artifact_bundle": {
-      "inputHash": "ce03d06fb8ca5928ce18f6ce0209f67ef0a8c30a42e5f7fbab2a0a7cce8f57ae",
-      "updatedAt": "2026-06-15T00:00:02.428988",
+      "inputHash": "e7911e7d7993b3fcb002fd8a24864fa836259905c92c6c79e29fd98a088933e5",
+      "updatedAt": "2026-06-25T18:37:59.183977",
       "outputs": [
-        "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpqvce3a5p\\bundle\\recommendations_latest.json",
-        "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpqvce3a5p\\bundle\\recommendations_2025.csv",
-        "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpqvce3a5p\\bundle\\college_football_betting_lines_2025.csv",
-        "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpqvce3a5p\\bundle\\college_football_schedule_2025_predicted_totals_enhanced.csv",
-        "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpqvce3a5p\\bundle\\recommendations_summary"
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\ncaaf_source\\source_artifacts\\college_football_schedule_2025_predicted_totals_enhanced_20260525T111624Z.csv",
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\ncaaf_source\\source_artifacts\\recommendations_summary"
       ],
       "metadata": {
-        "artifact_root": "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpqvce3a5p\\bundle",
+        "artifact_root": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\ncaaf_source\\source_artifacts",
         "season": 2025
       }
     },
@@ -739,17 +739,63 @@
       }
     },
     "mlb_live_lens:2026-06-25": {
-      "inputHash": "a044796fc1a0edf017601a98a97c405235df3d3f0e2458d31498839798e79eb8",
-      "updatedAt": "2026-06-25T17:47:52.542154",
+      "inputHash": "db14a958963feb2244819410ce7120cd1174a9d9c68427933c465ef4b78523b0",
+      "updatedAt": "2026-06-25T18:24:57.109493",
       "outputs": [
-        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\data\\live_lens\\live_lens_report_2026_06_25.json",
-        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\data\\live_lens\\live_lens_2026_06_25.jsonl",
-        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\data\\live_lens\\prop_registry\\live_prop_registry_2026_06_25.json"
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\live_lens\\live_lens_report_2026_06_25.json",
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\live_lens\\live_lens_2026_06_25.jsonl",
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\live_lens\\prop_registry\\live_prop_registry_2026_06_25.json"
       ],
       "metadata": {
         "date": "2026-06-25",
         "trigger": "syndicate_refresh",
-        "source_root": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source"
+        "source_root": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\source_artifacts"
+      }
+    },
+    "nhl_artifact_bundle:2026-06-25": {
+      "inputHash": "9de51b02a59d2a67a73693878769584c6bea8b65275721c0aa743c8d65f56804",
+      "updatedAt": "2026-06-25T18:37:55.967433",
+      "outputs": [
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\odds\\team\\date=2026-06-25\\oddsapi.csv",
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\props\\player_props_lines\\date=2026-06-25\\oddsapi.csv",
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\predictions_2026-06-25.csv",
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\predictions_sim_2026-06-25.csv",
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\recommendations_sim_2026-06-25.csv",
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\props_projections_all_2026-06-25.csv",
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\props_boxscores_sim_2026-06-25.csv",
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\props_boxscores_sim_hist_2026-06-25.csv",
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\props_boxscores_sim_samples_2026-06-25.csv",
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\props_predictions_2026-06-25.csv",
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\props_recommendations_2026-06-25.csv",
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\roster_snapshot_2026-06-25.csv",
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\injuries_2026-06-25.csv",
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\lineups_2026-06-25.csv",
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\lineups_co_toi_2026-06-25.csv",
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\shifts_2026-06-25.csv",
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\co_toi_shifts_2026-06-25.csv",
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\starting_goalies_2026-06-25.csv"
+      ],
+      "metadata": {
+        "artifact_root": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nhl_source\\source_artifacts",
+        "date": "2026-06-25"
+      }
+    },
+    "nhl_artifact_bundle:2026-06-26": {
+      "inputHash": "a7f67cae4b39c36b3ff939580dbeae295b9e728d6a660cb6c324fe8cc3e8226c",
+      "updatedAt": "2026-06-25T18:37:56.003156",
+      "outputs": [
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\odds\\team\\date=2026-06-26\\oddsapi.csv",
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\props\\player_props_lines\\date=2026-06-26\\oddsapi.csv",
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\props_projections_all_2026-06-26.csv",
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\roster_snapshot_2026-06-26.csv",
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\lineups_2026-06-26.csv",
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\lineups_co_toi_2026-06-26.csv",
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\starting_goalies_2026-06-26.csv",
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\props_predictions_2026-06-26.csv"
+      ],
+      "metadata": {
+        "artifact_root": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nhl_source\\source_artifacts",
+        "date": "2026-06-26"
       }
     }
   }
