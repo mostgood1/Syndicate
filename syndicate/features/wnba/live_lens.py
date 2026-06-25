@@ -209,7 +209,7 @@ def validate_live_lens_snapshot(snapshot: Any) -> bool:
 
 def build_live_lens_snapshot(selected_date: str, *, limit: int = 50) -> dict[str, Any]:
     try:
-        cards_context = build_cards_page_context(selected_date, allow_stored_date_fallback=True)
+        cards_context = build_cards_page_context(selected_date, allow_stored_date_fallback=False)
     except Exception:
         cards_context = {}
     resolved_date = str(cards_context.get("date") or selected_date).strip() or selected_date
@@ -218,7 +218,7 @@ def build_live_lens_snapshot(selected_date: str, *, limit: int = 50) -> dict[str
     live_line_by_event_id: dict[str, float] = {}
     if event_ids:
         try:
-            live_lines_payload = build_live_lines_payload(resolved_date, event_ids, allow_stored_date_fallback=True)
+            live_lines_payload = build_live_lines_payload(resolved_date, event_ids, allow_stored_date_fallback=False)
         except Exception:
             live_lines_payload = {}
         live_games = live_lines_payload.get("games") if isinstance(live_lines_payload, dict) and isinstance(live_lines_payload.get("games"), list) else []

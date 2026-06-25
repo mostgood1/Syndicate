@@ -72,7 +72,7 @@ def _selected_date(season: int | None = None) -> str:
 
 
 def _allow_stored_date_fallback() -> bool:
-    return "date" not in request.args
+    return False
 
 
 def _live_lens_query_string(season: int | None = None) -> str:

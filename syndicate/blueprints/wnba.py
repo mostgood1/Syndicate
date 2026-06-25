@@ -83,7 +83,7 @@ def _selected_date() -> str:
 
 
 def _allow_stored_date_fallback() -> bool:
-    return "date" not in request.args
+    return False
 
 
 def _official_wnba_logo_team_id(team_ref: str) -> int | None:
@@ -329,7 +329,7 @@ def cards():
     if client == "board":
         context = build_cards_page_context(
             selected_date,
-            allow_stored_date_fallback="date" not in request.args,
+            allow_stored_date_fallback=_allow_stored_date_fallback(),
         )
         return render_template("shared/game_cards_board.html", **context)
     return render_template(

@@ -540,7 +540,7 @@ def validate_live_lens_snapshot(snapshot: Any) -> bool:
 
 def build_live_lens_snapshot(selected_date: str, *, limit: int = 50) -> dict[str, Any]:
     try:
-        cards_context = _compute_cards_page_context(selected_date, allow_stored_date_fallback=True)
+        cards_context = _compute_cards_page_context(selected_date, allow_stored_date_fallback=False)
     except Exception:
         cards_context = {}
     resolved_date = str(cards_context.get("date") or selected_date).strip() or selected_date
