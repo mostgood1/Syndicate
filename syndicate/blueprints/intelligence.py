@@ -976,7 +976,7 @@ def run_intelligence():
 @intelligence_bp.get("/api/intelligence/status")
 def intelligence_status_api():
     try:
-        selected_date = str(request.args.get("date") or "").strip() or central_today_iso()
+        selected_date = str(request.args.get("date") or "").strip() or _latest_available_intelligence_date()
         _ = str(request.args.get("refresh") or request.args.get("force_refresh") or "").strip().lower() in {"1", "true", "yes", "on"}
         status = read_latest_intelligence_state({"date": selected_date})
         _log_api_state_read(status if isinstance(status, dict) else {})
@@ -995,5 +995,5 @@ def intelligence_status_api():
 
 @intelligence_bp.get("/intelligence/status")
 def intelligence_status_page():
-    selected_date = str(request.args.get("date") or "").strip() or central_today_iso()
+    selected_date = str(request.args.get("date") or "").strip() or _latest_available_intelligence_date()
     return redirect(f"/api/intelligence/status?date={selected_date}", code=302)

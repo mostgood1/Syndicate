@@ -858,6 +858,21 @@ class IntelligenceStateTests(unittest.TestCase):
         self.assertEqual((payload.get("status") or {}).get("top_opportunities"), [])
         mocked_read.assert_called_once_with({"date": "2026-06-10"})
 
+    def test_status_endpoint_defaults_to_latest_available_date_when_missing(self) -> None:
+        app = Flask(__name__)
+        app.register_blueprint(intelligence_bp)
+
+        with app.test_request_context("/api/intelligence/status", method="GET"):
+            with patch("syndicate.blueprints.intelligence._latest_available_intelligence_date", return_value="2026-06-15"):
+                with patch("syndicate.blueprints.intelligence.read_latest_intelligence_state", return_value={}) as mocked_read:
+                    response = intelligence_status_api()
+
+        payload = response.get_json()
+        self.assertIsNotNone(payload)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(payload["debug_source"], "snapshot_read")
+        mocked_read.assert_called_once_with({"date": "2026-06-15"})
+
     def test_status_endpoint_includes_state_debug_fields(self) -> None:
         app = Flask(__name__)
         app.register_blueprint(intelligence_bp)
