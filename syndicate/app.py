@@ -16,18 +16,6 @@ import os
 from typing import Callable
 
 from flask import Flask
-from syndicate.blueprints.ask_the_syndicate import ask_the_syndicate_bp
-from syndicate.blueprints.home import home_bp
-from syndicate.blueprints.intelligence import intelligence_bp
-from syndicate.blueprints.ops import ops_bp
-from syndicate.blueprints.nfl import nfl_bp
-from syndicate.blueprints.nhl import nhl_bp
-from syndicate.blueprints.ncaab import ncaab_bp
-from syndicate.blueprints.ncaaf import ncaaf_bp
-from syndicate.blueprints.nba import nba_bp
-from syndicate.blueprints.mlb import mlb_bp
-from syndicate.blueprints.sports import sports_bp
-from syndicate.blueprints.wnba import wnba_bp
 
 
 def _env_bool(name: str, *, default: bool = False) -> bool:
@@ -52,6 +40,19 @@ def _bootstrap_render_data(bootstrap_main: Callable[[], int] | None = None) -> N
 
 def create_app() -> Flask:
     _bootstrap_render_data()
+
+    from syndicate.blueprints.ask_the_syndicate import ask_the_syndicate_bp
+    from syndicate.blueprints.home import home_bp
+    from syndicate.blueprints.intelligence import intelligence_bp
+    from syndicate.blueprints.ops import ops_bp
+    from syndicate.blueprints.nfl import nfl_bp
+    from syndicate.blueprints.nhl import nhl_bp
+    from syndicate.blueprints.ncaab import ncaab_bp
+    from syndicate.blueprints.ncaaf import ncaaf_bp
+    from syndicate.blueprints.nba import nba_bp
+    from syndicate.blueprints.mlb import mlb_bp
+    from syndicate.blueprints.sports import sports_bp
+    from syndicate.blueprints.wnba import wnba_bp
 
     app = Flask(
         __name__,
