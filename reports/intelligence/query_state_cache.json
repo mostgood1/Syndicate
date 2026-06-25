@@ -1,177 +1,158 @@
 {
-  "latest_key": "8d4313c66718af04bcf8f00f6448034e592efd123cba17a25fb17c04e2b60193",
-  "updated_at": "2026-06-19T03:15:33Z",
+  "latest_key": "928315208c68c7117c06911c88c130237572a6ae6d0a2ab034f65d17f0a112ce",
+  "updated_at": "2026-06-25T23:07:23Z",
   "snapshots": {
-    "8d4313c66718af04bcf8f00f6448034e592efd123cba17a25fb17c04e2b60193": {
-      "key": "8d4313c66718af04bcf8f00f6448034e592efd123cba17a25fb17c04e2b60193",
+    "928315208c68c7117c06911c88c130237572a6ae6d0a2ab034f65d17f0a112ce": {
+      "key": "928315208c68c7117c06911c88c130237572a6ae6d0a2ab034f65d17f0a112ce",
       "payload": {
         "question": "top edges today",
-        "date": "2026-06-18"
+        "date": "2026-06-15",
+        "limit": 1
       },
       "response": {
         "ok": true,
-        "top_opportunities": [],
-        "by_sport": {},
+        "top_opportunities": [
+          {
+            "name": "Play 1",
+            "sport_slug": "mlb",
+            "market": "Hits",
+            "score": 91.0
+          }
+        ],
+        "by_sport": {
+          "mlb": [
+            {
+              "name": "Play 1",
+              "sport_slug": "mlb",
+              "market": "Hits",
+              "score": 91.0
+            }
+          ]
+        },
         "analysis": {
-          "recommendations": [],
-          "portfolio": {
-            "total_exposure": 0.0,
-            "risk_level": "low",
-            "expected_return": 0.0,
-            "risk_label": "low risk",
-            "diversification_score": 1.0,
-            "average_correlation": 0.0
-          },
+          "ok": true,
+          "headline": "The Syndicate brief",
+          "recommendations": [
+            {
+              "name": "Play 1",
+              "sport_slug": "mlb",
+              "market": "Hits",
+              "score": 91.0,
+              "sport": "mlb",
+              "market_type": "Hits",
+              "entity": "Play 1",
+              "player_name": "Play 1",
+              "subject_key": "play 1",
+              "market_key": "hits"
+            }
+          ],
+          "picks": [
+            {
+              "name": "Play 1",
+              "sport_slug": "mlb",
+              "market": "Hits",
+              "score": 91.0,
+              "sport": "mlb",
+              "market_type": "Hits",
+              "entity": "Play 1",
+              "player_name": "Play 1",
+              "subject_key": "play 1",
+              "market_key": "hits"
+            }
+          ],
+          "top_live_opportunities": [
+            {
+              "name": "Play 1",
+              "sport_slug": "mlb",
+              "market": "Hits",
+              "score": 91.0,
+              "sport": "mlb",
+              "market_type": "Hits",
+              "entity": "Play 1",
+              "player_name": "Play 1",
+              "subject_key": "play 1",
+              "market_key": "hits"
+            }
+          ],
+          "portfolio": {},
           "parlays": [],
-          "evidence": [],
-          "supporting_evidence": [],
-          "evaluation_record": {},
-          "query_type": "explanation",
-          "preferences": {},
-          "parsed_request": {},
-          "analysis_views": {},
-          "structured_response": {
-            "intent": "explanation",
-            "summary": "No summary was returned, so the board should be read through the returned recommendations and evidence.",
-            "clear_summary": "No summary was returned, so the board should be read through the returned recommendations and evidence.",
-            "deep_analysis": [
-              "The returned board is being summarized at the candidate, evidence, and risk level so the answer stays actionable rather than superficial."
-            ],
-            "context_awareness": {
-              "is_vague": true,
-              "confidence": "low",
-              "detected_signals": [
-                "mode=explanation",
-                "intent=explanation"
-              ],
-              "detected_sports": [],
-              "multi_sport": false,
-              "assumptions": [
-                "I assumed you want the strongest board-wide read because no specific sport or market was named.",
-                "I treated the request as a explanation prompt so the engine could answer instead of waiting for more input."
-              ],
-              "clarifying_questions": [
-                "Which sport should I narrow this to?",
-                "Do you want props, game plays, or both?",
-                "Should I focus on live, pregame, or both?"
-              ],
-              "reasoning": "The request was handled as a general explanation because the prompt did not pin down a narrower market frame. Because the prompt was vague, the pipeline also made best-effort assumptions and preserved clarifying questions for follow-up.",
-              "recommendation_count": 0,
-              "reasoning_step_count": 0
-            },
-            "routing_context": {
-              "question": "top edges today",
-              "query_type": "explanation",
-              "mode": "explanation",
-              "selected_date": "2026-06-18",
-              "preview_subject": null,
-              "player_subject": null,
-              "sport": null,
-              "game_state": null,
-              "limit": null,
-              "include_props": null,
-              "include_games": null
-            },
-            "odds_control_plane": {},
-            "key_insights": [],
-            "supporting_evidence": [],
-            "risks_uncertainty": [],
-            "recommended_interpretation": "Best takeaway: use the returned evidence and risks to interpret the board directionally, since no single standout candidate was returned.",
-            "final_takeaway": "Best takeaway: use the returned evidence and risks to interpret the board directionally, since no single standout candidate was returned.",
-            "reasoning_steps": []
-          },
-          "reasoning_steps": [],
-          "board_notes": [],
-          "readiness_gate": {},
-          "state_last_updated": "2026-06-19T03:15:33Z",
-          "last_updated": "2026-06-19T03:15:33Z",
-          "candidate_count": 0
+          "state_last_updated": "2026-06-25T23:07:23Z",
+          "last_updated": "2026-06-25T23:07:23Z",
+          "candidate_count": 1
         },
         "candidate_pool": {
-          "selected_date": "2026-06-18",
-          "source_fingerprint": "59dbdd210cb7da01d38c3bac0e1e45b1689ba6dfae95443be029a8d549982746",
-          "candidate_count": 0,
+          "selected_date": "2026-06-15",
+          "source_fingerprint": "fingerprint-1",
+          "candidate_count": 1,
           "candidate_pools": {},
-          "global_pool": [],
-          "candidates": []
+          "global_pool": [
+            {
+              "name": "Play 1",
+              "sport_slug": "mlb",
+              "market": "Hits"
+            }
+          ],
+          "candidates": [
+            {
+              "name": "Play 1",
+              "sport_slug": "mlb",
+              "market": "Hits"
+            }
+          ]
         },
-        "state_last_updated": "2026-06-19T03:15:33Z",
-        "last_updated": "2026-06-19T03:15:33Z",
-        "candidate_count": 0,
+        "state_last_updated": "2026-06-25T23:07:23Z",
+        "last_updated": "2026-06-25T23:07:23Z",
+        "candidate_count": 1,
         "response": {
-          "recommendations": [],
-          "portfolio": {
-            "total_exposure": 0.0,
-            "risk_level": "low",
-            "expected_return": 0.0,
-            "risk_label": "low risk",
-            "diversification_score": 1.0,
-            "average_correlation": 0.0
-          },
+          "ok": true,
+          "headline": "The Syndicate brief",
+          "recommendations": [
+            {
+              "name": "Play 1",
+              "sport_slug": "mlb",
+              "market": "Hits",
+              "score": 91.0,
+              "sport": "mlb",
+              "market_type": "Hits",
+              "entity": "Play 1",
+              "player_name": "Play 1",
+              "subject_key": "play 1",
+              "market_key": "hits"
+            }
+          ],
+          "picks": [
+            {
+              "name": "Play 1",
+              "sport_slug": "mlb",
+              "market": "Hits",
+              "score": 91.0,
+              "sport": "mlb",
+              "market_type": "Hits",
+              "entity": "Play 1",
+              "player_name": "Play 1",
+              "subject_key": "play 1",
+              "market_key": "hits"
+            }
+          ],
+          "top_live_opportunities": [
+            {
+              "name": "Play 1",
+              "sport_slug": "mlb",
+              "market": "Hits",
+              "score": 91.0,
+              "sport": "mlb",
+              "market_type": "Hits",
+              "entity": "Play 1",
+              "player_name": "Play 1",
+              "subject_key": "play 1",
+              "market_key": "hits"
+            }
+          ],
+          "portfolio": {},
           "parlays": [],
-          "evidence": [],
-          "supporting_evidence": [],
-          "evaluation_record": {},
-          "query_type": "explanation",
-          "preferences": {},
-          "parsed_request": {},
-          "analysis_views": {},
-          "structured_response": {
-            "intent": "explanation",
-            "summary": "No summary was returned, so the board should be read through the returned recommendations and evidence.",
-            "clear_summary": "No summary was returned, so the board should be read through the returned recommendations and evidence.",
-            "deep_analysis": [
-              "The returned board is being summarized at the candidate, evidence, and risk level so the answer stays actionable rather than superficial."
-            ],
-            "context_awareness": {
-              "is_vague": true,
-              "confidence": "low",
-              "detected_signals": [
-                "mode=explanation",
-                "intent=explanation"
-              ],
-              "detected_sports": [],
-              "multi_sport": false,
-              "assumptions": [
-                "I assumed you want the strongest board-wide read because no specific sport or market was named.",
-                "I treated the request as a explanation prompt so the engine could answer instead of waiting for more input."
-              ],
-              "clarifying_questions": [
-                "Which sport should I narrow this to?",
-                "Do you want props, game plays, or both?",
-                "Should I focus on live, pregame, or both?"
-              ],
-              "reasoning": "The request was handled as a general explanation because the prompt did not pin down a narrower market frame. Because the prompt was vague, the pipeline also made best-effort assumptions and preserved clarifying questions for follow-up.",
-              "recommendation_count": 0,
-              "reasoning_step_count": 0
-            },
-            "routing_context": {
-              "question": "top edges today",
-              "query_type": "explanation",
-              "mode": "explanation",
-              "selected_date": "2026-06-18",
-              "preview_subject": null,
-              "player_subject": null,
-              "sport": null,
-              "game_state": null,
-              "limit": null,
-              "include_props": null,
-              "include_games": null
-            },
-            "odds_control_plane": {},
-            "key_insights": [],
-            "supporting_evidence": [],
-            "risks_uncertainty": [],
-            "recommended_interpretation": "Best takeaway: use the returned evidence and risks to interpret the board directionally, since no single standout candidate was returned.",
-            "final_takeaway": "Best takeaway: use the returned evidence and risks to interpret the board directionally, since no single standout candidate was returned.",
-            "reasoning_steps": []
-          },
-          "reasoning_steps": [],
-          "board_notes": [],
-          "readiness_gate": {},
-          "state_last_updated": "2026-06-19T03:15:33Z",
-          "last_updated": "2026-06-19T03:15:33Z",
-          "candidate_count": 0
+          "state_last_updated": "2026-06-25T23:07:23Z",
+          "last_updated": "2026-06-25T23:07:23Z",
+          "candidate_count": 1
         },
         "board_contract": {
           "schema": "intelligence_board_v1",
@@ -184,26 +165,70 @@
             "movement",
             "simulated_edge"
           ],
-          "recommendation_count": 0,
+          "recommendation_count": 3,
           "lane_counts": {
             "live": 0,
-            "pregame": 0,
+            "pregame": 3,
             "archived": 0
           },
-          "active_lanes": [],
+          "active_lanes": [
+            "pregame"
+          ],
           "board_summary": {
             "headline": "The Syndicate board",
-            "recommendation_count": 0,
+            "recommendation_count": 3,
             "live_count": 0,
-            "pregame_count": 0,
+            "pregame_count": 3,
             "archived_count": 0,
-            "active_lanes": []
+            "active_lanes": [
+              "pregame"
+            ]
           },
-          "cards": []
+          "cards": [
+            {
+              "name": "Play 1",
+              "sport_slug": "mlb",
+              "market": "Hits",
+              "score": 91.0,
+              "lane": "pregame",
+              "sport": "mlb",
+              "team": "\u2014",
+              "player": "Play 1",
+              "line": null,
+              "movement": "flat",
+              "simulated_edge": null
+            },
+            {
+              "name": "Play 2",
+              "sport_slug": "nba",
+              "market": "Points",
+              "score": 89.0,
+              "lane": "pregame",
+              "sport": "nba",
+              "team": "\u2014",
+              "player": "Play 2",
+              "line": null,
+              "movement": "flat",
+              "simulated_edge": null
+            },
+            {
+              "name": "Play 3",
+              "sport_slug": "wnba",
+              "market": "Assists",
+              "score": 87.0,
+              "lane": "pregame",
+              "sport": "wnba",
+              "team": "\u2014",
+              "player": "Play 3",
+              "line": null,
+              "movement": "flat",
+              "simulated_edge": null
+            }
+          ]
         }
       },
-      "computed_at": "2026-06-19T03:15:33Z",
-      "source_fingerprint": "59dbdd210cb7da01d38c3bac0e1e45b1689ba6dfae95443be029a8d549982746"
+      "computed_at": "2026-06-25T23:07:23Z",
+      "source_fingerprint": "fingerprint-1"
     }
   }
 }
