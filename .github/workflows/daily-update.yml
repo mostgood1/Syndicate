@@ -177,11 +177,17 @@ jobs:
           $stageRoots = [System.Collections.Generic.List[string]]::new()
 
           foreach ($sourceRoot in @(Get-ChildItem -Path 'data' -Directory -ErrorAction SilentlyContinue | Where-Object { $_.Name -like '*_source' })) {
-            $candidateRoot = Join-Path $sourceRoot.FullName 'manifests'
-            if (Test-Path $candidateRoot) {
-              $relativeRoot = Convert-ToRelativeGitPath -FullPath $candidateRoot
-              if ($relativeRoot) {
-                $stageRoots.Add($relativeRoot) | Out-Null
+            foreach ($candidateRoot in @(
+              (Join-Path $sourceRoot.FullName 'manifests'),
+              (Join-Path $sourceRoot.FullName 'source_artifacts\data\daily'),
+              (Join-Path $sourceRoot.FullName 'source_artifacts\data\processed'),
+              (Join-Path $sourceRoot.FullName 'source_artifacts\data\live_lens')
+            )) {
+              if (Test-Path $candidateRoot) {
+                $relativeRoot = Convert-ToRelativeGitPath -FullPath $candidateRoot
+                if ($relativeRoot) {
+                  $stageRoots.Add($relativeRoot) | Out-Null
+                }
               }
             }
           }
