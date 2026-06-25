@@ -1,10 +1,10 @@
 # Render Data Authority
 
-Render's mounted disk is the runtime source of truth for Syndicate data.
+Render's mounted disk is the runtime source of truth for Syndicate write paths and worker-owned refresh jobs. The web service can read from the checked-in repo data tree when it does not need to mutate hosted state.
 
 ## Required layout
 
-The web and worker services mount the persistent data disk at `/opt/render/project/data`. Runtime reads should resolve from that disk first.
+The worker service mounts the persistent data disk at `/opt/render/project/data`. Runtime reads on the web service should resolve from the repo-local `data/` tree unless a hosted override is explicitly supplied.
 
 Required root structure:
 
@@ -37,19 +37,19 @@ Code should follow this order when choosing data roots:
 
 ## Render env contract
 
-`render.yaml` is the canonical contract for Render. It must keep these env vars aligned with the mounted disk:
+`render.yaml` is the canonical contract for Render. It must keep the worker env vars aligned with the mounted disk, while the web service can stay repo-local for read paths:
 
-- `SYNDICATE_DATA_ROOT=/opt/render/project/data`
-- `SYNDICATE_MLB_SOURCE_ROOT=/opt/render/project/data/mlb_source`
-- `SYNDICATE_NBA_SOURCE_ROOT=/opt/render/project/data/nba_source`
-- `SYNDICATE_NBA_ARTIFACT_ROOT=/opt/render/project/data/nba_source/source_artifacts`
-- `SYNDICATE_NHL_SOURCE_ROOT=/opt/render/project/data/nhl_source`
-- `SYNDICATE_NFL_SOURCE_ROOT=/opt/render/project/data/nfl_source`
-- `SYNDICATE_NCAAF_SOURCE_ROOT=/opt/render/project/data/ncaaf_source`
-- `SYNDICATE_NCAAB_SOURCE_ROOT=/opt/render/project/data/ncaab_source`
-- `SYNDICATE_WNBA_SOURCE_ROOT=/opt/render/project/data/wnba_source`
+- Worker-only: `SYNDICATE_DATA_ROOT=/opt/render/project/data`
+- Worker-only: `SYNDICATE_MLB_SOURCE_ROOT=/opt/render/project/data/mlb_source`
+- Worker-only: `SYNDICATE_NBA_SOURCE_ROOT=/opt/render/project/data/nba_source`
+- Worker-only: `SYNDICATE_NBA_ARTIFACT_ROOT=/opt/render/project/data/nba_source/source_artifacts`
+- Worker-only: `SYNDICATE_NHL_SOURCE_ROOT=/opt/render/project/data/nhl_source`
+- Worker-only: `SYNDICATE_NFL_SOURCE_ROOT=/opt/render/project/data/nfl_source`
+- Worker-only: `SYNDICATE_NCAAF_SOURCE_ROOT=/opt/render/project/data/ncaaf_source`
+- Worker-only: `SYNDICATE_NCAAB_SOURCE_ROOT=/opt/render/project/data/ncaab_source`
+- Worker-only: `SYNDICATE_WNBA_SOURCE_ROOT=/opt/render/project/data/wnba_source`
 
-Sport-specific live-lens and betting roots should point at the same mounted disk family, not at `/opt/render/project/src/...`.
+Sport-specific live-lens and betting roots should point at the same mounted disk family on the worker, while the web service may point at the repo-local `data/` tree for read-only serving.
 
 ## Compatibility rules
 

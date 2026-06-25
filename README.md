@@ -82,8 +82,8 @@ Render setup:
 
 1. In Render, choose New + and create a Blueprint instance from the GitHub repo `mostgood1/Syndicate`.
 2. Let Render read [render.yaml](c:/Users/mostg/OneDrive/Coding/Syndicate/render.yaml), which now defines three resources:
-  - `syndicate`: the public Flask web service.
-  - `syndicate-refresh-worker`: the background worker that polls for queued refresh jobs.
+  - `syndicate`: the public Flask web service that reads the repo-local `data/` and `reports/` trees.
+  - `orchestrator-worker`: the background worker that owns the persistent disk and polls for queued refresh jobs.
   - `syndicate-refresh-state`: the shared Render Key Value instance used for refresh state and logs.
 3. Set `ADMIN_TOKEN` in Render if you want the protected ops/status endpoints enabled for the deployed instance.
 4. Deploy the Blueprint and verify that all three resources become healthy.
@@ -111,8 +111,8 @@ Blueprint defaults:
 - The checked-in [render.yaml](c:/Users/mostg/OneDrive/Coding/Syndicate/render.yaml) sets `SYNDICATE_REFRESH_LAUNCH_MODE=manifest_only` on the hosted services so the ops refresh endpoint records queued work instead of spawning a local refresh subprocess on Render.
 - The checked-in [render.yaml](c:/Users/mostg/OneDrive/Coding/Syndicate/render.yaml) sets `SYNDICATE_REFRESH_STATE_BACKEND=keyvalue` on the web service.
 - The checked-in [render.yaml](c:/Users/mostg/OneDrive/Coding/Syndicate/render.yaml) wires `SYNDICATE_REFRESH_STATE_URL` from the Render Key Value service connection string.
-- The checked-in [render.yaml](c:/Users/mostg/OneDrive/Coding/Syndicate/render.yaml) leaves `SYNDICATE_DATA_ROOT` unset, so public mirrored artifacts still come from the repo-backed `data/` tree unless you deliberately introduce a separate hosted artifact strategy.
-- The checked-in [render.yaml](c:/Users/mostg/OneDrive/Coding/Syndicate/render.yaml) intentionally does not hardcode any `SYNDICATE_ARTIFACT_ROOT_*` values. Published bundle locations are deployment-specific, so set the matching artifact-root overrides on both the web service and the worker when you want hosted ingest to pull from neutral artifact bundles instead of the repo-backed `data/` tree.
+- The checked-in [render.yaml](c:/Users/mostg/OneDrive/Coding/Syndicate/render.yaml) points the web service at the repo-backed `data/` and `reports/` trees, while the worker keeps the mounted disk for write paths and refresh jobs.
+- The checked-in [render.yaml](c:/Users/mostg/OneDrive/Coding/Syndicate/render.yaml) intentionally does not hardcode any `SYNDICATE_ARTIFACT_ROOT_*` values. Published bundle locations are deployment-specific, so set the matching artifact-root overrides on the worker when you want hosted ingest to pull from neutral artifact bundles instead of the repo-backed `data/` tree.
 
 When the site is running in one of those queued hosted modes, a worker can pick up the latest queued refresh contract with:
 

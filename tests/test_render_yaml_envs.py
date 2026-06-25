@@ -5,7 +5,7 @@ from pathlib import Path
 
 
 class RenderYamlEnvTests(unittest.TestCase):
-    def test_render_yaml_points_sport_roots_at_render_data_disk(self) -> None:
+    def test_render_yaml_keeps_web_stateless_and_worker_disk_backed(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]
         content = (repo_root / "render.yaml").read_text(encoding="utf-8")
 
@@ -26,10 +26,17 @@ class RenderYamlEnvTests(unittest.TestCase):
         ):
             self.assertIn(expected, content)
 
-        self.assertNotIn("/opt/render/project/src/data/mlb_source/source_artifacts/data", content)
-        self.assertNotIn("/opt/render/project/src/data/nba_source/source_artifacts/data", content)
-        self.assertNotIn("/opt/render/project/src/data/nhl_source/source_artifacts/data", content)
-        self.assertNotIn("/opt/render/project/src/data/", content)
+        lines = content.splitlines()
+        worker_index = lines.index("  - type: worker")
+        web_section = "\n".join(lines[:worker_index])
+        worker_section = "\n".join(lines[worker_index:])
+
+        self.assertIn("value: data", web_section)
+        self.assertIn("value: reports", web_section)
+        self.assertNotIn("/opt/render/project/data/", web_section)
+
+        self.assertIn("disk:", worker_section)
+        self.assertIn("/opt/render/project/data/", worker_section)
 
 
 if __name__ == "__main__":
