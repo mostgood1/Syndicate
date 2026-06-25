@@ -1329,6 +1329,10 @@ def get_intelligence_state_response(payload: dict[str, Any], *, refresh: bool = 
     return _INTELLIGENCE_STATE_SERVICE.get_response(payload, refresh=refresh, wait=wait, force_refresh=force_refresh)
 
 
+def compute_intelligence_state_response(payload: dict[str, Any], *, force_refresh: bool = True) -> dict[str, Any] | None:
+    return _INTELLIGENCE_STATE_SERVICE._compute_response(payload, force_refresh=force_refresh)
+
+
 def read_latest_intelligence_state_response(payload: dict[str, Any] | None = None, *, force_refresh: bool = True) -> dict[str, Any] | None:
     return _INTELLIGENCE_STATE_SERVICE.read_latest_response(payload, force_refresh=force_refresh)
 

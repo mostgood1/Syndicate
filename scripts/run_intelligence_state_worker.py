@@ -12,7 +12,8 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from pipeline.intelligence_state import get_intelligence_state_response as compute_intelligence_state_response
+from syndicate.features.shared.timezone import central_today_iso
+from pipeline.intelligence_state import compute_intelligence_state_response
 from pipeline.intelligence_state import write_latest_intelligence_state
 
 
@@ -46,8 +47,13 @@ def _run_tick() -> None:
             {
                 "question": "top edges today",
                 "mode": "recommendation",
+                "date": central_today_iso(),
                 "timing": "all",
                 "sport": "all",
+                "game_state": "all",
+                "limit": 5,
+                "include_props": True,
+                "include_games": True,
             }
         )
         if _is_valid_intelligence_state(state):
