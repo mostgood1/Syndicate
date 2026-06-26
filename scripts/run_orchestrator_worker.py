@@ -11,12 +11,22 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 _SUBJOB_TIMEOUT_SECONDS = 120
 
 
+def _emit_child_output(script_name: str, *, stdout: str | None = None, stderr: str | None = None) -> None:
+    stdout_text = str(stdout or "").strip()
+    stderr_text = str(stderr or "").strip()
+    if stdout_text:
+        print(f"{script_name} STDOUT:\n{stdout_text}")
+    if stderr_text:
+        print(f"{script_name} STDERR:\n{stderr_text}")
+
+
 def _run_script(script_name: str) -> None:
     command = [sys.executable, str(REPO_ROOT / "scripts" / script_name), "--run-once"]
     popen_kwargs: dict[str, object] = {
         "cwd": str(REPO_ROOT),
-        "stdout": subprocess.DEVNULL,
-        "stderr": subprocess.DEVNULL,
+        "stdout": subprocess.PIPE,
+        "stderr": subprocess.PIPE,
+        "text": True,
     }
     if os.name == "nt":
         popen_kwargs["creationflags"] = getattr(subprocess, "DETACHED_PROCESS", 0) | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
@@ -25,7 +35,10 @@ def _run_script(script_name: str) -> None:
 
     process = subprocess.Popen(command, **popen_kwargs)
     try:
-        process.wait(timeout=_SUBJOB_TIMEOUT_SECONDS)
+        stdout, stderr = process.communicate(timeout=_SUBJOB_TIMEOUT_SECONDS)
+        if process.returncode:
+            print(f"{script_name} EXITED {process.returncode}")
+            _emit_child_output(script_name, stdout=stdout, stderr=stderr)
     except subprocess.TimeoutExpired:
         try:
             if os.name == "nt":
@@ -40,7 +53,8 @@ def _run_script(script_name: str) -> None:
         print(f"{script_name} TIMED OUT AFTER {_SUBJOB_TIMEOUT_SECONDS} SECONDS")
     finally:
         try:
-            process.wait(timeout=5)
+            if process.poll() is None:
+                process.wait(timeout=5)
         except Exception:
             pass
 

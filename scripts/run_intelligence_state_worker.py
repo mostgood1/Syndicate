@@ -12,9 +12,20 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
+from syndicate.app import create_app
 from syndicate.features.shared.timezone import central_today_iso
 from pipeline.intelligence_state import compute_intelligence_state_response
 from pipeline.intelligence_state import write_latest_intelligence_state
+
+
+_APP = None
+
+
+def _get_app():
+    global _APP
+    if _APP is None:
+        _APP = create_app()
+    return _APP
 
 
 def _contains_nan(value: Any) -> bool:
@@ -43,19 +54,21 @@ def _run_tick() -> None:
     state = None
     try:
         print(f"{_timestamp()} INTELLIGENCE WORKER RUN")
-        state = compute_intelligence_state_response(
-            {
-                "question": "top edges today",
-                "mode": "recommendation",
-                "date": central_today_iso(),
-                "timing": "all",
-                "sport": "all",
-                "game_state": "all",
-                "limit": 5,
-                "include_props": True,
-                "include_games": True,
-            }
-        )
+        app = _get_app()
+        with app.app_context():
+            state = compute_intelligence_state_response(
+                {
+                    "question": "top edges today",
+                    "mode": "recommendation",
+                    "date": central_today_iso(),
+                    "timing": "all",
+                    "sport": "all",
+                    "game_state": "all",
+                    "limit": 5,
+                    "include_props": True,
+                    "include_games": True,
+                }
+            )
         if _is_valid_intelligence_state(state):
             write_latest_intelligence_state(state)
             candidate_count = state.get("candidate_count", 0)
