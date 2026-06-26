@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping
 
 from syndicate.features.shared.intelligence_evaluation import build_reliability_profile
+from syndicate.features.shared.odds_lifecycle import build_market_features
 from syndicate.features.shared.source_roots import repo_root_from
 
 
@@ -278,6 +279,45 @@ def _tracking_snapshot(
         "ev_current": round(float(current_ev), 4) if current_ev is not None else None,
         "ev_delta": ev_delta,
         "line_movement_impact": line_movement_impact,
+    }
+
+
+def _market_dynamics_score(candidate: Mapping[str, Any], market_features: Mapping[str, Any] | None) -> dict[str, Any]:
+    features = _copy_mapping(market_features)
+    if not features:
+        return {
+            "movement_signal": None,
+            "clv_signal": None,
+            "volatility": 0.0,
+            "is_live": bool(candidate.get("is_live")),
+            "market_bonus": 0.0,
+        }
+
+    movement_signal = _coerce_float(features.get("movement_signal"))
+    clv_signal = _coerce_float(features.get("clv_signal"))
+    volatility = _coerce_float(features.get("volatility")) or 0.0
+    is_live = bool(candidate.get("is_live") or features.get("is_live"))
+
+    sim_weight = 0.72 if is_live else 1.0
+    movement_weight = 1.28 if is_live else 0.82
+    clv_weight = 1.10 if is_live else 1.0
+    volatility_weight = 0.45 if is_live else 0.18
+
+    movement_component = (movement_signal or 0.0) * 60.0 * movement_weight
+    clv_component = (clv_signal or 0.0) * 45.0 * clv_weight
+    volatility_component = min(6.0, volatility * volatility_weight)
+    market_bonus = movement_component + clv_component + volatility_component
+
+    return {
+        "movement_signal": movement_signal,
+        "clv_signal": clv_signal,
+        "volatility": volatility,
+        "is_live": is_live,
+        "sim_weight": sim_weight,
+        "movement_weight": movement_weight,
+        "clv_weight": clv_weight,
+        "volatility_weight": volatility_weight,
+        "market_bonus": market_bonus,
     }
 
 
@@ -886,6 +926,7 @@ def filter_candidates(
     for candidate in candidate_rows:
         market = _market(candidate)
         market_profile = _market_profile(history_rows, sport=sport, market=market)
+        market_features = build_market_features(candidate, sport=sport)
         live_pricing = _repriced_probabilities(candidate)
         edge_data = calculate_edge(candidate, implied_probability=live_pricing["implied_probability"])
         fair_probability = edge_data["fair_probability"]
@@ -930,6 +971,7 @@ def filter_candidates(
                 ],
                 "market_profile": market_profile,
                 "sport_profile": sport_profile,
+                "market_features": market_features,
             }
         )
         filtered.append(_standardize_recommendation_fields(enriched, edge=edge, fair_probability=fair_probability, implied_probability=implied_probability))
@@ -965,6 +1007,9 @@ def rank_recommendations(
     for candidate in filtered_candidates:
         market = str(candidate.get("market") or "market").strip().lower() or "market"
         market_profile = _market_profile(history_rows, sport=sport, market=market)
+        market_features = _copy_mapping(candidate.get("market_features"))
+        if not market_features:
+            market_features = build_market_features(candidate, sport=sport)
         fair_probability = float(candidate.get("fair_probability") or 0.5)
         model_probability = _coerce_probability(candidate.get("model_probability")) or _probability_from_simulation_payload(candidate) or fair_probability
         live_pricing = _repriced_probabilities(candidate, model_probability=model_probability)
@@ -975,16 +1020,24 @@ def rank_recommendations(
         market_fit_score = _coerce_float(candidate.get("market_fit_score")) or 0.0
         market_strength = float(market_profile.get("reliability_multiplier") or 1.0)
         sport_strength = float(sport_profile.get("reliability_multiplier") or 1.0)
+        market_dynamics = _market_dynamics_score(candidate, market_features)
+        sim_weight = float(market_dynamics.get("sim_weight") or 1.0)
+        movement_weight = float(market_dynamics.get("movement_weight") or 1.0)
+        clv_weight = float(market_dynamics.get("clv_weight") or 1.0)
+        market_bonus = float(market_dynamics.get("market_bonus") or 0.0)
         edge_bonus = float(edge or 0.0) * 100.0
         calibration_error = float(market_profile.get("calibration_error") or sport_profile.get("calibration_error") or 0.0)
         roi = _coerce_float(market_profile.get("metrics", {}).get("roi")) or 0.0
         core_adjusted_score = (
-            base_score * sport_strength * market_strength * (0.85 + policy_spec.confidence_weight * 0.30)
+            base_score * sport_strength * market_strength * sim_weight * (0.85 + policy_spec.confidence_weight * 0.30)
             + market_fit_score * (0.20 + policy_spec.market_fit_weight * 0.60)
             + edge_bonus * (0.50 + policy_spec.edge_weight)
             + confidence * 10.0 * (0.75 + policy_spec.confidence_weight)
             + roi * 20.0 * (0.70 + policy_spec.roi_weight)
             - calibration_error * 12.0 * (0.65 + policy_spec.calibration_weight)
+            + market_bonus * (0.70 + policy_spec.edge_weight)
+            + (market_dynamics.get("movement_signal") or 0.0) * 24.0 * movement_weight
+            + (market_dynamics.get("clv_signal") or 0.0) * 20.0 * clv_weight
         )
         performance_profile = _performance_multiplier_for_candidate(
             performance_summary,
@@ -1066,6 +1119,11 @@ def rank_recommendations(
                 "performance_context": performance_profile.get("performance_context"),
                 "performance_multiplier": round(performance_multiplier, 4),
                 "core_adjusted_score": round(core_adjusted_score, 3),
+                "market_features": market_features,
+                "movement_signal": market_dynamics.get("movement_signal"),
+                "clv_signal": market_dynamics.get("clv_signal"),
+                "volatility": market_dynamics.get("volatility"),
+                "market_bonus": round(market_bonus, 3),
                 "historical_profile": {
                     "sport": sport_profile,
                     "market": market_profile,

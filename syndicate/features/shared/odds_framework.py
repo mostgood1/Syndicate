@@ -60,6 +60,11 @@ def _candidate_edge(row: Mapping[str, Any]) -> float | None:
         _safe_float(row.get("price_edge_pct")),
     )
     if edge is None:
+        model_probability = _candidate_model_probability(row)
+        market_probability = _candidate_market_probability(row)
+        if model_probability is not None and market_probability is not None:
+            edge = round(model_probability - market_probability, 4)
+    if edge is None:
         return None
     if abs(edge) > 1.0 and abs(edge) <= 100.0:
         return edge / 100.0
@@ -87,7 +92,7 @@ def _rank_score(edge: float | None, confidence: float | None, market_probability
     if base_edge <= 0.0 and market_probability is not None and model_probability is not None:
         base_edge = abs(model_probability - market_probability)
     base_confidence = confidence if confidence is not None else 0.5
-    return round(base_edge * (0.5 + base_confidence), 6)
+    return round(base_edge * (0.4 + base_confidence), 6)
 
 
 def normalize_odds_entry(*, row: Mapping[str, Any], sport: str, market_key: str, timestamp: str | None = None, source_path: str | None = None, market_id: str | None = None, event_id: str | None = None, market_type: str | None = None, entity: str | None = None, line: float | None = None, odds: float | None = None, selection: str | None = None) -> dict[str, Any]:

@@ -42,7 +42,7 @@ from flask import current_app
 __path__ = [str(Path(__file__).with_name("intelligence"))]
 
 from syndicate.blueprints.home import _build_prop_dashboard_row
-from syndicate.blueprints.home import _build_sport_overview
+from syndicate.blueprints.home import build_home_overview
 from syndicate.blueprints.home import _game_bet_candidates_from_game
 from syndicate.features.mlb.sources import daily_artifact_path as mlb_daily_artifact_path
 from syndicate.features.mlb.sources import daily_snapshot_oddsapi_pitcher_props_path as mlb_daily_snapshot_oddsapi_pitcher_props_path
@@ -2335,42 +2335,20 @@ def _query_preferences(
 def build_intelligence_overview(*, selected_date: str | None = None, force_refresh: bool = False) -> list[dict[str, Any]]:
     effective_date = _effective_date(selected_date)
     sports = current_app.config.get("SYNDICATE_SPORTS", [])
-    preserve_requested_date = selected_date is not None
-    overview: list[dict[str, Any]] = []
-    for sport in sports:
-        if not isinstance(sport, dict):
-            continue
-        try:
-            sport_overview = _build_sport_overview(
-                    sport,
-                    effective_date,
-                    force_refresh=force_refresh,
-                    preserve_requested_date=preserve_requested_date,
-                )
-            overview.append(sport_overview)
-            if _safe_text(sport_overview.get("slug"), "").lower() == "wnba":
-                home_rails = sport_overview.get("home_rails") if isinstance(sport_overview.get("home_rails"), dict) else {}
-                pregame_items = home_rails.get("pregame", {}).get("items") if isinstance(home_rails.get("pregame"), dict) else []
-                live_items = home_rails.get("live", {}).get("items") if isinstance(home_rails.get("live"), dict) else []
-                dashboard_games = sport_overview.get("dashboard_games") if isinstance(sport_overview.get("dashboard_games"), list) else []
-                current_app.logger.info(
-                    "WNBA overview counts for %s: pregame=%s live=%s dashboard_games=%s data_health=%s",
-                    _safe_text(sport_overview.get("context_label"), effective_date),
-                    len(pregame_items),
-                    len(live_items),
-                    len(dashboard_games),
-                    _safe_text(sport_overview.get("data_health"), "unknown"),
-                )
-        except Exception as exc:
-            overview.append(
-                {
-                    **sport,
-                    "context_label": effective_date,
-                    "data_health": "error",
-                    "data_warnings": [f"Overview build failed: {exc}"],
-                    "home_rails": {"pregame": {"items": []}, "live": {"items": []}, "compact": {"items": []}},
-                    "dashboard_games": [],
-                }
+    overview = build_home_overview(sports, selected_date=effective_date, force_refresh=force_refresh)
+    for sport_overview in overview:
+        if _safe_text(sport_overview.get("slug"), "").lower() == "wnba":
+            home_rails = sport_overview.get("home_rails") if isinstance(sport_overview.get("home_rails"), dict) else {}
+            pregame_items = home_rails.get("pregame", {}).get("items") if isinstance(home_rails.get("pregame"), dict) else []
+            live_items = home_rails.get("live", {}).get("items") if isinstance(home_rails.get("live"), dict) else []
+            dashboard_games = sport_overview.get("dashboard_games") if isinstance(sport_overview.get("dashboard_games"), list) else []
+            current_app.logger.info(
+                "WNBA overview counts for %s: pregame=%s live=%s dashboard_games=%s data_health=%s",
+                _safe_text(sport_overview.get("context_label"), effective_date),
+                len(pregame_items),
+                len(live_items),
+                len(dashboard_games),
+                _safe_text(sport_overview.get("data_health"), "unknown"),
             )
     return overview
 

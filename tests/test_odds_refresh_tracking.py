@@ -4,9 +4,11 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from syndicate.features.shared.odds_refresh_tracking import sync_post_refresh_tracking_for_source_root
 from syndicate.features.shared.odds_refresh_tracking import refresh_impacted_recommendations_for_tracking
+from syndicate.features.shared.odds_lifecycle import load_odds_lifecycle_events
 
 
 class OddsRefreshTrackingTests(unittest.TestCase):
@@ -257,6 +259,38 @@ class OddsRefreshTrackingTests(unittest.TestCase):
             self.assertEqual(rows[0]["model_probability"], 0.64)
             self.assertEqual(rows[1]["model_probability"], 0.52)
             self.assertIn("lightweight_refresh", payload)
+
+    def test_sync_tracking_appends_lifecycle_events_incrementally(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            lifecycle_root = root / "odds_events"
+            team_root = root / "data" / "odds" / "team" / "date=2026-06-07"
+            team_root.mkdir(parents=True)
+            (team_root / "oddsapi.csv").write_text(
+                "home_team,away_team,bookmaker,market,selection,line,price\n"
+                "Home,Away,draftkings,total,over,6.5,-110\n",
+                encoding="utf-8",
+            )
+
+            with patch.dict("os.environ", {"SYNDICATE_ODDS_EVENTS_ROOT": str(lifecycle_root)}, clear=False):
+                first = sync_post_refresh_tracking_for_source_root(sport="nhl", source_root=root, date_str="2026-06-07")
+
+                (team_root / "oddsapi.csv").write_text(
+                    "home_team,away_team,bookmaker,market,selection,line,price\n"
+                    "Home,Away,draftkings,total,over,7.0,-110\n",
+                    encoding="utf-8",
+                )
+
+                second = sync_post_refresh_tracking_for_source_root(sport="nhl", source_root=root, date_str="2026-06-07")
+                events = load_odds_lifecycle_events("2026-06-07")
+
+            self.assertTrue(first["ok"])
+            self.assertTrue(second["ok"])
+            self.assertGreaterEqual(len(events), 2)
+            self.assertEqual(events[0]["event_type"], "open")
+            self.assertEqual(events[-1]["event_type"], "update")
+            self.assertEqual(events[-1]["line"], 7.0)
+            self.assertEqual(events[-1]["sport"], "nhl")
 
 
 if __name__ == "__main__":

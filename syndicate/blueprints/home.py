@@ -4368,7 +4368,7 @@ def _build_sport_overview(
         "overview_stats": overview_stats,
         "feature_links": _secondary_links(links),
         "active_today": active_today,
-        "show_on_home": bool(hydrated_game_count),
+        "show_on_home": bool(active_game_count or hydrated_game_count or props_count),
         "game_bar": game_bar,
         "props_bar": props_bar,
         "dashboard_games": home_games,
@@ -4410,7 +4410,7 @@ def _build_sport_overview(
     }
     props_count = _dashboard_prop_count(overview)
     overview["props_count"] = props_count
-    overview["show_on_home"] = bool(hydrated_game_count)
+    overview["show_on_home"] = bool(active_game_count or hydrated_game_count or props_count)
     data_warnings: list[str] = []
     if active_today and active_game_count <= 0:
         data_warnings.append("No game rows surfaced")

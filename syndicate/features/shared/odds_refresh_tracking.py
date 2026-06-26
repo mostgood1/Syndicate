@@ -11,6 +11,7 @@ from syndicate.features.shared.basketball_props_tracking import sync_basketball_
 from syndicate.features.shared.market_id import attach_market_id
 from syndicate.features.shared.odds_control_plane import shared_odds_history_root
 from syndicate.features.shared.odds_framework import normalize_odds_entry
+from syndicate.features.shared.odds_lifecycle import append_odds_lifecycle_events
 from syndicate.features.shared.recommendation_engine import build_recommendation_output
 
 
@@ -78,6 +79,55 @@ def _json_safe(value: Any) -> Any:
         except Exception:
             pass
     return str(value)
+
+
+def _is_final_status_row(row: Mapping[str, Any], normalized_entry: Mapping[str, Any] | None = None) -> bool:
+    text_parts = [
+        row.get("status"),
+        row.get("state"),
+        row.get("game_state"),
+        row.get("period"),
+        row.get("result"),
+        row.get("outcome"),
+        row.get("market_status"),
+    ]
+    if isinstance(normalized_entry, Mapping):
+        text_parts.extend([normalized_entry.get("market_type"), normalized_entry.get("selection")])
+    text = " ".join(str(value or "").strip().lower() for value in text_parts if str(value or "").strip())
+    return any(marker in text for marker in ("final", "closed", "close", "finale", "completed", "finished"))
+
+
+def _market_lifecycle_event(
+    *,
+    row: Mapping[str, Any],
+    normalized_entry: Mapping[str, Any],
+    event_type: str,
+    sport: str,
+    timestamp: str,
+    market_key: str,
+    current_line: float | None,
+    current_odds: float | None,
+    is_live: bool,
+) -> dict[str, Any]:
+    event = {
+        "timestamp": timestamp,
+        "game_id": normalized_entry.get("event_id") or row.get("event_id") or row.get("game_id") or row.get("game_pk"),
+        "sport": sport,
+        "market_id": normalized_entry.get("market_id") or market_key,
+        "player_id": row.get("player_id") or row.get("athlete_id"),
+        "market_type": normalized_entry.get("market_type") or row.get("market_type") or row.get("market") or row.get("selection"),
+        "event_type": event_type,
+        "line": current_line,
+        "price": current_odds,
+        "implied_prob": normalized_entry.get("market_probability") or normalized_entry.get("implied_probability"),
+        "source": normalized_entry.get("source_path") or row.get("source_path") or row.get("book") or row.get("bookmaker"),
+        "is_live": bool(is_live),
+    }
+    if event_type == "final":
+        event["result"] = row.get("result") or row.get("outcome") or row.get("market_status") or "final"
+        event["closing_line"] = current_line
+        event["closing_price"] = current_odds
+    return {key: value for key, value in event.items() if value is not None}
 
 
 def _is_live_odds_row(row: Mapping[str, Any], normalized_entry: Mapping[str, Any] | None = None) -> bool:
@@ -536,6 +586,9 @@ def _sync_odds_history_for_refresh(*, sport: str, source_root: Path, date_str: s
     count_pregame = 0
     files_scanned = 0
     seen_current_lines: set[tuple[str, float]] = set()
+    lifecycle_events: list[dict[str, Any]] = []
+    seen_market_keys: set[str] = set()
+    seen_live_market_keys: set[str] = set()
 
     for candidate in candidates:
         files_scanned += 1
@@ -561,6 +614,7 @@ def _sync_odds_history_for_refresh(*, sport: str, source_root: Path, date_str: s
             if dedupe_key in seen_current_lines:
                 continue
             seen_current_lines.add(dedupe_key)
+            seen_market_keys.add(market_key)
 
             market_state = markets.get(market_key)
             if not isinstance(market_state, dict):
@@ -614,10 +668,39 @@ def _sync_odds_history_for_refresh(*, sport: str, source_root: Path, date_str: s
                 odds=_primary_odds_value(row),
                 selection=str(row.get("selection") or "").strip() or None,
             )
-            if _is_live_odds_row(row, normalized_entry):
+            is_live_row = _is_live_odds_row(row, normalized_entry)
+            is_final_row = _is_final_status_row(row, normalized_entry)
+            if is_live_row:
                 count_live += 1
             else:
                 count_pregame += 1
+
+            previous_market_type = None
+            if history:
+                previous_market_type = str((history[-1] or {}).get("normalized", {}).get("market_type") or (history[-1] or {}).get("market_type") or "").strip().lower() or None
+
+            event_type = "open" if previous_line is None and not history else "update"
+            if is_live_row and market_key not in seen_live_market_keys:
+                event_type = "live"
+                seen_live_market_keys.add(market_key)
+            elif is_final_row:
+                event_type = "final"
+            elif previous_market_type is not None and str(normalized_entry.get("market_type") or "").strip().lower() != previous_market_type:
+                event_type = "update"
+
+            lifecycle_events.append(
+                _market_lifecycle_event(
+                    row=row,
+                    normalized_entry=normalized_entry,
+                    event_type=event_type,
+                    sport=slug,
+                    timestamp=now,
+                    market_key=market_key,
+                    current_line=current_line,
+                    current_odds=_primary_odds_value(row),
+                    is_live=is_live_row,
+                )
+            )
 
             history.append(
                 {
@@ -656,7 +739,32 @@ def _sync_odds_history_for_refresh(*, sport: str, source_root: Path, date_str: s
             markets[market_key] = market_state
             entries_appended += 1
 
-            print("ODDS COUNTS:", {"pregame": count_pregame, "live": count_live})
+    missing_market_keys = [key for key in markets.keys() if key not in seen_market_keys]
+    for market_key in missing_market_keys:
+        market_state = markets.get(market_key)
+        if not isinstance(market_state, dict):
+            continue
+        history = market_state.get("history") if isinstance(market_state.get("history"), list) else []
+        latest = history[-1] if history else {}
+        if not isinstance(latest, Mapping):
+            continue
+        normalized_entry = latest.get("normalized") if isinstance(latest.get("normalized"), Mapping) else {}
+        lifecycle_events.append(
+            _market_lifecycle_event(
+                row=latest.get("row") if isinstance(latest.get("row"), Mapping) else latest,
+                normalized_entry=normalized_entry,
+                event_type="close",
+                sport=slug,
+                timestamp=now,
+                market_key=market_key,
+                current_line=_line_number(latest.get("current_line")),
+                current_odds=_line_number(latest.get("last_odds")),
+                is_live=bool(normalized_entry.get("is_live") if isinstance(normalized_entry, Mapping) else False),
+            )
+        )
+
+    if lifecycle_events:
+        append_odds_lifecycle_events(date_str, lifecycle_events)
 
     if not entries_appended and history_path.exists():
         return {
