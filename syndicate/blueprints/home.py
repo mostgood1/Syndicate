@@ -4354,6 +4354,7 @@ def _build_sport_overview(
         game["is_live"] = _live_odds_backed_live_flag(_game_identifier(game), live_odds_game_ids, bool(game.get("is_live")))
     active_game_count = len(active_games)
     hydrated_game_count = len(hydrated_game_ids)
+    props_count = len(game_items) + len(pregame_prop_items) + len(live_prop_items)
     game_bar["items"] = game_items
     props_bar["items"] = list(pregame_prop_items)
 
@@ -4482,9 +4483,9 @@ def build_home_overview(
     active_sports = _active_sport_slugs()
     if active_sports:
         active = [sport for sport in active if _safe_text(sport.get("slug"), "").lower() in active_sports]
-    print("ACTIVE SPORTS:", [str(sport.get("slug") or "").strip().lower() for sport in active])
-    print("ACTIVE GAMES:", sum(int(sport.get("active_game_count") or 0) for sport in active))
-    print("HYDRATED GAMES:", sum(int(sport.get("hydrated_game_count") or 0) for sport in active))
+    _LOGGER.debug("ACTIVE SPORTS: %s", [str(sport.get("slug") or "").strip().lower() for sport in active])
+    _LOGGER.debug("ACTIVE GAMES: %s", sum(int(sport.get("active_game_count") or 0) for sport in active))
+    _LOGGER.debug("HYDRATED GAMES: %s", sum(int(sport.get("hydrated_game_count") or 0) for sport in active))
     return active
 
 
