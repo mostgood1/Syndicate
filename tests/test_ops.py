@@ -97,9 +97,28 @@ class OpsRefreshApiTests(unittest.TestCase):
                 encoding="utf-8",
             )
 
+            mocked_status = {
+                "refresh_status": {
+                    "manifest": {"date": "2026-05-19", "generatedAt": "2026-05-19T12:00:00Z"},
+                    "runtime": {
+                        "state": "finished",
+                        "elapsed_seconds": 1800,
+                        "remaining_budget_seconds": 12600,
+                        "finishedAt": "2026-05-19T12:30:00Z",
+                    },
+                    "artifacts": {"odds_refresh": {"exists": True}},
+                    "mirror_manifests": [{"sport": "mlb", "copiedArtifactCount": 14}],
+                    "history": [{"finishedAt": "2026-05-18T12:05:00Z"}],
+                },
+                "daily_update": {
+                    "manifest": {"date": "2026-05-19", "generatedAt": "2026-05-19T12:00:00Z"},
+                    "runtime": {"elapsed_seconds": 2700, "remaining_budget_seconds": 11700, "completedAt": "2026-05-19T12:45:00Z"},
+                },
+            }
+
             with patch.dict(os.environ, {"ADMIN_TOKEN": "secret-token"}, clear=False), patch(
-                "syndicate.features.shared.ops_refresh.REPO_ROOT", repo_root
-            ), patch("syndicate.features.shared.ops_refresh.REPORTS_ROOT", reports_root):
+                "syndicate.blueprints.ops.load_latest_refresh_status", return_value=mocked_status
+            ):
                 response = self.client.get(
                     "/api/ops/odds-refresh/status",
                     headers={"X-Admin-Token": "secret-token"},
@@ -113,9 +132,11 @@ class OpsRefreshApiTests(unittest.TestCase):
         self.assertEqual(payload["status"]["refresh_status"]["runtime"]["state"], "finished")
         self.assertEqual(payload["status"]["refresh_status"]["runtime"]["elapsed_seconds"], 1800)
         self.assertEqual(payload["status"]["refresh_status"]["runtime"]["remaining_budget_seconds"], 12600)
+        self.assertEqual(payload["status"]["refresh_status"]["manifest"]["generatedAt"], "2026-05-19T07:00:00-05:00")
+        self.assertEqual(payload["status"]["refresh_status"]["runtime"]["finishedAt"], "2026-05-19T07:30:00-05:00")
         self.assertGreaterEqual(len(payload["status"]["refresh_status"]["history"]), 1)
         self.assertEqual(payload["status"]["refresh_status"]["mirror_manifests"][0]["sport"], "mlb")
-        self.assertEqual(payload["status"]["refresh_status"]["mirror_manifests"][0]["copied_artifact_count"], 14)
+        self.assertEqual(payload["status"]["refresh_status"]["mirror_manifests"][0]["copiedArtifactCount"], 14)
         self.assertEqual(payload["status"]["daily_update"]["manifest"]["date"], "2026-05-19")
         self.assertEqual(payload["status"]["daily_update"]["runtime"]["elapsed_seconds"], 2700)
         self.assertEqual(payload["status"]["daily_update"]["runtime"]["remaining_budget_seconds"], 11700)

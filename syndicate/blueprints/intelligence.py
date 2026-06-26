@@ -21,6 +21,7 @@ from syndicate.features.intelligence import _attach_intelligence_response_aliase
 from syndicate.features.intelligence_board import build_intelligence_board_contract
 from syndicate.features.shared.artifact_manifests import load_artifact_manifests
 from syndicate.features.shared.intelligence_evaluation import build_intelligence_evaluation_bundle
+from syndicate.features.shared.timezone import normalize_timestamped_payload
 from syndicate.features.shared.timezone import central_today_iso
 from syndicate.features.shared.ops_refresh import launch_refresh_run
 from syndicate.features.shared.ops_refresh import load_latest_refresh_status
@@ -970,7 +971,7 @@ def run_intelligence():
     except Exception:
         launch_result = load_latest_refresh_status()
     queue_intelligence_state_refresh(_intelligence_page_payload(selected_date))
-    return jsonify({"ok": True, "selected_date": selected_date, "launched": launched, "refresh": launch_result, "queued": True})
+    return jsonify({"ok": True, "selected_date": selected_date, "launched": launched, "refresh": normalize_timestamped_payload(launch_result), "queued": True})
 
 
 @intelligence_bp.get("/api/intelligence/status")
@@ -986,13 +987,13 @@ def intelligence_status_api():
         _log_api_state_read(status if isinstance(status, dict) else {})
     except Exception as exc:
         return _api_error_response(exc)
-    state_snapshot = dict(status) if isinstance(status, dict) and _response_has_content(status) else _empty_default_intelligence_response()
+    state_snapshot = normalize_timestamped_payload(dict(status)) if isinstance(status, dict) and _response_has_content(status) else _empty_default_intelligence_response()
     response_payload = {"ok": True, "status": state_snapshot}
     if isinstance(status, dict) and _response_has_content(status):
         for key, value in status.items():
             if key == "ok":
                 continue
-            response_payload[key] = value
+            response_payload[key] = normalize_timestamped_payload(value)
     response_payload.update(_debug_state_fields(state_snapshot, source="snapshot_read"))
     return _no_cache_response(jsonify(response_payload))
 

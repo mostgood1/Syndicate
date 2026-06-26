@@ -5,6 +5,15 @@ from typing import Any
 from syndicate.features.shared.simulation_adapter import build_simulation_contract_from_context
 
 
+def _sim_payload(game: dict[str, Any] | None) -> dict[str, Any]:
+    if not isinstance(game, dict):
+        return {}
+    nested = game.get("sim")
+    if isinstance(nested, dict) and nested:
+        return nested
+    return game
+
+
 def _safe_float(value: Any) -> float | None:
     try:
         return float(value)
@@ -90,7 +99,7 @@ def _period_label(key: str) -> str:
 
 def _build_period_rows(game: dict[str, Any]) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
-    sim = game.get("sim") if isinstance(game.get("sim"), dict) else {}
+    sim = _sim_payload(game)
     periods = sim.get("periods") if isinstance(sim.get("periods"), dict) else {}
     betting = game.get("betting") if isinstance(game.get("betting"), dict) else {}
     home_abbr = _safe_text(game.get("home", {}).get("abbr"), "HME")
@@ -304,7 +313,7 @@ def _build_prop_rows(game: dict[str, Any]) -> list[dict[str, str]]:
 
 def _build_box_sections(game: dict[str, Any]) -> list[dict[str, Any]]:
     sections: list[dict[str, Any]] = []
-    sim = game.get("sim") if isinstance(game.get("sim"), dict) else {}
+    sim = _sim_payload(game)
     score = sim.get("score") if isinstance(sim.get("score"), dict) else {}
     away_abbr = _safe_text(game.get("away", {}).get("abbr"), "AWY")
     home_abbr = _safe_text(game.get("home", {}).get("abbr"), "HME")

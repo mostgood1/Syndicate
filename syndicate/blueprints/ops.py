@@ -27,6 +27,7 @@ from syndicate.features.shared.ops_refresh import load_latest_refresh_status
 from syndicate.features.shared.refresh_state_store import read_json_file
 from syndicate.features.shared.refresh_state_store import reports_root
 from syndicate.features.shared.refresh_state_store import write_json_file
+from syndicate.features.shared.timezone import normalize_timestamped_payload
 
 
 ops_bp = Blueprint("ops", __name__)
@@ -230,7 +231,7 @@ def _require_admin_token() -> Any:
 
 @ops_bp.get("/api/ops/odds-refresh/status")
 def api_ops_odds_refresh_status() -> Any:
-    return jsonify({"ok": True, "status": load_latest_refresh_status()})
+    return jsonify({"ok": True, "status": normalize_timestamped_payload(load_latest_refresh_status())})
 
 
 @ops_bp.get("/api/ops/version")
@@ -372,7 +373,7 @@ def api_ops_odds_refresh_run() -> Any:
         return jsonify({"ok": False, "error": str(exc)}), 400
     except Exception as exc:
         return jsonify({"ok": False, "error": f"{type(exc).__name__}: {exc}"}), 500
-    return jsonify({"ok": True, "status": "started", "job_id": job_id, "job": job}), 202
+    return jsonify({"ok": True, "status": "started", "job_id": job_id, "job": normalize_timestamped_payload(job)}), 202
 
 
 @ops_bp.post("/api/ops/full-refresh/run")
@@ -395,7 +396,7 @@ def api_ops_odds_refresh_cancel() -> Any:
         return jsonify({"ok": False, "error": str(exc)}), 400
     except Exception as exc:
         return jsonify({"ok": False, "error": f"{type(exc).__name__}: {exc}"}), 500
-    return jsonify({"ok": bool(result.get("ok")), "cancel": result}), 200 if result.get("ok") else 409
+    return jsonify({"ok": bool(result.get("ok")), "cancel": normalize_timestamped_payload(result)}), 200 if result.get("ok") else 409
 
 
 @ops_bp.get("/api/ops/odds-refresh/logs")

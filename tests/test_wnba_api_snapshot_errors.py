@@ -72,7 +72,7 @@ class WnbaApiSnapshotErrorTests(unittest.TestCase):
 
         def fake_build_source_cards_payload(selected_date: str, *, allow_stored_date_fallback: bool = False):
             self.assertEqual(selected_date, "2026-06-21")
-            self.assertFalse(allow_stored_date_fallback)
+            self.assertTrue(allow_stored_date_fallback)
             return {
                 "date": "2026-06-21",
                 "requested_date": "2026-06-21",

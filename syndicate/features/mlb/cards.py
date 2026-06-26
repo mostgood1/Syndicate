@@ -1069,7 +1069,7 @@ def _source_predictions(output: dict[str, Any]) -> dict[str, Any]:
 def _hydrate_output_segments_from_sim(output: dict[str, Any], sim_payload: dict[str, Any] | None) -> dict[str, Any]:
     if not isinstance(output, dict):
         return {}
-    sim_section = sim_payload.get("sim") if isinstance((sim_payload or {}).get("sim"), dict) else {}
+    sim_section = _sim_section_from_payload(sim_payload)
     sim_segments = sim_section.get("segments") if isinstance(sim_section.get("segments"), dict) else {}
     if not isinstance(sim_segments, dict) or not sim_segments:
         return output
@@ -1762,6 +1762,15 @@ def _daily_actual_by_game(selected_date: str, game_pks: list[int]) -> dict[int, 
         if isinstance(payload, dict):
             out[int(game_pk)] = payload
     return out
+
+
+def _sim_section_from_payload(sim_payload: dict[str, Any] | None) -> dict[str, Any]:
+    if not isinstance(sim_payload, dict):
+        return {}
+    nested = sim_payload.get("sim")
+    if isinstance(nested, dict) and nested:
+        return nested
+    return sim_payload
 
 
 def _fetch_current_feed_live(game_pk: int) -> dict[str, Any] | None:
@@ -2693,7 +2702,7 @@ def _current_live_pitcher_prop_rows(selected_date: str, sim_payload: dict[str, A
     if not isinstance(sim_payload, dict) or not isinstance(actual_payload, dict):
         return []
     refreshed_at = central_now().isoformat(timespec="seconds")
-    sim_section = sim_payload.get("sim") if isinstance(sim_payload.get("sim"), dict) else {}
+    sim_section = _sim_section_from_payload(sim_payload)
     pitcher_models = sim_section.get("pitcher_props") if isinstance(sim_section.get("pitcher_props"), dict) else {}
     market_lines = _pitcher_snapshot_market_lines(selected_date)
     probable_pitchers = ((actual_payload.get("gameData") or {}).get("probablePitchers")) if isinstance((actual_payload.get("gameData") or {}).get("probablePitchers"), dict) else {}
@@ -3051,7 +3060,7 @@ def _synth_live_hitter_prop_rows(
     existing_rows: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
     refreshed_at = central_now().isoformat(timespec="seconds")
-    sim_section = sim_payload.get("sim") if isinstance((sim_payload or {}).get("sim"), dict) else {}
+    sim_section = _sim_section_from_payload(sim_payload)
     hitter_models = sim_section.get("hitter_props") if isinstance(sim_section.get("hitter_props"), dict) else {}
     if not hitter_models:
         return []
@@ -3387,7 +3396,7 @@ def _source_sim_detail(selected_date: str, game_pk: int, sim_payload: dict[str, 
             "livePropRows": live_prop_rows,
             "gameLens": live_lens_row.get("gameLens") if isinstance((live_lens_row or {}).get("gameLens"), list) else [],
         }
-    sim_section = sim_payload.get("sim") if isinstance(sim_payload.get("sim"), dict) else {}
+    sim_section = _sim_section_from_payload(sim_payload)
     aggregate = sim_section.get("aggregate_boxscore") if isinstance(sim_section.get("aggregate_boxscore"), dict) else {}
     away_box = aggregate.get("away") if isinstance(aggregate.get("away"), dict) else {}
     home_box = aggregate.get("home") if isinstance(aggregate.get("home"), dict) else {}
@@ -3614,7 +3623,7 @@ def _sim_panel(sim_payload: dict[str, Any] | None, away_abbr: str, home_abbr: st
             "items": ["Daily sim boxscore artifact unavailable for the selected date."],
         }
 
-    sim_section = sim_payload.get("sim") if isinstance(sim_payload.get("sim"), dict) else {}
+    sim_section = _sim_section_from_payload(sim_payload)
     aggregate = sim_section.get("aggregate_boxscore") if isinstance(sim_section.get("aggregate_boxscore"), dict) else {}
     away_box = aggregate.get("away") if isinstance(aggregate.get("away"), dict) else {}
     home_box = aggregate.get("home") if isinstance(aggregate.get("home"), dict) else {}
@@ -4143,7 +4152,7 @@ def _live_starter_ladder_badges_for_side(
 ) -> list[dict[str, Any]]:
     if side not in {"away", "home"} or not isinstance(sim_payload, dict) or not isinstance(actual_payload, dict):
         return []
-    sim_section = sim_payload.get("sim") if isinstance(sim_payload.get("sim"), dict) else {}
+    sim_section = _sim_section_from_payload(sim_payload)
     pitcher_models = sim_section.get("pitcher_props") if isinstance(sim_section.get("pitcher_props"), dict) else {}
     market_lines = _pitcher_snapshot_market_lines(selected_date)
     probable_pitchers = ((actual_payload.get("gameData") or {}).get("probablePitchers")) if isinstance((actual_payload.get("gameData") or {}).get("probablePitchers"), dict) else {}

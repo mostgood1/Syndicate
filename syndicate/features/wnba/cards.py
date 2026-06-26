@@ -19,6 +19,7 @@ from urllib import request as urllib_request
 from syndicate.features.shared.game_board_contract import apply_game_board_contract
 from syndicate.features.shared.basketball_live_artifacts import build_live_lines_payload_from_artifacts
 from syndicate.features.shared.basketball_live_artifacts import build_live_player_lens_payload_from_artifacts
+from syndicate.features.shared.game_board_contract import _sim_payload
 from syndicate.features.wnba.sources import available_dates
 from syndicate.features.wnba.sources import build_module_links
 from syndicate.features.wnba.sources import format_moneyline
@@ -138,7 +139,7 @@ def _merge_sim_indexes(cards_sim_index: dict[tuple[str, str], dict[str, Any]], r
         key: dict(value) for key, value in cards_sim_index.items() if isinstance(value, dict)
     }
     for key, raw_game in raw_sim_index.items():
-        raw_sim = raw_game.get("sim") if isinstance(raw_game.get("sim"), dict) else {}
+        raw_sim = _sim_payload(raw_game)
         existing = merged.get(key)
         if not isinstance(existing, dict):
             merged[key] = {"away_tri": key[0], "home_tri": key[1], "sim": dict(raw_sim)}
@@ -447,7 +448,7 @@ def _quarter_values(players: list[dict[str, Any]], stat_key: str, quarter_index:
 def _source_quarter_summary_periods(sim_game: dict[str, Any] | None) -> dict[str, dict[str, float | None]]:
     if not isinstance(sim_game, dict):
         return {}
-    sim = sim_game.get("sim") if isinstance(sim_game.get("sim"), dict) else sim_game
+    sim = _sim_payload(sim_game)
     periods_source = sim.get("periods") if isinstance(sim.get("periods"), dict) else {}
     if periods_source:
         periods: dict[str, dict[str, float | None]] = {}
@@ -507,7 +508,7 @@ def _source_sim_periods(sim_game: dict[str, Any] | None) -> dict[str, dict[str, 
     summary_periods = _source_quarter_summary_periods(sim_game)
     if summary_periods:
         return summary_periods
-    sim = sim_game.get("sim") if isinstance(sim_game.get("sim"), dict) else sim_game
+    sim = _sim_payload(sim_game)
     players = sim.get("players") if isinstance(sim.get("players"), dict) else {}
     away_players = [row for row in (players.get("away") or []) if isinstance(row, dict)]
     home_players = [row for row in (players.get("home") or []) if isinstance(row, dict)]
@@ -566,7 +567,7 @@ def _top_pick_items(picks: list[dict[str, Any]], *, limit: int = 4) -> tuple[lis
 def _sim_table_groups(sim_game: dict[str, Any] | None, away_tri: str, home_tri: str) -> tuple[list[dict[str, Any]], list[dict[str, str]]]:
     if not isinstance(sim_game, dict):
         return [], []
-    sim = sim_game.get("sim") if isinstance(sim_game.get("sim"), dict) else {}
+    sim = _sim_payload(sim_game)
     summary = sim.get("players_summary") if isinstance(sim.get("players_summary"), dict) else {}
     stats = [
         {"label": "Away sims", "value": str(summary.get("away") or "-")},
@@ -843,7 +844,7 @@ def _source_betting(row: dict[str, str]) -> dict[str, Any]:
 
 
 def _source_sim_score(sim_game: dict[str, Any] | None, row: dict[str, str]) -> dict[str, float | None]:
-    sim = sim_game.get("sim") if isinstance((sim_game or {}).get("sim"), dict) else {}
+    sim = _sim_payload(sim_game)
     players = sim.get("players") if isinstance(sim.get("players"), dict) else {}
 
     def _team_total(side: str) -> float | None:
@@ -920,7 +921,7 @@ def _source_mode(context: dict[str, Any] | None) -> str:
 
 
 def _source_sim_payload(game_id: str, sim_game: dict[str, Any] | None, row: dict[str, str]) -> dict[str, Any]:
-    sim = sim_game.get("sim") if isinstance((sim_game or {}).get("sim"), dict) else {}
+    sim = _sim_payload(sim_game)
     players_summary = dict(sim.get("players_summary") or {}) if isinstance(sim, dict) else {}
     players = sim.get("players") if isinstance(sim.get("players"), dict) else {}
     missing_prop_players = sim.get("missing_prop_players") if isinstance(sim.get("missing_prop_players"), dict) else {}
@@ -1008,7 +1009,7 @@ def _wnba_advanced_simulation_contract(sim_payload: dict[str, Any] | None) -> di
 
 
 def _wnba_advanced_game_contract(game: dict[str, Any]) -> dict[str, Any]:
-    sim = game.get("sim") if isinstance(game.get("sim"), dict) else {}
+    sim = _sim_payload(game)
     betting = game.get("betting") if isinstance(game.get("betting"), dict) else {}
     prop_recommendations = game.get("prop_recommendations") if isinstance(game.get("prop_recommendations"), dict) else {}
     game_market_recommendations = game.get("game_market_recommendations") if isinstance(game.get("game_market_recommendations"), list) else []
@@ -1202,7 +1203,9 @@ def build_source_cards_sim_detail_payload(selected_date: str, away_tri: str, hom
     away_key = _canonical_wnba_tri(str(away_tri or "").strip().upper())
     home_key = _canonical_wnba_tri(str(home_tri or "").strip().upper())
     bundle = _artifact_bundle(resolved_date)
-    sim_detail = bundle.get("sim", {}).get((away_key, home_key)) if isinstance(bundle.get("sim"), dict) else None
+    sim_detail = bundle.get((away_key, home_key)) if isinstance(bundle, dict) else None
+    if not isinstance(sim_detail, dict) and isinstance(bundle.get("sim"), dict):
+        sim_detail = bundle.get("sim", {}).get((away_key, home_key))
     if isinstance(sim_detail, dict):
         return {
             "date": resolved_date,
@@ -3274,7 +3277,7 @@ def _public_live_player_boxscore_payload(selected_date: str, event_ids: list[str
 
 
 def _fallback_live_player_lens_game(game: dict[str, Any], *, event_id: str | None = None) -> dict[str, Any]:
-    sim = game.get("sim") if isinstance(game.get("sim"), dict) else {}
+    sim = _sim_payload(game)
     sim_players = sim.get("players") if isinstance(sim.get("players"), dict) else {}
     away_tri = str(game.get("away_tri") or "").strip().upper()
     home_tri = str(game.get("home_tri") or "").strip().upper()
@@ -3488,7 +3491,7 @@ def build_live_state_payload(selected_date: str, ttl: int = 12, *, allow_stored_
         )
         away_info = game.get("away") if isinstance(game.get("away"), dict) else {}
         home_info = game.get("home") if isinstance(game.get("home"), dict) else {}
-        sim_score = ((game.get("sim") or {}).get("score") or {}) if isinstance(game.get("sim"), dict) else {}
+        sim_score = (_sim_payload(game).get("score") or {})
         out_games.append(
             {
                 "game_id": game.get("gamePk"),

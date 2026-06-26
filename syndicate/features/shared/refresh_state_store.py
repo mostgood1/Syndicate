@@ -19,6 +19,7 @@ import os
 from pathlib import Path
 from typing import Any
 
+from syndicate.features.shared.timezone import normalize_timestamped_payload
 from syndicate.features.shared.source_roots import repo_root_from
 
 
@@ -227,12 +228,13 @@ def read_text_file(path: Path) -> str | None:
 
 
 def write_json_file(path: Path, payload: dict[str, Any]) -> None:
+    normalized_payload = normalize_timestamped_payload(payload)
     if _state_backend_kind() == "keyvalue":
-        _get_keyvalue_client().set(_state_key_for_path(path), json.dumps(payload, indent=2))
+        _get_keyvalue_client().set(_state_key_for_path(path), json.dumps(normalized_payload, indent=2))
         _record_refresh_status_history(path)
         return
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    path.write_text(json.dumps(normalized_payload, indent=2), encoding="utf-8")
 
 
 def write_text_file(path: Path, payload: str) -> None:

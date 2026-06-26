@@ -4798,26 +4798,28 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         app = Flask(__name__)
         app.register_blueprint(intelligence_bp)
 
-        cached_status = {"ok": True, "threadAlive": True, "cachedSnapshots": 3}
-        state_response = {
+        cached_status = {
             "ok": True,
+            "threadAlive": True,
+            "cachedSnapshots": 3,
+            "candidate_count": 1,
             "last_updated": "2026-06-11T16:05:00Z",
-            "candidate_pool": {"candidates": [{"name": "Play 1"}]},
+            "candidates": [{"name": "Play 1"}],
         }
 
         with app.test_request_context("/api/intelligence/status?date=2026-06-10", method="GET"):
-            with patch("syndicate.blueprints.intelligence.build_intelligence_status", return_value=dict(cached_status)) as build_status_mock:
-                with patch("syndicate.blueprints.intelligence.read_latest_intelligence_state_response", return_value=dict(state_response)):
-                    response = intelligence_status_api()
+            with patch("syndicate.blueprints.intelligence.read_latest_intelligence_board_snapshot_response", return_value={}):
+                with patch("syndicate.blueprints.intelligence.read_latest_intelligence_state_response", return_value=dict(cached_status)):
+                    with patch("syndicate.blueprints.intelligence._response_has_content", side_effect=lambda payload: bool(payload)):
+                        response = intelligence_status_api()
 
         payload = response.get_json()
         self.assertIsNotNone(payload)
         self.assertEqual((payload.get("status") or {}).get("cachedSnapshots"), 3)
         self.assertEqual((payload.get("status") or {}).get("threadAlive"), True)
-        self.assertEqual(payload["state_last_updated"], "2026-06-11T16:05:00Z")
-        self.assertEqual(payload["candidate_count"], 1)
-        self.assertEqual(payload["debug_source"], "worker")
-        build_status_mock.assert_called_once_with(selected_date="2026-06-10")
+        self.assertEqual(payload["state_last_updated"], "2026-06-11T11:05:00-05:00")
+        self.assertEqual((payload.get("status") or {}).get("last_updated"), "2026-06-11T11:05:00-05:00")
+        self.assertEqual(payload["debug_source"], "snapshot_read")
         self.assertEqual(response.headers.get("Cache-Control"), "no-cache, no-store, must-revalidate")
         self.assertEqual(response.headers.get("Pragma"), "no-cache")
         self.assertEqual(response.headers.get("Expires"), "0")

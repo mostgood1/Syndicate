@@ -36,6 +36,7 @@ from syndicate.features.shared.refresh_state_store import reports_root
 from syndicate.features.shared.refresh_state_store import write_json_file
 from syndicate.features.shared.source_roots import repo_root_from
 from syndicate.features.shared.timezone import central_today_iso
+from syndicate.features.shared.timezone import normalize_timestamped_payload
 
 
 REPO_ROOT = repo_root_from(__file__)
@@ -148,14 +149,14 @@ def _intelligence_state_history_entry(state: dict[str, Any]) -> dict[str, Any]:
     top_opportunities = response.get("top_opportunities") if isinstance(response, dict) and isinstance(response.get("top_opportunities"), list) else state.get("top_opportunities")
     opportunity_names = [str(item.get("name") or item.get("selection") or item.get("pick") or "").strip() for item in top_opportunities or [] if isinstance(item, Mapping)]
     opportunity_names = [name for name in opportunity_names if name]
-    return {
+    return normalize_timestamped_payload({
         "updated_at": _utc_now(),
         "last_updated": str(state.get("last_updated") or response.get("last_updated") or "").strip() or None,
         "selected_date": str(state.get("selected_date") or response.get("selected_date") or response.get("date") or "").strip() or None,
         "candidate_count": _intelligence_state_candidate_count(state),
         "top_opportunity_names": opportunity_names,
         "board_contract_schema": str((response.get("board_contract") or state.get("board_contract") or {}).get("schema") or "").strip() or None if isinstance((response.get("board_contract") or state.get("board_contract") or {}), dict) else None,
-    }
+    })
 
 
 def _is_intelligence_state_payload_valid(state: dict[str, Any] | None) -> bool:
@@ -188,7 +189,7 @@ def write_intelligence_state(state: dict[str, Any]) -> dict[str, Any] | None:
 def write_latest_intelligence_state(state: Any) -> dict[str, Any] | None:
     if hasattr(state, "to_dict") and callable(getattr(state, "to_dict")):
         state = state.to_dict()
-    normalized = _normalize_intelligence_state_payload(state if isinstance(state, dict) else None)
+    normalized = normalize_timestamped_payload(_normalize_intelligence_state_payload(state if isinstance(state, dict) else None))
     if not _is_intelligence_state_payload_valid(normalized):
         logger.info("STATE WRITTEN", extra={"written": False, "candidate_count": 0})
         return None

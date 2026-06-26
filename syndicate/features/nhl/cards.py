@@ -27,6 +27,7 @@ from syndicate.features.nhl.sources import scoreboard_snapshot_path
 from syndicate.features.nhl.sources import team_abbreviation
 from syndicate.features.nhl.sources import team_logo_url
 from syndicate.features.shared.game_board_contract import apply_game_board_contract
+from syndicate.features.shared.game_board_contract import _sim_payload
 
 
 def _load_csv_rows(path: Path) -> list[dict[str, str]]:

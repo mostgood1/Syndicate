@@ -18,6 +18,7 @@ from syndicate.features.nhl.sources import team_odds_snapshot_path
 from syndicate.features.shared.live_lens_contract import attach_live_lens_contract
 from syndicate.features.shared.rank_board import build_rank_api_payload
 from syndicate.features.shared.rank_board import build_rank_page_context
+from syndicate.features.shared.game_board_contract import _sim_payload
 from syndicate.features.shared.timezone import central_today_iso
 
 
@@ -32,7 +33,7 @@ def _safe_float(value: Any) -> float | None:
 
 def _best_edges(game: dict[str, Any]) -> list[tuple[float, str]]:
     betting = game.get("betting") if isinstance(game.get("betting"), dict) else {}
-    sim = game.get("sim") if isinstance(game.get("sim"), dict) else {}
+    sim = _sim_payload(game)
     first10 = sim.get("first10") if isinstance(sim.get("first10"), dict) else {}
     candidates = [
         (_safe_float(betting.get("home_ml_ev")), f"Home ML {format_pct(betting.get('home_ml_ev'))}"),
@@ -405,7 +406,7 @@ def _warning_panel(
 def _live_lens_card(game: dict[str, Any], selected_date: str, scoreboard_row: dict[str, Any] | None = None, team_odds: dict[str, Any] | None = None) -> dict[str, Any]:
     away = game.get("away") if isinstance(game.get("away"), dict) else {}
     home = game.get("home") if isinstance(game.get("home"), dict) else {}
-    sim = game.get("sim") if isinstance(game.get("sim"), dict) else {}
+    sim = _sim_payload(game)
     score = sim.get("score") if isinstance(sim.get("score"), dict) else {}
     first10 = sim.get("first10") if isinstance(sim.get("first10"), dict) else {}
     ranked_edges = sorted(_best_edges(game), key=lambda item: item[0], reverse=True)

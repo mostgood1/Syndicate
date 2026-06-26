@@ -468,6 +468,36 @@ class NbaRefreshRunnerTests(unittest.TestCase):
             payload = json.loads((processed_root / "cards_sim_detail_2026-05-29.json").read_text(encoding="utf-8"))
             self.assertEqual(payload["games"][0]["sim"]["quarters"][0]["away_pts_mu"], 26.1)
 
+    def test_cards_sim_detail_export_accepts_flat_smart_sim(self) -> None:
+        module = self._load_module()
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_root = Path(tmp_dir)
+            source_root = tmp_root / "source"
+            processed_root = tmp_root / "bundle" / "data" / "processed"
+            processed_root.mkdir(parents=True)
+            (processed_root / "smart_sim_2026-05-29_BOS_NYK.json").write_text(
+                json.dumps(
+                    {
+                        "home": "BOS",
+                        "away": "NYK",
+                        "periods": {"q1": {"away_mean": 26.1, "home_mean": 28.4, "total_mean": 54.5, "margin_mean": 2.3, "p_home_win": 0.61}},
+                        "players_summary": {"home": 1, "away": 1},
+                        "players": {"home": [{"player_name": "Home Player"}], "away": [{"player_name": "Away Player"}]},
+                        "missing_prop_players": {"home": [], "away": []},
+                        "injuries": {"home": [], "away": []},
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            with patch.object(module, "_copy_existing_processed_artifact", return_value=None), patch.object(module, "_load_source_app", side_effect=AssertionError("source app should not load")):
+                out = module._export_cards_sim_detail_snapshot(source_root=source_root, date_str="2026-05-29", processed_root=processed_root)
+
+            self.assertEqual(out, str(processed_root / "cards_sim_detail_2026-05-29.json"))
+            payload = json.loads((processed_root / "cards_sim_detail_2026-05-29.json").read_text(encoding="utf-8"))
+            self.assertEqual(payload["games"][0]["sim"]["quarters"][0]["away_pts_mu"], 26.1)
+
     def test_run_refresh_via_cli_uses_local_snapshot_fetcher(self) -> None:
         module = self._load_module()
 

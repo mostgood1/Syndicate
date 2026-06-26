@@ -29,6 +29,7 @@ from syndicate.features.shared.basketball_live_artifacts import build_live_lines
 from syndicate.features.shared.basketball_live_artifacts import build_live_player_lens_payload_from_artifacts
 from syndicate.features.shared.game_board_contract import apply_game_board_contract
 from syndicate.features.shared.game_board_contract import build_game_board_api_payload
+from syndicate.features.shared.game_board_contract import _sim_payload
 from syndicate.features.shared.timezone import central_now
 from syndicate.features.shared.timezone import central_today_iso
 
@@ -523,7 +524,7 @@ def _top_pick_items(picks: list[dict[str, Any]], *, limit: int = 4) -> tuple[lis
 def _sim_table_groups(sim_game: dict[str, Any] | None, away_tri: str, home_tri: str) -> tuple[list[dict[str, Any]], list[dict[str, str]]]:
     if not isinstance(sim_game, dict):
         return [], []
-    sim = sim_game.get("sim") if isinstance(sim_game.get("sim"), dict) else sim_game
+    sim = _sim_payload(sim_game)
     summary = sim.get("players_summary") if isinstance(sim.get("players_summary"), dict) else {}
     stats = [
         {"label": "Away sims", "value": str(summary.get("away") or "-")},
@@ -1461,7 +1462,7 @@ def _player_sim_stat(player_row: dict[str, Any], market: str) -> float | None:
 
 
 def _fallback_live_player_lens_game(game: dict[str, Any], *, event_id: str | None = None) -> dict[str, Any]:
-    sim = game.get("sim") if isinstance(game.get("sim"), dict) else {}
+    sim = _sim_payload(game)
     sim_players = sim.get("players") if isinstance(sim.get("players"), dict) else {}
     away_tri = str(game.get("away_tri") or "").strip().upper()
     home_tri = str(game.get("home_tri") or "").strip().upper()
@@ -1589,7 +1590,7 @@ def _quarter_values(players: list[dict[str, Any]], stat_key: str, quarter_index:
 def _source_quarter_summary_periods(sim_game: dict[str, Any] | None) -> dict[str, dict[str, float | None]]:
     if not isinstance(sim_game, dict):
         return {}
-    sim = sim_game.get("sim") if isinstance(sim_game.get("sim"), dict) else sim_game
+    sim = _sim_payload(sim_game)
     periods_source = sim.get("periods") if isinstance(sim.get("periods"), dict) else {}
     if periods_source:
         periods: dict[str, dict[str, float | None]] = {}
@@ -1649,7 +1650,7 @@ def _source_sim_periods(sim_game: dict[str, Any] | None) -> dict[str, dict[str, 
     summary_periods = _source_quarter_summary_periods(sim_game)
     if summary_periods:
         return summary_periods
-    sim = sim_game.get("sim") if isinstance(sim_game.get("sim"), dict) else sim_game
+    sim = _sim_payload(sim_game)
     players = sim.get("players") if isinstance(sim.get("players"), dict) else {}
     away_players = [row for row in (players.get("away") or []) if isinstance(row, dict)]
     home_players = [row for row in (players.get("home") or []) if isinstance(row, dict)]
@@ -1864,10 +1865,10 @@ def _normalize_source_game(game: dict[str, Any], *, idx: int, selected_date: str
     home_tri = str(game.get("home_tri") or "HOM").strip().upper() or "HOM"
     away_name = str(game.get("away_name") or away_tri).strip() or away_tri
     home_name = str(game.get("home_name") or home_tri).strip() or home_tri
-    game_id = str((((game.get("sim") or {}) if isinstance(game.get("sim"), dict) else {}).get("game_id") or idx)).strip()
+    game_id = str((_sim_payload(game).get("game_id") or idx)).strip()
     betting = dict(game.get("betting") or {}) if isinstance(game.get("betting"), dict) else {}
     odds = dict(game.get("odds") or {}) if isinstance(game.get("odds"), dict) else {}
-    sim = dict(game.get("sim") or {}) if isinstance(game.get("sim"), dict) else {}
+    sim = _sim_payload(game)
     props = dict(game.get("prop_recommendations") or {}) if isinstance(game.get("prop_recommendations"), dict) else {"away": [], "home": []}
     game_recs = [row for row in (game.get("game_market_recommendations") or []) if isinstance(row, dict)]
     score = sim.get("score") if isinstance(sim.get("score"), dict) else {}
@@ -1968,7 +1969,7 @@ def _game_from_row(
     away_score_mean = ((total - market_home_margin) / 2.0) if total is not None and market_home_margin is not None else None
     segment_total = (total / 4.0) if total is not None else None
     segment_margin = (market_home_margin / 4.0) if market_home_margin is not None else None
-    sim_payload = sim_game.get("sim") if isinstance(sim_game, dict) and isinstance(sim_game.get("sim"), dict) else (sim_game if isinstance(sim_game, dict) else {})
+    sim_payload = _sim_payload(sim_game)
     props_payload = props_game.get("prop_recommendations") if isinstance(props_game, dict) and isinstance(props_game.get("prop_recommendations"), dict) else (
         props_game if isinstance(props_game, dict) else {}
     )
@@ -2246,7 +2247,7 @@ def _games_from_artifacts(selected_date: str) -> tuple[list[dict[str, Any]], str
 
 def _game_has_actionable_data(game: dict[str, Any]) -> bool:
     betting = game.get("betting") if isinstance(game.get("betting"), dict) else {}
-    sim_score = ((game.get("sim") or {}).get("score") or {}) if isinstance(game.get("sim"), dict) else {}
+    sim_score = (_sim_payload(game).get("score") or {})
     game_recs = game.get("game_market_recommendations") if isinstance(game.get("game_market_recommendations"), list) else []
     prop_recs = game.get("prop_recommendations") if isinstance(game.get("prop_recommendations"), dict) else {}
 
@@ -2440,7 +2441,9 @@ def build_cards_sim_detail_payload(selected_date: str, away_tri: str, home_tri: 
     away_key = str(away_tri or "").strip().upper()
     home_key = str(home_tri or "").strip().upper()
     bundle = _artifact_bundle(selected_date)
-    sim_detail = bundle.get("sim", {}).get((home_key, away_key)) if isinstance(bundle.get("sim"), dict) else None
+    sim_detail = bundle.get((home_key, away_key)) if isinstance(bundle, dict) else None
+    if not isinstance(sim_detail, dict) and isinstance(bundle.get("sim"), dict):
+        sim_detail = bundle.get("sim", {}).get((home_key, away_key))
     if isinstance(sim_detail, dict):
         sim_payload = sim_detail.get("sim") if isinstance(sim_detail.get("sim"), dict) else sim_detail
         return {
@@ -2547,8 +2550,8 @@ def build_live_state_payload(selected_date: str, ttl: int = 12, *, allow_stored_
             start_time_utc=((game.get("odds") or {}).get("commence_time") if isinstance(game.get("odds"), dict) else None) or game.get("detail") or game.get("status"),
             in_progress=((game.get("live_state") or {}).get("in_progress") if isinstance(game.get("live_state"), dict) else False),
             final=((game.get("live_state") or {}).get("final") if isinstance(game.get("live_state"), dict) else False),
-            away_pts=((game.get("sim") or {}).get("score", {}).get("away_mean") if isinstance(game.get("sim"), dict) else None),
-            home_pts=((game.get("sim") or {}).get("score", {}).get("home_mean") if isinstance(game.get("sim"), dict) else None),
+            away_pts=(_sim_payload(game).get("score", {}).get("away_mean") if isinstance(_sim_payload(game).get("score"), dict) else None),
+            home_pts=(_sim_payload(game).get("score", {}).get("home_mean") if isinstance(_sim_payload(game).get("score"), dict) else None),
         )
         out_games.append(
             {

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections import deque
 from datetime import date
+import os
 from pathlib import Path
 import threading
 import time
@@ -83,7 +84,7 @@ def _selected_date() -> str:
 
 
 def _allow_stored_date_fallback() -> bool:
-    return False
+    return str(os.environ.get("RENDER") or "").strip().lower() in {"1", "true", "yes", "on"}
 
 
 def _official_wnba_logo_team_id(team_ref: str) -> int | None:
@@ -471,7 +472,7 @@ def api_game_detail(game_pk: str):
 def api_cards():
     selected_date = _selected_date()
     if str(__import__("os").environ.get("RENDER") or "").strip().lower() in {"1", "true", "yes", "on"}:
-        context = build_source_cards_payload(selected_date, allow_stored_date_fallback=False)
+        context = build_source_cards_payload(selected_date, allow_stored_date_fallback=_allow_stored_date_fallback())
         context = {
             **context,
             "source_title": "WNBA source cards fallback",

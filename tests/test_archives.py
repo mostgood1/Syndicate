@@ -349,6 +349,30 @@ class DateArchiveHelperTests(unittest.TestCase):
         self.assertEqual(((((sim.get("segments") or {}).get("full") or {}).get("total_runs_dist") or {}).get(8)), 210)
         self.assertEqual(len((((sim.get("segments") or {}).get("first1") or {}).get("samples") or [])), 1)
 
+    def test_mlb_source_card_detail_accepts_flat_sim_payload(self) -> None:
+        sim_payload = {
+            "away": "LAA",
+            "home": "DET",
+            "sims": 1000,
+            "aggregate_boxscore": {
+                "away": {"totals": {"R": 4.65, "H": 9.24, "E": None}, "batting": [], "pitching": []},
+                "home": {"totals": {"R": 4.67, "H": 9.41, "E": None}, "batting": [], "pitching": []},
+            },
+            "segments": {
+                "full": {"total_runs_dist": {8: 210}},
+            },
+        }
+
+        with patch("syndicate.features.mlb.cards._daily_sim_by_game", return_value={824272: sim_payload}):
+            with patch("syndicate.features.mlb.cards._daily_actual_by_game", return_value={}):
+                with patch("syndicate.features.mlb.cards._live_lens_game_row", return_value=None):
+                    payload = source_card_detail_payload("2026-05-28", 824272)
+
+        sim = payload.get("sim") or {}
+        self.assertTrue(sim.get("found"))
+        self.assertEqual(sim.get("simCount"), 1000)
+        self.assertEqual(((((sim.get("segments") or {}).get("full") or {}).get("total_runs_dist") or {}).get(8)), 210)
+
     def test_mlb_games_from_daily_summary_sets_first1_signal(self) -> None:
         from syndicate.features.mlb.cards import _games_from_daily_summary
 
@@ -3127,6 +3151,35 @@ class HomeBoardTests(unittest.TestCase):
 
         self.assertEqual(len(games), 1)
         self.assertEqual(games[0].get("game_id"), "wnba-1")
+
+    def test_home_loader_enables_render_stored_date_fallback_for_basketball(self) -> None:
+        from syndicate.blueprints import home as home_module
+
+        nba_payload = {
+            "requested_date": "2026-05-20",
+            "date": "2026-05-19",
+            "games": [{"game_id": "nba-1"}],
+            "source_title": "NBA cards",
+        }
+        wnba_payload = {
+            "requested_date": "2026-05-20",
+            "date": "2026-05-19",
+            "games": [{"game_id": "wnba-1"}],
+            "source_title": "WNBA cards",
+        }
+
+        with patch.dict("os.environ", {"RENDER": "true"}, clear=False):
+            with patch("syndicate.features.nba.cards.build_cards_page_context", return_value=dict(nba_payload)) as nba_mock:
+                nba_games = home_module._load_home_games("nba", context_label="2026-05-20")
+            with patch("syndicate.features.wnba.cards.build_cards_page_context", return_value=dict(wnba_payload)) as wnba_mock:
+                wnba_games = home_module._load_home_games("wnba", context_label="2026-05-20")
+
+        self.assertEqual(len(nba_games), 1)
+        self.assertEqual(nba_games[0].get("game_id"), "nba-1")
+        self.assertEqual(len(wnba_games), 1)
+        self.assertEqual(wnba_games[0].get("game_id"), "wnba-1")
+        nba_mock.assert_called_once_with("2026-05-20", allow_stored_date_fallback=True)
+        wnba_mock.assert_called_once_with("2026-05-20", allow_stored_date_fallback=True)
 
     def test_home_payload_force_refresh_bypasses_cached_html(self) -> None:
         from syndicate.blueprints import home as home_module

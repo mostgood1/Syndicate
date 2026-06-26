@@ -1,11 +1,13 @@
 from __future__ import annotations
 
-from datetime import date
 from datetime import datetime
+from datetime import date
 from datetime import timedelta
+from datetime import timezone
 from pathlib import Path
 from typing import Any
 
+from syndicate.features.shared.timezone import CENTRAL_TIMEZONE
 from syndicate.features.shared.timezone import central_today
 
 
@@ -14,6 +16,19 @@ def _parse_iso_date(value: str) -> date:
         return datetime.strptime(value, "%Y-%m-%d").date()
     except Exception:
         return central_today()
+
+
+def _centralize_iso_timestamp(value: Any) -> str | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    try:
+        stamp = datetime.fromisoformat(text.replace("Z", "+00:00"))
+        if stamp.tzinfo is None:
+            stamp = stamp.replace(tzinfo=CENTRAL_TIMEZONE)
+        return stamp.astimezone(CENTRAL_TIMEZONE).isoformat(timespec="seconds")
+    except Exception:
+        return text
 
 
 def build_rank_page_context(
@@ -91,6 +106,14 @@ def build_rank_api_payload(context: dict[str, Any]) -> dict[str, Any]:
         "using_sample_data": context.get("using_sample_data", False),
         "source_path": context.get("source_path"),
     }
+    if "generatedAt" in context:
+        payload["generatedAt"] = _centralize_iso_timestamp(context.get("generatedAt"))
+    if "generated_at" in context:
+        payload["generated_at"] = _centralize_iso_timestamp(context.get("generated_at"))
+    if "oddsRefreshedAt" in context:
+        payload["oddsRefreshedAt"] = _centralize_iso_timestamp(context.get("oddsRefreshedAt"))
+    if "odds_refreshed_at" in context:
+        payload["odds_refreshed_at"] = _centralize_iso_timestamp(context.get("odds_refreshed_at"))
     payload.setdefault("route_path", context.get("route_path"))
     payload.setdefault("control_label", context.get("control_label") or "Date")
     payload.setdefault("control_type", context.get("control_type") or "date")
@@ -129,11 +152,11 @@ def build_rank_api_payload(context: dict[str, Any]) -> dict[str, Any]:
         if key in context:
             payload[key] = context.get(key)
     if "odds_refreshed_at" not in payload:
-        fallback_ts = payload.get("oddsRefreshedAt") or payload.get("generatedAt") or payload.get("generated_at")
+        fallback_ts = _centralize_iso_timestamp(payload.get("oddsRefreshedAt") or payload.get("generatedAt") or payload.get("generated_at"))
         if fallback_ts:
             payload["odds_refreshed_at"] = fallback_ts
     if "oddsRefreshedAt" not in payload:
-        camel_ts = payload.get("odds_refreshed_at") or payload.get("generatedAt") or payload.get("generated_at")
+        camel_ts = _centralize_iso_timestamp(payload.get("odds_refreshed_at") or payload.get("generatedAt") or payload.get("generated_at"))
         if camel_ts:
             payload["oddsRefreshedAt"] = camel_ts
     return payload

@@ -7,6 +7,7 @@ from unittest.mock import patch
 
 from syndicate.features.wnba.cards import build_cards_page_context
 from syndicate.features.wnba.cards import _supplement_games_with_live_state
+from syndicate.features.wnba.cards import build_source_cards_sim_detail_payload
 from syndicate.features.wnba.cards import build_source_cards_payload
 
 
@@ -246,6 +247,33 @@ class WnbaCardsMergeAliasTests(unittest.TestCase):
         self.assertIn("quarters", sim)
         self.assertGreaterEqual(int((sim.get("players_summary") or {}).get("away") or 0), 0)
         self.assertGreaterEqual(int((sim.get("players_summary") or {}).get("home") or 0), 0)
+
+    def test_source_cards_sim_detail_payload_accepts_flat_sim_payload(self) -> None:
+        artifact_bundle = {
+            "rows": [],
+            "recommendations": {},
+            "sim": {
+                ("LAS", "CON"): {
+                    "players_summary": {"away": 4, "home": 5},
+                    "players": {"away": [{"player_name": "Away Player"}], "home": [{"player_name": "Home Player"}]},
+                    "pregame_context": {"available": True, "source": "sim"},
+                    "quarters": [{"quarter": 1, "away_mean": 20.0, "home_mean": 22.0}],
+                }
+            },
+            "props": {},
+        }
+
+        with patch("syndicate.features.wnba.cards._artifact_bundle", return_value=artifact_bundle):
+            payload = build_source_cards_sim_detail_payload("2026-06-22", "LAS", "CON")
+
+        games = payload.get("games") or []
+        self.assertEqual(len(games), 1)
+        sim = games[0].get("sim") if isinstance(games[0], dict) else {}
+        self.assertTrue(sim.get("players_loaded"))
+        self.assertGreater(len((sim.get("players") or {}).get("away") or []), 0)
+        self.assertGreater(len((sim.get("players") or {}).get("home") or []), 0)
+        self.assertIn("pregame_context", sim)
+        self.assertIn("quarters", sim)
 
 
 if __name__ == "__main__":
