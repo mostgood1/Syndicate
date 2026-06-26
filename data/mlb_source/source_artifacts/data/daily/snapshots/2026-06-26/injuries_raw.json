@@ -962,6 +962,7 @@
       },
       "injured_ids": [
         641941,
+        663574,
         663647,
         668881,
         668933,
@@ -1040,6 +1041,21 @@
             "name": "Third Base",
             "type": "Infielder",
             "abbreviation": "3B"
+          },
+          "roster_type_source": "40Man"
+        },
+        {
+          "player_id": 663574,
+          "full_name": "Tony Santillan",
+          "status": {
+            "code": "D15",
+            "description": "Injured 15-Day"
+          },
+          "position": {
+            "code": "1",
+            "name": "Pitcher",
+            "type": "Pitcher",
+            "abbreviation": "P"
           },
           "roster_type_source": "40Man"
         }
@@ -2188,7 +2204,6 @@
         543760,
         593871,
         605280,
-        621438,
         656731,
         657585,
         663795,
@@ -2331,21 +2346,6 @@
             "abbreviation": "P"
           },
           "roster_type_source": "40Man"
-        },
-        {
-          "player_id": 621438,
-          "full_name": "Tyrone Taylor",
-          "status": {
-            "code": "D10",
-            "description": "Injured 10-Day"
-          },
-          "position": {
-            "code": "8",
-            "name": "Outfielder",
-            "type": "Outfielder",
-            "abbreviation": "CF"
-          },
-          "roster_type_source": "40Man"
         }
       ]
     },
@@ -2482,8 +2482,7 @@
         606965,
         665833,
         687462,
-        696062,
-        804606
+        696062
       ],
       "injured": [
         {
@@ -2498,21 +2497,6 @@
             "name": "Pitcher",
             "type": "Pitcher",
             "abbreviation": "P"
-          },
-          "roster_type_source": "40Man"
-        },
-        {
-          "player_id": 804606,
-          "full_name": "Konnor Griffin",
-          "status": {
-            "code": "D10",
-            "description": "Injured 10-Day"
-          },
-          "position": {
-            "code": "6",
-            "name": "Shortstop",
-            "type": "Infielder",
-            "abbreviation": "SS"
           },
           "roster_type_source": "40Man"
         },
@@ -5456,6 +5440,22 @@
       "roster_type_source": "40Man"
     },
     {
+      "team_id": 113,
+      "player_id": 663574,
+      "full_name": "Tony Santillan",
+      "status": {
+        "code": "D15",
+        "description": "Injured 15-Day"
+      },
+      "position": {
+        "code": "1",
+        "name": "Pitcher",
+        "type": "Pitcher",
+        "abbreviation": "P"
+      },
+      "roster_type_source": "40Man"
+    },
+    {
       "team_id": 114,
       "player_id": 682657,
       "full_name": "Angel Mart\u00ednez",
@@ -6656,22 +6656,6 @@
       "roster_type_source": "40Man"
     },
     {
-      "team_id": 121,
-      "player_id": 621438,
-      "full_name": "Tyrone Taylor",
-      "status": {
-        "code": "D10",
-        "description": "Injured 10-Day"
-      },
-      "position": {
-        "code": "8",
-        "name": "Outfielder",
-        "type": "Outfielder",
-        "abbreviation": "CF"
-      },
-      "roster_type_source": "40Man"
-    },
-    {
       "team_id": 133,
       "player_id": 667670,
       "full_name": "Brent Rooker",
@@ -6796,22 +6780,6 @@
         "name": "Pitcher",
         "type": "Pitcher",
         "abbreviation": "P"
-      },
-      "roster_type_source": "40Man"
-    },
-    {
-      "team_id": 134,
-      "player_id": 804606,
-      "full_name": "Konnor Griffin",
-      "status": {
-        "code": "D10",
-        "description": "Injured 10-Day"
-      },
-      "position": {
-        "code": "6",
-        "name": "Shortstop",
-        "type": "Infielder",
-        "abbreviation": "SS"
       },
       "roster_type_source": "40Man"
     },

@@ -1006,12 +1006,6 @@
         "lev": 0.7
       },
       {
-        "id": 650960,
-        "name": "Daniel Duarte",
-        "role": "MR",
-        "lev": 0.5
-      },
-      {
         "id": 642207,
         "name": "Devin Williams",
         "role": "CL",
@@ -1020,6 +1014,12 @@
       {
         "id": 596133,
         "name": "Luke Weaver",
+        "role": "MR",
+        "lev": 0.5
+      },
+      {
+        "id": 804267,
+        "name": "Zach Thornton",
         "role": "MR",
         "lev": 0.5
       },
@@ -1409,6 +1409,35 @@
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
+      },
+      {
+        "id": 621438,
+        "name": "Tyrone Taylor",
+        "pos": "CF",
+        "bat": "R",
+        "throw": "R",
+        "k_rate": 0.19058257918552035,
+        "bb_rate": 0.028930995475113123,
+        "hbp_rate": 0.0,
+        "hr_rate": 0.028930995475113123,
+        "inplay_hit_rate": 0.17948780487804877,
+        "xb_hit_share": 0.2222222222222222,
+        "vs_pitch_type": {},
+        "vs_pitch_type_hr": {},
+        "platoon_mult_vs_lhp": {
+          "k": 1.1714720284908742,
+          "bb": 0.8075,
+          "hr": 1.2421146953405018,
+          "inplay": 1.1309500083042683
+        },
+        "platoon_mult_vs_rhp": {
+          "k": 0.810736014245437,
+          "bb": 1.1925000000000001,
+          "hr": 0.7894777265745008,
+          "inplay": 0.9163027230779229
+        },
+        "statcast_quality_mult": {},
+        "vs_pitcher_history": {}
       }
     ],
     "starter_profile": {
@@ -1586,50 +1615,6 @@
         "pitch_type_hr_mult": {}
       },
       {
-        "id": 650960,
-        "name": "Daniel Duarte",
-        "throw": "R",
-        "role": "MR",
-        "leverage_skill": 0.5,
-        "stamina_pitches": 24,
-        "availability_mult": 1.0,
-        "platoon_mult_vs_lhb": {
-          "k": 0.95,
-          "bb": 1.1925000000000001,
-          "hr": 1.0,
-          "inplay": 1.1925000000000001
-        },
-        "platoon_mult_vs_rhb": {
-          "k": 1.1375,
-          "bb": 0.8075,
-          "hr": 1.0,
-          "inplay": 0.8075
-        },
-        "statcast_quality_mult": {},
-        "arsenal_source": "statsapi_pitchArsenal",
-        "arsenal_sample_size": 56,
-        "statcast_splits_found": false,
-        "statcast_splits_source": "",
-        "statcast_splits_n_pitches": 0,
-        "statcast_splits_start_date": "",
-        "statcast_splits_end_date": "",
-        "k_rate": 0.2,
-        "bb_rate": 0.06666666666666667,
-        "hbp_rate": 0.0,
-        "hr_rate": 0.0,
-        "inplay_hit_rate": 0.09090909090909091,
-        "arsenal": {
-          "FF": 0.10714286,
-          "OTHER": 0.19642857,
-          "CH": 0.21428572,
-          "SI": 0.14285715,
-          "FC": 0.3392857
-        },
-        "pitch_type_whiff_mult": {},
-        "pitch_type_inplay_mult": {},
-        "pitch_type_hr_mult": {}
-      },
-      {
         "id": 642207,
         "name": "Devin Williams",
         "throw": "R",
@@ -1710,6 +1695,50 @@
           "CH": 0.35112934712073934,
           "SL": 0.0020533881831622165,
           "FC": 0.13552361888870634
+        },
+        "pitch_type_whiff_mult": {},
+        "pitch_type_inplay_mult": {},
+        "pitch_type_hr_mult": {}
+      },
+      {
+        "id": 804267,
+        "name": "Zach Thornton",
+        "throw": "L",
+        "role": "MR",
+        "leverage_skill": 0.5,
+        "stamina_pitches": 28,
+        "availability_mult": 1.0,
+        "platoon_mult_vs_lhb": {
+          "k": 0.8075,
+          "bb": 0.8075,
+          "hr": 1.275,
+          "inplay": 0.8075
+        },
+        "platoon_mult_vs_rhb": {
+          "k": 1.1925000000000001,
+          "bb": 1.1925000000000001,
+          "hr": 0.78,
+          "inplay": 1.1925000000000001
+        },
+        "statcast_quality_mult": {},
+        "arsenal_source": "statsapi_pitchArsenal",
+        "arsenal_sample_size": 80,
+        "statcast_splits_found": false,
+        "statcast_splits_source": "",
+        "statcast_splits_n_pitches": 0,
+        "statcast_splits_start_date": "",
+        "statcast_splits_end_date": "",
+        "k_rate": 0.15789473684210525,
+        "bb_rate": 0.10526315789473682,
+        "hbp_rate": 0.0,
+        "hr_rate": 0.05263157894736841,
+        "inplay_hit_rate": 0.2857142857142857,
+        "arsenal": {
+          "FF": 0.275,
+          "OTHER": 0.1125,
+          "CH": 0.0125,
+          "SI": 0.1,
+          "FC": 0.5
         },
         "pitch_type_whiff_mult": {},
         "pitch_type_inplay_mult": {},

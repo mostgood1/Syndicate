@@ -568,6 +568,7 @@ player_id,full_name,position,line_slot,pp_unit,pk_unit,proj_toi,confidence,team
 8481575,Lassi Thomson,D,,1.0,1.0,18.5,0.5,OTT
 8484759,Carter Yakemchuk,D,,1.0,1.0,18.5,0.5,OTT
 8482245,Artem Zub,D,,,,18.5,0.5,OTT
+8481035,Samuel Ersson,G,,,,60.0,0.5,OTT
 8482447,Leevi Meriläinen,G,,,,60.0,0.5,OTT
 8473503,James Reimer,G,,,,60.0,0.5,OTT
 8476999,Linus Ullmark,G,,,,60.0,0.5,OTT
@@ -752,7 +753,6 @@ player_id,full_name,position,line_slot,pp_unit,pk_unit,proj_toi,confidence,team
 8476853,Morgan Rielly,D,,1.0,1.0,18.5,0.5,TOR
 8479442,Troy Stecher,D,,1.0,1.0,18.5,0.5,TOR
 8475690,Chris Tanev,D,,,,18.5,0.5,TOR
-8481035,Samuel Ersson,G,,,,60.0,0.5,TOR
 8476932,Anthony Stolarz,G,,,,60.0,0.5,TOR
 8475461,Andrew Agozzino,F,L1,1.0,1.0,13.5,0.5,UTA
 8480855,Jack McBain,F,L1,1.0,1.0,13.5,0.5,UTA

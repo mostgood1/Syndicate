@@ -4319,6 +4319,93 @@
           "bb_ld_rate": 0.2,
           "bb_pu_rate": 0.11,
           "bb_inplay_n": 0
+        },
+        {
+          "player": {
+            "mlbam_id": 621438,
+            "full_name": "Tyrone Taylor",
+            "primary_position": "CF",
+            "bat_side": "R",
+            "throw_side": "R"
+          },
+          "k_rate": 0.19058257918552035,
+          "bb_rate": 0.028930995475113123,
+          "hbp_rate": 0.0,
+          "hr_rate": 0.028930995475113123,
+          "inplay_hit_rate": 0.17948780487804877,
+          "xb_hit_share": 0.2222222222222222,
+          "triple_share_of_xb": 0.02,
+          "sb_attempt_rate": 0.07142857142857142,
+          "sb_success_rate": 0.4,
+          "vs_pitch_type": {},
+          "vs_pitch_type_hr": {},
+          "platoon_mult_vs_lhp": {
+            "k": 1.1714720284908742,
+            "bb": 0.8075,
+            "hr": 1.2421146953405018,
+            "inplay": 1.1309500083042683
+          },
+          "platoon_mult_vs_rhp": {
+            "k": 0.810736014245437,
+            "bb": 1.1925000000000001,
+            "hr": 0.7894777265745008,
+            "inplay": 0.9163027230779229
+          },
+          "venue_mult_home": {
+            "k": 1.0083364398712988,
+            "bb": 0.9450671148940228,
+            "hr": 1.175,
+            "inplay": 1.015623726049735
+          },
+          "venue_mult_away": {
+            "k": 0.9706542348848329,
+            "bb": 1.0340556098620615,
+            "hr": 0.86,
+            "inplay": 1.0009987770077455
+          },
+          "vs_venue_hr_mult": {
+            "121": 1.175,
+            "108": 0.86
+          },
+          "vs_venue_k_mult": {
+            "121": 1.0083364398712988,
+            "108": 0.8775000000000001
+          },
+          "vs_venue_bb_mult": {
+            "121": 0.9450671148940228,
+            "108": 1.1225
+          },
+          "vs_venue_inplay_mult": {
+            "121": 1.0045442191997431,
+            "108": 0.8775000000000001
+          },
+          "vs_venue_history": {
+            "121": {
+              "pa": 41.0,
+              "k_mult": 1.0238183996322825,
+              "bb_mult": 0.8430488996972081,
+              "hr_mult": 1.5,
+              "inplay_mult": 1.0129834834278373
+            },
+            "108": {
+              "pa": 12.0,
+              "k_mult": 0.65,
+              "bb_mult": 1.35,
+              "hr_mult": 0.6,
+              "inplay_mult": 0.65
+            }
+          },
+          "statcast_quality_mult": {},
+          "vs_pitcher_hr_mult": {},
+          "vs_pitcher_k_mult": {},
+          "vs_pitcher_bb_mult": {},
+          "vs_pitcher_inplay_mult": {},
+          "vs_pitcher_history": {},
+          "bb_gb_rate": 0.44,
+          "bb_fb_rate": 0.25,
+          "bb_ld_rate": 0.2,
+          "bb_pu_rate": 0.11,
+          "bb_inplay_n": 0
         }
       ],
       "bullpen": [
@@ -4593,77 +4680,6 @@
         },
         {
           "player": {
-            "mlbam_id": 650960,
-            "full_name": "Daniel Duarte",
-            "primary_position": "P",
-            "bat_side": "R",
-            "throw_side": "R"
-          },
-          "k_rate": 0.2,
-          "bb_rate": 0.06666666666666667,
-          "hbp_rate": 0.0,
-          "hr_rate": 0.0,
-          "inplay_hit_rate": 0.09090909090909091,
-          "batters_faced": 15.0,
-          "balls_in_play": 11.0,
-          "arsenal": {
-            "FF": 0.10714286,
-            "OTHER": 0.19642857,
-            "CH": 0.21428572,
-            "SI": 0.14285715,
-            "FC": 0.3392857
-          },
-          "pitch_type_whiff_mult": {},
-          "pitch_type_inplay_mult": {},
-          "pitch_type_hr_mult": {},
-          "statcast_splits_source": "",
-          "statcast_splits_n_pitches": 0,
-          "statcast_splits_start_date": "",
-          "statcast_splits_end_date": "",
-          "arsenal_source": "statsapi_pitchArsenal",
-          "arsenal_sample_size": 56,
-          "stamina_pitches": 24,
-          "role": "MR",
-          "availability_mult": 1.0,
-          "platoon_mult_vs_lhb": {
-            "k": 0.95,
-            "bb": 1.1925000000000001,
-            "hr": 1.0,
-            "inplay": 1.1925000000000001
-          },
-          "platoon_mult_vs_rhb": {
-            "k": 1.1375,
-            "bb": 0.8075,
-            "hr": 1.0,
-            "inplay": 0.8075
-          },
-          "venue_mult_home": {
-            "k": 1.0875,
-            "bb": 1.1225,
-            "hr": 1.0,
-            "inplay": 0.8775000000000001
-          },
-          "venue_mult_away": {
-            "k": 0.8999999999999999,
-            "bb": 0.8775000000000001,
-            "hr": 1.0,
-            "inplay": 1.1225
-          },
-          "vs_venue_hr_mult": {},
-          "vs_venue_k_mult": {},
-          "vs_venue_bb_mult": {},
-          "vs_venue_inplay_mult": {},
-          "vs_venue_history": {},
-          "statcast_quality_mult": {},
-          "bb_gb_rate": 0.44,
-          "bb_fb_rate": 0.25,
-          "bb_ld_rate": 0.2,
-          "bb_pu_rate": 0.11,
-          "bb_inplay_n": 0,
-          "leverage_skill": 0.5
-        },
-        {
-          "player": {
             "mlbam_id": 642207,
             "full_name": "Devin Williams",
             "primary_position": "P",
@@ -4826,6 +4842,72 @@
               "inplay_mult": 1.35
             }
           },
+          "statcast_quality_mult": {},
+          "bb_gb_rate": 0.44,
+          "bb_fb_rate": 0.25,
+          "bb_ld_rate": 0.2,
+          "bb_pu_rate": 0.11,
+          "bb_inplay_n": 0,
+          "leverage_skill": 0.5
+        },
+        {
+          "player": {
+            "mlbam_id": 804267,
+            "full_name": "Zach Thornton",
+            "primary_position": "P",
+            "bat_side": "L",
+            "throw_side": "L"
+          },
+          "k_rate": 0.15789473684210525,
+          "bb_rate": 0.10526315789473682,
+          "hbp_rate": 0.0,
+          "hr_rate": 0.05263157894736841,
+          "inplay_hit_rate": 0.2857142857142857,
+          "batters_faced": 19.0,
+          "balls_in_play": 14.0,
+          "arsenal": {
+            "FF": 0.275,
+            "OTHER": 0.1125,
+            "CH": 0.0125,
+            "SI": 0.1,
+            "FC": 0.5
+          },
+          "pitch_type_whiff_mult": {},
+          "pitch_type_inplay_mult": {},
+          "pitch_type_hr_mult": {},
+          "statcast_splits_source": "",
+          "statcast_splits_n_pitches": 0,
+          "statcast_splits_start_date": "",
+          "statcast_splits_end_date": "",
+          "arsenal_source": "statsapi_pitchArsenal",
+          "arsenal_sample_size": 80,
+          "stamina_pitches": 28,
+          "role": "MR",
+          "availability_mult": 1.0,
+          "platoon_mult_vs_lhb": {
+            "k": 0.8075,
+            "bb": 0.8075,
+            "hr": 1.275,
+            "inplay": 0.8075
+          },
+          "platoon_mult_vs_rhb": {
+            "k": 1.1925000000000001,
+            "bb": 1.1925000000000001,
+            "hr": 0.78,
+            "inplay": 1.1925000000000001
+          },
+          "venue_mult_home": {},
+          "venue_mult_away": {
+            "k": 1.0,
+            "bb": 1.0,
+            "hr": 1.0,
+            "inplay": 1.0
+          },
+          "vs_venue_hr_mult": {},
+          "vs_venue_k_mult": {},
+          "vs_venue_bb_mult": {},
+          "vs_venue_inplay_mult": {},
+          "vs_venue_history": {},
           "statcast_quality_mult": {},
           "bb_gb_rate": 0.44,
           "bb_fb_rate": 0.25,

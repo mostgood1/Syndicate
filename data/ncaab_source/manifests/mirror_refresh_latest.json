@@ -1,7 +1,7 @@
 ﻿{
     "sport":  "ncaab",
     "date":  "2026-06-26",
-    "refreshedAtUtc":  "2026-06-26T16:12:54.4763382Z",
+    "refreshedAtUtc":  "2026-06-26T19:15:26.8920924Z",
     "sourceRepo":  null,
     "sourceRootEnvVar":  "SYNDICATE_SOURCE_ROOT_NCAAB",
     "destinationRoot":  "D:\\a\\Syndicate\\Syndicate\\data\\ncaab_source",

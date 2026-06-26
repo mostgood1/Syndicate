@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "date": "2026-06-26",
-  "generated_at": "2026-06-26T15:26:34.341568",
+  "generated_at": "2026-06-26T18:36:15.574472",
   "include_baseline": false,
   "teams": {
     "108": {
@@ -484,8 +484,8 @@
         },
         "active": {
           "prev_date": null,
-          "n_players": 25,
-          "n_added": 25,
+          "n_players": 26,
+          "n_added": 26,
           "n_removed": 0
         }
       }

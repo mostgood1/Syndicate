@@ -7523,25 +7523,6 @@
           },
           {
             "person": {
-              "id": 663574,
-              "fullName": "Tony Santillan",
-              "link": "/api/v1/people/663574"
-            },
-            "jerseyNumber": "64",
-            "position": {
-              "code": "1",
-              "name": "Pitcher",
-              "type": "Pitcher",
-              "abbreviation": "P"
-            },
-            "status": {
-              "code": "A",
-              "description": "Active"
-            },
-            "parentTeamId": 113
-          },
-          {
-            "person": {
               "id": 663886,
               "fullName": "Tyler Stephenson",
               "link": "/api/v1/people/663886"
@@ -7552,6 +7533,25 @@
               "name": "Catcher",
               "type": "Catcher",
               "abbreviation": "C"
+            },
+            "status": {
+              "code": "A",
+              "description": "Active"
+            },
+            "parentTeamId": 113
+          },
+          {
+            "person": {
+              "id": 685112,
+              "fullName": "Zach McCambley",
+              "link": "/api/v1/people/685112"
+            },
+            "jerseyNumber": "62",
+            "position": {
+              "code": "1",
+              "name": "Pitcher",
+              "type": "Pitcher",
+              "abbreviation": "P"
             },
             "status": {
               "code": "A",
@@ -8263,9 +8263,10 @@
               "type": "Pitcher",
               "abbreviation": "P"
             },
+            "note": "Left oblique strain.",
             "status": {
-              "code": "A",
-              "description": "Active"
+              "code": "D15",
+              "description": "Injured 15-Day"
             },
             "parentTeamId": 113
           },
@@ -8359,8 +8360,8 @@
               "abbreviation": "P"
             },
             "status": {
-              "code": "RM",
-              "description": "Reassigned to Minors"
+              "code": "A",
+              "description": "Active"
             },
             "parentTeamId": 113
           }
@@ -18218,25 +18219,6 @@
           },
           {
             "person": {
-              "id": 650960,
-              "fullName": "Daniel Duarte",
-              "link": "/api/v1/people/650960"
-            },
-            "jerseyNumber": "54",
-            "position": {
-              "code": "1",
-              "name": "Pitcher",
-              "type": "Pitcher",
-              "abbreviation": "P"
-            },
-            "status": {
-              "code": "A",
-              "description": "Active"
-            },
-            "parentTeamId": 121
-          },
-          {
-            "person": {
               "id": 642207,
               "fullName": "Devin Williams",
               "link": "/api/v1/people/642207"
@@ -18446,25 +18428,6 @@
           },
           {
             "person": {
-              "id": 669004,
-              "fullName": "MJ Melendez",
-              "link": "/api/v1/people/669004"
-            },
-            "jerseyNumber": "1",
-            "position": {
-              "code": "10",
-              "name": "Designated Hitter",
-              "type": "Hitter",
-              "abbreviation": "DH"
-            },
-            "status": {
-              "code": "A",
-              "description": "Active"
-            },
-            "parentTeamId": 121
-          },
-          {
-            "person": {
               "id": 668901,
               "fullName": "Mark Vientos",
               "link": "/api/v1/people/668901"
@@ -18546,6 +18509,44 @@
               "link": "/api/v1/people/668964"
             },
             "jerseyNumber": "32",
+            "position": {
+              "code": "1",
+              "name": "Pitcher",
+              "type": "Pitcher",
+              "abbreviation": "P"
+            },
+            "status": {
+              "code": "A",
+              "description": "Active"
+            },
+            "parentTeamId": 121
+          },
+          {
+            "person": {
+              "id": 621438,
+              "fullName": "Tyrone Taylor",
+              "link": "/api/v1/people/621438"
+            },
+            "jerseyNumber": "28",
+            "position": {
+              "code": "8",
+              "name": "Outfielder",
+              "type": "Outfielder",
+              "abbreviation": "CF"
+            },
+            "status": {
+              "code": "A",
+              "description": "Active"
+            },
+            "parentTeamId": 121
+          },
+          {
+            "person": {
+              "id": 804267,
+              "fullName": "Zach Thornton",
+              "link": "/api/v1/people/804267"
+            },
+            "jerseyNumber": "49",
             "position": {
               "code": "1",
               "name": "Pitcher",
@@ -18785,8 +18786,8 @@
               "abbreviation": "P"
             },
             "status": {
-              "code": "A",
-              "description": "Active"
+              "code": "RM",
+              "description": "Reassigned to Minors"
             },
             "parentTeamId": 121
           },
@@ -19207,8 +19208,8 @@
               "abbreviation": "DH"
             },
             "status": {
-              "code": "A",
-              "description": "Active"
+              "code": "RM",
+              "description": "Reassigned to Minors"
             },
             "parentTeamId": 121
           },
@@ -19398,10 +19399,9 @@
               "type": "Outfielder",
               "abbreviation": "CF"
             },
-            "note": "Right hip flexor strain.",
             "status": {
-              "code": "D10",
-              "description": "Injured 10-Day"
+              "code": "A",
+              "description": "Active"
             },
             "parentTeamId": 121
           },
@@ -19419,8 +19419,8 @@
               "abbreviation": "P"
             },
             "status": {
-              "code": "RM",
-              "description": "Reassigned to Minors"
+              "code": "A",
+              "description": "Active"
             },
             "parentTeamId": 121
           }
@@ -21053,25 +21053,6 @@
           },
           {
             "person": {
-              "id": 687394,
-              "fullName": "Jack Brannigan",
-              "link": "/api/v1/people/687394"
-            },
-            "jerseyNumber": "76",
-            "position": {
-              "code": "6",
-              "name": "Shortstop",
-              "type": "Infielder",
-              "abbreviation": "SS"
-            },
-            "status": {
-              "code": "A",
-              "description": "Active"
-            },
-            "parentTeamId": 134
-          },
-          {
-            "person": {
               "id": 663968,
               "fullName": "Jake Mangum",
               "link": "/api/v1/people/663968"
@@ -21115,6 +21096,25 @@
               "link": "/api/v1/people/669707"
             },
             "jerseyNumber": "19",
+            "position": {
+              "code": "6",
+              "name": "Shortstop",
+              "type": "Infielder",
+              "abbreviation": "SS"
+            },
+            "status": {
+              "code": "A",
+              "description": "Active"
+            },
+            "parentTeamId": 134
+          },
+          {
+            "person": {
+              "id": 804606,
+              "fullName": "Konnor Griffin",
+              "link": "/api/v1/people/804606"
+            },
+            "jerseyNumber": "6",
             "position": {
               "code": "6",
               "name": "Shortstop",
@@ -21675,8 +21675,8 @@
               "abbreviation": "SS"
             },
             "status": {
-              "code": "A",
-              "description": "Active"
+              "code": "RM",
+              "description": "Reassigned to Minors"
             },
             "parentTeamId": 134
           },
@@ -21788,10 +21788,9 @@
               "type": "Infielder",
               "abbreviation": "SS"
             },
-            "note": "Right elbow strain",
             "status": {
-              "code": "D10",
-              "description": "Injured 10-Day"
+              "code": "A",
+              "description": "Active"
             },
             "parentTeamId": 134
           },
@@ -35688,6 +35687,25 @@
           },
           {
             "person": {
+              "id": 689818,
+              "fullName": "David Sandlin",
+              "link": "/api/v1/people/689818"
+            },
+            "jerseyNumber": "54",
+            "position": {
+              "code": "1",
+              "name": "Pitcher",
+              "type": "Pitcher",
+              "abbreviation": "P"
+            },
+            "status": {
+              "code": "A",
+              "description": "Active"
+            },
+            "parentTeamId": 145
+          },
+          {
+            "person": {
               "id": 663436,
               "fullName": "Davis Martin",
               "link": "/api/v1/people/663436"
@@ -36217,8 +36235,8 @@
               "abbreviation": "P"
             },
             "status": {
-              "code": "RM",
-              "description": "Reassigned to Minors"
+              "code": "A",
+              "description": "Active"
             },
             "parentTeamId": 145
           },

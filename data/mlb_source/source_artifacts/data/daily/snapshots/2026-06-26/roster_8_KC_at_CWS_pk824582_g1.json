@@ -54,18 +54,18 @@
     "lineup_source": "projected_rotowire_today_lineup",
     "lineup_confidence": 0.72,
     "probable_pitcher": {
-      "id": null,
-      "source": "none",
-      "confidence": 0.0,
-      "raw_schedule_id": null,
-      "raw_feed_id": null
+      "id": 674444,
+      "source": "feed_gameData_probablePitchers",
+      "confidence": 0.75,
+      "raw_schedule_id": 674444,
+      "raw_feed_id": 674444
     },
     "starter": {
-      "id": 608379,
-      "name": "Michael Wacha",
+      "id": 674444,
+      "name": "Steven Cruz",
       "role": "SP",
-      "selection_source": "heuristic",
-      "requested_id": null
+      "selection_source": "probable",
+      "requested_id": 674444
     },
     "bullpen": [
       {
@@ -107,12 +107,6 @@
       {
         "id": 621381,
         "name": "Matt Strahm",
-        "role": "MR",
-        "lev": 0.5
-      },
-      {
-        "id": 674444,
-        "name": "Steven Cruz",
         "role": "MR",
         "lev": 0.5
       }
@@ -494,45 +488,43 @@
       }
     ],
     "starter_profile": {
-      "id": 608379,
-      "name": "Michael Wacha",
+      "id": 674444,
+      "name": "Steven Cruz",
       "throw": "R",
       "role": "SP",
       "leverage_skill": 0.5,
       "stamina_pitches": 94,
       "availability_mult": 1.0,
       "platoon_mult_vs_lhb": {
-        "k": 1.058914115567135,
-        "bb": 1.0416791612534202,
-        "hr": 1.0580902426284349,
-        "inplay": 0.9974590665126707
+        "k": 1.0460887140828146,
+        "bb": 1.0339197324414717,
+        "hr": 1.275,
+        "inplay": 1.051829705812007
       },
       "platoon_mult_vs_rhb": {
-        "k": 0.977271999513441,
-        "bb": 0.9866528048174301,
-        "hr": 0.9708966696630913,
-        "inplay": 0.9793345713401423
+        "k": 0.946740595069012,
+        "bb": 1.0582497212931994,
+        "hr": 0.78,
+        "inplay": 0.9448377581120944
       },
       "statcast_quality_mult": {},
       "arsenal_source": "statsapi_pitchArsenal",
-      "arsenal_sample_size": 1464,
+      "arsenal_sample_size": 399,
       "statcast_splits_found": false,
       "statcast_splits_source": "",
       "statcast_splits_n_pitches": 0,
       "statcast_splits_start_date": "",
       "statcast_splits_end_date": "",
-      "k_rate": 0.1806494498777506,
-      "bb_rate": 0.06870644865525671,
-      "hbp_rate": 0.009779951100244499,
-      "hr_rate": 0.02359489608801956,
-      "inplay_hit_rate": 0.3001672240802676,
+      "k_rate": 0.2839019851116625,
+      "bb_rate": 0.1159274193548387,
+      "hbp_rate": 0.0,
+      "hr_rate": 0.07022332506203474,
+      "inplay_hit_rate": 0.37049180327868847,
       "arsenal": {
-        "FF": 0.27459016,
-        "CU": 0.10245901,
-        "CH": 0.22677596,
-        "SI": 0.14890711,
-        "SL": 0.09631147,
-        "FC": 0.15095629
+        "FF": 0.5814536250025059,
+        "OTHER": 0.0075187973233082845,
+        "SL": 0.18045112775939848,
+        "FC": 0.23057644991478735
       },
       "pitch_type_whiff_mult": {},
       "pitch_type_inplay_mult": {},
@@ -844,49 +836,6 @@
         "pitch_type_whiff_mult": {},
         "pitch_type_inplay_mult": {},
         "pitch_type_hr_mult": {}
-      },
-      {
-        "id": 674444,
-        "name": "Steven Cruz",
-        "throw": "R",
-        "role": "MR",
-        "leverage_skill": 0.5,
-        "stamina_pitches": 25,
-        "availability_mult": 1.0,
-        "platoon_mult_vs_lhb": {
-          "k": 1.0460887140828146,
-          "bb": 1.0339197324414717,
-          "hr": 1.275,
-          "inplay": 1.051829705812007
-        },
-        "platoon_mult_vs_rhb": {
-          "k": 0.946740595069012,
-          "bb": 1.0582497212931994,
-          "hr": 0.78,
-          "inplay": 0.9448377581120944
-        },
-        "statcast_quality_mult": {},
-        "arsenal_source": "statsapi_pitchArsenal",
-        "arsenal_sample_size": 399,
-        "statcast_splits_found": false,
-        "statcast_splits_source": "",
-        "statcast_splits_n_pitches": 0,
-        "statcast_splits_start_date": "",
-        "statcast_splits_end_date": "",
-        "k_rate": 0.2839019851116625,
-        "bb_rate": 0.1159274193548387,
-        "hbp_rate": 0.0,
-        "hr_rate": 0.07022332506203474,
-        "inplay_hit_rate": 0.37049180327868847,
-        "arsenal": {
-          "FF": 0.5814536250025059,
-          "OTHER": 0.0075187973233082845,
-          "SL": 0.18045112775939848,
-          "FC": 0.23057644991478735
-        },
-        "pitch_type_whiff_mult": {},
-        "pitch_type_inplay_mult": {},
-        "pitch_type_hr_mult": {}
       }
     ]
   },
@@ -918,7 +867,7 @@
       671976
     ],
     "lineup_source": "projected_rotowire_default_vs_rhp",
-    "lineup_confidence": 0.58,
+    "lineup_confidence": 0.66,
     "probable_pitcher": {
       "id": null,
       "source": "none",

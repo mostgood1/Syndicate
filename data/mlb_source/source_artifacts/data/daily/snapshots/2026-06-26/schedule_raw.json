@@ -189,9 +189,9 @@
     "officialDate": "2026-06-26",
     "status": {
       "abstractGameState": "Preview",
-      "codedGameState": "S",
-      "detailedState": "Scheduled",
-      "statusCode": "S",
+      "codedGameState": "P",
+      "detailedState": "Pre-Game",
+      "statusCode": "P",
       "startTimeTBD": false,
       "abstractGameCode": "P"
     },
@@ -1505,6 +1505,11 @@
           "ties": 0,
           "pct": ".415"
         },
+        "probablePitcher": {
+          "id": 674444,
+          "fullName": "Steven Cruz",
+          "link": "/api/v1/people/674444"
+        },
         "splitSquad": false,
         "seriesNumber": 27,
         "springLeague": {
@@ -1794,9 +1799,9 @@
     "officialDate": "2026-06-26",
     "status": {
       "abstractGameState": "Preview",
-      "codedGameState": "S",
-      "detailedState": "Scheduled",
-      "statusCode": "S",
+      "codedGameState": "P",
+      "detailedState": "Pre-Game",
+      "statusCode": "P",
       "startTimeTBD": false,
       "abstractGameCode": "P"
     },

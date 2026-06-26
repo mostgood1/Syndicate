@@ -2,16 +2,16 @@
   "date": "2026-06-26",
   "season": 2026,
   "spring_mode": false,
-  "generated_at": "2026-06-26T15:29:34.592260",
+  "generated_at": "2026-06-26T18:39:06.782024",
   "summary": {
     "games": 15,
-    "projected_teams": 30,
+    "projected_teams": 28,
     "adjusted_teams": 0,
     "partial_teams": 0,
     "fallback_pool_teams": 0,
-    "confirmed_teams": 0,
-    "projected_only_teams": 30,
-    "confirmed_only_teams": 0,
+    "confirmed_teams": 2,
+    "projected_only_teams": 28,
+    "confirmed_only_teams": 2,
     "comparable_teams": 0,
     "exact_match_teams": 0,
     "true_mismatch_teams": 0
@@ -193,7 +193,17 @@
         "abbr": "PIT"
       },
       "away_confirmed_ids": [],
-      "home_confirmed_ids": [],
+      "home_confirmed_ids": [
+        804606,
+        664040,
+        668804,
+        542303,
+        656811,
+        699013,
+        669707,
+        663968,
+        680779
+      ],
       "away_projected_ids": [
         694362,
         682829,
@@ -205,17 +215,7 @@
         663886,
         680574
       ],
-      "home_projected_ids": [
-        663968,
-        664040,
-        668804,
-        693304,
-        656811,
-        699013,
-        682997,
-        669707,
-        680779
-      ],
+      "home_projected_ids": [],
       "away_projected_validation": {
         "status": "ok",
         "raw_ids": [
@@ -270,62 +270,14 @@
         "mapping_source": "projected_rotowire_default_vs_rhp"
       },
       "home_projected_validation": {
-        "status": "ok",
-        "raw_ids": [
-          663968,
-          664040,
-          668804,
-          693304,
-          656811,
-          699013,
-          682997,
-          669707,
-          680779
-        ],
-        "ids": [
-          663968,
-          664040,
-          668804,
-          693304,
-          656811,
-          699013,
-          682997,
-          669707,
-          680779
-        ],
-        "missing_ids": [],
-        "backfilled_ids": [],
-        "pool_source": "active+40Man",
-        "pool_size": 17,
-        "raw_names": [
-          "Jake Mangum",
-          "Brandon Lowe",
-          "Bryan Reynolds",
-          "Nick Gonzales",
-          "Ryan O'Hearn",
-          "Esmerlyn Valdez",
-          "Tyler Callihan",
-          "Jared Triolo",
-          "Henry Davis"
-        ],
-        "matched_names": [
-          "Jake Mangum",
-          "Brandon Lowe",
-          "Bryan Reynolds",
-          "Nick Gonzales",
-          "Ryan O'Hearn",
-          "Esmerlyn Valdez",
-          "Tyler Callihan",
-          "Jared Triolo",
-          "Henry Davis"
-        ],
-        "missing_name_labels": [],
-        "mapping_source": "projected_rotowire_today_lineup"
+        "status": "none",
+        "raw_ids": [],
+        "ids": []
       },
       "away_source": "projected_rotowire_default_vs_rhp",
-      "home_source": "projected_rotowire_today_lineup",
+      "home_source": "confirmed_feed_live",
       "away_confidence": 0.66,
-      "home_confidence": 0.72,
+      "home_confidence": 1.0,
       "away_comparison": {
         "status": "projected_only",
         "is_true_mismatch": false,
@@ -336,10 +288,10 @@
         "extra_in_projection": []
       },
       "home_comparison": {
-        "status": "projected_only",
+        "status": "confirmed_only",
         "is_true_mismatch": false,
-        "confirmed_count": 0,
-        "projected_count": 9,
+        "confirmed_count": 9,
+        "projected_count": 0,
         "overlap_count": 0,
         "missing_from_projection": [],
         "extra_in_projection": []
@@ -1116,7 +1068,7 @@
         "missing_ids": [],
         "backfilled_ids": [],
         "pool_source": "active+40Man",
-        "pool_size": 16,
+        "pool_size": 17,
         "raw_names": [
           "Francisco Lindor",
           "Bo Bichette",
@@ -1473,7 +1425,7 @@
       "away_source": "projected_rotowire_today_lineup",
       "home_source": "projected_rotowire_default_vs_rhp",
       "away_confidence": 0.72,
-      "home_confidence": 0.58,
+      "home_confidence": 0.66,
       "away_comparison": {
         "status": "projected_only",
         "is_true_mismatch": false,
@@ -1668,19 +1620,19 @@
         "team_id": 142,
         "abbr": "MIN"
       },
-      "away_confirmed_ids": [],
-      "home_confirmed_ids": [],
-      "away_projected_ids": [
+      "away_confirmed_ids": [
         664983,
         666160,
-        681198,
         696100,
+        681198,
         650489,
-        671289,
+        687859,
         694249,
         678662,
-        691720
+        666397
       ],
+      "home_confirmed_ids": [],
+      "away_projected_ids": [],
       "home_projected_ids": [
         663616,
         621439,
@@ -1693,57 +1645,9 @@
         668952
       ],
       "away_projected_validation": {
-        "status": "ok",
-        "raw_ids": [
-          664983,
-          666160,
-          681198,
-          696100,
-          650489,
-          671289,
-          694249,
-          678662,
-          691720
-        ],
-        "ids": [
-          664983,
-          666160,
-          681198,
-          696100,
-          650489,
-          671289,
-          694249,
-          678662,
-          691720
-        ],
-        "missing_ids": [],
-        "backfilled_ids": [],
-        "pool_source": "active+40Man",
-        "pool_size": 18,
-        "raw_names": [
-          "Jake McCarthy",
-          "Mickey Moniak",
-          "TJ Rumfield",
-          "Hunter Goodman",
-          "Willi Castro",
-          "Tyler Freeman",
-          "Cole Carrigg",
-          "Ezequiel Tovar",
-          "Kyle Karros"
-        ],
-        "matched_names": [
-          "Jake McCarthy",
-          "Mickey Moniak",
-          "TJ Rumfield",
-          "Hunter Goodman",
-          "Willi Castro",
-          "Tyler Freeman",
-          "Cole Carrigg",
-          "Ezequiel Tovar",
-          "Kyle Karros"
-        ],
-        "missing_name_labels": [],
-        "mapping_source": "projected_rotowire_default_vs_rhp"
+        "status": "none",
+        "raw_ids": [],
+        "ids": []
       },
       "home_projected_validation": {
         "status": "ok",
@@ -1798,15 +1702,15 @@
         "missing_name_labels": [],
         "mapping_source": "projected_rotowire_default_vs_rhp"
       },
-      "away_source": "projected_rotowire_default_vs_rhp",
+      "away_source": "confirmed_feed_live",
       "home_source": "projected_rotowire_default_vs_rhp",
-      "away_confidence": 0.66,
+      "away_confidence": 1.0,
       "home_confidence": 0.66,
       "away_comparison": {
-        "status": "projected_only",
+        "status": "confirmed_only",
         "is_true_mismatch": false,
-        "confirmed_count": 0,
-        "projected_count": 9,
+        "confirmed_count": 9,
+        "projected_count": 0,
         "overlap_count": 0,
         "missing_from_projection": [],
         "extra_in_projection": []
