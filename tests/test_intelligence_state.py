@@ -58,6 +58,42 @@ class IntelligenceStateTests(unittest.TestCase):
 
         self.assertIsNone(response)
 
+    def test_read_latest_response_can_opt_into_latest_fallback(self) -> None:
+        service = IntelligenceStateService()
+        snapshot = {
+            "key": _payload_key({"question": "top edges today", "date": "2026-06-15"}),
+            "payload": {"question": "top edges today", "date": "2026-06-15"},
+            "response": {
+                "ok": True,
+                "selected_date": "2026-06-15",
+                "response": {"selected_date": "2026-06-15", "recommendations": [{"name": "Play 1"}]},
+            },
+            "computed_at": "2026-06-10T17:31:00Z",
+            "source_fingerprint": "fingerprint-1",
+        }
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            state_path = Path(tmp_dir) / "reports" / "intelligence" / "query_state_cache.json"
+            state_path.parent.mkdir(parents=True, exist_ok=True)
+            refresh_state_store.write_json_file(
+                state_path,
+                {
+                    "latest_key": snapshot["key"],
+                    "updated_at": "2026-06-10T17:31:00Z",
+                    "snapshots": {snapshot["key"]: snapshot},
+                },
+            )
+
+            with patch.object(intelligence_state_module, "STATE_PATH", state_path):
+                response = service.read_latest_response(
+                    {"question": "top edges today", "date": "2026-06-17"},
+                    allow_latest_fallback=True,
+                )
+
+        self.assertIsNotNone(response)
+        self.assertEqual(response.get("selected_date"), "2026-06-15")
+        self.assertEqual(len(response.get("response", {}).get("recommendations", [])), 1)
+
     def test_board_snapshot_reader_skips_mismatched_dates(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir, patch.dict(
             os.environ,

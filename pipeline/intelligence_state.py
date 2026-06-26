@@ -963,7 +963,13 @@ class IntelligenceStateService:
                 return dict(self._snapshots[self._latest_key].response)
         return None
 
-    def read_latest_response(self, payload: dict[str, Any] | None = None, *, force_refresh: bool = True) -> dict[str, Any] | None:
+    def read_latest_response(
+        self,
+        payload: dict[str, Any] | None = None,
+        *,
+        force_refresh: bool = True,
+        allow_latest_fallback: bool = False,
+    ) -> dict[str, Any] | None:
         normalized_payload = self._normalize_payload(payload or self._default_payload())
         key = _payload_key(normalized_payload)
         requested_date = _selected_date_from_payload(normalized_payload)
@@ -977,7 +983,7 @@ class IntelligenceStateService:
             latest_snapshot = self._snapshots.get(self._latest_key or "") if self._latest_key else None
             if latest_snapshot is not None:
                 latest_date = _selected_date_from_payload(latest_snapshot.payload)
-                if requested_date is None or latest_date is None or latest_date == requested_date:
+                if allow_latest_fallback or requested_date is None or latest_date is None or latest_date == requested_date:
                     print("RETURNING state_last_updated:", latest_snapshot.response.get("state_last_updated") if isinstance(latest_snapshot.response, dict) else None)
                     return dict(latest_snapshot.response)
             return None
@@ -1330,8 +1336,17 @@ def compute_intelligence_state_response(payload: dict[str, Any], *, force_refres
     return _INTELLIGENCE_STATE_SERVICE._compute_response(payload, force_refresh=force_refresh)
 
 
-def read_latest_intelligence_state_response(payload: dict[str, Any] | None = None, *, force_refresh: bool = True) -> dict[str, Any] | None:
-    return _INTELLIGENCE_STATE_SERVICE.read_latest_response(payload, force_refresh=force_refresh)
+def read_latest_intelligence_state_response(
+    payload: dict[str, Any] | None = None,
+    *,
+    force_refresh: bool = True,
+    allow_latest_fallback: bool = False,
+) -> dict[str, Any] | None:
+    return _INTELLIGENCE_STATE_SERVICE.read_latest_response(
+        payload,
+        force_refresh=force_refresh,
+        allow_latest_fallback=allow_latest_fallback,
+    )
 
 
 def read_latest_intelligence_board_snapshot_response(payload: dict[str, Any] | None = None, *, force_refresh: bool = True) -> dict[str, Any] | None:
