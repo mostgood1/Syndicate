@@ -78,15 +78,39 @@ if (-not $UseExistingMirrorArtifacts) {
     }
 }
 
-if ((-not $UseExistingMirrorArtifacts) -and (-not $artifactRoot)) {
+if (-not $UseExistingMirrorArtifacts) {
     $sourceRootCandidate = [Environment]::GetEnvironmentVariable($sourceRootEnvVar)
     if ([string]::IsNullOrWhiteSpace($sourceRootCandidate)) {
         $sourceRootCandidate = Join-Path $repoRoot $SourceRepo
     }
-    if (-not (Test-Path $sourceRootCandidate)) {
-        throw "Source repo path not found: $sourceRootCandidate. Set $sourceRootEnvVar, pass -SourceRepo, set $sourceArtifactRootEnvVar / -SourceArtifactRoot, or use -UseExistingMirrorArtifacts."
+    if (-not [string]::IsNullOrWhiteSpace($sourceRootCandidate) -and (Test-Path $sourceRootCandidate)) {
+        $sourceRoot = (Resolve-Path $sourceRootCandidate).Path
     }
-    $sourceRoot = (Resolve-Path $sourceRootCandidate).Path
+}
+
+function Resolve-CopySourcePath {
+    param([string]$RelativePath)
+
+    if ([string]::IsNullOrWhiteSpace($RelativePath) -or $UseExistingMirrorArtifacts) {
+        return $null
+    }
+
+    foreach ($root in @($artifactRoot, $sourceRoot)) {
+        if ([string]::IsNullOrWhiteSpace($root)) {
+            continue
+        }
+
+        $candidate = Join-Path $root $RelativePath
+        if (Test-Path $candidate) {
+            return $candidate
+        }
+    }
+
+    return $null
+}
+
+if ((-not $UseExistingMirrorArtifacts) -and (-not $artifactRoot) -and (-not $sourceRoot)) {
+    throw "Source repo path not found. Set $sourceRootEnvVar, pass -SourceRepo, set $sourceArtifactRootEnvVar / -SourceArtifactRoot, or use -UseExistingMirrorArtifacts."
 }
 
 function Copy-IfExists {
@@ -207,7 +231,7 @@ $files = @(
 
 foreach ($name in $files) {
     $dst = Join-Path $destDataRoot $name
-    $src = if ($UseExistingMirrorArtifacts) { $dst } elseif ($artifactRoot) { Join-Path $artifactRoot (Join-Path 'data\processed' $name) } else { Join-Path $sourceRoot (Join-Path 'data\processed' $name) }
+    $src = if ($UseExistingMirrorArtifacts) { $dst } else { Resolve-CopySourcePath -RelativePath (Join-Path 'data\processed' $name) }
     if (Copy-IfExists -SourcePath $src -DestinationPath $dst) {
         $copied.Add($name) | Out-Null
     }
@@ -236,7 +260,7 @@ $liveLensFiles = @(
 
 foreach ($name in $liveLensFiles) {
     $dst = Join-Path $destLiveLensRoot $name
-    $src = if ($UseExistingMirrorArtifacts) { $dst } elseif ($artifactRoot) { Join-Path $artifactRoot (Join-Path 'data\live_lens' $name) } else { Join-Path $sourceRoot (Join-Path 'data\live_lens' $name) }
+    $src = if ($UseExistingMirrorArtifacts) { $dst } else { Resolve-CopySourcePath -RelativePath (Join-Path 'data\live_lens' $name) }
     if (Copy-IfExists -SourcePath $src -DestinationPath $dst) {
         $copied.Add((Join-Path 'live_lens' $name)) | Out-Null
     }
