@@ -38,6 +38,7 @@ from syndicate.features.mlb.sources import raw_feed_live_path
 from syndicate.features.mlb.sources import load_json_or_gz_file
 from syndicate.features.mlb.sources import load_json_file
 from syndicate.features.shared.timezone import CENTRAL_TIMEZONE
+from syndicate.features.shared.timezone import central_now
 from syndicate.features.shared.timezone import central_today
 from syndicate.features.shared.timezone import central_today_iso
 
@@ -249,6 +250,19 @@ def _format_start_time_local(game_date: Any, *, fallback_time: Any = None, fallb
     if time_text:
         return time_text
     return "-"
+
+
+def _centralize_iso_timestamp(value: Any) -> str | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    try:
+        stamp = datetime.fromisoformat(text.replace("Z", "+00:00"))
+        if stamp.tzinfo is None:
+            stamp = stamp.replace(tzinfo=CENTRAL_TIMEZONE)
+        return stamp.astimezone(CENTRAL_TIMEZONE).isoformat(timespec="seconds")
+    except Exception:
+        return text
 
 
 def _schedule_context(
@@ -1895,7 +1909,7 @@ def source_cards_api_payload(context: dict[str, Any]) -> dict[str, Any]:
                 for game in games
             ]
     if selected_date == today_iso and latest_live_odds_refreshed_at and not str(latest_live_odds_refreshed_at).startswith(selected_date):
-        latest_live_odds_refreshed_at = datetime.now().astimezone().isoformat(timespec="seconds")
+        latest_live_odds_refreshed_at = central_now().isoformat(timespec="seconds")
     for game in games:
         if not isinstance(game, dict):
             continue
@@ -2678,7 +2692,7 @@ def _bounded_live_pitcher_projection(actual_value: float | None, model_mean: flo
 def _current_live_pitcher_prop_rows(selected_date: str, sim_payload: dict[str, Any] | None, actual_payload: dict[str, Any] | None) -> list[dict[str, Any]]:
     if not isinstance(sim_payload, dict) or not isinstance(actual_payload, dict):
         return []
-    refreshed_at = datetime.now().astimezone().isoformat(timespec="seconds")
+    refreshed_at = central_now().isoformat(timespec="seconds")
     sim_section = sim_payload.get("sim") if isinstance(sim_payload.get("sim"), dict) else {}
     pitcher_models = sim_section.get("pitcher_props") if isinstance(sim_section.get("pitcher_props"), dict) else {}
     market_lines = _pitcher_snapshot_market_lines(selected_date)
@@ -3036,7 +3050,7 @@ def _synth_live_hitter_prop_rows(
     actual_payload: dict[str, Any] | None,
     existing_rows: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
-    refreshed_at = datetime.now().astimezone().isoformat(timespec="seconds")
+    refreshed_at = central_now().isoformat(timespec="seconds")
     sim_section = sim_payload.get("sim") if isinstance((sim_payload or {}).get("sim"), dict) else {}
     hitter_models = sim_section.get("hitter_props") if isinstance(sim_section.get("hitter_props"), dict) else {}
     if not hitter_models:
@@ -3313,7 +3327,7 @@ def _source_sim_detail(selected_date: str, game_pk: int, sim_payload: dict[str, 
     away_team = matchup.get("away") if isinstance(matchup.get("away"), dict) else {}
     home_team = matchup.get("home") if isinstance(matchup.get("home"), dict) else {}
     today_iso = central_today_iso()
-    refreshed_at = datetime.now().astimezone().isoformat(timespec="seconds")
+    refreshed_at = central_now().isoformat(timespec="seconds")
     is_historical_date = bool(selected_date and selected_date != today_iso)
     has_live_props = isinstance((live_lens_row or {}).get("liveProps"), list) and bool((live_lens_row or {}).get("liveProps"))
     has_archived_live_props = isinstance((live_lens_row or {}).get("archivedLiveProps"), list) and bool((live_lens_row or {}).get("archivedLiveProps"))
@@ -4413,7 +4427,7 @@ def build_cards_page_context(selected_date: str) -> dict[str, Any]:
                 game_pk = 0
             if game_pk:
                 live_lens_by_game_pk[game_pk] = row
-                odds_refreshed_at = str(row.get("oddsRefreshedAt") or row.get("odds_refreshed_at") or "").strip() or None
+                odds_refreshed_at = _centralize_iso_timestamp(row.get("oddsRefreshedAt") or row.get("odds_refreshed_at"))
                 if odds_refreshed_at and (latest_live_odds_refreshed_at is None or odds_refreshed_at > latest_live_odds_refreshed_at):
                     latest_live_odds_refreshed_at = odds_refreshed_at
         if live_lens_by_game_pk:
@@ -4425,7 +4439,7 @@ def build_cards_page_context(selected_date: str) -> dict[str, Any]:
                 for game in games
             ]
     if resolved_date == today_iso:
-        refresh_ts = latest_live_odds_refreshed_at or datetime.now().astimezone().isoformat(timespec="seconds")
+        refresh_ts = latest_live_odds_refreshed_at or central_now().isoformat(timespec="seconds")
         for game in games:
             if not isinstance(game, dict):
                 continue
