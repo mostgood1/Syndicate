@@ -64,7 +64,7 @@ services:
       - key: SYNDICATE_REPORTS_ROOT
         value: reports
       - key: SYNDICATE_BOOTSTRAP_ON_START
-        value: "0"
+        value: "1"
       - key: SYNDICATE_NBA_SOURCE_APP_FALLBACK
         value: "false"
       - key: SYNDICATE_WNBA_SOURCE_APP_FALLBACK

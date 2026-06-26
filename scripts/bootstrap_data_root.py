@@ -121,20 +121,15 @@ def _wnba_today_bundle_paths(data_root: Path, date_str: str) -> list[Path]:
 
 
 def _wnba_today_bundle_ready(data_root: Path, date_str: str) -> bool:
-    bundle_paths = _wnba_today_bundle_paths(data_root, date_str)
-    if not bundle_paths:
+    props_path = _wnba_today_props_path(data_root, date_str)
+    try:
+        return props_path.exists() and props_path.is_file() and props_path.stat().st_size > 0
+    except OSError:
         return False
-    for path in bundle_paths:
-        try:
-            if not path.exists() or not path.is_file() or path.stat().st_size <= 0:
-                return False
-        except OSError:
-            return False
-    return True
 
 
 def _bootstrap_wnba_today_artifacts(repo_root: Path, data_root: Path) -> bool:
-    if not _env_bool("RENDER"):
+    if not _env_bool("SYNDICATE_BOOTSTRAP_ON_START"):
         return False
 
     today = central_today_iso()
@@ -187,7 +182,8 @@ def main() -> int:
     # Merge the Render-critical published artifact roots into the mounted data root on startup.
     logger.info("Bootstrapping data root: repo=%s data_root=%s", repo_root, data_root)
     counters = _sync_bootstrap_roots(repo_root, data_root)
-    _bootstrap_wnba_today_artifacts(repo_root, data_root)
+    if _env_bool("SYNDICATE_BOOTSTRAP_ON_START"):
+        _bootstrap_wnba_today_artifacts(repo_root, data_root)
 
     # Log summary counts
     if counters:
