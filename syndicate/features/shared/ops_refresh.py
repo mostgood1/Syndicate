@@ -547,6 +547,8 @@ def load_latest_refresh_status() -> dict[str, Any]:
     daily_update_trace = read_json_file(daily_update_trace_path)
     daily_update_simulation_contract_path = daily_update_latest_dir / "unified_daily_update_latest_simulation_contract.json"
     daily_update_simulation_contract = read_json_file(daily_update_simulation_contract_path)
+    daily_update_market_summary = daily_update_simulation_contract.get("market_summary") if isinstance(daily_update_simulation_contract, dict) else None
+    daily_update_market_summary_by_sport = daily_update_simulation_contract.get("market_summary_by_sport") if isinstance(daily_update_simulation_contract, dict) else None
     daily_update_runtime = {
         "elapsed_seconds": _elapsed_seconds(
             started_at=(daily_update_manifest or {}).get("generatedAt"),
@@ -589,6 +591,8 @@ def load_latest_refresh_status() -> dict[str, Any]:
             "simulation_contract_path": str(daily_update_simulation_contract_path),
             "simulation_contract_exists": path_exists(daily_update_simulation_contract_path),
             "simulation_contract": daily_update_simulation_contract,
+            "market_summary": daily_update_market_summary,
+            "market_summary_by_sport": daily_update_market_summary_by_sport,
         },
     }
 

@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import json
 import os
-from datetime import datetime, timezone
+from datetime import date
+from datetime import datetime
+from datetime import timedelta
+from datetime import timezone
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
@@ -42,6 +45,21 @@ def _coerce_probability(value: Any) -> float | None:
     return None
 
 
+def _parse_date_token(value: Any) -> date | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    for token in (text, text.replace("Z", "")):
+        try:
+            return datetime.fromisoformat(token).date()
+        except Exception:
+            pass
+    try:
+        return date.fromisoformat(text)
+    except Exception:
+        return None
+
+
 def _first_present(*values: Any) -> Any:
     for value in values:
         if value is not None:
@@ -64,6 +82,84 @@ def odds_lifecycle_path(date_str: str) -> Path:
     if not date_token:
         date_token = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     return odds_lifecycle_root() / f"{date_token}.jsonl"
+
+
+def _load_jsonl_rows(path: Path) -> list[dict[str, Any]]:
+    if not path.exists():
+        return []
+    rows: list[dict[str, Any]] = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            payload = json.loads(line)
+        except Exception:
+            continue
+        if isinstance(payload, dict):
+            rows.append(payload)
+    return rows
+
+
+def load_recent_odds_events(*, days_back: int = 7, end_date: str | None = None, root: Path | None = None) -> list[dict[str, Any]]:
+    lookback = max(int(days_back or 0), 1)
+    end_token = _parse_date_token(end_date) or date.today()
+    odds_root = root or odds_lifecycle_root()
+    rows: list[dict[str, Any]] = []
+    for offset in range(lookback):
+        current_date = end_token - timedelta(days=offset)
+        rows.extend(_load_jsonl_rows(odds_root / f"{current_date.isoformat()}.jsonl"))
+    return rows
+
+
+def _event_aliases(event: Mapping[str, Any]) -> list[str]:
+    aliases: list[str] = []
+    for key in (
+        event.get("market_id"),
+        event.get("event_id"),
+        event.get("game_id"),
+        event.get("gamePk"),
+        event.get("game_pk"),
+        event.get("player_id"),
+        event.get("athlete_id"),
+        event.get("subject_key"),
+        event.get("market_key"),
+    ):
+        text = str(key or "").strip()
+        if text and text not in aliases:
+            aliases.append(text)
+    return aliases
+
+
+def build_recent_market_history_index(events: Sequence[Mapping[str, Any]]) -> dict[str, list[dict[str, Any]]]:
+    index: dict[str, list[dict[str, Any]]] = {}
+    for event in events:
+        if not isinstance(event, Mapping):
+            continue
+        payload = dict(event)
+        market_id = str(payload.get("market_id") or "").strip() or _candidate_market_id(payload, sport=str(payload.get("sport") or payload.get("sport_slug") or "").strip().lower() or None)
+        aliases = _event_aliases(payload)
+        if market_id and market_id not in aliases:
+            aliases.insert(0, market_id)
+        for alias in aliases:
+            index.setdefault(alias, []).append(payload)
+    for rows in index.values():
+        rows.sort(key=_event_timestamp)
+    return index
+
+
+def _recent_history_rows(candidate: Mapping[str, Any], *, sport: str | None = None, lookback_days: int = 7, end_date: str | None = None) -> list[dict[str, Any]]:
+    recent_events = load_recent_odds_events(days_back=lookback_days, end_date=end_date)
+    if not recent_events:
+        return []
+    index = build_recent_market_history_index(recent_events)
+    candidate_row = dict(candidate)
+    candidate_market_id = _candidate_market_id(candidate_row, sport=sport)
+    candidate_aliases = [candidate_market_id, str(candidate_row.get("market_id") or "").strip(), str(candidate_row.get("event_id") or "").strip(), str(candidate_row.get("game_id") or "").strip(), str(candidate_row.get("gamePk") or candidate_row.get("game_pk") or "").strip(), str(candidate_row.get("player_id") or candidate_row.get("athlete_id") or "").strip()]
+    for alias in candidate_aliases:
+        if alias and alias in index:
+            return [dict(row) for row in index[alias]]
+    return []
 
 
 def append_odds_lifecycle_events(date_str: str, events: Sequence[Mapping[str, Any]]) -> Path | None:
@@ -198,7 +294,7 @@ def _implied_probability_from_american_odds(value: Any) -> float | None:
     return absolute / (absolute + 100.0)
 
 
-def build_market_history_view(candidate: Mapping[str, Any] | None = None, *, sport: str | None = None, market_state: Mapping[str, Any] | None = None) -> dict[str, Any]:
+def build_market_history_view(candidate: Mapping[str, Any] | None = None, *, sport: str | None = None, market_state: Mapping[str, Any] | None = None, lookback_days: int = 7, end_date: str | None = None) -> dict[str, Any]:
     candidate_row = dict(candidate) if isinstance(candidate, Mapping) else {}
     resolved_sport = str(sport or candidate_row.get("sport") or candidate_row.get("sport_slug") or "").strip().lower() or None
     market_id = _candidate_market_id(candidate_row, sport=resolved_sport)
@@ -213,6 +309,11 @@ def build_market_history_view(candidate: Mapping[str, Any] | None = None, *, spo
                     if isinstance(value, Mapping) and str(value.get("market_id") or "").strip() == market_id:
                         market_state = value
                         break
+
+    if market_state is None:
+        recent_rows = _recent_history_rows(candidate_row, sport=resolved_sport, lookback_days=lookback_days, end_date=end_date)
+        if recent_rows:
+            market_state = {"history": recent_rows}
 
     history_rows = _history_rows(candidate_row, market_state)
     if not history_rows:
@@ -351,11 +452,54 @@ def build_market_history_view(candidate: Mapping[str, Any] | None = None, *, spo
     }
 
 
-def build_market_features(candidate: Mapping[str, Any], *, sport: str | None = None, market_state: Mapping[str, Any] | None = None) -> dict[str, Any]:
-    features = build_market_history_view(candidate, sport=sport, market_state=market_state)
+def build_market_features(candidate: Mapping[str, Any], *, sport: str | None = None, market_state: Mapping[str, Any] | None = None, lookback_days: int = 7, end_date: str | None = None) -> dict[str, Any]:
+    features = build_market_history_view(candidate, sport=sport, market_state=market_state, lookback_days=lookback_days, end_date=end_date)
     candidate_row = dict(candidate)
     features["candidate_line"] = _coerce_float(candidate_row.get("line") or candidate_row.get("current_line") or candidate_row.get("projected"))
     features["candidate_price"] = _coerce_float(candidate_row.get("odds") or candidate_row.get("current_odds") or candidate_row.get("market_probability"))
     features["candidate_probability"] = _coerce_probability(candidate_row.get("market_probability")) or _coerce_probability(candidate_row.get("implied_probability")) or _implied_probability_from_american_odds(features["candidate_price"])
     features["source_sport"] = str(sport or candidate_row.get("sport") or candidate_row.get("sport_slug") or "").strip().lower() or None
+    features["lookback_days"] = max(int(lookback_days or 0), 1)
+    features["has_recent_history"] = bool(features.get("history_points") or 0)
     return features
+
+
+def market_feature_summary(features: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    market_rows = [dict(item) for item in features if isinstance(item, Mapping)]
+    if not market_rows:
+        return {
+            "market_feature_count": 0,
+            "movement_delta_mean": None,
+            "movement_velocity_mean": None,
+            "volatility_mean": None,
+            "clv_mean": None,
+            "closing_edge_mean": None,
+            "edge_retention_mean": None,
+            "closing_line_count": 0,
+            "market_history_points": 0,
+        }
+
+    movement_deltas = [_coerce_float(row.get("movement_delta")) for row in market_rows if _coerce_float(row.get("movement_delta")) is not None]
+    movement_velocity = [_coerce_float(row.get("movement_velocity")) for row in market_rows if _coerce_float(row.get("movement_velocity")) is not None]
+    volatility = [_coerce_float(row.get("volatility")) for row in market_rows if _coerce_float(row.get("volatility")) is not None]
+    clv_values = [_coerce_float(row.get("clv")) for row in market_rows if _coerce_float(row.get("clv")) is not None]
+    closing_edges = [_coerce_float(row.get("closing_edge")) for row in market_rows if _coerce_float(row.get("closing_edge")) is not None]
+    edge_retention_values: list[float] = []
+    for row in market_rows:
+        edge = _coerce_float(row.get("edge")) or _coerce_float(row.get("candidate_edge"))
+        closing_edge = _coerce_float(row.get("closing_edge"))
+        if edge is None or closing_edge is None or edge == 0:
+            continue
+        edge_retention_values.append(round(closing_edge / edge, 4))
+
+    return {
+        "market_feature_count": len(market_rows),
+        "movement_delta_mean": round(sum(movement_deltas) / len(movement_deltas), 4) if movement_deltas else None,
+        "movement_velocity_mean": round(sum(movement_velocity) / len(movement_velocity), 4) if movement_velocity else None,
+        "volatility_mean": round(sum(volatility) / len(volatility), 4) if volatility else None,
+        "clv_mean": round(sum(clv_values) / len(clv_values), 4) if clv_values else None,
+        "closing_edge_mean": round(sum(closing_edges) / len(closing_edges), 4) if closing_edges else None,
+        "edge_retention_mean": round(sum(edge_retention_values) / len(edge_retention_values), 4) if edge_retention_values else None,
+        "closing_line_count": len([row for row in market_rows if row.get("closing_line") is not None]),
+        "market_history_points": sum(int(row.get("history_points") or 0) for row in market_rows),
+    }

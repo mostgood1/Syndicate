@@ -4763,7 +4763,11 @@ class IntelligenceBlueprintTests(unittest.TestCase):
                 "syndicate.features.intelligence.load_latest_refresh_status",
                 return_value={
                     "refresh_status": {"runtime": {"state": "finished"}, "manifest": {"date": "2026-06-04"}},
-                    "daily_update": {"manifest": {"date": "2026-06-04", "state": "finished"}},
+                    "daily_update": {
+                        "manifest": {"date": "2026-06-04", "state": "finished"},
+                        "market_summary": {"market_feature_count": 1},
+                        "market_summary_by_sport": {"mlb": {"market_feature_count": 1}},
+                    },
                 },
             ):
                 response = self.client.get("/api/intelligence/status?date=2026-06-04")
@@ -4785,6 +4789,8 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertEqual((payload.get("refresh_status") or {}).get("refresh_status", {}).get("runtime", {}).get("state"), "finished")
         self.assertIn("daily_update", payload)
         self.assertEqual((payload.get("daily_update") or {}).get("manifest", {}).get("state"), "finished")
+        self.assertEqual((payload.get("daily_update") or {}).get("market_summary", {}).get("market_feature_count"), 1)
+        self.assertEqual((payload.get("daily_update") or {}).get("market_summary_by_sport", {}).get("mlb", {}).get("market_feature_count"), 1)
         self.assertIn("advanced_gate", mlb_row or {})
         self.assertIn("publish_missing_inputs", (mlb_row or {}).get("advanced_gate") or {})
 

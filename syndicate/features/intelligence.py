@@ -3299,6 +3299,8 @@ def build_intelligence_status(*, selected_date: str | None = None, force_refresh
     simulation_contract = None
     if simulation_contract_path.exists():
         simulation_contract = _read_json_payload(simulation_contract_path)
+    market_summary = simulation_contract.get("market_summary") if isinstance(simulation_contract, dict) else None
+    market_summary_by_sport = simulation_contract.get("market_summary_by_sport") if isinstance(simulation_contract, dict) else None
 
     return {
         "selected_date": _effective_date(selected_date),
@@ -3318,6 +3320,8 @@ def build_intelligence_status(*, selected_date: str | None = None, force_refresh
             "simulation_contract_path": str(simulation_contract_path),
             "simulation_contract_exists": simulation_contract is not None,
             "simulation_contract": simulation_contract,
+            "market_summary": market_summary,
+            "market_summary_by_sport": market_summary_by_sport,
         },
         "local_only": True,
     }

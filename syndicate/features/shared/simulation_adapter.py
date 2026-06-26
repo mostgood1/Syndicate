@@ -5,6 +5,7 @@ from typing import Any
 from typing import Callable
 from typing import Mapping
 
+from syndicate.features.shared.odds_lifecycle import build_market_features
 from syndicate.features.shared.timezone import central_today_iso
 
 
@@ -135,7 +136,7 @@ def _advanced_context(game: dict[str, Any], context: dict[str, Any]) -> dict[str
     }
 
 
-def _normalize_game_context(game: dict[str, Any], *, context: dict[str, Any] | None = None) -> dict[str, Any]:
+def _normalize_game_context(game: dict[str, Any], *, context: dict[str, Any] | None = None, sport: str | None = None) -> dict[str, Any]:
     page_context = _copy_mapping(context)
     sim = _copy_mapping(game.get("sim"))
     betting = _copy_mapping(game.get("betting"))
@@ -160,6 +161,20 @@ def _normalize_game_context(game: dict[str, Any], *, context: dict[str, Any] | N
     confidence = _safe_float(game.get("confidence") or sim.get("confidence") or betting.get("confidence"))
     edge = _safe_float(game.get("edge") or sim.get("edge") or betting.get("edge"))
     advanced = _advanced_context(game, page_context)
+    market_features = build_market_features(
+        game,
+        sport=_safe_text(sport or game.get("sport") or game.get("sport_slug") or page_context.get("sport") or "", "").lower() or None,
+        end_date=_safe_text(
+            game.get("date")
+            or game.get("game_date")
+            or game.get("requested_date")
+            or page_context.get("date")
+            or page_context.get("selected_date")
+            or "",
+            "",
+        )
+        or None,
+    )
 
     engine_context = {
         "sport": _safe_text(game.get("sport") or "", ""),
@@ -195,12 +210,14 @@ def _normalize_game_context(game: dict[str, Any], *, context: dict[str, Any] | N
             "team": team_projections,
             "player": player_projections,
             "market": betting,
+            "market_features": market_features,
             "live": live_state,
             "evaluation": _copy_mapping(game.get("evaluation")),
             "advanced": advanced,
         },
         "simulation": sim,
         "advanced": advanced,
+        "market_features": market_features,
         "display": {
             "summary": _safe_text(game.get("summary") or "", ""),
             "detail": _safe_text(game.get("detail") or "", ""),
@@ -329,7 +346,7 @@ def build_unified_simulation_adapter(
             allow_stored_date_fallback=allow_stored_date_fallback,
         )
     )
-    normalized_games = [_normalize_game_context(game, context=context) for game in _coerce_list(context.get("games")) if isinstance(game, Mapping)]
+    normalized_games = [_normalize_game_context(game, context=context, sport=sport_key) for game in _coerce_list(context.get("games")) if isinstance(game, Mapping)]
     selection_kind = _selection_kind(sport_key)
     resolved_selection = _safe_text(context.get("date") or context.get("requested_date") or selection, "")
 
@@ -362,7 +379,7 @@ def build_simulation_contract_from_context(
     sport_key = _safe_text(sport, _safe_text(normalized_context.get("active_sport_slug") or normalized_context.get("sport") or normalized_context.get("sport_slug"), "")).lower()
     selection_value = selection if selection is not None else normalized_context.get("control_value") or normalized_context.get("date") or normalized_context.get("requested_date")
     selection_kind = _selection_kind(sport_key)
-    normalized_games = [_normalize_game_context(game, context=normalized_context) for game in _coerce_list(normalized_context.get("games")) if isinstance(game, Mapping)]
+    normalized_games = [_normalize_game_context(game, context=normalized_context, sport=sport_key) for game in _coerce_list(normalized_context.get("games")) if isinstance(game, Mapping)]
     resolved_selection = _safe_text(normalized_context.get("date") or normalized_context.get("requested_date") or selection_value, "")
 
     return {
@@ -387,6 +404,13 @@ def build_simulation_contract_from_context(
 def build_simulation_engine_context_from_candidate(candidate: Mapping[str, Any]) -> dict[str, Any]:
     row = _copy_mapping(candidate)
     market_data = _copy_mapping(row.get("market_data"))
+    market_features = _copy_mapping(row.get("market_features"))
+    if not market_features:
+        market_features = build_market_features(
+            row,
+            sport=_safe_text(row.get("sport") or row.get("sport_slug") or "", "").lower() or None,
+            end_date=_safe_text(row.get("date") or row.get("game_date") or row.get("selected_date") or "", "") or None,
+        )
     return {
         "sport": _safe_text(row.get("sport") or row.get("sport_slug") or "", ""),
         "market": _safe_text(row.get("market") or row.get("market_key") or "", ""),
@@ -401,6 +425,7 @@ def build_simulation_engine_context_from_candidate(candidate: Mapping[str, Any])
         "edge": row.get("edge"),
         "model_probability": row.get("model_probability") or row.get("fair_probability"),
         "seed": row.get("seed"),
+        "market_features": market_features,
     }
 
 

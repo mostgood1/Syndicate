@@ -250,12 +250,24 @@ class RefreshStateStoreTests(unittest.TestCase):
                 daily_latest / "unified_daily_update_latest.json",
                 {"date": "2026-06-04", "skipped": {"nba": True}},
             )
+            refresh_state_store.write_json_file(
+                daily_latest / "unified_daily_update_latest_simulation_contract.json",
+                {
+                    "contract_version": "v1",
+                    "scope": "daily_update",
+                    "date": "2026-06-04",
+                    "market_summary": {"market_feature_count": 2},
+                    "market_summary_by_sport": {"mlb": {"market_feature_count": 1}},
+                },
+            )
 
             status = ops_refresh.load_latest_refresh_status()
 
         self.assertEqual(status["daily_update"]["manifest"]["date"], "2026-06-04")
         self.assertTrue(status["daily_update"]["manifest_exists"])
         self.assertTrue(status["daily_update"]["manifest_path"].endswith("unified_daily_update_latest.json"))
+        self.assertEqual(status["daily_update"]["market_summary"]["market_feature_count"], 2)
+        self.assertEqual(status["daily_update"]["market_summary_by_sport"]["mlb"]["market_feature_count"], 1)
 
 
 if __name__ == "__main__":

@@ -22,6 +22,7 @@ from statistics import mean
 from typing import Any, Iterable, Mapping
 
 from syndicate.features.shared.artifact_manifests import load_artifact_manifests
+from syndicate.features.shared.odds_lifecycle import market_feature_summary
 from syndicate.features.shared.request_path_guard import warn_if_compute_in_request_path
 from syndicate.features.shared.source_roots import repo_root_from
 
@@ -828,6 +829,11 @@ def build_intelligence_evaluation_bundle(*, query: Any, response: Any, persist: 
         )
         for portfolio_event in portfolio_event_rows
     ]
+    market_features = [
+        recommendation.get("market_features")
+        for recommendation in recommendation_rows
+        if isinstance(recommendation.get("market_features"), Mapping)
+    ]
     history_summary = build_evaluation_history_summary(
         records=None,
         ledger_path=ledger_path,
@@ -844,6 +850,7 @@ def build_intelligence_evaluation_bundle(*, query: Any, response: Any, persist: 
         "portfolio_events": portfolio_events,
         "portfolio_event_records": portfolio_event_records,
         "metrics": compute_metrics(records=recommendation_records),
+        "market_summary": market_feature_summary(market_features),
         "history": history_summary,
     }
 

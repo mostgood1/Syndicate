@@ -21,7 +21,7 @@ class DailyUpdateSimulationContractTests(unittest.TestCase):
             "source_paths": {"source_path": "/tmp/mlb"},
             "freshness": {"requested": "2026-06-22", "resolved": "2026-06-22", "selection_kind": "date", "is_current_day": True, "is_stale": False, "lookahead_applied": False},
             "advanced": {"available": True, "page": {"workflow": {"mode": "daily_update"}}, "game": {"first1BetSignal": {"market": "first1"}}},
-            "games": [{"game_id": "g1", "event_id": "e1"}],
+            "games": [{"game_id": "g1", "event_id": "e1", "market_features": {"movement_delta": 1.0, "history_points": 2}}],
             "game_count": 1,
         }
 
@@ -41,6 +41,10 @@ class DailyUpdateSimulationContractTests(unittest.TestCase):
         self.assertEqual(payload["sports_by_key"]["mlb"]["source_mode"], "live_supplement")
         self.assertIn("mlb", payload["advanced_by_sport"])
         self.assertEqual(payload["advanced_by_sport"]["mlb"], fake_contract.get("advanced"))
+        self.assertIn("market_summary", payload)
+        self.assertIn("market_summary_by_sport", payload)
+        self.assertEqual(payload["market_summary_by_sport"]["mlb"]["market_feature_count"], 1)
+        self.assertEqual(payload["market_summary"]["market_feature_count"], 7)
 
     def test_writer_persists_advanced_contract_shape(self) -> None:
         fake_contract = {
@@ -52,7 +56,7 @@ class DailyUpdateSimulationContractTests(unittest.TestCase):
             "source_paths": {"source_path": "/tmp/mlb"},
             "freshness": {"requested": "2026-06-22", "resolved": "2026-06-22", "selection_kind": "date", "is_current_day": True, "is_stale": False, "lookahead_applied": False},
             "advanced": {"available": True, "page": {"workflow": {"mode": "daily_update"}}, "game": {"first1BetSignal": {"market": "first1"}}},
-            "games": [{"game_id": "g1", "event_id": "e1"}],
+            "games": [{"game_id": "g1", "event_id": "e1", "market_features": {"movement_delta": 1.0, "history_points": 2}}],
             "game_count": 1,
         }
 
@@ -80,5 +84,7 @@ class DailyUpdateSimulationContractTests(unittest.TestCase):
             latest_payload = loads(latest_path.read_text(encoding="utf-8"))
 
         self.assertEqual(payload["advanced_by_sport"]["mlb"]["game"]["first1BetSignal"]["market"], "first1")
+        self.assertEqual(payload["market_summary_by_sport"]["mlb"]["market_feature_count"], 1)
         self.assertEqual(run_payload["advanced_by_sport"]["mlb"]["page"]["workflow"]["mode"], "daily_update")
+        self.assertEqual(run_payload["market_summary"]["market_feature_count"], 1)
         self.assertEqual(latest_payload["advanced_by_sport"]["mlb"]["game"]["first1BetSignal"]["market"], "first1")

@@ -6,6 +6,7 @@ from typing import Any
 
 from syndicate.features.ncaaf.sources import default_week as ncaaf_default_week
 from syndicate.features.nfl.sources import default_week as nfl_default_week
+from syndicate.features.shared.odds_lifecycle import market_feature_summary
 from syndicate.features.shared.simulation_adapter import build_unified_simulation_adapter
 
 
@@ -21,6 +22,17 @@ def _default_selection_for_sport(sport: str, *, date_value: str, season: int | N
     if sport_key == "ncaab":
         return date_value
     return date_value
+
+
+def _sport_market_features(contract: dict[str, Any]) -> list[dict[str, Any]]:
+    features: list[dict[str, Any]] = []
+    for game in contract.get("games") or []:
+        if not isinstance(game, dict):
+            continue
+        market_features = game.get("market_features")
+        if isinstance(market_features, dict):
+            features.append(dict(market_features))
+    return features
 
 
 def build_daily_update_simulation_contract(*, date_value: str, season: int | None = None) -> dict[str, Any]:
@@ -60,7 +72,14 @@ def build_daily_update_simulation_contract(*, date_value: str, season: int | Non
             }
         sport_contracts.append(deepcopy(contract))
 
-        advanced_by_sport = {contract["sport"]: contract.get("advanced") for contract in sport_contracts}
+    advanced_by_sport = {contract["sport"]: contract.get("advanced") for contract in sport_contracts}
+    market_summary_by_sport = {
+        contract["sport"]: market_feature_summary(_sport_market_features(contract))
+        for contract in sport_contracts
+    }
+    market_summary = market_feature_summary(
+        [feature for contract in sport_contracts for feature in _sport_market_features(contract)]
+    )
 
     return {
         "contract_version": "v1",
@@ -72,6 +91,8 @@ def build_daily_update_simulation_contract(*, date_value: str, season: int | Non
         "sports": sport_contracts,
         "sports_by_key": {contract["sport"]: contract for contract in sport_contracts},
         "advanced_by_sport": advanced_by_sport,
+        "market_summary": market_summary,
+        "market_summary_by_sport": market_summary_by_sport,
         "source_modes": {contract["sport"]: contract.get("source_mode") for contract in sport_contracts},
         "freshness": {contract["sport"]: contract.get("freshness") for contract in sport_contracts},
         "source_paths": {contract["sport"]: contract.get("source_paths") for contract in sport_contracts},
