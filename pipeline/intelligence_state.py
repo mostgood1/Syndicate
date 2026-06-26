@@ -19,6 +19,7 @@ from pipeline.intelligence_entrypoint import run_routed_intelligence_pipeline
 from syndicate.features.intelligence import build_intelligence_status
 from syndicate.features.intelligence import build_intelligence_overview
 from syndicate.features.intelligence import _build_board_dictionary
+from syndicate.features.intelligence import _balanced_recommendation_order
 from syndicate.features.intelligence import collect_candidates
 from syndicate.features.intelligence import collect_all_recommendations
 from syndicate.features.intelligence import _apply_candidate_tier_penalty
@@ -1145,7 +1146,7 @@ class IntelligenceStateService:
             candidate_pool = self._build_candidate_pool(selected_date, source_fingerprint)
             candidates = [self._serialize_candidate(candidate) for candidate in candidate_pool.get("candidates") if isinstance(candidate, Mapping)]
 
-            ranked_candidates = _profile_stage("candidate_scoring", rank_global_recommendations, candidates, limit=None)
+            ranked_candidates = _profile_stage("candidate_scoring", _balanced_recommendation_order, candidates)
             if ranked_candidates:
                 top_candidates = [dict(candidate) for candidate in ranked_candidates if isinstance(candidate, Mapping)]
             elif candidates:

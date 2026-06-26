@@ -20,6 +20,7 @@ from syndicate.features.intelligence import _advanced_signals_from_item
 from syndicate.features.intelligence import _advanced_input_rows_for_sport
 from syndicate.features.intelligence import _advanced_signals_from_item
 from syndicate.features.intelligence import _build_parlays
+from syndicate.features.intelligence import _balanced_recommendation_order
 from syndicate.features.intelligence import _candidate_advanced_signal_score
 from syndicate.features.intelligence import _basketball_source_summary_score
 from syndicate.features.intelligence import _candidate_market_fit
@@ -1247,6 +1248,52 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertTrue(scored.get("state_invalid"))
         self.assertIn("inactive", str(scored.get("state_note") or "").lower())
         self.assertNotIn("score", scored)
+
+    def test_balanced_recommendation_order_preserves_multi_sport_live_mix(self) -> None:
+        candidates = [
+            {
+                "sport_slug": "mlb",
+                "sport": "MLB",
+                "name": "Play 1",
+                "score": 0.96,
+                "edge": 0.22,
+                "confidence": 0.94,
+                "is_live": True,
+            },
+            {
+                "sport_slug": "mlb",
+                "sport": "MLB",
+                "name": "Play 2",
+                "score": 0.95,
+                "edge": 0.21,
+                "confidence": 0.93,
+                "is_live": True,
+            },
+            {
+                "sport_slug": "wnba",
+                "sport": "WNBA",
+                "name": "Play 3",
+                "score": 0.81,
+                "edge": 0.16,
+                "confidence": 0.88,
+                "is_live": True,
+            },
+            {
+                "sport_slug": "nhl",
+                "sport": "NHL",
+                "name": "Play 4",
+                "score": 0.79,
+                "edge": 0.15,
+                "confidence": 0.86,
+                "is_live": False,
+            },
+        ]
+
+        ordered = _balanced_recommendation_order(candidates)
+
+        self.assertEqual([item.get("sport_slug") for item in ordered[:3]], ["mlb", "wnba", "nhl"])
+        self.assertTrue(any(item.get("sport_slug") == "wnba" for item in ordered[:3]))
+        self.assertTrue(any(item.get("is_live") for item in ordered[:3]))
 
     def test_score_candidate_applies_shared_formula(self) -> None:
         candidate = {

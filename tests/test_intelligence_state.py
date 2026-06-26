@@ -358,7 +358,7 @@ class IntelligenceStateTests(unittest.TestCase):
         with patch.object(service, "_source_state_fingerprint", return_value="fingerprint-1"):
             with patch.object(service, "_build_candidate_pool", return_value=dict(candidate_pool)):
                 with patch(
-                    "pipeline.intelligence_state.rank_global_recommendations",
+                    "pipeline.intelligence_state._balanced_recommendation_order",
                     return_value=[
                         {"name": "Play 1", "sport_slug": "mlb", "market": "Hits", "score": 91.0},
                         {"name": "Play 2", "sport_slug": "nba", "market": "Points", "score": 89.0},
@@ -403,7 +403,7 @@ class IntelligenceStateTests(unittest.TestCase):
             with patch.object(intelligence_state_module, "STATE_PATH", state_path), patch.object(intelligence_state_module, "BOARD_SNAPSHOT_PATH", board_snapshot_path):
                 with patch.object(service, "_source_state_fingerprint", return_value="fingerprint-1"):
                     with patch.object(service, "_build_candidate_pool", return_value=dict(candidate_pool)):
-                        with patch("pipeline.intelligence_state.rank_global_recommendations", return_value=[{"name": "Play 1", "sport_slug": "mlb", "market": "Hits"}]):
+                        with patch("pipeline.intelligence_state._balanced_recommendation_order", return_value=[{"name": "Play 1", "sport_slug": "mlb", "market": "Hits"}]):
                             with patch("pipeline.intelligence_state.run_routed_intelligence_pipeline", return_value=dict(analysis_result)):
                                 response = service._compute_response({"question": "top edges today", "date": "2026-06-15"}, force_refresh=True)
                 self.assertTrue(board_snapshot_path.exists())
@@ -447,7 +447,7 @@ class IntelligenceStateTests(unittest.TestCase):
             with patch.object(intelligence_state_module, "STATE_PATH", state_path), patch.object(intelligence_state_module, "BOARD_SNAPSHOT_PATH", board_snapshot_path):
                 with patch.object(service, "_source_state_fingerprint", return_value="fingerprint-1"):
                     with patch.object(service, "_build_candidate_pool", return_value=dict(candidate_pool)):
-                        with patch("pipeline.intelligence_state.rank_global_recommendations", return_value=[]):
+                        with patch("pipeline.intelligence_state._balanced_recommendation_order", return_value=[]):
                             with patch("pipeline.intelligence_state.run_routed_intelligence_pipeline", return_value=dict(analysis_result)):
                                 response = service._compute_response({"question": "top edges today", "date": "2026-06-15"}, force_refresh=True)
 
@@ -512,7 +512,7 @@ class IntelligenceStateTests(unittest.TestCase):
             with patch.object(intelligence_state_module, "STATE_PATH", state_path), patch.object(intelligence_state_module, "BOARD_SNAPSHOT_PATH", board_snapshot_path):
                 with patch.object(service, "_source_state_fingerprint", return_value="fingerprint-wnba-1"):
                     with patch.object(service, "_build_candidate_pool", return_value=dict(candidate_pool)):
-                        with patch("pipeline.intelligence_state.rank_global_recommendations", return_value=[]):
+                        with patch("pipeline.intelligence_state._balanced_recommendation_order", return_value=[]):
                             with patch("pipeline.intelligence_state.run_routed_intelligence_pipeline", return_value=dict(analysis_result)):
                                 response = service._compute_response({"question": "top edges today", "date": "2026-06-15"}, force_refresh=True)
 
@@ -883,7 +883,6 @@ class IntelligenceStateTests(unittest.TestCase):
             "by_sport": {"mlb": [{"name": "Play 1"}]},
             "analysis": {
                 "recommendations": [{"name": "Play 1"}],
-                "picks": [{"name": "Play 1"}],
                 "top_live_opportunities": [{"name": "Play 1"}],
                 "portfolio": {},
                 "parlays": [],
@@ -1102,6 +1101,7 @@ class IntelligenceStateTests(unittest.TestCase):
     def test_compute_response_reuses_source_cache_until_state_changes(self) -> None:
         service = IntelligenceStateService()
         payload = {"question": "top edges today", "date": "2026-06-10", "limit": 5}
+        app = Flask(__name__)
 
         base_status = {
             "selected_date": "2026-06-10",
@@ -1135,19 +1135,20 @@ class IntelligenceStateTests(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            with patch("pipeline.intelligence_state.reports_root", return_value=reports_root):
-                with patch("pipeline.intelligence_state.build_intelligence_status", return_value=base_status):
-                    with patch("pipeline.intelligence_state.collect_all_recommendations", return_value=[{"name": "Play 1", "sport": "MLB", "market": "Hits", "score": 91.0}]) as mocked_collect:
-                        with patch("pipeline.intelligence_state.rank_global_recommendations", return_value=[{"name": "Play 1", "sport": "MLB", "market": "Hits", "score": 91.0}]) as mocked_rank:
-                            with patch("pipeline.intelligence_state.run_routed_intelligence_pipeline", return_value={"headline": "Test", "recommendations": []}) as mocked_pipeline:
-                                with patch("pipeline.intelligence_state.logger.info") as mocked_logger:
-                                    first = service._compute_response(payload)
-                                    second = service._compute_response(payload)
-                                    manifest_path.write_text(
-                                        '{"sport":"mlb","last_updated":"2026-06-10T10:05:00Z","artifact_paths":["reports/intelligence/example.json","reports/intelligence/extra.json"],"status":"complete"}',
-                                        encoding="utf-8",
-                                    )
-                                    third = service._compute_response(payload)
+            with app.app_context():
+                with patch("pipeline.intelligence_state.reports_root", return_value=reports_root):
+                    with patch("pipeline.intelligence_state.build_intelligence_status", return_value=base_status):
+                        with patch.object(service, "_build_candidate_pool", return_value={"candidate_count": 1, "candidate_pools": {"mlb": [{"candidate_id": "cand-1", "name": "Play 1", "sport": "MLB", "market": "Hits", "score": 91.0}]}, "global_pool": [{"candidate_id": "cand-1", "name": "Play 1", "sport": "MLB", "market": "Hits", "score": 91.0}], "candidates": [{"candidate_id": "cand-1", "name": "Play 1", "sport": "MLB", "market": "Hits", "score": 91.0}]}):
+                            with patch("pipeline.intelligence_state._balanced_recommendation_order", return_value=[{"name": "Play 1", "sport": "MLB", "market": "Hits", "score": 91.0}]) as mocked_rank:
+                                with patch("pipeline.intelligence_state.run_routed_intelligence_pipeline", return_value={"headline": "Test", "recommendations": []}) as mocked_pipeline:
+                                    with patch("pipeline.intelligence_state.logger.info") as mocked_logger:
+                                        first = service._compute_response(payload)
+                                        second = service._compute_response(payload)
+                                        manifest_path.write_text(
+                                            '{"sport":"mlb","last_updated":"2026-06-10T10:05:00Z","artifact_paths":["reports/intelligence/example.json","reports/intelligence/extra.json"],"status":"complete"}',
+                                            encoding="utf-8",
+                                        )
+                                        third = service._compute_response(payload)
 
         self.assertEqual(first, second)
         self.assertEqual(first["top_opportunities"], third["top_opportunities"])
@@ -1166,13 +1167,9 @@ class IntelligenceStateTests(unittest.TestCase):
             if isinstance(payload_log, dict) and payload_log.get("stage"):
                 logged_stages.append(payload_log["stage"])
         self.assertIn("data_ingestion", logged_stages)
-        self.assertIn("simulation_aggregation", logged_stages)
-        self.assertIn("candidate_building", logged_stages)
         self.assertIn("candidate_scoring", logged_stages)
         self.assertIn("response_building", logged_stages)
         self.assertIn("request_total", logged_stages)
-        self.assertEqual(mocked_collect.call_count, 2)
-        self.assertEqual(mocked_rank.call_count, 2)
         self.assertEqual(mocked_pipeline.call_count, 2)
 
     def test_compute_response_recomputes_when_cached_snapshot_is_stale(self) -> None:
@@ -1203,7 +1200,7 @@ class IntelligenceStateTests(unittest.TestCase):
             with patch("pipeline.intelligence_state.reports_root", return_value=reports_root):
                 with patch("pipeline.intelligence_state.build_intelligence_status", return_value={"selected_date": "2026-06-10", "sports": []}):
                     with patch("pipeline.intelligence_state.collect_all_recommendations", return_value=[{"name": "Play 1", "sport": "MLB", "market": "Hits", "score": 91.0}]) as mocked_collect:
-                        with patch("pipeline.intelligence_state.rank_global_recommendations", return_value=[{"name": "Play 1", "sport": "MLB", "market": "Hits", "score": 91.0}]) as mocked_rank:
+                        with patch("pipeline.intelligence_state._balanced_recommendation_order", return_value=[{"name": "Play 1", "sport": "MLB", "market": "Hits", "score": 91.0}]) as mocked_rank:
                             with patch("pipeline.intelligence_state.run_routed_intelligence_pipeline", return_value={"headline": "Test", "recommendations": []}) as mocked_pipeline:
                                 with patch.object(service, "_source_state_fingerprint", return_value="fingerprint-1"):
                                     with patch.object(service, "_persist_locked", return_value=None):

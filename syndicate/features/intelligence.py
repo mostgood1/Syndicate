@@ -6160,9 +6160,9 @@ def collect_all_recommendations(*, selected_date: str | None = None, force_refre
     candidates = _enrich_candidates_with_odds_history(candidates, odds_history_by_sport)
     candidates = _score_candidates(candidates, advanced_by_sport, preferences)
     filtered_candidates = filter_candidates(candidates, sport=_safe_text(preferences.get("sport"), "") or None)
-    ranked_recommendations = rank_global_recommendations(filtered_candidates, limit=None)
+    ranked_recommendations = _balanced_recommendation_order(filtered_candidates)
     if not ranked_recommendations:
-        ranked_recommendations = rank_global_recommendations(candidates, limit=None)
+        ranked_recommendations = _balanced_recommendation_order(candidates)
     if log_pipeline:
         _log_candidate_pipeline(
             candidates=candidates,
@@ -6182,6 +6182,52 @@ def rank_global_recommendations(recommendations: list[dict[str, Any]], *, limit:
     if limit is None:
         return ranked
     return ranked[: max(int(limit), 0)]
+
+
+def _balanced_recommendation_order(recommendations: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    ranked = rank_global_recommendations(recommendations, limit=None)
+    if len(ranked) < 2:
+        return ranked
+
+    sport_buckets: dict[str, list[dict[str, Any]]] = {}
+    for recommendation in ranked:
+        sport_key = _safe_text(recommendation.get("sport_slug") or recommendation.get("sport"), "sport").lower()
+        sport_buckets.setdefault(sport_key, []).append(recommendation)
+
+    if len(sport_buckets) < 2:
+        return ranked
+
+    sport_order = sorted(
+        sport_buckets,
+        key=lambda sport_key: _candidate_betting_rank_key(sport_buckets[sport_key][0]),
+        reverse=True,
+    )
+    for bucket in sport_buckets.values():
+        bucket.sort(
+            key=lambda recommendation: (
+                1 if bool(recommendation.get("is_live")) else 0,
+                *_candidate_betting_rank_key(recommendation),
+            ),
+            reverse=True,
+        )
+
+    balanced: list[dict[str, Any]] = []
+    index = 0
+    while len(balanced) < len(ranked):
+        advanced = False
+        for sport_key in sport_order:
+            bucket = sport_buckets.get(sport_key) or []
+            if index >= len(bucket):
+                continue
+            balanced.append(bucket[index])
+            advanced = True
+            if len(balanced) >= len(ranked):
+                break
+        if not advanced:
+            break
+        index += 1
+
+    return balanced or ranked
 
 
 def _build_board_dictionary(recommendations: list[dict[str, Any]]) -> dict[str, Any]:
@@ -6288,9 +6334,9 @@ def run_intelligence_query(
     candidates = _enrich_candidates_with_odds_history(candidates, odds_history_by_sport)
     candidates = _score_candidates(candidates, advanced_by_sport, preferences)
     filtered_candidates = filter_candidates(candidates, sport=_safe_text(preferences.get("sport"), "") or None)
-    ranked_recommendations = rank_global_recommendations(filtered_candidates, limit=None)
+    ranked_recommendations = _balanced_recommendation_order(filtered_candidates)
     if not ranked_recommendations:
-        ranked_recommendations = rank_global_recommendations(candidates, limit=None)
+        ranked_recommendations = _balanced_recommendation_order(candidates)
     recommendations = _greedy_low_correlation_selection(
         [dict(candidate) for candidate in ranked_recommendations],
         limit=preferences["limit"],
