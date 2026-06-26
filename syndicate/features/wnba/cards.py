@@ -40,7 +40,11 @@ _WNBA_CARDS_CONTEXT_CACHE: dict[tuple[Any, ...], dict[str, Any]] = {}
 
 
 def _render_web_dyno() -> bool:
-    return str(os.environ.get("RENDER") or "").strip().lower() in {"1", "true", "yes", "on"}
+    return bool(
+        str(os.environ.get("RENDER") or "").strip().lower() in {"1", "true", "yes", "on"}
+        or str(os.environ.get("RENDER_EXTERNAL_URL") or "").strip()
+        or str(os.environ.get("RENDER_SERVICE_ID") or "").strip()
+    )
 
 
 def _path_cache_signature(path: Path | None) -> int:
