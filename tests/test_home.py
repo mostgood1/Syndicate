@@ -8,6 +8,7 @@ from syndicate.blueprints.home import _build_game_watch_row
 from syndicate.blueprints.home import _home_prop_hero_metrics
 from syndicate.blueprints.home import _build_sport_overview
 from syndicate.blueprints.home import _build_prop_dashboard_row
+from syndicate.blueprints.home import _load_home_pregame_prop_items
 from syndicate.blueprints.home import build_home_overview
 from syndicate.blueprints.home import get_active_games
 from syndicate.blueprints.home import _sport_availability_reason
@@ -274,6 +275,135 @@ class HomePageCommandCenterTests(unittest.TestCase):
 
         mocked_build.assert_called_once()
         self.assertEqual([sport["slug"] for sport in overview], ["mlb"])
+
+    def test_build_sport_overview_keeps_today_games_when_props_are_missing(self) -> None:
+        app = create_app()
+        app.testing = True
+
+        sport = {"slug": "mlb", "name": "MLB", "primary_label": "Open MLB cards"}
+        games = [{"gamePk": 1, "status": {"status": "Scheduled"}}]
+        game_items = [{"gamePk": 1, "title": "MLB game card"}]
+
+        with app.app_context():
+            with patch("syndicate.blueprints.home.central_today_iso", return_value="2026-06-26"), patch(
+                "syndicate.blueprints.home._active_sport_slugs",
+                return_value=["mlb"],
+            ), patch(
+                "syndicate.blueprints.home.build_mlb_module_links",
+                return_value=[],
+            ), patch(
+                "syndicate.blueprints.home._load_home_games",
+                return_value=games,
+            ), patch(
+                "syndicate.blueprints.home._load_home_game_items",
+                return_value=(game_items, len(game_items)),
+            ), patch(
+                "syndicate.blueprints.home._load_home_prop_items",
+                return_value=[],
+            ), patch(
+                "syndicate.blueprints.home._finalize_home_prop_rows",
+                side_effect=lambda rows, **_: rows,
+            ), patch(
+                "syndicate.blueprints.home.get_active_games",
+                return_value=games,
+            ), patch(
+                "syndicate.blueprints.home._game_identity_set",
+                side_effect=lambda items: {str((item or {}).get("gamePk") or "") for item in items if str((item or {}).get("gamePk") or "")},
+            ), patch(
+                "syndicate.blueprints.home._game_identifier",
+                side_effect=lambda item: str((item or {}).get("gamePk") or "") or None,
+            ), patch(
+                "syndicate.blueprints.home._choose_game_bar",
+                side_effect=lambda links, **kwargs: {"items": list(game_items), "title": "Game cards"},
+            ), patch(
+                "syndicate.blueprints.home._choose_props_bar",
+                side_effect=lambda links, **kwargs: {"items": [], "title": "Props"},
+            ), patch(
+                "syndicate.blueprints.home._dashboard_prop_count",
+                return_value=0,
+            ), patch(
+                "syndicate.blueprints.home._game_bet_candidates_from_game",
+                return_value=[{"sport_slug": "mlb", "pick": "MLB game bet", "score": 1.0}],
+            ), patch(
+                "syndicate.blueprints.home._build_game_watch_row",
+                side_effect=lambda sport_obj, item: {"sport_slug": "mlb", "score": 1.0, "pick": "MLB game bet"},
+            ), patch(
+                "syndicate.blueprints.home._build_prop_dashboard_row",
+                side_effect=lambda sport_obj, item, default_surface: {"sport_slug": "mlb", "score": 1.0, "name": "MLB prop"},
+            ), patch(
+                "syndicate.blueprints.home._mlb_top_prop_lane_counts",
+                return_value={"pitcher_count": 0, "hitter_count": 0},
+            ):
+                overview = _build_sport_overview(sport, "2026-06-26", force_refresh=True)
+
+        self.assertEqual(overview["games_count"], 1)
+        self.assertEqual(overview["active_game_count"], 1)
+        self.assertTrue(overview["show_on_home"])
+        self.assertEqual(len(overview["dashboard_games"]), 1)
+
+    def test_load_home_pregame_prop_items_falls_back_to_compact_game_props(self) -> None:
+        home_games = [
+            {
+                "gamePk": 1,
+                "away": {"abbr": "AWY", "name": "Away"},
+                "home": {"abbr": "HME", "name": "Home"},
+                "shared_prop_rows": [
+                    {
+                        "name": "Player points",
+                        "detail": "Compact fallback",
+                        "value": "O 20.5",
+                        "pick": "Over",
+                        "market": "Points",
+                    }
+                ],
+            }
+        ]
+
+        with patch(
+            "syndicate.blueprints.home._pregame_prop_rows_from_betting_card",
+            return_value=[],
+        ), patch(
+            "syndicate.blueprints.home._prop_rows_from_props_recommendations_csv",
+            return_value=[],
+        ):
+            rows = _load_home_pregame_prop_items(
+                "ncaab",
+                context_label="2026-06-26",
+                home_games=home_games,
+                is_active_today=True,
+            )
+
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["name"], "Player points")
+        self.assertEqual(rows[0]["matchup"], "AWY @ HME")
+
+    def test_load_home_pregame_prop_items_uses_mlb_top_props_when_betting_card_is_empty(self) -> None:
+        home_games = [{"gamePk": 1, "away": {"abbr": "AWY"}, "home": {"abbr": "HME"}}]
+
+        with patch(
+            "syndicate.blueprints.home._pregame_prop_rows_from_betting_card",
+            return_value=[],
+        ), patch(
+            "syndicate.blueprints.home._load_mlb_home_top_prop_items",
+            return_value=[
+                {
+                    "game_pk": 1,
+                    "matchup": "Away @ Home",
+                    "name": "MLB top prop",
+                    "value": "+120",
+                    "pick": "Over",
+                }
+            ],
+        ):
+            rows = _load_home_pregame_prop_items(
+                "mlb",
+                context_label="2026-06-26",
+                home_games=home_games,
+                is_active_today=True,
+            )
+
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["name"], "MLB top prop")
 
     def test_live_rows_require_live_odds_backing(self) -> None:
         game = {

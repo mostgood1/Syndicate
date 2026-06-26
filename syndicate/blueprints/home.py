@@ -3461,14 +3461,31 @@ def _load_home_pregame_prop_items(
             nba_rows = _pregame_prop_rows_from_betting_card(slug, context_label=context_label, season=season, week=week)
             if nba_rows:
                 return nba_rows
-            return _prop_rows_from_props_recommendations_csv(slug, context_label=context_label, fallback_href=f"/nba/cards?date={context_label}")
+            csv_rows = _prop_rows_from_props_recommendations_csv(slug, context_label=context_label, fallback_href=f"/nba/cards?date={context_label}")
+            if csv_rows:
+                return csv_rows
+            return _compact_prop_rows(home_games)
         if slug == "wnba":
             wnba_rows = _pregame_prop_rows_from_betting_card(slug, context_label=context_label, season=season, week=week)
             if wnba_rows:
                 return wnba_rows
-            return _prop_rows_from_props_recommendations_csv(slug, context_label=context_label, fallback_href=f"/wnba/cards?date={context_label}")
+            csv_rows = _prop_rows_from_props_recommendations_csv(slug, context_label=context_label, fallback_href=f"/wnba/cards?date={context_label}")
+            if csv_rows:
+                return csv_rows
+            return _compact_prop_rows(home_games)
+        if slug == "mlb":
+            mlb_rows = _pregame_prop_rows_from_betting_card(slug, context_label=context_label, season=season, week=week)
+            if mlb_rows:
+                return mlb_rows
+            mlb_top_prop_rows = _load_mlb_home_top_prop_items(context_label)
+            if mlb_top_prop_rows:
+                return mlb_top_prop_rows
+            return _compact_prop_rows(home_games)
         if slug in {"mlb", "nhl", "nfl", "ncaaf", "ncaab"}:
-            return _pregame_prop_rows_from_betting_card(slug, context_label=context_label, season=season, week=week)
+            betting_rows = _pregame_prop_rows_from_betting_card(slug, context_label=context_label, season=season, week=week)
+            if betting_rows:
+                return betting_rows
+            return _compact_prop_rows(home_games)
     except Exception:
         return []
     return []
@@ -4338,6 +4355,8 @@ def _build_sport_overview(
     game_item_ids = _game_identity_set(game_items)
     prop_item_ids = _game_identity_set(list(pregame_prop_items) + list(live_prop_items))
     hydrated_game_ids = {identifier for identifier in active_game_ids if identifier in game_item_ids and identifier in prop_item_ids}
+    if active_today and not hydrated_game_ids and active_game_ids:
+        hydrated_game_ids = {identifier for identifier in active_game_ids if identifier in game_item_ids}
     game_items = [item for item in game_items if _game_identifier(item) in hydrated_game_ids]
     pregame_prop_items = [item for item in pregame_prop_items if _game_identifier(item) in hydrated_game_ids]
     live_prop_items = [item for item in live_prop_items if _game_identifier(item) in hydrated_game_ids]
