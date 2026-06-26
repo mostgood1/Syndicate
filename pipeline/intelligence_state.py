@@ -966,22 +966,17 @@ class IntelligenceStateService:
         key = _payload_key(normalized_payload)
         requested_date = _selected_date_from_payload(normalized_payload)
         with self._lock:
+            print("READING INTELLIGENCE STATE FROM DISK:", str(STATE_PATH))
+            self._sync_persisted_state_locked(force=True)
             snapshot = self._snapshots.get(key)
             if snapshot is not None:
+                print("RETURNING state_last_updated:", snapshot.response.get("state_last_updated") if isinstance(snapshot.response, dict) else None)
                 return dict(snapshot.response)
             latest_snapshot = self._snapshots.get(self._latest_key or "") if self._latest_key else None
             if latest_snapshot is not None:
                 latest_date = _selected_date_from_payload(latest_snapshot.payload)
                 if requested_date is None or latest_date is None or latest_date == requested_date:
-                    return dict(latest_snapshot.response)
-            self._sync_persisted_state_locked(force=force_refresh)
-            snapshot = self._snapshots.get(key)
-            if snapshot is not None:
-                return dict(snapshot.response)
-            latest_snapshot = self._snapshots.get(self._latest_key or "") if self._latest_key else None
-            if latest_snapshot is not None:
-                latest_date = _selected_date_from_payload(latest_snapshot.payload)
-                if requested_date is None or latest_date is None or latest_date == requested_date:
+                    print("RETURNING state_last_updated:", latest_snapshot.response.get("state_last_updated") if isinstance(latest_snapshot.response, dict) else None)
                     return dict(latest_snapshot.response)
             return None
 
