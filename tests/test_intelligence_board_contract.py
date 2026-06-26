@@ -204,6 +204,38 @@ class IntelligenceBoardContractTests(unittest.TestCase):
         self.assertEqual(contract["cards"][0]["team"], "Las Vegas Aces")
         self.assertEqual(contract["cards"][1]["team"], "Boston Celtics")
 
+    def test_build_intelligence_board_contract_emits_trace_bundle(self) -> None:
+        contract = build_intelligence_board_contract(
+            {
+                "headline": "The Syndicate board",
+                "recommendations": [
+                    {
+                        "sport": "mlb",
+                        "sport_slug": "mlb",
+                        "team": "New York Yankees",
+                        "player_name": "Aaron Judge",
+                        "name": "Aaron Judge Over 1.5 Hits",
+                        "market": "hits",
+                        "surface_key": "pregame",
+                        "surface_title": "Top props artifact",
+                        "selection": "Aaron Judge Over 1.5 Hits",
+                        "provenance": {
+                            "source": "reports/intelligence/query_state_cache.json",
+                            "source_id": "cand_123",
+                            "selected_date": "2026-06-25",
+                        },
+                        "sport_context": {"matchup": "NYY at BOS"},
+                    }
+                ],
+            }
+        )
+
+        card = contract["cards"][0]
+        self.assertEqual(card["trace_path"], "reports/intelligence/query_state_cache.json")
+        self.assertEqual(card["trace"]["source_id"], "cand_123")
+        self.assertEqual(card["trace"]["selected_date"], "2026-06-25")
+        self.assertEqual(card["trace"]["matchup"], "NYY at BOS")
+
     def test_build_response_interleaves_active_sports_in_order(self) -> None:
         response = build_response(
             recommendations=[

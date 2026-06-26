@@ -107,6 +107,40 @@ def _recommendation_card(item: Mapping[str, Any]) -> dict[str, Any]:
     lane = _recommendation_lane(card)
     line = _number(card.get("line"), card.get("line_open"), card.get("market_data", {}).get("current_line") if isinstance(card.get("market_data"), Mapping) else None)
     edge = _number(card.get("edge"), card.get("adjusted_edge"), card.get("expected_value"), card.get("ev_current"))
+    provenance = card.get("provenance") if isinstance(card.get("provenance"), Mapping) else {}
+    sport_context = card.get("sport_context") if isinstance(card.get("sport_context"), Mapping) else {}
+    trace_path = _safe_text(
+        provenance.get("source_path") if isinstance(provenance, Mapping) else None,
+        provenance.get("source") if isinstance(provenance, Mapping) else None,
+        card.get("source_path"),
+        card.get("source"),
+        card.get("surface_title"),
+        default="",
+    )
+    if not trace_path:
+        trace_path = "/".join(
+            part
+            for part in (
+                _safe_text(card.get("sport_slug"), card.get("sport"), default="sport").lower(),
+                _safe_text(card.get("surface_key"), default="board"),
+                _safe_text(card.get("market_key"), card.get("market"), default="market").lower(),
+                _safe_text(card.get("selection"), card.get("pick"), card.get("name"), card.get("player_name"), default="candidate"),
+            )
+            if part
+        )
+    trace = {
+        "path": trace_path,
+        "source": _safe_text(provenance.get("source") if isinstance(provenance, Mapping) else None, card.get("source"), card.get("surface_title"), default=""),
+        "source_id": _safe_text(provenance.get("source_id") if isinstance(provenance, Mapping) else None, card.get("candidate_id"), card.get("recommendation_id"), card.get("prediction_id"), default=""),
+        "selected_date": _safe_text(provenance.get("selected_date") if isinstance(provenance, Mapping) else None, card.get("selected_date"), card.get("date"), card.get("context_label"), default=""),
+        "surface_key": _safe_text(card.get("surface_key"), default=""),
+        "surface_title": _safe_text(card.get("surface_title"), default=""),
+        "sport_slug": _safe_text(card.get("sport_slug"), card.get("sport"), default="").lower(),
+        "selection": _safe_text(card.get("selection"), card.get("pick"), card.get("name"), card.get("player_name"), default=""),
+        "market": _safe_text(card.get("market"), card.get("market_label"), card.get("market_key"), default=""),
+        "matchup": _safe_text(sport_context.get("matchup") if isinstance(sport_context, Mapping) else None, card.get("matchup"), default=""),
+    }
+    trace = {key: value for key, value in trace.items() if value}
     card.update(
         {
             "lane": lane,
@@ -117,6 +151,8 @@ def _recommendation_card(item: Mapping[str, Any]) -> dict[str, Any]:
             "line": line,
             "movement": _movement_summary(card),
             "simulated_edge": edge,
+            "trace": trace,
+            "trace_path": trace.get("path"),
         }
     )
     return card
@@ -201,7 +237,7 @@ def build_intelligence_board_contract(response: Mapping[str, Any] | None) -> dic
     }
     return {
         "schema": "intelligence_board_v1",
-        "card_fields": ["sport", "team", "player", "market", "line", "movement", "simulated_edge"],
+        "card_fields": ["sport", "team", "player", "market", "line", "movement", "simulated_edge", "trace_path"],
         "recommendation_count": len(cards),
         "lane_counts": lane_counts,
         "active_lanes": active_lanes,

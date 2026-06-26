@@ -1009,6 +1009,60 @@ class IntelligenceStateTests(unittest.TestCase):
         self.assertEqual(response.headers.get("Pragma"), "no-cache")
         self.assertEqual(response.headers.get("Expires"), "0")
 
+    def test_status_endpoint_preserves_board_trace_metadata(self) -> None:
+        app = Flask(__name__)
+        app.register_blueprint(intelligence_bp)
+
+        state_response = {
+            "ok": True,
+            "last_updated": "2026-06-11T16:05:00Z",
+            "top_opportunities": [
+                {
+                    "name": "Aaron Judge Over 1.5 Hits",
+                    "sport": "mlb",
+                    "sport_slug": "mlb",
+                    "market": "Hits",
+                    "score": 91.0,
+                    "provenance": {
+                        "source": "reports/intelligence/query_state_cache.json",
+                        "source_id": "cand_123",
+                        "selected_date": "2026-06-25",
+                    },
+                    "sport_context": {"matchup": "NYY at BOS"},
+                }
+            ],
+            "analysis": {"recommendations": []},
+            "board_contract": {
+                "schema": "intelligence_board_v1",
+                "cards": [
+                    {
+                        "name": "Aaron Judge Over 1.5 Hits",
+                        "sport": "mlb",
+                        "sport_slug": "mlb",
+                        "market": "Hits",
+                        "trace_path": "reports/intelligence/query_state_cache.json",
+                        "trace": {
+                            "source": "reports/intelligence/query_state_cache.json",
+                            "source_id": "cand_123",
+                            "selected_date": "2026-06-25",
+                            "matchup": "NYY at BOS",
+                        },
+                    }
+                ],
+            },
+        }
+
+        with app.test_request_context("/api/intelligence/status?date=2026-06-10", method="GET"):
+            with patch("syndicate.blueprints.intelligence.read_latest_intelligence_state", return_value=dict(state_response)):
+                with patch("syndicate.blueprints.intelligence.read_latest_intelligence_board_snapshot_response", return_value=dict(state_response)):
+                    response = intelligence_status_api()
+
+        payload = response.get_json()
+        self.assertIsNotNone(payload)
+        board_contract = (payload or {}).get("status", {}).get("board_contract", {})
+        self.assertEqual((board_contract.get("cards") or [])[0].get("trace_path"), "reports/intelligence/query_state_cache.json")
+        self.assertEqual((board_contract.get("cards") or [])[0].get("trace", {}).get("source_id"), "cand_123")
+
     def test_status_exposes_freshness_sla_fields(self) -> None:
         service = IntelligenceStateService()
         service._interval_seconds = 30
