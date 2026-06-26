@@ -4,8 +4,12 @@ import unittest
 from unittest.mock import patch
 
 from syndicate.app import create_app
+from syndicate.blueprints.home import _build_game_watch_row
 from syndicate.blueprints.home import _home_prop_hero_metrics
 from syndicate.blueprints.home import _build_sport_overview
+from syndicate.blueprints.home import _build_prop_dashboard_row
+from syndicate.blueprints.home import build_home_overview
+from syndicate.blueprints.home import get_active_games
 from syndicate.blueprints.home import _sport_availability_reason
 
 
@@ -205,6 +209,17 @@ class HomePageCommandCenterTests(unittest.TestCase):
         self.assertEqual(mocked_render.call_args.kwargs["sports"][0]["name"], "NBA")
         self.assertTrue(mocked_render.call_args.kwargs["show_command_center"])
 
+    def test_get_active_games_only_keeps_scheduled_and_live_rows(self) -> None:
+        games = [
+            {"gamePk": "1", "status": {"detailed": "Scheduled"}},
+            {"gamePk": "2", "status": {"detailed": "Live"}},
+            {"gamePk": "3", "status": {"detailed": "Final"}},
+        ]
+
+        active_games = get_active_games(games)
+
+        self.assertEqual([game["gamePk"] for game in active_games], ["1", "2"])
+
     def test_sport_availability_reason_explains_missing_mlb_and_wnba_lanes(self) -> None:
         mlb_reason = _sport_availability_reason(
             {"slug": "mlb", "name": "MLB"},
@@ -223,32 +238,67 @@ class HomePageCommandCenterTests(unittest.TestCase):
         self.assertIn("hitter top-props rows were not present", mlb_reason["props_availability_reason"] or "")
         self.assertIn("live-state feed returned no event IDs", wnba_reason["game_availability_reason"] or "")
 
-    def test_wnba_overview_does_not_warn_when_games_exist_but_props_do_not(self) -> None:
-        sport = {"slug": "wnba", "name": "WNBA", "primary_label": "Open WNBA cards"}
-        with patch("syndicate.blueprints.home.central_today_iso", return_value="2026-06-23"), patch(
-            "syndicate.blueprints.home.build_wnba_module_links",
-            return_value=[{"label": "Cards", "href": "/wnba/cards?date=2026-06-23"}],
-        ), patch(
-            "syndicate.blueprints.home._load_home_game_items",
-            return_value=([{"matchup": "TOR @ ATL", "detail": "Scheduled", "status_badge": "Scheduled", "away_label": "TOR", "home_label": "ATL", "away_score": None, "home_score": None, "has_scores": False, "score_kind": None, "is_projected_score": False, "summary": "", "signals": [], "market_chips": [], "href": "/wnba/cards?date=2026-06-23", "href_label": "Open Cards"}], 1),
-        ), patch(
-            "syndicate.blueprints.home._load_home_games",
-            return_value=[{"event_id": "evt-1", "away": "TOR", "home": "ATL", "status": "Scheduled", "detail": "Scheduled", "shared_is_live": False}],
-        ), patch(
-            "syndicate.blueprints.home._load_home_prop_items",
-            return_value=[],
-        ), patch(
-            "syndicate.blueprints.home._choose_game_bar",
-            return_value={"items": []},
-        ), patch(
-            "syndicate.blueprints.home._choose_props_bar",
-            return_value={"items": []},
-        ), patch("syndicate.blueprints.home._LOGGER.warning") as warning_mock:
-            overview = _build_sport_overview(sport, "2026-06-23", force_refresh=True)
+    def test_build_home_overview_keeps_only_hydrated_sports(self) -> None:
+        sports = [
+            {"slug": "nba", "name": "NBA"},
+            {"slug": "wnba", "name": "WNBA"},
+        ]
 
-        self.assertEqual(overview["games_count"], 1)
-        self.assertEqual(overview["data_health"], "partial")
-        self.assertEqual(warning_mock.call_count, 0)
+        with patch(
+            "syndicate.blueprints.home._build_sport_overview",
+            side_effect=[
+                {"slug": "nba", "show_on_home": True, "active_game_count": 1, "hydrated_game_count": 1},
+                {"slug": "wnba", "show_on_home": False, "active_game_count": 1, "hydrated_game_count": 0},
+            ],
+        ):
+            overview = build_home_overview(sports, selected_date="2026-06-23", force_refresh=True)
+
+        self.assertEqual([sport["slug"] for sport in overview], ["nba"])
+
+    def test_build_home_overview_filters_inactive_sports(self) -> None:
+        app = create_app()
+        app.testing = True
+        app.config["SYNDICATE_ACTIVE_SPORTS"] = ["mlb", "wnba"]
+
+        sports = [
+            {"slug": "mlb", "name": "MLB"},
+            {"slug": "nhl", "name": "NHL"},
+        ]
+
+        with app.app_context():
+            with patch(
+                "syndicate.blueprints.home._build_sport_overview",
+                return_value={"slug": "mlb", "show_on_home": True, "active_game_count": 1, "hydrated_game_count": 1},
+            ) as mocked_build:
+                overview = build_home_overview(sports, selected_date="2026-06-23", force_refresh=True)
+
+        mocked_build.assert_called_once()
+        self.assertEqual([sport["slug"] for sport in overview], ["mlb"])
+
+    def test_live_rows_require_live_odds_backing(self) -> None:
+        game = {
+            "game_id": "game-1",
+            "status_badge": "Live",
+            "detail": "Q4 07:12",
+            "signals": ["Momentum +12.3%"],
+            "market_chips": ["Live"],
+        }
+        prop = {
+            "game_id": "game-1",
+            "heading": "Live props",
+            "detail": "In-game prop lane",
+            "is_live": True,
+        }
+
+        game_row = _build_game_watch_row({"slug": "mlb", "name": "MLB"}, game, live_odds_game_ids=set())
+        prop_row = _build_prop_dashboard_row({"slug": "mlb", "name": "MLB"}, prop, default_surface="Live props", live_odds_game_ids=set())
+        game_row_live = _build_game_watch_row({"slug": "mlb", "name": "MLB"}, game, live_odds_game_ids={"game-1"})
+        prop_row_live = _build_prop_dashboard_row({"slug": "mlb", "name": "MLB"}, prop, default_surface="Live props", live_odds_game_ids={"game-1"})
+
+        self.assertFalse(game_row["is_live"])
+        self.assertFalse(prop_row["is_live"])
+        self.assertTrue(game_row_live["is_live"])
+        self.assertTrue(prop_row_live["is_live"])
 
     def test_home_prop_hero_metrics_prefers_explicit_sim_projection(self) -> None:
         live_box, sim_box = _home_prop_hero_metrics(

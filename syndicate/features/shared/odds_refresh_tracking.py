@@ -80,6 +80,27 @@ def _json_safe(value: Any) -> Any:
     return str(value)
 
 
+def _is_live_odds_row(row: Mapping[str, Any], normalized_entry: Mapping[str, Any] | None = None) -> bool:
+    text_parts = [
+        row.get("market_type"),
+        row.get("market"),
+        row.get("selection"),
+        row.get("period"),
+        row.get("status"),
+        row.get("state"),
+        row.get("game_state"),
+        row.get("live"),
+        row.get("is_live"),
+    ]
+    if isinstance(normalized_entry, Mapping):
+        text_parts.extend([
+            normalized_entry.get("market_type"),
+            normalized_entry.get("selection"),
+        ])
+    text = " ".join(str(value or "").strip().lower() for value in text_parts if str(value or "").strip())
+    return any(marker in text for marker in ("live", "in_play", "in play", "in-progress", "in progress"))
+
+
 def _line_number(value: Any) -> float | None:
     if value in (None, "", "-"):
         return None
@@ -511,6 +532,8 @@ def _sync_odds_history_for_refresh(*, sport: str, source_root: Path, date_str: s
 
     now = _utc_now()
     entries_appended = 0
+    count_live = 0
+    count_pregame = 0
     files_scanned = 0
     seen_current_lines: set[tuple[str, float]] = set()
 
@@ -591,6 +614,10 @@ def _sync_odds_history_for_refresh(*, sport: str, source_root: Path, date_str: s
                 odds=_primary_odds_value(row),
                 selection=str(row.get("selection") or "").strip() or None,
             )
+            if _is_live_odds_row(row, normalized_entry):
+                count_live += 1
+            else:
+                count_pregame += 1
 
             history.append(
                 {
@@ -628,6 +655,8 @@ def _sync_odds_history_for_refresh(*, sport: str, source_root: Path, date_str: s
             market_state["last_source_path"] = source_path
             markets[market_key] = market_state
             entries_appended += 1
+
+            print("ODDS COUNTS:", {"pregame": count_pregame, "live": count_live})
 
     if not entries_appended and history_path.exists():
         return {

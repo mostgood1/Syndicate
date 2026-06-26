@@ -181,6 +181,8 @@ def create_app() -> Flask:
                 },
             },
         ]
+    if not app.config.get("SYNDICATE_ACTIVE_SPORTS"):
+        app.config["SYNDICATE_ACTIVE_SPORTS"] = ["mlb", "wnba"]
 
     @app.context_processor
     def inject_syndicate_sports() -> dict[str, object]:
