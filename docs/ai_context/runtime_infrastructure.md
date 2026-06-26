@@ -13,22 +13,26 @@ Syndicate is deployed on Render (render.com)
 - writes data to storage used at runtime
 
 ### Render (Runtime)
-- serves user requests
-- loads artifacts produced by daily pipeline
+- serves user requests through a stateless web service
+- reads repo-local artifacts for read-only responses
 - may supplement with live data
-- typically does NOT run full simulation for all routes
+- does NOT run full simulation for all routes
+- delegates disk-backed writes and refresh jobs to workers
 
 ---
 
 ## Data Availability at Runtime
 
 At request time, the system depends on:
-- stored artifacts from daily pipeline
+- stored artifacts from daily pipeline or repo-local checked-in mirrors
 - live-lens data (if available)
 - cached or fallback data
 
 If data is not produced in the daily pipeline:
 → it will not exist at runtime
+
+If hosted refresh or write state is needed:
+→ the worker-owned mounted disk and shared refresh-state backend handle it
 
 ---
 
@@ -60,3 +64,4 @@ When debugging:
 - always verify whether the issue is:
   - pipeline-level (data not generated)
   - runtime-level (data not consumed correctly)
+  - deployment-level (web/worker split or stale Render rollout)

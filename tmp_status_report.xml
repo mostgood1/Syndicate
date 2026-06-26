@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="2" skipped="0" tests="7" time="0.561" timestamp="2026-06-25T18:07:26.122920-05:00" hostname="ClarkAndAddison"><testcase classname="tests.test_intelligence_state.IntelligenceStateTests" name="test_status_endpoint_defaults_to_latest_available_date_when_missing" time="0.008" /><testcase classname="tests.test_intelligence_state.IntelligenceStateTests" name="test_status_endpoint_does_not_compute_when_snapshot_is_missing" time="0.006"><failure message="AssertionError: 1 != 0">self = &lt;test_intelligence_state.IntelligenceStateTests testMethod=test_status_endpoint_does_not_compute_when_snapshot_is_missing&gt;
+
+    def test_status_endpoint_does_not_compute_when_snapshot_is_missing(self) -&gt; None:
+        app = Flask(__name__)
+        app.register_blueprint(intelligence_bp)
+    
+        with app.test_request_context("/api/intelligence/status?date=2026-06-10", method="GET"):
+            with patch("syndicate.blueprints.intelligence.read_latest_intelligence_state", return_value={}):
+                response = intelligence_status_api()
+    
+        payload = response.get_json()
+        self.assertIsNotNone(payload)
+        self.assertEqual(payload["debug_source"], "snapshot_read")
+&gt;       self.assertEqual((payload.get("status") or {}).get("candidate_count", 0), 0)
+E       AssertionError: 1 != 0
+
+tests\test_intelligence_state.py:1007: AssertionError</failure></testcase><testcase classname="tests.test_intelligence_state.IntelligenceStateTests" name="test_status_endpoint_falls_back_to_empty_status_when_snapshot_is_missing" time="0.003"><failure message="AssertionError: Lists differ: [{'market': 'Hits', 'name': 'Play 1', 'score': 91.0, 'sport_slug': 'mlb'}] != []&#10;&#10;First list contains 1 additional elements.&#10;First extra element 0:&#10;{'market': 'Hits', 'name': 'Play 1', 'score': 91.0, 'sport_slug': 'mlb'}&#10;&#10;- [{'market': 'Hits', 'name': 'Play 1', 'score': 91.0, 'sport_slug': 'mlb'}]&#10;+ []">self = &lt;test_intelligence_state.IntelligenceStateTests testMethod=test_status_endpoint_falls_back_to_empty_status_when_snapshot_is_missing&gt;
+
+    def test_status_endpoint_falls_back_to_empty_status_when_snapshot_is_missing(self) -&gt; None:
+        app = Flask(__name__)
+        app.register_blueprint(intelligence_bp)
+    
+        with app.test_request_context("/api/intelligence/status?date=2026-06-10", method="GET"):
+            with patch("syndicate.blueprints.intelligence.read_latest_intelligence_state", return_value={}) as mocked_read:
+                response = intelligence_status_api()
+    
+        payload = response.get_json()
+        self.assertIsNotNone(payload)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(payload["debug_source"], "snapshot_read")
+        self.assertEqual((payload.get("status") or {}).get("board_contract", {}).get("schema"), "intelligence_board_v1")
+&gt;       self.assertEqual((payload.get("status") or {}).get("top_opportunities"), [])
+E       AssertionError: Lists differ: [{'market': 'Hits', 'name': 'Play 1', 'score': 91.0, 'sport_slug': 'mlb'}] != []
+E       
+E       First list contains 1 additional elements.
+E       First extra element 0:
+E       {'market': 'Hits', 'name': 'Play 1', 'score': 91.0, 'sport_slug': 'mlb'}
+E       
+E       - [{'market': 'Hits', 'name': 'Play 1', 'score': 91.0, 'sport_slug': 'mlb'}]
+E       + []
+
+tests\test_intelligence_state.py:858: AssertionError</failure></testcase><testcase classname="tests.test_intelligence_state.IntelligenceStateTests" name="test_status_endpoint_forces_state_snapshot_reload" time="0.002" /><testcase classname="tests.test_intelligence_state.IntelligenceStateTests" name="test_status_endpoint_hydrates_opportunities_from_analysis_only_state" time="0.003" /><testcase classname="tests.test_intelligence_state.IntelligenceStateTests" name="test_status_endpoint_includes_state_debug_fields" time="0.002" /><testcase classname="tests.test_intelligence_state.IntelligenceStateTests" name="test_status_endpoint_uses_latest_board_snapshot_when_state_is_date_mismatched" time="0.002" /></testsuite></testsuites>

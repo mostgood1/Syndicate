@@ -2,6 +2,11 @@
 
 This note documents the current execution paths that reach the three intelligence entrypoints and the polling loops that can drive them.
 
+Render deployment note:
+- the public web service is stateless and reads the repo-local `data/` and `reports/` trees for read-only response shaping
+- the `orchestrator-worker` owns the mounted disk and background refresh/write paths
+- the Render Key Value backend remains the shared refresh-state store for both surfaces
+
 ## Public entrypoints
 
 - [pipeline/intelligence_pipeline.py](../pipeline/intelligence_pipeline.py): `run_intelligence_pipeline()`

@@ -6,6 +6,17 @@ This is the current assessment of the Syndicate intelligence board, also treated
 
 The board is already a real cross-sport decision surface, not just a card list. It has a live board contract, a query engine, sport-specific analysis views, Ask-facing response shaping, a cached-state read path, and a background worker path. The main gaps are freshness ownership, orchestration clarity, cross-sport consistency, and reducing the number of places that can produce slightly different board shapes.
 
+## Recent changes
+
+The most recent hosted-runtime work changed how the board is deployed and populated on Render without changing the visible board contract.
+
+- The default board query now preserves explicit recommendation mode for generic prompts like "top edges today" so the board path does not collapse into explanation mode.
+- The intelligence state worker now computes fresh state before persisting it instead of only re-reading cached snapshots.
+- The Render web service now reads the checked-in repo `data/` and `reports/` trees, while the `orchestrator-worker` keeps the persistent disk for refresh and write paths.
+- The Render contract and regression checks were updated so the repo documents the stateless web service / disk-backed worker split explicitly.
+
+These changes were made to keep the betting board functional while avoiding the Render runtime split-brain that appeared when the web service and worker both tried to share the same disk-backed deployment shape.
+
 ## What is wired now
 
 ### Public surfaces

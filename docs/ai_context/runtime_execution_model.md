@@ -42,12 +42,17 @@ Runs:
 
 Consumes:
 - precomputed artifacts
+- repo-local read-only mirrors for the public web service
 - live-lens snapshots (if available)
 
 Must NOT:
 - run expensive simulations
 - rebuild full game contexts from scratch
 - recompute probabilities heavily
+
+Deployment shape:
+- the public web service is stateless
+- the worker owns disk-backed writes, refresh jobs, and mutable hosted state
 
 ---
 
@@ -100,5 +105,5 @@ Daily pipeline produces:
 → fully enriched inputs + outputs
 
 Render consumes:
-→ simulation_contract only
-→ no recomputation required
+→ simulation_contract and read-only mirrors
+→ no recomputation required on the web service

@@ -47,7 +47,8 @@ Workers write:
 
 Render reads:
 
-→ artifacts only
+→ repo-local artifacts for read-only serving on the web service
+→ worker-persisted artifacts and state from the mounted disk when present
 
 ---
 
@@ -70,6 +71,7 @@ SimulationEngine:
 Render:
 - never runs full simulation
 - only consumes outputs
+- the web service stays stateless, while the worker owns disk-backed writes and refresh jobs
 
 ---
 
