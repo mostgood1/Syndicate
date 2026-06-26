@@ -3152,7 +3152,7 @@ class HomeBoardTests(unittest.TestCase):
         self.assertEqual(len(games), 1)
         self.assertEqual(games[0].get("game_id"), "wnba-1")
 
-    def test_home_loader_enables_render_stored_date_fallback_for_basketball(self) -> None:
+    def test_home_loader_uses_requested_date_for_basketball(self) -> None:
         from syndicate.blueprints import home as home_module
 
         nba_payload = {
@@ -3178,8 +3178,8 @@ class HomeBoardTests(unittest.TestCase):
         self.assertEqual(nba_games[0].get("game_id"), "nba-1")
         self.assertEqual(len(wnba_games), 1)
         self.assertEqual(wnba_games[0].get("game_id"), "wnba-1")
-        nba_mock.assert_called_once_with("2026-05-20", allow_stored_date_fallback=True)
-        wnba_mock.assert_called_once_with("2026-05-20", allow_stored_date_fallback=True)
+        nba_mock.assert_called_once_with("2026-05-20", allow_stored_date_fallback=False)
+        wnba_mock.assert_called_once_with("2026-05-20", allow_stored_date_fallback=False)
 
     def test_home_payload_force_refresh_bypasses_cached_html(self) -> None:
         from syndicate.blueprints import home as home_module

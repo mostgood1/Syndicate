@@ -84,7 +84,7 @@ def _selected_date() -> str:
 
 
 def _allow_stored_date_fallback() -> bool:
-    return str(os.environ.get("RENDER") or "").strip().lower() in {"1", "true", "yes", "on"}
+    return False
 
 
 def _official_wnba_logo_team_id(team_ref: str) -> int | None:
@@ -422,7 +422,7 @@ def api_source_team_logo(team_id: str):
 def api_source_cards():
     selected_date = _selected_date()
     try:
-        payload = build_source_cards_payload(selected_date, allow_stored_date_fallback=_allow_stored_date_fallback())
+        payload = build_source_cards_payload(selected_date, allow_stored_date_fallback=False)
         return jsonify(payload)
     except Exception:
         return jsonify(_snapshot_unavailable_payload())
@@ -471,39 +471,8 @@ def api_game_detail(game_pk: str):
 @wnba_bp.get("/api/cards")
 def api_cards():
     selected_date = _selected_date()
-    if str(__import__("os").environ.get("RENDER") or "").strip().lower() in {"1", "true", "yes", "on"}:
-        context = build_source_cards_payload(selected_date, allow_stored_date_fallback=_allow_stored_date_fallback())
-        context = {
-            **context,
-            "source_title": "WNBA source cards fallback",
-            "empty_state": {
-                "eyebrow": "WNBA cards",
-                "title": "WNBA source cards fallback",
-                "body": "The shared WNBA board is using the artifact-backed source cards payload on Render to avoid request-path live hydration.",
-                "list_items": ["Reload after the next WNBA refresh cycle."] if not context.get("games") else [],
-            },
-        }
-        return jsonify(build_game_board_api_payload(context))
     try:
         context = build_cards_page_context(selected_date, allow_stored_date_fallback=False)
-    except Exception:
-        try:
-            context = build_source_cards_payload(selected_date, allow_stored_date_fallback=False)
-            context = {
-                **context,
-                "source_title": "WNBA source cards fallback",
-                "empty_state": {
-                    "eyebrow": "WNBA cards",
-                    "title": "WNBA source cards fallback",
-                    "body": "The shared WNBA board could not build the dense game-card payload, so this route is showing the stored source cards payload instead.",
-                    "list_items": ["Reload after the next WNBA refresh cycle."] if not context.get("games") else [],
-                },
-            }
-            return jsonify(build_game_board_api_payload(context))
-        except Exception as error:
-            print("WNBA SNAPSHOT ERROR:", error)
-            return jsonify(_snapshot_unavailable_payload())
-    try:
         return jsonify(build_game_board_api_payload(context))
     except Exception as error:
         print("WNBA SNAPSHOT ERROR:", error)

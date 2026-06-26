@@ -67,7 +67,7 @@ def _home_selected_date(selected_date: str | None = None) -> str:
 
 
 def _allow_stored_date_fallback() -> bool:
-    return str(os.environ.get("RENDER") or "").strip().lower() in {"1", "true", "yes", "on"}
+    return False
 
 
 def _public_version_payload() -> dict[str, str] | None:
@@ -3935,12 +3935,6 @@ def _load_home_games(slug: str, *, context_label: str, season: int | None = None
             from syndicate.features.nba.cards import build_cards_page_context
 
             payload = build_cards_page_context(context_label, allow_stored_date_fallback=_allow_stored_date_fallback())
-            if (
-                not _allow_stored_date_fallback()
-                and str(payload.get("requested_date") or context_label).strip() == str(context_label).strip()
-                and str(payload.get("date") or context_label).strip() != str(context_label).strip()
-            ):
-                return _nba_live_state_games(context_label) if is_active_today else []
             games = list(payload.get("games") or [])
             if is_active_today and not games:
                 games = _nba_live_state_games(context_label)
@@ -3998,11 +3992,7 @@ def _load_home_games(slug: str, *, context_label: str, season: int | None = None
 
 
 def _prefer_today_or_latest(values: list[str], today_value: str, *, preserve_requested: bool = False) -> str:
-    if preserve_requested:
-        return today_value
-    if today_value in values:
-        return today_value
-    return values[-1] if values else today_value
+    return today_value
 
 
 def _link_lookup(links: list[dict[str, Any]], label: str) -> str | None:
