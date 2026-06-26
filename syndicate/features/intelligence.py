@@ -3410,6 +3410,7 @@ def _prop_candidate_from_item(sport: dict[str, Any], item: dict[str, Any], *, su
             "advanced_signals": advanced_signals,
         }
     )
+    _bind_candidate_state(row)
     return row
 
 
@@ -3721,6 +3722,50 @@ def _candidate_is_final(candidate: dict[str, Any]) -> bool:
         for field in ("status_badge", "status_line", "status_display", "status_context", "detail", "summary", "score_kind")
     ).lower()
     return any(token in terminal_text for token in ("final", "game over", "completed"))
+
+
+_CANDIDATE_INACTIVE_PLAYER_TOKENS = (
+    "inactive",
+    "not active",
+    "did not play",
+    "did not dress",
+    "dnp",
+    "out",
+    "suspended",
+)
+
+
+def _candidate_state_text(candidate: dict[str, Any]) -> str:
+    return " ".join(
+        _safe_text(candidate.get(field), "")
+        for field in ("status_badge", "status_line", "status_display", "status_context", "game_state", "detail", "summary")
+    ).lower()
+
+
+def _bind_candidate_state(candidate: dict[str, Any]) -> None:
+    status_display = _safe_text(candidate.get("status_display"), "")
+    status_context = _safe_text(candidate.get("status_context"), "")
+    game_state = _safe_text(candidate.get("game_state"), "")
+    if not game_state and (status_display or status_context):
+        candidate["game_state"] = status_display or status_context
+    if not status_display and game_state:
+        candidate["status_display"] = game_state
+    if not status_context and candidate.get("status_display"):
+        candidate["status_context"] = _safe_text(candidate.get("status_display"), "")
+
+
+def _apply_candidate_state_guard(candidate: dict[str, Any]) -> None:
+    _bind_candidate_state(candidate)
+    if _candidate_is_final(candidate):
+        candidate["state_invalid"] = True
+        candidate.setdefault("state_note", "Final or settled game state excluded.")
+        return
+    if _safe_text(candidate.get("candidate_type"), "").lower() != "prop":
+        return
+    status_text = _candidate_state_text(candidate)
+    if any(re.search(rf"(?<![a-z]){re.escape(token)}(?![a-z])", status_text) for token in _CANDIDATE_INACTIVE_PLAYER_TOKENS):
+        candidate["state_invalid"] = True
+        candidate.setdefault("state_note", "Inactive player state excluded.")
 
 
 def _mlb_actual_payload_for_candidate(
@@ -4322,7 +4367,6 @@ def _primary_query_candidates(
 def _collect_candidates(overview: list[dict[str, Any]], preferences: dict[str, Any]) -> list[dict[str, Any]]:
     candidates: list[dict[str, Any]] = []
     question_text = _safe_text(preferences.get("question"), "").lower()
-    require_active_sports = _requested_date_requires_active_sports(preferences)
     wants_mlb_hr_targets = preferences.get("analysis_focus") == "mlb_home_runs" or "home_runs" in {
         str(item).strip().lower() for item in (preferences.get("requested_markets") or []) if str(item).strip()
     }
@@ -4332,49 +4376,40 @@ def _collect_candidates(overview: list[dict[str, Any]], preferences: dict[str, A
     for sport in overview:
         if not isinstance(sport, dict) or not _sport_matches_preferences(sport, preferences):
             continue
-        if require_active_sports and not bool(sport.get("active_today")):
-            continue
+        sport_start_count = len(candidates)
         sport_slug = _safe_text(sport.get("slug"), "").lower()
         sport_health = _safe_text(sport.get("data_health"), "").lower()
         dashboard_games = sport.get("dashboard_games") if isinstance(sport.get("dashboard_games"), list) else []
-        if sport_slug == "nhl" and sport_health == "stale" and not dashboard_games:
-            continue
         home_rails = sport.get("home_rails") if isinstance(sport.get("home_rails"), dict) else {}
         if preferences.get("include_props"):
-            if not preferences.get("live_only"):
-                pregame = home_rails.get("pregame") if isinstance(home_rails.get("pregame"), dict) else {}
-                for item in pregame.get("items") or []:
-                    if isinstance(item, dict):
-                        candidates.append(
-                            _prop_candidate_from_item(
-                                sport,
-                                item,
-                                surface_key="pregame",
-                                surface_title=_safe_text(pregame.get("title"), "Pregame props"),
-                            )
+            pregame = home_rails.get("pregame") if isinstance(home_rails.get("pregame"), dict) else {}
+            for item in pregame.get("items") or []:
+                if isinstance(item, dict):
+                    candidates.append(
+                        _prop_candidate_from_item(
+                            sport,
+                            item,
+                            surface_key="pregame",
+                            surface_title=_safe_text(pregame.get("title"), "Pregame props"),
                         )
-            if not preferences.get("pregame_only"):
-                live = home_rails.get("live") if isinstance(home_rails.get("live"), dict) else {}
-                for item in live.get("items") or []:
-                    if isinstance(item, dict):
-                        candidates.append(
-                            _prop_candidate_from_item(
-                                sport,
-                                item,
-                                surface_key="live",
-                                surface_title=_safe_text(live.get("title"), "Top Live Props"),
-                            )
+                    )
+            live = home_rails.get("live") if isinstance(home_rails.get("live"), dict) else {}
+            for item in live.get("items") or []:
+                if isinstance(item, dict):
+                    candidates.append(
+                        _prop_candidate_from_item(
+                            sport,
+                            item,
+                            surface_key="live",
+                            surface_title=_safe_text(live.get("title"), "Top Live Props"),
                         )
+                    )
         if preferences.get("include_games"):
             game_candidates = _game_candidates_for_sport(sport)
-            if preferences.get("live_only"):
-                game_candidates = [row for row in game_candidates if bool(row.get("is_live")) or "live" in _safe_text(row.get("market"), "").lower()]
-            if preferences.get("pregame_only"):
-                game_candidates = [row for row in game_candidates if not bool(row.get("is_live")) and "live" not in _safe_text(row.get("market"), "").lower()]
             candidates.extend(game_candidates)
-        if wants_mlb_hr_targets and not preferences.get("live_only"):
+        if wants_mlb_hr_targets:
             candidates.extend(_mlb_home_run_candidates_from_artifact(sport))
-        if wants_ranked_mlb_market_backfill and not preferences.get("live_only"):
+        if wants_ranked_mlb_market_backfill:
             for artifact_candidate in _mlb_market_prop_candidates_from_artifact(sport, preferences):
                 artifact_subject = _candidate_subject_key(artifact_candidate)
                 artifact_market = _candidate_market_key(artifact_candidate)
@@ -4387,11 +4422,26 @@ def _collect_candidates(overview: list[dict[str, Any]], preferences: dict[str, A
                 ):
                     continue
                 candidates.append(artifact_candidate)
+        print("SPORT:", sport, "CANDIDATES:", len(candidates) - sport_start_count)
 
     odds_history_by_sport = _odds_history_payloads_by_sport(overview)
     candidates = _enrich_candidates_with_odds_history(candidates, odds_history_by_sport)
 
+    print("BEFORE FILTER:", len(candidates))
+    validated_candidates: list[dict[str, Any]] = []
+    for candidate in candidates:
+        if not isinstance(candidate, dict):
+            continue
+        _apply_candidate_state_guard(candidate)
+        if bool(candidate.get("state_invalid")):
+            continue
+        validated_candidates.append(candidate)
+    candidates = validated_candidates
+    print("AFTER FILTER:", len(candidates))
+
+    print("BEFORE FILTER:", len(candidates))
     candidates = _filter_candidates_to_requested_markets(candidates, preferences.get("requested_markets") or [])
+    print("AFTER FILTER:", len(candidates))
 
     deduped: list[dict[str, Any]] = []
     seen: set[tuple[str, str, str, str, str]] = set()
@@ -5973,6 +6023,10 @@ def score_candidate(
     scored_candidate = classify_candidate(candidate)
     if scored_candidate is None:
         return normalize_candidate(candidate)
+
+    _apply_candidate_state_guard(scored_candidate)
+    if bool(scored_candidate.get("state_invalid")):
+        return scored_candidate
 
     has_edge = _numeric_hint(scored_candidate.get("edge")) is not None or _numeric_hint(scored_candidate.get("adjusted_edge")) is not None
     has_model_probability = _numeric_hint(scored_candidate.get("model_probability")) is not None

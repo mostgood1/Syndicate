@@ -981,6 +981,273 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertGreater(float(candidates_by_sport["mlb"].get("projected") or 0.0), 0.0)
         self.assertTrue("fallback" in str(candidates_by_sport["mlb"].get("detail") or candidates_by_sport["mlb"].get("summary") or "").lower())
 
+    def test_collect_candidates_drops_final_and_inactive_prop_rows(self) -> None:
+        overview = [
+            {
+                "slug": "nba",
+                "name": "NBA",
+                "context_label": "2026-06-06",
+                "active_today": True,
+                "data_health": "healthy",
+                "data_warnings": [],
+                "home_rails": {
+                    "pregame": {
+                        "title": "Pregame props",
+                        "items": [
+                            {
+                                "name": "Jayson Tatum Over 28.5",
+                                "market": "PTS",
+                                "pick": "Over 28.5",
+                                "matchup": "BOS at NYK",
+                                "projected": 31.8,
+                                "line": 28.5,
+                                "odds": "+102",
+                                "confidence": "63%",
+                                "edge": "+5.4%",
+                                "writeup": "Projection is clearing the number with usage and minutes support.",
+                                "href": "/nba/prop-ladders?date=2026-06-06",
+                            },
+                            {
+                                "name": "Al Horford Over 7.5 Rebounds",
+                                "market": "REB",
+                                "pick": "Over 7.5",
+                                "matchup": "BOS at NYK",
+                                "projected": 8.1,
+                                "line": 7.5,
+                                "odds": "+110",
+                                "confidence": "56%",
+                                "edge": "+1.9%",
+                                "status_display": "Inactive",
+                                "status_context": "Out",
+                                "writeup": "This row should be filtered because the player is inactive.",
+                                "href": "/nba/prop-ladders?date=2026-06-06",
+                            },
+                            {
+                                "name": "Jaylen Brown Over 22.5 Points",
+                                "market": "PTS",
+                                "pick": "Over 22.5",
+                                "matchup": "BOS at NYK",
+                                "projected": 24.0,
+                                "line": 22.5,
+                                "odds": "-104",
+                                "confidence": "58%",
+                                "edge": "+2.2%",
+                                "status_display": "Final",
+                                "status_context": "Completed",
+                                "writeup": "This row should be filtered because the game is final.",
+                                "href": "/nba/prop-ladders?date=2026-06-06",
+                            },
+                        ],
+                    },
+                    "live": {"title": "Top Live Props", "items": []},
+                    "compact": {"items": []},
+                },
+                "dashboard_games": [],
+            }
+        ]
+
+        preferences = _query_preferences("top edges today", mode="recommendation", sport="all", timing="all", include_props=True, include_games=False)
+        candidates = collect_candidates(overview, preferences)
+
+        candidate_names = [str(candidate.get("name") or "") for candidate in candidates]
+        self.assertIn("Jayson Tatum Over 28.5", candidate_names)
+        self.assertNotIn("Al Horford Over 7.5 Rebounds", candidate_names)
+        self.assertNotIn("Jaylen Brown Over 22.5 Points", candidate_names)
+
+    def test_collect_candidates_keeps_multi_sport_pregame_and_live_rows(self) -> None:
+        overview = [
+            {
+                "slug": "mlb",
+                "name": "MLB",
+                "context_label": "2026-06-06",
+                "active_today": True,
+                "data_health": "healthy",
+                "data_warnings": [],
+                "home_rails": {
+                    "pregame": {
+                        "title": "Pregame props",
+                        "items": [
+                            {
+                                "name": "Mookie Betts Over 1.5 Hits",
+                                "market": "Hits",
+                                "pick": "Over 1.5",
+                                "matchup": "LAD at SFG",
+                                "projected": 1.8,
+                                "line": 1.5,
+                                "odds": "+104",
+                                "confidence": "60%",
+                                "edge": "+2.5%",
+                                "writeup": "Pregame MLB prop",
+                                "href": "/mlb/cards?date=2026-06-06",
+                            }
+                        ],
+                    },
+                    "live": {
+                        "title": "Top Live Props",
+                        "items": [
+                            {
+                                "name": "Freddie Freeman Over 1.5 Hits",
+                                "market": "Hits",
+                                "pick": "Over 1.5",
+                                "matchup": "LAD at SFG",
+                                "projected": 2.1,
+                                "live_projection": 2.3,
+                                "line": 1.5,
+                                "odds": "+118",
+                                "confidence": "59%",
+                                "edge": "+2.9%",
+                                "is_live": True,
+                                "writeup": "Live MLB prop",
+                                "href": "/mlb/cards?date=2026-06-06",
+                            }
+                        ],
+                    },
+                    "compact": {"items": []},
+                },
+                "dashboard_games": [
+                    {
+                        "matchup": "LAD at SFG",
+                        "is_live": False,
+                    }
+                ],
+            },
+            {
+                "slug": "wnba",
+                "name": "WNBA",
+                "context_label": "2026-06-06",
+                "active_today": True,
+                "data_health": "healthy",
+                "data_warnings": [],
+                "home_rails": {
+                    "pregame": {
+                        "title": "Pregame props",
+                        "items": [
+                            {
+                                "name": "A'ja Wilson Over 24.5 Points",
+                                "market": "PTS",
+                                "pick": "Over 24.5",
+                                "matchup": "LVA at SEA",
+                                "projected": 27.1,
+                                "line": 24.5,
+                                "odds": "+102",
+                                "confidence": "63%",
+                                "edge": "+4.1%",
+                                "writeup": "Pregame WNBA prop",
+                                "href": "/wnba/prop-ladders?date=2026-06-06",
+                            }
+                        ],
+                    },
+                    "live": {
+                        "title": "Top Live Props",
+                        "items": [
+                            {
+                                "name": "A'ja Wilson Over 26.5 Points",
+                                "market": "PTS",
+                                "pick": "Over 26.5",
+                                "matchup": "LVA at SEA",
+                                "projected": 28.0,
+                                "live_projection": 28.8,
+                                "line": 26.5,
+                                "odds": "+122",
+                                "confidence": "61%",
+                                "edge": "+3.7%",
+                                "is_live": True,
+                                "writeup": "Live WNBA prop",
+                                "href": "/wnba/prop-ladders?date=2026-06-06",
+                            }
+                        ],
+                    },
+                    "compact": {"items": []},
+                },
+                "dashboard_games": [
+                    {
+                        "matchup": "LVA at SEA",
+                        "is_live": True,
+                    }
+                ],
+            },
+        ]
+
+        def _fake_game_candidates_for_sport(sport: dict[str, object]) -> list[dict[str, object]]:
+            slug = str(sport.get("slug") or "").lower()
+            if slug == "mlb":
+                return [
+                    {
+                        "candidate_type": "game",
+                        "sport": "MLB",
+                        "sport_slug": "mlb",
+                        "selection": "LAD ML",
+                        "pick": "LAD ML",
+                        "market": "Moneyline",
+                        "projection": 0.57,
+                        "odds": "+108",
+                        "is_live": False,
+                        "is_final": False,
+                        "matchup": "LAD at SFG",
+                    }
+                ]
+            if slug == "wnba":
+                return [
+                    {
+                        "candidate_type": "game",
+                        "sport": "WNBA",
+                        "sport_slug": "wnba",
+                        "selection": "LVA ML",
+                        "pick": "LVA ML",
+                        "market": "Moneyline",
+                        "projection": 0.61,
+                        "odds": "+114",
+                        "is_live": True,
+                        "is_final": False,
+                        "matchup": "LVA at SEA",
+                    }
+                ]
+            return []
+
+        preferences = _query_preferences("top edges today", mode="recommendation", sport="all", timing="all", include_props=True, include_games=True)
+        with patch("syndicate.features.intelligence._game_candidates_for_sport", side_effect=_fake_game_candidates_for_sport):
+            candidates = collect_candidates(overview, preferences)
+
+        by_sport = {}
+        live_count = 0
+        pregame_count = 0
+        for candidate in candidates:
+            sport_slug = str(candidate.get("sport_slug") or "").lower()
+            by_sport.setdefault(sport_slug, 0)
+            by_sport[sport_slug] += 1
+            if bool(candidate.get("is_live")):
+                live_count += 1
+            else:
+                pregame_count += 1
+
+        self.assertIn("mlb", by_sport)
+        self.assertIn("wnba", by_sport)
+        self.assertGreaterEqual(by_sport["mlb"], 2)
+        self.assertGreaterEqual(by_sport["wnba"], 2)
+        self.assertGreaterEqual(live_count, 2)
+        self.assertGreaterEqual(pregame_count, 2)
+
+    def test_score_candidate_marks_inactive_prop_as_state_invalid(self) -> None:
+        candidate = {
+            "sport_slug": "nba",
+            "candidate_type": "prop",
+            "pick": "Over 7.5",
+            "name": "Al Horford Over 7.5 Rebounds",
+            "market": "REB",
+            "projection": 8.1,
+            "odds": "+110",
+            "edge": 0.19,
+            "status_display": "Inactive",
+            "status_context": "Out",
+            "source_strength": 0.5,
+        }
+
+        scored = score_candidate(candidate)
+
+        self.assertTrue(scored.get("state_invalid"))
+        self.assertIn("inactive", str(scored.get("state_note") or "").lower())
+        self.assertNotIn("score", scored)
+
     def test_score_candidate_applies_shared_formula(self) -> None:
         candidate = {
             "sport_slug": "mlb",
