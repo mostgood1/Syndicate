@@ -119,6 +119,10 @@ function Copy-IfExists {
         [string]$DestinationPath
     )
 
+    if ([string]::IsNullOrWhiteSpace($SourcePath)) {
+        return $false
+    }
+
     if (-not (Test-Path $SourcePath)) {
         return $false
     }
