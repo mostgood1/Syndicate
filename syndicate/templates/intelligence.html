@@ -1563,24 +1563,26 @@ function renderIntelligence(response) {
     }
   }
 
-  portfolioEl.innerHTML = `
-    <div style="background:#111;color:white;padding:16px;border-radius:12px;">
-      <div style="font-size:13px; opacity:.7;">Portfolio Overview</div>
-      <div style="margin-top:10px;">
-        <div><strong>Exposure:</strong> ${portfolio.total_exposure || "—"}</div>
-        <div><strong>Risk:</strong> ${portfolio.risk_level || "—"}</div>
+  if (portfolioEl) {
+    portfolioEl.innerHTML = `
+      <div style="background:#111;color:white;padding:16px;border-radius:12px;">
+        <div style="font-size:13px; opacity:.7;">Portfolio Overview</div>
+        <div style="margin-top:10px;">
+          <div><strong>Exposure:</strong> ${portfolio.total_exposure || "—"}</div>
+          <div><strong>Risk:</strong> ${portfolio.risk_level || "—"}</div>
+        </div>
+        ${recommendationHistory.history_status ? `<div style="margin-top:10px; font-size:11px; opacity:.78;">Ledger: ${escapeHtml(recommendationHistory.history_status)} · ${escapeHtml(String(recommendationHistory.sample_size ?? 0))} samples</div>` : ""}
+        ${portfolioTracking.wager_count !== undefined ? `<div style="margin-top:10px; font-size:11px; opacity:.78;">Portfolio: ${escapeHtml(String(portfolioTracking.wager_count))} wagers · ${escapeHtml(String(portfolioTracking.open_exposure ?? "—"))} open exposure</div>` : ""}
+        ${portfolioEvents.event_count !== undefined ? `<div style="margin-top:10px; font-size:11px; opacity:.78;">Events: ${escapeHtml(String(portfolioEvents.event_count))} · added ${escapeHtml(String(portfolioEvents.added_count ?? 0))} · removed ${escapeHtml(String(portfolioEvents.removed_count ?? 0))}</div>` : ""}
+        ${portfolioEventRecords.length ? `<div style="margin-top:10px; font-size:11px; opacity:.78;">Recent: ${escapeHtml(portfolioEventRecords.slice(0, 3).map((event) => `${String(event.action || event.event_type || event.type || "event").toUpperCase()} ${String(event.status || event.state || "").toUpperCase() || "OPEN"} ${String(event.name || event.market || event.label || "").trim()}`.trim()).join(" · "))}</div>` : ""}
+        ${boardContract.schema ? `<div style="margin-top:10px; font-size:11px; opacity:.78;">Board: ${escapeHtml(boardContract.schema)} · ${escapeHtml((boardContract.active_lanes || []).join(" / ") || "no active lanes")}</div>` : ""}
+        <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:12px;">
+          <button type="button" id="portfolio-event-add" aria-label="Add a manual portfolio event" style="appearance:none; border:none; border-radius:999px; padding:8px 12px; background:linear-gradient(135deg, #2563eb, #0ea5e9); color:white; font-weight:700; cursor:pointer;">Add Event</button>
+          <button type="button" id="portfolio-event-remove" aria-label="Remove a manual portfolio event" style="appearance:none; border:1px solid rgba(255,255,255,.14); border-radius:999px; padding:8px 12px; background:rgba(255,255,255,.06); color:#fff; font-weight:700; cursor:pointer;">Remove Event</button>
+        </div>
       </div>
-      ${recommendationHistory.history_status ? `<div style="margin-top:10px; font-size:11px; opacity:.78;">Ledger: ${escapeHtml(recommendationHistory.history_status)} · ${escapeHtml(String(recommendationHistory.sample_size ?? 0))} samples</div>` : ""}
-      ${portfolioTracking.wager_count !== undefined ? `<div style="margin-top:10px; font-size:11px; opacity:.78;">Portfolio: ${escapeHtml(String(portfolioTracking.wager_count))} wagers · ${escapeHtml(String(portfolioTracking.open_exposure ?? "—"))} open exposure</div>` : ""}
-      ${portfolioEvents.event_count !== undefined ? `<div style="margin-top:10px; font-size:11px; opacity:.78;">Events: ${escapeHtml(String(portfolioEvents.event_count))} · added ${escapeHtml(String(portfolioEvents.added_count ?? 0))} · removed ${escapeHtml(String(portfolioEvents.removed_count ?? 0))}</div>` : ""}
-      ${portfolioEventRecords.length ? `<div style="margin-top:10px; font-size:11px; opacity:.78;">Recent: ${escapeHtml(portfolioEventRecords.slice(0, 3).map((event) => `${String(event.action || event.event_type || event.type || "event").toUpperCase()} ${String(event.status || event.state || "").toUpperCase() || "OPEN"} ${String(event.name || event.market || event.label || "").trim()}`.trim()).join(" · "))}</div>` : ""}
-      ${boardContract.schema ? `<div style="margin-top:10px; font-size:11px; opacity:.78;">Board: ${escapeHtml(boardContract.schema)} · ${escapeHtml((boardContract.active_lanes || []).join(" / ") || "no active lanes")}</div>` : ""}
-      <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:12px;">
-        <button type="button" id="portfolio-event-add" aria-label="Add a manual portfolio event" style="appearance:none; border:none; border-radius:999px; padding:8px 12px; background:linear-gradient(135deg, #2563eb, #0ea5e9); color:white; font-weight:700; cursor:pointer;">Add Event</button>
-        <button type="button" id="portfolio-event-remove" aria-label="Remove a manual portfolio event" style="appearance:none; border:1px solid rgba(255,255,255,.14); border-radius:999px; padding:8px 12px; background:rgba(255,255,255,.06); color:#fff; font-weight:700; cursor:pointer;">Remove Event</button>
-      </div>
-    </div>
-  `;
+    `;
+  }
 
   const portfolioAddButton = document.getElementById("portfolio-event-add");
   const portfolioRemoveButton = document.getElementById("portfolio-event-remove");
