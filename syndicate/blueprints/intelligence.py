@@ -847,8 +847,12 @@ def intelligence_home():
     initial_response: dict[str, Any] = {}
     try:
         cached_response, _ = _cached_intelligence_response_with_source(payload)
-        if cached_response is not None and _response_has_content(cached_response) and not _response_needs_refresh(payload, cached_response):
+        if cached_response is not None and _response_has_content(cached_response):
             initial_response = dict(cached_response)
+            by_sport = initial_response.get("by_sport") if isinstance(initial_response.get("by_sport"), dict) else {}
+            has_wnba = any(str(key).strip().lower() == "wnba" for key in by_sport.keys())
+            if _response_needs_refresh(payload, cached_response) or not has_wnba:
+                queue_intelligence_state_refresh(dict(payload))
         else:
             queue_intelligence_state_refresh(dict(payload))
     except Exception:

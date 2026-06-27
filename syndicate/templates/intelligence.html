@@ -918,14 +918,18 @@ function displaySettlementSummary(item) {
 }
 
 function displayGameStatus(item) {
-  return String(
+  const status = String(
     item.status_display ||
     item.status_context ||
     item.game_state?.detailed ||
     item.game_state?.abstract ||
     item.outcome_state ||
-    "—"
-  ).trim() || "—";
+    ""
+  ).trim();
+  if (status) {
+    return status;
+  }
+  return item.is_live ? "Live" : "—";
 }
 
 function renderPropFacts(item, compact = false) {
@@ -1087,7 +1091,16 @@ function normalizeIntelligenceResponse(response) {
     : (Array.isArray(analysis.top_opportunities) ? analysis.top_opportunities : recommendations);
   const topLiveOpportunities = Array.isArray(response.top_live_opportunities) && response.top_live_opportunities.length
     ? response.top_live_opportunities
-    : (Array.isArray(analysis.top_live_opportunities) ? analysis.top_live_opportunities : recommendations.filter((item) => String(item.tag || item.timing || item.phase || "").trim().toUpperCase() === "LIVE"));
+    : (Array.isArray(analysis.top_live_opportunities) && analysis.top_live_opportunities.length
+      ? analysis.top_live_opportunities
+      : (Array.isArray(boardContract.live) && boardContract.live.length
+        ? boardContract.live
+        : recommendations.filter((item) => String(item.tag || item.timing || item.phase || "").trim().toUpperCase() === "LIVE")));
+  const bySport = response.by_sport && typeof response.by_sport === "object"
+    ? response.by_sport
+    : (boardContract.by_sport && typeof boardContract.by_sport === "object"
+      ? boardContract.by_sport
+      : (analysis.by_sport && typeof analysis.by_sport === "object" ? analysis.by_sport : {}));
   const portfolio = response.portfolio && typeof response.portfolio === "object"
     ? response.portfolio
     : (analysis.portfolio && typeof analysis.portfolio === "object" ? analysis.portfolio : {});
@@ -1100,6 +1113,7 @@ function normalizeIntelligenceResponse(response) {
     recommendations,
     topOpportunities,
     topLiveOpportunities,
+    bySport,
     portfolio,
     parlays,
     recommendationHistory,
@@ -1202,6 +1216,9 @@ function recommendationState(item) {
     return "live";
   }
   if (liveFlag && hasLiveSignal(item)) {
+    return "live";
+  }
+  if (liveFlag) {
     return "live";
   }
   if (status.includes("live") || status.includes("in progress")) {
@@ -1516,6 +1533,7 @@ function renderIntelligence(response) {
     .sort((a, b) => (b.edge || 0) - (a.edge || 0));
 
   const topLiveOpportunities = (data.topLiveOpportunities || []).slice(0, 5);
+  const bySport = data.bySport && typeof data.bySport === "object" ? data.bySport : {};
 
   // ✅ Split by activity state
   const liveRecs = allRecs.filter(isLiveRecommendation);
@@ -1829,7 +1847,13 @@ function renderIntelligence(response) {
     scannerEl.innerHTML = renderScannerSection("⚡ Top Live Opportunities", visibleTopLiveOpportunities);
   }
 
+  const sportLaneSections = Object.entries(bySport)
+    .filter(([, items]) => Array.isArray(items) && items.length)
+    .map(([sportKey, items]) => renderSection(`${String(sportKey).toUpperCase()} Lane`, items.slice(0, 5)))
+    .join("");
+
   picksEl.innerHTML = `
+    ${sportLaneSections}
     ${renderSection("🔥 Live Props", liveRecs)}
     ${renderSection("📊 Pregame Props", pregameRecs)}
   `;
