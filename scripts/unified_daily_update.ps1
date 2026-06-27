@@ -1,7 +1,6 @@
 <#
 Context: Syndicate Simulation System
 See: docs/ai_context/architecture.md
-
 Role:
 - Main orchestration controller for planning, state updates, simulation, artifact generation, and publish.
 
@@ -3065,6 +3064,8 @@ function Get-ForcedPublishArtifactPaths {
             return
         }
 
+        $sportSlug = ($SportRootRelative.TrimEnd('/', '\') -split '[\\/]')[-1].Replace('_source', '').ToLowerInvariant()
+
         foreach ($rootRelative in @(
             $SportRootRelative.TrimEnd('/', '\'),
             ($SportRootRelative.TrimEnd('/', '\') + '/source_artifacts')
@@ -3098,15 +3099,19 @@ function Get-ForcedPublishArtifactPaths {
                 "${rootRelative}/data/processed/live_snapshots/live_player_lens_${DateValue}.jsonl",
                 "${rootRelative}/data/live_lens/live_lens_projections_${DateValue}.jsonl",
                 "${rootRelative}/data/live_lens/live_lens_signals_${DateValue}.jsonl",
-                "${rootRelative}/data/live_lens/live_lens_tuning_override.json"
+                "${rootRelative}/data/live_lens/live_lens_tuning_override.json",
+                "${rootRelative}/tracking/odds_history.json",
+                "${rootRelative}/artifacts/${sportSlug}/odds_history.json"
             )) {
                 Add-PathIfPresent -RelativePath $relativePath
             }
 
+            Add-PathsUnderRoot -RelativeRoot "${rootRelative}/manifests"
+
             foreach ($relativePath in @(
-                "${rootRelative}/data/raw/odds_${SportName}_player_props_${DateValue}.csv",
-                "${rootRelative}/data/raw/odds_${SportName}_player_props_opening_${DateValue}.csv",
-                "${rootRelative}/data/raw/odds_${SportName}_player_props_history_${DateValue}.csv"
+                "${rootRelative}/data/raw/odds_${sportSlug}_player_props_${DateValue}.csv",
+                "${rootRelative}/data/raw/odds_${sportSlug}_player_props_opening_${DateValue}.csv",
+                "${rootRelative}/data/raw/odds_${sportSlug}_player_props_history_${DateValue}.csv"
             )) {
                 Add-PathIfPresent -RelativePath $relativePath
             }
@@ -3120,6 +3125,7 @@ function Get-ForcedPublishArtifactPaths {
                 Add-PathsByPattern -RelativePattern "${rootRelative}/data/processed/season_betting_card_day_*_retuned_${DateValue}_insights.json"
             }
             Add-DateGameBoxscoreCachePaths -GameCardsRelativePath "${rootRelative}/data/processed/game_cards_${DateValue}.csv" -BoxscoreRelativeRoot "${rootRelative}/data/processed/boxscores"
+            Add-PathsUnderRoot -RelativeRoot "${rootRelative}/source_artifacts/manifests"
         }
     }
 
@@ -3174,7 +3180,7 @@ function Get-ForcedPublishArtifactPaths {
     }
 
     if (-not $SkipWNBA) {
-        Add-BasketballPublishPaths -SportRootRelative 'data/wnba_source'
+        Add-BasketballPublishPaths -SportRootRelative 'data/wnba_source' -IncludeSeasonBettingCards
     }
 
     if (-not $SkipNHL) {

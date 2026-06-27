@@ -93,10 +93,28 @@ class LiveRefreshLoopTests(unittest.TestCase):
         self.assertFalse(started)
 
     def test_create_app_starts_shared_live_refresh_loop(self) -> None:
-        with patch("syndicate.app.start_live_refresh_background_loop") as mocked_start:
+        with patch.dict(os.environ, {"RENDER": "", "RENDER_EXTERNAL_URL": "", "RENDER_SERVICE_ID": ""}, clear=False), patch(
+            "syndicate.app.start_live_refresh_background_loop"
+        ) as mocked_start, patch("syndicate.app.Flask.before_request", side_effect=lambda func: func()):
             create_app()
 
         mocked_start.assert_called_once()
+
+    def test_create_app_skips_shared_live_refresh_loop_on_render_web(self) -> None:
+        with patch.dict(
+            os.environ,
+            {
+                "RENDER": "true",
+                "RENDER_SERVICE_ID": "svc-test",
+                "SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP": "true",
+            },
+            clear=False,
+        ), patch("syndicate.app.start_live_refresh_background_loop") as mocked_start, patch(
+            "syndicate.app.Flask.before_request", side_effect=lambda func: func()
+        ):
+            create_app()
+
+        mocked_start.assert_not_called()
 
 
 if __name__ == "__main__":

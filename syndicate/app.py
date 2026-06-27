@@ -52,6 +52,15 @@ def _bootstrap_render_data(bootstrap_main: Callable[[], int] | None = None) -> N
     except Exception:
         return
 
+
+def _is_render_web_dyno() -> bool:
+    return bool(
+        str(os.environ.get("RENDER") or "").strip().lower() in {"1", "true", "yes", "on"}
+        or str(os.environ.get("RENDER_EXTERNAL_URL") or "").strip()
+        or str(os.environ.get("RENDER_SERVICE_ID") or "").strip()
+    )
+
+
 def create_app() -> Flask:
     _bootstrap_render_data()
 
@@ -204,6 +213,8 @@ def create_app() -> Flask:
     app.register_blueprint(sports_bp)
 
     def _start_background_loops() -> None:
+        if _is_render_web_dyno():
+            return
         if app.extensions.get("syndicate_background_loops_started"):
             return
         app.extensions["syndicate_background_loops_started"] = True
