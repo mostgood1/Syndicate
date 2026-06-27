@@ -1,13 +1,13 @@
 ﻿{
     "scope":  "daily_update",
-    "date":  "2026-06-26",
+    "date":  "2026-06-27",
     "runMode":  "standard",
     "overallStatus":  "ok",
-    "generatedAt":  "2026-06-26T18:35:47.0699611+00:00",
-    "updatedAt":  "2026-06-26T19:18:33.6478992+00:00",
-    "runManifestPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-06-26\\20260626_183546\\unified_daily_update_run.json",
+    "generatedAt":  "2026-06-27T07:05:51.8863898+00:00",
+    "updatedAt":  "2026-06-27T07:44:20.5418852+00:00",
+    "runManifestPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-06-27\\20260627_070551\\unified_daily_update_run.json",
     "latestManifestPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest.json",
-    "runCheckpointPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-06-26\\20260626_183546\\unified_daily_update_checkpoint.json",
+    "runCheckpointPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-06-27\\20260627_070551\\unified_daily_update_checkpoint.json",
     "latestCheckpointPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest_checkpoint.json",
     "currentStage":  "completed",
     "completedStages":  [
@@ -15,7 +15,7 @@
                             "refresh_gate"
                         ],
     "failedStage":  null,
-    "lastUpdatedAt":  "2026-06-26T19:18:33.6463858+00:00",
+    "lastUpdatedAt":  "2026-06-27T07:44:20.5398616+00:00",
     "replayContext":  {
                           "latestCheckpointLoaded":  true,
                           "latestCheckpointPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest_checkpoint.json",
@@ -121,12 +121,11 @@
     "runTrace":  {
                      "eventSimExecutionCount":  21,
                      "artifactUpdateCount":  21,
-                     "inputFingerprintCount":  3,
+                     "inputFingerprintCount":  2,
                      "artifactPathCount":  21,
                      "inputFingerprints":  [
-                                               "372af486cd0845dc59d6f5ec0459eea34af4e72319e3a43dcb7dd4186216651c",
-                                               "26eb894bece3051a72888c2915de7b0f1fe1802c130317928ea767cf1fd58f5e",
-                                               "2af2236f78516742d0b6ffbce202c5b3fb4f345aacd659d3510ffa3a5d7389f6"
+                                               "a9c3165697afe5e76bc33a2a0f769f7b72164284c7022f28e59a4b34e8b3f32b",
+                                               "dd9fca4bf08c3636d7532d430f805826302129c48a84820c0b00c73f3cb90d33"
                                            ],
                      "artifactPaths":  [
                                            "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_0_NYM_at_CIN_pk824503_g1.json",
@@ -154,7 +153,7 @@
                      "simExecutionDecision":  true
                  },
     "simulationContractPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest_simulation_contract.json",
-    "simulationContractRunPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-06-26\\20260626_183546\\unified_daily_update_simulation_contract.json",
+    "simulationContractRunPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-06-27\\20260627_070551\\unified_daily_update_simulation_contract.json",
     "simulationContractSportCount":  4,
     "simulationContractAdvancedBySport":  {
                                               "mlb":  {
@@ -164,9 +163,9 @@
                                                                                                 "title":  "HR Targets",
                                                                                                 "kicker":  "Best 1+ HR looks",
                                                                                                 "body":  "30 targets surfaced for the slate.",
-                                                                                                "href":  "/mlb/hr-targets?date=2026-06-26",
+                                                                                                "href":  "/mlb/hr-targets?date=2026-06-27",
                                                                                                 "cta":  "Open board",
-                                                                                                "source_path":  "daily_summary_2026_06_26_hr_targets.json",
+                                                                                                "source_path":  "daily_summary_2026_06_27_hr_targets.json",
                                                                                                 "row_count":  30,
                                                                                                 "game_count":  15,
                                                                                                 "rows":  [
@@ -176,13 +175,13 @@
                                                                                                                  "team":  "KC",
                                                                                                                  "opponent":  "CWS",
                                                                                                                  "matchup":  "KC @ CWS",
-                                                                                                                 "probability":  "16.3%",
+                                                                                                                 "probability":  "15.9%",
                                                                                                                  "support":  "74",
                                                                                                                  "summary":  "Expected opportunity is strong at about 4.6 PA. The handedness split is leaning toward extra damage in this matchup.",
-                                                                                                                 "p_hr_1plus":  0.163,
+                                                                                                                 "p_hr_1plus":  0.159,
                                                                                                                  "support_score":  74.0,
                                                                                                                  "support_label":  "strong",
-                                                                                                                 "pa_mean":  4.593,
+                                                                                                                 "pa_mean":  4.626,
                                                                                                                  "lineup_order":  5,
                                                                                                                  "opponent_pitcher_name":  "Davis Martin",
                                                                                                                  "writeup":  "Expected opportunity is strong at about 4.6 PA. The handedness split is leaning toward extra damage in this matchup.",
@@ -197,51 +196,51 @@
                                                                                                              },
                                                                                                              {
                                                                                                                  "rank":  "#2",
-                                                                                                                 "player_name":  "Mickey Moniak",
-                                                                                                                 "team":  "COL",
-                                                                                                                 "opponent":  "MIN",
-                                                                                                                 "matchup":  "COL @ MIN",
-                                                                                                                 "probability":  "13.4%",
-                                                                                                                 "support":  "81",
-                                                                                                                 "summary":  "Expected opportunity is strong at about 5.1 PA. He is tracking toward a premium lineup slot (2).",
-                                                                                                                 "p_hr_1plus":  0.134,
-                                                                                                                 "support_score":  81.0,
+                                                                                                                 "player_name":  "Juan Soto",
+                                                                                                                 "team":  "NYM",
+                                                                                                                 "opponent":  "PHI",
+                                                                                                                 "matchup":  "PHI @ NYM",
+                                                                                                                 "probability":  "13.6%",
+                                                                                                                 "support":  "77",
+                                                                                                                 "summary":  "Expected opportunity is strong at about 4.7 PA. He is tracking toward a premium lineup slot (3).",
+                                                                                                                 "p_hr_1plus":  0.136,
+                                                                                                                 "support_score":  77.0,
                                                                                                                  "support_label":  "strong",
-                                                                                                                 "pa_mean":  5.116,
-                                                                                                                 "lineup_order":  2,
-                                                                                                                 "opponent_pitcher_name":  "Taj Bradley",
-                                                                                                                 "writeup":  "Expected opportunity is strong at about 5.1 PA. He is tracking toward a premium lineup slot (2).",
-                                                                                                                 "headshot_url":  "https://img.mlbstatic.com/mlb-photos/image/upload/w_180,q_auto:best/v1/people/666160/headshot/67/current",
-                                                                                                                 "team_logo_url":  "https://www.mlbstatic.com/team-logos/115.svg",
-                                                                                                                 "opponent_logo_url":  "https://www.mlbstatic.com/team-logos/142.svg",
+                                                                                                                 "pa_mean":  4.713,
+                                                                                                                 "lineup_order":  3,
+                                                                                                                 "opponent_pitcher_name":  "Alan Rangel",
+                                                                                                                 "writeup":  "Expected opportunity is strong at about 4.7 PA. He is tracking toward a premium lineup slot (3).",
+                                                                                                                 "headshot_url":  "https://img.mlbstatic.com/mlb-photos/image/upload/w_180,q_auto:best/v1/people/665742/headshot/67/current",
+                                                                                                                 "team_logo_url":  "https://www.mlbstatic.com/team-logos/121.svg",
+                                                                                                                 "opponent_logo_url":  "https://www.mlbstatic.com/team-logos/143.svg",
                                                                                                                  "drivers":  [
-                                                                                                                                 "Expected opportunity is strong at about 5.1 PA.",
-                                                                                                                                 "He is tracking toward a premium lineup slot (2).",
+                                                                                                                                 "Expected opportunity is strong at about 4.7 PA.",
+                                                                                                                                 "He is tracking toward a premium lineup slot (3).",
                                                                                                                                  "The handedness split is leaning toward extra damage in this matchup."
                                                                                                                              ]
                                                                                                              },
                                                                                                              {
                                                                                                                  "rank":  "#3",
-                                                                                                                 "player_name":  "Kyle Schwarber",
-                                                                                                                 "team":  "PHI",
-                                                                                                                 "opponent":  "NYM",
-                                                                                                                 "matchup":  "PHI @ NYM",
-                                                                                                                 "probability":  "14.0%",
-                                                                                                                 "support":  "73",
-                                                                                                                 "summary":  "Expected opportunity is strong at about 4.9 PA. He is tracking toward a premium lineup slot (2).",
-                                                                                                                 "p_hr_1plus":  0.14,
-                                                                                                                 "support_score":  73.0,
+                                                                                                                 "player_name":  "Paul Goldschmidt",
+                                                                                                                 "team":  "NYY",
+                                                                                                                 "opponent":  "BOS",
+                                                                                                                 "matchup":  "NYY @ BOS",
+                                                                                                                 "probability":  "11.9%",
+                                                                                                                 "support":  "80",
+                                                                                                                 "summary":  "Expected opportunity is strong at about 4.8 PA. He is tracking toward a premium lineup slot (3).",
+                                                                                                                 "p_hr_1plus":  0.119,
+                                                                                                                 "support_score":  80.0,
                                                                                                                  "support_label":  "strong",
-                                                                                                                 "pa_mean":  4.902,
-                                                                                                                 "lineup_order":  2,
-                                                                                                                 "opponent_pitcher_name":  "Freddy Peralta",
-                                                                                                                 "writeup":  "Expected opportunity is strong at about 4.9 PA. He is tracking toward a premium lineup slot (2).",
-                                                                                                                 "headshot_url":  "https://img.mlbstatic.com/mlb-photos/image/upload/w_180,q_auto:best/v1/people/656941/headshot/67/current",
-                                                                                                                 "team_logo_url":  "https://www.mlbstatic.com/team-logos/143.svg",
-                                                                                                                 "opponent_logo_url":  "https://www.mlbstatic.com/team-logos/121.svg",
+                                                                                                                 "pa_mean":  4.79,
+                                                                                                                 "lineup_order":  3,
+                                                                                                                 "opponent_pitcher_name":  "Jake Bennett",
+                                                                                                                 "writeup":  "Expected opportunity is strong at about 4.8 PA. He is tracking toward a premium lineup slot (3).",
+                                                                                                                 "headshot_url":  "https://img.mlbstatic.com/mlb-photos/image/upload/w_180,q_auto:best/v1/people/502671/headshot/67/current",
+                                                                                                                 "team_logo_url":  "https://www.mlbstatic.com/team-logos/147.svg",
+                                                                                                                 "opponent_logo_url":  "https://www.mlbstatic.com/team-logos/111.svg",
                                                                                                                  "drivers":  [
-                                                                                                                                 "Expected opportunity is strong at about 4.9 PA.",
-                                                                                                                                 "He is tracking toward a premium lineup slot (2).",
+                                                                                                                                 "Expected opportunity is strong at about 4.8 PA.",
+                                                                                                                                 "He is tracking toward a premium lineup slot (3).",
                                                                                                                                  "The handedness split is leaning toward extra damage in this matchup."
                                                                                                                              ]
                                                                                                              },
@@ -251,21 +250,21 @@
                                                                                                                  "team":  "MIN",
                                                                                                                  "opponent":  "COL",
                                                                                                                  "matchup":  "COL @ MIN",
-                                                                                                                 "probability":  "13.7%",
+                                                                                                                 "probability":  "12.8%",
                                                                                                                  "support":  "71",
-                                                                                                                 "summary":  "Expected opportunity is strong at about 4.8 PA. He is tracking toward a premium lineup slot (2).",
-                                                                                                                 "p_hr_1plus":  0.137,
+                                                                                                                 "summary":  "Expected opportunity is strong at about 4.9 PA. He is tracking toward a premium lineup slot (2).",
+                                                                                                                 "p_hr_1plus":  0.128,
                                                                                                                  "support_score":  71.0,
                                                                                                                  "support_label":  "solid",
-                                                                                                                 "pa_mean":  4.76,
+                                                                                                                 "pa_mean":  4.876,
                                                                                                                  "lineup_order":  2,
-                                                                                                                 "opponent_pitcher_name":  "Tomoyuki Sugano",
-                                                                                                                 "writeup":  "Expected opportunity is strong at about 4.8 PA. He is tracking toward a premium lineup slot (2).",
+                                                                                                                 "opponent_pitcher_name":  "Michael Lorenzen",
+                                                                                                                 "writeup":  "Expected opportunity is strong at about 4.9 PA. He is tracking toward a premium lineup slot (2).",
                                                                                                                  "headshot_url":  "https://img.mlbstatic.com/mlb-photos/image/upload/w_180,q_auto:best/v1/people/621439/headshot/67/current",
                                                                                                                  "team_logo_url":  "https://www.mlbstatic.com/team-logos/142.svg",
                                                                                                                  "opponent_logo_url":  "https://www.mlbstatic.com/team-logos/115.svg",
                                                                                                                  "drivers":  [
-                                                                                                                                 "Expected opportunity is strong at about 4.8 PA.",
+                                                                                                                                 "Expected opportunity is strong at about 4.9 PA.",
                                                                                                                                  "He is tracking toward a premium lineup slot (2).",
                                                                                                                                  "The handedness split is leaning toward extra damage in this matchup."
                                                                                                                              ]
@@ -274,145 +273,145 @@
                                                                                             },
                                                                        "scoreboard_items":  [
                                                                                                 {
-                                                                                                    "target_id":  "game-824255",
+                                                                                                    "target_id":  "game-824257",
                                                                                                     "label":  "HOU @ DET",
-                                                                                                    "status":  "5:40 PM"
+                                                                                                    "status":  "12:10 PM"
                                                                                                 },
                                                                                                 {
-                                                                                                    "target_id":  "game-823363",
+                                                                                                    "target_id":  "game-824745",
+                                                                                                    "label":  "NYY @ BOS",
+                                                                                                    "status":  "12:10 PM"
+                                                                                                },
+                                                                                                {
+                                                                                                    "target_id":  "game-822794",
+                                                                                                    "label":  "TEX @ TOR",
+                                                                                                    "status":  "2:07 PM"
+                                                                                                },
+                                                                                                {
+                                                                                                    "target_id":  "game-823364",
                                                                                                     "label":  "CIN @ PIT",
-                                                                                                    "status":  "5:40 PM"
+                                                                                                    "status":  "3:05 PM"
                                                                                                 },
                                                                                                 {
-                                                                                                    "target_id":  "game-824824",
+                                                                                                    "target_id":  "game-823609",
+                                                                                                    "label":  "PHI @ NYM",
+                                                                                                    "status":  "3:10 PM"
+                                                                                                },
+                                                                                                {
+                                                                                                    "target_id":  "game-824581",
+                                                                                                    "label":  "KC @ CWS",
+                                                                                                    "status":  "3:10 PM"
+                                                                                                },
+                                                                                                {
+                                                                                                    "target_id":  "game-822960",
+                                                                                                    "label":  "AZ @ TB",
+                                                                                                    "status":  "5:10 PM"
+                                                                                                },
+                                                                                                {
+                                                                                                    "target_id":  "game-824825",
                                                                                                     "label":  "WSH @ BAL",
                                                                                                     "status":  "6:05 PM"
                                                                                                 },
                                                                                                 {
-                                                                                                    "target_id":  "game-822796",
-                                                                                                    "label":  "TEX @ TOR",
-                                                                                                    "status":  "6:07 PM"
-                                                                                                },
-                                                                                                {
-                                                                                                    "target_id":  "game-824423",
+                                                                                                    "target_id":  "game-824421",
                                                                                                     "label":  "SEA @ CLE",
                                                                                                     "status":  "6:10 PM"
                                                                                                 },
                                                                                                 {
-                                                                                                    "target_id":  "game-822962",
-                                                                                                    "label":  "AZ @ TB",
-                                                                                                    "status":  "6:10 PM"
-                                                                                                },
-                                                                                                {
-                                                                                                    "target_id":  "game-823610",
-                                                                                                    "label":  "PHI @ NYM",
-                                                                                                    "status":  "6:10 PM"
-                                                                                                },
-                                                                                                {
-                                                                                                    "target_id":  "game-824743",
-                                                                                                    "label":  "NYY @ BOS",
-                                                                                                    "status":  "6:10 PM"
-                                                                                                },
-                                                                                                {
-                                                                                                    "target_id":  "game-824582",
-                                                                                                    "label":  "KC @ CWS",
-                                                                                                    "status":  "6:40 PM"
-                                                                                                },
-                                                                                                {
-                                                                                                    "target_id":  "game-823773",
-                                                                                                    "label":  "CHC @ MIL",
-                                                                                                    "status":  "6:45 PM"
-                                                                                                },
-                                                                                                {
-                                                                                                    "target_id":  "game-823688",
+                                                                                                    "target_id":  "game-823689",
                                                                                                     "label":  "COL @ MIN",
-                                                                                                    "status":  "7:10 PM"
+                                                                                                    "status":  "6:10 PM"
                                                                                                 },
                                                                                                 {
-                                                                                                    "target_id":  "game-823039",
+                                                                                                    "target_id":  "game-823770",
+                                                                                                    "label":  "CHC @ MIL",
+                                                                                                    "status":  "6:10 PM"
+                                                                                                },
+                                                                                                {
+                                                                                                    "target_id":  "game-823038",
                                                                                                     "label":  "MIA @ STL",
-                                                                                                    "status":  "7:15 PM"
+                                                                                                    "status":  "6:15 PM"
                                                                                                 },
                                                                                                 {
-                                                                                                    "target_id":  "game-824014",
+                                                                                                    "target_id":  "game-823283",
+                                                                                                    "label":  "LAD @ SD",
+                                                                                                    "status":  "7:40 PM"
+                                                                                                },
+                                                                                                {
+                                                                                                    "target_id":  "game-823207",
+                                                                                                    "label":  "ATL @ SF",
+                                                                                                    "status":  "8:05 PM"
+                                                                                                },
+                                                                                                {
+                                                                                                    "target_id":  "game-824015",
                                                                                                     "label":  "ATH @ LAA",
                                                                                                     "status":  "8:38 PM"
-                                                                                                },
-                                                                                                {
-                                                                                                    "target_id":  "game-823285",
-                                                                                                    "label":  "LAD @ SD",
-                                                                                                    "status":  "8:45 PM"
-                                                                                                },
-                                                                                                {
-                                                                                                    "target_id":  "game-823206",
-                                                                                                    "label":  "ATL @ SF",
-                                                                                                    "status":  "9:15 PM"
                                                                                                 }
                                                                                             ],
                                                                        "module_links":  [
                                                                                             {
                                                                                                 "label":  "Cards",
-                                                                                                "href":  "/mlb/cards?date=2026-06-26",
+                                                                                                "href":  "/mlb/cards?date=2026-06-27",
                                                                                                 "active":  true
                                                                                             },
                                                                                             {
                                                                                                 "label":  "Betting Card",
-                                                                                                "href":  "/mlb/season/2026/betting-card?date=2026-06-26",
+                                                                                                "href":  "/mlb/season/2026/betting-card?date=2026-06-27",
                                                                                                 "active":  false
                                                                                             },
                                                                                             {
                                                                                                 "label":  "Live Lens",
-                                                                                                "href":  "/mlb/live-lens?date=2026-06-26",
+                                                                                                "href":  "/mlb/live-lens?date=2026-06-27",
                                                                                                 "active":  false
                                                                                             },
                                                                                             {
                                                                                                 "label":  "Market Accuracy",
-                                                                                                "href":  "/mlb/market-accuracy?date=2026-06-26",
+                                                                                                "href":  "/mlb/market-accuracy?date=2026-06-27",
                                                                                                 "active":  false
                                                                                             },
                                                                                             {
                                                                                                 "label":  "Daily Archive",
-                                                                                                "href":  "/mlb/archive?date=2026-06-26",
+                                                                                                "href":  "/mlb/archive?date=2026-06-27",
                                                                                                 "active":  false
                                                                                             },
                                                                                             {
                                                                                                 "label":  "Season Review",
-                                                                                                "href":  "/mlb/season/2026?date=2026-06-26",
+                                                                                                "href":  "/mlb/season/2026?date=2026-06-27",
                                                                                                 "active":  false
                                                                                             },
                                                                                             {
                                                                                                 "label":  "Pitcher top props",
-                                                                                                "href":  "/mlb/pitcher-top-props?date=2026-06-26",
+                                                                                                "href":  "/mlb/pitcher-top-props?date=2026-06-27",
                                                                                                 "active":  false
                                                                                             },
                                                                                             {
                                                                                                 "label":  "Hitter top props",
-                                                                                                "href":  "/mlb/hitter-top-props?date=2026-06-26",
+                                                                                                "href":  "/mlb/hitter-top-props?date=2026-06-27",
                                                                                                 "active":  false
                                                                                             },
                                                                                             {
                                                                                                 "label":  "Top props",
-                                                                                                "href":  "/mlb/top-props?date=2026-06-26",
+                                                                                                "href":  "/mlb/top-props?date=2026-06-27",
                                                                                                 "active":  false
                                                                                             },
                                                                                             {
                                                                                                 "label":  "HR targets",
-                                                                                                "href":  "/mlb/hr-targets?date=2026-06-26",
+                                                                                                "href":  "/mlb/hr-targets?date=2026-06-27",
                                                                                                 "active":  false
                                                                                             },
                                                                                             {
                                                                                                 "label":  "RFI targets",
-                                                                                                "href":  "/mlb/rfi-targets?date=2026-06-26",
+                                                                                                "href":  "/mlb/rfi-targets?date=2026-06-27",
                                                                                                 "active":  false
                                                                                             },
                                                                                             {
                                                                                                 "label":  "Pitcher ladders",
-                                                                                                "href":  "/mlb/pitcher-ladders?date=2026-06-26",
+                                                                                                "href":  "/mlb/pitcher-ladders?date=2026-06-27",
                                                                                                 "active":  false
                                                                                             },
                                                                                             {
                                                                                                 "label":  "Hitter ladders",
-                                                                                                "href":  "/mlb/hitter-ladders?date=2026-06-26",
+                                                                                                "href":  "/mlb/hitter-ladders?date=2026-06-27",
                                                                                                 "active":  false
                                                                                             },
                                                                                             {
@@ -424,9 +423,9 @@
                                                                        "cards_control_links":  [
 
                                                                                                ],
-                                                                       "cards_header_meta":  "Artifact-backed slate | 2026-06-26",
+                                                                       "cards_header_meta":  "Artifact-backed slate | 2026-06-27",
                                                                        "cards_header_title":  "MLB Game Cards",
-                                                                       "source_path":  "daily_summary_2026_06_26.json",
+                                                                       "source_path":  "daily_summary_2026_06_27.json",
                                                                        "source_title":  "MLB daily summary artifact"
                                                                    },
                                                           "game":  {
@@ -438,50 +437,50 @@
                                                            "page":  {
                                                                         "scoreboard_items":  [
                                                                                                  {
-                                                                                                     "target_id":  "game-401857024",
-                                                                                                     "label":  "WSH @ CON",
-                                                                                                     "status":  "6/26 - 7:30 PM EDT"
+                                                                                                     "target_id":  "game-401857027",
+                                                                                                     "label":  "PHX @ TOR",
+                                                                                                     "status":  "6/27 - 2:00 PM EDT"
                                                                                                  },
                                                                                                  {
-                                                                                                     "target_id":  "game-401857025",
-                                                                                                     "label":  "POR @ CHI",
-                                                                                                     "status":  "6/26 - 7:30 PM EDT"
+                                                                                                     "target_id":  "game-401857028",
+                                                                                                     "label":  "LAS @ IND",
+                                                                                                     "status":  "6/27 - 8:00 PM EDT"
                                                                                                  },
                                                                                                  {
-                                                                                                     "target_id":  "game-401857026",
-                                                                                                     "label":  "ATL @ GSV",
-                                                                                                     "status":  "6/26 - 10:00 PM EDT"
+                                                                                                     "target_id":  "game-401857029",
+                                                                                                     "label":  "ATL @ SEA",
+                                                                                                     "status":  "6/27 - 9:00 PM EDT"
                                                                                                  }
                                                                                              ],
                                                                         "module_links":  [
                                                                                              {
                                                                                                  "label":  "Cards",
-                                                                                                 "href":  "/wnba/cards?date=2026-06-26",
+                                                                                                 "href":  "/wnba/cards?date=2026-06-27",
                                                                                                  "active":  true
                                                                                              },
                                                                                              {
                                                                                                  "label":  "Betting Card",
-                                                                                                 "href":  "/wnba/season/2026/betting-card?date=2026-06-26",
+                                                                                                 "href":  "/wnba/season/2026/betting-card?date=2026-06-27",
                                                                                                  "active":  false
                                                                                              },
                                                                                              {
                                                                                                  "label":  "Picks",
-                                                                                                 "href":  "/wnba/picks?date=2026-06-26",
+                                                                                                 "href":  "/wnba/picks?date=2026-06-27",
                                                                                                  "active":  false
                                                                                              },
                                                                                              {
                                                                                                  "label":  "Props",
-                                                                                                 "href":  "/wnba/props?date=2026-06-26",
+                                                                                                 "href":  "/wnba/props?date=2026-06-27",
                                                                                                  "active":  false
                                                                                              },
                                                                                              {
                                                                                                  "label":  "Live Lens",
-                                                                                                 "href":  "/wnba/live-lens?date=2026-06-26",
+                                                                                                 "href":  "/wnba/live-lens?date=2026-06-27",
                                                                                                  "active":  false
                                                                                              },
                                                                                              {
                                                                                                  "label":  "Daily Archive",
-                                                                                                 "href":  "/wnba/archive?date=2026-06-26",
+                                                                                                 "href":  "/wnba/archive?date=2026-06-27",
                                                                                                  "active":  false
                                                                                              },
                                                                                              {
@@ -493,35 +492,35 @@
                                                                         "cards_control_links":  [
                                                                                                     {
                                                                                                         "label":  "Betting Card",
-                                                                                                        "href":  "/wnba/season/2026/betting-card?date=2026-06-26"
+                                                                                                        "href":  "/wnba/season/2026/betting-card?date=2026-06-27"
                                                                                                     },
                                                                                                     {
                                                                                                         "label":  "Props",
-                                                                                                        "href":  "/wnba/props?date=2026-06-26"
+                                                                                                        "href":  "/wnba/props?date=2026-06-27"
                                                                                                     },
                                                                                                     {
                                                                                                         "label":  "Live Lens",
-                                                                                                        "href":  "/wnba/live-lens?date=2026-06-26"
+                                                                                                        "href":  "/wnba/live-lens?date=2026-06-27"
                                                                                                     }
                                                                                                 ],
-                                                                        "source_path":  "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\game_cards_2026-06-26.csv | espn_scoreboard_fallback",
+                                                                        "source_path":  "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\game_cards_2026-06-27.csv | espn_scoreboard_fallback",
                                                                         "source_title":  "WNBA processed game cards + live scoreboard supplement",
                                                                         "wnba_advanced_contract":  {
                                                                                                        "available":  true,
                                                                                                        "sport":  "wnba",
                                                                                                        "selection":  {
                                                                                                                          "kind":  "date",
-                                                                                                                         "requested":  "2026-06-26",
-                                                                                                                         "resolved":  "2026-06-26"
+                                                                                                                         "requested":  "2026-06-27",
+                                                                                                                         "resolved":  "2026-06-27"
                                                                                                                      },
                                                                                                        "source":  {
                                                                                                                       "title":  "WNBA processed game cards + live scoreboard supplement",
-                                                                                                                      "path":  "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\game_cards_2026-06-26.csv | espn_scoreboard_fallback",
+                                                                                                                      "path":  "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\game_cards_2026-06-27.csv | espn_scoreboard_fallback",
                                                                                                                       "mode":  "live"
                                                                                                                   },
                                                                                                        "freshness":  {
-                                                                                                                         "requested":  "2026-06-26",
-                                                                                                                         "resolved":  "2026-06-26",
+                                                                                                                         "requested":  "2026-06-27",
+                                                                                                                         "resolved":  "2026-06-27",
                                                                                                                          "selection_kind":  "date",
                                                                                                                          "is_current_day":  true,
                                                                                                                          "is_stale":  false,
@@ -538,21 +537,21 @@
                                                                                                        "game_count":  3,
                                                                                                        "games":  [
                                                                                                                      {
-                                                                                                                         "game_id":  "401857024",
-                                                                                                                         "event_id":  "401857024",
+                                                                                                                         "game_id":  "401857027",
+                                                                                                                         "event_id":  "401857027",
                                                                                                                          "matchup":  {
                                                                                                                                          "away":  {
-                                                                                                                                                      "tri":  "WSH",
+                                                                                                                                                      "tri":  "PHX",
                                                                                                                                                       "name":  "Away"
                                                                                                                                                   },
                                                                                                                                          "home":  {
-                                                                                                                                                      "tri":  "CON",
+                                                                                                                                                      "tri":  "TOR",
                                                                                                                                                       "name":  "Home"
                                                                                                                                                   }
                                                                                                                                      },
                                                                                                                          "status":  {
                                                                                                                                         "status":  "Scheduled",
-                                                                                                                                        "detail":  "6/26 - 7:30 PM EDT",
+                                                                                                                                        "detail":  "6/27 - 2:00 PM EDT",
                                                                                                                                         "live":  false,
                                                                                                                                         "final":  false
                                                                                                                                     },
@@ -626,21 +625,21 @@
                                                                                                                                       }
                                                                                                                      },
                                                                                                                      {
-                                                                                                                         "game_id":  "401857025",
-                                                                                                                         "event_id":  "401857025",
+                                                                                                                         "game_id":  "401857028",
+                                                                                                                         "event_id":  "401857028",
                                                                                                                          "matchup":  {
                                                                                                                                          "away":  {
-                                                                                                                                                      "tri":  "POR",
+                                                                                                                                                      "tri":  "LAS",
                                                                                                                                                       "name":  "Away"
                                                                                                                                                   },
                                                                                                                                          "home":  {
-                                                                                                                                                      "tri":  "CHI",
+                                                                                                                                                      "tri":  "IND",
                                                                                                                                                       "name":  "Home"
                                                                                                                                                   }
                                                                                                                                      },
                                                                                                                          "status":  {
                                                                                                                                         "status":  "Scheduled",
-                                                                                                                                        "detail":  "6/26 - 7:30 PM EDT",
+                                                                                                                                        "detail":  "6/27 - 8:00 PM EDT",
                                                                                                                                         "live":  false,
                                                                                                                                         "final":  false
                                                                                                                                     },
@@ -714,21 +713,21 @@
                                                                                                                                       }
                                                                                                                      },
                                                                                                                      {
-                                                                                                                         "game_id":  "401857026",
-                                                                                                                         "event_id":  "401857026",
+                                                                                                                         "game_id":  "401857029",
+                                                                                                                         "event_id":  "401857029",
                                                                                                                          "matchup":  {
                                                                                                                                          "away":  {
                                                                                                                                                       "tri":  "ATL",
                                                                                                                                                       "name":  "Away"
                                                                                                                                                   },
                                                                                                                                          "home":  {
-                                                                                                                                                      "tri":  "GSV",
+                                                                                                                                                      "tri":  "SEA",
                                                                                                                                                       "name":  "Home"
                                                                                                                                                   }
                                                                                                                                      },
                                                                                                                          "status":  {
                                                                                                                                         "status":  "Scheduled",
-                                                                                                                                        "detail":  "6/26 - 10:00 PM EDT",
+                                                                                                                                        "detail":  "6/27 - 9:00 PM EDT",
                                                                                                                                         "live":  false,
                                                                                                                                         "final":  false
                                                                                                                                     },
@@ -821,27 +820,27 @@
                                                                        "module_links":  [
                                                                                             {
                                                                                                 "label":  "Cards",
-                                                                                                "href":  "/nhl/cards?date=2026-06-26",
+                                                                                                "href":  "/nhl/cards?date=2026-06-27",
                                                                                                 "active":  true
                                                                                             },
                                                                                             {
                                                                                                 "label":  "Betting Card",
-                                                                                                "href":  "/nhl/season/2026/betting-card?date=2026-06-26",
+                                                                                                "href":  "/nhl/season/2026/betting-card?date=2026-06-27",
                                                                                                 "active":  false
                                                                                             },
                                                                                             {
                                                                                                 "label":  "Picks",
-                                                                                                "href":  "/nhl/picks?date=2026-06-26",
+                                                                                                "href":  "/nhl/picks?date=2026-06-27",
                                                                                                 "active":  false
                                                                                             },
                                                                                             {
                                                                                                 "label":  "Live Lens",
-                                                                                                "href":  "/nhl/live-lens?date=2026-06-26",
+                                                                                                "href":  "/nhl/live-lens?date=2026-06-27",
                                                                                                 "active":  false
                                                                                             },
                                                                                             {
                                                                                                 "label":  "Daily Archive",
-                                                                                                "href":  "/nhl/archive?date=2026-06-26",
+                                                                                                "href":  "/nhl/archive?date=2026-06-27",
                                                                                                 "active":  false
                                                                                             },
                                                                                             {
@@ -853,18 +852,18 @@
                                                                        "cards_control_links":  [
                                                                                                    {
                                                                                                        "label":  "Betting Card",
-                                                                                                       "href":  "/nhl/season/2026/betting-card?date=2026-06-26"
+                                                                                                       "href":  "/nhl/season/2026/betting-card?date=2026-06-27"
                                                                                                    },
                                                                                                    {
                                                                                                        "label":  "Picks",
-                                                                                                       "href":  "/nhl/picks?date=2026-06-26"
+                                                                                                       "href":  "/nhl/picks?date=2026-06-27"
                                                                                                    },
                                                                                                    {
                                                                                                        "label":  "Live Lens",
-                                                                                                       "href":  "/nhl/live-lens?date=2026-06-26"
+                                                                                                       "href":  "/nhl/live-lens?date=2026-06-27"
                                                                                                    }
                                                                                                ],
-                                                                       "source_path":  "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\data\\processed\\predictions_2026-06-26.csv",
+                                                                       "source_path":  "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\data\\processed\\predictions_2026-06-27.csv",
                                                                        "source_title":  "NHL processed predictions"
                                                                    },
                                                           "game":  {
@@ -880,27 +879,27 @@
                                                                          "module_links":  [
                                                                                               {
                                                                                                   "label":  "Cards",
-                                                                                                  "href":  "/ncaab/cards?date=2026-06-26",
+                                                                                                  "href":  "/ncaab/cards?date=2026-06-27",
                                                                                                   "active":  true
                                                                                               },
                                                                                               {
                                                                                                   "label":  "Betting Card",
-                                                                                                  "href":  "/ncaab/season/2025/betting-card?date=2026-06-26",
+                                                                                                  "href":  "/ncaab/season/2025/betting-card?date=2026-06-27",
                                                                                                   "active":  false
                                                                                               },
                                                                                               {
                                                                                                   "label":  "Live Lens",
-                                                                                                  "href":  "/ncaab/live-lens?date=2026-06-26",
+                                                                                                  "href":  "/ncaab/live-lens?date=2026-06-27",
                                                                                                   "active":  false
                                                                                               },
                                                                                               {
                                                                                                   "label":  "Daily Archive",
-                                                                                                  "href":  "/ncaab/archive?date=2026-06-26",
+                                                                                                  "href":  "/ncaab/archive?date=2026-06-27",
                                                                                                   "active":  false
                                                                                               },
                                                                                               {
                                                                                                   "label":  "Season Review",
-                                                                                                  "href":  "/ncaab/season/2025?date=2026-06-26",
+                                                                                                  "href":  "/ncaab/season/2025?date=2026-06-27",
                                                                                                   "active":  false
                                                                                               },
                                                                                               {
@@ -912,18 +911,18 @@
                                                                          "cards_control_links":  [
                                                                                                      {
                                                                                                          "label":  "Betting Card",
-                                                                                                         "href":  "/ncaab/season/2026/betting-card?date=2026-06-26"
+                                                                                                         "href":  "/ncaab/season/2026/betting-card?date=2026-06-27"
                                                                                                      },
                                                                                                      {
                                                                                                          "label":  "Live Lens",
-                                                                                                         "href":  "/ncaab/live-lens?date=2026-06-26"
+                                                                                                         "href":  "/ncaab/live-lens?date=2026-06-27"
                                                                                                      },
                                                                                                      {
                                                                                                          "label":  "Season Review",
-                                                                                                         "href":  "/ncaab/season/2026?date=2026-06-26"
+                                                                                                         "href":  "/ncaab/season/2026?date=2026-06-27"
                                                                                                      }
                                                                                                  ],
-                                                                         "source_path":  "data/ncaab_source/api/recommendations/recommendations_2026-06-26.json",
+                                                                         "source_path":  "data/ncaab_source/api/recommendations/recommendations_2026-06-27.json",
                                                                          "source_title":  "NCAAB cards unavailable"
                                                                      },
                                                             "game":  {
