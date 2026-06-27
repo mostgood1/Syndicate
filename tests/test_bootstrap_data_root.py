@@ -141,6 +141,8 @@ class BootstrapDataRootTests(unittest.TestCase):
             self.assertIn("wnba", called_command)
             self.assertIn("--execution-mode", called_command)
             self.assertIn("source", called_command)
+            self.assertIn("--source-root", called_command)
+            self.assertIn("vendor", " ".join(called_command))
 
     def test_bootstrap_wnba_today_artifacts_skips_when_present(self) -> None:
         module = _load_module()

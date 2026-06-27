@@ -131,6 +131,13 @@ def _wnba_today_bundle_ready(data_root: Path, date_str: str) -> bool:
     return True
 
 
+def _wnba_refresh_source_root(repo_root: Path) -> Path:
+    vendor_root = repo_root / "vendor" / "wnba_betting_repo"
+    if vendor_root.exists() and vendor_root.is_dir():
+        return vendor_root
+    return repo_root / "data" / "wnba_source"
+
+
 def _bootstrap_wnba_today_artifacts(repo_root: Path, data_root: Path) -> bool:
     if not _env_bool("SYNDICATE_BOOTSTRAP_ON_START"):
         return False
@@ -159,6 +166,8 @@ def _bootstrap_wnba_today_artifacts(repo_root: Path, data_root: Path) -> bool:
             "all",
             "--execution-mode",
             "source",
+            "--source-root",
+            str(_wnba_refresh_source_root(repo_root)),
             "--skip-mirror",
             "--mode",
             "full",
