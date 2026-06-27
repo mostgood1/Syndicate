@@ -121,11 +121,14 @@ def _wnba_today_bundle_paths(data_root: Path, date_str: str) -> list[Path]:
 
 
 def _wnba_today_bundle_ready(data_root: Path, date_str: str) -> bool:
-    props_path = _wnba_today_props_path(data_root, date_str)
-    try:
-        return props_path.exists() and props_path.is_file() and props_path.stat().st_size > 0
-    except OSError:
-        return False
+    required_paths = [_wnba_today_props_path(data_root, date_str), *_wnba_today_bundle_paths(data_root, date_str)]
+    for path in required_paths:
+        try:
+            if not path.exists() or not path.is_file() or path.stat().st_size <= 0:
+                return False
+        except OSError:
+            return False
+    return True
 
 
 def _bootstrap_wnba_today_artifacts(repo_root: Path, data_root: Path) -> bool:

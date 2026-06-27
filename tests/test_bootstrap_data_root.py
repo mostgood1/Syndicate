@@ -147,6 +147,22 @@ class BootstrapDataRootTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             data_root = Path(temp_dir) / "data-root"
             today = datetime.datetime.now().strftime("%Y-%m-%d")
+            for sentinel in [module._wnba_today_props_path(data_root, today), *module._wnba_today_bundle_paths(data_root, today)]:
+                sentinel.parent.mkdir(parents=True, exist_ok=True)
+                sentinel.write_text("{}\n", encoding="utf-8")
+
+            with patch.dict(os.environ, {"SYNDICATE_BOOTSTRAP_ON_START": "1"}, clear=False):
+                with patch.object(module.subprocess, "run") as run_mock:
+                    did_run = module._bootstrap_wnba_today_artifacts(Path(__file__).resolve().parents[1], data_root)
+
+            self.assertFalse(did_run)
+            run_mock.assert_not_called()
+
+    def test_bootstrap_wnba_today_artifacts_runs_when_cards_missing(self) -> None:
+        module = _load_module()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            data_root = Path(temp_dir) / "data-root"
+            today = datetime.datetime.now().strftime("%Y-%m-%d")
             sentinel = module._wnba_today_props_path(data_root, today)
             sentinel.parent.mkdir(parents=True, exist_ok=True)
             sentinel.write_text("{}\n", encoding="utf-8")
@@ -155,8 +171,8 @@ class BootstrapDataRootTests(unittest.TestCase):
                 with patch.object(module.subprocess, "run") as run_mock:
                     did_run = module._bootstrap_wnba_today_artifacts(Path(__file__).resolve().parents[1], data_root)
 
-            self.assertFalse(did_run)
-            run_mock.assert_not_called()
+            self.assertTrue(did_run)
+            run_mock.assert_called_once()
 
     def test_main_triggers_wnba_artifact_bootstrap(self) -> None:
         module = _load_module()
