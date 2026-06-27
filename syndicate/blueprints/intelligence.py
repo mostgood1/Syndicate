@@ -880,7 +880,11 @@ def intelligence_query_api():
         if _render_hosted_request():
             queue_intelligence_state_refresh(dict(payload))
             cached_response, cache_source = _cached_intelligence_response_with_source(dict(payload), force_refresh=False)
-            state_payload = cached_response or _empty_default_intelligence_response()
+            if cached_response is not None and _response_has_content(cached_response):
+                state_payload = cached_response
+            else:
+                state_payload = _INTELLIGENCE_STATE_SERVICE._compute_response(dict(payload), force_refresh=True) or _empty_default_intelligence_response()
+                cache_source = cache_source or "sync_fallback"
             if isinstance(state_payload, dict):
                 state_payload = dict(state_payload)
                 state_payload.setdefault("queued_refresh", True)
