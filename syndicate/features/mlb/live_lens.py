@@ -1146,8 +1146,18 @@ def read_latest_live_lens_snapshot() -> dict[str, Any] | None:
     return dict(snapshot) if isinstance(snapshot, dict) else None
 
 
+def _live_lens_snapshot_needs_refresh(selected_date: str, snapshot: dict[str, Any] | None) -> bool:
+    if str(selected_date).strip() != datetime.now().astimezone().date().isoformat():
+        return False
+    return not bool(_snapshot_games(snapshot or {}))
+
+
 def read_latest_live_lens_page_context(selected_date: str, *, season: int | None = None) -> dict[str, Any]:
     snapshot = read_latest_live_lens_snapshot()
+    if _live_lens_snapshot_needs_refresh(selected_date, snapshot):
+        fresh_snapshot = build_live_lens_snapshot_internal(selected_date, season=season, persist=False)
+        if isinstance(fresh_snapshot, dict):
+            snapshot = fresh_snapshot
     if snapshot is None:
         return _snapshot_route_context(selected_date, season=season, snapshot=None)
     return _snapshot_route_context(selected_date, season=season, snapshot=snapshot)
@@ -1155,6 +1165,10 @@ def read_latest_live_lens_page_context(selected_date: str, *, season: int | None
 
 def read_latest_live_lens_api_payload(selected_date: str, *, season: int | None = None) -> dict[str, Any]:
     snapshot = read_latest_live_lens_snapshot()
+    if _live_lens_snapshot_needs_refresh(selected_date, snapshot):
+        fresh_snapshot = build_live_lens_snapshot_internal(selected_date, season=season, persist=False)
+        if isinstance(fresh_snapshot, dict):
+            snapshot = fresh_snapshot
     if snapshot is None:
         return _snapshot_api_payload(selected_date, season=season, snapshot=None)
     api_payload = snapshot.get("api_payload") if isinstance(snapshot.get("api_payload"), dict) else None

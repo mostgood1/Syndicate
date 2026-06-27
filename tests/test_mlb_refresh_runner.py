@@ -263,6 +263,26 @@ class MlbRefreshRunnerTests(unittest.TestCase):
         self.assertIsNone(captured["season"])
         mocked_payload.assert_called_once()
 
+    def test_live_lens_api_rebuilds_empty_today_snapshot(self) -> None:
+        from syndicate.features.mlb import live_lens as live_lens_module
+
+        today = datetime.now().astimezone().date().isoformat()
+        rebuilt_snapshot = {
+            "games": [{"gamePk": 123, "status": {"abstract": "Live", "detailed": "In Progress"}, "props": [1]}],
+            "counts": {"games": 1, "live": 1, "final": 0, "pregame": 0, "props": 1, "archivedLiveProps": 0},
+            "source_title": "MLB live-lens report artifact",
+            "generatedAt": "2026-06-27T15:10:00-05:00",
+        }
+
+        with patch.object(live_lens_module, "read_latest_live_lens_snapshot", return_value={}) as mocked_snapshot:
+            with patch.object(live_lens_module, "build_live_lens_snapshot_internal", return_value=rebuilt_snapshot) as mocked_build:
+                payload = live_lens_module.read_latest_live_lens_api_payload(today)
+
+        self.assertEqual(payload["counts"]["games"], 1)
+        self.assertEqual(payload["games"][0]["gamePk"], 123)
+        mocked_snapshot.assert_called_once()
+        mocked_build.assert_called_once_with(today, season=None, persist=False)
+
     def test_build_live_lens_snapshot_internal_reads_report_without_feed_refresh(self) -> None:
         from syndicate.features.mlb import live_lens as live_lens_module
 

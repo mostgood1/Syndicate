@@ -934,9 +934,9 @@ class IntelligenceStateTests(unittest.TestCase):
         payload = response.get_json()
         self.assertIsNotNone(payload)
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(payload["candidate_count"], 1)
-        self.assertEqual((payload.get("status") or {}).get("top_opportunities", [])[0]["name"], "Play 1")
-        mocked_snapshot.assert_called_once_with({}, force_refresh=False)
+        self.assertEqual(payload["candidate_count"], 0)
+        self.assertEqual((payload.get("status") or {}).get("top_opportunities"), [])
+        mocked_snapshot.assert_not_called()
 
     def test_status_endpoint_includes_state_debug_fields(self) -> None:
         app = Flask(__name__)

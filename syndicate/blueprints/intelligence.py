@@ -982,14 +982,19 @@ def intelligence_status_api():
         selected_date = str(request.args.get("date") or "").strip() or _latest_available_intelligence_date()
         _ = str(request.args.get("refresh") or request.args.get("force_refresh") or "").strip().lower() in {"1", "true", "yes", "on"}
         status = read_latest_intelligence_state({"date": selected_date})
+        board_response = isinstance(status, dict) and _is_board_response(status)
+        if board_response and _response_needs_refresh({"date": selected_date}, status):
+            fresh_status, _ = _cached_intelligence_response_with_source({"date": selected_date, "force_refresh": True}, force_refresh=True)
+            if isinstance(fresh_status, dict) and _response_has_content(fresh_status):
+                status = fresh_status
+                board_response = _is_board_response(status)
         if not (isinstance(status, dict) and _response_has_content(status)):
-            latest_snapshot = read_latest_intelligence_board_snapshot_response({}, force_refresh=False)
-            if isinstance(latest_snapshot, dict) and _response_has_content(latest_snapshot):
-                status = latest_snapshot
+            status = _empty_default_intelligence_response()
+            board_response = True
         _log_api_state_read(status if isinstance(status, dict) else {})
     except Exception as exc:
         return _api_error_response(exc)
-    state_snapshot = normalize_timestamped_payload(dict(status)) if isinstance(status, dict) and _response_has_content(status) else _empty_default_intelligence_response()
+    state_snapshot = normalize_timestamped_payload(dict(status)) if board_response else dict(status)
     response_payload = {"ok": True, "status": state_snapshot}
     if isinstance(status, dict) and _response_has_content(status):
         for key, value in status.items():

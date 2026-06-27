@@ -2687,6 +2687,28 @@ def _starter_removed_from_actual_payload(
     return False
 
 
+def _live_pitcher_prop_row_actionable(row: dict[str, Any], actual_payload: dict[str, Any] | None) -> bool:
+    if str(row.get("market") or "").strip().lower() != "pitcher_props":
+        return True
+    if not isinstance(actual_payload, dict):
+        return True
+    side = str(row.get("team_side") or "").strip().lower()
+    if side not in {"away", "home"}:
+        return True
+    probable_pitchers = ((actual_payload.get("gameData") or {}).get("probablePitchers")) if isinstance((actual_payload.get("gameData") or {}).get("probablePitchers"), dict) else {}
+    probable = probable_pitchers.get(side) if isinstance(probable_pitchers, dict) else None
+    starter_id = _safe_int((probable or {}).get("id")) if isinstance(probable, dict) else None
+    starter_name = str((probable or {}).get("fullName") or "").strip() if isinstance(probable, dict) else ""
+    if starter_id is None and not starter_name:
+        return True
+    return not _starter_removed_from_actual_payload(
+        actual_payload,
+        side=side,
+        starter_id=starter_id,
+        starter_name=starter_name,
+    )
+
+
 def _bounded_live_pitcher_projection(actual_value: float | None, model_mean: float | None, progress_fraction: float) -> float | None:
     mean = _safe_float(model_mean)
     actual = _safe_float(actual_value)
@@ -3352,7 +3374,7 @@ def _source_sim_detail(selected_date: str, game_pk: int, sim_payload: dict[str, 
                 row for row in live_prop_rows
                 if str(row.get("market") or "").strip().lower() != "pitcher_props"
             ]
-    elif is_live_game:
+    if is_live_game:
         live_prop_rows.extend(_synth_live_hitter_prop_rows(selected_date, int(game_pk), sim_payload, actual_payload, live_prop_rows))
     if not is_historical_date and is_live_game:
         same_day_hitter_synth = _synth_live_hitter_prop_rows(selected_date, int(game_pk), sim_payload, actual_payload, [])
@@ -3366,6 +3388,7 @@ def _source_sim_detail(selected_date: str, game_pk: int, sim_payload: dict[str, 
             if str(row.get("market") or "").strip().lower() == "hitter_props":
                 row["source"] = "current_market"
         live_prop_rows.extend(_current_live_pitcher_prop_rows(selected_date, sim_payload, actual_payload))
+        live_prop_rows = [row for row in live_prop_rows if _live_pitcher_prop_row_actionable(row, actual_payload)]
     ranking_rows = live_prop_rows
     if is_live_game:
         ranking_rows = _annotate_source_live_prop_rows_with_state(live_prop_rows, actual_payload, live_lens_row)
