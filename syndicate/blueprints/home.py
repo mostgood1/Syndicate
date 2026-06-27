@@ -178,9 +178,15 @@ def versionz():
     return jsonify({"ok": True, "version": _public_detailed_version_payload()})
 
 
-def _safe_text(value: Any, fallback: str = "-") -> str:
+def _safe_text(value: Any, fallback: str = "-", *fallbacks: Any) -> str:
     text = str(value or "").strip()
-    return text or fallback
+    if text:
+        return text
+    for candidate in (fallback, *fallbacks):
+        candidate_text = str(candidate or "").strip()
+        if candidate_text:
+            return candidate_text
+    return ""
 
 
 def _sport_matchup(game: dict[str, Any]) -> str:
@@ -2598,6 +2604,7 @@ def _prop_item_from_rank_card(
         "live_projection": _metric_value(metrics, ["live projection", "live_proj"]),
         "line": _metric_value(metrics, ["line", "market line", "threshold"]),
         "odds": _metric_value(metrics, ["odds", "price"]),
+        "price": _metric_value(metrics, ["price", "odds"]),
         "edge": _metric_value(metrics, ["edge", "ev"]),
         "confidence": _metric_value(metrics, ["confidence", "win prob", "probability", "hit rate"]),
         "game_state": _metric_value(metrics, ["game state", "state", "status"]),

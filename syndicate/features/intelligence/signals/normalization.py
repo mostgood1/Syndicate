@@ -4,9 +4,15 @@ import re
 from typing import Any
 
 
-def _safe_text(value: Any, fallback: str = "-") -> str:
+def _safe_text(value: Any, fallback: str = "-", *fallbacks: Any) -> str:
     text = str(value or "").strip()
-    return text or fallback
+    if text:
+        return text
+    for candidate in (fallback, *fallbacks):
+        candidate_text = str(candidate or "").strip()
+        if candidate_text:
+            return candidate_text
+    return ""
 
 
 def _safe_float(value: Any) -> float | None:

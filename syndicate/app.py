@@ -28,6 +28,7 @@ from syndicate.blueprints.nba import nba_bp
 from syndicate.blueprints.mlb import mlb_bp
 from syndicate.blueprints.sports import sports_bp
 from syndicate.blueprints.wnba import wnba_bp
+from pipeline.intelligence_state import start_intelligence_state_background_loop
 
 
 def _env_bool(name: str, *, default: bool = False) -> bool:
@@ -200,6 +201,7 @@ def create_app() -> Flask:
     app.register_blueprint(ncaaf_bp)
     app.register_blueprint(ncaab_bp)
     app.register_blueprint(sports_bp)
+    start_intelligence_state_background_loop(app)
     return app
 
 

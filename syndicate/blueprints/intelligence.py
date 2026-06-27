@@ -876,8 +876,15 @@ def intelligence_query_api():
         return _no_cache_response(response)
     force_refresh = _query_bool(payload.get("force_refresh"))
     state_payload = read_latest_intelligence_state(dict(payload))
-    if force_refresh or not isinstance(state_payload, dict) or not _response_has_content(state_payload):
-        state_payload = _INTELLIGENCE_STATE_SERVICE._compute_response(dict(payload), force_refresh=True) or _empty_default_intelligence_response()
+    if force_refresh:
+        queue_intelligence_state_refresh(dict(payload))
+    if not isinstance(state_payload, dict) or not _response_has_content(state_payload):
+        queued_state = read_latest_intelligence_state(dict(payload))
+        if isinstance(queued_state, dict) and _response_has_content(queued_state):
+            state_payload = queued_state
+        else:
+            state_payload = _empty_default_intelligence_response()
+            state_payload["queued"] = True
     response = dict(state_payload)
     response.setdefault("ok", True)
     response.setdefault("response", dict(response))
