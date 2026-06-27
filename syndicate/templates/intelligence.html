@@ -41,6 +41,12 @@
     display: grid;
     gap: 18px;
   }
+  
+  .betting-board-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 16px;
+  }
 
   .intelligence-shell {
     max-width: 1560px;
@@ -369,7 +375,7 @@
         </label>
       </div>
       <div class="intelligence-hero__actions-row">
-        <button type="submit" class="intelligence-action">Prompt The Syndicate</button>
+        <button type="submit" class="intelligence-action">Refresh Board</button>
       </div>
     </form>
   </div>
@@ -404,20 +410,13 @@
   </div>
 </section>
 
-<section class="intelligence-layout">
-  <div class="intelligence-panel">
-    <section class="intelligence-card">
-      <div class="intelligence-card__head">
-        <div>
-          <div class="intelligence-card__kicker">Portfolio</div>
-          <h3 class="intelligence-card__title">Exposure and tracking</h3>
-          <p class="intelligence-card__lede">Keep the active ledger, open exposure, and saved recommendation state in view.</p>
-        </div>
-      </div>
-      <div class="intelligence-card__body">
-        <div id="portfolio"></div>
-      </div>
-    </section>
+
+<section class="intelligence-shell">
+  <div class="betting-board-grid">
+    <div id="top-opportunities"></div>
+  </div>
+</section>
+
 
     <section class="intelligence-card">
       <div class="intelligence-card__head">
@@ -478,7 +477,10 @@ let initialIntelligenceResponse = {};
 const defaultIntelligenceQuestion = "top edges today";
 const defaultIntelligenceSport = "all";
 const defaultIntelligenceGameState = "all";
-const initialIntelligenceSelectedDate = String({{ initial_intelligence_selected_date | default('', true) | tojson }} || "").trim();
+const initialIntelligenceSelectedDate = (() => {
+  const dateInput = document.getElementById("intel-date");
+  return dateInput && typeof dateInput.value === "string" ? dateInput.value.trim() : "";
+})();
 
 try {
   initialIntelligenceResponse = initialIntelligenceResponseScript && initialIntelligenceResponseScript.textContent
@@ -752,7 +754,7 @@ function renderSupportingEvidence(response) {
 }
 
 function displayTeam(item) {
-  return String(item.team || item.team_name || item.player_team || "—").trim() || "—";
+  return String(item.team || item.team_name || item.player_team || item.home_team || item.away_team || "—").trim() || "—";
 }
 
 function displayMatchup(item) {
@@ -826,7 +828,19 @@ function displayActualValue(item) {
 }
 
 function displayLiveProjection(item) {
-  const projection = item.live_projection ?? item.live_total ?? item.projected_live ?? item.projected;
+  const projection = item.live_projection ?? item.live_total ?? item.projected_live ?? item.live_projection_display;
+  if (projection === null || projection === undefined || projection === "" || projection === "-") {
+    return "—";
+  }
+  const numeric = Number(projection);
+  if (Number.isFinite(numeric)) {
+    return Number.isInteger(numeric) ? `${numeric}` : numeric.toFixed(1);
+  }
+  return String(projection).trim() || "—";
+}
+
+function displaySimProjection(item) {
+  const projection = item.sim_projection ?? item.projected ?? item.projected_sim ?? item.simulated_projection;
   if (projection === null || projection === undefined || projection === "") {
     return "—";
   }
@@ -929,7 +943,7 @@ function displayGameStatus(item) {
   if (status) {
     return status;
   }
-  return item.is_live ? "Live" : "—";
+  return recommendationState(item) === "live" ? "Live" : "—";
 }
 
 function renderPropFacts(item, compact = false) {
@@ -945,6 +959,7 @@ function renderPropFacts(item, compact = false) {
       <div><strong>Line:</strong> ${displayLine(item)}</div>
       <div><strong>Sport:</strong> ${String(item.sport || item.sport_slug || "—").trim() || "—"}</div>
       <div><strong>Odds:</strong> ${displayOdds(item)}</div>
+      ${(displaySimProjection(item) !== "—") ? `<div><strong>Sim Projection:</strong> ${displaySimProjection(item)}</div>` : ""}
       ${(displayLiveProjection(item) !== "—") ? `<div><strong>Live Projection:</strong> ${displayLiveProjection(item)}</div>` : ""}
       ${(displayMovementSummary(item) !== "—") ? `<div><strong>Movement:</strong> ${displayMovementSummary(item)}</div>` : ""}
       ${(displayActualValue(item) !== "—" || recommendationState(item) !== "pregame") ? `<div><strong>Actual:</strong> ${displayActualText(item)}</div>` : ""}
@@ -1050,7 +1065,7 @@ function renderBoardMetaRow(item) {
   const player = String(item.player_name || item.name || "").trim();
   const market = String(item.market || item.market_label || "").trim();
   const line = displayLine(item);
-  const movement = String(item.movement || item.movement_label || item.line_movement_label || "").trim();
+  const movement = displayMovementSummary(item);
   const simulatedEdge = edgeValue(item);
 
   if (sport) chips.push(`Sport: ${escapeHtml(sport.toUpperCase())}`);
@@ -1058,7 +1073,7 @@ function renderBoardMetaRow(item) {
   if (player && player !== "—") chips.push(`Player: ${escapeHtml(player)}`);
   if (market) chips.push(`Market: ${escapeHtml(market)}`);
   if (line && line !== "—") chips.push(`Line: ${escapeHtml(line)}`);
-  if (movement) chips.push(`Movement: ${escapeHtml(movement)}`);
+  if (movement && movement !== "—") chips.push(`Movement: ${escapeHtml(movement)}`);
   if (simulatedEdge) chips.push(`Sim edge: ${escapeHtml((simulatedEdge * 100).toFixed(1))}%`);
 
   return chips.length
@@ -1179,13 +1194,28 @@ function hasLiveSignal(item) {
   if (!item || typeof item !== "object") {
     return false;
   }
-  const liveProjection = String(item.live_projection ?? "").trim();
+  const liveProjection = String(item.live_projection ?? item.live_total ?? item.live_projection_display ?? "").trim();
   return Boolean(
     item.hero_live_box ||
     item.hero_sim_box ||
     (liveProjection && liveProjection !== "-") ||
     (item.live_total !== null && item.live_total !== undefined)
   );
+}
+
+function isTimeLikeStatus(status) {
+  const value = String(status || "").trim().toLowerCase();
+  return /\b\d{1,2}:\d{2}\s?(?:am|pm)\b/.test(value) || /\b(?:ct|et|pt|mt|st)\b/.test(value);
+}
+
+function isPregameStatus(status) {
+  const value = String(status || "").trim().toLowerCase();
+  return Boolean(value && (isTimeLikeStatus(value) || ["pre-game", "pregame", "scheduled", "preview", "warmup", "not started", "lineups"].some((token) => value.includes(token))));
+}
+
+function isLiveStatus(status) {
+  const value = String(status || "").trim().toLowerCase();
+  return Boolean(value && ["live", "in progress", "top of", "bottom of", "inning", "quarter", "period", "half"].some((token) => value.includes(token)));
 }
 
 function recommendationState(item) {
@@ -1209,19 +1239,19 @@ function recommendationState(item) {
   if (["won", "lost", "push", "graded", "final", "completed", "settled", "resolved"].includes(settlementResult)) {
     return "final";
   }
-  if (status.includes("warmup") || status.includes("scheduled") || status.includes("pregame")) {
+  if (isPregameStatus(status)) {
     return "pregame";
   }
-  if ((status.includes("live") || status.includes("in progress")) && liveFlag && hasLiveSignal(item)) {
+  if (isLiveStatus(status) && (liveFlag || hasLiveSignal(item))) {
     return "live";
   }
   if (liveFlag && hasLiveSignal(item)) {
     return "live";
   }
   if (liveFlag) {
-    return "live";
+    return status ? "stale" : "live";
   }
-  if (status.includes("live") || status.includes("in progress")) {
+  if (isLiveStatus(status)) {
     return "stale";
   }
   return "pregame";
@@ -1544,130 +1574,186 @@ function renderIntelligence(response) {
   const visibleTopLiveOpportunities = activeTopLiveOpportunities.length ? activeTopLiveOpportunities : topLiveOpportunities.slice(0, 5);
 
   function renderSection(title, recs) {
-    if (!recs.length) {
-      return `<div style="opacity:.5; margin-bottom:20px;">No ${title} picks</div>`;
-    }
+  if (!recs.length) {
+    return `<div style="opacity:.5; margin-bottom:20px;">No ${title} picks</div>`;
+  }
 
-    function liveIndicatorChips(p) {
-      const chips = [];
-      const evDelta = numericValue(p.ev_delta) ?? numericValue(p.ev_change) ?? numericValue(p.expected_value_delta);
-      const lineDelta = numericValue(p.line_movement_impact) ?? numericValue(p.line_delta) ?? numericValue(p.line_move_delta);
-      const confidenceStability = numericValue(p.confidence_stability) ?? numericValue(p.confidence_delta) ?? numericValue(p.confidence_change);
+  const sorted = recs
+    .slice()
+    .sort((a, b) => {
+      const edgeDiff = (edgeValue(b) || 0) - (edgeValue(a) || 0);
+      if (edgeDiff !== 0) return edgeDiff;
+      return (b.confidence || 0) - (a.confidence || 0);
+    });
 
-      if (evDelta !== null) {
-        chips.push(`
-          <span style="padding:4px 8px; border-radius:999px; background:${evDelta > 0 ? 'rgba(46, 204, 113, .14)' : 'rgba(231, 76, 60, .14)'}; color:${evDelta > 0 ? '#b9f6cf' : '#ffd0cc'};">
-            EV ${evDelta > 0 ? '↑ improving' : evDelta < 0 ? '↓ worsening' : 'flat'}
-          </span>
-        `);
-      }
+  return `
+    <div style="margin-bottom:25px;">
+      <h3 style="margin-bottom:10px;">${title}</h3>
 
-      if (lineDelta !== null) {
-        chips.push(`
-          <span style="padding:4px 8px; border-radius:999px; background:${lineDelta > 0 ? 'rgba(46, 204, 113, .14)' : 'rgba(231, 76, 60, .14)'}; color:${lineDelta > 0 ? '#b9f6cf' : '#ffd0cc'};">
-            Line ${lineDelta > 0 ? '↑' : lineDelta < 0 ? '↓' : '→'} ${lineDelta > 0 ? 'moving for us' : lineDelta < 0 ? 'moving against' : 'flat'}
-          </span>
-        `);
-      }
-
-      if (confidenceStability !== null) {
-        chips.push(`
-          <span style="padding:4px 8px; border-radius:999px; background:${confidenceStability > 0 ? 'rgba(125, 211, 252, .14)' : confidenceStability < 0 ? 'rgba(251, 191, 36, .14)' : 'rgba(255,255,255,.08)'}; color:${confidenceStability > 0 ? '#cfefff' : confidenceStability < 0 ? '#fde6a0' : '#d1d5db'};">
-            Confidence ${confidenceStability > 0 ? 'stable' : confidenceStability < 0 ? 'slipping' : 'unchanged'}
-          </span>
-        `);
-      }
-
-      return chips.length
-        ? `<div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; font-size:11px;">${chips.join("")}</div>`
-        : "";
-    }
-
-    return `
-      <div style="margin-bottom:25px;">
-        <h3 style="margin-bottom:10px;">${title}</h3>
-        ${renderRefreshStamp()}
-        ${recs.map((p, i) => {
+      <div class="betting-board-grid">
+        ${sorted.map((p, i) => {
           const theme = edgeTheme(p);
           const edge = (edgeValue(p) * 100).toFixed(1);
-
           const confidence = p.confidence
-            ? Math.round(p.confidence * 100) + "%"
-            : "—";
-
-          const betSize = p.recommended_bet_size
-            ? (p.recommended_bet_size * 100).toFixed(1) + "%"
-            : "—";
-
-          const question = syndicateQuestionForItem(p);
-          const syndicateContext = syndicateContextForItem(p);
+            ? Math.round(p.confidence * 100)
+            : null;
 
           return `
-            <div
-              role="link"
-              tabindex="0"
-              aria-label="Open recommendation card for ${escapeHtml(displayTitle(p))}"
-              data-syndicate-question="${escapeHtml(question)}"
-              data-syndicate-sport="${escapeHtml(syndicateContext.sport)}"
-              data-syndicate-sport-slug="${escapeHtml(syndicateContext.sport_slug)}"
-              data-syndicate-market="${escapeHtml(syndicateContext.market)}"
-              data-syndicate-candidate-type="${escapeHtml(syndicateContext.candidate_type)}"
-              data-syndicate-selection="${escapeHtml(syndicateContext.selection)}"
-              data-syndicate-matchup="${escapeHtml(syndicateContext.matchup)}"
-              data-syndicate-player-name="${escapeHtml(syndicateContext.player_name)}"
-              data-syndicate-name="${escapeHtml(syndicateContext.name)}"
-              data-syndicate-prediction-id="${escapeHtml(String(p.prediction_id || p.predictionId || "").trim())}"
-              data-syndicate-recommendation-id="${escapeHtml(String(p.recommendation_id || p.recommendationId || "").trim())}"
-              style="
-              background:${theme.background};
-              color:white;
+            <div style="
+              background:#161b22;
+              border-radius:14px;
               padding:16px;
-              border-radius:12px;
-              margin-bottom:10px;
-              border-left:6px solid ${theme.color};
-              border:1px solid ${theme.border};
-              cursor:pointer;
+              border:1px solid rgba(255,255,255,.08);
+              transition: all 0.2s ease;
             ">
 
-              <div style="display:flex; justify-content:space-between;">
-                <div style="font-size:16px; font-weight:600;">
+              <!-- Header -->
+              <div style="display:flex; justify-content:space-between; align-items:center;">
+                <div style="font-weight:600;">
                   ${i === 0 ? "🔥 " : ""}${displayTitle(p)}
                 </div>
-
-                <div style="font-weight:600;color:${theme.color};">
+                <div style="color:${theme.color}; font-weight:700;">
                   ${edge}%
                 </div>
               </div>
 
-              <div style="font-size:12px; margin-top:4px; opacity:.6;">
-                ${String(p.selection || p.market || p.candidate_type || "EDGE").toUpperCase()}
+              <!-- Matchup -->
+              <div style="font-size:12px; opacity:.7; margin-top:6px;">
+                ${displayMatchup(p)}
               </div>
 
-              <div style="display:flex; gap:20px; margin-top:8px; font-size:12px;">
-                <div>Confidence: ${confidence}</div>
-                <div>Bet Size: ${betSize}</div>
+              <!-- Pick -->
+              <div style="margin-top:10px; font-size:13px;">
+                <strong>Pick:</strong> ${p.selection || "—"}
               </div>
 
-              ${renderBoardMetaRow(p)}
-              ${renderPropFacts(p, true)}
-              ${renderUpdatedLine(p)}
+              <!-- Odds / Line -->
+              <div style="display:flex; gap:12px; margin-top:10px; font-size:12px; opacity:.85;">
+                <div>Odds: ${displayOdds(p)}</div>
+                <div>Line: ${displayLine(p)}</div>
+              </div>
+
+              <!-- Confidence Bar -->
+              ${confidence !== null ? `
+                <div style="margin-top:10px;">
+                  <div style="font-size:11px; opacity:.6;">Confidence</div>
+                  <div style="height:6px; background:#2b3440; border-radius:999px;">
+                    <div style="
+                      width:${confidence}%;
+                      background:${theme.color};
+                      height:100%;
+                      border-radius:999px;
+                    "></div>
+                  </div>
+                </div>
+              ` : ""}
+
+              <!-- Badges -->
               ${renderCardBadges(p)}
 
-              ${liveIndicatorChips(p)}
+              <!-- Portfolio Actions -->
+              <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:12px;">
+                <button
+                  type="button"
+                  data-portfolio-action="add"
+                  style="
+                    appearance:none;
+                    border:none;
+                    border-radius:999px;
+                    padding:7px 10px;
+                    background:rgba(37,99,235,.18);
+                    color:#dbeafe;
+                    font-weight:700;
+                    cursor:pointer;
+                  ">
+                  Add
+                </button>
 
-              <div style="margin-top:10px; font-size:11px; opacity:.75; letter-spacing:.02em; text-transform:uppercase;">Open in Ask The Syndicate</div>
-
-              <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:10px;">
-                <button type="button" data-portfolio-action="add" aria-label="Add this recommendation to the portfolio ledger" style="appearance:none; border:none; border-radius:999px; padding:7px 10px; background:rgba(37,99,235,.18); color:#dbeafe; font-weight:700; cursor:pointer;">Add Event</button>
-                <button type="button" data-portfolio-action="remove" aria-label="Remove this recommendation from the portfolio ledger" style="appearance:none; border:1px solid rgba(255,255,255,.14); border-radius:999px; padding:7px 10px; background:rgba(255,255,255,.06); color:#fff; font-weight:700; cursor:pointer;">Remove Event</button>
+                <button
+                  type="button"
+                  data-portfolio-action="remove"
+                  style="
+                    appearance:none;
+                    border:1px solid rgba(255,255,255,.14);
+                    border-radius:999px;
+                    padding:7px 10px;
+                    background:rgba(255,255,255,.06);
+                    color:#fff;
+                    font-weight:700;
+                    cursor:pointer;
+                  ">
+                  Remove
+                </button>
               </div>
 
             </div>
           `;
         }).join("")}
       </div>
-    `;
-  }
+    </div>
+  `;
+}
+
+function renderTopStrip(recs) {
+  if (!recs.length) return "";
+
+  const top = recs
+    .slice()
+    .sort((a, b) => (edgeValue(b) || 0) - (edgeValue(a) || 0))
+    .slice(0, 5);
+
+  return `
+    <div style="
+      margin-bottom:20px;
+      padding:14px;
+      border-radius:14px;
+      background:#101418;
+      border:1px solid rgba(255,255,255,.08);
+    ">
+      <div style="
+        font-size:12px;
+        opacity:.6;
+        margin-bottom:10px;
+        text-transform:uppercase;
+        letter-spacing:.05em;
+      ">
+        🔥 Best Opportunities
+      </div>
+
+      <div style="display:flex; gap:10px; overflow-x:auto;">
+        ${top.map(p => {
+          const theme = edgeTheme(p);
+          return `
+            <div style="
+              min-width:180px;
+              padding:10px;
+              border-radius:10px;
+              background:#161b22;
+              border:1px solid rgba(255,255,255,.08);
+            ">
+              <div style="font-size:12px; font-weight:600;">
+                ${displayTitle(p)}
+              </div>
+
+              <div style="
+                margin-top:6px;
+                font-size:11px;
+                color:${theme.color};
+                font-weight:700;
+              ">
+                ${(edgeValue(p) * 100).toFixed(1)}%
+              </div>
+
+              <div style="font-size:10px; opacity:.6;">
+                ${p.selection || ""}
+              </div>
+            </div>
+          `;
+        }).join("")}
+      </div>
+    </div>
+  `;
+}
 
   function renderScannerSection(title, recs) {
     if (!recs.length) {
@@ -1852,45 +1938,14 @@ function renderIntelligence(response) {
     .map(([sportKey, items]) => renderSection(`${String(sportKey).toUpperCase()} Lane`, items.slice(0, 5)))
     .join("");
 
+  const allRecsCombined = [...liveRecs, ...pregameRecs];
+
   picksEl.innerHTML = `
+    ${renderTopStrip(allRecsCombined)}
     ${sportLaneSections}
     ${renderSection("🔥 Live Props", liveRecs)}
     ${renderSection("📊 Pregame Props", pregameRecs)}
   `;
-
-  const syndicatePickCards = picksEl.querySelectorAll("[data-syndicate-question]");
-  syndicatePickCards.forEach((card) => {
-    const question = String(card.getAttribute("data-syndicate-question") || "").trim();
-    const navigateToSyndicate = () => {
-      const params = new URLSearchParams();
-      const fields = [
-        ["question", question],
-        ["sport", card.getAttribute("data-syndicate-sport")],
-        ["sport_slug", card.getAttribute("data-syndicate-sport-slug")],
-        ["market", card.getAttribute("data-syndicate-market")],
-        ["candidate_type", card.getAttribute("data-syndicate-candidate-type")],
-        ["selection", card.getAttribute("data-syndicate-selection")],
-        ["matchup", card.getAttribute("data-syndicate-matchup")],
-        ["player_name", card.getAttribute("data-syndicate-player-name")],
-        ["name", card.getAttribute("data-syndicate-name")],
-      ];
-      fields.forEach(([key, value]) => {
-        const text = String(value || "").trim();
-        if (text) {
-          params.set(key, text);
-        }
-      });
-      window.location.assign(params.toString() ? `/syndicate?${params.toString()}` : "/syndicate");
-    };
-
-    card.addEventListener("click", navigateToSyndicate);
-    card.addEventListener("keydown", (event) => {
-      if (event.key === "Enter" || event.key === " ") {
-        event.preventDefault();
-        navigateToSyndicate();
-      }
-    });
-  });
 
   const portfolioActionButtons = picksEl.querySelectorAll("[data-portfolio-action]");
   portfolioActionButtons.forEach((button) => {

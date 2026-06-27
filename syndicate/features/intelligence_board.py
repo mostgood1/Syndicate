@@ -12,6 +12,8 @@ Constraints:
 
 from __future__ import annotations
 
+import re
+
 from typing import Any, Mapping
 
 
@@ -68,6 +70,35 @@ def _movement_summary(item: Mapping[str, Any]) -> str:
     return "flat"
 
 
+def _is_time_like_status(status: str) -> bool:
+    if not status:
+        return False
+    lowered = status.lower()
+    return bool(
+        re.search(r"\b\d{1,2}:\d{2}\s?(?:am|pm)\b", lowered)
+        or re.search(r"\b(?:ct|et|pt|mt|st)\b", lowered)
+    )
+
+
+def _is_pregame_status(status: str) -> bool:
+    lowered = status.lower()
+    return bool(
+        lowered
+        and (
+            _is_time_like_status(lowered)
+            or any(token in lowered for token in ("pre-game", "pregame", "scheduled", "preview", "warmup", "not started", "lineups"))
+        )
+    )
+
+
+def _is_live_status(status: str) -> bool:
+    lowered = status.lower()
+    return bool(
+        lowered
+        and any(token in lowered for token in ("live", "in progress", "top of", "bottom of", "inning", "quarter", "period", "half"))
+    )
+
+
 def _recommendation_lane(item: Mapping[str, Any]) -> str:
     status = _safe_text(
         item.get("status_display"),
@@ -97,7 +128,15 @@ def _recommendation_lane(item: Mapping[str, Any]) -> str:
         return "archived"
     if settlement_result in {"won", "lost", "push", "graded", "final", "completed", "settled", "resolved"}:
         return "archived"
-    if bool(item.get("is_live")) or "live" in status or "in progress" in status or _safe_text(item.get("live_projection"), default="") not in {"", "-"}:
+    if _is_pregame_status(status):
+        return "pregame"
+    if _is_live_status(status) and (
+        bool(item.get("is_live"))
+        or _safe_text(item.get("live_projection"), default="") not in {"", "-"}
+        or _safe_text(item.get("live_total"), default="") not in {"", "-"}
+    ):
+        return "live"
+    if bool(item.get("is_live")) and not _is_pregame_status(status):
         return "live"
     return "pregame"
 
@@ -237,7 +276,7 @@ def build_intelligence_board_contract(response: Mapping[str, Any] | None) -> dic
     }
     return {
         "schema": "intelligence_board_v1",
-        "card_fields": ["sport", "team", "player", "market", "line", "movement", "simulated_edge", "trace_path"],
+        "card_fields": ["sport", "team", "player", "market", "line", "projected", "live_projection", "actual", "status_display", "movement", "simulated_edge", "trace_path", "game_pk"],
         "recommendation_count": len(cards),
         "lane_counts": lane_counts,
         "active_lanes": active_lanes,

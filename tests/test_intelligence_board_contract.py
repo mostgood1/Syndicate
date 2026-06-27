@@ -165,6 +165,39 @@ class IntelligenceBoardContractTests(unittest.TestCase):
         self.assertEqual(contract["lane_counts"]["archived"], 1)
         self.assertEqual(contract["cards"][0]["lane"], "archived")
 
+    def test_build_intelligence_board_contract_keeps_time_like_mlb_props_pregame(self) -> None:
+        contract = build_intelligence_board_contract(
+            {
+                "headline": "The Syndicate board",
+                "recommendations": [
+                    {
+                        "sport": "mlb",
+                        "sport_slug": "mlb",
+                        "team": "Houston Astros",
+                        "player_name": "Kai-Wei Teng",
+                        "name": "Kai-Wei Teng Over 15.5 Outs Recorded",
+                        "market": "outs recorded",
+                        "line": 15.5,
+                        "projected": 16.2,
+                        "sim_projection": 16.2,
+                        "live_projection": "-",
+                        "movement": {"trend": "up", "delta": 0.4},
+                        "is_live": True,
+                        "status_display": "12:10 PM CT",
+                        "status_context": "12:10 PM CT",
+                        "game_pk": 824255,
+                        "matchup": "HOU @ DET",
+                    }
+                ],
+            }
+        )
+
+        card = contract["cards"][0]
+        self.assertEqual(card["lane"], "pregame")
+        self.assertEqual(card["game_pk"], 824255)
+        self.assertEqual(card["team"], "Houston Astros")
+        self.assertEqual(card["movement"], "+0.4 (up)")
+
     def test_build_intelligence_board_contract_reads_nested_worker_payloads(self) -> None:
         contract = build_intelligence_board_contract(
             {
