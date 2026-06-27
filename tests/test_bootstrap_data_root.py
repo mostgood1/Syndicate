@@ -141,8 +141,12 @@ class BootstrapDataRootTests(unittest.TestCase):
             self.assertIn("wnba", called_command)
             self.assertIn("--execution-mode", called_command)
             self.assertIn("source", called_command)
-            self.assertIn("--source-root", called_command)
-            self.assertIn("vendor", " ".join(called_command))
+            self.assertNotIn("--source-root", called_command)
+            called_env = run_mock.call_args.kwargs.get("env") or {}
+            self.assertEqual(
+                called_env.get("SYNDICATE_SOURCE_ROOT_WNBA"),
+                str(Path(__file__).resolve().parents[1] / "vendor" / "wnba_betting_repo"),
+            )
 
     def test_bootstrap_wnba_today_artifacts_skips_when_present(self) -> None:
         module = _load_module()

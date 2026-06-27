@@ -1873,7 +1873,7 @@
       const oddsRefreshedByEvent = new Map();
 
       if (eventIds.length) {
-        const [linesPayload, pbpPayload, tuningPayload, boxscorePayload] = await Promise.all([
+        const [linesPayload, pbpPayload, boxscorePayload] = await Promise.all([
           fetchApiJson(
             `${API_BASE_PATH}/live_lines?date=${encodeURIComponent(dateValue)}&event_ids=${encodeURIComponent(eventIds.join(','))}&include_period_totals=1`,
             'Failed to load live lines.',
@@ -1884,15 +1884,22 @@
             'Failed to load live PBP stats.',
             { retries: silent ? 2 : 1 }
           ),
-          fetchApiJson(`${API_BASE_PATH}/live_lens_tuning?ttl=300`, 'Failed to load live lens tuning.', { retries: 1 }),
           fetchApiJson(
             `${API_BASE_PATH}/live_player_boxscore?date=${encodeURIComponent(dateValue)}&event_ids=${encodeURIComponent(eventIds.join(','))}`,
             'Failed to load live player boxscore.',
             { retries: silent ? 2 : 1 }
           ),
         ]);
-        tuning = tuningPayload || null;
         liveBoxscorePayload = boxscorePayload || null;
+        try {
+          tuning = await fetchApiJson(`${API_BASE_PATH}/live_lens_tuning?ttl=300`, 'Failed to load live lens tuning.', { retries: 1 });
+        } catch (error) {
+          tuning = null;
+          const message = String(error?.message || '').trim();
+          if (message) {
+            setNote(message, 'warning');
+          }
+        }
         const globalOddsRefreshedAt = linesPayload?.odds_refreshed_at || linesPayload?.generated_at || null;
 
         safeArray(linesPayload?.games).forEach((item) => {
