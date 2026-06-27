@@ -3967,7 +3967,7 @@ def _load_home_games(slug: str, *, context_label: str, season: int | None = None
         if slug == "wnba":
             from syndicate.features.wnba.cards import build_cards_page_context
 
-            payload = build_cards_page_context(context_label, allow_stored_date_fallback=_allow_stored_date_fallback())
+            payload = build_cards_page_context(context_label, allow_stored_date_fallback=False)
             source_title = _safe_text(payload.get("source_title"), "")
             source_path = _safe_text(payload.get("source_path"), "")
             games = list(payload.get("games") or [])
@@ -3981,12 +3981,6 @@ def _load_home_games(slug: str, *, context_label: str, season: int | None = None
                     _safe_text(payload.get("requested_date"), ""),
                     _safe_text(payload.get("date"), ""),
                 )
-            if str(payload.get("requested_date") or context_label).strip() == str(context_label).strip() and str(payload.get("date") or context_label).strip() != str(context_label).strip():
-                if games:
-                    return _apply_wnba_live_scores(games, context_label) if is_active_today else games
-                return _wnba_live_state_games(context_label) if is_active_today else []
-            if is_active_today and not games:
-                games = _wnba_live_state_games(context_label)
             return _apply_wnba_live_scores(games, context_label) if is_active_today else games
         if slug == "ncaab":
             from syndicate.features.ncaab.cards import build_cards_page_context
