@@ -1076,46 +1076,92 @@ function renderBoardMetaRow(item) {
 }
 
 function normalizeIntelligenceResponse(response) {
+  const nestedResponse = response && typeof response.response === "object" && response.response ? response.response : {};
   const analysis = response && typeof response.analysis === "object" && response.analysis ? response.analysis : {};
+  const nestedAnalysis = nestedResponse && typeof nestedResponse.analysis === "object" && nestedResponse.analysis ? nestedResponse.analysis : {};
   const recommendationHistory = response.recommendation_history && typeof response.recommendation_history === "object"
     ? response.recommendation_history
-    : (analysis.recommendation_history && typeof analysis.recommendation_history === "object" ? analysis.recommendation_history : {});
+    : (nestedResponse.recommendation_history && typeof nestedResponse.recommendation_history === "object"
+      ? nestedResponse.recommendation_history
+      : (analysis.recommendation_history && typeof analysis.recommendation_history === "object"
+        ? analysis.recommendation_history
+        : (nestedAnalysis.recommendation_history && typeof nestedAnalysis.recommendation_history === "object" ? nestedAnalysis.recommendation_history : {})));
   const portfolioTracking = response.portfolio_tracking && typeof response.portfolio_tracking === "object"
     ? response.portfolio_tracking
-    : (analysis.portfolio_tracking && typeof analysis.portfolio_tracking === "object" ? analysis.portfolio_tracking : {});
+    : (nestedResponse.portfolio_tracking && typeof nestedResponse.portfolio_tracking === "object"
+      ? nestedResponse.portfolio_tracking
+      : (analysis.portfolio_tracking && typeof analysis.portfolio_tracking === "object"
+        ? analysis.portfolio_tracking
+        : (nestedAnalysis.portfolio_tracking && typeof nestedAnalysis.portfolio_tracking === "object" ? nestedAnalysis.portfolio_tracking : {})));
   const portfolioEvents = response.portfolio_events && typeof response.portfolio_events === "object"
     ? response.portfolio_events
-    : (analysis.portfolio_events && typeof analysis.portfolio_events === "object" ? analysis.portfolio_events : {});
+    : (nestedResponse.portfolio_events && typeof nestedResponse.portfolio_events === "object"
+      ? nestedResponse.portfolio_events
+      : (analysis.portfolio_events && typeof analysis.portfolio_events === "object"
+        ? analysis.portfolio_events
+        : (nestedAnalysis.portfolio_events && typeof nestedAnalysis.portfolio_events === "object" ? nestedAnalysis.portfolio_events : {})));
   const portfolioEventRecords = Array.isArray(response.portfolio_event_records) && response.portfolio_event_records.length
     ? response.portfolio_event_records
-    : (Array.isArray(analysis.portfolio_event_records) ? analysis.portfolio_event_records : []);
+    : (Array.isArray(nestedResponse.portfolio_event_records) && nestedResponse.portfolio_event_records.length
+      ? nestedResponse.portfolio_event_records
+      : (Array.isArray(analysis.portfolio_event_records) ? analysis.portfolio_event_records : (Array.isArray(nestedAnalysis.portfolio_event_records) ? nestedAnalysis.portfolio_event_records : [])));
   const boardContract = response.board_contract && typeof response.board_contract === "object"
     ? response.board_contract
-    : (analysis.board_contract && typeof analysis.board_contract === "object" ? analysis.board_contract : {});
+    : (nestedResponse.board_contract && typeof nestedResponse.board_contract === "object"
+      ? nestedResponse.board_contract
+      : (analysis.board_contract && typeof analysis.board_contract === "object"
+        ? analysis.board_contract
+        : (nestedAnalysis.board_contract && typeof nestedAnalysis.board_contract === "object" ? nestedAnalysis.board_contract : {})));
   const recommendations = Array.isArray(response.recommendations)
     ? response.recommendations
-    : (Array.isArray(analysis.recommendations) ? analysis.recommendations : (Array.isArray(analysis.picks) ? analysis.picks : []));
+    : (Array.isArray(nestedResponse.recommendations)
+      ? nestedResponse.recommendations
+      : (Array.isArray(analysis.recommendations)
+        ? analysis.recommendations
+        : (Array.isArray(nestedAnalysis.recommendations)
+          ? nestedAnalysis.recommendations
+          : (Array.isArray(analysis.picks) ? analysis.picks : (Array.isArray(nestedAnalysis.picks) ? nestedAnalysis.picks : [])))));
   const topOpportunities = Array.isArray(response.top_opportunities)
     ? response.top_opportunities
-    : (Array.isArray(analysis.top_opportunities) ? analysis.top_opportunities : recommendations);
+    : (Array.isArray(nestedResponse.top_opportunities)
+      ? nestedResponse.top_opportunities
+      : (Array.isArray(analysis.top_opportunities)
+        ? analysis.top_opportunities
+        : (Array.isArray(nestedAnalysis.top_opportunities) ? nestedAnalysis.top_opportunities : recommendations)));
   const topLiveOpportunities = Array.isArray(response.top_live_opportunities) && response.top_live_opportunities.length
     ? response.top_live_opportunities
-    : (Array.isArray(analysis.top_live_opportunities) && analysis.top_live_opportunities.length
-      ? analysis.top_live_opportunities
-      : (Array.isArray(boardContract.live) && boardContract.live.length
-        ? boardContract.live
-        : recommendations.filter((item) => String(item.tag || item.timing || item.phase || "").trim().toUpperCase() === "LIVE")));
+    : (Array.isArray(nestedResponse.top_live_opportunities) && nestedResponse.top_live_opportunities.length
+      ? nestedResponse.top_live_opportunities
+      : (Array.isArray(analysis.top_live_opportunities) && analysis.top_live_opportunities.length
+        ? analysis.top_live_opportunities
+        : (Array.isArray(nestedAnalysis.top_live_opportunities) && nestedAnalysis.top_live_opportunities.length
+          ? nestedAnalysis.top_live_opportunities
+          : (Array.isArray(boardContract.live) && boardContract.live.length
+            ? boardContract.live
+            : recommendations.filter((item) => String(item.tag || item.timing || item.phase || "").trim().toUpperCase() === "LIVE")))));
   const bySport = response.by_sport && typeof response.by_sport === "object"
     ? response.by_sport
-    : (boardContract.by_sport && typeof boardContract.by_sport === "object"
-      ? boardContract.by_sport
-      : (analysis.by_sport && typeof analysis.by_sport === "object" ? analysis.by_sport : {}));
+    : (nestedResponse.by_sport && typeof nestedResponse.by_sport === "object"
+      ? nestedResponse.by_sport
+      : (boardContract.by_sport && typeof boardContract.by_sport === "object"
+        ? boardContract.by_sport
+        : (analysis.by_sport && typeof analysis.by_sport === "object"
+          ? analysis.by_sport
+          : (nestedAnalysis.by_sport && typeof nestedAnalysis.by_sport === "object" ? nestedAnalysis.by_sport : {}))));
   const portfolio = response.portfolio && typeof response.portfolio === "object"
     ? response.portfolio
-    : (analysis.portfolio && typeof analysis.portfolio === "object" ? analysis.portfolio : {});
+    : (nestedResponse.portfolio && typeof nestedResponse.portfolio === "object"
+      ? nestedResponse.portfolio
+      : (analysis.portfolio && typeof analysis.portfolio === "object"
+        ? analysis.portfolio
+        : (nestedAnalysis.portfolio && typeof nestedAnalysis.portfolio === "object" ? nestedAnalysis.portfolio : {})));
   const parlays = Array.isArray(response.parlays) && response.parlays.length
     ? response.parlays
-    : (Array.isArray(analysis.parlays) ? analysis.parlays : []);
+    : (Array.isArray(nestedResponse.parlays) && nestedResponse.parlays.length
+      ? nestedResponse.parlays
+      : (Array.isArray(analysis.parlays)
+        ? analysis.parlays
+        : (Array.isArray(nestedAnalysis.parlays) ? nestedAnalysis.parlays : [])));
 
   return {
     analysis,
