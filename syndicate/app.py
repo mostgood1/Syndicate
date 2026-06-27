@@ -28,6 +28,7 @@ from syndicate.blueprints.nba import nba_bp
 from syndicate.blueprints.mlb import mlb_bp
 from syndicate.blueprints.sports import sports_bp
 from syndicate.blueprints.wnba import wnba_bp
+from syndicate.features.shared.live_refresh_loop import start_live_refresh_background_loop
 from pipeline.intelligence_state import start_intelligence_state_background_loop
 
 
@@ -201,7 +202,19 @@ def create_app() -> Flask:
     app.register_blueprint(ncaaf_bp)
     app.register_blueprint(ncaab_bp)
     app.register_blueprint(sports_bp)
-    start_intelligence_state_background_loop(app)
+
+    def _start_background_loops() -> None:
+        if app.extensions.get("syndicate_background_loops_started"):
+            return
+        app.extensions["syndicate_background_loops_started"] = True
+        start_intelligence_state_background_loop(app)
+        start_live_refresh_background_loop()
+
+    try:
+        app.before_serving(_start_background_loops)
+    except AttributeError:
+        app.before_request(_start_background_loops)
+
     return app
 
 
