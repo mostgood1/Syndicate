@@ -1,12 +1,12 @@
 {
-  "generated_at": "2026-06-23T02:16:29+00:00",
-  "date": "2026-06-22",
-  "phase": "live",
+  "generated_at": "2026-06-27T15:39:11-05:00",
+  "date": "2026-06-27",
+  "phase": "all",
   "execution_mode": "source",
   "dry_run": false,
   "publish_parity": {
-    "generatedAt": "2026-06-23T02:16:29+00:00",
-    "date": "2026-06-22",
+    "generatedAt": "2026-06-27T15:39:11-05:00",
+    "date": "2026-06-27",
     "totalForcedPublishPaths": 2,
     "totalIntelligencePublishPaths": 0,
     "totalPublishPaths": 2,

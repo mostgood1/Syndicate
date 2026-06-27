@@ -1,6 +1,6 @@
 {
   "latest_key": "928315208c68c7117c06911c88c130237572a6ae6d0a2ab034f65d17f0a112ce",
-  "updated_at": "2026-06-25T23:07:23Z",
+  "updated_at": "2026-06-27T15:10:38-05:00",
   "response": {
     "ok": true,
     "top_opportunities": [
@@ -68,8 +68,8 @@
       ],
       "portfolio": {},
       "parlays": [],
-      "state_last_updated": "2026-06-25T23:07:23Z",
-      "last_updated": "2026-06-25T23:07:23Z",
+      "state_last_updated": "2026-06-27T20:10:38Z",
+      "last_updated": "2026-06-27T15:10:38-05:00",
       "candidate_count": 1
     },
     "candidate_pool": {
@@ -92,8 +92,8 @@
         }
       ]
     },
-    "state_last_updated": "2026-06-25T23:07:23Z",
-    "last_updated": "2026-06-25T23:07:23Z",
+    "state_last_updated": "2026-06-27T20:10:38Z",
+    "last_updated": "2026-06-27T15:10:38-05:00",
     "candidate_count": 1,
     "response": {
       "ok": true,
@@ -142,8 +142,8 @@
       ],
       "portfolio": {},
       "parlays": [],
-      "state_last_updated": "2026-06-25T23:07:23Z",
-      "last_updated": "2026-06-25T23:07:23Z",
+      "state_last_updated": "2026-06-27T20:10:38Z",
+      "last_updated": "2026-06-27T15:10:38-05:00",
       "candidate_count": 1
     },
     "board_contract": {
@@ -154,8 +154,14 @@
         "player",
         "market",
         "line",
+        "projected",
+        "live_projection",
+        "actual",
+        "status_display",
         "movement",
-        "simulated_edge"
+        "simulated_edge",
+        "trace_path",
+        "game_pk"
       ],
       "recommendation_count": 3,
       "lane_counts": {
@@ -188,7 +194,14 @@
           "player": "Play 1",
           "line": null,
           "movement": "flat",
-          "simulated_edge": null
+          "simulated_edge": null,
+          "trace": {
+            "path": "mlb/board/hits/Play 1",
+            "sport_slug": "mlb",
+            "selection": "Play 1",
+            "market": "Hits"
+          },
+          "trace_path": "mlb/board/hits/Play 1"
         },
         {
           "name": "Play 2",
@@ -201,7 +214,14 @@
           "player": "Play 2",
           "line": null,
           "movement": "flat",
-          "simulated_edge": null
+          "simulated_edge": null,
+          "trace": {
+            "path": "nba/board/points/Play 2",
+            "sport_slug": "nba",
+            "selection": "Play 2",
+            "market": "Points"
+          },
+          "trace_path": "nba/board/points/Play 2"
         },
         {
           "name": "Play 3",
@@ -214,7 +234,14 @@
           "player": "Play 3",
           "line": null,
           "movement": "flat",
-          "simulated_edge": null
+          "simulated_edge": null,
+          "trace": {
+            "path": "wnba/board/assists/Play 3",
+            "sport_slug": "wnba",
+            "selection": "Play 3",
+            "market": "Assists"
+          },
+          "trace_path": "wnba/board/assists/Play 3"
         }
       ]
     }
@@ -227,8 +254,14 @@
       "player",
       "market",
       "line",
+      "projected",
+      "live_projection",
+      "actual",
+      "status_display",
       "movement",
-      "simulated_edge"
+      "simulated_edge",
+      "trace_path",
+      "game_pk"
     ],
     "recommendation_count": 3,
     "lane_counts": {
@@ -261,7 +294,14 @@
         "player": "Play 1",
         "line": null,
         "movement": "flat",
-        "simulated_edge": null
+        "simulated_edge": null,
+        "trace": {
+          "path": "mlb/board/hits/Play 1",
+          "sport_slug": "mlb",
+          "selection": "Play 1",
+          "market": "Hits"
+        },
+        "trace_path": "mlb/board/hits/Play 1"
       },
       {
         "name": "Play 2",
@@ -274,7 +314,14 @@
         "player": "Play 2",
         "line": null,
         "movement": "flat",
-        "simulated_edge": null
+        "simulated_edge": null,
+        "trace": {
+          "path": "nba/board/points/Play 2",
+          "sport_slug": "nba",
+          "selection": "Play 2",
+          "market": "Points"
+        },
+        "trace_path": "nba/board/points/Play 2"
       },
       {
         "name": "Play 3",
@@ -287,7 +334,14 @@
         "player": "Play 3",
         "line": null,
         "movement": "flat",
-        "simulated_edge": null
+        "simulated_edge": null,
+        "trace": {
+          "path": "wnba/board/assists/Play 3",
+          "sport_slug": "wnba",
+          "selection": "Play 3",
+          "market": "Assists"
+        },
+        "trace_path": "wnba/board/assists/Play 3"
       }
     ]
   }

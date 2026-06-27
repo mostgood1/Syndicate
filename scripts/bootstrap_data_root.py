@@ -142,6 +142,8 @@ def _wnba_refresh_source_root(repo_root: Path) -> Path:
 def _bootstrap_wnba_today_artifacts(repo_root: Path, data_root: Path) -> bool:
     if not _env_bool("SYNDICATE_BOOTSTRAP_ON_START"):
         return False
+    if not _env_bool("SYNDICATE_BOOTSTRAP_WNBA_TODAY"):
+        return False
 
     today = central_today_iso()
     if _wnba_today_bundle_ready(data_root, today):

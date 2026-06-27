@@ -130,7 +130,7 @@ class BootstrapDataRootTests(unittest.TestCase):
         module = _load_module()
         with tempfile.TemporaryDirectory() as temp_dir:
             data_root = Path(temp_dir) / "data-root"
-            with patch.dict(os.environ, {"SYNDICATE_BOOTSTRAP_ON_START": "1"}, clear=False):
+            with patch.dict(os.environ, {"SYNDICATE_BOOTSTRAP_ON_START": "1", "SYNDICATE_BOOTSTRAP_WNBA_TODAY": "1"}, clear=False):
                 with patch.object(module.subprocess, "Popen") as popen_mock:
                     did_run = module._bootstrap_wnba_today_artifacts(Path(__file__).resolve().parents[1], data_root)
 
@@ -173,7 +173,7 @@ class BootstrapDataRootTests(unittest.TestCase):
             sentinel.parent.mkdir(parents=True, exist_ok=True)
             sentinel.write_text("{}\n", encoding="utf-8")
 
-            with patch.dict(os.environ, {"SYNDICATE_BOOTSTRAP_ON_START": "1"}, clear=False):
+            with patch.dict(os.environ, {"SYNDICATE_BOOTSTRAP_ON_START": "1", "SYNDICATE_BOOTSTRAP_WNBA_TODAY": "1"}, clear=False):
                 with patch.object(module.subprocess, "Popen") as popen_mock:
                     did_run = module._bootstrap_wnba_today_artifacts(Path(__file__).resolve().parents[1], data_root)
 

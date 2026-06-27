@@ -1,0 +1,82 @@
+[2026-06-27T20:35:06] $ 'C:\Users\tempadmin\AppData\Local\Programs\Python\Python311-arm64\python.exe' 'C:\Users\tempadmin\OneDrive\Coding\Syndicate\scripts\fetch_basketball_oddsapi_props_local.py' --league wnba --date 2026-06-27 --out 'C:\Users\tempadmin\OneDrive\Coding\Syndicate\vendor\wnba_betting_repo\data\raw\odds_wnba_player_props_2026-06-27.csv' --regions us --markets h2h,spreads,totals,spreads_h1,totals_h1,spreads_h2,totals_h2
+C:\Users\tempadmin\OneDrive\Coding\Syndicate\scripts\fetch_basketball_oddsapi_props_local.py:193: Pandas4Warning: Timestamp.utcnow is deprecated and will be removed in a future version. Use Timestamp.now('UTC') instead.
+  snapshot_ts = pd.Timestamp.utcnow().isoformat()
+Wrote C:\Users\tempadmin\OneDrive\Coding\Syndicate\vendor\wnba_betting_repo\data\raw\odds_wnba_player_props_2026-06-27.csv with 176 rows.
+[2026-06-27T20:35:07] Materialized processed OddsAPI props snapshot alias: C:\Users\tempadmin\OneDrive\Coding\Syndicate\vendor\wnba_betting_repo\data\processed\oddsapi_player_props_2026-06-27.csv (rows=176)
+[2026-06-27T20:35:07] Snapshot stage finished for 2026-06-27: rc_snapshot=0, rows=176, alias_rows=176
+[2026-06-27T20:35:07] Generating required game predictions artifact via source bootstrap: C:\Users\tempadmin\OneDrive\Coding\Syndicate\vendor\wnba_betting_repo\data\processed\predictions_2026-06-27.csv
+[2026-06-27T20:35:07] $ 'C:\Users\tempadmin\AppData\Local\Programs\Python\Python311-arm64\python.exe' -m wnba_betting.cli fetch-schedule
+─────────────────────────────── Fetch Schedule ────────────────────────────────
+Saved schedule to 
+C:\Users\tempadmin\OneDrive\Coding\Syndicate\vendor\wnba_betting_repo\data\proc
+essed\schedule_2026.json and 
+C:\Users\tempadmin\OneDrive\Coding\Syndicate\vendor\wnba_betting_repo\data\proc
+essed\schedule_2026.csv
+{'rows': 350, 'unique_dates': 119}
+[2026-06-27T20:35:32] Seeded fallback game odds slate from props snapshot: C:\Users\tempadmin\OneDrive\Coding\Syndicate\vendor\wnba_betting_repo\data\processed\game_odds_2026-06-27.csv (rows=2)
+[2026-06-27T20:35:32] $ 'C:\Users\tempadmin\AppData\Local\Programs\Python\Python311-arm64\python.exe' -m wnba_betting.cli predict-date --date 2026-06-27
+─────────────────────────────── Predict (Date) ────────────────────────────────
+C:\Users\tempadmin\OneDrive\Coding\Syndicate\vendor\wnba_betting_repo\src\wnba_betting\cli.py:13493: DeprecationWarning: ScoreboardV2 has known issues with line score data for 2025-26 season games (October 22 - December 25, 2025). Please use ScoreboardV3 instead. ScoreboardV3 is fully backward compatible and works for all historical seasons. See: https://github.com/swar/nba_api/issues/596
+  sb = scoreboardv2.ScoreboardV2(game_date=date_str, day_offset=0, timeout=30)
+Scoreboard fetch failed (Scoreboard returned empty tables); trying fallbacks 
+for 2026-06-27.
+Updating Elo ---------------------------------------- 100% 0:00:00
+[Building enhanced features (45 features)...]
+
+======================================================================
+ENHANCED FEATURE ENGINEERING
+======================================================================
+
+[1/3] Building base features (ELO, rest, form, schedule)...
+Built 75 base features
+
+[2/3] Adding advanced statistics (pace, efficiency, Four Factors)...
+Loaded advanced stats from C:\Users\tempadmin\OneDrive\Coding\Syndicate\vendor\wnba_betting_repo\data\processed\team_advanced_stats_2026.csv
+Added 13 advanced stats features
+Added 31 advanced stat features
+
+[3/3] Adding injury impact features...
+No injury data found. Run: python -m wnba_betting.cli fetch-injuries
+Added 9 injury features
+
+======================================================================
+TOTAL FEATURES: 115
+======================================================================
+
+[NPU] Using NPU-accelerated predictions (ONNX + QNN)
+[INFO][LOADING] Loading NBA Game Models with NPU acceleration...
+[OK] Loaded 56 game features from feature_columns_enhanced.joblib
+[OK] WIN_PROB loaded (CPU fallback from win_prob_enhanced.joblib)
+[OK] SPREAD_MARGIN loaded (CPU fallback from spread_margin_enhanced.joblib)
+[OK] TOTALS loaded (CPU fallback from totals_enhanced.joblib)
+[OK] Loaded halves models: 6 CPU (ONNX not available)
+[OK] Loaded quarters models: 12 CPU (ONNX not available)
+[READY] Ready with 21 models (0 NPU-accelerated)
+{
+    'game_odds_rows': 2,
+    'output': 
+'C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\vendor\\wnba_betting_repo\\
+data\\processed\\game_odds_2026-06-27.csv'
+}
+Saved predictions to 
+C:\Users\tempadmin\OneDrive\Coding\Syndicate\vendor\wnba_betting_repo\data\proc
+essed\predictions_2026-06-27.csv
+[2026-06-27T20:35:37] Generated game predictions at C:\Users\tempadmin\OneDrive\Coding\Syndicate\vendor\wnba_betting_repo\data\processed\predictions_2026-06-27.csv (rows=3)
+[WARN] Props model artifacts missing; using priors + rolling-stat fallback predictions
+Traceback (most recent call last):
+  File "C:\Users\tempadmin\OneDrive\Coding\Syndicate\syndicate\features\shared\basketball_props_predictions.py", line 415, in export_props_predictions_local
+    basketball_props_smart_sim.export_props_predictions_with_smart_sim_local(
+  File "C:\Users\tempadmin\OneDrive\Coding\Syndicate\syndicate\features\shared\basketball_props_smart_sim.py", line 4893, in export_props_predictions_with_smart_sim_local
+    raise RuntimeError(reason)
+RuntimeError: SmartSim produced no player rows for 2026-06-27; see smart_sim_failures_2026-06-27.csv
+[2026-06-27T20:35:40] Traceback (most recent call last):
+  File "C:\Users\tempadmin\OneDrive\Coding\Syndicate\scripts\refresh_wnba_oddsapi_props.py", line 2883, in _run_refresh_via_cli
+    _, _ = export_props_predictions_local(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\tempadmin\OneDrive\Coding\Syndicate\syndicate\features\shared\basketball_props_predictions.py", line 415, in export_props_predictions_local
+    basketball_props_smart_sim.export_props_predictions_with_smart_sim_local(
+  File "C:\Users\tempadmin\OneDrive\Coding\Syndicate\syndicate\features\shared\basketball_props_smart_sim.py", line 4893, in export_props_predictions_with_smart_sim_local
+    raise RuntimeError(reason)
+RuntimeError: SmartSim produced no player rows for 2026-06-27; see smart_sim_failures_2026-06-27.csv
+[2026-06-27T20:35:40] Predictions stage finished for 2026-06-27: rc_pred=1, rows=118
+[2026-06-27T20:35:40] predict-props failed with exit code 1

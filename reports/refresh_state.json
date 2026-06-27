@@ -2,7 +2,7 @@
   "steps": {
     "nba_artifact_bundle:2026-06-10:1:1": {
       "inputHash": "e6361f51df4ebd4ea1a9b849d747bb27742b81257271b89b5f2ebf2256af98ff",
-      "updatedAt": "2026-06-12T16:51:09.855389",
+      "updatedAt": "2026-06-12T16:51:09-05:00",
       "outputs": [],
       "metadata": {
         "date": "2026-06-10",
@@ -12,7 +12,7 @@
     },
     "nhl_artifact_bundle:2026-05-22": {
       "inputHash": "13133df73de397075cf1bcea730b4ca753fa12b3e21d8eb5da0bac37261b6b11",
-      "updatedAt": "2026-06-15T00:01:53.123048",
+      "updatedAt": "2026-06-15T00:01:53-05:00",
       "outputs": [
         "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmp8e9jusf2\\bundle\\data\\processed\\props_projections_all_2026-05-22.csv",
         "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmp8e9jusf2\\bundle\\data\\processed\\props_boxscores_sim_2026-05-22.csv",
@@ -34,7 +34,7 @@
     },
     "nhl_artifact_bundle:2026-06-11": {
       "inputHash": "7cb102d200c1d0b2e021ec34660abaf662609b820b7d8fd87201349f4803151e",
-      "updatedAt": "2026-06-11T22:24:28.567245",
+      "updatedAt": "2026-06-11T22:24:28-05:00",
       "outputs": [
         "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\odds\\team\\date=2026-06-11\\oddsapi.csv",
         "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\props\\player_props_lines\\date=2026-06-11\\oddsapi.csv",
@@ -62,7 +62,7 @@
     },
     "nhl_artifact_bundle:2026-06-12": {
       "inputHash": "81e1e9d6071808dcfa107f1b1e732d5d5ab80059deb3b4ecbe0d0c4e6e605401",
-      "updatedAt": "2026-06-12T20:54:05.809836",
+      "updatedAt": "2026-06-12T20:54:05-05:00",
       "outputs": [
         "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\odds\\team\\date=2026-06-12\\oddsapi.csv",
         "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\props\\player_props_lines\\date=2026-06-12\\oddsapi.csv",
@@ -90,7 +90,7 @@
     },
     "wnba_artifact_bundle:2026-06-12:1:1": {
       "inputHash": "fdc5591b77ce995d207349c6bc57cf1ab3a315978abd98a548ffda0e883c2b59",
-      "updatedAt": "2026-06-12T16:30:31.785121",
+      "updatedAt": "2026-06-12T16:30:31-05:00",
       "outputs": [],
       "metadata": {
         "date": "2026-06-12",
@@ -100,7 +100,7 @@
     },
     "nfl_artifact_bundle": {
       "inputHash": "da8f3194473f022c520a0a30969a6580b1d9108885f85ecb49c676af6b1c9566",
-      "updatedAt": "2026-06-25T18:37:58.675184",
+      "updatedAt": "2026-06-25T18:37:58-05:00",
       "outputs": [
         "data\\nfl_source\\source_artifacts\\current_week.json",
         "data\\nfl_source\\source_artifacts\\real_betting_lines_2026_06_15.json",
@@ -117,7 +117,7 @@
     },
     "mlb_live_lens:2026-06-12": {
       "inputHash": "65d72021619fe6d558a6ce7c144133968b16174cb33e18c984ecde43660b8b4e",
-      "updatedAt": "2026-06-12T20:36:14.701002",
+      "updatedAt": "2026-06-12T20:36:14-05:00",
       "outputs": [
         "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\live_lens\\live_lens_report_2026_06_12.json",
         "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\live_lens\\live_lens_2026_06_12.jsonl",
@@ -131,7 +131,7 @@
     },
     "nhl_artifact_bundle:2026-06-13": {
       "inputHash": "229a9a3fc696f61bbbe9ab1288d910a301fef8d93649c644beb49ccdf41b2853",
-      "updatedAt": "2026-06-13T14:07:30.505658",
+      "updatedAt": "2026-06-13T14:07:30-05:00",
       "outputs": [
         "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\odds\\team\\date=2026-06-13\\oddsapi.csv",
         "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\props\\player_props_lines\\date=2026-06-13\\oddsapi.csv",
@@ -159,7 +159,7 @@
     },
     "mlb_live_lens:2026-06-13": {
       "inputHash": "709954254b303bcda63bca0aded073a2531bc07ae0369e318ac2f202092bbe7b",
-      "updatedAt": "2026-06-13T13:50:59.799451",
+      "updatedAt": "2026-06-13T13:50:59-05:00",
       "outputs": [
         "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\live_lens\\live_lens_report_2026_06_13.json",
         "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\live_lens\\live_lens_2026_06_13.jsonl",
@@ -173,7 +173,7 @@
     },
     "nba_artifact_bundle:2026-06-13:1:1": {
       "inputHash": "6e2c06617fcb288aa3c8c7ba059862c727994f58d29a88e696f5952d521a7076",
-      "updatedAt": "2026-06-13T13:52:47.948248",
+      "updatedAt": "2026-06-13T13:52:47-05:00",
       "outputs": [],
       "metadata": {
         "date": "2026-06-13",
@@ -183,7 +183,7 @@
     },
     "nhl_artifact_bundle:2026-06-14": {
       "inputHash": "4f9eece7e4a65a8d462441f9e2885a2bc253405629071d0efc0db5dcd960f5cb",
-      "updatedAt": "2026-06-15T02:20:01.373252",
+      "updatedAt": "2026-06-15T02:20:01-05:00",
       "outputs": [
         "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\odds\\team\\date=2026-06-14\\oddsapi.csv",
         "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\props\\player_props_lines\\date=2026-06-14\\oddsapi.csv",
@@ -211,7 +211,7 @@
     },
     "mlb_live_lens:2026-06-14": {
       "inputHash": "be72003d2245ae3e923b1567bf49aa6b3ecf4a1148a68aa347984e9b5f464f37",
-      "updatedAt": "2026-06-14T07:57:12.745575",
+      "updatedAt": "2026-06-14T07:57:12-05:00",
       "outputs": [
         "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\live_lens\\live_lens_report_2026_06_14.json",
         "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\live_lens\\live_lens_2026_06_14.jsonl",
@@ -225,7 +225,7 @@
     },
     "nhl_artifact_bundle:2026-06-15": {
       "inputHash": "5656fbbef0124c297a248ce44dbd5ccb34c6e5f6d429d0744ce7ed90af757b3e",
-      "updatedAt": "2026-06-15T17:25:42.550188",
+      "updatedAt": "2026-06-15T17:25:42-05:00",
       "outputs": [
         "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\odds\\team\\date=2026-06-15\\oddsapi.csv",
         "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\props\\player_props_lines\\date=2026-06-15\\oddsapi.csv",
@@ -252,22 +252,22 @@
       }
     },
     "mlb_live_lens:2026-05-22": {
-      "inputHash": "69973b853e955ecc9d96f89ef69f4678d332eef8d7c4806902bd09a38a85cf01",
-      "updatedAt": "2026-06-23T01:03:54.192015",
+      "inputHash": "60bf919256da568ddb39fde9193593a1219ee38b365f7bec88d4bdbdfb966a4f",
+      "updatedAt": "2026-06-27T20:14:42-05:00",
       "outputs": [
-        "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpjq47jal6\\source\\data\\live_lens\\live_lens_report_2026_05_22.json",
-        "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpjq47jal6\\source\\data\\live_lens\\live_lens_2026_05_22.jsonl",
-        "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpjq47jal6\\source\\data\\live_lens\\prop_registry\\live_prop_registry_2026_05_22.json"
+        "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpsxcm238f\\source\\data\\live_lens\\live_lens_report_2026_05_22.json",
+        "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpsxcm238f\\source\\data\\live_lens\\live_lens_2026_05_22.jsonl",
+        "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpsxcm238f\\source\\data\\live_lens\\prop_registry\\live_prop_registry_2026_05_22.json"
       ],
       "metadata": {
         "date": "2026-05-22",
         "trigger": "syndicate_refresh",
-        "source_root": "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpjq47jal6\\source"
+        "source_root": "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpsxcm238f\\source"
       }
     },
     "nba_artifact_bundle:2026-05-22:1:1": {
       "inputHash": "5cd7e3581e2c8946b7cb8a5bc6f60285e0e6fcaa3620cf951a21ca3e090ebc0d",
-      "updatedAt": "2026-06-15T00:00:09.537324",
+      "updatedAt": "2026-06-15T00:00:09-05:00",
       "outputs": [],
       "metadata": {
         "date": "2026-05-22",
@@ -277,7 +277,7 @@
     },
     "wnba_artifact_bundle:2026-05-22:1:1": {
       "inputHash": "c56fe68de316d9e9dbd43efa9fec3c87ade9cecd6dd54f9db690127ce9c66b99",
-      "updatedAt": "2026-06-15T00:02:56.392025",
+      "updatedAt": "2026-06-15T00:02:56-05:00",
       "outputs": [],
       "metadata": {
         "date": "2026-05-22",
@@ -287,7 +287,7 @@
     },
     "ncaaf_artifact_bundle": {
       "inputHash": "e7911e7d7993b3fcb002fd8a24864fa836259905c92c6c79e29fd98a088933e5",
-      "updatedAt": "2026-06-25T18:37:59.183977",
+      "updatedAt": "2026-06-25T18:37:59-05:00",
       "outputs": [
         "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\ncaaf_source\\source_artifacts\\college_football_schedule_2025_predicted_totals_enhanced_20260525T111624Z.csv",
         "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\ncaaf_source\\source_artifacts\\recommendations_summary"
@@ -299,7 +299,7 @@
     },
     "ncaab_odds_current:2026-05-22": {
       "inputHash": "6be4503f50d2b5665237c1be5fbae5746d04c4bbdf73a998e9867069bf24fee0",
-      "updatedAt": "2026-06-15T00:00:03.005226",
+      "updatedAt": "2026-06-15T00:00:03-05:00",
       "outputs": [
         "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmp3p7ljy99\\odds_history\\odds_2026-05-22.csv"
       ],
@@ -314,7 +314,7 @@
     },
     "nba_artifact_bundle::2026-05-22:1:1": {
       "inputHash": "28edb1ff192262cc94246956478ae99bbbacac99892f120dc6e7a6bcc206d975",
-      "updatedAt": "2026-06-15T00:08:17.434168",
+      "updatedAt": "2026-06-15T00:08:17-05:00",
       "outputs": [],
       "metadata": {
         "date": "2026-05-22",
@@ -324,7 +324,7 @@
     },
     "nba_artifact_bundle:C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpbjbna5za\\bundle:2026-05-22:1:1": {
       "inputHash": "338138020059a86db79e31416b51d2910db6ffbdd2c7c028d56ac148f8b68e0b",
-      "updatedAt": "2026-06-15T00:06:08.894325",
+      "updatedAt": "2026-06-15T00:06:08-05:00",
       "outputs": [],
       "metadata": {
         "date": "2026-05-22",
@@ -334,7 +334,7 @@
     },
     "wnba_artifact_bundle::2026-05-22:1:1": {
       "inputHash": "a449fd542d7c50940e594a5cfdfb51cface77b71f2f989e2afb5fd56d4d97f6c",
-      "updatedAt": "2026-06-15T00:10:51.175638",
+      "updatedAt": "2026-06-15T00:10:51-05:00",
       "outputs": [],
       "metadata": {
         "date": "2026-05-22",
@@ -344,7 +344,7 @@
     },
     "wnba_artifact_bundle:C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmp7qcgfyi9\\bundle:2026-05-22:1:1": {
       "inputHash": "ad0fc3cf923ae93d62b78fd3018621df3453330eedd9204c9d9159a6c8d96208",
-      "updatedAt": "2026-06-15T00:06:29.189536",
+      "updatedAt": "2026-06-15T00:06:29-05:00",
       "outputs": [],
       "metadata": {
         "date": "2026-05-22",
@@ -354,7 +354,7 @@
     },
     "nba_artifact_bundle:C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmp_dsdfkik\\bundle:2026-05-22:1:1": {
       "inputHash": "7bbb6a29a87c9f45ab0677ce33a9c3ace33754b57e3f13421ecc204fe9f729a8",
-      "updatedAt": "2026-06-15T00:08:19.690907",
+      "updatedAt": "2026-06-15T00:08:19-05:00",
       "outputs": [],
       "metadata": {
         "date": "2026-05-22",
@@ -364,7 +364,7 @@
     },
     "nba_artifact_bundle:C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpf4a6t1de\\bundle:2026-05-22:1:1": {
       "inputHash": "aab0c942f52fe43001a7feb7100cfda535c8b31b73d9d9b20c4bfa44f044c1a0",
-      "updatedAt": "2026-06-15T00:08:20.305455",
+      "updatedAt": "2026-06-15T00:08:20-05:00",
       "outputs": [],
       "metadata": {
         "date": "2026-05-22",
@@ -374,7 +374,7 @@
     },
     "nba_artifact_bundle:C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmp2lzhq15e\\bundle:2026-05-22:1:1": {
       "inputHash": "b9892985b27304179ef5acd1b1aff37f0f1c8c6b2da5c3ad63a7f436204c7736",
-      "updatedAt": "2026-06-15T00:08:21.014731",
+      "updatedAt": "2026-06-15T00:08:21-05:00",
       "outputs": [],
       "metadata": {
         "date": "2026-05-22",
@@ -384,7 +384,7 @@
     },
     "wnba_artifact_bundle:C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmp38y4xl68\\bundle:2026-05-22:1:1": {
       "inputHash": "866ef6adc79c5036b59fb0b434b9ee2dce606733396d90fe37b4aa789c1d1350",
-      "updatedAt": "2026-06-15T00:09:12.510666",
+      "updatedAt": "2026-06-15T00:09:12-05:00",
       "outputs": [],
       "metadata": {
         "date": "2026-05-22",
@@ -394,7 +394,7 @@
     },
     "wnba_artifact_bundle:C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpu_x3_8p5\\bundle:2026-05-22:1:1": {
       "inputHash": "a472f019662229e09a4b33822303c906fc8096d3ce96ab13ed49e05502b16ea4",
-      "updatedAt": "2026-06-15T00:09:12.551106",
+      "updatedAt": "2026-06-15T00:09:12-05:00",
       "outputs": [],
       "metadata": {
         "date": "2026-05-22",
@@ -404,7 +404,7 @@
     },
     "wnba_artifact_bundle:C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmp3iz8scob\\bundle:2026-05-22:1:1": {
       "inputHash": "de2f5504e171a0e7b594c1d3ee5a5c3675b63f131bdcbf0b2bc2b23e1daf84db",
-      "updatedAt": "2026-06-15T00:09:12.628856",
+      "updatedAt": "2026-06-15T00:09:12-05:00",
       "outputs": [],
       "metadata": {
         "date": "2026-05-22",
@@ -414,7 +414,7 @@
     },
     "wnba_artifact_bundle:C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpek94664i\\bundle:2026-05-22:1:1": {
       "inputHash": "5b6998130a9c13b63b9fe0a77f028e90b97a9b5b66a41dd41d91597c1b80880b",
-      "updatedAt": "2026-06-15T00:10:59.577798",
+      "updatedAt": "2026-06-15T00:10:59-05:00",
       "outputs": [],
       "metadata": {
         "date": "2026-05-22",
@@ -424,7 +424,7 @@
     },
     "wnba_artifact_bundle:C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmprj7ll1x5\\bundle:2026-05-22:1:1": {
       "inputHash": "f325524bf50b58ba409a80c8d07b7500a61d6133d3f2e1b8fc904074b5182c43",
-      "updatedAt": "2026-06-15T00:10:59.622998",
+      "updatedAt": "2026-06-15T00:10:59-05:00",
       "outputs": [],
       "metadata": {
         "date": "2026-05-22",
@@ -434,7 +434,7 @@
     },
     "wnba_artifact_bundle:C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpnra0qj8n\\bundle:2026-05-22:1:1": {
       "inputHash": "dd4c77b7b8db209d666b525bb5a921304c71ddf524612248f3ab4449cb3017e0",
-      "updatedAt": "2026-06-15T00:10:59.734048",
+      "updatedAt": "2026-06-15T00:10:59-05:00",
       "outputs": [],
       "metadata": {
         "date": "2026-05-22",
@@ -444,7 +444,7 @@
     },
     "mlb_live_lens:2026-06-15": {
       "inputHash": "e14248d27f899118692f3e25c8f540df71f0ca96c865847ed129aa9943333554",
-      "updatedAt": "2026-06-15T17:12:09.013003",
+      "updatedAt": "2026-06-15T17:12:09-05:00",
       "outputs": [
         "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\live_lens\\live_lens_report_2026_06_15.json",
         "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\live_lens\\live_lens_2026_06_15.jsonl",
@@ -458,7 +458,7 @@
     },
     "nhl_artifact_bundle:2026-06-16": {
       "inputHash": "160e2460cd5e383286243300ed310d8432a46f5bbe752a9d11985b7f57e426e2",
-      "updatedAt": "2026-06-16T17:08:23.902364",
+      "updatedAt": "2026-06-16T17:08:23-05:00",
       "outputs": [
         "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\odds\\team\\date=2026-06-16\\oddsapi.csv",
         "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\props\\player_props_lines\\date=2026-06-16\\oddsapi.csv",
@@ -486,7 +486,7 @@
     },
     "mlb_live_lens:2026-06-16": {
       "inputHash": "316b5249ec7e5e94de5f7d7f66ec4a1a061475b0def905405e241630aa285893",
-      "updatedAt": "2026-06-16T16:53:37.162249",
+      "updatedAt": "2026-06-16T16:53:37-05:00",
       "outputs": [
         "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\live_lens\\live_lens_report_2026_06_16.json",
         "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\live_lens\\live_lens_2026_06_16.jsonl",
@@ -500,7 +500,7 @@
     },
     "nhl_artifact_bundle:2026-06-17": {
       "inputHash": "f7f96f82f13f3458b8829dde960320d94cc5dfe6ddf2fbfc959e0bcbecc5ad78",
-      "updatedAt": "2026-06-17T15:29:54.416795",
+      "updatedAt": "2026-06-17T15:29:54-05:00",
       "outputs": [
         "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\odds\\team\\date=2026-06-17\\oddsapi.csv",
         "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\props\\player_props_lines\\date=2026-06-17\\oddsapi.csv",
@@ -528,7 +528,7 @@
     },
     "mlb_live_lens:2026-06-17": {
       "inputHash": "7636599dfc6ef4778d18edab5eb821e5863f82b7d4d6d4d098a83cc61df9d991",
-      "updatedAt": "2026-06-17T17:01:32.967060",
+      "updatedAt": "2026-06-17T17:01:32-05:00",
       "outputs": [
         "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\live_lens\\live_lens_report_2026_06_17.json",
         "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\live_lens\\live_lens_2026_06_17.jsonl",
@@ -542,7 +542,7 @@
     },
     "nhl_artifact_bundle:2026-06-18": {
       "inputHash": "b821439288bd4dba03e0700675a885e5e01f982f2b072735a5cfedd47cccf4ee",
-      "updatedAt": "2026-06-18T08:03:00.353252",
+      "updatedAt": "2026-06-18T08:03:00-05:00",
       "outputs": [
         "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\odds\\team\\date=2026-06-18\\oddsapi.csv",
         "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\props\\player_props_lines\\date=2026-06-18\\oddsapi.csv",
@@ -570,7 +570,7 @@
     },
     "mlb_live_lens:2026-06-18": {
       "inputHash": "f9fd3aa7a270d1c2156ceac65915fe89b20e3dfb06cf98624c0cb565e6966dde",
-      "updatedAt": "2026-06-18T07:48:33.820404",
+      "updatedAt": "2026-06-18T07:48:33-05:00",
       "outputs": [
         "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\live_lens\\live_lens_report_2026_06_18.json",
         "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\live_lens\\live_lens_2026_06_18.jsonl",
@@ -584,7 +584,7 @@
     },
     "nhl_artifact_bundle:2026-06-19": {
       "inputHash": "7fd9e0793877744dcdc8c6f065ed488a181b97db7d93ed646c05922359ecea76",
-      "updatedAt": "2026-06-19T12:37:10.928827",
+      "updatedAt": "2026-06-19T12:37:10-05:00",
       "outputs": [
         "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\odds\\team\\date=2026-06-19\\oddsapi.csv",
         "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\props\\player_props_lines\\date=2026-06-19\\oddsapi.csv",
@@ -612,7 +612,7 @@
     },
     "mlb_live_lens:2026-06-19": {
       "inputHash": "a4f2e9c3412862168ee2255f71c40bc9cfd26a98c768e9540af4c1f27982d99d",
-      "updatedAt": "2026-06-19T11:49:50.474626",
+      "updatedAt": "2026-06-19T11:49:50-05:00",
       "outputs": [
         "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\live_lens\\live_lens_report_2026_06_19.json",
         "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\live_lens\\live_lens_2026_06_19.jsonl",
@@ -626,7 +626,7 @@
     },
     "nhl_artifact_bundle:2026-06-20": {
       "inputHash": "341a0957ddbf0cd592e8ce9fb6690460f0cec9c9791169f43a044d6862606d8a",
-      "updatedAt": "2026-06-20T22:45:27.316634",
+      "updatedAt": "2026-06-20T22:45:27-05:00",
       "outputs": [
         "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\odds\\team\\date=2026-06-20\\oddsapi.csv",
         "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\props\\player_props_lines\\date=2026-06-20\\oddsapi.csv",
@@ -654,7 +654,7 @@
     },
     "mlb_live_lens:2026-06-20": {
       "inputHash": "3afc0013150408a9e99ae300998d9b9f8c27bb162c7f9f7c63aaf011967e2d79",
-      "updatedAt": "2026-06-20T22:31:00.648208",
+      "updatedAt": "2026-06-20T22:31:00-05:00",
       "outputs": [
         "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\live_lens\\live_lens_report_2026_06_20.json",
         "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\live_lens\\live_lens_2026_06_20.jsonl",
@@ -668,7 +668,7 @@
     },
     "nhl_artifact_bundle:2026-06-21": {
       "inputHash": "7cfaf7bb3ef12519d5d7db355d12fbb0e6a469146e146cf88a6d66d52aaf06a3",
-      "updatedAt": "2026-06-20T22:45:27.340517",
+      "updatedAt": "2026-06-20T22:45:27-05:00",
       "outputs": [
         "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\odds\\team\\date=2026-06-21\\oddsapi.csv",
         "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\props\\player_props_lines\\date=2026-06-21\\oddsapi.csv",
@@ -686,7 +686,7 @@
     },
     "wnba_artifact_bundle:D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts:2026-06-20:1:1": {
       "inputHash": "d8873e792502717f74b4478ec8a8c1c407b0d42fdb5f5fd6feb9f2aadbeb4df8",
-      "updatedAt": "2026-06-20T22:41:41.636252",
+      "updatedAt": "2026-06-20T22:41:41-05:00",
       "outputs": [],
       "metadata": {
         "date": "2026-06-20",
@@ -696,7 +696,7 @@
     },
     "mlb_live_lens:2026-06-21": {
       "inputHash": "3ae075d2b502c8ca9369fa71dd46e30028c719a6e07aa58425741089771aa908",
-      "updatedAt": "2026-06-21T17:34:51.111679",
+      "updatedAt": "2026-06-21T17:34:51-05:00",
       "outputs": [
         "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\live_lens\\live_lens_report_2026_06_21.json",
         "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\live_lens\\live_lens_2026_06_21.jsonl",
@@ -710,7 +710,7 @@
     },
     "wnba_artifact_bundle:C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\wnba_source\\source_artifacts:2026-06-22:1:1": {
       "inputHash": "bd2cdc0cd538c6e3c367a5f12a2c053693964fbde23f2a9075f18a161d5d6be4",
-      "updatedAt": "2026-06-23T02:23:15.546097",
+      "updatedAt": "2026-06-23T02:23:15-05:00",
       "outputs": [],
       "metadata": {
         "date": "2026-06-22",
@@ -720,7 +720,7 @@
     },
     "nba_artifact_bundle:C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nba_source\\source_artifacts:2026-06-22:1:1": {
       "inputHash": "32a0b67c1ad7cb86902d7923f201941d16b5397bba53c9091e92713d69e58c54",
-      "updatedAt": "2026-06-23T02:20:05.327805",
+      "updatedAt": "2026-06-23T02:20:05-05:00",
       "outputs": [],
       "metadata": {
         "date": "2026-06-22",
@@ -730,7 +730,7 @@
     },
     "wnba_artifact_bundle:C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmp17p71dob\\bundle:2026-06-22:1:1": {
       "inputHash": "8f3f4d95214acba083124023597416a8d3aa7ef1b210edaac9d98c6efa60be86",
-      "updatedAt": "2026-06-23T02:25:32.257064",
+      "updatedAt": "2026-06-23T02:25:32-05:00",
       "outputs": [],
       "metadata": {
         "date": "2026-06-22",
@@ -740,7 +740,7 @@
     },
     "mlb_live_lens:2026-06-25": {
       "inputHash": "db14a958963feb2244819410ce7120cd1174a9d9c68427933c465ef4b78523b0",
-      "updatedAt": "2026-06-25T18:24:57.109493",
+      "updatedAt": "2026-06-25T18:24:57-05:00",
       "outputs": [
         "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\live_lens\\live_lens_report_2026_06_25.json",
         "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\live_lens\\live_lens_2026_06_25.jsonl",
@@ -754,7 +754,7 @@
     },
     "nhl_artifact_bundle:2026-06-25": {
       "inputHash": "9de51b02a59d2a67a73693878769584c6bea8b65275721c0aa743c8d65f56804",
-      "updatedAt": "2026-06-25T18:37:55.967433",
+      "updatedAt": "2026-06-25T18:37:55-05:00",
       "outputs": [
         "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\odds\\team\\date=2026-06-25\\oddsapi.csv",
         "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\props\\player_props_lines\\date=2026-06-25\\oddsapi.csv",
@@ -782,7 +782,7 @@
     },
     "nhl_artifact_bundle:2026-06-26": {
       "inputHash": "a7f67cae4b39c36b3ff939580dbeae295b9e728d6a660cb6c324fe8cc3e8226c",
-      "updatedAt": "2026-06-25T18:37:56.003156",
+      "updatedAt": "2026-06-25T18:37:56-05:00",
       "outputs": [
         "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\odds\\team\\date=2026-06-26\\oddsapi.csv",
         "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\props\\player_props_lines\\date=2026-06-26\\oddsapi.csv",

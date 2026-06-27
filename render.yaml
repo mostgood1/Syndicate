@@ -69,6 +69,8 @@ services:
         value: /opt/render/project/data/reports
       - key: SYNDICATE_BOOTSTRAP_ON_START
         value: "1"
+      - key: SYNDICATE_BOOTSTRAP_WNBA_TODAY
+        value: "1"
       - key: SYNDICATE_NBA_SOURCE_APP_FALLBACK
         value: "false"
       - key: SYNDICATE_WNBA_SOURCE_APP_FALLBACK
@@ -186,6 +188,8 @@ services:
       - key: SYNDICATE_REPORTS_ROOT
         value: /opt/render/project/data/reports
       - key: SYNDICATE_BOOTSTRAP_ON_START
+        value: "0"
+      - key: SYNDICATE_BOOTSTRAP_WNBA_TODAY
         value: "0"
       - key: SYNDICATE_NBA_SOURCE_APP_FALLBACK
         value: "false"
