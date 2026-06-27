@@ -7,6 +7,7 @@ import os
 import subprocess
 import shutil
 import sys
+from subprocess import DEVNULL
 from pathlib import Path
 from typing import Dict
 
@@ -157,7 +158,7 @@ def _bootstrap_wnba_today_artifacts(repo_root: Path, data_root: Path) -> bool:
     env = _prepend_pythonpath(repo_root)
     env["SYNDICATE_WNBA_SOURCE_APP_FALLBACK"] = "1"
     env["SYNDICATE_SOURCE_ROOT_WNBA"] = str(_wnba_refresh_source_root(repo_root))
-    subprocess.run(
+    subprocess.Popen(
         [
             sys.executable,
             str(refresh_script),
@@ -175,7 +176,9 @@ def _bootstrap_wnba_today_artifacts(repo_root: Path, data_root: Path) -> bool:
         ],
         cwd=str(repo_root),
         env=env,
-        check=False,
+        stdout=DEVNULL,
+        stderr=DEVNULL,
+        start_new_session=True,
     )
     return True
 

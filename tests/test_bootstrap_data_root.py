@@ -131,18 +131,18 @@ class BootstrapDataRootTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             data_root = Path(temp_dir) / "data-root"
             with patch.dict(os.environ, {"SYNDICATE_BOOTSTRAP_ON_START": "1"}, clear=False):
-                with patch.object(module.subprocess, "run") as run_mock:
+                with patch.object(module.subprocess, "Popen") as popen_mock:
                     did_run = module._bootstrap_wnba_today_artifacts(Path(__file__).resolve().parents[1], data_root)
 
             self.assertTrue(did_run)
-            run_mock.assert_called_once()
-            called_command = run_mock.call_args.args[0]
+            popen_mock.assert_called_once()
+            called_command = popen_mock.call_args.args[0]
             self.assertIn("--sports", called_command)
             self.assertIn("wnba", called_command)
             self.assertIn("--execution-mode", called_command)
             self.assertIn("source", called_command)
             self.assertNotIn("--source-root", called_command)
-            called_env = run_mock.call_args.kwargs.get("env") or {}
+            called_env = popen_mock.call_args.kwargs.get("env") or {}
             self.assertEqual(
                 called_env.get("SYNDICATE_SOURCE_ROOT_WNBA"),
                 str(Path(__file__).resolve().parents[1] / "vendor" / "wnba_betting_repo"),
@@ -174,11 +174,11 @@ class BootstrapDataRootTests(unittest.TestCase):
             sentinel.write_text("{}\n", encoding="utf-8")
 
             with patch.dict(os.environ, {"SYNDICATE_BOOTSTRAP_ON_START": "1"}, clear=False):
-                with patch.object(module.subprocess, "run") as run_mock:
+                with patch.object(module.subprocess, "Popen") as popen_mock:
                     did_run = module._bootstrap_wnba_today_artifacts(Path(__file__).resolve().parents[1], data_root)
 
             self.assertTrue(did_run)
-            run_mock.assert_called_once()
+            popen_mock.assert_called_once()
 
     def test_main_triggers_wnba_artifact_bootstrap(self) -> None:
         module = _load_module()
