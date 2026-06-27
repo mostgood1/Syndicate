@@ -154,6 +154,8 @@ def _bootstrap_wnba_today_artifacts(repo_root: Path, data_root: Path) -> bool:
         return False
 
     logger.info("WNBA props artifact missing at %s; refreshing today's WNBA bundle", target_path)
+    env = _prepend_pythonpath(repo_root)
+    env["SYNDICATE_WNBA_SOURCE_APP_FALLBACK"] = "1"
     subprocess.run(
         [
             sys.executable,
@@ -173,7 +175,7 @@ def _bootstrap_wnba_today_artifacts(repo_root: Path, data_root: Path) -> bool:
             "full",
         ],
         cwd=str(repo_root),
-        env=_prepend_pythonpath(repo_root),
+        env=env,
         check=False,
     )
     return True

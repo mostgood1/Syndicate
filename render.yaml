@@ -23,6 +23,10 @@ services:
     buildCommand: pip install -r requirements.txt
     startCommand: bash -lc "exec gunicorn wsgi:application --preload --bind 0.0.0.0:$PORT --workers ${WEB_CONCURRENCY:-1} --threads ${GUNICORN_THREADS:-1} --timeout ${GUNICORN_TIMEOUT:-60} --graceful-timeout ${GUNICORN_GRACEFUL_TIMEOUT:-30} --keep-alive ${GUNICORN_KEEPALIVE:-5}"
     healthCheckPath: /healthz
+    disk:
+      name: syndicate-data-web
+      mountPath: /opt/render/project/data
+      sizeGB: 50
     envVars: &shared_render_env_vars
       - key: TZ
         value: America/Chicago
@@ -44,25 +48,25 @@ services:
           type: keyvalue
           property: connectionString
       - key: SYNDICATE_DATA_ROOT
-        value: data
+        value: /opt/render/project/data
       - key: SYNDICATE_MLB_SOURCE_ROOT
-        value: data/mlb_source
+        value: /opt/render/project/data/mlb_source
       - key: SYNDICATE_NBA_SOURCE_ROOT
-        value: data/nba_source
+        value: /opt/render/project/data/nba_source
       - key: SYNDICATE_NBA_ARTIFACT_ROOT
-        value: data/nba_source/source_artifacts
+        value: /opt/render/project/data/nba_source/source_artifacts
       - key: SYNDICATE_NHL_SOURCE_ROOT
-        value: data/nhl_source
+        value: /opt/render/project/data/nhl_source
       - key: SYNDICATE_NFL_SOURCE_ROOT
-        value: data/nfl_source
+        value: /opt/render/project/data/nfl_source
       - key: SYNDICATE_NCAAF_SOURCE_ROOT
-        value: data/ncaaf_source
+        value: /opt/render/project/data/ncaaf_source
       - key: SYNDICATE_NCAAB_SOURCE_ROOT
-        value: data/ncaab_source
+        value: /opt/render/project/data/ncaab_source
       - key: SYNDICATE_WNBA_SOURCE_ROOT
-        value: data/wnba_source
+        value: /opt/render/project/data/wnba_source
       - key: SYNDICATE_REPORTS_ROOT
-        value: reports
+        value: /opt/render/project/data/reports
       - key: SYNDICATE_BOOTSTRAP_ON_START
         value: "1"
       - key: SYNDICATE_NBA_SOURCE_APP_FALLBACK
@@ -102,21 +106,23 @@ services:
       - key: SYNDICATE_LIVE_ODDS_REFRESH_SKIP_MIRROR
         value: "true"
       - key: MLB_BETTING_DATA_ROOT
-        value: data/mlb_source/source_artifacts/data
+        value: /opt/render/project/data/mlb_source/source_artifacts/data
       - key: MLB_LIVE_LENS_DIR
-        value: data/mlb_source/source_artifacts/data/live_lens
+        value: /opt/render/project/data/mlb_source/source_artifacts/data/live_lens
       - key: NBA_BETTING_DATA_ROOT
-        value: data/nba_source/source_artifacts/data
+        value: /opt/render/project/data/nba_source/source_artifacts/data
       - key: NBA_LIVE_LENS_DIR
-        value: data/nba_source/source_artifacts/data/live_lens
+        value: /opt/render/project/data/nba_source/source_artifacts/data/live_lens
       - key: NHL_DATA_DIR
-        value: data/nhl_source/source_artifacts/data
+        value: /opt/render/project/data/nhl_source/source_artifacts/data
       - key: NHL_LIVE_LENS_DIR
-        value: data/nhl_source/source_artifacts/data/live_lens
+        value: /opt/render/project/data/nhl_source/source_artifacts/data/live_lens
       - key: WNBA_BETTING_DATA_ROOT
-        value: data/wnba_source/source_artifacts/data
+        value: /opt/render/project/data/wnba_source/source_artifacts/data
       - key: WNBA_LIVE_LENS_DIR
-        value: data/wnba_source/source_artifacts/data/live_lens
+        value: /opt/render/project/data/wnba_source/source_artifacts/data/live_lens
+      - key: SYNDICATE_WNBA_SOURCE_APP_FALLBACK
+        value: "false"
       - key: MLB_ENABLE_LIVE_LENS_LOOP
         value: "false"
       - key: MLB_ENABLE_LIVE_LENS_BACKGROUND_REPORTS
@@ -160,25 +166,25 @@ services:
           type: keyvalue
           property: connectionString
       - key: SYNDICATE_DATA_ROOT
-        value: data
+        value: /opt/render/project/data
       - key: SYNDICATE_MLB_SOURCE_ROOT
-        value: data/mlb_source
+        value: /opt/render/project/data/mlb_source
       - key: SYNDICATE_NBA_SOURCE_ROOT
-        value: data/nba_source
+        value: /opt/render/project/data/nba_source
       - key: SYNDICATE_NBA_ARTIFACT_ROOT
-        value: data/nba_source/source_artifacts
+        value: /opt/render/project/data/nba_source/source_artifacts
       - key: SYNDICATE_NHL_SOURCE_ROOT
-        value: data/nhl_source
+        value: /opt/render/project/data/nhl_source
       - key: SYNDICATE_NFL_SOURCE_ROOT
-        value: data/nfl_source
+        value: /opt/render/project/data/nfl_source
       - key: SYNDICATE_NCAAF_SOURCE_ROOT
-        value: data/ncaaf_source
+        value: /opt/render/project/data/ncaaf_source
       - key: SYNDICATE_NCAAB_SOURCE_ROOT
-        value: data/ncaab_source
+        value: /opt/render/project/data/ncaab_source
       - key: SYNDICATE_WNBA_SOURCE_ROOT
-        value: data/wnba_source
+        value: /opt/render/project/data/wnba_source
       - key: SYNDICATE_REPORTS_ROOT
-        value: reports
+        value: /opt/render/project/data/reports
       - key: SYNDICATE_BOOTSTRAP_ON_START
         value: "0"
       - key: SYNDICATE_NBA_SOURCE_APP_FALLBACK
