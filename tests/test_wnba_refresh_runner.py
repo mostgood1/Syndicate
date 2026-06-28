@@ -1624,8 +1624,62 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
                     source_root=source_root,
                 )
 
-        export_snapshots.assert_called_once_with(source_root=source_root, date_str="2026-06-06", processed_root=processed_root)
+        export_snapshots.assert_called_once_with(source_root=artifact_root, date_str="2026-06-06", processed_root=processed_root)
         self.assertEqual(copied.get("live_lines_path"), "written")
+
+    def test_materialize_artifact_bundle_builds_game_cards_when_bundle_lacks_export(self) -> None:
+        module = self._load_module()
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_root = Path(tmp_dir)
+            artifact_root = tmp_root / "bundle"
+            processed_root = artifact_root / "data" / "processed"
+            raw_root = artifact_root / "data" / "raw"
+            processed_root.mkdir(parents=True, exist_ok=True)
+            raw_root.mkdir(parents=True, exist_ok=True)
+            source_root = tmp_root / "source"
+            source_root.mkdir(parents=True, exist_ok=True)
+
+            date_str = "2026-06-27"
+            (processed_root / f"game_odds_{date_str}.csv").write_text(
+                "date,home_team,visitor_team,commence_time,home_ml,away_ml,home_spread,away_spread,total,bookmaker\n"
+                "2026-06-27,Chicago Sky,Minnesota Lynx,2026-06-27T23:00:00Z,-140,120,-4.5,4.5,164.5,oddsapi_consensus\n",
+                encoding="utf-8",
+            )
+            (raw_root / f"odds_wnba_player_props_{date_str}.csv").write_text(
+                "snapshot_ts,event_id,commence_time,bookmaker,bookmaker_title,market,outcome_name,player_name,point,price,last_update,home_team,away_team\n"
+                "2026-06-27T12:00:00Z,401,2026-06-27T23:00:00Z,fanduel,FanDuel,h2h,Chicago Sky,,,-140,2026-06-27T12:00:00Z,Chicago Sky,Minnesota Lynx\n"
+                "2026-06-27T12:00:00Z,401,2026-06-27T23:00:00Z,fanduel,FanDuel,h2h,Minnesota Lynx,,,120,2026-06-27T12:00:00Z,Chicago Sky,Minnesota Lynx\n"
+                "2026-06-27T12:00:00Z,401,2026-06-27T23:00:00Z,fanduel,FanDuel,spreads,Chicago Sky,,-4.5,-110,2026-06-27T12:00:00Z,Chicago Sky,Minnesota Lynx\n"
+                "2026-06-27T12:00:00Z,401,2026-06-27T23:00:00Z,fanduel,FanDuel,spreads,Minnesota Lynx,,4.5,-110,2026-06-27T12:00:00Z,Chicago Sky,Minnesota Lynx\n"
+                "2026-06-27T12:00:00Z,401,2026-06-27T23:00:00Z,fanduel,FanDuel,totals,Over,,164.5,-110,2026-06-27T12:00:00Z,Chicago Sky,Minnesota Lynx\n"
+                "2026-06-27T12:00:00Z,401,2026-06-27T23:00:00Z,fanduel,FanDuel,totals,Under,,164.5,-110,2026-06-27T12:00:00Z,Chicago Sky,Minnesota Lynx\n",
+                encoding="utf-8",
+            )
+
+            state = {
+                "date": date_str,
+                "snapshot_alias_path": str(processed_root / f"oddsapi_player_props_{date_str}.csv"),
+                "predictions_path": str(processed_root / f"props_predictions_{date_str}.csv"),
+                "edges_path": str(processed_root / f"props_edges_{date_str}.csv"),
+                "recs_path": str(processed_root / f"props_recommendations_{date_str}.csv"),
+                "snapshot_path": str(raw_root / f"odds_wnba_player_props_{date_str}.csv"),
+            }
+            (processed_root / f"oddsapi_player_props_{date_str}.csv").write_text("id\n1\n", encoding="utf-8")
+
+            with patch.object(module, "_export_recon_games_artifact", return_value=None), patch.object(module, "_export_recon_quarters_artifact", return_value=None), patch.object(module, "_export_boxscores_artifact", return_value=None), patch.object(module, "_export_recommendations_artifact", return_value=None), patch.object(module, "_export_recommendations_slate_snapshot", return_value=None), patch.object(module, "_export_cards_props_snapshot", return_value=None), patch.object(module, "_export_cards_sim_detail_snapshot", return_value=None), patch.object(module, "_export_top_by_game_snapshot", return_value=None), patch.object(module, "_export_live_lens_artifacts", return_value={}), patch.object(module, "_build_optional_player_recon_artifacts", return_value={}), patch.object(module, "_export_live_snapshot_artifacts", return_value={}):
+                copied = module._materialize_artifact_bundle(
+                    state=state,
+                    artifact_root=artifact_root,
+                    source_root=source_root,
+                )
+
+            game_cards_path = processed_root / f"game_cards_{date_str}.csv"
+            self.assertTrue(game_cards_path.exists())
+            self.assertIn("game_cards_path", copied)
+            written = game_cards_path.read_text(encoding="utf-8")
+            self.assertIn("Chicago Sky", written)
+            self.assertIn("Minnesota Lynx", written)
 
     def test_main_materializes_core_artifacts_into_bundle_root(self) -> None:
         module = self._load_module()

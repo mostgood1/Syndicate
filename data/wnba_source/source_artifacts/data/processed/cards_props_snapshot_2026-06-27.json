@@ -1,0 +1,95 @@
+{
+  "date": "2026-06-27",
+  "games": [
+    {
+      "home_tri": "SEA",
+      "away_tri": "ATL",
+      "game_id": "1",
+      "prop_recommendations": {
+        "home": [
+          {
+            "market": "points",
+            "stat": "points",
+            "side": "OVER",
+            "line": 14.5,
+            "price": -110,
+            "edge": 0.5,
+            "ev": 0.05,
+            "ev_pct": 5.0,
+            "p_win": 0.5738095238095239,
+            "proj": 15.2,
+            "book": "draftkings",
+            "display_pick": "Example Player OVER 14.5",
+            "selection": "OVER 14.5",
+            "basketball_summary": "Example summary",
+            "basketball_reasons": [
+              "seeded"
+            ],
+            "player": "Example Player",
+            "team": "SEA",
+            "opponent": "ATL",
+            "tier": "Medium",
+            "score": 5.0,
+            "recommendation_priority_score": 5.0,
+            "basketball_priority_score": 5.0,
+            "picks": [
+              {
+                "market": "points",
+                "stat": "points",
+                "side": "OVER",
+                "line": 14.5,
+                "price": -110,
+                "edge": 0.5,
+                "ev": 0.05,
+                "ev_pct": 5.0,
+                "p_win": 0.5738095238095239,
+                "proj": 15.2,
+                "book": "draftkings",
+                "display_pick": "Example Player OVER 14.5",
+                "selection": "OVER 14.5",
+                "basketball_summary": "Example summary",
+                "basketball_reasons": [
+                  "seeded"
+                ],
+                "player": "Example Player",
+                "team": "SEA",
+                "opponent": "ATL",
+                "tier": "Medium",
+                "score": 5.0,
+                "recommendation_priority_score": 5.0,
+                "basketball_priority_score": 5.0
+              }
+            ],
+            "best": {
+              "market": "points",
+              "stat": "points",
+              "side": "OVER",
+              "line": 14.5,
+              "price": -110,
+              "edge": 0.5,
+              "ev": 0.05,
+              "ev_pct": 5.0,
+              "p_win": 0.5738095238095239,
+              "proj": 15.2,
+              "book": "draftkings",
+              "display_pick": "Example Player OVER 14.5",
+              "selection": "OVER 14.5",
+              "basketball_summary": "Example summary",
+              "basketball_reasons": [
+                "seeded"
+              ],
+              "player": "Example Player",
+              "team": "SEA",
+              "opponent": "ATL",
+              "tier": "Medium",
+              "score": 5.0,
+              "recommendation_priority_score": 5.0,
+              "basketball_priority_score": 5.0
+            }
+          }
+        ],
+        "away": []
+      }
+    }
+  ]
+}

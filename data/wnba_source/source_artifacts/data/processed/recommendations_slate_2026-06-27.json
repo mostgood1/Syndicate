@@ -1,0 +1,32 @@
+{
+  "date": "2026-06-27",
+  "counts": {
+    "games": 1,
+    "picks": 1
+  },
+  "per_game": [
+    {
+      "home": "SEA",
+      "away": "ATL",
+      "matchup": "ATL @ SEA",
+      "picks": [
+        {
+          "market": "PROPS",
+          "team": "SEA",
+          "display_pick": "Example Player OVER 14.5",
+          "selection": "OVER 14.5",
+          "price": -110.0,
+          "score": 5.0,
+          "ev_pct": 5.0,
+          "win_prob": 0.54,
+          "p_win": 0.54,
+          "basketball_summary": "Points projection 15.2",
+          "top_play_reasons": [
+            "seeded"
+          ],
+          "matchup": "ATL @ SEA"
+        }
+      ]
+    }
+  ]
+}

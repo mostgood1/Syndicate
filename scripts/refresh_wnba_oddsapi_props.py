@@ -160,6 +160,11 @@ def _copy_existing_live_snapshot_artifact(*, source_root: Path, file_name: str, 
     if not source.exists() or not source.is_file():
         return None
     destination.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        if source.resolve() == destination.resolve():
+            return str(destination)
+    except Exception:
+        pass
     shutil.copy2(source, destination)
     return str(destination)
 
@@ -1420,8 +1425,12 @@ def _build_local_cards_props_snapshot_artifact(*, processed_root: Path, date_str
     return len(games_out), out_path
 
 
-def _build_local_game_cards_artifact(*, source_root: Path, processed_root: Path, date_str: str, log_file: Path) -> tuple[int, Path | None]:
+def _build_local_game_cards_artifact(*, source_root: Path, processed_root: Path, date_str: str, log_file: Path | None = None) -> tuple[int, Path | None]:
     out_path = processed_root / f"game_cards_{date_str}.csv"
+
+    def _log(message: str) -> None:
+        if log_file is not None:
+            _append_log(log_file, message)
 
     raw_candidates = [
         source_root / "data" / "raw" / f"odds_wnba_current_{date_str}.csv",
@@ -1493,13 +1502,13 @@ def _build_local_game_cards_artifact(*, source_root: Path, processed_root: Path,
                             for current in rows_out:
                                 writer.writerow({field: current.get(field, "") for field in header_order})
 
-                        _append_log(log_file, f"Built local game_cards from raw player props snapshot fallback: {out_path} (rows={len(rows_out)})")
+                        _log(f"Built local game_cards from raw player props snapshot fallback: {out_path} (rows={len(rows_out)})")
                         return len(rows_out), out_path
 
         # Fallback to processed game_odds when raw team odds snapshots are unavailable.
         game_odds_path = source_root / "data" / "processed" / f"game_odds_{date_str}.csv"
         if not game_odds_path.exists() or not game_odds_path.is_file() or _count_csv_rows_quick(game_odds_path) <= 0:
-            _append_log(log_file, f"Local game_cards build skipped for {date_str}: no raw team odds snapshot found")
+            _log(f"Local game_cards build skipped for {date_str}: no raw team odds snapshot found")
             return 0, None
 
         allowed_matchups: set[tuple[str, str]] = set()
@@ -1551,7 +1560,7 @@ def _build_local_game_cards_artifact(*, source_root: Path, processed_root: Path,
         if not rows_out:
             if out_path.exists() and out_path.is_file():
                 out_path.unlink()
-            _append_log(log_file, f"Local game_cards build skipped for {date_str}: processed game_odds had no usable rows")
+            _log(f"Local game_cards build skipped for {date_str}: processed game_odds had no usable rows")
             return 0, None
 
         header_order = [
@@ -1587,7 +1596,7 @@ def _build_local_game_cards_artifact(*, source_root: Path, processed_root: Path,
         else:
             raw_frame = pd.read_csv(raw_path)
     except Exception as exc:
-        _append_log(log_file, f"Failed to read raw team odds snapshot {raw_path}: {exc}")
+        _log(f"Failed to read raw team odds snapshot {raw_path}: {exc}")
         return 0, None
 
     if raw_frame.empty:
@@ -1595,7 +1604,7 @@ def _build_local_game_cards_artifact(*, source_root: Path, processed_root: Path,
 
     required_columns = {"event_id", "commence_time", "market", "outcome_name", "point", "price", "home_team", "away_team"}
     if not required_columns.issubset(set(str(column) for column in raw_frame.columns)):
-        _append_log(log_file, f"Local game_cards build skipped for {date_str}: raw team odds snapshot missing required columns")
+        _log(f"Local game_cards build skipped for {date_str}: raw team odds snapshot missing required columns")
         return 0, None
 
     working = raw_frame.copy()
@@ -3788,6 +3797,7 @@ def _materialize_artifact_bundle(*, state: dict[str, object], artifact_root: Pat
     processed_root = artifact_root / "data" / "processed"
     raw_root = artifact_root / "data" / "raw"
     live_lens_root = artifact_root / "data" / "live_lens"
+    bundle_source_root = artifact_root
     copied: dict[str, object] = {}
     artifact_map = {
         "snapshot_alias_path": processed_root / Path(str(state.get("snapshot_alias_path") or "")).name,
@@ -3818,40 +3828,40 @@ def _materialize_artifact_bundle(*, state: dict[str, object], artifact_root: Pat
             copied["smart_sim_paths"] = smart_sim_files
         # Reused refresh states can still be incomplete, so always materialize the
         # render-facing WNBA exports into the published artifact tree.
-        recon_games_path = _export_recon_games_artifact(source_root=source_root, date_str=date_text, processed_root=processed_root)
+        recon_games_path = _export_recon_games_artifact(source_root=bundle_source_root, date_str=date_text, processed_root=processed_root)
         if recon_games_path:
             copied["recon_games_path"] = recon_games_path
-        recon_quarters_path = _export_recon_quarters_artifact(source_root=source_root, date_str=date_text, processed_root=processed_root)
+        recon_quarters_path = _export_recon_quarters_artifact(source_root=bundle_source_root, date_str=date_text, processed_root=processed_root)
         if recon_quarters_path:
             copied["recon_quarters_path"] = recon_quarters_path
-        game_cards_path = _export_game_cards_artifact(source_root=source_root, date_str=date_text, processed_root=processed_root)
+        game_cards_path = _export_game_cards_artifact(source_root=bundle_source_root, date_str=date_text, processed_root=processed_root)
         if game_cards_path:
             copied["game_cards_path"] = game_cards_path
-        boxscores_path = _export_boxscores_artifact(source_root=source_root, date_str=date_text, processed_root=processed_root)
+        boxscores_path = _export_boxscores_artifact(source_root=bundle_source_root, date_str=date_text, processed_root=processed_root)
         if boxscores_path:
             copied["boxscores_path"] = boxscores_path
-        recommendations_path = _export_recommendations_artifact(source_root=source_root, date_str=date_text, processed_root=processed_root)
+        recommendations_path = _export_recommendations_artifact(source_root=bundle_source_root, date_str=date_text, processed_root=processed_root)
         if recommendations_path:
             copied["recommendations_path"] = recommendations_path
-        recon_props_path = _export_recon_props_artifact(source_root=source_root, date_str=date_text, processed_root=processed_root)
+        recon_props_path = _export_recon_props_artifact(source_root=bundle_source_root, date_str=date_text, processed_root=processed_root)
         if recon_props_path:
             copied["recon_props_path"] = recon_props_path
-        recommendations_slate_path = _export_recommendations_slate_snapshot(source_root=source_root, date_str=date_text, processed_root=processed_root)
+        recommendations_slate_path = _export_recommendations_slate_snapshot(source_root=bundle_source_root, date_str=date_text, processed_root=processed_root)
         if recommendations_slate_path:
             copied["recommendations_slate_path"] = recommendations_slate_path
-        cards_props_snapshot_path = _export_cards_props_snapshot(source_root=source_root, date_str=date_text, processed_root=processed_root)
+        cards_props_snapshot_path = _export_cards_props_snapshot(source_root=bundle_source_root, date_str=date_text, processed_root=processed_root)
         if cards_props_snapshot_path:
             copied["cards_props_snapshot_path"] = cards_props_snapshot_path
-        cards_sim_detail_path = _export_cards_sim_detail_snapshot(source_root=source_root, date_str=date_text, processed_root=processed_root)
+        cards_sim_detail_path = _export_cards_sim_detail_snapshot(source_root=bundle_source_root, date_str=date_text, processed_root=processed_root)
         if cards_sim_detail_path:
             copied["cards_sim_detail_path"] = cards_sim_detail_path
-        top_by_game_path = _export_top_by_game_snapshot(source_root=source_root, date_str=date_text, processed_root=processed_root)
+        top_by_game_path = _export_top_by_game_snapshot(source_root=bundle_source_root, date_str=date_text, processed_root=processed_root)
         if top_by_game_path:
             copied["top_by_game_path"] = top_by_game_path
-        copied.update(_export_live_lens_artifacts(source_root=source_root, date_str=date_text, processed_root=processed_root, live_lens_root=live_lens_root))
-        copied.update(_build_optional_player_recon_artifacts(source_root=source_root, date_str=date_text, processed_root=processed_root))
+        copied.update(_export_live_lens_artifacts(source_root=bundle_source_root, date_str=date_text, processed_root=processed_root, live_lens_root=live_lens_root))
+        copied.update(_build_optional_player_recon_artifacts(source_root=bundle_source_root, date_str=date_text, processed_root=processed_root))
         if not reuse_existing_run:
-            copied.update(_export_live_snapshot_artifacts(source_root=source_root, date_str=date_text, processed_root=processed_root))
+            copied.update(_export_live_snapshot_artifacts(source_root=bundle_source_root, date_str=date_text, processed_root=processed_root))
     boxscores_history_path = _refresh_boxscores_history_artifact(source_root=source_root, processed_root=processed_root)
     if boxscores_history_path:
         copied["boxscores_history_path"] = boxscores_history_path
@@ -4027,6 +4037,14 @@ def _export_game_cards_artifact(*, source_root: Path, date_str: str, processed_r
     )
     if existing:
         return existing
+    local_rows, local_path = _build_local_game_cards_artifact(
+        source_root=source_root,
+        processed_root=processed_root,
+        date_str=date_str,
+        log_file=None,
+    )
+    if local_rows > 0 and local_path is not None:
+        return str(local_path)
     source = source_root / "data" / "processed" / f"game_cards_{date_str}.csv"
     if not source.exists() or not source.is_file():
         return None
