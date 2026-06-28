@@ -211,6 +211,53 @@ class HomePageCommandCenterTests(unittest.TestCase):
         self.assertEqual(mocked_render.call_args.kwargs["sports"][0]["name"], "NBA")
         self.assertTrue(mocked_render.call_args.kwargs["show_command_center"])
 
+    def test_home_payload_uses_light_shell_on_render_web_dyno(self) -> None:
+        from syndicate.blueprints import home as home_module
+
+        light_sports = [
+            {
+                "slug": "wnba",
+                "name": "WNBA",
+                "home_anchor": "wnba-home",
+                "data_health": "partial",
+                "freshness_label": "Stored slate",
+                "games_count": "—",
+                "props_count": "—",
+                "overview_stats": [],
+                "home_rails": {
+                    "compact": {"title": "", "items": [], "links": [], "empty_summary": "No game rows were surfaced for this slate."},
+                    "pregame": {"title": "", "items": [], "links": [], "empty_summary": "No prop rows were surfaced for this slate."},
+                    "live": {"title": "", "items": [], "links": [], "empty_summary": "No live rows were surfaced for this slate.", "links": []},
+                },
+                "game_bar": {"opportunity_tags": []},
+                "props_bar": {"opportunity_tags": []},
+                "feature_links": [],
+            }
+        ]
+
+        with patch("syndicate.blueprints.home._render_web_dyno", return_value=True), patch(
+            "syndicate.blueprints.home._build_light_home_sports",
+            return_value=light_sports,
+        ) as mocked_light, patch(
+            "syndicate.blueprints.home.build_home_overview",
+            side_effect=AssertionError("home overview should not be built on render web dynos"),
+        ), patch(
+            "syndicate.blueprints.home._build_home_dashboard",
+            return_value={"summary_cards": [], "live_watch": [], "top_props": [], "top_game_bets": [], "sport_summaries": []},
+        ) as mocked_dashboard, patch(
+            "syndicate.blueprints.home._build_home_command_center_contract",
+            return_value={"schema": "home_command_center_v1", "headline": "Syndicate main page", "lede": "One hub.", "shortcuts": [], "summary_cards": [], "live_watch": [], "top_props": [], "top_game_bets": [], "sport_summaries": []},
+        ) as mocked_command_center, patch(
+            "syndicate.blueprints.home.render_template",
+            return_value="ok",
+        ):
+            payload = home_module._home_payload(selected_date="2026-06-21", force_refresh=True)
+
+        self.assertEqual(payload["sports"], light_sports)
+        mocked_light.assert_called_once_with("2026-06-21")
+        mocked_dashboard.assert_called_once()
+        mocked_command_center.assert_called_once()
+
     def test_get_active_games_only_keeps_scheduled_and_live_rows(self) -> None:
         games = [
             {"gamePk": "1", "status": {"detailed": "Scheduled"}},

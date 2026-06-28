@@ -3,6 +3,7 @@ from __future__ import annotations
 import unittest
 from unittest.mock import patch
 
+from syndicate.features.nba.cards import build_cards_page_context
 from syndicate.features.nba.cards import _merge_games_with_live_state, build_cards_sim_detail_payload, build_live_lines_payload
 
 
@@ -91,6 +92,33 @@ class NbaCardsMergeAliasTests(unittest.TestCase):
 
         self.assertEqual(payload["games"], [{"event_id": "401859964", "found": False}])
         self.assertEqual(payload["requested_date"], "2026-05-22")
+
+    def test_cards_page_context_stays_artifact_first_on_render_web_dyno(self) -> None:
+        with patch("syndicate.features.nba.cards._render_web_dyno", return_value=True), patch(
+            "syndicate.features.nba.cards._games_from_artifacts",
+            return_value=([
+                {
+                    "gamePk": "1",
+                    "away_tri": "BOS",
+                    "home_tri": "NYK",
+                    "status": "Scheduled",
+                    "detail": "2026-05-22",
+                    "away": {"abbr": "BOS"},
+                    "home": {"abbr": "NYK"},
+                }
+            ], "cards.csv", "recs.json"),
+        ), patch(
+            "syndicate.features.nba.cards._merge_games_with_live_state",
+            side_effect=AssertionError("live merge should not run on render web dynos"),
+        ), patch(
+            "syndicate.features.nba.cards._games_from_live_state_fallback",
+            side_effect=AssertionError("live fallback should not run on render web dynos"),
+        ):
+            context = build_cards_page_context("2026-05-22", allow_stored_date_fallback=True)
+
+        self.assertEqual(context.get("source_title"), "NBA processed game cards")
+        self.assertEqual(context.get("date"), "2026-05-22")
+        self.assertEqual(len(context.get("games") or []), 1)
 
 
 if __name__ == "__main__":

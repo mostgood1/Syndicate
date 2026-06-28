@@ -2298,18 +2298,19 @@ def build_cards_page_context(selected_date: str, *, allow_stored_date_fallback: 
     parsed_date = parse_iso_date(resolved_date)
     games, cards_path, recs_path = _games_from_artifacts(resolved_date)
     had_artifact_games = bool(games)
-    games, live_source_path, supplemented_count, updated_count = _merge_games_with_live_state(games, resolved_date)
-    if supplemented_count > 0 or updated_count > 0:
-        if had_artifact_games:
-            source_title = "NBA processed game cards + live scoreboard supplement"
-            cards_path = f"{cards_path} | {live_source_path}"
-        else:
-            source_title = "NBA live scoreboard fallback"
-            cards_path = str(live_source_path)
-            recs_path = str(live_source_path)
+    if not _render_web_dyno():
+        games, live_source_path, supplemented_count, updated_count = _merge_games_with_live_state(games, resolved_date)
+        if supplemented_count > 0 or updated_count > 0:
+            if had_artifact_games:
+                source_title = "NBA processed game cards + live scoreboard supplement"
+                cards_path = f"{cards_path} | {live_source_path}"
+            else:
+                source_title = "NBA live scoreboard fallback"
+                cards_path = str(live_source_path)
+                recs_path = str(live_source_path)
     has_actionable_data = _games_have_actionable_data(games)
 
-    if not games and resolved_date == central_today_iso():
+    if not _render_web_dyno() and not games and resolved_date == central_today_iso():
         live_games, live_source_path = _games_from_live_state_fallback(resolved_date)
         if live_games:
             games = live_games
@@ -2319,7 +2320,7 @@ def build_cards_page_context(selected_date: str, *, allow_stored_date_fallback: 
             has_actionable_data = _games_have_actionable_data(games)
 
     # Prefer nearby local artifact-backed slates before any live/remote fallback.
-    if allow_stored_date_fallback and (not games or not has_actionable_data):
+    if not _render_web_dyno() and allow_stored_date_fallback and (not games or not has_actionable_data):
         fallback_date = None
         if games and not has_actionable_data:
             fallback_date = _next_available_actionable_cards_date(resolved_date)

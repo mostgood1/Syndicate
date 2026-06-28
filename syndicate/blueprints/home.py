@@ -66,6 +66,14 @@ def _home_selected_date(selected_date: str | None = None) -> str:
     return value or central_today_iso()
 
 
+def _render_web_dyno() -> bool:
+    return bool(
+        str(os.environ.get("RENDER") or "").strip().lower() in {"1", "true", "yes", "on"}
+        or str(os.environ.get("RENDER_EXTERNAL_URL") or "").strip()
+        or str(os.environ.get("RENDER_SERVICE_ID") or "").strip()
+    )
+
+
 def _allow_stored_date_fallback() -> bool:
     return False
 
@@ -4528,8 +4536,11 @@ def _home_payload(*, selected_date: str | None = None, cached_only: bool = False
             "html": render_template("shared/_home_sport_stack.html", sports=sports),
             "polled_at": time.time(),
         }
-    sports = current_app.config["SYNDICATE_SPORTS"]
-    overview = build_home_overview(sports, selected_date=effective_date, force_refresh=force_refresh)
+    if _render_web_dyno():
+        overview = _build_light_home_sports(effective_date)
+    else:
+        sports = current_app.config["SYNDICATE_SPORTS"]
+        overview = build_home_overview(sports, selected_date=effective_date, force_refresh=force_refresh)
     polled_at = time.time()
     polled_label = _format_home_timestamp(polled_at)
     for sport in overview:
