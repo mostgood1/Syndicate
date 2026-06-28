@@ -3,22 +3,23 @@
     "date":  "2026-06-28",
     "runMode":  "standard",
     "overallStatus":  "ok",
-    "generatedAt":  "2026-06-28T05:13:49.8209935+00:00",
-    "updatedAt":  "2026-06-28T05:33:28.8438565+00:00",
-    "runManifestPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-06-28\\20260628_051349\\unified_daily_update_run.json",
+    "generatedAt":  "2026-06-28T07:20:47.8131741+00:00",
+    "updatedAt":  "2026-06-28T07:40:23.9301932+00:00",
+    "runManifestPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-06-28\\20260628_072046\\unified_daily_update_run.json",
     "latestManifestPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest.json",
-    "runCheckpointPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-06-28\\20260628_051349\\unified_daily_update_checkpoint.json",
+    "runCheckpointPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-06-28\\20260628_072046\\unified_daily_update_checkpoint.json",
     "latestCheckpointPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest_checkpoint.json",
-    "runStatePath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-06-28\\20260628_051349\\unified_daily_update_run_state.json",
+    "runStatePath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-06-28\\20260628_072046\\unified_daily_update_run_state.json",
     "latestRunStatePath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest_run_state.json",
     "trace":  {
                   "eventSimExecutionCount":  21,
                   "artifactUpdateCount":  21,
-                  "inputFingerprintCount":  2,
+                  "inputFingerprintCount":  3,
                   "artifactPathCount":  21,
                   "inputFingerprints":  [
-                                            "a9c3165697afe5e76bc33a2a0f769f7b72164284c7022f28e59a4b34e8b3f32b",
-                                            "3be5e63107c259041d123831644c0db733165238e5c1df32e419b1a04d46160c"
+                                            "202737b9f0d501f71d0891612e066946a07c36ddfe8add7f6056e0aab344894e",
+                                            "b6978cd8f47bbebfa4c1028933e311366607f79c460fde585a3b5bd93afea73f",
+                                            "563a06b8e8830bba5d1cdcf73bb91ad105470d2e01ba859ebaa44c2126a6045d"
                                         ],
                   "artifactPaths":  [
                                         "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_0_NYM_at_CIN_pk824503_g1.json",
@@ -46,7 +47,7 @@
                   "simExecutionDecision":  true
               },
     "simulationContractPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest_simulation_contract.json",
-    "simulationContractRunPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-06-28\\20260628_051349\\unified_daily_update_simulation_contract.json",
+    "simulationContractRunPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-06-28\\20260628_072046\\unified_daily_update_simulation_contract.json",
     "simulationContractSportCount":  4,
     "simulationContractAdvancedBySport":  {
                                               "mlb":  {
@@ -439,11 +440,11 @@
                                                                                                                          "matchup":  {
                                                                                                                                          "away":  {
                                                                                                                                                       "tri":  "LVA",
-                                                                                                                                                      "name":  "Las Vegas Aces"
+                                                                                                                                                      "name":  "Away"
                                                                                                                                                   },
                                                                                                                                          "home":  {
                                                                                                                                                       "tri":  "CHI",
-                                                                                                                                                      "name":  "Chicago Sky"
+                                                                                                                                                      "name":  "Home"
                                                                                                                                                   }
                                                                                                                                      },
                                                                                                                          "status":  {
@@ -527,11 +528,11 @@
                                                                                                                          "matchup":  {
                                                                                                                                          "away":  {
                                                                                                                                                       "tri":  "NYL",
-                                                                                                                                                      "name":  "New York Liberty"
+                                                                                                                                                      "name":  "Away"
                                                                                                                                                   },
                                                                                                                                          "home":  {
                                                                                                                                                       "tri":  "GSV",
-                                                                                                                                                      "name":  "Golden State Valkyries"
+                                                                                                                                                      "name":  "Home"
                                                                                                                                                   }
                                                                                                                                      },
                                                                                                                          "status":  {
@@ -615,11 +616,11 @@
                                                                                                                          "matchup":  {
                                                                                                                                          "away":  {
                                                                                                                                                       "tri":  "POR",
-                                                                                                                                                      "name":  "Portland Fire"
+                                                                                                                                                      "name":  "Away"
                                                                                                                                                   },
                                                                                                                                          "home":  {
                                                                                                                                                       "tri":  "WSH",
-                                                                                                                                                      "name":  "Washington Mystics"
+                                                                                                                                                      "name":  "Home"
                                                                                                                                                   }
                                                                                                                                      },
                                                                                                                          "status":  {
@@ -703,11 +704,11 @@
                                                                                                                          "matchup":  {
                                                                                                                                          "away":  {
                                                                                                                                                       "tri":  "MIN",
-                                                                                                                                                      "name":  "Minnesota Lynx"
+                                                                                                                                                      "name":  "Away"
                                                                                                                                                   },
                                                                                                                                          "home":  {
                                                                                                                                                       "tri":  "DAL",
-                                                                                                                                                      "name":  "Dallas Wings"
+                                                                                                                                                      "name":  "Home"
                                                                                                                                                   }
                                                                                                                                      },
                                                                                                                          "status":  {
