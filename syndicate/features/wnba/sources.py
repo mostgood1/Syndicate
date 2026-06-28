@@ -1,20 +1,19 @@
 from __future__ import annotations
 
+import logging
 from functools import lru_cache
 from datetime import date
 from datetime import datetime
-import re
 import json
 from pathlib import Path
 from typing import Any
 
+from syndicate.features.shared.odds_control_plane import current_odds_root_for_sport
 from syndicate.features.shared.source_roots import preferred_artifact_roots
 from syndicate.features.shared.source_roots import preferred_source_roots
 from syndicate.features.shared.timezone import central_today
 from syndicate.features.shared.timezone import central_today_iso
-
-
-_DATE_TOKEN = re.compile(r"(\d{4}-\d{2}-\d{2})")
+_LOG = logging.getLogger(__name__)
 
 
 def _source_roots() -> list[Path]:
@@ -33,85 +32,31 @@ def default_wnba_source_root() -> Path:
     )[0]
 
 
-def _best_existing_path(candidates: list[Path]) -> Path | None:
-    existing: list[Path] = []
-    for candidate in candidates:
+def processed_root() -> Path:
+    return current_odds_root_for_sport("wnba")
+
+
+def _strict_artifact_path(filename: str, subdir: tuple[str, ...]) -> Path:
+    roots = _source_roots()
+    for root in roots:
+        candidate = root.joinpath("data", "processed", *subdir, filename)
         try:
             if candidate.exists() and candidate.is_file():
-                existing.append(candidate)
+                return candidate
         except OSError:
             continue
-    if not existing:
-        return None
 
-    def _score(path: Path) -> tuple[int, int, int]:
-        try:
-            stat = path.stat()
-            size = int(stat.st_size)
-            mtime = int(stat.st_mtime_ns)
-        except OSError:
-            return (0, 0, 0)
-
-        date_match = _DATE_TOKEN.search(path.name)
-        date_token = date_match.group(1) if date_match else ""
-
-        # Prefer the latest date-scoped snapshot when one exists, then fall back
-        # to size/mtime so non-date files still pick the most complete payload.
-        return (1 if date_token else 0, date_token, size, mtime)
-
-    return max(existing, key=_score)
-
-
-def _dated_fallback_candidates(roots: list[Path], subdir: tuple[str, ...], filename: str) -> list[Path]:
-    date_match = _DATE_TOKEN.search(filename)
-    if not date_match:
-        return []
-    pattern = f"{filename[:date_match.start()]}*{filename[date_match.end():]}"
-    candidates: list[Path] = []
-    for root in roots:
-        directory = root.joinpath(*subdir)
-        try:
-            if not directory.exists():
-                continue
-            for candidate in directory.glob(pattern):
-                try:
-                    if candidate.is_file():
-                        candidates.append(candidate)
-                except OSError:
-                    continue
-        except OSError:
-            continue
-    return candidates
+    missing_path = processed_root().joinpath(*subdir, filename)
+    _LOG.error("Missing WNBA artifact: %s", missing_path)
+    raise FileNotFoundError(f"Missing WNBA artifact: {missing_path}")
 
 
 def processed_path(filename: str) -> Path:
-    roots = _source_roots()
-    for root in roots:
-        candidate = root / "data" / "processed" / filename
-        try:
-            if candidate.exists() and candidate.is_file():
-                return candidate
-        except OSError:
-            continue
-    fallback = _best_existing_path(_dated_fallback_candidates(roots, ("data", "processed"), filename))
-    if fallback is not None:
-        return fallback
-    return roots[0] / "data" / "processed" / filename
+    return _strict_artifact_path(filename, ())
 
 
 def live_snapshot_path(filename: str) -> Path:
-    roots = _source_roots()
-    for root in roots:
-        candidate = root / "data" / "processed" / "live_snapshots" / filename
-        try:
-            if candidate.exists() and candidate.is_file():
-                return candidate
-        except OSError:
-            continue
-    fallback = _best_existing_path(_dated_fallback_candidates(roots, ("data", "processed", "live_snapshots"), filename))
-    if fallback is not None:
-        return fallback
-    return roots[0] / "data" / "processed" / "live_snapshots" / filename
+    return _strict_artifact_path(filename, ("live_snapshots",))
 
 
 def parse_iso_date(value: str) -> date:

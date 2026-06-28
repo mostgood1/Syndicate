@@ -8,10 +8,32 @@ from syndicate.features.shared.refresh_state_store import read_json_file
 from syndicate.features.shared.refresh_state_store import data_root
 from syndicate.features.shared.refresh_state_store import reports_root
 from syndicate.features.shared.refresh_state_store import write_json_file
+from syndicate.features.shared.source_roots import preferred_artifact_roots
+from syndicate.features.shared.source_roots import preferred_source_roots
 
 
 def _utc_now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+
+def current_odds_root_for_sport(sport_slug: str) -> Path:
+    slug = str(sport_slug or "").strip().lower()
+    if slug == "nba":
+        roots = preferred_source_roots(__file__, env_var="SYNDICATE_NBA_SOURCE_ROOT", local_dir_name="nba_source")
+        if roots:
+            return (roots[0] / "data" / "processed").resolve()
+        return (Path(__file__).resolve().parents[3] / "data" / "nba_source" / "data" / "processed").resolve()
+    if slug == "wnba":
+        roots = preferred_artifact_roots(__file__, env_var="SYNDICATE_WNBA_SOURCE_ROOT", local_dir_name="wnba_source")
+        if roots:
+            return (roots[0] / "data" / "processed").resolve()
+        return (Path(__file__).resolve().parents[3] / "data" / "wnba_source" / "data" / "processed").resolve()
+    if slug == "nhl":
+        roots = preferred_source_roots(__file__, env_var="SYNDICATE_NHL_SOURCE_ROOT", local_dir_name="nhl_source")
+        if roots:
+            return (roots[0] / "data").resolve()
+        return (Path(__file__).resolve().parents[3] / "data" / "nhl_source" / "data").resolve()
+    raise ValueError(f"Unsupported sport for current odds root resolution: {sport_slug!r}")
 
 
 def odds_control_plane_root() -> Path:

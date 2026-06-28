@@ -10,6 +10,7 @@ import unicodedata
 from syndicate.features.shared.formatters import format_num
 from syndicate.features.shared.formatters import format_pct
 from syndicate.features.shared.formatters import format_signed_price
+from syndicate.features.shared.odds_control_plane import current_odds_root_for_sport
 from syndicate.features.shared.source_roots import preferred_artifact_roots
 from syndicate.features.shared.source_roots import preferred_source_roots
 from syndicate.features.shared.timezone import central_today
@@ -37,11 +38,7 @@ def default_nhl_source_root() -> Path:
 
 
 def _data_roots() -> list[Path]:
-    roots: list[Path] = []
-    source_roots = _source_roots()
-    if source_roots:
-        roots.append(source_roots[0] / "data")
-    return roots
+    return [current_odds_root_for_sport("nhl")]
 
 
 def default_nhl_data_root() -> Path:

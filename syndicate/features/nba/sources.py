@@ -11,6 +11,7 @@ from typing import Any
 
 from syndicate.features.shared.source_roots import preferred_artifact_roots
 from syndicate.features.shared.source_roots import preferred_source_roots
+from syndicate.features.shared.odds_control_plane import current_odds_root_for_sport
 from syndicate.features.shared.timezone import central_today
 from syndicate.features.shared.timezone import central_today_iso
 
@@ -37,18 +38,7 @@ def _artifact_roots() -> list[Path]:
 
 
 def artifact_processed_root() -> Path:
-    env_value = str(os.environ.get("SYNDICATE_NBA_ARTIFACT_ROOT") or "").strip()
-    if env_value:
-        root = Path(env_value).resolve()
-        if root.name == "processed" and root.parent.name == "data":
-            return root
-        if root.name == "data" and root.parent.name != "processed":
-            return (root / "processed").resolve()
-        return (root / "data" / "processed").resolve()
-    roots = _artifact_roots()
-    if roots:
-        return (roots[0] / "data" / "processed").resolve()
-    return (Path(__file__).resolve().parents[3] / "data" / "nba_source" / "data" / "processed").resolve()
+    return current_odds_root_for_sport("nba")
 
 
 def _first_existing_path(candidates: list[Path]) -> Path | None:
@@ -62,25 +52,11 @@ def _first_existing_path(candidates: list[Path]) -> Path | None:
 
 
 def processed_path(filename: str) -> Path:
-    roots = _artifact_roots()
-    if roots:
-        candidates = [(root / "data" / "processed" / filename) for root in roots]
-        best = _first_existing_path(candidates)
-        if best is not None:
-            return best
-        return roots[0] / "data" / "processed" / filename
-    return Path(__file__).resolve().parents[3] / "data" / "nba_source" / "data" / "processed" / filename
+    return artifact_processed_root() / filename
 
 
 def live_snapshot_path(filename: str) -> Path:
-    roots = _artifact_roots()
-    if roots:
-        candidates = [(root / "data" / "processed" / "live_snapshots" / filename) for root in roots]
-        best = _first_existing_path(candidates)
-        if best is not None:
-            return best
-        return roots[0] / "data" / "processed" / "live_snapshots" / filename
-    return Path(__file__).resolve().parents[3] / "data" / "nba_source" / "data" / "processed" / "live_snapshots" / filename
+    return artifact_processed_root() / "live_snapshots" / filename
 
 
 def _processed_candidate_path(filename: str, *, root: Path | None = None) -> Path:

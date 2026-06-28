@@ -31,6 +31,7 @@ from syndicate.features.wnba.sources import load_json
 from syndicate.features.wnba.sources import live_snapshot_path
 from syndicate.features.wnba.sources import market_label
 from syndicate.features.wnba.sources import parse_iso_date
+from syndicate.features.wnba.sources import processed_root
 from syndicate.features.wnba.sources import processed_path
 from syndicate.features.wnba.sources import _source_roots as _wnba_source_roots
 from syndicate.features.shared.source_roots import repo_root_from as _repo_root_from
@@ -2813,10 +2814,10 @@ def _median(values: list[float]) -> float | None:
 
 @lru_cache(maxsize=1)
 def _live_projection_calibration_index() -> dict[str, dict[Any, Any]]:
-    processed_root = processed_path("game_cards_2000-01-01.csv").parent
+    processed_root_dir = processed_root()
     stat_samples: dict[str, list[float]] = {}
     player_stat_samples: dict[tuple[str, str], list[float]] = {}
-    for path in processed_root.glob("live_player_lens_tuning_*.csv"):
+    for path in processed_root_dir.glob("live_player_lens_tuning_*.csv"):
         for row in _load_csv_rows(path):
             stat_key = str(row.get("stat") or "").strip().lower()
             player_key = _normalize_player_key(row.get("player_name"))
