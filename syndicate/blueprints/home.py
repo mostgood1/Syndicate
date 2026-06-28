@@ -502,10 +502,12 @@ def _wnba_live_state_games(selected_date: str) -> list[dict[str, Any]]:
         away_label = _safe_text(row.get("away"), "Away")
         home_label = _safe_text(row.get("home"), "Home")
         event_id = row.get("event_id")
+        game_id = str(row.get("game_id") or event_id or f"{away_label}@{home_label}").strip() or f"{away_label}@{home_label}"
         games.append(
             {
-                "gamePk": str(row.get("game_id") or "").strip() or f"{away_label}@{home_label}",
-                "event_id": row.get("event_id"),
+                "game_id": game_id,
+                "gamePk": game_id,
+                "event_id": event_id,
                 "away": {"abbr": away_label, "name": away_label, "score": row.get("away_pts")},
                 "home": {"abbr": home_label, "name": home_label, "score": row.get("home_pts")},
                 "status": {
@@ -1201,6 +1203,17 @@ def _finalize_home_prop_rows(rows: list[dict[str, Any]], *, slug: str, context_l
             if matched_away_label and matched_home_label:
                 away_label = matched_away_label
                 home_label = matched_home_label
+            if game_pk is None:
+                matched_game_pk = _int_or_none(matched_game.get("gamePk") or matched_game.get("game_pk") or matched_game.get("game_id"))
+                if matched_game_pk is not None:
+                    item["gamePk"] = matched_game_pk
+                    item["game_pk"] = matched_game_pk
+            if not item.get("game_id"):
+                matched_game_id = str(matched_game.get("game_id") or matched_game.get("gamePk") or matched_game.get("game_pk") or "").strip()
+                if matched_game_id:
+                    item["game_id"] = matched_game_id
+            if not item.get("event_id") and matched_game.get("event_id") is not None:
+                item["event_id"] = matched_game.get("event_id")
         away_logo = str(item.get("away_logo") or item.get("team_logo_url") or "").strip() or None
         home_logo = str(item.get("home_logo") or item.get("opponent_logo_url") or "").strip() or None
         if isinstance(matched_game, dict):
@@ -3986,6 +3999,12 @@ def _load_home_games(slug: str, *, context_label: str, season: int | None = None
             source_title = _safe_text(payload.get("source_title"), "")
             source_path = _safe_text(payload.get("source_path"), "")
             games = list(payload.get("games") or [])
+            if is_active_today and not get_active_games(games):
+                live_games = _wnba_live_state_games(context_label)
+                if live_games:
+                    games = live_games
+                    source_title = "WNBA live-state artifact fallback"
+                    source_path = f"live_state_{context_label}.jsonl"
             if has_app_context():
                 current_app.logger.info(
                     "WNBA cards payload for %s: source_title=%s source_path=%s games=%s requested_date=%s date=%s",

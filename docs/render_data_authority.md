@@ -57,6 +57,14 @@ Sport-specific live-lens and betting roots should point at the same mounted disk
 - On Render, fallback should remain disabled unless explicitly required for a recovery workflow.
 - Repo-local mirrors are acceptable only as a non-Render fallback.
 
+## WNBA artifact identity requirements
+
+- Every WNBA game artifact, home payload, live-state row, and prop row must carry a stable `event_id`.
+- When a source payload only exposes a matchup id or game id alias, normalize it to the same `event_id` contract before the payload leaves the WNBA feature layer.
+- Do not use a row index or other transient placeholder as the canonical WNBA game identifier.
+- WNBA timestamps and date selection logic must be normalized to Central time for request routing, artifact selection, and display so UTC boundaries do not split a single slate across two dates.
+- If a payload cannot be associated with an `event_id`, it should be treated as incomplete rather than silently re-keyed or merged under a synthetic id.
+
 ## Odds control plane and intelligence
 
 The intelligence layer reads persisted refresh state, the shared odds control plane, and the sport data roots above. The odds control plane should follow this precedence:

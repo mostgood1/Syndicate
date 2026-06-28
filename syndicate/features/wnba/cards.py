@@ -209,6 +209,8 @@ def _safe_float(value: Any) -> float | None:
 def _safe_text(value: Any, fallback: str = "") -> str:
     text = str(value or "").strip()
     return text or fallback
+def _wnba_generated_at() -> str:
+    return central_now().isoformat(timespec="seconds")
 
 
 def _parse_utc_datetime(value: Any) -> datetime | None:
@@ -1096,6 +1098,19 @@ def _wnba_advanced_contract(*, selected_date: str, requested_date: str, source_t
     }
 
 
+def _wnba_row_game_id(row: dict[str, Any], *, idx: int, away_tri: str, home_tri: str) -> str:
+    event_id = str(row.get("event_id") or "").strip()
+    if event_id:
+        return event_id
+    game_id = str(row.get("game_id") or "").strip()
+    if game_id and not game_id.isdigit() and game_id != str(idx):
+        return game_id
+    matchup_id = f"{away_tri}@{home_tri}"
+    if matchup_id:
+        return matchup_id
+    return str(idx)
+
+
 def _source_game_from_row(
     row: dict[str, str],
     *,
@@ -1112,7 +1127,7 @@ def _source_game_from_row(
     picks = rec_index.get((away_tri, home_tri), [])
     sim_game = sim_index.get((away_tri, home_tri))
     props_game = props_index.get((away_tri, home_tri)) if isinstance(props_index.get((away_tri, home_tri)), dict) else {}
-    game_id = str(row.get("game_id") or idx)
+    game_id = _wnba_row_game_id(row, idx=idx, away_tri=away_tri, home_tri=home_tri)
     sim_payload = _source_sim_payload(game_id, sim_game, row)
     score = sim_payload.get("score") if isinstance(sim_payload.get("score"), dict) else {}
     betting = _source_betting(
@@ -1329,7 +1344,7 @@ def _game_from_row(
     top_picks, pick_rows = _top_pick_items(picks)
     sim_groups, sim_stats = _sim_table_groups(sim_game, away_tri, home_tri)
     props_groups, prop_items = _props_table_groups(props_game, away_tri, home_tri)
-    game_id = str(row.get("game_id") or idx)
+    game_id = _wnba_row_game_id(row, idx=idx, away_tri=away_tri, home_tri=home_tri)
     sim_payload = _source_sim_stub(game_id, sim_game, row)
     score = sim_payload.get("score") if isinstance(sim_payload.get("score"), dict) else {}
     betting = _source_betting(
@@ -1351,7 +1366,7 @@ def _game_from_row(
     return {
         "game_id": game_id,
         "gamePk": game_id,
-        "event_id": row.get("event_id"),
+        "event_id": str(row.get("event_id") or game_id).strip() or game_id,
         "away_tri": away_tri,
         "away_name": away_name,
         "home_tri": home_tri,
@@ -1428,7 +1443,9 @@ def _game_by_id_from_artifacts(selected_date: str, game_pk: str | int) -> tuple[
     bundle = _artifact_bundle(selected_date)
     wanted = str(game_pk).strip()
     for idx, row in enumerate(bundle["rows"], start=1):
-        if str(row.get("game_id") or idx).strip() != wanted:
+        away_tri = _canonical_wnba_tri(str(row.get("away_tri") or str(row.get("visitor_team") or "")[:3]).strip().upper()) or "AWY"
+        home_tri = _canonical_wnba_tri(str(row.get("home_tri") or str(row.get("home_team") or "")[:3]).strip().upper()) or "HOM"
+        if _wnba_row_game_id(row, idx=idx, away_tri=away_tri, home_tri=home_tri) != wanted:
             continue
         return (
             _game_from_row(
@@ -1993,7 +2010,7 @@ def _public_scoreboard_live_state_payload(selected_date: str) -> dict[str, Any] 
         games.append(
             {
                 "game_id": str(event_id or f"{away_tri}@{home_tri}"),
-                "event_id": event_id,
+                "event_id": str(event_id or f"{away_tri}@{home_tri}"),
                 "home": home_tri,
                 "away": away_tri,
                 "home_tri": home_tri,
@@ -2017,7 +2034,7 @@ def _public_scoreboard_live_state_payload(selected_date: str) -> dict[str, Any] 
         "ttl": 12,
         "source": "espn_scoreboard_fallback",
         "games": games,
-        "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
+        "generated_at": _wnba_generated_at(),
     }
 
 
@@ -2089,8 +2106,40 @@ def _filtered_local_live_snapshot_payload(kind: str, selected_date: str, event_i
     return filtered_payload
 
 
+def _ensure_wnba_game_ids(payload: dict[str, Any]) -> dict[str, Any]:
+    if not isinstance(payload, dict):
+        return payload
+    games = payload.get("games") if isinstance(payload.get("games"), list) else None
+    if not games:
+        return payload
+    normalized_payload = dict(payload)
+    normalized_games: list[dict[str, Any]] = []
+    for game in games:
+        if not isinstance(game, dict):
+            continue
+        normalized_game = dict(game)
+        game_id = str(
+            normalized_game.get("game_id")
+            or normalized_game.get("gamePk")
+            or normalized_game.get("event_id")
+            or ""
+        ).strip()
+        if not game_id:
+            away_tri = str(normalized_game.get("away_tri") or normalized_game.get("away") or "").strip().upper()
+            home_tri = str(normalized_game.get("home_tri") or normalized_game.get("home") or "").strip().upper()
+            if away_tri and home_tri:
+                game_id = f"{away_tri}@{home_tri}"
+        if game_id:
+            normalized_game.setdefault("game_id", game_id)
+            normalized_game.setdefault("gamePk", game_id)
+            normalized_game.setdefault("event_id", game_id)
+        normalized_games.append(normalized_game)
+    normalized_payload["games"] = normalized_games
+    return normalized_payload
+
+
 def _attach_odds_refresh_timestamp(payload: dict[str, Any]) -> dict[str, Any]:
-    out = dict(payload)
+    out = _ensure_wnba_game_ids(dict(payload))
     timestamp = str(out.get("odds_refreshed_at") or out.get("generated_at") or "").strip()
     if not timestamp:
         timestamp = central_now().isoformat(timespec="seconds")
@@ -2103,7 +2152,7 @@ def _attach_odds_refresh_timestamp(payload: dict[str, Any]) -> dict[str, Any]:
         except Exception:
             pass
     out["odds_refreshed_at"] = timestamp
-    out.setdefault("generated_at", timestamp)
+    out["generated_at"] = timestamp
     return out
 
 
@@ -3231,7 +3280,7 @@ def _public_live_player_boxscore_payload(selected_date: str, event_ids: list[str
         "lookahead_applied": False,
         "source": "espn_summary_boxscore_fallback",
         "games": out_games,
-        "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
+        "generated_at": _wnba_generated_at(),
     }
 
 
@@ -3368,7 +3417,7 @@ def build_live_state_payload(selected_date: str, ttl: int = 12, *, allow_stored_
             "ttl": int(ttl),
             "source": "wnba_artifacts",
             "games": out_games,
-            "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
+            "generated_at": _wnba_generated_at(),
         })
 
     context = build_cards_page_context(selected_date, allow_stored_date_fallback=allow_stored_date_fallback)
@@ -3412,7 +3461,7 @@ def build_live_state_payload(selected_date: str, ttl: int = 12, *, allow_stored_
         "ttl": int(ttl),
         "source": "syndicate_cards_fallback",
         "games": out_games,
-        "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
+        "generated_at": _wnba_generated_at(),
     })
 
 
@@ -3441,8 +3490,8 @@ def build_live_player_boxscore_payload(
         "date": resolved_date or None,
         "requested_date": selected_date,
         "lookahead_applied": bool(resolved_date != selected_date),
-        "games": [{"event_id": event_id, "players": []} for event_id in normalized_event_ids],
-        "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
+        "games": [{"event_id": event_id, "game_id": event_id, "players": []} for event_id in normalized_event_ids],
+        "generated_at": _wnba_generated_at(),
     })
 
 
@@ -3502,7 +3551,7 @@ def build_live_player_lens_payload(
             "requested_date": selected_date,
             "lookahead_applied": bool(resolved_date != selected_date),
             "games": fallback_games,
-            "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
+            "generated_at": _wnba_generated_at(),
         }), resolved_date, normalized_event_ids, allow_stored_date_fallback=allow_stored_date_fallback)
     return _attach_odds_refresh_timestamp({
         "ok": True,
@@ -3513,7 +3562,7 @@ def build_live_player_lens_payload(
         "games": [
             {
                 "event_id": event_id,
-                "game_id": None,
+                "game_id": event_id,
                 "home": None,
                 "away": None,
                 "status": {"in_progress": False, "final": False, "period": None, "clock": ""},
@@ -3521,7 +3570,7 @@ def build_live_player_lens_payload(
             }
             for event_id in normalized_event_ids
         ],
-        "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
+        "generated_at": _wnba_generated_at(),
     })
 
 
@@ -3585,7 +3634,7 @@ def build_live_lines_payload(
             "lookahead_applied": bool(resolved_date != selected_date),
             "include_period_totals": bool(include_period_totals),
             "games": fallback_games,
-            "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
+            "generated_at": _wnba_generated_at(),
         }
         merged_payload = _merge_live_lines_payloads(merged_payload, fallback_payload)
         return _attach_odds_refresh_timestamp(_finalize_live_lines_payload(merged_payload or fallback_payload, include_period_totals=bool(include_period_totals)))
@@ -3598,8 +3647,8 @@ def build_live_lines_payload(
         "requested_date": selected_date,
         "lookahead_applied": bool(resolved_date != selected_date),
         "include_period_totals": bool(include_period_totals),
-        "games": [{"event_id": event_id, "found": False} for event_id in normalized_event_ids],
-        "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
+        "games": [{"event_id": event_id, "game_id": event_id, "found": False} for event_id in normalized_event_ids],
+        "generated_at": _wnba_generated_at(),
     })
 
 
@@ -3625,7 +3674,7 @@ def build_live_pbp_stats_payload(
         "games": [
             {
                 "event_id": event_id,
-                "game_id": None,
+                "game_id": event_id,
                 "home": None,
                 "away": None,
                 "pbp_attempts": {"home": {}, "away": {}, "unknown": {}, "total": {}},
@@ -3637,7 +3686,7 @@ def build_live_pbp_stats_payload(
             }
             for event_id in normalized_event_ids
         ],
-        "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
+        "generated_at": _wnba_generated_at(),
     })
 
 
@@ -3654,6 +3703,7 @@ def build_live_lens_tuning_payload(ttl: int = 300) -> dict[str, Any]:
             "ats": {"watch": 2.0, "bet": 4.0},
             "player_prop": {"watch": 2.0, "bet": 4.0},
         },
+        "generated_at": _wnba_generated_at(),
     }
 
 

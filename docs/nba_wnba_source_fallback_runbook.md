@@ -51,6 +51,15 @@ Notes:
 - Base URLs must be absolute, for example `https://<service>.onrender.com`
 - Tokens should match the standalone apps' accepted cron/auth token.
 
+## WNBA artifact requirements
+
+Treat the following as non-negotiable when working on WNBA artifacts or fallback behavior:
+
+- Every game row, prop row, live-state row, and downstream home card must be keyed by a stable `event_id`.
+- Matchup aliases and `game_id` variants are acceptable only as intermediate inputs; normalize them to the canonical `event_id` before returning payloads.
+- Never use UTC boundaries to decide the WNBA slate date when Central time is the contract date for routing and artifact selection.
+- If an artifact cannot be attached to an `event_id`, do not silently invent one from a row number or from a UTC-only date boundary.
+
 ## Verification checklist
 
 After deploy + env update, verify:
