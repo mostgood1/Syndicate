@@ -12,9 +12,17 @@ Constraints:
 
 from __future__ import annotations
 
+import json
 import re
 
 from typing import Any, Mapping
+
+
+def _intel_trace(event: str, **fields: Any) -> None:
+    try:
+        print(f"[INTEL_TRACE] {json.dumps({'event': event, **fields}, sort_keys=True, default=str)}", flush=True)
+    except Exception:
+        print(f"[INTEL_TRACE] {event}", flush=True)
 
 
 def _copy_mapping(value: Any) -> dict[str, Any]:
@@ -274,6 +282,13 @@ def build_intelligence_board_contract(response: Mapping[str, Any] | None) -> dic
         "archived_count": lane_counts["archived"],
         "active_lanes": active_lanes,
     }
+    _intel_trace(
+        "board_input",
+        opportunities_received=len(recommendations),
+        cards=len(cards),
+        lane_counts=lane_counts,
+        active_lanes=active_lanes,
+    )
     waterfall = [
         {"step": "source_response", "count": len(recommendations), "label": "Raw response recommendations"},
         {"step": "normalized_cards", "count": len(cards), "label": "Deduped board cards"},

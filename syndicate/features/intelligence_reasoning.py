@@ -1,7 +1,16 @@
 from __future__ import annotations
 
+import json
+
 from typing import Any
 from typing import Callable
+
+
+def _intel_trace(event: str, **fields: Any) -> None:
+    try:
+        print(f"[INTEL_TRACE] {json.dumps({'event': event, **fields}, sort_keys=True, default=str)}", flush=True)
+    except Exception:
+        print(f"[INTEL_TRACE] {event}", flush=True)
 
 
 def _analysis_brief_driver_items(
@@ -219,6 +228,14 @@ def build_analysis_brief(
     if not top:
         return None
 
+    _intel_trace(
+        "reasoning_input",
+        recommendation_count=len(recommendations),
+        has_analysis_views=bool(analysis_views),
+        has_supporting_evidence=bool(supporting_evidence),
+        focus=str((analysis_views or {}).get("focus") or "").strip().lower() if isinstance(analysis_views, dict) else None,
+    )
+
     sections: list[dict[str, Any]] = []
     matchup_bits = []
     target_name = safe_text(top.get("name") or top.get("pick"), "Top target")
@@ -299,6 +316,12 @@ def build_analysis_brief(
 
     if not sections:
         return None
+
+    _intel_trace(
+        "reasoning_output",
+        section_count=len(sections),
+        top_recommendation=target_name,
+    )
 
     focus = safe_text((analysis_views or {}).get("focus"), "")
     title = "Returned analysis brief"

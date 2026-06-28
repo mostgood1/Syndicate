@@ -92,6 +92,26 @@ def _utc_from_epoch(epoch_seconds: float) -> str | None:
     return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(epoch_seconds))
 
 
+def _timestamp_age_seconds(timestamp: str | None) -> float | None:
+    value = str(timestamp or "").strip()
+    if not value:
+        return None
+    normalized = value.replace("Z", "+00:00")
+    try:
+        parsed = datetime.fromisoformat(normalized)
+    except Exception:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=None)
+        try:
+            epoch = time.mktime(parsed.timetuple())
+        except Exception:
+            return None
+    else:
+        epoch = parsed.timestamp()
+    return max(0.0, time.time() - float(epoch))
+
+
 def _selected_date_from_payload(payload: dict[str, Any] | None) -> str | None:
     current = dict(payload or {})
     return str(current.get("date") or current.get("selected_date") or "").strip() or None
@@ -127,6 +147,74 @@ def _normalize_intelligence_state_payload(state: dict[str, Any] | None) -> dict[
         nested_response = dict(nested_response)
         nested_response["candidate_count"] = candidate_count
         current["response"] = nested_response
+    return current
+
+
+def _freshness_status_from_age(age_seconds: float | None, sla_seconds: int) -> str:
+    if age_seconds is None:
+        return "unknown"
+    return "fresh" if age_seconds <= float(sla_seconds) else "stale"
+
+
+def _snapshot_state_meta(snapshot: "IntelligenceSnapshot | None", *, source: str | None = None, run_key: str | None = None, sla_seconds: int | None = None) -> dict[str, Any]:
+    if snapshot is None:
+        return {
+            "source": source,
+            "computed_at": None,
+            "age_seconds": None,
+            "freshness_sla_seconds": int(sla_seconds or 0),
+            "freshness_status": "unknown",
+            "is_fresh": False,
+            "source_fingerprint": None,
+            "run_key": run_key,
+            "last_run_started_at": _utc_from_epoch(_INTELLIGENCE_LAST_RUN_STARTED_AT),
+            "last_run_finished_at": _utc_from_epoch(_INTELLIGENCE_LAST_RUN_FINISHED_AT),
+        }
+    age_seconds = _timestamp_age_seconds(snapshot.computed_at)
+    freshness_sla_seconds = int(sla_seconds if sla_seconds is not None else _env_int("SYNDICATE_INTELLIGENCE_REFRESH_INTERVAL_SECONDS", 30))
+    freshness_status = _freshness_status_from_age(age_seconds, freshness_sla_seconds)
+    return {
+        "source": source,
+        "computed_at": snapshot.computed_at,
+        "age_seconds": age_seconds,
+        "freshness_sla_seconds": freshness_sla_seconds,
+        "freshness_status": freshness_status,
+        "is_fresh": freshness_status == "fresh",
+        "source_fingerprint": snapshot.source_fingerprint,
+        "run_key": run_key or snapshot.key,
+        "last_run_started_at": _utc_from_epoch(_INTELLIGENCE_LAST_RUN_STARTED_AT),
+        "last_run_finished_at": _utc_from_epoch(_INTELLIGENCE_LAST_RUN_FINISHED_AT),
+    }
+
+
+def _decorate_response_with_state_meta(response: dict[str, Any] | None, snapshot: "IntelligenceSnapshot | None", *, source: str | None = None, run_key: str | None = None, sla_seconds: int | None = None) -> dict[str, Any] | None:
+    current = dict(response or {})
+    if not current:
+        return None
+    if snapshot is None:
+        computed_at = str(current.get("state_last_updated") or current.get("last_updated") or current.get("updated_at") or "").strip() or None
+        age_seconds = _timestamp_age_seconds(computed_at)
+        freshness_sla_seconds = int(sla_seconds if sla_seconds is not None else _env_int("SYNDICATE_INTELLIGENCE_REFRESH_INTERVAL_SECONDS", 30))
+        freshness_status = _freshness_status_from_age(age_seconds, freshness_sla_seconds)
+        state_meta = {
+            "source": source,
+            "computed_at": computed_at,
+            "age_seconds": age_seconds,
+            "freshness_sla_seconds": freshness_sla_seconds,
+            "freshness_status": freshness_status,
+            "is_fresh": freshness_status == "fresh",
+            "source_fingerprint": current.get("source_fingerprint"),
+            "run_key": run_key,
+            "last_run_started_at": _utc_from_epoch(_INTELLIGENCE_LAST_RUN_STARTED_AT),
+            "last_run_finished_at": _utc_from_epoch(_INTELLIGENCE_LAST_RUN_FINISHED_AT),
+        }
+    else:
+        state_meta = _snapshot_state_meta(snapshot, source=source, run_key=run_key, sla_seconds=sla_seconds)
+    current.setdefault("state_meta", state_meta)
+    current.setdefault("freshness", dict(current.get("state_meta") or {}))
+    current.setdefault("state_freshness", dict(current.get("state_meta") or {}))
+    current.setdefault("state_last_updated", str(current.get("state_last_updated") or current.get("last_updated") or current.get("updated_at") or (snapshot.computed_at if snapshot else "")).strip() or None)
+    current.setdefault("source_fingerprint", snapshot.source_fingerprint if snapshot is not None else current.get("source_fingerprint"))
     return current
 
 
@@ -194,9 +282,11 @@ def write_latest_intelligence_state(state: Any) -> dict[str, Any] | None:
         logger.info("STATE WRITTEN", extra={"written": False, "candidate_count": 0})
         return None
     daily_paths = _intelligence_state_daily_paths()
+    state_meta = dict(normalized.get("state_meta") or {})
     board_snapshot_payload = {
         "updated_at": _utc_now(),
         "response": dict(normalized),
+        "state_meta": state_meta,
         "board_contract": normalized.get("board_contract") if isinstance(normalized.get("board_contract"), dict) else None,
     }
     write_json_file(INTELLIGENCE_STATE_PATH, normalized)
@@ -953,14 +1043,15 @@ class IntelligenceStateService:
             elif self._is_stale(snapshot):
                 self._enqueue_locked(normalized_payload)
             if snapshot is not None and not refresh and not self._is_stale(snapshot):
-                return dict(snapshot.response)
+                return _decorate_response_with_state_meta(dict(snapshot.response), snapshot, source="worker", run_key=snapshot.key, sla_seconds=self._interval_seconds)
             if wait:
                 self._condition.wait_for(lambda: key in self._snapshots and not self._is_stale(self._snapshots[key]), timeout=self._wait_timeout_seconds)
             snapshot = self._snapshots.get(key)
             if snapshot is not None:
-                return dict(snapshot.response)
+                return _decorate_response_with_state_meta(dict(snapshot.response), snapshot, source="worker", run_key=snapshot.key, sla_seconds=self._interval_seconds)
             if self._latest_key and self._latest_key in self._snapshots:
-                return dict(self._snapshots[self._latest_key].response)
+                latest_snapshot = self._snapshots[self._latest_key]
+                return _decorate_response_with_state_meta(dict(latest_snapshot.response), latest_snapshot, source="worker", run_key=latest_snapshot.key, sla_seconds=self._interval_seconds)
         return None
 
     def read_latest_response(
@@ -974,17 +1065,14 @@ class IntelligenceStateService:
         key = _payload_key(normalized_payload)
         requested_date = _selected_date_from_payload(normalized_payload)
         with self._lock:
-            print("READING INTELLIGENCE STATE FROM DISK:", str(STATE_PATH))
             self._sync_persisted_state_locked(force=True)
             snapshot = self._snapshots.get(key)
             if snapshot is not None:
-                print("RETURNING state_last_updated:", snapshot.response.get("state_last_updated") if isinstance(snapshot.response, dict) else None)
-                return dict(snapshot.response)
+                return _decorate_response_with_state_meta(dict(snapshot.response), snapshot, source="worker", run_key=snapshot.key, sla_seconds=self._interval_seconds)
             latest_snapshot = self._snapshots.get(self._latest_key or "") if self._latest_key else None
             if latest_snapshot is not None:
                 latest_date = _selected_date_from_payload(latest_snapshot.payload)
                 if allow_latest_fallback or requested_date is None or latest_date is None or latest_date == requested_date:
-                    print("RETURNING state_last_updated:", latest_snapshot.response.get("state_last_updated") if isinstance(latest_snapshot.response, dict) else None)
                     return dict(latest_snapshot.response)
             return None
 
@@ -1139,10 +1227,11 @@ class IntelligenceStateService:
                 snapshot = self._snapshots.get(cache_key)
                 if snapshot is not None:
                     _log_stage_timing("request_total", (time.perf_counter() - request_started_at) * 1000.0)
-                    return dict(snapshot.response)
+                    return _decorate_response_with_state_meta(dict(snapshot.response), snapshot, source="worker", run_key=snapshot.key, sla_seconds=self._interval_seconds)
                 if self._latest_key and self._latest_key in self._snapshots:
                     _log_stage_timing("request_total", (time.perf_counter() - request_started_at) * 1000.0)
-                    return dict(self._snapshots[self._latest_key].response)
+                    latest_snapshot = self._snapshots[self._latest_key]
+                    return _decorate_response_with_state_meta(dict(latest_snapshot.response), latest_snapshot, source="worker", run_key=latest_snapshot.key, sla_seconds=self._interval_seconds)
             return {"ok": False, "error": "intelligence worker busy", "response": {}, "top_opportunities": [], "by_sport": {}, "analysis": None}
 
         try:
@@ -1215,7 +1304,7 @@ class IntelligenceStateService:
                 snapshot = IntelligenceSnapshot(
                     key=cache_key,
                     payload=dict(request_payload),
-                    response=dict(response),
+                    response=_decorate_response_with_state_meta(dict(response), None, source="worker", run_key=cache_key, sla_seconds=self._interval_seconds) or dict(response),
                     computed_at=_utc_now(),
                     source_fingerprint=source_fingerprint,
                 )
@@ -1308,6 +1397,7 @@ class IntelligenceStateService:
                     "latest_key": latest_snapshot.key,
                     "updated_at": _utc_now(),
                     "response": latest_snapshot.response,
+                    "state_meta": latest_snapshot.response.get("state_meta") if isinstance(latest_snapshot.response, dict) else None,
                     "board_contract": latest_snapshot.response.get("board_contract") if isinstance(latest_snapshot.response, dict) else None,
                 },
             )
@@ -1354,15 +1444,59 @@ def read_latest_intelligence_board_snapshot_response(payload: dict[str, Any] | N
     _ = force_refresh
     snapshot = read_json_file(BOARD_SNAPSHOT_PATH)
     if isinstance(snapshot, dict):
+        updated_at = str(snapshot.get("updated_at") or "").strip() or None
         response = snapshot.get("response")
         if isinstance(response, dict):
             if requested_date and _selected_date_from_response(response) not in {None, requested_date}:
                 return None
-            return dict(response)
+            decorated = dict(response)
+            state_meta = dict(decorated.get("state_meta") or {})
+            if not state_meta:
+                age_seconds = _timestamp_age_seconds(updated_at or decorated.get("state_last_updated") or decorated.get("last_updated") or decorated.get("updated_at"))
+                freshness_sla_seconds = _env_int("SYNDICATE_INTELLIGENCE_REFRESH_INTERVAL_SECONDS", 30)
+                state_meta = {
+                    "source": "board_snapshot",
+                    "computed_at": updated_at or decorated.get("state_last_updated") or decorated.get("last_updated") or decorated.get("updated_at"),
+                    "age_seconds": age_seconds,
+                    "freshness_sla_seconds": freshness_sla_seconds,
+                    "freshness_status": _freshness_status_from_age(age_seconds, freshness_sla_seconds),
+                    "is_fresh": bool(age_seconds is not None and age_seconds <= float(freshness_sla_seconds)),
+                    "source_fingerprint": decorated.get("source_fingerprint"),
+                    "run_key": snapshot.get("latest_key"),
+                    "last_run_started_at": None,
+                    "last_run_finished_at": None,
+                }
+            decorated.setdefault("state_meta", state_meta)
+            decorated.setdefault("freshness", dict(state_meta))
+            decorated.setdefault("state_freshness", dict(state_meta))
+            decorated.setdefault("state_last_updated", updated_at or decorated.get("state_last_updated") or decorated.get("last_updated") or decorated.get("updated_at"))
+            return decorated
         if all(key in snapshot for key in ("ok", "analysis", "top_opportunities")):
             if requested_date and _selected_date_from_response(snapshot) not in {None, requested_date}:
                 return None
-            return dict(snapshot)
+            decorated = dict(snapshot)
+            updated_at = str(decorated.get("updated_at") or decorated.get("state_last_updated") or "").strip() or None
+            age_seconds = _timestamp_age_seconds(updated_at)
+            freshness_sla_seconds = _env_int("SYNDICATE_INTELLIGENCE_REFRESH_INTERVAL_SECONDS", 30)
+            state_meta = decorated.get("state_meta") if isinstance(decorated.get("state_meta"), dict) else {}
+            if not state_meta:
+                state_meta = {
+                    "source": "board_snapshot",
+                    "computed_at": updated_at,
+                    "age_seconds": age_seconds,
+                    "freshness_sla_seconds": freshness_sla_seconds,
+                    "freshness_status": _freshness_status_from_age(age_seconds, freshness_sla_seconds),
+                    "is_fresh": bool(age_seconds is not None and age_seconds <= float(freshness_sla_seconds)),
+                    "source_fingerprint": decorated.get("source_fingerprint"),
+                    "run_key": snapshot.get("latest_key"),
+                    "last_run_started_at": None,
+                    "last_run_finished_at": None,
+                }
+            decorated.setdefault("state_meta", state_meta)
+            decorated.setdefault("freshness", dict(state_meta))
+            decorated.setdefault("state_freshness", dict(state_meta))
+            decorated.setdefault("state_last_updated", updated_at)
+            return decorated
     return None
 
 

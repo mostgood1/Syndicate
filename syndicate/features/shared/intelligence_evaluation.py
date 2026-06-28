@@ -31,6 +31,13 @@ SCHEMA_VERSION = 1
 DEFAULT_LEDGER_PATH = repo_root_from(__file__) / "reports" / "intelligence" / "evaluation_ledger.jsonl"
 
 
+def _intel_trace(event: str, **fields: Any) -> None:
+    try:
+        print(f"[INTEL_TRACE] {json.dumps({'event': event, **fields}, sort_keys=True, default=str)}", flush=True)
+    except Exception:
+        print(f"[INTEL_TRACE] {event}", flush=True)
+
+
 def _copy_mapping(value: Any) -> dict[str, Any]:
     return dict(value) if isinstance(value, Mapping) else {}
 
@@ -209,6 +216,14 @@ def build_artifact_metadata(*, query: Any, response: Any) -> dict[str, Any]:
     deltas = [abs(context["delta"]) for context in movement_contexts if context.get("delta") is not None]
     update_timestamps = [context["last_odds_update_timestamp"] for context in movement_contexts if context.get("last_odds_update_timestamp")]
     manifest_summary = _artifact_manifest_summary(selected_date=selected_date, sport=sport)
+    _intel_trace(
+        "evaluation_artifact_metadata",
+        selected_date=selected_date,
+        sport=sport,
+        recommendation_count=len([item for item in recommendations if isinstance(item, Mapping)]),
+        manifest_count=manifest_summary.get("manifest_count") if isinstance(manifest_summary, dict) else None,
+        has_analysis_views=bool(analysis_views),
+    )
     return {
         "selected_date": selected_date,
         "sport": sport,
@@ -748,6 +763,14 @@ def build_reliability_profile(*, records: Iterable[Mapping[str, Any]] | None = N
     win_rate_adjustment = 0.0 if win_rate is None else max(-0.04, min(0.04, (win_rate - 0.5) * 0.08))
     roi_adjustment = 0.0 if roi is None else max(-0.03, min(0.03, roi * 0.12))
     reliability_multiplier = round(max(0.78, min(1.06, 1.0 - calibration_penalty + win_rate_adjustment + roi_adjustment)), 3)
+    _intel_trace(
+        "evaluation_reliability_profile",
+        sport=sport,
+        sample_size=sample_size,
+        settled_count=metrics.get("settled_count"),
+        calibration_error=calibration_error,
+        reliability_multiplier=reliability_multiplier,
+    )
     return {
         "sport": sport,
         "sample_size": sample_size,
@@ -839,6 +862,14 @@ def build_intelligence_evaluation_bundle(*, query: Any, response: Any, persist: 
         ledger_path=ledger_path,
         sport=artifact_metadata.get("sport"),
         market_family=_record_market_family(recommendation_records[0]) if recommendation_records else None,
+    )
+    _intel_trace(
+        "evaluation_bundle",
+        recommendation_count=len(recommendation_rows),
+        recommendation_records=len(recommendation_records),
+        portfolio_event_records=len(portfolio_event_records),
+        market_features=len(market_features),
+        history_status=history_summary.get("history_status") if isinstance(history_summary, dict) else None,
     )
     return {
         "schema_version": SCHEMA_VERSION,

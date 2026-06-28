@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+
 from typing import Any
 
 from syndicate.features.intelligence_analysis_common import candidate_analysis_row
@@ -10,6 +12,13 @@ from syndicate.features.ncaab.intelligence_analysis import build_ncaab_matchup_a
 from syndicate.features.nfl.intelligence_analysis import build_football_market_analysis_views
 from syndicate.features.nhl.intelligence_analysis import build_hockey_prop_analysis_views
 from syndicate.features.wnba.intelligence_analysis import build_wnba_matchup_analysis_views
+
+
+def _intel_trace(event: str, **fields: Any) -> None:
+    try:
+        print(f"[INTEL_TRACE] {json.dumps({'event': event, **fields}, sort_keys=True, default=str)}", flush=True)
+    except Exception:
+        print(f"[INTEL_TRACE] {event}", flush=True)
 
 
 def _analysis_table_sort_options(table: dict[str, Any]) -> list[dict[str, Any]]:
@@ -68,6 +77,14 @@ def build_generic_market_analysis_views(
     ]
     if requested_markets:
         filtered = [candidate for candidate in filtered if candidate_market_focuses(candidate) & requested_markets]
+    _intel_trace(
+        "analysis_views_input",
+        focus="market_board",
+        candidates=len(candidates),
+        filtered=len(filtered),
+        requested_sports=sorted(requested_sports),
+        requested_markets=sorted(requested_markets),
+    )
     top_rows = filtered[: min(int(preferences.get("limit") or 5), 10)]
     if not top_rows:
         return None
@@ -139,7 +156,7 @@ def build_analysis_views(
     candidate_market_focuses,
     advanced_signal_text,
 ) -> dict[str, Any] | None:
-    return (
+    result = (
         _augment_analysis_view_sorting(build_mlb_home_run_analysis_views(candidates, preferences))
         or _augment_analysis_view_sorting(build_mlb_prop_analysis_views(
             candidates,
@@ -192,3 +209,11 @@ def build_analysis_views(
             advanced_signal_text=advanced_signal_text,
         ))
     )
+    _intel_trace(
+        "analysis_views_output",
+        candidates=len(candidates),
+        focus=str(preferences.get("analysis_focus") or preferences.get("query_type") or "").strip().lower(),
+        has_view=bool(result),
+        view_keys=sorted(list(result.keys()))[:8] if isinstance(result, dict) else [],
+    )
+    return result

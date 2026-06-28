@@ -105,6 +105,13 @@ MAX_CORRELATION_THRESHOLD = 0.65
 logger = logging.getLogger(__name__)
 
 
+def _intel_trace(event: str, **fields: Any) -> None:
+    try:
+        print(f"[INTEL_TRACE] {json.dumps({'event': event, **fields}, sort_keys=True, default=str)}", flush=True)
+    except Exception:
+        print(f"[INTEL_TRACE] {event}", flush=True)
+
+
 def _cache_query_response(cache_key: str, response_payload: dict[str, Any]) -> None:
     return None
 
@@ -2342,13 +2349,14 @@ def build_intelligence_overview(*, selected_date: str | None = None, force_refre
             pregame_items = home_rails.get("pregame", {}).get("items") if isinstance(home_rails.get("pregame"), dict) else []
             live_items = home_rails.get("live", {}).get("items") if isinstance(home_rails.get("live"), dict) else []
             dashboard_games = sport_overview.get("dashboard_games") if isinstance(sport_overview.get("dashboard_games"), list) else []
-            current_app.logger.info(
-                "WNBA overview counts for %s: pregame=%s live=%s dashboard_games=%s data_health=%s",
-                _safe_text(sport_overview.get("context_label"), effective_date),
-                len(pregame_items),
-                len(live_items),
-                len(dashboard_games),
-                _safe_text(sport_overview.get("data_health"), "unknown"),
+            _intel_trace(
+                "overview_counts",
+                sport="wnba",
+                context_label=_safe_text(sport_overview.get("context_label"), effective_date),
+                pregame_count=len(pregame_items),
+                live_count=len(live_items),
+                dashboard_games_count=len(dashboard_games),
+                data_health=_safe_text(sport_overview.get("data_health"), "unknown"),
             )
     return overview
 
@@ -2501,13 +2509,54 @@ def _odds_history_path_for_sport(slug: str) -> Path | None:
 
 def _load_odds_history_payload_for_sport(slug: str) -> dict[str, Any] | None:
     path = _odds_history_path_for_sport(slug)
-    if path is None or not path.exists():
+    exists = False
+    if path is not None:
+        try:
+            exists = path.exists()
+        except OSError:
+            exists = False
+    if path is None or not exists:
+        _intel_trace(
+            "odds_history_input",
+            sport=_safe_text(slug, "sport").lower(),
+            path=str(path) if path is not None else None,
+            present=False,
+            entry_count=0,
+        )
         return None
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
     except Exception:
+        _intel_trace(
+            "odds_history_input",
+            sport=_safe_text(slug, "sport").lower(),
+            path=str(path),
+            present=False,
+            entry_count=0,
+            reason="load_failed",
+        )
         return None
-    return payload if isinstance(payload, dict) else None
+    if not isinstance(payload, dict):
+        _intel_trace(
+            "odds_history_input",
+            sport=_safe_text(slug, "sport").lower(),
+            path=str(path),
+            present=False,
+            entry_count=0,
+            reason="non_dict_payload",
+        )
+        return None
+    markets = payload.get("markets") if isinstance(payload.get("markets"), dict) else {}
+    market_keys = list(markets.keys()) if isinstance(markets, dict) else []
+    _intel_trace(
+        "odds_history_input",
+        sport=_safe_text(slug, "sport").lower(),
+        path=str(path),
+        present=True,
+        entry_count=len(market_keys),
+        sample_market_keys=market_keys[:5],
+    )
+    return payload
 
 
 def _odds_history_payloads_by_sport(overview: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
@@ -2521,6 +2570,12 @@ def _odds_history_payloads_by_sport(overview: list[dict[str, Any]]) -> dict[str,
         payload = _load_odds_history_payload_for_sport(slug)
         if isinstance(payload, dict):
             payloads[slug] = payload
+    _intel_trace(
+        "odds_history_summary",
+        odds_data_present=bool(payloads),
+        sports_loaded=len(payloads),
+        sample_sports=sorted(payloads.keys())[:5],
+    )
     return payloads
 
 
@@ -3275,6 +3330,17 @@ def build_intelligence_status(*, selected_date: str | None = None, force_refresh
         if not artifact_exists and not advanced_exists:
             data_warnings.append("No tracked artifacts or advanced inputs found for this sport context.")
         data_health = "ready" if (artifact_exists or advanced_exists) else "missing"
+        _intel_trace(
+            "artifact_status",
+            sport=_safe_text(sport.get("slug"), "sport").lower(),
+            context_label=_safe_text(sport.get("context_label"), _effective_date(selected_date)),
+            artifact_exists=artifact_exists,
+            advanced_exists=advanced_exists,
+            artifact_count=len(artifact_rows),
+            advanced_count=len(advanced_rows),
+            data_health=data_health,
+            artifact_paths=[row.get("path") for row in artifact_rows[:4]],
+        )
 
         sports_status.append(
             {
@@ -4414,12 +4480,23 @@ def _collect_candidates(overview: list[dict[str, Any]], preferences: dict[str, A
                 ):
                     continue
                 candidates.append(artifact_candidate)
-        print("SPORT:", sport, "CANDIDATES:", len(candidates) - sport_start_count)
+        sport_candidates = candidates[sport_start_count:]
+        sport_market_counts: dict[str, int] = {}
+        for candidate in sport_candidates:
+            market_key = _safe_text(candidate.get("candidate_type") or candidate.get("type"), "candidate").lower() or "candidate"
+            sport_market_counts[market_key] = sport_market_counts.get(market_key, 0) + 1
+        _intel_trace(
+            "candidate_generation",
+            sport=sport_slug,
+            context_label=_safe_text(sport.get("context_label"), ""),
+            generated=len(sport_candidates),
+            markets=sport_market_counts,
+        )
 
     odds_history_by_sport = _odds_history_payloads_by_sport(overview)
     candidates = _enrich_candidates_with_odds_history(candidates, odds_history_by_sport)
 
-    print("BEFORE FILTER:", len(candidates))
+    _intel_trace("candidate_generation", stage="post_odds_enrichment", total_candidates=len(candidates))
     validated_candidates: list[dict[str, Any]] = []
     for candidate in candidates:
         if not isinstance(candidate, dict):
@@ -4429,11 +4506,11 @@ def _collect_candidates(overview: list[dict[str, Any]], preferences: dict[str, A
             continue
         validated_candidates.append(candidate)
     candidates = validated_candidates
-    print("AFTER FILTER:", len(candidates))
+    _intel_trace("candidate_generation", stage="post_state_filter", total_candidates=len(candidates))
 
-    print("BEFORE FILTER:", len(candidates))
+    _intel_trace("candidate_generation", stage="pre_requested_market_filter", total_candidates=len(candidates))
     candidates = _filter_candidates_to_requested_markets(candidates, preferences.get("requested_markets") or [])
-    print("AFTER FILTER:", len(candidates))
+    _intel_trace("candidate_generation", stage="post_requested_market_filter", total_candidates=len(candidates))
 
     deduped: list[dict[str, Any]] = []
     seen: set[tuple[str, str, str, str, str]] = set()
@@ -6076,6 +6153,8 @@ def _score_candidates(
     preferences: dict[str, Any],
 ) -> list[dict[str, Any]]:
     scored_candidates: list[dict[str, Any]] = []
+    state_invalid_filtered = 0
+    final_filtered = 0
     for candidate in candidates:
         scored_candidate = score_candidate(
             candidate,
@@ -6085,8 +6164,28 @@ def _score_candidates(
         if not is_valid_candidate(scored_candidate):
             continue
         if _candidate_is_final(scored_candidate) or bool(scored_candidate.get("state_invalid")):
+            if bool(scored_candidate.get("state_invalid")):
+                state_invalid_filtered += 1
+            else:
+                final_filtered += 1
             continue
         scored_candidates.append(scored_candidate)
+    sport_counts: dict[str, int] = {}
+    market_counts: dict[str, int] = {}
+    for candidate in scored_candidates:
+        sport_key = _safe_text(candidate.get("sport_slug"), _safe_text(candidate.get("sport"), "sport")).lower() or "sport"
+        sport_counts[sport_key] = sport_counts.get(sport_key, 0) + 1
+        market_key = _safe_text(candidate.get("candidate_type") or candidate.get("type"), "candidate").lower() or "candidate"
+        market_counts[market_key] = market_counts.get(market_key, 0) + 1
+    _intel_trace(
+        "candidate_scoring",
+        input_count=len(candidates),
+        output_count=len(scored_candidates),
+        state_invalid_filtered=state_invalid_filtered,
+        final_filtered=final_filtered,
+        by_sport=sport_counts,
+        by_market=market_counts,
+    )
     return scored_candidates
 
 
@@ -6162,6 +6261,13 @@ def collect_all_recommendations(*, selected_date: str | None = None, force_refre
     ranked_recommendations = _balanced_recommendation_order(filtered_candidates)
     if not ranked_recommendations:
         ranked_recommendations = _balanced_recommendation_order(candidates)
+    _intel_trace(
+        "opportunity_generation",
+        pipeline="collect_all_recommendations",
+        total_candidates=len(candidates),
+        filtered_candidates=len(filtered_candidates),
+        opportunities=len(ranked_recommendations),
+    )
     if log_pipeline:
         _log_candidate_pipeline(
             candidates=candidates,
@@ -6258,6 +6364,17 @@ def _build_board_dictionary(recommendations: list[dict[str, Any]]) -> dict[str, 
             board["games"].append(item)
         elif candidate_type == "parlay":
             board["parlays"].append(item)
+    _intel_trace(
+        "board_input",
+        opportunities_received=len(recommendations),
+        lane_counts={
+            "live": len(board["live"]),
+            "pregame": len(board["pregame"]),
+            "props": len(board["props"]),
+            "games": len(board["games"]),
+            "parlays": len(board["parlays"]),
+        },
+    )
     return board
 
 
@@ -6340,6 +6457,14 @@ def run_intelligence_query(
         [dict(candidate) for candidate in ranked_recommendations],
         limit=preferences["limit"],
         threshold=MAX_CORRELATION_THRESHOLD,
+    )
+    _intel_trace(
+        "opportunity_generation",
+        pipeline="run_intelligence_query",
+        total_candidates=len(candidates),
+        filtered_candidates=len(filtered_candidates),
+        ranked_candidates=len(ranked_recommendations),
+        opportunities=len(recommendations),
     )
     for recommendation in recommendations:
         if not recommendation.get("advanced_inputs") and recommendation.get("advanced_context"):
