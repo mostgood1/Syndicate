@@ -181,6 +181,29 @@ class WnbaCardsMergeAliasTests(unittest.TestCase):
         self.assertFalse(payload["lookahead_applied"])
         self.assertEqual(payload["requested_date"], "2026-06-23")
 
+    def test_cards_page_context_does_not_require_recommendations_artifact(self) -> None:
+        with TemporaryDirectory() as tempdir, patch("syndicate.features.wnba.cards.central_today_iso", return_value="2026-06-28"), patch(
+            "syndicate.features.wnba.cards.available_dates",
+            return_value=["2026-06-28"],
+        ), patch(
+            "syndicate.features.wnba.cards._wnba_source_roots",
+            return_value=[Path(tempdir)],
+        ), patch(
+            "syndicate.features.wnba.cards.live_snapshot_path",
+            side_effect=lambda filename: Path(tempdir) / "live_snapshots" / filename,
+        ), patch(
+            "syndicate.features.wnba.cards._games_from_live_state_fallback",
+            return_value=([], "live_source_path"),
+        ), patch(
+            "syndicate.features.wnba.cards._supplement_games_with_live_state",
+            return_value=([], None, 0, 0),
+        ):
+            context = build_cards_page_context("2026-06-28", allow_stored_date_fallback=False)
+
+        self.assertEqual(context["date"], "2026-06-28")
+        self.assertEqual(context["games"], [])
+        self.assertIn("board_contract", context)
+
     def test_source_cards_payload_uses_live_supplement_for_today(self) -> None:
         artifact_bundle = {
             "rows": [
