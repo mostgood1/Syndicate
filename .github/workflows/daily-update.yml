@@ -228,7 +228,7 @@ jobs:
           $stagedFiles = @(& git diff --cached --name-only --relative)
           Write-Host 'Files staged for commit:'
           Write-Host ($stagedFiles -join "`n")
-          $artifactTreePresent = ($stagedFiles | Select-String -Pattern '^data/[^/]+_source/manifests/' -Quiet)
+          $artifactTreePresent = ($stagedFiles | Select-String -Pattern '^data/[^/]+_source/(manifests|source_artifacts)/' -Quiet)
           if (-not $artifactTreePresent) {
             Write-Error 'ERROR: artifacts not found in staged pipeline outputs; failing workflow to indicate Stage 2 failure.'
             exit 1
