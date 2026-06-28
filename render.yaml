@@ -21,7 +21,7 @@ services:
     plan: standard
     autoDeploy: true
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn wsgi:application --bind 0.0.0.0:${PORT:-10000} --workers ${WEB_CONCURRENCY:-1} --threads ${GUNICORN_THREADS:-1} --timeout ${GUNICORN_TIMEOUT:-60} --graceful-timeout ${GUNICORN_GRACEFUL_TIMEOUT:-30} --keep-alive ${GUNICORN_KEEPALIVE:-5}
+    startCommand: sh -c 'PORT=${PORT:-10000}; exec gunicorn wsgi:application --bind 0.0.0.0:$PORT --workers ${WEB_CONCURRENCY:-1} --threads ${GUNICORN_THREADS:-1} --timeout ${GUNICORN_TIMEOUT:-60} --graceful-timeout ${GUNICORN_GRACEFUL_TIMEOUT:-30} --keep-alive ${GUNICORN_KEEPALIVE:-5}'
     healthCheckPath: /healthz
     disk:
       name: syndicate-data-web
