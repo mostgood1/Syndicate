@@ -689,13 +689,6 @@ def _artifact_bundle(selected_date: str) -> dict[str, Any]:
         except Exception:
             rows = []
 
-    if not rows and selected_date == central_today_iso() and not _render_web_dyno():
-        try:
-            public_payload = _public_scoreboard_live_state_payload(selected_date)
-            rows = public_payload.get("games") if isinstance(public_payload, dict) and isinstance(public_payload.get("games"), list) else []
-        except Exception:
-            rows = []
-
     return {
         "paths": paths,
         "rows": rows,
@@ -1227,31 +1220,6 @@ def build_source_cards_sim_detail_payload(selected_date: str, away_tri: str, hom
             ],
         }
 
-    should_try_remote = (not _render_web_dyno()) and (_remote_source_fallback_enabled() or bool(_remote_source_base_url()))
-    if should_try_remote and away_key and home_key:
-        params = {"away": away_key, "home": home_key}
-        date_value = resolved_date
-        if date_value:
-            params["date"] = date_value
-        query = urllib_parse.urlencode(params)
-        url = f"{_remote_source_base_url()}/api/source/cards/sim-detail{'?' + query if query else ''}"
-        headers = {"User-Agent": "Syndicate-WNBA/1.0"}
-        token = _remote_source_auth_token()
-        if token:
-            headers["Authorization"] = f"Bearer {token}"
-        try:
-            request = urllib_request.Request(url, headers=headers)
-            with urllib_request.urlopen(request, timeout=5) as response:
-                remote_payload = json.loads(response.read().decode("utf-8"))
-        except Exception:
-            remote_payload = None
-        remote_games = remote_payload.get("games") if isinstance(remote_payload, dict) and isinstance(remote_payload.get("games"), list) else []
-        if remote_games:
-            out = dict(remote_payload)
-            out.setdefault("requested_date", selected_date)
-            out.setdefault("date", resolved_date)
-            return out
-
     return {
         "date": resolved_date,
         "requested_date": selected_date,
@@ -1527,19 +1495,7 @@ def _games_from_artifacts(selected_date: str) -> tuple[list[dict[str, Any]], str
 
 def _games_from_live_state_fallback(selected_date: str, ttl: int = 12) -> tuple[list[dict[str, Any]], str]:
     is_today = str(selected_date).strip() == central_today_iso()
-    should_try_remote = (not _render_web_dyno()) and (_remote_source_fallback_enabled() or is_today)
-    candidate_payloads: list[dict[str, Any] | None] = []
-    if is_today:
-        if should_try_remote:
-            candidate_payloads.append(_remote_live_snapshot_payload("live_state", selected_date=selected_date))
-        candidate_payloads.append(_public_scoreboard_live_state_payload(selected_date))
-        candidate_payloads.append(_local_live_state_payload(selected_date))
-    else:
-        candidate_payloads.append(_local_live_state_payload(selected_date))
-        if should_try_remote:
-            candidate_payloads.append(_remote_live_snapshot_payload("live_state", selected_date=selected_date))
-        candidate_payloads.append(_public_scoreboard_live_state_payload(selected_date))
-
+    candidate_payloads: list[dict[str, Any] | None] = [_local_live_state_payload(selected_date)]
     payload: dict[str, Any] | None = None
     source_path = None
     for candidate_payload in candidate_payloads:
@@ -1548,8 +1504,6 @@ def _games_from_live_state_fallback(selected_date: str, ttl: int = 12) -> tuple[
             source_name = str(candidate_payload.get("source") or "").strip().lower()
             if source_name:
                 source_path = source_name
-            elif is_today:
-                source_path = "espn_scoreboard_fallback"
             else:
                 try:
                     source_path = str(live_snapshot_path(f"live_state_{selected_date}.jsonl"))
@@ -3417,105 +3371,6 @@ def build_live_state_payload(selected_date: str, ttl: int = 12, *, allow_stored_
             "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
         })
 
-    # Live-state is operationally critical for in-progress scoreboards on WNBA and Home.
-    # For today's slate, prefer fresher remote/public live sources ahead of the local snapshot
-    # so a stale halftime file does not mask a game that has already advanced.
-    should_try_remote = (not _render_web_dyno()) and (_remote_source_fallback_enabled() or is_today)
-    candidate_payloads: list[dict[str, Any] | None] = []
-    if _render_web_dyno():
-        candidate_payloads.append(_local_live_state_payload(selected_date))
-    else:
-        if is_today:
-            if should_try_remote:
-                candidate_payloads.append(_remote_live_snapshot_payload("live_state", selected_date=selected_date))
-            candidate_payloads.append(_public_scoreboard_live_state_payload(selected_date))
-            candidate_payloads.append(_local_live_state_payload(selected_date))
-        else:
-            candidate_payloads.append(_local_live_state_payload(selected_date))
-            if should_try_remote:
-                candidate_payloads.append(_remote_live_snapshot_payload("live_state", selected_date=selected_date))
-            candidate_payloads.append(_public_scoreboard_live_state_payload(selected_date))
-
-    for candidate_payload in candidate_payloads:
-        if isinstance(candidate_payload, dict) and isinstance(candidate_payload.get("games"), list) and bool(candidate_payload.get("games")):
-            source_name = str(candidate_payload.get("source") or "").strip().lower()
-            if source_name.startswith("espn") or is_today:
-                public_payload = candidate_payload
-            else:
-                return _attach_odds_refresh_timestamp(candidate_payload)
-            break
-    else:
-        public_payload = None
-
-    if isinstance(public_payload, dict) and isinstance(public_payload.get("games"), list) and bool(public_payload.get("games")):
-        context_for_event_ids = build_cards_page_context(selected_date, allow_stored_date_fallback=allow_stored_date_fallback)
-        context_games = context_for_event_ids.get("games") if isinstance(context_for_event_ids.get("games"), list) else []
-        if not context_games:
-            return _attach_odds_refresh_timestamp(public_payload)
-        games_by_matchup: dict[tuple[str, str], dict[str, Any]] = {}
-        for cards_game in context_games:
-            if not isinstance(cards_game, dict):
-                continue
-            away_tri = _canonical_wnba_tri(
-                str(
-                    cards_game.get("away_tri")
-                    or ((cards_game.get("away") or {}).get("abbr") if isinstance(cards_game.get("away"), dict) else "")
-                    or ""
-                ).strip().upper()
-            )
-            home_tri = _canonical_wnba_tri(
-                str(
-                    cards_game.get("home_tri")
-                    or ((cards_game.get("home") or {}).get("abbr") if isinstance(cards_game.get("home"), dict) else "")
-                    or ""
-                ).strip().upper()
-            )
-            if away_tri and home_tri:
-                games_by_matchup[(away_tri, home_tri)] = cards_game
-
-        filtered_public_games: list[dict[str, Any]] = []
-        for game in public_payload.get("games") or []:
-            if not isinstance(game, dict):
-                continue
-            away_tri = _canonical_wnba_tri(game.get("away"))
-            home_tri = _canonical_wnba_tri(game.get("home"))
-            cards_game = games_by_matchup.get((away_tri, home_tri)) if away_tri and home_tri else None
-            if isinstance(cards_game, dict):
-                event_id = str(cards_game.get("event_id") or "").strip()
-                if event_id:
-                    game["event_id"] = event_id
-                cards_state = _cards_context_live_state_snapshot(cards_game)
-                if _live_state_row_needs_cards_override(game, cards_state):
-                    game["away_pts"] = cards_state.get("away_pts")
-                    game["home_pts"] = cards_state.get("home_pts")
-                    game["status"] = cards_state.get("status")
-                    game["period"] = cards_state.get("period")
-                    game["clock"] = cards_state.get("clock")
-                    game["in_progress"] = bool(cards_state.get("in_progress"))
-                    game["final"] = bool(cards_state.get("final"))
-                period_rows = []
-                for candidate_key in ("periods", "linescores"):
-                    candidate_rows = game.get(candidate_key)
-                    if isinstance(candidate_rows, list) and candidate_rows:
-                        period_rows = candidate_rows
-                        break
-                    live_state_rows = game.get("live_state") if isinstance(game.get("live_state"), dict) else {}
-                    nested_rows = live_state_rows.get(candidate_key) if isinstance(live_state_rows, dict) else []
-                    if isinstance(nested_rows, list) and nested_rows:
-                        period_rows = nested_rows
-                        break
-                game["away_pts"], game["home_pts"] = _repair_final_score_from_periods(
-                    _safe_float(game.get("away_pts")),
-                    _safe_float(game.get("home_pts")),
-                    period_rows,
-                    bool(game.get("final")),
-                )
-            filtered_public_games.append(game)
-        if filtered_public_games:
-            filtered_payload = dict(public_payload)
-            filtered_payload["games"] = filtered_public_games
-            return _attach_odds_refresh_timestamp(filtered_payload)
-
     context = build_cards_page_context(selected_date, allow_stored_date_fallback=allow_stored_date_fallback)
     games = context.get("games") if isinstance(context.get("games"), list) else []
     out_games = []
@@ -3580,15 +3435,6 @@ def build_live_player_boxscore_payload(
     if _payload_has_live_boxscore_players(local_payload):
         return _attach_odds_refresh_timestamp(local_payload)
 
-    if _remote_source_fallback_enabled():
-        remote_payload = _remote_live_snapshot_payload(
-            "live_player_boxscore",
-            selected_date=resolved_date,
-            event_ids=normalized_event_ids,
-        )
-        if _payload_has_live_boxscore_players(remote_payload):
-            return _attach_odds_refresh_timestamp(remote_payload)
-
     return _attach_odds_refresh_timestamp({
         "ok": True,
         "ttl": int(ttl),
@@ -3640,38 +3486,6 @@ def build_live_player_lens_payload(
             normalized_event_ids,
             allow_stored_date_fallback=allow_stored_date_fallback,
         )
-
-    if is_today and _remote_source_fallback_enabled() and not _render_web_dyno():
-        remote_payload = _remote_live_snapshot_payload(
-            "live_player_lens",
-            selected_date=resolved_date,
-            event_ids=normalized_event_ids,
-        )
-        if isinstance(remote_payload, dict) and isinstance(remote_payload.get("games"), list) and bool(remote_payload.get("games")):
-            hydrated_remote_payload = _hydrate_live_player_lens_payload(
-                _attach_odds_refresh_timestamp(remote_payload),
-                resolved_date,
-                normalized_event_ids,
-                allow_stored_date_fallback=allow_stored_date_fallback,
-            )
-            if any(isinstance(game, dict) and bool(game.get("rows")) for game in (hydrated_remote_payload.get("games") if isinstance(hydrated_remote_payload.get("games"), list) else [])):
-                return _attach_odds_refresh_timestamp(hydrated_remote_payload)
-
-    if _remote_source_fallback_enabled() and not is_today and not _render_web_dyno():
-        remote_payload = _remote_live_snapshot_payload(
-            "live_player_lens",
-            selected_date=resolved_date,
-            event_ids=normalized_event_ids,
-        )
-        if isinstance(remote_payload, dict) and isinstance(remote_payload.get("games"), list) and bool(remote_payload.get("games")):
-            hydrated_remote_payload = _hydrate_live_player_lens_payload(
-                _attach_odds_refresh_timestamp(remote_payload),
-                resolved_date,
-                normalized_event_ids,
-                allow_stored_date_fallback=allow_stored_date_fallback,
-            )
-            if any(isinstance(game, dict) and bool(game.get("rows")) for game in (hydrated_remote_payload.get("games") if isinstance(hydrated_remote_payload.get("games"), list) else [])):
-                return _attach_odds_refresh_timestamp(hydrated_remote_payload)
 
     game_index = _resolve_games_for_event_ids(resolved_date, normalized_event_ids)
     fallback_games = [
@@ -3755,38 +3569,6 @@ def build_live_lines_payload(
         ):
             return _attach_odds_refresh_timestamp(_finalize_live_lines_payload(merged_payload, include_period_totals=bool(include_period_totals)))
 
-    if is_today and _remote_source_fallback_enabled():
-        remote_payload = _remote_live_snapshot_payload(
-            "live_lines",
-            selected_date=resolved_date,
-            event_ids=normalized_event_ids,
-            include_period_totals=bool(include_period_totals),
-        )
-        if isinstance(remote_payload, dict) and isinstance(remote_payload.get("games"), list) and bool(remote_payload.get("games")):
-            merged_payload = _merge_live_lines_payloads(merged_payload, remote_payload)
-            if _payload_has_requested_live_line_coverage(
-                merged_payload,
-                normalized_event_ids,
-                include_period_totals=bool(include_period_totals),
-            ):
-                return _attach_odds_refresh_timestamp(_finalize_live_lines_payload(merged_payload, include_period_totals=bool(include_period_totals)))
-
-    if _remote_source_fallback_enabled() and not is_today:
-        remote_payload = _remote_live_snapshot_payload(
-            "live_lines",
-            selected_date=resolved_date,
-            event_ids=normalized_event_ids,
-            include_period_totals=bool(include_period_totals),
-        )
-        if isinstance(remote_payload, dict) and isinstance(remote_payload.get("games"), list) and bool(remote_payload.get("games")):
-            merged_payload = _merge_live_lines_payloads(merged_payload, remote_payload)
-            if _payload_has_requested_live_line_coverage(
-                merged_payload,
-                normalized_event_ids,
-                include_period_totals=bool(include_period_totals),
-            ):
-                return _attach_odds_refresh_timestamp(_finalize_live_lines_payload(merged_payload, include_period_totals=bool(include_period_totals)))
-
     game_index = _resolve_games_for_event_ids(resolved_date, normalized_event_ids)
     fallback_games = [
         _fallback_live_lines_game(game, event_id=event_id, include_period_totals=bool(include_period_totals))
@@ -3834,14 +3616,6 @@ def build_live_pbp_stats_payload(
     local_payload = _filtered_local_live_snapshot_payload("live_pbp_stats", resolved_date, normalized_event_ids)
     if isinstance(local_payload, dict) and isinstance(local_payload.get("games"), list) and bool(local_payload.get("games")):
         return _attach_odds_refresh_timestamp(local_payload)
-    if _remote_source_fallback_enabled():
-        remote_payload = _remote_live_snapshot_payload(
-            "live_pbp_stats",
-            selected_date=resolved_date,
-            event_ids=normalized_event_ids,
-        )
-        if isinstance(remote_payload, dict) and isinstance(remote_payload.get("games"), list) and bool(remote_payload.get("games")):
-            return _attach_odds_refresh_timestamp(remote_payload)
     return _attach_odds_refresh_timestamp({
         "ok": True,
         "ttl": int(ttl),
