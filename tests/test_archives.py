@@ -79,10 +79,12 @@ from syndicate.features.shared.rank_board import build_rank_page_context
 from syndicate.features.wnba.live_game_accuracy import build_live_game_accuracy_payload as build_wnba_live_game_accuracy_payload
 from syndicate.features.wnba.live_prop_accuracy import build_live_prop_accuracy_payload as build_wnba_live_prop_accuracy_payload
 from syndicate.features.wnba.live_prop_audit import build_live_prop_audit_payload as build_wnba_live_prop_audit_payload
+from syndicate.features.wnba.cards import build_source_cards_sim_detail_payload as build_wnba_source_cards_sim_detail_payload
 from syndicate.features.wnba.cards import build_live_player_boxscore_payload as build_wnba_live_player_boxscore_payload
 from syndicate.features.wnba.sources import processed_path as wnba_processed_path
 from syndicate.features.wnba.sources import live_snapshot_path as wnba_live_snapshot_path
 from syndicate.features.wnba.sources import available_dates as wnba_available_dates
+from syndicate.features.wnba.cards import _default_live_event_ids as wnba_default_live_event_ids
 from syndicate.features.intelligence_audit import _scored_candidates
 
 
@@ -1861,6 +1863,56 @@ class DateArchiveHelperTests(unittest.TestCase):
         self.assertEqual(len(payload.get("games") or []), 1)
         self.assertEqual((payload.get("games") or [{}])[0].get("event_id"), "401856965")
 
+    def test_wnba_default_live_event_ids_fall_back_to_visible_cards_when_no_live_games_exist(self) -> None:
+        with patch(
+            "syndicate.features.wnba.cards.build_live_state_payload",
+            return_value={"games": []},
+        ), patch(
+            "syndicate.features.wnba.cards.build_cards_page_context",
+            return_value={
+                "games": [
+                    {"event_id": "evt-1", "live_state": {"in_progress": False, "final": False}},
+                    {"event_id": "evt-2", "live_state": {"in_progress": False, "final": False}},
+                ]
+            },
+        ):
+            event_ids = wnba_default_live_event_ids("2026-06-05")
+
+        self.assertEqual(event_ids, ["evt-1", "evt-2"])
+
+    def test_wnba_source_cards_sim_detail_uses_artifact_bundle_sim_index(self) -> None:
+        bundle = {
+            "paths": {},
+            "rows": [],
+            "recommendations": {},
+            "sim": {
+                ("ATL", "SEA"): {
+                    "home_tri": "SEA",
+                    "away_tri": "ATL",
+                    "sim": {
+                        "quarters": [
+                            {"q": 1, "away_pts_mu": 18.0, "home_pts_mu": 20.0},
+                        ],
+                        "players_summary": {"away": 1, "home": 1},
+                    },
+                }
+            },
+            "props": {},
+        }
+
+        with patch("syndicate.features.wnba.cards._resolved_source_cards_date", return_value="2026-06-27"), patch(
+            "syndicate.features.wnba.cards._artifact_bundle",
+            return_value=bundle,
+        ):
+            payload = build_wnba_source_cards_sim_detail_payload("2026-06-27", "ATL", "SEA")
+
+        self.assertEqual(payload["date"], "2026-06-27")
+        self.assertEqual(payload["requested_date"], "2026-06-27")
+        self.assertTrue(payload["players_included"])
+        self.assertEqual(payload["games"][0]["away_tri"], "ATL")
+        self.assertEqual(payload["games"][0]["home_tri"], "SEA")
+        self.assertEqual(payload["games"][0]["sim"]["quarters"][0]["home_pts_mu"], 20.0)
+
     def test_nba_live_player_lens_preserves_existing_live_projection(self) -> None:
         from syndicate.features.nba.cards import build_live_player_lens_payload
 
@@ -3345,6 +3397,51 @@ class HomeBoardTests(unittest.TestCase):
             )
 
         self.assertEqual(rows, [])
+
+    def test_home_mlb_compact_game_items_prefer_full_cards_over_smaller_live_lens_snapshot(self) -> None:
+        from syndicate.blueprints import home as home_module
+
+        full_cards = [
+            {
+                "gamePk": index,
+                "away": {"abbr": f"A{index}"},
+                "home": {"abbr": f"H{index}"},
+                "detail": "Scheduled",
+                "summary": f"MLB game {index}",
+                "href": f"/mlb/game/{index}?date=2026-06-28",
+                "href_label": "Open MLB game",
+            }
+            for index in range(1, 16)
+        ]
+        smaller_live_lens = {
+            "games": [
+                {
+                    "gamePk": index,
+                    "away": {"abbr": f"A{index}"},
+                    "home": {"abbr": f"H{index}"},
+                    "detail": "Live",
+                    "summary": f"Live MLB game {index}",
+                    "href": f"/mlb/game/{index}?date=2026-06-28",
+                    "href_label": "Open MLB game",
+                }
+                for index in range(1, 10)
+            ]
+        }
+
+        with patch("syndicate.blueprints.home._load_home_games", return_value=full_cards), patch(
+            "syndicate.features.mlb.live_lens.read_latest_live_lens_page_context",
+            return_value=smaller_live_lens,
+        ):
+            items, count = home_module._load_home_game_items(
+                "mlb",
+                context_label="2026-06-28",
+                is_active_today=True,
+            )
+
+        self.assertEqual(count, 15)
+        self.assertEqual(len(items), 15)
+        self.assertEqual(items[0]["gamePk"], 1)
+        self.assertEqual(items[-1]["gamePk"], 15)
 
     def test_dashboard_prop_count_uses_unified_home_rails(self) -> None:
         from syndicate.blueprints import home as home_module

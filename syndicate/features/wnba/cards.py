@@ -1216,8 +1216,8 @@ def build_source_cards_sim_detail_payload(selected_date: str, away_tri: str, hom
     away_key = _canonical_wnba_tri(str(away_tri or "").strip().upper())
     home_key = _canonical_wnba_tri(str(home_tri or "").strip().upper())
     bundle = _artifact_bundle(resolved_date)
-    sim_detail = bundle.get((away_key, home_key)) if isinstance(bundle, dict) else None
-    if not isinstance(sim_detail, dict) and isinstance(bundle.get("sim"), dict):
+    sim_detail = None
+    if isinstance(bundle, dict) and isinstance(bundle.get("sim"), dict):
         sim_detail = bundle.get("sim", {}).get((away_key, home_key))
     if isinstance(sim_detail, dict):
         return {
@@ -2140,7 +2140,8 @@ def _ensure_wnba_game_ids(payload: dict[str, Any]) -> dict[str, Any]:
 
 def _attach_odds_refresh_timestamp(payload: dict[str, Any]) -> dict[str, Any]:
     out = _ensure_wnba_game_ids(dict(payload))
-    timestamp = str(out.get("odds_refreshed_at") or out.get("generated_at") or "").strip()
+    source_generated_at = str(out.get("generated_at") or "").strip()
+    timestamp = str(out.get("odds_refreshed_at") or source_generated_at or "").strip()
     if not timestamp:
         timestamp = central_now().isoformat(timespec="seconds")
     else:
@@ -2152,7 +2153,7 @@ def _attach_odds_refresh_timestamp(payload: dict[str, Any]) -> dict[str, Any]:
         except Exception:
             pass
     out["odds_refreshed_at"] = timestamp
-    out["generated_at"] = timestamp
+    out["generated_at"] = source_generated_at or timestamp
     return out
 
 
@@ -2513,6 +2514,7 @@ def _default_live_event_ids(selected_date: str, *, allow_stored_date_fallback: b
 
     context = build_cards_page_context(selected_date, allow_stored_date_fallback=allow_stored_date_fallback)
     context_games = context.get("games") if isinstance(context.get("games"), list) else []
+    visible_event_ids: list[str] = []
     for game in context_games:
         if not isinstance(game, dict):
             continue
@@ -2520,7 +2522,11 @@ def _default_live_event_ids(selected_date: str, *, allow_stored_date_fallback: b
         event_id = str(game.get("event_id") or "").strip()
         if event_id and bool(status.get("in_progress")) and not bool(status.get("final")):
             event_ids.append(event_id)
-    return list(dict.fromkeys(event_ids))
+        if event_id:
+            visible_event_ids.append(event_id)
+    if event_ids:
+        return list(dict.fromkeys(event_ids))
+    return list(dict.fromkeys(visible_event_ids))
 
 
 def _player_sim_stat(player_row: dict[str, Any], market: str) -> float | None:
@@ -3422,10 +3428,34 @@ def build_live_state_payload(selected_date: str, ttl: int = 12, *, allow_stored_
 
     context = build_cards_page_context(selected_date, allow_stored_date_fallback=allow_stored_date_fallback)
     games = context.get("games") if isinstance(context.get("games"), list) else []
+    public_payload = _public_scoreboard_live_state_payload(selected_date) if is_today or allow_stored_date_fallback else None
+    public_games = public_payload.get("games") if isinstance(public_payload, dict) and isinstance(public_payload.get("games"), list) else []
+    public_by_event_id = {
+        str(game.get("event_id") or "").strip(): game
+        for game in public_games
+        if isinstance(game, dict) and str(game.get("event_id") or "").strip()
+    }
     out_games = []
     for game in games:
         if not isinstance(game, dict):
             continue
+        event_id = str(game.get("event_id") or "").strip()
+        public_row = public_by_event_id.get(event_id) if event_id else None
+        if isinstance(public_row, dict):
+            cards_state = _cards_context_live_state_snapshot(game)
+            if _live_state_row_needs_cards_override(public_row, cards_state):
+                public_row = {
+                    **dict(public_row),
+                    "away_pts": cards_state.get("away_pts"),
+                    "home_pts": cards_state.get("home_pts"),
+                    "status": cards_state.get("status") or public_row.get("status"),
+                    "clock": cards_state.get("clock") or public_row.get("clock") or "",
+                    "period": cards_state.get("period") or public_row.get("period"),
+                    "in_progress": bool(cards_state.get("in_progress")),
+                    "final": bool(cards_state.get("final")),
+                }
+        else:
+            public_row = None
         normalized_status = _normalized_game_status(
             status_text=game.get("status"),
             detail_text=game.get("detail"),
@@ -3438,21 +3468,67 @@ def build_live_state_payload(selected_date: str, ttl: int = 12, *, allow_stored_
         away_info = game.get("away") if isinstance(game.get("away"), dict) else {}
         home_info = game.get("home") if isinstance(game.get("home"), dict) else {}
         sim_score = (_sim_payload(game).get("score") or {})
+        source_row = public_row if isinstance(public_row, dict) else None
+        source_away_pts = _safe_float(source_row.get("away_pts")) if source_row else _safe_float(sim_score.get("away_mean"))
+        source_home_pts = _safe_float(source_row.get("home_pts")) if source_row else _safe_float(sim_score.get("home_mean"))
+        source_status = str(source_row.get("status") or "").strip() if source_row else normalized_status["detail"]
+        source_clock = str(source_row.get("clock") or "").strip() if source_row else normalized_status.get("clock") or ""
+        source_period = source_row.get("period") if source_row else normalized_status.get("period")
+        source_in_progress = bool(source_row.get("in_progress")) if source_row else bool(normalized_status["in_progress"])
+        source_final = bool(source_row.get("final")) if source_row else bool(normalized_status["final"])
         out_games.append(
             {
                 "game_id": game.get("gamePk"),
                 "event_id": game.get("event_id"),
                 "home": game.get("home_tri") or home_info.get("abbr"),
                 "away": game.get("away_tri") or away_info.get("abbr"),
-                "home_pts": _safe_float(sim_score.get("home_mean")),
-                "away_pts": _safe_float(sim_score.get("away_mean")),
+                "home_pts": source_home_pts,
+                "away_pts": source_away_pts,
                 "status_id": None,
-                "status": normalized_status["detail"],
-                "period": normalized_status.get("period"),
-                "clock": normalized_status.get("clock") or "",
-                "in_progress": bool(normalized_status["in_progress"]),
-                "final": bool(normalized_status["final"]),
+                "status": source_status,
+                "period": source_period,
+                "clock": source_clock,
+                "in_progress": source_in_progress,
+                "final": source_final,
                 "periods": [],
+            }
+        )
+
+        if event_id:
+            public_by_event_id.pop(event_id, None)
+
+    for event_id, public_row in public_by_event_id.items():
+        if not isinstance(public_row, dict):
+            continue
+        cards_state = {
+            "away_pts": _safe_float(public_row.get("away_pts")),
+            "home_pts": _safe_float(public_row.get("home_pts")),
+            "status": str(public_row.get("status") or "").strip(),
+            "period": public_row.get("period"),
+            "clock": str(public_row.get("clock") or "").strip(),
+            "in_progress": bool(public_row.get("in_progress")),
+            "final": bool(public_row.get("final")),
+        }
+        merged_public_row = dict(public_row)
+        if cards_state.get("status"):
+            merged_public_row["status"] = cards_state["status"]
+        if cards_state.get("clock"):
+            merged_public_row["clock"] = cards_state["clock"]
+        out_games.append(
+            {
+                "game_id": merged_public_row.get("game_id") or event_id,
+                "event_id": event_id,
+                "home": merged_public_row.get("home"),
+                "away": merged_public_row.get("away"),
+                "home_pts": _safe_float(merged_public_row.get("home_pts")),
+                "away_pts": _safe_float(merged_public_row.get("away_pts")),
+                "status_id": None,
+                "status": str(merged_public_row.get("status") or "").strip() or "Scheduled",
+                "period": merged_public_row.get("period"),
+                "clock": str(merged_public_row.get("clock") or "").strip(),
+                "in_progress": bool(merged_public_row.get("in_progress")),
+                "final": bool(merged_public_row.get("final")),
+                "periods": list(merged_public_row.get("periods") or []),
             }
         )
 
@@ -3483,6 +3559,10 @@ def build_live_player_boxscore_payload(
     local_payload = _filtered_local_live_snapshot_payload("live_player_boxscore", resolved_date, normalized_event_ids)
     if _payload_has_live_boxscore_players(local_payload):
         return _attach_odds_refresh_timestamp(local_payload)
+
+    public_payload = _public_live_player_boxscore_payload(resolved_date, normalized_event_ids)
+    if _payload_has_live_boxscore_players(public_payload):
+        return _attach_odds_refresh_timestamp(public_payload)
 
     return _attach_odds_refresh_timestamp({
         "ok": True,

@@ -2711,9 +2711,10 @@ def _load_home_game_items(
             from syndicate.features.mlb.live_lens import read_latest_live_lens_page_context
 
             live_games = list(read_latest_live_lens_page_context(context_label).get("games") or [])
+            if home_games:
+                return _compact_game_cards(home_games), len(home_games)
             if live_games:
                 live_games = _apply_mlb_live_scores(live_games, context_label)
-            if live_games:
                 return _compact_game_cards(live_games), len(live_games)
         if slug == "nba":
             if home_games:
@@ -4389,7 +4390,9 @@ def _build_sport_overview(
     active_game_ids = _game_identity_set(active_games)
     game_item_ids = _game_identity_set(game_items)
     prop_item_ids = _game_identity_set(list(pregame_prop_items) + list(live_prop_items))
-    hydrated_game_ids = {identifier for identifier in active_game_ids if identifier in game_item_ids and identifier in prop_item_ids}
+    hydrated_game_ids = {identifier for identifier in active_game_ids if identifier in game_item_ids}
+    if active_today and not hydrated_game_ids and active_game_ids and prop_item_ids:
+        hydrated_game_ids = {identifier for identifier in active_game_ids if identifier in prop_item_ids}
     if active_today and not hydrated_game_ids and active_game_ids:
         hydrated_game_ids = {identifier for identifier in active_game_ids if identifier in game_item_ids}
     game_items = [item for item in game_items if _game_identifier(item) in hydrated_game_ids]

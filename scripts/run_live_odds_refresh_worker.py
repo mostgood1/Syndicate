@@ -50,8 +50,11 @@ def main() -> int:
         interval_seconds = 30
 
     if args.run_once:
-        _run_tick()
-        return 0
+        try:
+            _run_tick()
+            return 0
+        finally:
+            _release_process_lock()
 
     try:
         while not _LIVE_REFRESH_LOOP_STOP.is_set():

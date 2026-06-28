@@ -6,6 +6,7 @@ from unittest.mock import patch
 
 from syndicate.app import create_app
 from syndicate.features.shared import live_refresh_loop
+from scripts import run_live_odds_refresh_worker
 
 
 class LiveRefreshLoopTests(unittest.TestCase):
@@ -115,6 +116,27 @@ class LiveRefreshLoopTests(unittest.TestCase):
             create_app()
 
         mocked_start.assert_not_called()
+
+    def test_run_live_odds_refresh_worker_run_once_releases_lock(self) -> None:
+        with patch.object(run_live_odds_refresh_worker, "_acquire_process_lock", return_value=True) as mocked_acquire, patch.object(
+            run_live_odds_refresh_worker,
+            "_run_tick",
+            return_value=None,
+        ) as mocked_tick, patch.object(run_live_odds_refresh_worker, "_release_process_lock") as mocked_release, patch.object(
+            run_live_odds_refresh_worker,
+            "_live_refresh_loop_interval_seconds",
+            return_value=30,
+        ), patch.object(run_live_odds_refresh_worker.signal, "signal", side_effect=ValueError("skip signals")), patch.object(
+            run_live_odds_refresh_worker.sys,
+            "argv",
+            ["run_live_odds_refresh_worker.py", "--run-once"],
+        ):
+            exit_code = run_live_odds_refresh_worker.main()
+
+        self.assertEqual(exit_code, 0)
+        mocked_acquire.assert_called_once()
+        mocked_tick.assert_called_once()
+        mocked_release.assert_called_once()
 
 
 if __name__ == "__main__":

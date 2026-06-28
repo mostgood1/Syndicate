@@ -93,6 +93,9 @@ def processed_path(filename: str) -> Path:
                 return candidate
         except OSError:
             continue
+    fallback = _best_existing_path(_dated_fallback_candidates(roots, ("data", "processed"), filename))
+    if fallback is not None:
+        return fallback
     return roots[0] / "data" / "processed" / filename
 
 
@@ -105,6 +108,9 @@ def live_snapshot_path(filename: str) -> Path:
                 return candidate
         except OSError:
             continue
+    fallback = _best_existing_path(_dated_fallback_candidates(roots, ("data", "processed", "live_snapshots"), filename))
+    if fallback is not None:
+        return fallback
     return roots[0] / "data" / "processed" / "live_snapshots" / filename
 
 
