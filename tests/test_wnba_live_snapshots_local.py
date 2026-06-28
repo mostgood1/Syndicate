@@ -51,6 +51,35 @@ class WnbaLiveSnapshotLocalTests(unittest.TestCase):
         self.assertEqual([game.get("event_id") for game in payload.get("games") or []], ["evt-2"])
         self.assertEqual(((payload.get("games") or [{}])[0]).get("players"), [{"player": "Two"}])
 
+    def test_live_player_boxscore_payload_retries_resolved_event_ids(self) -> None:
+        def _snapshot_payload(kind: str, selected_date: str, event_ids: list[str]) -> dict[str, object] | None:
+            if kind != "live_player_boxscore":
+                return None
+            if event_ids == ["evt-hash"]:
+                return {"ok": True, "date": selected_date, "games": [{"event_id": "evt-hash", "players": []}]}
+            if event_ids == ["401857027"]:
+                return {
+                    "ok": True,
+                    "date": selected_date,
+                    "games": [{"event_id": "401857027", "players": [{"player": "Two"}]}],
+                }
+            return None
+
+        with patch("syndicate.features.wnba.cards.build_cards_page_context", return_value={"date": "2026-06-28"}), patch(
+            "syndicate.features.wnba.cards._filtered_local_live_snapshot_payload",
+            side_effect=_snapshot_payload,
+        ), patch(
+            "syndicate.features.wnba.cards._public_live_player_boxscore_payload",
+            return_value=None,
+        ), patch(
+            "syndicate.features.wnba.cards._resolve_games_for_event_ids",
+            return_value={"evt-hash": {"event_id": "401857027", "game_id": "401857027"}},
+        ):
+            payload = build_live_player_boxscore_payload("2026-06-28", ["evt-hash"], ttl=20)
+
+        self.assertEqual([game.get("event_id") for game in payload.get("games") or []], ["401857027"])
+        self.assertEqual(((payload.get("games") or [{}])[0]).get("players"), [{"player": "Two"}])
+
     def test_live_player_lens_payload_uses_local_snapshot(self) -> None:
         with TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)

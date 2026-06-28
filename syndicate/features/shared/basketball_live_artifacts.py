@@ -331,6 +331,29 @@ def _event_id_for_row(
     return ""
 
 
+def resolve_event_ids_from_games(
+    event_games: dict[str, dict[str, Any]],
+    requested_event_ids: list[str],
+) -> list[str]:
+    if not event_games or not requested_event_ids:
+        return []
+
+    id_index, _matchup_index = _build_event_index(event_games)
+    resolved_event_ids: list[str] = []
+    for requested_event_id in requested_event_ids:
+        requested = str(requested_event_id or "").strip()
+        if not requested:
+            continue
+        matched_event_id = id_index.get(requested) or id_index.get(_canonical_game_id(requested)) or requested
+        game = event_games.get(matched_event_id)
+        if not isinstance(game, dict):
+            continue
+        canonical_event_id = str(game.get("event_id") or game.get("gamePk") or game.get("game_id") or matched_event_id).strip()
+        if canonical_event_id and canonical_event_id not in resolved_event_ids:
+            resolved_event_ids.append(canonical_event_id)
+    return resolved_event_ids
+
+
 def _latest_projection_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     grouped: dict[tuple[str, str, str], dict[str, Any]] = {}
     for row in rows:

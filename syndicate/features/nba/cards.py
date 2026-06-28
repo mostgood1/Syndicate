@@ -27,6 +27,7 @@ from syndicate.features.nba.sources import processed_path
 from syndicate.features.nba.sources import live_snapshot_path
 from syndicate.features.shared.basketball_live_artifacts import build_live_lines_payload_from_artifacts
 from syndicate.features.shared.basketball_live_artifacts import build_live_player_lens_payload_from_artifacts
+from syndicate.features.shared.basketball_live_artifacts import resolve_event_ids_from_games
 from syndicate.features.shared.game_board_contract import apply_game_board_contract
 from syndicate.features.shared.game_board_contract import build_game_board_api_payload
 from syndicate.features.shared.game_board_contract import _sim_payload
@@ -2586,6 +2587,16 @@ def build_live_player_boxscore_payload(
     if _payload_has_live_boxscore_players(public_payload):
         return _attach_odds_refresh_timestamp(public_payload)
     game_index = _resolve_games_for_event_ids(resolved_date, normalized_event_ids)
+    resolved_event_ids = resolve_event_ids_from_games(game_index, normalized_event_ids)
+    if resolved_event_ids:
+        local_payload = _filtered_local_live_snapshot_payload("live_player_boxscore", resolved_date, resolved_event_ids)
+        if _payload_has_live_boxscore_players(local_payload):
+            return _attach_odds_refresh_timestamp(local_payload)
+
+        public_payload = _public_live_player_boxscore_payload(resolved_date, resolved_event_ids)
+        if _payload_has_live_boxscore_players(public_payload):
+            return _attach_odds_refresh_timestamp(public_payload)
+
     fallback_games = [
         _fallback_live_player_boxscore_game(game, event_id=event_id, selected_date=resolved_date)
         for event_id in normalized_event_ids
