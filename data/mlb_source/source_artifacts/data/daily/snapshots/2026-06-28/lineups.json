@@ -1,0 +1,2485 @@
+{
+  "date": "2026-06-28",
+  "season": 2026,
+  "spring_mode": false,
+  "generated_at": "2026-06-28T05:17:08.637075",
+  "summary": {
+    "games": 15,
+    "projected_teams": 30,
+    "adjusted_teams": 2,
+    "partial_teams": 0,
+    "fallback_pool_teams": 0,
+    "confirmed_teams": 0,
+    "projected_only_teams": 30,
+    "confirmed_only_teams": 0,
+    "comparable_teams": 0,
+    "exact_match_teams": 0,
+    "true_mismatch_teams": 0
+  },
+  "games": [
+    {
+      "idx": 0,
+      "game_pk": 824821,
+      "away": {
+        "team_id": 120,
+        "abbr": "WSH"
+      },
+      "home": {
+        "team_id": 110,
+        "abbr": "BAL"
+      },
+      "away_confirmed_ids": [],
+      "home_confirmed_ids": [],
+      "away_projected_ids": [
+        695578,
+        671277,
+        678554,
+        682928,
+        686611,
+        695734,
+        696285,
+        660688,
+        683083
+      ],
+      "home_projected_ids": [
+        621493,
+        683002,
+        624413,
+        694212,
+        665750,
+        681297,
+        641933,
+        702616,
+        677942
+      ],
+      "away_projected_validation": {
+        "status": "ok",
+        "raw_ids": [
+          695578,
+          671277,
+          678554,
+          682928,
+          686611,
+          695734,
+          696285,
+          660688,
+          683083
+        ],
+        "ids": [
+          695578,
+          671277,
+          678554,
+          682928,
+          686611,
+          695734,
+          696285,
+          660688,
+          683083
+        ],
+        "missing_ids": [],
+        "backfilled_ids": [],
+        "pool_source": "active+40Man",
+        "pool_size": 19,
+        "raw_names": [
+          "James Wood",
+          "Luis Garcia",
+          "Curtis Mead",
+          "CJ Abrams",
+          "Dylan Crews",
+          "Daylen Lile",
+          "Jacob Young",
+          "Keibert Ruiz",
+          "Nasim Nunez"
+        ],
+        "matched_names": [
+          "James Wood",
+          "Luis Garc\u00eda Jr.",
+          "Curtis Mead",
+          "CJ Abrams",
+          "Dylan Crews",
+          "Daylen Lile",
+          "Jacob Young",
+          "Keibert Ruiz",
+          "Nasim Nu\u00f1ez"
+        ],
+        "missing_name_labels": [],
+        "mapping_source": "projected_rotowire_default_vs_rhp"
+      },
+      "home_projected_validation": {
+        "status": "ok",
+        "raw_ids": [
+          621493,
+          683002,
+          624413,
+          694212,
+          665750,
+          681297,
+          641933,
+          702616,
+          677942
+        ],
+        "ids": [
+          621493,
+          683002,
+          624413,
+          694212,
+          665750,
+          681297,
+          641933,
+          702616,
+          677942
+        ],
+        "missing_ids": [],
+        "backfilled_ids": [],
+        "pool_source": "active+40Man",
+        "pool_size": 18,
+        "raw_names": [
+          "Taylor Ward",
+          "Gunnar Henderson",
+          "Pete Alonso",
+          "Samuel Basallo",
+          "Leody Taveras",
+          "Colton Cowser",
+          "Tyler O'Neill",
+          "Jackson Holliday",
+          "Blaze Alexander"
+        ],
+        "matched_names": [
+          "Taylor Ward",
+          "Gunnar Henderson",
+          "Pete Alonso",
+          "Samuel Basallo",
+          "Leody Taveras",
+          "Colton Cowser",
+          "Tyler O'Neill",
+          "Jackson Holliday",
+          "Blaze Alexander"
+        ],
+        "missing_name_labels": [],
+        "mapping_source": "projected_rotowire_default_vs_rhp"
+      },
+      "away_source": "projected_rotowire_default_vs_rhp",
+      "home_source": "projected_rotowire_default_vs_rhp",
+      "away_confidence": 0.66,
+      "home_confidence": 0.66,
+      "away_comparison": {
+        "status": "projected_only",
+        "is_true_mismatch": false,
+        "confirmed_count": 0,
+        "projected_count": 9,
+        "overlap_count": 0,
+        "missing_from_projection": [],
+        "extra_in_projection": []
+      },
+      "home_comparison": {
+        "status": "projected_only",
+        "is_true_mismatch": false,
+        "confirmed_count": 0,
+        "projected_count": 9,
+        "overlap_count": 0,
+        "missing_from_projection": [],
+        "extra_in_projection": []
+      }
+    },
+    {
+      "idx": 1,
+      "game_pk": 823362,
+      "away": {
+        "team_id": 113,
+        "abbr": "CIN"
+      },
+      "home": {
+        "team_id": 134,
+        "abbr": "PIT"
+      },
+      "away_confirmed_ids": [],
+      "home_confirmed_ids": [],
+      "away_projected_ids": [
+        694362,
+        682829,
+        668709,
+        701398,
+        663993,
+        668715,
+        553993,
+        663886,
+        680574
+      ],
+      "home_projected_ids": [
+        663968,
+        664040,
+        668804,
+        693304,
+        656811,
+        699013,
+        682997,
+        669707,
+        680779
+      ],
+      "away_projected_validation": {
+        "status": "ok",
+        "raw_ids": [
+          694362,
+          682829,
+          668709,
+          701398,
+          663993,
+          668715,
+          553993,
+          663886,
+          680574
+        ],
+        "ids": [
+          694362,
+          682829,
+          668709,
+          701398,
+          663993,
+          668715,
+          553993,
+          663886,
+          680574
+        ],
+        "missing_ids": [],
+        "backfilled_ids": [],
+        "pool_source": "active+40Man",
+        "pool_size": 18,
+        "raw_names": [
+          "Blake Dunn",
+          "Elly De La Cruz",
+          "JJ Bleday",
+          "Sal Stewart",
+          "Nathaniel Lowe",
+          "Spencer Steer",
+          "Eugenio Suarez",
+          "Tyler Stephenson",
+          "Matt McLain"
+        ],
+        "matched_names": [
+          "Blake Dunn",
+          "Elly De La Cruz",
+          "JJ Bleday",
+          "Sal Stewart",
+          "Nathaniel Lowe",
+          "Spencer Steer",
+          "Eugenio Su\u00e1rez",
+          "Tyler Stephenson",
+          "Matt McLain"
+        ],
+        "missing_name_labels": [],
+        "mapping_source": "projected_rotowire_default_vs_rhp"
+      },
+      "home_projected_validation": {
+        "status": "ok",
+        "raw_ids": [
+          663968,
+          664040,
+          668804,
+          693304,
+          656811,
+          699013,
+          682997,
+          669707,
+          680779
+        ],
+        "ids": [
+          663968,
+          664040,
+          668804,
+          693304,
+          656811,
+          699013,
+          682997,
+          669707,
+          680779
+        ],
+        "missing_ids": [],
+        "backfilled_ids": [],
+        "pool_source": "active+40Man",
+        "pool_size": 18,
+        "raw_names": [
+          "Jake Mangum",
+          "Brandon Lowe",
+          "Bryan Reynolds",
+          "Nick Gonzales",
+          "Ryan O'Hearn",
+          "Esmerlyn Valdez",
+          "Tyler Callihan",
+          "Jared Triolo",
+          "Henry Davis"
+        ],
+        "matched_names": [
+          "Jake Mangum",
+          "Brandon Lowe",
+          "Bryan Reynolds",
+          "Nick Gonzales",
+          "Ryan O'Hearn",
+          "Esmerlyn Valdez",
+          "Tyler Callihan",
+          "Jared Triolo",
+          "Henry Davis"
+        ],
+        "missing_name_labels": [],
+        "mapping_source": "projected_rotowire_today_lineup"
+      },
+      "away_source": "projected_rotowire_default_vs_rhp",
+      "home_source": "projected_rotowire_today_lineup",
+      "away_confidence": 0.66,
+      "home_confidence": 0.72,
+      "away_comparison": {
+        "status": "projected_only",
+        "is_true_mismatch": false,
+        "confirmed_count": 0,
+        "projected_count": 9,
+        "overlap_count": 0,
+        "missing_from_projection": [],
+        "extra_in_projection": []
+      },
+      "home_comparison": {
+        "status": "projected_only",
+        "is_true_mismatch": false,
+        "confirmed_count": 0,
+        "projected_count": 9,
+        "overlap_count": 0,
+        "missing_from_projection": [],
+        "extra_in_projection": []
+      }
+    },
+    {
+      "idx": 2,
+      "game_pk": 822795,
+      "away": {
+        "team_id": 140,
+        "abbr": "TEX"
+      },
+      "home": {
+        "team_id": 141,
+        "abbr": "TOR"
+      },
+      "away_confirmed_ids": [],
+      "home_confirmed_ids": [],
+      "away_projected_ids": [
+        592626,
+        694671,
+        673962,
+        607043,
+        669394,
+        677649,
+        696030,
+        543309,
+        670032
+      ],
+      "home_projected_ids": [
+        543807,
+        665489,
+        672960,
+        672386,
+        662139,
+        676391,
+        676914,
+        649966,
+        664702
+      ],
+      "away_projected_validation": {
+        "status": "ok",
+        "raw_ids": [
+          592626,
+          694671,
+          673962,
+          607043,
+          669394,
+          677649,
+          696030,
+          543309,
+          670032
+        ],
+        "ids": [
+          592626,
+          694671,
+          673962,
+          607043,
+          669394,
+          677649,
+          696030,
+          543309,
+          670032
+        ],
+        "missing_ids": [],
+        "backfilled_ids": [],
+        "pool_source": "active+40Man",
+        "pool_size": 14,
+        "raw_names": [
+          "Joc Pederson",
+          "Wyatt Langford",
+          "Josh Jung",
+          "Brandon Nimmo",
+          "Jake Burger",
+          "Ezequiel Duran",
+          "Alejandro Osuna",
+          "Kyle Higashioka",
+          "Nicky Lopez"
+        ],
+        "matched_names": [
+          "Joc Pederson",
+          "Wyatt Langford",
+          "Josh Jung",
+          "Brandon Nimmo",
+          "Jake Burger",
+          "Ezequiel Duran",
+          "Alejandro Osuna",
+          "Kyle Higashioka",
+          "Nicky Lopez"
+        ],
+        "missing_name_labels": [],
+        "mapping_source": "projected_rotowire_default_vs_rhp"
+      },
+      "home_projected_validation": {
+        "status": "ok",
+        "raw_ids": [
+          543807,
+          665489,
+          672960,
+          672386,
+          662139,
+          676391,
+          676914,
+          649966,
+          664702
+        ],
+        "ids": [
+          543807,
+          665489,
+          672960,
+          672386,
+          662139,
+          676391,
+          676914,
+          649966,
+          664702
+        ],
+        "missing_ids": [],
+        "backfilled_ids": [],
+        "pool_source": "active+40Man",
+        "pool_size": 17,
+        "raw_names": [
+          "George Springer",
+          "Vladimir Guerrero",
+          "Kazuma Okamoto",
+          "Alejandro Kirk",
+          "Daulton Varsho",
+          "Ernie Clement",
+          "Davis Schneider",
+          "Luis Urias",
+          "Myles Straw"
+        ],
+        "matched_names": [
+          "George Springer",
+          "Vladimir Guerrero Jr.",
+          "Kazuma Okamoto",
+          "Alejandro Kirk",
+          "Daulton Varsho",
+          "Ernie Clement",
+          "Davis Schneider",
+          "Luis Ur\u00edas",
+          "Myles Straw"
+        ],
+        "missing_name_labels": [],
+        "mapping_source": "projected_rotowire_default_vs_lhp"
+      },
+      "away_source": "projected_rotowire_default_vs_rhp",
+      "home_source": "projected_rotowire_default_vs_lhp",
+      "away_confidence": 0.66,
+      "home_confidence": 0.56,
+      "away_comparison": {
+        "status": "projected_only",
+        "is_true_mismatch": false,
+        "confirmed_count": 0,
+        "projected_count": 9,
+        "overlap_count": 0,
+        "missing_from_projection": [],
+        "extra_in_projection": []
+      },
+      "home_comparison": {
+        "status": "projected_only",
+        "is_true_mismatch": false,
+        "confirmed_count": 0,
+        "projected_count": 9,
+        "overlap_count": 0,
+        "missing_from_projection": [],
+        "extra_in_projection": []
+      }
+    },
+    {
+      "idx": 3,
+      "game_pk": 824256,
+      "away": {
+        "team_id": 117,
+        "abbr": "HOU"
+      },
+      "home": {
+        "team_id": 116,
+        "abbr": "DET"
+      },
+      "away_confirmed_ids": [],
+      "home_confirmed_ids": [],
+      "away_projected_ids": [
+        665161,
+        670541,
+        572233,
+        670623,
+        514888,
+        673237,
+        701358,
+        694388,
+        676694
+      ],
+      "home_projected_ids": [
+        805808,
+        693307,
+        681481,
+        682985,
+        679529,
+        690993,
+        681546,
+        701678,
+        656716
+      ],
+      "away_projected_validation": {
+        "status": "ok",
+        "raw_ids": [
+          665161,
+          670541,
+          572233,
+          670623,
+          514888,
+          673237,
+          701358,
+          694388,
+          676694
+        ],
+        "ids": [
+          665161,
+          670541,
+          572233,
+          670623,
+          514888,
+          673237,
+          701358,
+          694388,
+          676694
+        ],
+        "missing_ids": [],
+        "backfilled_ids": [],
+        "pool_source": "active+40Man",
+        "pool_size": 17,
+        "raw_names": [
+          "Jeremy Pena",
+          "Yordan Alvarez",
+          "Christian Walker",
+          "Isaac Paredes",
+          "Jose Altuve",
+          "Yainer Diaz",
+          "Cam Smith",
+          "Joey Loperfido",
+          "Jake Meyers"
+        ],
+        "matched_names": [
+          "Jeremy Pe\u00f1a",
+          "Yordan Alvarez",
+          "Christian Walker",
+          "Isaac Paredes",
+          "Jose Altuve",
+          "Yainer Diaz",
+          "Cam Smith",
+          "Joey Loperfido",
+          "Jake Meyers"
+        ],
+        "missing_name_labels": [],
+        "mapping_source": "projected_rotowire_default_vs_rhp"
+      },
+      "home_projected_validation": {
+        "status": "ok",
+        "raw_ids": [
+          805808,
+          693307,
+          681481,
+          682985,
+          679529,
+          690993,
+          681546,
+          701678,
+          656716
+        ],
+        "ids": [
+          805808,
+          693307,
+          681481,
+          682985,
+          679529,
+          690993,
+          681546,
+          701678,
+          656716
+        ],
+        "missing_ids": [],
+        "backfilled_ids": [],
+        "pool_source": "active+40Man",
+        "pool_size": 18,
+        "raw_names": [
+          "Kevin McGonigle",
+          "Dillon Dingler",
+          "Kerry Carpenter",
+          "Riley Greene",
+          "Spencer Torkelson",
+          "Colt Keith",
+          "James Outman",
+          "Hao-Yu Lee",
+          "Zach McKinstry"
+        ],
+        "matched_names": [
+          "Kevin McGonigle",
+          "Dillon Dingler",
+          "Kerry Carpenter",
+          "Riley Greene",
+          "Spencer Torkelson",
+          "Colt Keith",
+          "James Outman",
+          "Hao-Yu Lee",
+          "Zach McKinstry"
+        ],
+        "missing_name_labels": [],
+        "mapping_source": "projected_rotowire_default_vs_rhp"
+      },
+      "away_source": "projected_rotowire_default_vs_rhp",
+      "home_source": "projected_rotowire_default_vs_rhp",
+      "away_confidence": 0.66,
+      "home_confidence": 0.66,
+      "away_comparison": {
+        "status": "projected_only",
+        "is_true_mismatch": false,
+        "confirmed_count": 0,
+        "projected_count": 9,
+        "overlap_count": 0,
+        "missing_from_projection": [],
+        "extra_in_projection": []
+      },
+      "home_comparison": {
+        "status": "projected_only",
+        "is_true_mismatch": false,
+        "confirmed_count": 0,
+        "projected_count": 9,
+        "overlap_count": 0,
+        "missing_from_projection": [],
+        "extra_in_projection": []
+      }
+    },
+    {
+      "idx": 4,
+      "game_pk": 824422,
+      "away": {
+        "team_id": 136,
+        "abbr": "SEA"
+      },
+      "home": {
+        "team_id": 114,
+        "abbr": "CLE"
+      },
+      "away_confirmed_ids": [],
+      "home_confirmed_ids": [],
+      "away_projected_ids": [
+        641487,
+        663728,
+        677594,
+        647304,
+        668227,
+        670042,
+        702284,
+        641598,
+        806068
+      ],
+      "home_projected_ids": [
+        683953,
+        700932,
+        677587,
+        656555,
+        682177,
+        696135,
+        680757,
+        672275,
+        690984
+      ],
+      "away_projected_validation": {
+        "status": "ok",
+        "raw_ids": [
+          641487,
+          663728,
+          677594,
+          647304,
+          668227,
+          670042,
+          702284,
+          641598,
+          806068
+        ],
+        "ids": [
+          641487,
+          663728,
+          677594,
+          647304,
+          668227,
+          670042,
+          702284,
+          641598,
+          806068
+        ],
+        "missing_ids": [],
+        "backfilled_ids": [],
+        "pool_source": "active+40Man",
+        "pool_size": 19,
+        "raw_names": [
+          "J.P. Crawford",
+          "Cal Raleigh",
+          "Julio Rodriguez",
+          "Josh Naylor",
+          "Randy Arozarena",
+          "Luke Raley",
+          "Cole Young",
+          "Mitch Garver",
+          "Colt Emerson"
+        ],
+        "matched_names": [
+          "J.P. Crawford",
+          "Cal Raleigh",
+          "Julio Rodr\u00edguez",
+          "Josh Naylor",
+          "Randy Arozarena",
+          "Luke Raley",
+          "Cole Young",
+          "Mitch Garver",
+          "Colt Emerson"
+        ],
+        "missing_name_labels": [],
+        "mapping_source": "projected_rotowire_today_lineup"
+      },
+      "home_projected_validation": {
+        "status": "ok",
+        "raw_ids": [
+          683953,
+          700932,
+          677587,
+          656555,
+          682177,
+          696135,
+          680757,
+          672275,
+          690984
+        ],
+        "ids": [
+          683953,
+          700932,
+          677587,
+          656555,
+          682177,
+          696135,
+          680757,
+          672275,
+          690984
+        ],
+        "missing_ids": [],
+        "backfilled_ids": [],
+        "pool_source": "active+40Man",
+        "pool_size": 17,
+        "raw_names": [
+          "Travis Bazzana",
+          "Kyle Manzardo",
+          "Brayan Rocchio",
+          "Rhys Hoskins",
+          "Daniel Schneemann",
+          "Kahlil Watson",
+          "Steven Kwan",
+          "Patrick Bailey",
+          "Petey Halpin"
+        ],
+        "matched_names": [
+          "Travis Bazzana",
+          "Kyle Manzardo",
+          "Brayan Rocchio",
+          "Rhys Hoskins",
+          "Daniel Schneemann",
+          "Kahlil Watson",
+          "Steven Kwan",
+          "Patrick Bailey",
+          "Petey Halpin"
+        ],
+        "missing_name_labels": [],
+        "mapping_source": "projected_rotowire_default_vs_rhp"
+      },
+      "away_source": "projected_rotowire_today_lineup",
+      "home_source": "projected_rotowire_default_vs_rhp",
+      "away_confidence": 0.72,
+      "home_confidence": 0.66,
+      "away_comparison": {
+        "status": "projected_only",
+        "is_true_mismatch": false,
+        "confirmed_count": 0,
+        "projected_count": 9,
+        "overlap_count": 0,
+        "missing_from_projection": [],
+        "extra_in_projection": []
+      },
+      "home_comparison": {
+        "status": "projected_only",
+        "is_true_mismatch": false,
+        "confirmed_count": 0,
+        "projected_count": 9,
+        "overlap_count": 0,
+        "missing_from_projection": [],
+        "extra_in_projection": []
+      }
+    },
+    {
+      "idx": 5,
+      "game_pk": 822959,
+      "away": {
+        "team_id": 109,
+        "abbr": "AZ"
+      },
+      "home": {
+        "team_id": 139,
+        "abbr": "TB"
+      },
+      "away_confirmed_ids": [],
+      "home_confirmed_ids": [],
+      "away_projected_ids": [
+        606466,
+        672695,
+        682998,
+        672515,
+        656976,
+        571448,
+        666971,
+        596146,
+        694371
+      ],
+      "home_projected_ids": [
+        650490,
+        666018,
+        691406,
+        680700,
+        802415,
+        656775,
+        670764,
+        683748,
+        676439
+      ],
+      "away_projected_validation": {
+        "status": "ok",
+        "raw_ids": [
+          606466,
+          672695,
+          682998,
+          672515,
+          656976,
+          571448,
+          666971,
+          596146,
+          694371
+        ],
+        "ids": [
+          606466,
+          672695,
+          682998,
+          672515,
+          656976,
+          571448,
+          666971,
+          596146,
+          694371
+        ],
+        "missing_ids": [],
+        "backfilled_ids": [],
+        "pool_source": "active+40Man",
+        "pool_size": 17,
+        "raw_names": [
+          "Ketel Marte",
+          "Geraldo Perdomo",
+          "Corbin Carroll",
+          "Gabriel Moreno",
+          "Pavin Smith",
+          "Nolan Arenado",
+          "Lourdes Gurriel",
+          "Max Kepler",
+          "Tommy Troy"
+        ],
+        "matched_names": [
+          "Ketel Marte",
+          "Geraldo Perdomo",
+          "Corbin Carroll",
+          "Gabriel Moreno",
+          "Pavin Smith",
+          "Nolan Arenado",
+          "Lourdes Gurriel Jr.",
+          "Max Kepler",
+          "Tommy Troy"
+        ],
+        "missing_name_labels": [],
+        "mapping_source": "projected_rotowire_default_vs_rhp"
+      },
+      "home_projected_validation": {
+        "status": "ok",
+        "raw_ids": [
+          650490,
+          666018,
+          691406,
+          680700,
+          802415,
+          656775,
+          670764,
+          683748,
+          676439
+        ],
+        "ids": [
+          650490,
+          666018,
+          691406,
+          680700,
+          802415,
+          656775,
+          670764,
+          683748,
+          676439
+        ],
+        "missing_ids": [],
+        "backfilled_ids": [],
+        "pool_source": "active+40Man",
+        "pool_size": 17,
+        "raw_names": [
+          "Yandy Diaz",
+          "Jonathan Aranda",
+          "Junior Caminero",
+          "Richie Palacios",
+          "Chandler Simpson",
+          "Cedric Mullins",
+          "Taylor Walls",
+          "Victor Mesa",
+          "Hunter Feduccia"
+        ],
+        "matched_names": [
+          "Yandy D\u00edaz",
+          "Jonathan Aranda",
+          "Junior Caminero",
+          "Richie Palacios",
+          "Chandler Simpson",
+          "Cedric Mullins",
+          "Taylor Walls",
+          "Victor Mesa Jr.",
+          "Hunter Feduccia"
+        ],
+        "missing_name_labels": [],
+        "mapping_source": "projected_rotowire_today_lineup"
+      },
+      "away_source": "projected_rotowire_default_vs_rhp",
+      "home_source": "projected_rotowire_today_lineup",
+      "away_confidence": 0.66,
+      "home_confidence": 0.72,
+      "away_comparison": {
+        "status": "projected_only",
+        "is_true_mismatch": false,
+        "confirmed_count": 0,
+        "projected_count": 9,
+        "overlap_count": 0,
+        "missing_from_projection": [],
+        "extra_in_projection": []
+      },
+      "home_comparison": {
+        "status": "projected_only",
+        "is_true_mismatch": false,
+        "confirmed_count": 0,
+        "projected_count": 9,
+        "overlap_count": 0,
+        "missing_from_projection": [],
+        "extra_in_projection": []
+      }
+    },
+    {
+      "idx": 6,
+      "game_pk": 823608,
+      "away": {
+        "team_id": 143,
+        "abbr": "PHI"
+      },
+      "home": {
+        "team_id": 121,
+        "abbr": "NYM"
+      },
+      "away_confirmed_ids": [],
+      "home_confirmed_ids": [],
+      "away_projected_ids": [
+        607208,
+        656941,
+        547180,
+        664761,
+        624641,
+        669016,
+        592663,
+        656537,
+        681082
+      ],
+      "home_projected_ids": [
+        596019,
+        666182,
+        665742,
+        682626,
+        701807,
+        676572,
+        668901,
+        805999,
+        677595
+      ],
+      "away_projected_validation": {
+        "status": "ok",
+        "raw_ids": [
+          607208,
+          656941,
+          547180,
+          664761,
+          624641,
+          669016,
+          592663,
+          656537,
+          681082
+        ],
+        "ids": [
+          607208,
+          656941,
+          547180,
+          664761,
+          624641,
+          669016,
+          592663,
+          656537,
+          681082
+        ],
+        "missing_ids": [],
+        "backfilled_ids": [],
+        "pool_source": "active+40Man",
+        "pool_size": 17,
+        "raw_names": [
+          "Trea Turner",
+          "Kyle Schwarber",
+          "Bryce Harper",
+          "Alec Bohm",
+          "Edmundo Sosa",
+          "Brandon Marsh",
+          "J.T. Realmuto",
+          "Derek Hill",
+          "Bryson Stott"
+        ],
+        "matched_names": [
+          "Trea Turner",
+          "Kyle Schwarber",
+          "Bryce Harper",
+          "Alec Bohm",
+          "Edmundo Sosa",
+          "Brandon Marsh",
+          "J.T. Realmuto",
+          "Derek Hill",
+          "Bryson Stott"
+        ],
+        "missing_name_labels": [],
+        "mapping_source": "projected_rotowire_default_vs_lhp"
+      },
+      "home_projected_validation": {
+        "status": "ok",
+        "raw_ids": [
+          596019,
+          666182,
+          665742,
+          682626,
+          701807,
+          676572,
+          668901,
+          805999,
+          677595
+        ],
+        "ids": [
+          596019,
+          666182,
+          665742,
+          682626,
+          701807,
+          676572,
+          668901,
+          805999,
+          677595
+        ],
+        "missing_ids": [],
+        "backfilled_ids": [],
+        "pool_source": "active+40Man",
+        "pool_size": 17,
+        "raw_names": [
+          "Francisco Lindor",
+          "Bo Bichette",
+          "Juan Soto",
+          "Francisco Alvarez",
+          "Carson Benge",
+          "Eric Wagaman",
+          "Mark Vientos",
+          "A.J. Ewing",
+          "Ronny Mauricio"
+        ],
+        "matched_names": [
+          "Francisco Lindor",
+          "Bo Bichette",
+          "Juan Soto",
+          "Francisco Alvarez",
+          "Carson Benge",
+          "Eric Wagaman",
+          "Mark Vientos",
+          "A.J. Ewing",
+          "Ronny Mauricio"
+        ],
+        "missing_name_labels": [],
+        "mapping_source": "projected_rotowire_default_vs_lhp"
+      },
+      "away_source": "projected_rotowire_default_vs_lhp",
+      "home_source": "projected_rotowire_default_vs_lhp",
+      "away_confidence": 0.66,
+      "home_confidence": 0.66,
+      "away_comparison": {
+        "status": "projected_only",
+        "is_true_mismatch": false,
+        "confirmed_count": 0,
+        "projected_count": 9,
+        "overlap_count": 0,
+        "missing_from_projection": [],
+        "extra_in_projection": []
+      },
+      "home_comparison": {
+        "status": "projected_only",
+        "is_true_mismatch": false,
+        "confirmed_count": 0,
+        "projected_count": 9,
+        "overlap_count": 0,
+        "missing_from_projection": [],
+        "extra_in_projection": []
+      }
+    },
+    {
+      "idx": 7,
+      "game_pk": 823686,
+      "away": {
+        "team_id": 115,
+        "abbr": "COL"
+      },
+      "home": {
+        "team_id": 142,
+        "abbr": "MIN"
+      },
+      "away_confirmed_ids": [],
+      "home_confirmed_ids": [],
+      "away_projected_ids": [
+        650489,
+        671289,
+        681198,
+        696100,
+        694249,
+        664983,
+        690924,
+        678662,
+        691720
+      ],
+      "home_projected_ids": [
+        663616,
+        621439,
+        665019,
+        605137,
+        668904,
+        686797,
+        605170,
+        807712,
+        668952
+      ],
+      "away_projected_validation": {
+        "status": "ok",
+        "raw_ids": [
+          650489,
+          671289,
+          681198,
+          696100,
+          694249,
+          664983,
+          690924,
+          678662,
+          691720
+        ],
+        "ids": [
+          650489,
+          671289,
+          681198,
+          696100,
+          694249,
+          664983,
+          690924,
+          678662,
+          691720
+        ],
+        "missing_ids": [],
+        "backfilled_ids": [],
+        "pool_source": "active+40Man",
+        "pool_size": 18,
+        "raw_names": [
+          "Willi Castro",
+          "Tyler Freeman",
+          "TJ Rumfield",
+          "Hunter Goodman",
+          "Cole Carrigg",
+          "Jake McCarthy",
+          "Braxton Fulford",
+          "Ezequiel Tovar",
+          "Kyle Karros"
+        ],
+        "matched_names": [
+          "Willi Castro",
+          "Tyler Freeman",
+          "TJ Rumfield",
+          "Hunter Goodman",
+          "Cole Carrigg",
+          "Jake McCarthy",
+          "Braxton Fulford",
+          "Ezequiel Tovar",
+          "Kyle Karros"
+        ],
+        "missing_name_labels": [],
+        "mapping_source": "projected_rotowire_default_vs_lhp"
+      },
+      "home_projected_validation": {
+        "status": "ok",
+        "raw_ids": [
+          663616,
+          621439,
+          665019,
+          605137,
+          668904,
+          686797,
+          605170,
+          807712,
+          668952
+        ],
+        "ids": [
+          663616,
+          621439,
+          665019,
+          605137,
+          668904,
+          686797,
+          605170,
+          807712,
+          668952
+        ],
+        "missing_ids": [],
+        "backfilled_ids": [],
+        "pool_source": "active+40Man",
+        "pool_size": 18,
+        "raw_names": [
+          "Trevor Larnach",
+          "Byron Buxton",
+          "Kody Clemens",
+          "Josh Bell",
+          "Royce Lewis",
+          "Brooks Lee",
+          "Victor Caratini",
+          "Luke Keaschall",
+          "Ryan Kreidler"
+        ],
+        "matched_names": [
+          "Trevor Larnach",
+          "Byron Buxton",
+          "Kody Clemens",
+          "Josh Bell",
+          "Royce Lewis",
+          "Brooks Lee",
+          "Victor Caratini",
+          "Luke Keaschall",
+          "Ryan Kreidler"
+        ],
+        "missing_name_labels": [],
+        "mapping_source": "projected_rotowire_default_vs_rhp"
+      },
+      "away_source": "projected_rotowire_default_vs_lhp",
+      "home_source": "projected_rotowire_default_vs_rhp",
+      "away_confidence": 0.66,
+      "home_confidence": 0.66,
+      "away_comparison": {
+        "status": "projected_only",
+        "is_true_mismatch": false,
+        "confirmed_count": 0,
+        "projected_count": 9,
+        "overlap_count": 0,
+        "missing_from_projection": [],
+        "extra_in_projection": []
+      },
+      "home_comparison": {
+        "status": "projected_only",
+        "is_true_mismatch": false,
+        "confirmed_count": 0,
+        "projected_count": 9,
+        "overlap_count": 0,
+        "missing_from_projection": [],
+        "extra_in_projection": []
+      }
+    },
+    {
+      "idx": 8,
+      "game_pk": 824580,
+      "away": {
+        "team_id": 118,
+        "abbr": "KC"
+      },
+      "home": {
+        "team_id": 145,
+        "abbr": "CWS"
+      },
+      "away_confirmed_ids": [],
+      "home_confirmed_ids": [],
+      "away_projected_ids": [
+        695600,
+        679845,
+        695506,
+        657041,
+        668942,
+        521692,
+        686555,
+        516782,
+        686475
+      ],
+      "home_projected_ids": [
+        803011,
+        678246,
+        643217,
+        691019,
+        695657,
+        805367,
+        695731,
+        694378,
+        671976
+      ],
+      "away_projected_validation": {
+        "status": "ok",
+        "raw_ids": [
+          695600,
+          679845,
+          695506,
+          657041,
+          668942,
+          521692,
+          686555,
+          516782,
+          686475
+        ],
+        "ids": [
+          695600,
+          679845,
+          695506,
+          657041,
+          668942,
+          521692,
+          686555,
+          516782,
+          686475
+        ],
+        "missing_ids": [],
+        "backfilled_ids": [],
+        "pool_source": "active+40Man",
+        "pool_size": 14,
+        "raw_names": [
+          "Carter Jensen",
+          "Nick Loftin",
+          "Jac Caglianone",
+          "Lane Thomas",
+          "Josh Rojas",
+          "Salvador Perez",
+          "Isaac Collins",
+          "Starling Marte",
+          "Tyler Tolbert"
+        ],
+        "matched_names": [
+          "Carter Jensen",
+          "Nick Loftin",
+          "Jac Caglianone",
+          "Lane Thomas",
+          "Josh Rojas",
+          "Salvador Perez",
+          "Isaac Collins",
+          "Starling Marte",
+          "Tyler Tolbert"
+        ],
+        "missing_name_labels": [],
+        "mapping_source": "projected_rotowire_today_lineup"
+      },
+      "home_projected_validation": {
+        "status": "ok",
+        "raw_ids": [
+          803011,
+          678246,
+          643217,
+          691019,
+          695657,
+          805367,
+          695731,
+          694378,
+          671976
+        ],
+        "ids": [
+          803011,
+          678246,
+          643217,
+          691019,
+          695657,
+          805367,
+          695731,
+          694378,
+          671976
+        ],
+        "missing_ids": [],
+        "backfilled_ids": [],
+        "pool_source": "active+40Man",
+        "pool_size": 15,
+        "raw_names": [
+          "Sam Antonacci",
+          "Miguel Vargas",
+          "Andrew Benintendi",
+          "Kyle Teel",
+          "Colson Montgomery",
+          "Chase Meidroth",
+          "Braden Montgomery",
+          "Jacob Gonzalez",
+          "Tristan Peters"
+        ],
+        "matched_names": [
+          "Sam Antonacci",
+          "Miguel Vargas",
+          "Andrew Benintendi",
+          "Kyle Teel",
+          "Colson Montgomery",
+          "Chase Meidroth",
+          "Braden Montgomery",
+          "Jacob Gonzalez",
+          "Tristan Peters"
+        ],
+        "missing_name_labels": [],
+        "mapping_source": "projected_rotowire_default_vs_rhp"
+      },
+      "away_source": "projected_rotowire_today_lineup",
+      "home_source": "projected_rotowire_default_vs_rhp",
+      "away_confidence": 0.72,
+      "home_confidence": 0.66,
+      "away_comparison": {
+        "status": "projected_only",
+        "is_true_mismatch": false,
+        "confirmed_count": 0,
+        "projected_count": 9,
+        "overlap_count": 0,
+        "missing_from_projection": [],
+        "extra_in_projection": []
+      },
+      "home_comparison": {
+        "status": "projected_only",
+        "is_true_mismatch": false,
+        "confirmed_count": 0,
+        "projected_count": 9,
+        "overlap_count": 0,
+        "missing_from_projection": [],
+        "extra_in_projection": []
+      }
+    },
+    {
+      "idx": 9,
+      "game_pk": 823769,
+      "away": {
+        "team_id": 112,
+        "abbr": "CHC"
+      },
+      "home": {
+        "team_id": 158,
+        "abbr": "MIL"
+      },
+      "away_confirmed_ids": [],
+      "home_confirmed_ids": [],
+      "away_projected_ids": [
+        691718,
+        608324,
+        683737,
+        673548,
+        664023,
+        807713,
+        663538,
+        608348,
+        621020
+      ],
+      "home_projected_ids": [
+        592885,
+        694192,
+        668930,
+        661388,
+        683734,
+        663368,
+        669003,
+        806198,
+        687401
+      ],
+      "away_projected_validation": {
+        "status": "ok",
+        "raw_ids": [
+          691718,
+          608324,
+          683737,
+          673548,
+          664023,
+          807713,
+          663538,
+          608348,
+          621020
+        ],
+        "ids": [
+          691718,
+          608324,
+          683737,
+          673548,
+          664023,
+          807713,
+          663538,
+          608348,
+          621020
+        ],
+        "missing_ids": [],
+        "backfilled_ids": [],
+        "pool_source": "active+40Man",
+        "pool_size": 16,
+        "raw_names": [
+          "Pete Crow-Armstrong",
+          "Alex Bregman",
+          "Michael Busch",
+          "Seiya Suzuki",
+          "Ian Happ",
+          "Matt Shaw",
+          "Nico Hoerner",
+          "Carson Kelly",
+          "Dansby Swanson"
+        ],
+        "matched_names": [
+          "Pete Crow-Armstrong",
+          "Alex Bregman",
+          "Michael Busch",
+          "Seiya Suzuki",
+          "Ian Happ",
+          "Matt Shaw",
+          "Nico Hoerner",
+          "Carson Kelly",
+          "Dansby Swanson"
+        ],
+        "missing_name_labels": [],
+        "mapping_source": "projected_rotowire_default_vs_rhp"
+      },
+      "home_projected_validation": {
+        "status": "ok",
+        "raw_ids": [
+          592885,
+          694192,
+          668930,
+          661388,
+          683734,
+          663368,
+          669003,
+          806198,
+          687401
+        ],
+        "ids": [
+          592885,
+          694192,
+          668930,
+          661388,
+          683734,
+          663368,
+          669003,
+          806198,
+          687401
+        ],
+        "missing_ids": [],
+        "backfilled_ids": [],
+        "pool_source": "active+40Man",
+        "pool_size": 17,
+        "raw_names": [
+          "Christian Yelich",
+          "Jackson Chourio",
+          "Brice Turang",
+          "William Contreras",
+          "Andrew Vaughn",
+          "Blake Perkins",
+          "Garrett Mitchell",
+          "Cooper Pratt",
+          "Joey Ortiz"
+        ],
+        "matched_names": [
+          "Christian Yelich",
+          "Jackson Chourio",
+          "Brice Turang",
+          "William Contreras",
+          "Andrew Vaughn",
+          "Blake Perkins",
+          "Garrett Mitchell",
+          "Cooper Pratt",
+          "Joey Ortiz"
+        ],
+        "missing_name_labels": [],
+        "mapping_source": "projected_rotowire_default_vs_lhp"
+      },
+      "away_source": "projected_rotowire_default_vs_rhp",
+      "home_source": "projected_rotowire_default_vs_lhp",
+      "away_confidence": 0.66,
+      "home_confidence": 0.66,
+      "away_comparison": {
+        "status": "projected_only",
+        "is_true_mismatch": false,
+        "confirmed_count": 0,
+        "projected_count": 9,
+        "overlap_count": 0,
+        "missing_from_projection": [],
+        "extra_in_projection": []
+      },
+      "home_comparison": {
+        "status": "projected_only",
+        "is_true_mismatch": false,
+        "confirmed_count": 0,
+        "projected_count": 9,
+        "overlap_count": 0,
+        "missing_from_projection": [],
+        "extra_in_projection": []
+      }
+    },
+    {
+      "idx": 10,
+      "game_pk": 823037,
+      "away": {
+        "team_id": 146,
+        "abbr": "MIA"
+      },
+      "home": {
+        "team_id": 138,
+        "abbr": "STL"
+      },
+      "away_confirmed_ids": [],
+      "home_confirmed_ids": [],
+      "away_projected_ids": [
+        669364,
+        672640,
+        669065,
+        681715,
+        665052,
+        805300,
+        683357,
+        691788,
+        691594
+      ],
+      "home_projected_ids": [
+        802139,
+        671056,
+        676475,
+        691023,
+        663457,
+        691026,
+        699625,
+        691458,
+        701675
+      ],
+      "away_projected_validation": {
+        "status": "ok",
+        "raw_ids": [
+          669364,
+          672640,
+          669065,
+          681715,
+          665052,
+          805300,
+          683357,
+          691788,
+          691594
+        ],
+        "ids": [
+          669364,
+          672640,
+          669065,
+          681715,
+          665052,
+          805300,
+          683357,
+          691788,
+          691594
+        ],
+        "missing_ids": [],
+        "backfilled_ids": [],
+        "pool_source": "active+40Man",
+        "pool_size": 19,
+        "raw_names": [
+          "Xavier Edwards",
+          "Otto Lopez",
+          "Kyle Stowers",
+          "Heriberto Hernandez",
+          "Griffin Conine",
+          "Jakob Marsee",
+          "Owen Caissie",
+          "Joe Mack",
+          "Javier Sanoja"
+        ],
+        "matched_names": [
+          "Xavier Edwards",
+          "Otto Lopez",
+          "Kyle Stowers",
+          "Heriberto Hern\u00e1ndez",
+          "Griffin Conine",
+          "Jakob Marsee",
+          "Owen Caissie",
+          "Joe Mack",
+          "Javier Sanoja"
+        ],
+        "missing_name_labels": [],
+        "mapping_source": "projected_rotowire_default_vs_rhp"
+      },
+      "home_projected_validation": {
+        "status": "ok",
+        "raw_ids": [
+          802139,
+          671056,
+          676475,
+          691023,
+          663457,
+          691026,
+          699625,
+          691458,
+          701675
+        ],
+        "ids": [
+          802139,
+          671056,
+          676475,
+          691023,
+          663457,
+          691026,
+          699625,
+          691458,
+          701675
+        ],
+        "missing_ids": [],
+        "backfilled_ids": [],
+        "pool_source": "active+40Man",
+        "pool_size": 20,
+        "raw_names": [
+          "JJ Wetherholt",
+          "Ivan Herrera",
+          "Alec Burleson",
+          "Jordan Walker",
+          "Lars Nootbaar",
+          "Masyn Winn",
+          "Jimmy Crooks",
+          "Blaze Jordan",
+          "Nathan Church"
+        ],
+        "matched_names": [
+          "JJ Wetherholt",
+          "Iv\u00e1n Herrera",
+          "Alec Burleson",
+          "Jordan Walker",
+          "Lars Nootbaar",
+          "Masyn Winn",
+          "Jimmy Crooks",
+          "Blaze Jordan",
+          "Nathan Church"
+        ],
+        "missing_name_labels": [],
+        "mapping_source": "projected_rotowire_default_vs_rhp"
+      },
+      "away_source": "projected_rotowire_default_vs_rhp",
+      "home_source": "projected_rotowire_default_vs_rhp",
+      "away_confidence": 0.66,
+      "home_confidence": 0.66,
+      "away_comparison": {
+        "status": "projected_only",
+        "is_true_mismatch": false,
+        "confirmed_count": 0,
+        "projected_count": 9,
+        "overlap_count": 0,
+        "missing_from_projection": [],
+        "extra_in_projection": []
+      },
+      "home_comparison": {
+        "status": "projected_only",
+        "is_true_mismatch": false,
+        "confirmed_count": 0,
+        "projected_count": 9,
+        "overlap_count": 0,
+        "missing_from_projection": [],
+        "extra_in_projection": []
+      }
+    },
+    {
+      "idx": 11,
+      "game_pk": 824011,
+      "away": {
+        "team_id": 133,
+        "abbr": "ATH"
+      },
+      "home": {
+        "team_id": 108,
+        "abbr": "LAA"
+      },
+      "away_confirmed_ids": [],
+      "home_confirmed_ids": [],
+      "away_projected_ids": [
+        703607,
+        701762,
+        669127,
+        691016,
+        641680,
+        671732,
+        691777,
+        643446,
+        675961
+      ],
+      "home_projected_ids": [
+        687263,
+        694384,
+        666176,
+        624585,
+        685133,
+        694203,
+        622268,
+        681351,
+        666139
+      ],
+      "away_projected_validation": {
+        "status": "ok",
+        "raw_ids": [
+          703607,
+          701762,
+          669127,
+          691016,
+          641680,
+          671732,
+          691777,
+          643446,
+          675961
+        ],
+        "ids": [
+          703607,
+          701762,
+          669127,
+          691016,
+          641680,
+          671732,
+          691777,
+          643446,
+          675961
+        ],
+        "missing_ids": [],
+        "backfilled_ids": [],
+        "pool_source": "active+40Man",
+        "pool_size": 14,
+        "raw_names": [
+          "Henry Bolte",
+          "Nick Kurtz",
+          "Shea Langeliers",
+          "Tyler Soderstrom",
+          "Jonah Heim",
+          "Lawrence Butler",
+          "Max Muncy",
+          "Jeff McNeil",
+          "Alika Williams"
+        ],
+        "matched_names": [
+          "Henry Bolte",
+          "Nick Kurtz",
+          "Shea Langeliers",
+          "Tyler Soderstrom",
+          "Jonah Heim",
+          "Lawrence Butler",
+          "Max Muncy",
+          "Jeff McNeil",
+          "Alika Williams"
+        ],
+        "missing_name_labels": [],
+        "mapping_source": "projected_rotowire_today_lineup"
+      },
+      "home_projected_validation": {
+        "status": "ok",
+        "raw_ids": [
+          687263,
+          694384,
+          666176,
+          624585,
+          685133,
+          694203,
+          622268,
+          681351,
+          666139
+        ],
+        "ids": [
+          687263,
+          694384,
+          666176,
+          624585,
+          685133,
+          694203,
+          622268,
+          681351,
+          666139
+        ],
+        "missing_ids": [],
+        "backfilled_ids": [],
+        "pool_source": "active+40Man",
+        "pool_size": 17,
+        "raw_names": [
+          "Zach Neto",
+          "Nolan Schanuel",
+          "Jo Adell",
+          "Jorge Soler",
+          "Wade Meckler",
+          "Denzer Guzman",
+          "Donovan Walton",
+          "Logan O'Hoppe",
+          "Josh Lowe"
+        ],
+        "matched_names": [
+          "Zach Neto",
+          "Nolan Schanuel",
+          "Jo Adell",
+          "Jorge Soler",
+          "Wade Meckler",
+          "Denzer Guzman",
+          "Donovan Walton",
+          "Logan O'Hoppe",
+          "Josh Lowe"
+        ],
+        "missing_name_labels": [],
+        "mapping_source": "projected_rotowire_default_vs_rhp"
+      },
+      "away_source": "projected_rotowire_today_lineup",
+      "home_source": "projected_rotowire_default_vs_rhp",
+      "away_confidence": 0.72,
+      "home_confidence": 0.66,
+      "away_comparison": {
+        "status": "projected_only",
+        "is_true_mismatch": false,
+        "confirmed_count": 0,
+        "projected_count": 9,
+        "overlap_count": 0,
+        "missing_from_projection": [],
+        "extra_in_projection": []
+      },
+      "home_comparison": {
+        "status": "projected_only",
+        "is_true_mismatch": false,
+        "confirmed_count": 0,
+        "projected_count": 9,
+        "overlap_count": 0,
+        "missing_from_projection": [],
+        "extra_in_projection": []
+      }
+    },
+    {
+      "idx": 12,
+      "game_pk": 823204,
+      "away": {
+        "team_id": 144,
+        "abbr": "ATL"
+      },
+      "home": {
+        "team_id": 137,
+        "abbr": "SF"
+      },
+      "away_confirmed_ids": [],
+      "home_confirmed_ids": [],
+      "away_projected_ids": [
+        643289,
+        686948,
+        645277,
+        621566,
+        671739,
+        663586,
+        663698,
+        642201,
+        622761
+      ],
+      "home_projected_ids": [
+        656305,
+        805811,
+        669477,
+        646240,
+        642715,
+        808982,
+        682674,
+        813841,
+        671083
+      ],
+      "away_projected_validation": {
+        "status": "ok",
+        "raw_ids": [
+          643289,
+          686948,
+          645277,
+          621566,
+          671739,
+          663586,
+          663698,
+          642201,
+          622761
+        ],
+        "ids": [
+          643289,
+          686948,
+          645277,
+          621566,
+          671739,
+          663586,
+          663698,
+          642201,
+          622761
+        ],
+        "missing_ids": [],
+        "backfilled_ids": [],
+        "pool_source": "active+40Man",
+        "pool_size": 18,
+        "raw_names": [
+          "Mauricio Dubon",
+          "Drake Baldwin",
+          "Ozzie Albies",
+          "Matt Olson",
+          "Michael Harris",
+          "Austin Riley",
+          "Joey Bart",
+          "Eli White",
+          "Jorge Mateo"
+        ],
+        "matched_names": [
+          "Mauricio Dub\u00f3n",
+          "Drake Baldwin",
+          "Ozzie Albies",
+          "Matt Olson",
+          "Michael Harris II",
+          "Austin Riley",
+          "Joey Bart",
+          "Eli White",
+          "Jorge Mateo"
+        ],
+        "missing_name_labels": [],
+        "mapping_source": "projected_rotowire_default_vs_lhp"
+      },
+      "home_projected_validation": {
+        "status": "adjusted",
+        "raw_ids": [
+          656305,
+          805811,
+          669477,
+          646240,
+          642715,
+          808982,
+          682674,
+          813841
+        ],
+        "ids": [
+          656305,
+          805811,
+          669477,
+          646240,
+          642715,
+          808982,
+          682674,
+          813841,
+          671083
+        ],
+        "missing_ids": [],
+        "backfilled_ids": [
+          671083
+        ],
+        "pool_source": "active+40Man",
+        "pool_size": 16,
+        "raw_names": [
+          "Matt Chapman",
+          "Bryce Eldridge",
+          "Casey Schmitt",
+          "Rafael Devers",
+          "Willy Adames",
+          "Jung Hoo Lee",
+          "Victor Bericoto",
+          "Daniel Susac",
+          "Jonah Cox"
+        ],
+        "matched_names": [
+          "Matt Chapman",
+          "Bryce Eldridge",
+          "Casey Schmitt",
+          "Rafael Devers",
+          "Willy Adames",
+          "Jung Hoo Lee",
+          "Victor Bericoto",
+          "Jonah Cox"
+        ],
+        "missing_name_labels": [
+          "Daniel Susac"
+        ],
+        "mapping_source": "projected_rotowire_today_lineup"
+      },
+      "away_source": "projected_rotowire_default_vs_lhp",
+      "home_source": "projected_rotowire_today_lineup",
+      "away_confidence": 0.66,
+      "home_confidence": 0.48000000000000004,
+      "away_comparison": {
+        "status": "projected_only",
+        "is_true_mismatch": false,
+        "confirmed_count": 0,
+        "projected_count": 9,
+        "overlap_count": 0,
+        "missing_from_projection": [],
+        "extra_in_projection": []
+      },
+      "home_comparison": {
+        "status": "projected_only",
+        "is_true_mismatch": false,
+        "confirmed_count": 0,
+        "projected_count": 9,
+        "overlap_count": 0,
+        "missing_from_projection": [],
+        "extra_in_projection": []
+      }
+    },
+    {
+      "idx": 13,
+      "game_pk": 823281,
+      "away": {
+        "team_id": 119,
+        "abbr": "LAD"
+      },
+      "home": {
+        "team_id": 135,
+        "abbr": "SD"
+      },
+      "away_confirmed_ids": [],
+      "home_confirmed_ids": [],
+      "away_projected_ids": [
+        660271,
+        681624,
+        518692,
+        605141,
+        571970,
+        663656,
+        669242,
+        687221,
+        669899
+      ],
+      "home_projected_ids": [
+        665487,
+        669392,
+        701538,
+        592518,
+        657757,
+        593428,
+        695238,
+        664034,
+        666023
+      ],
+      "away_projected_validation": {
+        "status": "ok",
+        "raw_ids": [
+          660271,
+          681624,
+          518692,
+          605141,
+          571970,
+          663656,
+          669242,
+          687221,
+          669899
+        ],
+        "ids": [
+          660271,
+          681624,
+          518692,
+          605141,
+          571970,
+          663656,
+          669242,
+          687221,
+          669899
+        ],
+        "missing_ids": [],
+        "backfilled_ids": [],
+        "pool_source": "active+40Man",
+        "pool_size": 15,
+        "raw_names": [
+          "Shohei Ohtani",
+          "Andy Pages",
+          "Freddie Freeman",
+          "Mookie Betts",
+          "Max Muncy",
+          "Kyle Tucker",
+          "Tommy Edman",
+          "Dalton Rushing",
+          "Ryan Ward"
+        ],
+        "matched_names": [
+          "Shohei Ohtani",
+          "Andy Pages",
+          "Freddie Freeman",
+          "Mookie Betts",
+          "Max Muncy",
+          "Kyle Tucker",
+          "Tommy Edman",
+          "Dalton Rushing",
+          "Ryan Ward"
+        ],
+        "missing_name_labels": [],
+        "mapping_source": "projected_rotowire_default_vs_rhp"
+      },
+      "home_projected_validation": {
+        "status": "ok",
+        "raw_ids": [
+          665487,
+          669392,
+          701538,
+          592518,
+          657757,
+          593428,
+          695238,
+          664034,
+          666023
+        ],
+        "ids": [
+          665487,
+          669392,
+          701538,
+          592518,
+          657757,
+          593428,
+          695238,
+          664034,
+          666023
+        ],
+        "missing_ids": [],
+        "backfilled_ids": [],
+        "pool_source": "active+40Man",
+        "pool_size": 15,
+        "raw_names": [
+          "Fernando Tatis",
+          "Samad Taylor",
+          "Jackson Merrill",
+          "Manny Machado",
+          "Gavin Sheets",
+          "Xander Bogaerts",
+          "Will Wagner",
+          "Ty France",
+          "Freddy Fermin"
+        ],
+        "matched_names": [
+          "Fernando Tatis Jr.",
+          "Samad Taylor",
+          "Jackson Merrill",
+          "Manny Machado",
+          "Gavin Sheets",
+          "Xander Bogaerts",
+          "Will Wagner",
+          "Ty France",
+          "Freddy Fermin"
+        ],
+        "missing_name_labels": [],
+        "mapping_source": "projected_rotowire_default_vs_rhp"
+      },
+      "away_source": "projected_rotowire_default_vs_rhp",
+      "home_source": "projected_rotowire_default_vs_rhp",
+      "away_confidence": 0.66,
+      "home_confidence": 0.66,
+      "away_comparison": {
+        "status": "projected_only",
+        "is_true_mismatch": false,
+        "confirmed_count": 0,
+        "projected_count": 9,
+        "overlap_count": 0,
+        "missing_from_projection": [],
+        "extra_in_projection": []
+      },
+      "home_comparison": {
+        "status": "projected_only",
+        "is_true_mismatch": false,
+        "confirmed_count": 0,
+        "projected_count": 9,
+        "overlap_count": 0,
+        "missing_from_projection": [],
+        "extra_in_projection": []
+      }
+    },
+    {
+      "idx": 14,
+      "game_pk": 824744,
+      "away": {
+        "team_id": 147,
+        "abbr": "NYY"
+      },
+      "home": {
+        "team_id": 111,
+        "abbr": "BOS"
+      },
+      "away_confirmed_ids": [],
+      "home_confirmed_ids": [],
+      "away_projected_ids": [
+        700250,
+        691176,
+        641355,
+        502671,
+        665862,
+        682987,
+        676609,
+        669224,
+        683011
+      ],
+      "home_projected_ids": [
+        681987,
+        678882,
+        677800,
+        575929,
+        680776,
+        702332,
+        655316,
+        665966,
+        678011
+      ],
+      "away_projected_validation": {
+        "status": "ok",
+        "raw_ids": [
+          700250,
+          691176,
+          641355,
+          502671,
+          665862,
+          682987,
+          676609,
+          669224,
+          683011
+        ],
+        "ids": [
+          700250,
+          691176,
+          641355,
+          502671,
+          665862,
+          682987,
+          676609,
+          669224,
+          683011
+        ],
+        "missing_ids": [],
+        "backfilled_ids": [],
+        "pool_source": "active+40Man",
+        "pool_size": 14,
+        "raw_names": [
+          "Ben Rice",
+          "Jasson Dominguez",
+          "Cody Bellinger",
+          "Paul Goldschmidt",
+          "Jazz Chisholm",
+          "Spencer Jones",
+          "Jose Caballero",
+          "Austin Wells",
+          "Anthony Volpe"
+        ],
+        "matched_names": [
+          "Ben Rice",
+          "Jasson Dom\u00ednguez",
+          "Cody Bellinger",
+          "Paul Goldschmidt",
+          "Jazz Chisholm Jr.",
+          "Spencer Jones",
+          "Jos\u00e9 Caballero",
+          "Austin Wells",
+          "Anthony Volpe"
+        ],
+        "missing_name_labels": [],
+        "mapping_source": "projected_rotowire_default_vs_rhp"
+      },
+      "home_projected_validation": {
+        "status": "adjusted",
+        "raw_ids": [
+          681987,
+          678882,
+          677800,
+          575929,
+          680776,
+          702332,
+          655316,
+          665966
+        ],
+        "ids": [
+          681987,
+          678882,
+          677800,
+          575929,
+          680776,
+          702332,
+          655316,
+          665966,
+          678011
+        ],
+        "missing_ids": [],
+        "backfilled_ids": [
+          678011
+        ],
+        "pool_source": "active+40Man",
+        "pool_size": 14,
+        "raw_names": [
+          "Nate Eaton",
+          "Ceddanne Rafaela",
+          "Wilyer Abreu",
+          "Willson Contreras",
+          "Jarren Duran",
+          "Caleb Durbin",
+          "Andruw Monasterio",
+          "Marcelo Mayer",
+          "Carlos Narvaez"
+        ],
+        "matched_names": [
+          "Nate Eaton",
+          "Ceddanne Rafaela",
+          "Wilyer Abreu",
+          "Willson Contreras",
+          "Jarren Duran",
+          "Caleb Durbin",
+          "Andruw Monasterio",
+          "Carlos Narv\u00e1ez"
+        ],
+        "missing_name_labels": [
+          "Marcelo Mayer"
+        ],
+        "mapping_source": "projected_rotowire_default_vs_lhp"
+      },
+      "away_source": "projected_rotowire_default_vs_rhp",
+      "home_source": "projected_rotowire_default_vs_lhp",
+      "away_confidence": 0.66,
+      "home_confidence": 0.48000000000000004,
+      "away_comparison": {
+        "status": "projected_only",
+        "is_true_mismatch": false,
+        "confirmed_count": 0,
+        "projected_count": 9,
+        "overlap_count": 0,
+        "missing_from_projection": [],
+        "extra_in_projection": []
+      },
+      "home_comparison": {
+        "status": "projected_only",
+        "is_true_mismatch": false,
+        "confirmed_count": 0,
+        "projected_count": 9,
+        "overlap_count": 0,
+        "missing_from_projection": [],
+        "extra_in_projection": []
+      }
+    }
+  ]
+}

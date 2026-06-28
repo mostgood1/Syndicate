@@ -1,0 +1,5 @@
+date,game_id,home_team,visitor_team,commence_time,home_ml,away_ml,home_spread,away_spread,total,bookmaker,home_tri,away_tri
+2026-06-28,075a6b68701084a0dcfc9c2a18a6b3f3a,Chicago Sky,Las Vegas Aces,2026-06-28T20:00:00Z,,,,,,oddsapi_consensus,CHI,LVA
+2026-06-28,083f0a57af90439fdbb978c025e2d0bd2,Golden State Valkyries,New York Liberty,2026-06-28T23:00:00Z,,,,,,oddsapi_consensus,GSV,NYL
+2026-06-28,0a11fe7954fde6bc459c54dae86c6fc54,Washington Mystics,Portland Fire,2026-06-28T19:00:00Z,,,,,,oddsapi_consensus,WSH,POR
+2026-06-28,0fd3f57e3db87c4c1fa74f6bcdaed649d,Dallas Wings,Minnesota Lynx,2026-06-28T18:00:00Z,,,,,,oddsapi_consensus,DAL,MIN
