@@ -4,6 +4,7 @@ import csv
 import importlib.util
 import json
 import tempfile
+import types
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -1202,6 +1203,51 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
             self.assertEqual(out, str(processed_root / "cards_sim_detail_2026-05-29.json"))
             payload = json.loads((processed_root / "cards_sim_detail_2026-05-29.json").read_text(encoding="utf-8"))
             self.assertEqual(payload["games"][0]["sim"]["quarters"][0]["away_pts_mu"], 21.4)
+
+    def test_cards_sim_detail_export_uses_source_cards_api_fallback(self) -> None:
+        module = self._load_module()
+
+        class _FakeResponse:
+            def get_json(self):
+                return {
+                    "games": [
+                        {
+                            "home_tri": "LVA",
+                            "away_tri": "CHI",
+                            "sim": {
+                                "players_summary": {"home": 1, "away": 1},
+                                "players": {"home": [{"player_name": "Home Player"}], "away": [{"player_name": "Away Player"}]},
+                                "missing_prop_players": {"home": [], "away": []},
+                                "injuries": {"home": [], "away": []},
+                                "quarters": [{"q": 1, "away_pts_mu": 19.5, "home_pts_mu": 22.5}],
+                            },
+                        }
+                    ]
+                }
+
+        class _FakeClient:
+            def get(self, query):
+                self.query = query
+                return _FakeResponse()
+
+        class _FakeApp:
+            def test_client(self):
+                return _FakeClient()
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_root = Path(tmp_dir)
+            source_root = tmp_root / "source"
+            processed_root = source_root / "data" / "processed"
+            processed_root.mkdir(parents=True, exist_ok=True)
+
+            with patch.object(module, "_copy_existing_processed_artifact", return_value=None), patch.object(module, "_source_app_fallback_enabled", return_value=True), patch.object(module, "_load_source_app", return_value=types.SimpleNamespace(app=_FakeApp())):
+                out = module._export_cards_sim_detail_snapshot(source_root=source_root, date_str="2026-05-22", processed_root=processed_root)
+
+            self.assertEqual(out, str(processed_root / "cards_sim_detail_2026-05-22.json"))
+            payload = json.loads((processed_root / "cards_sim_detail_2026-05-22.json").read_text(encoding="utf-8"))
+            self.assertEqual(payload["date"], "2026-05-22")
+            self.assertEqual(payload["games"][0]["home_tri"], "LVA")
+            self.assertEqual(payload["games"][0]["away_tri"], "CHI")
 
     def test_optional_tool_exports_prefer_existing_processed_files(self) -> None:
         module = self._load_module()

@@ -11,11 +11,13 @@ from unittest.mock import patch
 
 from syndicate.features.wnba.cards import _local_live_snapshot_payload
 from syndicate.features.wnba.cards import _local_live_state_payload
+from syndicate.features.wnba.cards import _props_index_from_recommendations_rows
 from syndicate.features.wnba.cards import build_live_lines_payload
 from syndicate.features.wnba.cards import build_live_pbp_stats_payload
 from syndicate.features.wnba.cards import build_live_player_boxscore_payload
 from syndicate.features.wnba.cards import build_live_player_lens_payload
 from syndicate.features.wnba.cards import build_live_state_payload
+from syndicate.features.wnba.props import _summary_from_props_recommendations_rows
 
 
 class WnbaLiveSnapshotLocalTests(unittest.TestCase):
@@ -202,6 +204,64 @@ class WnbaLiveSnapshotLocalTests(unittest.TestCase):
 
         self.assertEqual(selected_processed, fallback_processed)
         self.assertEqual(selected_live, fallback_live)
+
+    def test_props_index_from_recommendations_rows_uses_team_and_opponent_matching(self) -> None:
+        game_rows = [
+            {"away_tri": "LVA", "home_tri": "CHI"},
+            {"away_tri": "NYL", "home_tri": "GSV"},
+        ]
+        prop_rows = [
+            {
+                "player": "A'ja Wilson",
+                "team": "LVA",
+                "opponent": "CHI",
+                "tier": "High",
+                "score": "9.1",
+                "top_play": "{'market': 'points', 'side': 'OVER', 'line': 24.5, 'price': -110, 'ev_pct': 14.2, 'book': 'draftkings'}",
+            },
+            {
+                "player": "Angel Reese",
+                "team": "CHI",
+                "opponent": "LVA",
+                "tier": "Medium",
+                "score": "7.3",
+                "top_play": "{'market': 'rebounds', 'side': 'OVER', 'line': 11.5, 'price': -105, 'ev_pct': 11.0, 'book': 'fanduel'}",
+            },
+        ]
+
+        index = _props_index_from_recommendations_rows(game_rows, prop_rows)
+
+        self.assertIn(("LVA", "CHI"), index)
+        props_game = index[("LVA", "CHI")]
+        self.assertEqual(len((props_game.get("prop_recommendations") or {}).get("away") or []), 1)
+        self.assertEqual(len((props_game.get("prop_recommendations") or {}).get("home") or []), 1)
+        away_pick = ((props_game.get("prop_recommendations") or {}).get("away") or [{}])[0]
+        self.assertEqual(away_pick.get("player"), "A'ja Wilson")
+        self.assertEqual(((away_pick.get("picks") or [{}])[0]).get("market"), "points")
+
+    def test_props_summary_from_csv_rows_builds_cards(self) -> None:
+        summary = _summary_from_props_recommendations_rows(
+            [
+                {
+                    "player": "A'ja Wilson",
+                    "team": "Las Vegas Aces",
+                    "team_tricode": "LVA",
+                    "opponent": "Chicago Sky",
+                    "tier": "High",
+                    "top_play": "{'market': 'points', 'side': 'OVER', 'line': 24.5, 'price': -110, 'ev_pct': 14.2, 'book': 'draftkings'}",
+                    "top_play_explain": "model 26.1 vs line 24.5 (+1.6)",
+                    "top_play_baseline": "26.1",
+                    "top_play_reasons": "['EV 14.2%', 'Regular price range (-150 to +150)']",
+                }
+            ],
+            selected_date="2026-06-28",
+        )
+
+        self.assertIsNotNone(summary)
+        card = summary["data"][0]
+        self.assertEqual(card["player"], "A'ja Wilson")
+        self.assertEqual(card["top_play"]["market"], "points")
+        self.assertEqual(card["team_tricode"], "LVA")
 
     def test_live_state_payload_falls_back_to_cards_context(self) -> None:
         with patch(

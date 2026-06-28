@@ -7,6 +7,7 @@ from unittest.mock import patch
 
 from syndicate.features.wnba.cards import build_cards_page_context
 from syndicate.features.wnba.cards import _supplement_games_with_live_state
+from syndicate.features.wnba.cards import _source_sim_score
 from syndicate.features.wnba.cards import build_source_cards_sim_detail_payload
 from syndicate.features.wnba.cards import build_source_cards_payload
 
@@ -274,6 +275,20 @@ class WnbaCardsMergeAliasTests(unittest.TestCase):
         self.assertGreater(len((sim.get("players") or {}).get("home") or []), 0)
         self.assertIn("pregame_context", sim)
         self.assertIn("quarters", sim)
+
+    def test_source_sim_score_uses_row_projection_when_players_are_missing(self) -> None:
+        score = _source_sim_score(
+            None,
+            {
+                "pred_total": "161.5",
+                "pred_margin": "5.5",
+            },
+        )
+
+        self.assertEqual(score["away_mean"], 78.0)
+        self.assertEqual(score["home_mean"], 83.5)
+        self.assertEqual(score["total_mean"], 161.5)
+        self.assertEqual(score["margin_mean"], 5.5)
 
 
 if __name__ == "__main__":

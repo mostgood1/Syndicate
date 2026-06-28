@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 from copy import deepcopy
 import csv
 from datetime import date
@@ -123,6 +124,86 @@ def _artifact_games_index(path: Path) -> dict[tuple[str, str], dict[str, Any]]:
         if away and home:
             index[(away, home)] = game
     return index
+
+
+def _props_index_from_recommendations_rows(
+    game_rows: list[dict[str, str]],
+    prop_rows: list[dict[str, str]],
+) -> dict[tuple[str, str], dict[str, Any]]:
+    games: dict[tuple[str, str], dict[str, Any]] = {}
+    for row in game_rows:
+        if not isinstance(row, dict):
+            continue
+        away_tri = _canonical_wnba_tri(
+            str(
+                row.get("away_tri")
+                or row.get("visitor_team")
+                or row.get("away_team")
+                or row.get("away")
+                or ""
+            ).strip().upper()
+        )
+        home_tri = _canonical_wnba_tri(
+            str(
+                row.get("home_tri")
+                or row.get("home_team")
+                or row.get("home")
+                or ""
+            ).strip().upper()
+        )
+        if away_tri and home_tri:
+            games[(away_tri, home_tri)] = {"prop_recommendations": {"away": [], "home": []}}
+
+    for raw in prop_rows:
+        if not isinstance(raw, dict):
+            continue
+        top_play_text = str(raw.get("top_play") or "").strip()
+        if not top_play_text:
+            continue
+        try:
+            top_play = ast.literal_eval(top_play_text)
+        except Exception:
+            continue
+        if not isinstance(top_play, dict):
+            continue
+
+        team_tri = _canonical_wnba_tri(
+            str(raw.get("team_tri") or raw.get("team_tricode") or raw.get("team") or "").strip().upper()
+        )
+        opponent_tri = _canonical_wnba_tri(
+            str(raw.get("opponent_tri") or raw.get("opponent_tricode") or raw.get("opponent") or "").strip().upper()
+        )
+        if not team_tri or not opponent_tri:
+            continue
+
+        target_key: tuple[str, str] | None = None
+        side_key: str | None = None
+        if (team_tri, opponent_tri) in games:
+            target_key = (team_tri, opponent_tri)
+            side_key = "away"
+        elif (opponent_tri, team_tri) in games:
+            target_key = (opponent_tri, team_tri)
+            side_key = "home"
+        if target_key is None or side_key is None:
+            continue
+
+        row_payload = {
+            "player": _safe_text(raw.get("player") or raw.get("player_name") or "Prop", "Prop"),
+            "team": team_tri,
+            "opponent": opponent_tri,
+            "market": str(top_play.get("market") or raw.get("market") or "").strip(),
+            "pick": str(top_play.get("side") or raw.get("side") or "").strip().upper(),
+            "picks": [dict(top_play)],
+            "best": dict(top_play),
+            "score": _safe_float(raw.get("score") or raw.get("score_adj") or top_play.get("ev_pct") or top_play.get("ev")),
+            "recommendation_priority_score": _safe_float(raw.get("score_adj") or raw.get("recommendation_priority_score") or top_play.get("ev_pct") or top_play.get("ev")),
+            "tier": raw.get("tier"),
+            "opponent": opponent_tri,
+            "game_id": raw.get("game_id"),
+        }
+        games[target_key]["prop_recommendations"][side_key].append(row_payload)
+
+    return games
 
 
 def _raw_smart_sim_index(selected_date: str) -> dict[tuple[str, str], dict[str, Any]]:
@@ -692,6 +773,12 @@ def _artifact_bundle(selected_date: str) -> dict[str, Any]:
         except Exception:
             rows = []
 
+    props_index = _artifact_games_index(paths["props"])
+    if not props_index:
+        props_rows = _load_csv_rows(processed_path(f"props_recommendations_{selected_date}.csv"))
+        if props_rows:
+            props_index = _props_index_from_recommendations_rows(rows, props_rows)
+
     return {
         "paths": paths,
         "rows": rows,
@@ -700,7 +787,7 @@ def _artifact_bundle(selected_date: str) -> dict[str, Any]:
             _artifact_games_index(paths["sim"]),
             _raw_smart_sim_index(selected_date),
         ),
-        "props": _artifact_games_index(paths["props"]),
+        "props": props_index,
     }
 
 def _source_logo_url(team_tri: str) -> str:
@@ -858,12 +945,17 @@ def _source_sim_score(sim_game: dict[str, Any] | None, row: dict[str, str]) -> d
 
     away_mean = _team_total("away")
     home_mean = _team_total("home")
-    total_mean = _safe_float(row.get("total"))
+    total_mean = _safe_float(row.get("pred_total") or row.get("total_mean") or row.get("total"))
     if total_mean is not None and total_mean <= 1.0:
         total_mean = None
+    margin_mean = _safe_float(row.get("pred_margin") or row.get("margin_mean") or row.get("home_spread"))
+    if margin_mean is not None and abs(margin_mean) <= 1.0 and not row.get("pred_margin") and not row.get("margin_mean"):
+        margin_mean = None
+    if away_mean is None and home_mean is None and total_mean is not None and margin_mean is not None:
+        away_mean = round((total_mean - margin_mean) / 2.0, 3)
+        home_mean = round((total_mean + margin_mean) / 2.0, 3)
     if away_mean is not None and home_mean is not None:
         total_mean = round(away_mean + home_mean, 3)
-    margin_mean = None
     if away_mean is not None and home_mean is not None:
         margin_mean = round(home_mean - away_mean, 3)
     return {
