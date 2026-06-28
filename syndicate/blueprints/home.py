@@ -4010,6 +4010,13 @@ def _load_home_games(slug: str, *, context_label: str, season: int | None = None
 
 
 def _prefer_today_or_latest(values: list[str], today_value: str, *, preserve_requested: bool = False) -> str:
+    if preserve_requested:
+        return today_value
+    normalized_values = [str(value).strip() for value in values if str(value).strip()]
+    if today_value in normalized_values:
+        return today_value
+    if normalized_values:
+        return max(normalized_values)
     return today_value
 
 

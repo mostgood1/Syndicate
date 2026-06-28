@@ -12,6 +12,7 @@ from syndicate.blueprints.home import _load_home_pregame_prop_items
 from syndicate.blueprints.home import build_home_overview
 from syndicate.blueprints.home import get_active_games
 from syndicate.blueprints.home import _sport_availability_reason
+from syndicate.blueprints.home import _prefer_today_or_latest
 
 
 class HomePageCommandCenterTests(unittest.TestCase):
@@ -245,14 +246,16 @@ class HomePageCommandCenterTests(unittest.TestCase):
             {"slug": "wnba", "name": "WNBA"},
         ]
 
-        with patch(
-            "syndicate.blueprints.home._build_sport_overview",
-            side_effect=[
-                {"slug": "nba", "show_on_home": True, "active_game_count": 1, "hydrated_game_count": 1},
-                {"slug": "wnba", "show_on_home": False, "active_game_count": 1, "hydrated_game_count": 0},
-            ],
-        ):
-            overview = build_home_overview(sports, selected_date="2026-06-23", force_refresh=True)
+        with self.client.application.app_context():
+            self.client.application.config["SYNDICATE_ACTIVE_SPORTS"] = ["nba", "wnba"]
+            with patch(
+                "syndicate.blueprints.home._build_sport_overview",
+                side_effect=[
+                    {"slug": "nba", "show_on_home": True, "active_game_count": 1, "hydrated_game_count": 1},
+                    {"slug": "wnba", "show_on_home": False, "active_game_count": 1, "hydrated_game_count": 0},
+                ],
+            ):
+                overview = build_home_overview(sports, selected_date="2026-06-23", force_refresh=True)
 
         self.assertEqual([sport["slug"] for sport in overview], ["nba"])
 
@@ -275,6 +278,16 @@ class HomePageCommandCenterTests(unittest.TestCase):
 
         mocked_build.assert_called_once()
         self.assertEqual([sport["slug"] for sport in overview], ["mlb"])
+
+    def test_prefer_today_or_latest_uses_latest_available_date(self) -> None:
+        self.assertEqual(
+            _prefer_today_or_latest(["2026-06-26", "2026-06-24"], "2026-06-27"),
+            "2026-06-26",
+        )
+        self.assertEqual(
+            _prefer_today_or_latest(["2026-06-26", "2026-06-24"], "2026-06-27", preserve_requested=True),
+            "2026-06-27",
+        )
 
     def test_build_sport_overview_keeps_today_games_when_props_are_missing(self) -> None:
         app = create_app()
