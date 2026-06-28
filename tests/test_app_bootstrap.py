@@ -19,16 +19,13 @@ class AppBootstrapTests(unittest.TestCase):
 
         bootstrap_mock.assert_called_once()
 
-    def test_bootstrap_render_data_skips_on_render_web_dyno(self) -> None:
+    def test_bootstrap_render_data_runs_on_render_web_dyno_when_enabled(self) -> None:
         calls: list[int] = []
 
-        with patch("syndicate.app._is_render_web_dyno", return_value=True), patch(
-            "syndicate.app._env_bool",
-            return_value=True,
-        ):
+        with patch("syndicate.app._env_bool", return_value=True):
             syndicate_app._bootstrap_render_data(lambda: calls.append(1) or 0)
 
-        self.assertEqual(calls, [])
+        self.assertEqual(calls, [1])
 
     def test_bootstrap_render_data_skips_when_disabled(self) -> None:
         calls: list[int] = []

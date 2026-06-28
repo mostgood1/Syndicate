@@ -40,8 +40,6 @@ def _env_bool(name: str, *, default: bool = False) -> bool:
 
 
 def _bootstrap_render_data(bootstrap_main: Callable[[], int] | None = None) -> None:
-    if _is_render_web_dyno():
-        return
     if not _env_bool("SYNDICATE_BOOTSTRAP_ON_START", default=False):
         return
     if bootstrap_main is None:
