@@ -42,6 +42,13 @@ def _build_payload(args: argparse.Namespace) -> dict[str, object]:
     return payload
 
 
+def _is_busy_refresh_response(error_text: str) -> bool:
+    lowered = str(error_text or "").strip().lower()
+    if not lowered:
+        return False
+    return "already queued for the external runner" in lowered or "already active" in lowered
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Render cron helper: enqueue Syndicate odds refresh through web API.")
     parser.add_argument("--base-url", default="", help="Optional explicit Syndicate base URL, e.g. https://syndicate.onrender.com. If omitted, uses SYNDICATE_BASE_URL then SYNDICATE_WEB_HOST/SYNDICATE_WEB_PORT.")
@@ -81,6 +88,9 @@ def main() -> int:
             print(response_body)
     except urllib.error.HTTPError as exc:
         error_text = exc.read().decode("utf-8", errors="replace") if hasattr(exc, "read") else str(exc)
+        if int(getattr(exc, "code", 0) or 0) in {400, 409} and _is_busy_refresh_response(error_text):
+            print(json.dumps({"ok": True, "status": "skipped", "reason": error_text}, separators=(",", ":")))
+            return 0
         print(error_text, file=sys.stderr)
         return int(exc.code or 1)
     except Exception as exc:
