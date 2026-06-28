@@ -1034,7 +1034,55 @@ def _local_props_tier(ev_pct: float | None) -> str:
 def _local_game_cards_index(*, processed_root: Path, date_str: str) -> tuple[list[dict[str, str]], dict[str, dict[str, str]], dict[tuple[str, str], dict[str, str]]]:
     game_cards_path = processed_root / f"game_cards_{date_str}.csv"
     if not game_cards_path.exists() or not game_cards_path.is_file() or _count_csv_rows_quick(game_cards_path) <= 0:
-        return [], {}, {}
+        schedule_path = processed_root / f"schedule_{date_str[:4]}.csv"
+        if not schedule_path.exists() or not schedule_path.is_file() or _count_csv_rows_quick(schedule_path) <= 0:
+            return [], {}, {}
+
+        rows: list[dict[str, str]] = []
+        by_team: dict[str, dict[str, str]] = {}
+        by_names: dict[tuple[str, str], dict[str, str]] = {}
+        with schedule_path.open("r", encoding="utf-8", newline="") as handle:
+            for row in csv.DictReader(handle):
+                if not isinstance(row, dict):
+                    continue
+                if str(row.get("date_utc") or "").strip() != date_str:
+                    continue
+                home_name = str(row.get("home_name") or "").strip()
+                away_name = str(row.get("away_name") or "").strip()
+                home_tri = str(row.get("home_tricode") or "").strip().upper()
+                away_tri = str(row.get("away_tricode") or "").strip().upper()
+                if not home_name or not away_name or not home_tri or not away_tri:
+                    continue
+                normalized = {
+                    "date": date_str,
+                    "game_id": str(row.get("game_id") or "").strip(),
+                    "home_team": home_name,
+                    "visitor_team": away_name,
+                    "commence_time": str(row.get("time_est") or row.get("time_utc") or "").strip(),
+                    "home_tri": home_tri,
+                    "away_tri": away_tri,
+                }
+                rows.append(normalized)
+                by_team[home_tri] = {
+                    "side": "home",
+                    "opponent": away_tri,
+                    "home_tri": home_tri,
+                    "away_tri": away_tri,
+                    "home_team": home_name,
+                    "away_team": away_name,
+                    "game_id": normalized.get("game_id", ""),
+                }
+                by_team[away_tri] = {
+                    "side": "away",
+                    "opponent": home_tri,
+                    "home_tri": home_tri,
+                    "away_tri": away_tri,
+                    "home_team": home_name,
+                    "away_team": away_name,
+                    "game_id": normalized.get("game_id", ""),
+                }
+                by_names[(home_name.lower(), away_name.lower())] = normalized
+        return rows, by_team, by_names
 
     rows: list[dict[str, str]] = []
     by_team: dict[str, dict[str, str]] = {}
@@ -1287,10 +1335,9 @@ def _build_local_recommendations_slate_artifact(*, processed_root: Path, date_st
         home_tri = str(game_row.get("home_tri") or "").strip().upper()
         away_tri = str(game_row.get("away_tri") or "").strip().upper()
         picks = grouped.get((home_tri, away_tri), [])
-        if not picks:
-            continue
-        picks.sort(key=lambda item: float(item.get("ev_pct") or float("-inf")), reverse=True)
-        picks_count += len(picks)
+        if picks:
+            picks.sort(key=lambda item: float(item.get("ev_pct") or float("-inf")), reverse=True)
+            picks_count += len(picks)
         per_game.append({"home": home_tri, "away": away_tri, "matchup": f"{away_tri} @ {home_tri}", "picks": picks})
 
     payload = {"date": date_str, "counts": {"games": len(per_game), "picks": picks_count}, "per_game": per_game}

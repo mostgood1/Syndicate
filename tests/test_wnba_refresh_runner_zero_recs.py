@@ -103,6 +103,41 @@ class WnbaRefreshRunnerZeroRecsTests(unittest.TestCase):
             self.assertIn('"date": "2026-06-22"', payload)
             self.assertIn('"per_game": []', payload)
 
+    def test_schedule_only_slate_keeps_all_games_without_picks(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        module = self._load_module(repo_root)
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_root = Path(tmp_dir)
+            processed_root = tmp_root / "data" / "processed"
+            processed_root.mkdir(parents=True, exist_ok=True)
+            (processed_root / "game_cards_2026-06-28.csv").write_text(
+                "game_id,home_team,visitor_team,commence_time,home_tri,away_tri\n",
+                encoding="utf-8",
+            )
+            (processed_root / "schedule_2026.csv").write_text(
+                "game_id,season_year,game_label,game_subtype,season_type_slug,game_status,game_status_text,date_utc,time_utc,datetime_utc,date_est,time_est,datetime_est,home_team_id,home_tricode,home_city,home_name,away_team_id,away_tricode,away_city,away_name,arena_name,arena_city,arena_state,broadcasters_national\n"
+                "401857028,2026,Regular Season,STD,regular-season,1,Scheduled,2026-06-28,00:00,2026-06-28 00:00:00+00:00,2026-06-27,20:00,2026-06-27 20:00:00-04:00,5,IND,Indiana,Fever,6,LAS,Los Angeles,Sparks,Gainbridge Fieldhouse,Indianapolis,IN,CBS | Paramount+\n"
+                "401857029,2026,Regular Season,STD,regular-season,1,Scheduled,2026-06-28,01:00,2026-06-28 01:00:00+00:00,2026-06-27,21:00,2026-06-27 21:00:00-04:00,14,SEA,Seattle,Storm,20,ATL,Atlanta,Dream,Climate Pledge Arena,Seattle,WA,WNBA League Pass | Atlanta News First | Victory+ ATL | KOMO-TV | Prime Video-Seattle\n"
+                "401857030,2026,Regular Season,STD,regular-season,1,Scheduled,2026-06-28,18:00,2026-06-28 18:00:00+00:00,2026-06-28,14:00,2026-06-28 14:00:00-04:00,3,DAL,Dallas,Wings,8,MIN,Minnesota,Lynx,College Park Center,Arlington,TX,CBS | Paramount+\n"
+                "401857031,2026,Regular Season,STD,regular-season,1,Scheduled,2026-06-28,19:00,2026-06-28 19:00:00+00:00,2026-06-28,15:00,2026-06-28 15:00:00-04:00,16,WSH,Washington,Mystics,132052,POR,Portland,Fire,CareFirst Arena,Washington,DC,WNBA League Pass | Fox 12 Plus | MNMT\n",
+                encoding="utf-8",
+            )
+
+            rc, out_path = module._build_local_recommendations_slate_artifact(
+                processed_root=processed_root,
+                date_str="2026-06-28",
+            )
+
+            self.assertEqual(rc, 4)
+            self.assertIsNotNone(out_path)
+            assert out_path is not None
+            payload = out_path.read_text(encoding="utf-8")
+            self.assertIn('"date": "2026-06-28"', payload)
+            self.assertIn('"games": 4', payload)
+            self.assertIn('"picks": 0', payload)
+            self.assertIn('"per_game": [', payload)
+
 
 if __name__ == "__main__":
     unittest.main()

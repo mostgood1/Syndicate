@@ -3635,6 +3635,25 @@ function Assert-IntelligenceSportReady {
         return
     }
 
+    function New-IntelligenceReadinessFallback {
+        param(
+            [string]$SportName,
+            [string]$Status,
+            [string]$Detail
+        )
+
+        return [pscustomobject]@{
+            sport = $SportName
+            state = 'unavailable'
+            active_today = $false
+            missing_inputs = @()
+            publish_missing_inputs = @()
+            ok = $false
+            status = $Status
+            detail = $Detail
+        }
+    }
+
     $pythonExe = Resolve-Python $RepoRoot
     $script = @'
 import json
@@ -3681,7 +3700,8 @@ print(json.dumps(result))
     try {
         $rawOutput = & $pythonExe $tempScriptPath $Sport $DateValue
         if ($LASTEXITCODE -ne 0) {
-            throw "intelligence status builder exited with code $LASTEXITCODE"
+            Write-Warning ("Intelligence readiness audit unavailable for {0}: builder exited with code {1}" -f $Sport, $LASTEXITCODE)
+            return
         }
     }
     finally {
@@ -3689,11 +3709,35 @@ print(json.dumps(result))
         Remove-Item -Path $tempScriptPath -Force -ErrorAction SilentlyContinue
     }
 
+    $statusText = ((($rawOutput | Out-String) -replace "^\uFEFF", "").Trim())
+    if ([string]::IsNullOrWhiteSpace($statusText)) {
+        Write-Warning ("Intelligence readiness audit unavailable for {0}: empty status payload" -f $Sport)
+        return
+    }
+
+    $audit = $null
     try {
-        $audit = ($rawOutput | Out-String | ConvertFrom-Json -ErrorAction Stop)
+        $audit = $statusText | ConvertFrom-Json -ErrorAction Stop
     }
     catch {
-        throw "Intelligence readiness audit failed for ${Sport}: unable to parse status payload"
+        $jsonMatches = [regex]::Matches($statusText, '(?s)(\{.*\}|\[.*\])')
+        foreach ($match in @($jsonMatches)) {
+            try {
+                $audit = $match.Groups[1].Value | ConvertFrom-Json -ErrorAction Stop
+                break
+            }
+            catch {
+            }
+        }
+        if (-not $audit) {
+            Write-Warning ("Intelligence readiness audit unavailable for {0}: unable to parse status payload" -f $Sport)
+            return
+        }
+    }
+
+    if (-not ($audit -is [psobject]) -and -not ($audit -is [hashtable])) {
+        Write-Warning ("Intelligence readiness audit unavailable for {0}: unexpected status payload type" -f $Sport)
+        return
     }
 
     $missingLabels = @($audit.missing_inputs)
