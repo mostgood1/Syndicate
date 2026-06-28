@@ -18,6 +18,8 @@ class RenderYamlEnvTests(unittest.TestCase):
             "SYNDICATE_NCAAF_SOURCE_ROOT",
             "SYNDICATE_NCAAB_SOURCE_ROOT",
             "SYNDICATE_WNBA_SOURCE_ROOT",
+            "SYNDICATE_BOOTSTRAP_ON_START",
+            "SYNDICATE_BOOTSTRAP_WNBA_TODAY",
             "MLB_BETTING_DATA_ROOT",
             "NBA_BETTING_DATA_ROOT",
             "WNBA_BETTING_DATA_ROOT",
@@ -31,9 +33,9 @@ class RenderYamlEnvTests(unittest.TestCase):
         web_section = "\n".join(lines[:worker_index])
         worker_section = "\n".join(lines[worker_index:])
 
-        self.assertIn("value: data", web_section)
-        self.assertIn("value: reports", web_section)
-        self.assertNotIn("/opt/render/project/data/", web_section)
+        self.assertIn("SYNDICATE_BOOTSTRAP_ON_START", web_section)
+        self.assertIn("SYNDICATE_BOOTSTRAP_WNBA_TODAY", web_section)
+        self.assertIn("/opt/render/project/data/wnba_source", web_section)
 
         self.assertIn("disk:", worker_section)
         self.assertIn("/opt/render/project/data/", worker_section)

@@ -47,6 +47,8 @@ services:
           name: syndicate-refresh-state
           type: keyvalue
           property: connectionString
+      - key: SYNDICATE_BOOTSTRAP_ON_START
+        value: "1"
       - key: SYNDICATE_DATA_ROOT
         value: /opt/render/project/data
       - key: SYNDICATE_MLB_SOURCE_ROOT
@@ -89,6 +91,8 @@ services:
         value: "false"
       - key: SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP
         value: "false"
+      - key: SYNDICATE_BOOTSTRAP_WNBA_TODAY
+        value: "1"
       - key: SYNDICATE_LIVE_ODDS_REFRESH_INTERVAL_SECONDS
         value: "30"
       - key: SYNDICATE_INTELLIGENCE_REFRESH_INTERVAL_SECONDS
@@ -165,6 +169,8 @@ services:
           name: syndicate-refresh-state
           type: keyvalue
           property: connectionString
+      - key: SYNDICATE_BOOTSTRAP_ON_START
+        value: "1"
       - key: SYNDICATE_DATA_ROOT
         value: /opt/render/project/data
       - key: SYNDICATE_MLB_SOURCE_ROOT
@@ -209,6 +215,8 @@ services:
         value: "false"
       - key: SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP
         value: "true"
+      - key: SYNDICATE_BOOTSTRAP_WNBA_TODAY
+        value: "1"
       - key: SYNDICATE_LIVE_ODDS_REFRESH_INTERVAL_SECONDS
         value: "30"
       - key: SYNDICATE_INTELLIGENCE_REFRESH_INTERVAL_SECONDS
