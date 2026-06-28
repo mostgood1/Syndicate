@@ -1240,7 +1240,7 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
             processed_root = source_root / "data" / "processed"
             processed_root.mkdir(parents=True, exist_ok=True)
 
-            with patch.object(module, "_copy_existing_processed_artifact", return_value=None), patch.object(module, "_source_app_fallback_enabled", return_value=True), patch.object(module, "_load_source_app", return_value=types.SimpleNamespace(app=_FakeApp())):
+            with patch.object(module, "_copy_existing_processed_artifact", return_value=None), patch.object(module, "_load_source_app", return_value=types.SimpleNamespace(app=_FakeApp())):
                 out = module._export_cards_sim_detail_snapshot(source_root=source_root, date_str="2026-05-22", processed_root=processed_root)
 
             self.assertEqual(out, str(processed_root / "cards_sim_detail_2026-05-22.json"))

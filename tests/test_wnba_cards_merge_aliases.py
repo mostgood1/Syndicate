@@ -128,7 +128,7 @@ class WnbaCardsMergeAliasTests(unittest.TestCase):
             return_value=["2026-06-23"],
         ), patch(
             "syndicate.features.wnba.cards._artifact_paths",
-            side_effect=lambda selected_date: {
+            side_effect=lambda selected_date, **kwargs: {
                 "cards": Path(tempdir) / f"game_cards_{selected_date}.csv",
                 "recommendations": Path(tempdir) / f"recommendations_slate_{selected_date}.json",
                 "sim": Path(tempdir) / f"cards_sim_detail_{selected_date}.json",

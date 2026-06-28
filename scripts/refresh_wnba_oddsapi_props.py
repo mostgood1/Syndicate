@@ -3601,7 +3601,7 @@ def _export_cards_sim_detail_snapshot(*, source_root: Path, date_str: str, proce
         return existing
     out_path = processed_root / f"cards_sim_detail_{date_str}.json"
     games_out = _build_cards_sim_detail_from_local_smart_sim(processed_root=processed_root, date_str=date_str)
-    if not games_out and _source_app_fallback_enabled():
+    if not games_out:
         source_app = _load_source_app(source_root)
         if source_app is not None:
             try:
