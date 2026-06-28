@@ -513,6 +513,15 @@ def _hydrate_board_response_payload(response_payload: dict[str, object] | None) 
         if nested_records:
             current["portfolio_event_records"] = [dict(item) for item in nested_records if isinstance(item, dict)]
 
+    if not isinstance(current.get("board_contract"), dict) or not current.get("board_contract"):
+        try:
+            current["board_contract"] = build_intelligence_board_contract(current)
+        except Exception:
+            current.setdefault("board_contract", {"schema": "intelligence_board_v1", "waterfall": []})
+
+    if not isinstance(current.get("boardContract"), dict) or not current.get("boardContract"):
+        current["boardContract"] = dict(current.get("board_contract") or {})
+
     return current
 
 

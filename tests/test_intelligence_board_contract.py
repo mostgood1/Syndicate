@@ -385,6 +385,30 @@ class IntelligenceBoardContractTests(unittest.TestCase):
         self.assertEqual(len(payload.get("recommendations") or []), 1)
         self.assertEqual(len(payload.get("parlays") or []), 1)
 
+    def test_hydrate_board_response_payload_synthesizes_board_contract(self) -> None:
+        payload = _hydrate_board_response_payload(
+            {
+                "headline": "The Syndicate brief",
+                "recommendations": [
+                    {
+                        "sport": "nba",
+                        "team": "Boston Celtics",
+                        "name": "Jayson Tatum",
+                        "market": "points",
+                        "line": 28.5,
+                        "movement": {"delta": 0.2, "trend": "up"},
+                        "edge": 0.071,
+                        "is_live": False,
+                    }
+                ],
+            }
+        )
+
+        board_contract = payload.get("board_contract") or {}
+        self.assertEqual(board_contract.get("schema"), "intelligence_board_v1")
+        self.assertGreaterEqual(len(board_contract.get("waterfall") or []), 1)
+        self.assertEqual((payload.get("boardContract") or {}).get("schema"), "intelligence_board_v1")
+
     def test_run_intelligence_query_emits_board_contract(self) -> None:
         with patch("syndicate.features.intelligence.build_intelligence_overview", return_value=_sample_overview()):
             with patch("syndicate.features.intelligence._tracked_repo_files", return_value=set()):

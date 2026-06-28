@@ -582,7 +582,7 @@ class IntelligenceStateTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         html = response.get_data(as_text=True)
         self.assertIn("Initial board", html)
-        self.assertIn("Prompt The Syndicate", html)
+        self.assertIn("Betting Board", html)
         self.assertIn("Board snapshot", html)
         self.assertIn("Live and pregame lanes", html)
         self.assertIn("Decision lanes", html)
@@ -651,7 +651,7 @@ class IntelligenceStateTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         mocked_board_snapshot.assert_called_once_with(expected_payload, force_refresh=True)
-        mocked_state_response.assert_called_once_with(expected_payload, force_refresh=True)
+        mocked_state_response.assert_called_once_with(expected_payload, force_refresh=True, allow_latest_fallback=True)
         mocked_queue.assert_called_once()
 
     def test_intelligence_home_computes_render_fallback_when_cache_is_missing(self) -> None:

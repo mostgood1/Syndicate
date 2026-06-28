@@ -4937,7 +4937,7 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertIn('/api/intelligence/query', body)
         self.assertIn('renderSupportingEvidence', body)
         self.assertIn('View data coverage page', body)
-        self.assertIn('Prompt The Syndicate', body)
+        self.assertIn('Betting Board', body)
         self.assertIn('Initial board', body)
         self.assertIn('Portfolio summary', body)
         self.assertIn('Player A over 1.5 hits', body)
