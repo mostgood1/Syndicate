@@ -274,6 +274,13 @@ def build_intelligence_board_contract(response: Mapping[str, Any] | None) -> dic
         "archived_count": lane_counts["archived"],
         "active_lanes": active_lanes,
     }
+    waterfall = [
+        {"step": "source_response", "count": len(recommendations), "label": "Raw response recommendations"},
+        {"step": "normalized_cards", "count": len(cards), "label": "Deduped board cards"},
+        {"step": "live_lane", "count": lane_counts["live"], "label": "Live recommendations"},
+        {"step": "pregame_lane", "count": lane_counts["pregame"], "label": "Pregame recommendations"},
+        {"step": "archived_lane", "count": lane_counts["archived"], "label": "Archived recommendations"},
+    ]
     return {
         "schema": "intelligence_board_v1",
         "card_fields": ["sport", "team", "player", "market", "line", "projected", "live_projection", "actual", "status_display", "movement", "simulated_edge", "trace_path", "game_pk"],
@@ -281,7 +288,8 @@ def build_intelligence_board_contract(response: Mapping[str, Any] | None) -> dic
         "lane_counts": lane_counts,
         "active_lanes": active_lanes,
         "board_summary": board_summary,
-        "cards": cards[:10],
+        "cards": cards,
+        "waterfall": waterfall,
     }
 
 

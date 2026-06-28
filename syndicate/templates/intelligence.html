@@ -668,6 +668,7 @@ function renderSupportingEvidence(response) {
     : (data.board_contract && typeof data.board_contract === "object" ? data.board_contract : {});
   const laneCounts = boardContract.lane_counts && typeof boardContract.lane_counts === "object" ? boardContract.lane_counts : {};
   const cardFields = Array.isArray(boardContract.card_fields) ? boardContract.card_fields : [];
+  const boardWaterfall = Array.isArray(boardContract.waterfall) ? boardContract.waterfall : [];
   const evidenceBits = [];
   if (headline) {
     evidenceBits.push(`<div style="font-size:18px; font-weight:700; margin-bottom:6px;">${escapeHtml(headline)}</div>`);
@@ -2076,6 +2077,23 @@ function renderTopStrip(recs) {
         ${escapeHtml(part)}
       </span>
     `).join("");
+    const waterfallMarkup = boardWaterfall.length ? `
+      <details style="margin-top:12px; padding:12px; border-radius:12px; background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.08);">
+        <summary style="cursor:pointer; list-style:none; display:flex; align-items:center; justify-content:space-between; gap:12px; font-size:11px; text-transform:uppercase; letter-spacing:.04em; opacity:.78;">
+          <span>Board waterfall</span>
+          <span>${escapeHtml(boardWaterfall.length)} steps</span>
+        </summary>
+        <div style="display:grid; gap:8px; margin-top:12px;">
+          ${boardWaterfall.map((step, index) => `
+            <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding:8px 10px; border-radius:10px; background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.06);">
+              <span style="min-width:24px; height:24px; border-radius:999px; display:inline-flex; align-items:center; justify-content:center; background:rgba(255,255,255,.10); font-size:11px; font-weight:700;">${index + 1}</span>
+              <span style="font-size:12px; font-weight:600;">${escapeHtml(step.label || step.step || `Step ${index + 1}`)}</span>
+              <span style="margin-left:auto; font-size:12px; opacity:.8;">${escapeHtml(step.count ?? 0)}</span>
+            </div>
+          `).join("")}
+        </div>
+      </details>
+    ` : "";
     boardSummaryEl.innerHTML = `
       <div style="display:grid; gap:10px; padding:12px 14px; border-radius:14px; background:linear-gradient(180deg, rgba(255,255,255,.07), rgba(255,255,255,.04)); border:1px solid rgba(255,255,255,.12); color:#e5e7eb;">
         <div style="display:flex; flex-wrap:wrap; gap:10px; align-items:flex-start; justify-content:space-between;">
@@ -2085,6 +2103,7 @@ function renderTopStrip(recs) {
           </div>
           <div style="opacity:.72; font-size:11px; white-space:nowrap;">Odds/opps refresh every 30s</div>
         </div>
+        ${waterfallMarkup}
         <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
           ${summaryChips}
         </div>

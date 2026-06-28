@@ -102,6 +102,31 @@ class IntelligenceBoardContractTests(unittest.TestCase):
         self.assertEqual([card["name"] for card in contract["cards"]], ["Jayson Tatum", "Aaron Judge"])
         self.assertEqual(contract["cards"][1]["lane"], "pregame")
 
+    def test_build_intelligence_board_contract_keeps_all_cards_and_exposes_waterfall(self) -> None:
+        contract = build_intelligence_board_contract(
+            {
+                "headline": "The Syndicate board",
+                "recommendations": [
+                    {
+                        "sport": "nba",
+                        "team": f"Team {index}",
+                        "name": f"Player {index}",
+                        "market": "points",
+                        "line": 10.5 + index,
+                        "movement": {"delta": 0.1, "trend": "flat"},
+                        "odds": -110,
+                        "is_live": index % 2 == 0,
+                    }
+                    for index in range(12)
+                ],
+            }
+        )
+
+        self.assertEqual(contract["recommendation_count"], 12)
+        self.assertEqual(len(contract["cards"]), 12)
+        self.assertGreaterEqual(len(contract["waterfall"]), 5)
+        self.assertEqual(contract["waterfall"][0]["step"], "source_response")
+
     def test_build_intelligence_board_contract_splits_live_and_pregame_cards(self) -> None:
         contract = build_intelligence_board_contract(
             {
