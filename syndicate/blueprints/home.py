@@ -4563,59 +4563,15 @@ def _home_payload(*, selected_date: str | None = None, cached_only: bool = False
 
 def _build_light_home_sports(selected_date: str | None = None) -> list[dict[str, Any]]:
     context_label = _home_selected_date(selected_date)
-    today_iso = central_today_iso()
-    empty_game_rail = {"title": "", "items": [], "links": [], "empty_summary": "No game rows were surfaced for this slate."}
-    empty_prop_rail = {"title": "", "items": [], "links": [], "empty_summary": "No prop rows were surfaced for this slate."}
-    empty_live_rail = {"title": "", "items": [], "links": [], "empty_summary": "No live rows were surfaced for this slate."}
-    sports: list[dict[str, Any]] = []
-    for sport in current_app.config.get("SYNDICATE_SPORTS", []):
-        if not isinstance(sport, dict):
-            continue
-        slug = str(sport.get("slug") or "").strip()
-        name = str(sport.get("name") or slug.upper() or "Sport").strip()
-        live_links: list[dict[str, str]] = []
-        if slug == "mlb":
-            live_links = [{"href": f"/mlb/live-lens?date={context_label}", "label": "Open Live Lens"}]
-        elif slug == "nba":
-            live_links = [{"href": f"/nba/season/{central_year()}/live-lens?date={context_label}&profile=retuned", "label": "Open Live Lens"}]
-        elif slug == "nhl":
-            live_links = [{"href": f"/nhl/live-lens?date={context_label}", "label": "Open Live Lens"}]
-        elif slug == "wnba":
-            live_links = [{"href": f"/wnba/live-lens?date={context_label}", "label": "Open Live Lens"}]
-        elif slug == "ncaab":
-            live_links = [{"href": f"/ncaab/live-lens?date={context_label}", "label": "Open Live Lens"}]
-        elif slug == "ncaaf":
-            live_links = [{"href": f"/ncaaf/live-lens?week={ncaaf_default_week()}", "label": "Open Live Lens"}]
-        elif slug == "nfl":
-            nfl_season = nfl_latest_season()
-            nfl_week = (nfl_tracked_week() or {}).get("week") or nfl_default_week(nfl_season)
-            live_links = [{"href": f"/nfl/live-lens?season={nfl_season}&week={nfl_week}", "label": "Open Live Lens"}]
-        sports.append(
-            {
-                "slug": slug,
-                "name": name,
-                "status": sport.get("status") or "Active",
-                "phase": sport.get("phase") or "",
-                "summary": sport.get("summary") or "",
-                "primary_href": sport.get("primary_href") or f"/{slug}" if slug else "/",
-                "primary_label": sport.get("primary_label") or f"Open {name}",
-                "home_anchor": f"{slug}-home" if slug else name.lower().replace(" ", "-"),
-                "context_label": context_label,
-                "slate_label": "Today" if context_label == today_iso else context_label,
-                "freshness_label": "Live slate" if context_label == today_iso else "Stored slate",
-                "data_health": "partial",
-                "games_count": "—",
-                "props_count": "—",
-                "active_today": False,
-                "data_warnings": [],
-                "overview_stats": [],
-                "home_rails": {"compact": empty_game_rail, "pregame": empty_prop_rail, "live": {**empty_live_rail, "links": live_links}},
-                "game_bar": {"opportunity_tags": []},
-                "props_bar": {"opportunity_tags": []},
-                "feature_links": [],
-            }
+    try:
+        sports = build_home_overview(
+            current_app.config.get("SYNDICATE_SPORTS", []),
+            selected_date=context_label,
+            force_refresh=context_label == central_today_iso(),
         )
-    return sports
+    except Exception:
+        return []
+    return [sport for sport in sports if isinstance(sport, dict) and _safe_text(sport.get("slug"), "").lower() in _active_sport_slugs()]
 
 
 @home_bp.get("/")

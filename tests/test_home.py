@@ -22,15 +22,56 @@ class HomePageCommandCenterTests(unittest.TestCase):
         self.client = app.test_client()
 
     def test_home_page_renders_daily_command_center(self) -> None:
-        light_sports = [{"slug": "nba", "name": "NBA", "home_anchor": "nba-home", "data_health": "partial", "freshness_label": "Stored slate", "games_count": "—", "props_count": "—", "overview_stats": [], "home_rails": {"compact": {"title": "", "items": [], "links": [], "empty_summary": ""}, "pregame": {"title": "", "items": [], "links": [], "empty_summary": ""}, "live": {"title": "", "items": [], "links": [], "empty_summary": "", "links": []}}, "game_bar": {"opportunity_tags": []}, "props_bar": {"opportunity_tags": []}, "feature_links": []}]
+        light_sports = [
+            {
+                "slug": "mlb",
+                "name": "MLB",
+                "home_anchor": "mlb-home",
+                "data_health": "partial",
+                "freshness_label": "Stored slate",
+                "games_count": "4",
+                "props_count": "8",
+                "overview_stats": [],
+                "home_rails": {
+                    "compact": {"title": "Compact rail", "items": [], "links": [], "empty_summary": ""},
+                    "pregame": {"title": "Pregame props", "items": [], "links": [], "empty_summary": ""},
+                    "live": {"title": "Top Live Props", "items": [], "links": [], "empty_summary": "", "links": []},
+                },
+                "game_bar": {"opportunity_tags": []},
+                "props_bar": {"opportunity_tags": []},
+                "feature_links": [],
+            },
+            {
+                "slug": "wnba",
+                "name": "WNBA",
+                "home_anchor": "wnba-home",
+                "data_health": "partial",
+                "freshness_label": "Stored slate",
+                "games_count": "3",
+                "props_count": "6",
+                "overview_stats": [],
+                "home_rails": {
+                    "compact": {"title": "Compact rail", "items": [], "links": [], "empty_summary": ""},
+                    "pregame": {"title": "Pregame props", "items": [], "links": [], "empty_summary": ""},
+                    "live": {"title": "Top Live Props", "items": [], "links": [], "empty_summary": "", "links": []},
+                },
+                "game_bar": {"opportunity_tags": []},
+                "props_bar": {"opportunity_tags": []},
+                "feature_links": [],
+            },
+        ]
 
         with patch("syndicate.blueprints.home._build_light_home_sports", return_value=light_sports):
             response = self.client.get("/")
 
         self.assertEqual(response.status_code, 200)
         html = response.get_data(as_text=True)
-        self.assertNotIn("Daily command center", html)
-        self.assertIn("syndicate-home-shell", html)
+        self.assertNotIn('<form class="home-topbar__date-form"', html)
+        self.assertNotIn('<section class="home-decision-grid"', html)
+        self.assertIn("home-active-strip", html)
+        self.assertIn('id="mlb-home"', html)
+        self.assertIn('id="wnba-home"', html)
+        self.assertNotIn('id="nba-home"', html)
 
     def test_home_page_defaults_to_current_local_date_and_active_payload(self) -> None:
         with patch("syndicate.blueprints.home.central_today_iso", return_value="2026-06-21"):
