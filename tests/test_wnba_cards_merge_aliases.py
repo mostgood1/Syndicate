@@ -123,9 +123,32 @@ class WnbaCardsMergeAliasTests(unittest.TestCase):
             }
         ]
 
-        with patch("syndicate.features.wnba.cards.central_today_iso", return_value="2026-06-23"), patch(
+        with TemporaryDirectory() as tempdir, patch("syndicate.features.wnba.cards.central_today_iso", return_value="2026-06-23"), patch(
             "syndicate.features.wnba.cards.available_dates",
             return_value=["2026-06-23"],
+        ), patch(
+            "syndicate.features.wnba.cards._artifact_paths",
+            side_effect=lambda selected_date: {
+                "cards": Path(tempdir) / f"game_cards_{selected_date}.csv",
+                "recommendations": Path(tempdir) / f"recommendations_slate_{selected_date}.json",
+                "sim": Path(tempdir) / f"cards_sim_detail_{selected_date}.json",
+                "props": Path(tempdir) / f"cards_props_snapshot_{selected_date}.json",
+            },
+        ), patch(
+            "syndicate.features.wnba.cards._path_cache_signature",
+            return_value=0,
+        ), patch(
+            "syndicate.features.wnba.cards.live_snapshot_path",
+            side_effect=lambda filename: Path(tempdir) / "live_snapshots" / filename,
+        ), patch(
+            "syndicate.features.wnba.sources.live_snapshot_path",
+            side_effect=lambda filename: Path(tempdir) / "live_snapshots" / filename,
+        ), patch(
+            "syndicate.features.wnba.sources.processed_path",
+            side_effect=lambda filename: Path(tempdir) / filename,
+        ), patch(
+            "syndicate.features.wnba.sources._strict_artifact_path",
+            side_effect=lambda filename, subdir: Path(tempdir).joinpath(*subdir, filename),
         ), patch(
             "syndicate.features.wnba.cards._games_from_artifacts",
             return_value=([], "cards_path", "recs_path"),
