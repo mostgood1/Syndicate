@@ -16,7 +16,7 @@ from syndicate.features.wnba.sources import build_module_links
 from syndicate.features.wnba.sources import load_json
 
 
-LIVE_LENS_SNAPSHOT_PATH = Path("/opt/render/project/data/live/wnba_live_lens.json")
+LIVE_LENS_SNAPSHOT_PATH = Path("data/live/wnba_live_lens.json")
 
 
 def _safe_text(value: Any, fallback: str = "-") -> str:

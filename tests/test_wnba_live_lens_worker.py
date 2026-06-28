@@ -102,6 +102,6 @@ class WnbaLiveLensWorkerTests(unittest.TestCase):
         mocked_write.assert_not_called()
         mocked_warning.assert_called_once_with(
             "INVALID LIVE LENS STATE",
-            extra={"path": "/opt/render/project/data/live/wnba_live_lens.json", "date": "2026-06-19"},
+            extra={"path": "data/live/wnba_live_lens.json", "date": "2026-06-19"},
         )
         self.assertEqual(snapshot, invalid_snapshot)

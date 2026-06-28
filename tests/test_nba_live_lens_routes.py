@@ -44,7 +44,7 @@ class NbaLiveLensRouteTests(unittest.TestCase):
         page_context = {
             "route_path": "/nba/live-lens",
             "rank_cards": [{"title": "BOS @ NYK"}],
-            "source_path": "/opt/render/project/data/live/nba_live_lens.json",
+            "source_path": "data/live/nba_live_lens.json",
         }
         api_payload = {
             "ok": True,
@@ -78,7 +78,7 @@ class NbaLiveLensRouteTests(unittest.TestCase):
         page_context = {
             "route_path": "/nba/season/2025/live-lens",
             "rank_cards": [{"title": "BOS @ NYK"}],
-            "source_path": "/opt/render/project/data/live/nba_live_lens.json",
+            "source_path": "data/live/nba_live_lens.json",
             "hidden_fields": [{"name": "profile", "value": "retuned"}],
         }
 

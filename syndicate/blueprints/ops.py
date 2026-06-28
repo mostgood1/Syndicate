@@ -310,7 +310,7 @@ def api_ops_mlb_live_check() -> Any:
         return jsonify({"ok": False, "error": "date parameter required (YYYY-MM-DD)"}), 400
     try:
         repo_root = Path(current_app.root_path).resolve().parent
-        data_root = Path(str(os.environ.get("SYNDICATE_DATA_ROOT") or "").strip() or "/opt/render/project/data").resolve()
+        data_root = Path(str(os.environ.get("SYNDICATE_DATA_ROOT") or "").strip() or "data")
         # live_lens report path candidates
         live_lens_candidates = []
         for base in (data_root / "mlb_source", repo_root / "data" / "mlb_source"):

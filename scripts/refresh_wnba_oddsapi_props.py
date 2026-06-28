@@ -1172,8 +1172,6 @@ def _basketball_recent_form_fields(row: dict[str, object], *, line_value: float 
 def _build_local_recommendations_slate_artifact(*, processed_root: Path, date_str: str) -> tuple[int, Path | None]:
     rows, _, by_names = _local_game_cards_index(processed_root=processed_root, date_str=date_str)
     recommendations_path = processed_root / f"recommendations_{date_str}.csv"
-    if not rows:
-        return 0, None
 
     grouped: dict[tuple[str, str], list[dict[str, object]]] = {}
     if recommendations_path.exists() and recommendations_path.is_file() and _count_csv_rows_quick(recommendations_path) > 0:
@@ -1294,9 +1292,6 @@ def _build_local_recommendations_slate_artifact(*, processed_root: Path, date_st
         picks.sort(key=lambda item: float(item.get("ev_pct") or float("-inf")), reverse=True)
         picks_count += len(picks)
         per_game.append({"home": home_tri, "away": away_tri, "matchup": f"{away_tri} @ {home_tri}", "picks": picks})
-
-    if not per_game:
-        return 0, None
 
     payload = {"date": date_str, "counts": {"games": len(per_game), "picks": picks_count}, "per_game": per_game}
     out_path = processed_root / f"recommendations_slate_{date_str}.json"

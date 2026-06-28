@@ -77,6 +77,32 @@ class WnbaRefreshRunnerZeroRecsTests(unittest.TestCase):
 
         self.assertEqual(rc, 0)
 
+    def test_zero_recs_refresh_still_writes_recommendations_slate(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        module = self._load_module(repo_root)
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_root = Path(tmp_dir)
+            processed_root = tmp_root / "data" / "processed"
+            processed_root.mkdir(parents=True, exist_ok=True)
+            (processed_root / "game_cards_2026-06-22.csv").write_text(
+                "gamePk,away_tri,home_tri,commence_time\n",
+                encoding="utf-8",
+            )
+
+            rc, out_path = module._build_local_recommendations_slate_artifact(
+                processed_root=processed_root,
+                date_str="2026-06-22",
+            )
+
+            self.assertEqual(rc, 0)
+            self.assertIsNotNone(out_path)
+            assert out_path is not None
+            self.assertTrue(out_path.exists())
+            payload = out_path.read_text(encoding="utf-8")
+            self.assertIn('"date": "2026-06-22"', payload)
+            self.assertIn('"per_game": []', payload)
+
 
 if __name__ == "__main__":
     unittest.main()

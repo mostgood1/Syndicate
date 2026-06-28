@@ -20,7 +20,7 @@ from syndicate.features.shared.rank_board import build_rank_page_context
 build_cards_page_context = _compute_cards_page_context
 
 
-LIVE_LENS_SNAPSHOT_PATH = Path("/opt/render/project/data/live/nba_live_lens.json")
+LIVE_LENS_SNAPSHOT_PATH = Path("data/live/nba_live_lens.json")
 
 
 def _safe_text(value: Any, fallback: str = "-") -> str:

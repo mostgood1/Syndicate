@@ -709,13 +709,11 @@ def _props_table_groups(props_game: dict[str, Any] | None, away_tri: str, home_t
 
 
 def _artifact_paths(selected_date: str) -> dict[str, Path]:
-    candidate_root = (_wnba_source_roots() or [_repo_root_from(__file__) / "data" / "wnba_source"])[0]
-    processed_root_dir = candidate_root / "data" / "processed"
     return {
-        "cards": processed_root_dir / f"game_cards_{selected_date}.csv",
-        "recommendations": processed_root_dir / f"recommendations_slate_{selected_date}.json",
-        "sim": processed_root_dir / f"cards_sim_detail_{selected_date}.json",
-        "props": processed_root_dir / f"cards_props_snapshot_{selected_date}.json",
+        "cards": processed_path(f"game_cards_{selected_date}.csv"),
+        "recommendations": processed_path(f"recommendations_slate_{selected_date}.json"),
+        "sim": processed_path(f"cards_sim_detail_{selected_date}.json"),
+        "props": processed_path(f"cards_props_snapshot_{selected_date}.json"),
     }
 
 

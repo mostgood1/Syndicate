@@ -20,7 +20,7 @@ from syndicate.features.shared.game_board_contract import apply_game_board_contr
 from syndicate.features.shared.live_lens_contract import attach_live_lens_contract
 
 
-LIVE_LENS_SNAPSHOT_PATH = Path("/opt/render/project/data/live/mlb_live_lens.json")
+LIVE_LENS_SNAPSHOT_PATH = Path("data/live/mlb_live_lens.json")
 
 
 def _load_vendor_live_frontend() -> tuple[Any | None, Any | None]:
