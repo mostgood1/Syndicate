@@ -214,6 +214,15 @@ def create_app() -> Flask:
     app.register_blueprint(ncaab_bp)
     app.register_blueprint(sports_bp)
 
+    
+    @app.route("/")
+    def root():
+        return "OK", 200
+
+    @app.route("/healthz")
+    def healthz():
+        return "OK", 200
+
     def _start_background_loops() -> None:
         if _is_render_web_dyno():
             return

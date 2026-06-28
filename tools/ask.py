@@ -1,40 +1,52 @@
-import os
+from pathlib import Path
 
-BASE = "docs/ai_context"
+ROOT = Path(__file__).resolve().parents[1]
 
 def load(file):
-    path = os.path.join(BASE, file)
-    return open(path).read() if os.path.exists(path) else ""
+    path = ROOT / file
+    return path.read_text(encoding="utf-8") if path.exists() else ""
 
 def build_prompt(task):
     return f"""
 
 SYSTEM CONTEXT:
-{load("architecture.md")}
+{load("docs/ai_context/architecture.md")}
 
 DATA FLOW CONTEXT:
-{load("data_flow_system.md")}
+{load("docs/ai_context/data_flow_system.md")}
 
 SIMULATION CONTEXT:
-{load("simulation_system.md")}
+{load("docs/ai_context/simulation_system.md")}
 
-ADAPTER GAP CONTEXT:
-{load("simulation_adapter_gap.md")}
+SIMULATION ADAPTER CONTEXT:
+{load("docs/ai_context/simulation_adapter_design.md")}
 
 DAILY PIPELINE CONTEXT:
-{load("daily_pipeline.md")}
+{load("docs/ai_context/daily_pipeline.md")}
+
+DAILY UPDATE CONTROL PLANE:
+{load("docs/daily_update_control_plane.md")}
 
 SIMULATION TIMING CONTEXT:
-{load("simulation_timing.md")}
+{load("docs/ai_context/simulation_timing.md")}
 
 RUNTIME CONTEXT:
-{load("runtime_infrastructure.md")}
+{load("docs/ai_context/runtime_infrastructure.md")}
 
 EXECUTION MODEL:
-{load("runtime_execution_model.md")}
+{load("docs/ai_context/runtime_execution_model.md")}
 
 DECISIONS:
-{load("decisions.md")}
+{load("docs/ai_context/decisions.md")}
+
+INTELLIGENCE / BETTING BOARD ASSESSMENT:
+{load("docs/intelligence_betting_board_assessment.md")}
+
+WORLD CLASS PLAN:
+{load("docs/syndicate_world_class_implementation_plan.md")}
+
+DAILY UPDATE WORKFLOW:
+{load("docs/daily_update_workflow.md")}
 
 TASK:
 {task}

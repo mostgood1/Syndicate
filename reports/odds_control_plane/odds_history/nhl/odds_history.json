@@ -2,11 +2,11 @@
   "date": "2026-06-07",
   "history_limit": 50,
   "home_team=Home|away_team=Away|market=total|selection=over|bookmaker=draftkings": {
-    "delta": null,
-    "delta_line": null,
+    "delta": 0.5,
+    "delta_line": 0.5,
     "history": [
       {
-        "captured_at": "2026-06-16T03:58:15+00:00",
+        "captured_at": "2026-06-27T21:39:45+00:00",
         "current_line": 6.5,
         "date": "2026-06-07",
         "delta": null,
@@ -39,7 +39,7 @@
           "selection": "over",
           "source_path": "data\\odds\\team\\date=2026-06-07\\oddsapi.csv",
           "sport": "nhl",
-          "timestamp": "2026-06-16T03:58:15+00:00"
+          "timestamp": "2026-06-27T21:39:45+00:00"
         },
         "odds": -110.0,
         "percent_change": null,
@@ -59,24 +59,80 @@
         },
         "source_path": "data\\odds\\team\\date=2026-06-07\\oddsapi.csv",
         "sport": "nhl",
-        "timestamp": "2026-06-16T03:58:15+00:00"
+        "timestamp": "2026-06-27T21:39:45+00:00"
+      },
+      {
+        "captured_at": "2026-06-27T21:39:45+00:00",
+        "current_line": 7.0,
+        "date": "2026-06-07",
+        "delta": 0.5,
+        "delta_line": 0.5,
+        "entity": "over",
+        "event_id": "Away@Home",
+        "last_odds": -110.0,
+        "line": {
+          "line": 7.0,
+          "price": -110
+        },
+        "market_id": "home_team=Home|away_team=Away|market=total|selection=over|bookmaker=draftkings",
+        "market_key": "home_team=Home|away_team=Away|market=total|selection=over|bookmaker=draftkings",
+        "market_type": "total",
+        "movement": "up",
+        "normalized": {
+          "confidence": null,
+          "edge": null,
+          "entity": "over",
+          "event_id": "Away@Home",
+          "line": 7.0,
+          "market_id": "NHL:away_home:TOTAL:over:7",
+          "market_key": "home_team=Home|away_team=Away|market=total|selection=over|bookmaker=draftkings",
+          "market_probability": null,
+          "market_type": "total",
+          "model_probability": null,
+          "odds": -110.0,
+          "rank_score": 0.0,
+          "schema_version": 1,
+          "selection": "over",
+          "source_path": "data\\odds\\team\\date=2026-06-07\\oddsapi.csv",
+          "sport": "nhl",
+          "timestamp": "2026-06-27T21:39:45+00:00"
+        },
+        "odds": -110.0,
+        "percent_change": 7.6923076923076925,
+        "previous_line": 6.5,
+        "row": {
+          "away_team": "Away",
+          "bookmaker": "draftkings",
+          "entity": "over",
+          "event_id": "Away@Home",
+          "home_team": "Home",
+          "line": 7.0,
+          "market": "total",
+          "market_id": "NHL:away_home:TOTAL:over:7",
+          "market_type": "total",
+          "price": -110,
+          "selection": "over"
+        },
+        "source_path": "data\\odds\\team\\date=2026-06-07\\oddsapi.csv",
+        "sport": "nhl",
+        "timestamp": "2026-06-27T21:39:45+00:00"
       }
     ],
-    "last_line": 6.5,
+    "last_line": 7.0,
     "last_odds": -110.0,
     "last_source_path": "data\\odds\\team\\date=2026-06-07\\oddsapi.csv",
-    "last_updated": "2026-06-16T03:58:15+00:00",
-    "movement": "flat",
-    "percent_change": null,
-    "previous_line": null
+    "last_updated": "2026-06-27T21:39:45+00:00",
+    "movement": "up",
+    "percent_change": 7.6923076923076925,
+    "previous_line": 6.5
   },
   "markets": {
     "home_team=Home|away_team=Away|market=total|selection=over|bookmaker=draftkings": {
-      "delta": null,
-      "delta_line": null,
+      "delta": 0.5,
+      "delta_line": 0.5,
       "history": [
         {
-          "captured_at": "2026-06-16T03:58:15+00:00",
+          "captured_at": "2026-06-27T21:39:45+00:00",
           "current_line": 6.5,
           "date": "2026-06-07",
           "delta": null,
@@ -109,7 +165,7 @@
             "selection": "over",
             "source_path": "data\\odds\\team\\date=2026-06-07\\oddsapi.csv",
             "sport": "nhl",
-            "timestamp": "2026-06-16T03:58:15+00:00"
+            "timestamp": "2026-06-27T21:39:45+00:00"
           },
           "odds": -110.0,
           "percent_change": null,
@@ -129,155 +185,75 @@
           },
           "source_path": "data\\odds\\team\\date=2026-06-07\\oddsapi.csv",
           "sport": "nhl",
-          "timestamp": "2026-06-16T03:58:15+00:00"
-        }
-      ],
-      "last_line": 6.5,
-      "last_odds": -110.0,
-      "last_source_path": "data\\odds\\team\\date=2026-06-07\\oddsapi.csv",
-      "last_updated": "2026-06-16T03:58:15+00:00",
-      "movement": "flat",
-      "percent_change": null,
-      "previous_line": null
-    },
-    "player_name=Player One|market=POINTS|book=draftkings": {
-      "delta": null,
-      "delta_line": null,
-      "history": [
+          "timestamp": "2026-06-27T21:39:45+00:00"
+        },
         {
-          "captured_at": "2026-06-16T03:58:15+00:00",
-          "current_line": 2.5,
+          "captured_at": "2026-06-27T21:39:45+00:00",
+          "current_line": 7.0,
           "date": "2026-06-07",
-          "delta": null,
-          "delta_line": null,
-          "entity": "Player One",
-          "event_id": null,
+          "delta": 0.5,
+          "delta_line": 0.5,
+          "entity": "over",
+          "event_id": "Away@Home",
           "last_odds": -110.0,
           "line": {
-            "line": 2.5,
-            "over_price": -110
+            "line": 7.0,
+            "price": -110
           },
-          "market_id": "player_name=Player One|market=POINTS|book=draftkings",
-          "market_key": "player_name=Player One|market=POINTS|book=draftkings",
-          "market_type": "POINTS",
-          "movement": "flat",
+          "market_id": "home_team=Home|away_team=Away|market=total|selection=over|bookmaker=draftkings",
+          "market_key": "home_team=Home|away_team=Away|market=total|selection=over|bookmaker=draftkings",
+          "market_type": "total",
+          "movement": "up",
           "normalized": {
             "confidence": null,
             "edge": null,
-            "entity": "Player One",
-            "event_id": null,
-            "line": 2.5,
-            "market_id": "NHL:event:POINTS:player_one:2.5",
-            "market_key": "player_name=Player One|market=POINTS|book=draftkings",
+            "entity": "over",
+            "event_id": "Away@Home",
+            "line": 7.0,
+            "market_id": "NHL:away_home:TOTAL:over:7",
+            "market_key": "home_team=Home|away_team=Away|market=total|selection=over|bookmaker=draftkings",
             "market_probability": null,
-            "market_type": "POINTS",
+            "market_type": "total",
             "model_probability": null,
             "odds": -110.0,
             "rank_score": 0.0,
             "schema_version": 1,
-            "selection": null,
-            "source_path": "data\\props\\player_props_lines\\date=2026-06-07\\oddsapi.csv",
+            "selection": "over",
+            "source_path": "data\\odds\\team\\date=2026-06-07\\oddsapi.csv",
             "sport": "nhl",
-            "timestamp": "2026-06-16T03:58:15+00:00"
+            "timestamp": "2026-06-27T21:39:45+00:00"
           },
           "odds": -110.0,
-          "percent_change": null,
-          "previous_line": null,
+          "percent_change": 7.6923076923076925,
+          "previous_line": 6.5,
           "row": {
-            "book": "draftkings",
-            "entity": "Player One",
-            "event_id": null,
-            "last_seen_at": "2026-06-07T12:00:00Z",
-            "line": 2.5,
-            "market": "POINTS",
-            "market_id": "NHL:event:POINTS:player_one:2.5",
-            "market_type": "POINTS",
-            "over_price": -110,
-            "player_name": "Player One"
+            "away_team": "Away",
+            "bookmaker": "draftkings",
+            "entity": "over",
+            "event_id": "Away@Home",
+            "home_team": "Home",
+            "line": 7.0,
+            "market": "total",
+            "market_id": "NHL:away_home:TOTAL:over:7",
+            "market_type": "total",
+            "price": -110,
+            "selection": "over"
           },
-          "source_path": "data\\props\\player_props_lines\\date=2026-06-07\\oddsapi.csv",
+          "source_path": "data\\odds\\team\\date=2026-06-07\\oddsapi.csv",
           "sport": "nhl",
-          "timestamp": "2026-06-16T03:58:15+00:00"
+          "timestamp": "2026-06-27T21:39:45+00:00"
         }
       ],
-      "last_line": 2.5,
+      "last_line": 7.0,
       "last_odds": -110.0,
-      "last_source_path": "data\\props\\player_props_lines\\date=2026-06-07\\oddsapi.csv",
-      "last_updated": "2026-06-16T03:58:15+00:00",
-      "movement": "flat",
-      "percent_change": null,
-      "previous_line": null
+      "last_source_path": "data\\odds\\team\\date=2026-06-07\\oddsapi.csv",
+      "last_updated": "2026-06-27T21:39:45+00:00",
+      "movement": "up",
+      "percent_change": 7.6923076923076925,
+      "previous_line": 6.5
     }
-  },
-  "player_name=Player One|market=POINTS|book=draftkings": {
-    "delta": null,
-    "delta_line": null,
-    "history": [
-      {
-        "captured_at": "2026-06-16T03:58:15+00:00",
-        "current_line": 2.5,
-        "date": "2026-06-07",
-        "delta": null,
-        "delta_line": null,
-        "entity": "Player One",
-        "event_id": null,
-        "last_odds": -110.0,
-        "line": {
-          "line": 2.5,
-          "over_price": -110
-        },
-        "market_id": "player_name=Player One|market=POINTS|book=draftkings",
-        "market_key": "player_name=Player One|market=POINTS|book=draftkings",
-        "market_type": "POINTS",
-        "movement": "flat",
-        "normalized": {
-          "confidence": null,
-          "edge": null,
-          "entity": "Player One",
-          "event_id": null,
-          "line": 2.5,
-          "market_id": "NHL:event:POINTS:player_one:2.5",
-          "market_key": "player_name=Player One|market=POINTS|book=draftkings",
-          "market_probability": null,
-          "market_type": "POINTS",
-          "model_probability": null,
-          "odds": -110.0,
-          "rank_score": 0.0,
-          "schema_version": 1,
-          "selection": null,
-          "source_path": "data\\props\\player_props_lines\\date=2026-06-07\\oddsapi.csv",
-          "sport": "nhl",
-          "timestamp": "2026-06-16T03:58:15+00:00"
-        },
-        "odds": -110.0,
-        "percent_change": null,
-        "previous_line": null,
-        "row": {
-          "book": "draftkings",
-          "entity": "Player One",
-          "event_id": null,
-          "last_seen_at": "2026-06-07T12:00:00Z",
-          "line": 2.5,
-          "market": "POINTS",
-          "market_id": "NHL:event:POINTS:player_one:2.5",
-          "market_type": "POINTS",
-          "over_price": -110,
-          "player_name": "Player One"
-        },
-        "source_path": "data\\props\\player_props_lines\\date=2026-06-07\\oddsapi.csv",
-        "sport": "nhl",
-        "timestamp": "2026-06-16T03:58:15+00:00"
-      }
-    ],
-    "last_line": 2.5,
-    "last_odds": -110.0,
-    "last_source_path": "data\\props\\player_props_lines\\date=2026-06-07\\oddsapi.csv",
-    "last_updated": "2026-06-16T03:58:15+00:00",
-    "movement": "flat",
-    "percent_change": null,
-    "previous_line": null
   },
   "schema_version": 1,
   "sport": "nhl",
-  "updated_at": "2026-06-16T03:58:15+00:00"
+  "updated_at": "2026-06-27T21:39:45+00:00"
 }

@@ -1,6 +1,6 @@
 {
   "latest_key": "928315208c68c7117c06911c88c130237572a6ae6d0a2ab034f65d17f0a112ce",
-  "updated_at": "2026-06-27T15:10:38-05:00",
+  "updated_at": "2026-06-28T14:23:19-05:00",
   "response": {
     "ok": true,
     "top_opportunities": [
@@ -68,8 +68,8 @@
       ],
       "portfolio": {},
       "parlays": [],
-      "state_last_updated": "2026-06-27T20:10:38Z",
-      "last_updated": "2026-06-27T15:10:38-05:00",
+      "state_last_updated": "2026-06-28T19:23:19Z",
+      "last_updated": "2026-06-28T14:23:19-05:00",
       "candidate_count": 1
     },
     "candidate_pool": {
@@ -92,8 +92,8 @@
         }
       ]
     },
-    "state_last_updated": "2026-06-27T20:10:38Z",
-    "last_updated": "2026-06-27T15:10:38-05:00",
+    "state_last_updated": "2026-06-28T19:23:19Z",
+    "last_updated": "2026-06-28T14:23:19-05:00",
     "candidate_count": 1,
     "response": {
       "ok": true,
@@ -142,8 +142,8 @@
       ],
       "portfolio": {},
       "parlays": [],
-      "state_last_updated": "2026-06-27T20:10:38Z",
-      "last_updated": "2026-06-27T15:10:38-05:00",
+      "state_last_updated": "2026-06-28T19:23:19Z",
+      "last_updated": "2026-06-28T14:23:19-05:00",
       "candidate_count": 1
     },
     "board_contract": {
@@ -243,8 +243,84 @@
           },
           "trace_path": "wnba/board/assists/Play 3"
         }
+      ],
+      "waterfall": [
+        {
+          "step": "source_response",
+          "count": 3,
+          "label": "Raw response recommendations"
+        },
+        {
+          "step": "normalized_cards",
+          "count": 3,
+          "label": "Deduped board cards"
+        },
+        {
+          "step": "live_lane",
+          "count": 0,
+          "label": "Live recommendations"
+        },
+        {
+          "step": "pregame_lane",
+          "count": 3,
+          "label": "Pregame recommendations"
+        },
+        {
+          "step": "archived_lane",
+          "count": 0,
+          "label": "Archived recommendations"
+        }
       ]
-    }
+    },
+    "state_meta": {
+      "source": "worker",
+      "computed_at": "2026-06-28T19:23:19Z",
+      "age_seconds": 0.2501070499420166,
+      "freshness_sla_seconds": 30,
+      "freshness_status": "fresh",
+      "is_fresh": true,
+      "source_fingerprint": null,
+      "run_key": "928315208c68c7117c06911c88c130237572a6ae6d0a2ab034f65d17f0a112ce",
+      "last_run_started_at": null,
+      "last_run_finished_at": null
+    },
+    "freshness": {
+      "source": "worker",
+      "computed_at": "2026-06-28T19:23:19Z",
+      "age_seconds": 0.2501070499420166,
+      "freshness_sla_seconds": 30,
+      "freshness_status": "fresh",
+      "is_fresh": true,
+      "source_fingerprint": null,
+      "run_key": "928315208c68c7117c06911c88c130237572a6ae6d0a2ab034f65d17f0a112ce",
+      "last_run_started_at": null,
+      "last_run_finished_at": null
+    },
+    "state_freshness": {
+      "source": "worker",
+      "computed_at": "2026-06-28T19:23:19Z",
+      "age_seconds": 0.2501070499420166,
+      "freshness_sla_seconds": 30,
+      "freshness_status": "fresh",
+      "is_fresh": true,
+      "source_fingerprint": null,
+      "run_key": "928315208c68c7117c06911c88c130237572a6ae6d0a2ab034f65d17f0a112ce",
+      "last_run_started_at": null,
+      "last_run_finished_at": null
+    },
+    "source_fingerprint": null
+  },
+  "state_meta": {
+    "source": "worker",
+    "computed_at": "2026-06-28T19:23:19Z",
+    "age_seconds": 0.2501070499420166,
+    "freshness_sla_seconds": 30,
+    "freshness_status": "fresh",
+    "is_fresh": true,
+    "source_fingerprint": null,
+    "run_key": "928315208c68c7117c06911c88c130237572a6ae6d0a2ab034f65d17f0a112ce",
+    "last_run_started_at": null,
+    "last_run_finished_at": null
   },
   "board_contract": {
     "schema": "intelligence_board_v1",
@@ -342,6 +418,33 @@
           "market": "Assists"
         },
         "trace_path": "wnba/board/assists/Play 3"
+      }
+    ],
+    "waterfall": [
+      {
+        "step": "source_response",
+        "count": 3,
+        "label": "Raw response recommendations"
+      },
+      {
+        "step": "normalized_cards",
+        "count": 3,
+        "label": "Deduped board cards"
+      },
+      {
+        "step": "live_lane",
+        "count": 0,
+        "label": "Live recommendations"
+      },
+      {
+        "step": "pregame_lane",
+        "count": 3,
+        "label": "Pregame recommendations"
+      },
+      {
+        "step": "archived_lane",
+        "count": 0,
+        "label": "Archived recommendations"
       }
     ]
   }

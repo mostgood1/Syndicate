@@ -6,7 +6,7 @@
     "delta_line": null,
     "history": [
       {
-        "captured_at": "2026-06-16T03:58:15+00:00",
+        "captured_at": "2026-06-27T21:39:45+00:00",
         "current_line": NaN,
         "date": "2026-06-07",
         "delta": null,
@@ -39,7 +39,7 @@
           "selection": null,
           "source_path": "raw_outputs\\by_date\\2026-06-07\\odds_2026-06-07.csv",
           "sport": "ncaab",
-          "timestamp": "2026-06-16T03:58:15+00:00"
+          "timestamp": "2026-06-27T21:39:45+00:00"
         },
         "odds": -140.0,
         "percent_change": null,
@@ -59,13 +59,13 @@
         },
         "source_path": "raw_outputs\\by_date\\2026-06-07\\odds_2026-06-07.csv",
         "sport": "ncaab",
-        "timestamp": "2026-06-16T03:58:15+00:00"
+        "timestamp": "2026-06-27T21:39:45+00:00"
       }
     ],
     "last_line": NaN,
     "last_odds": -140.0,
     "last_source_path": "raw_outputs\\by_date\\2026-06-07\\odds_2026-06-07.csv",
-    "last_updated": "2026-06-16T03:58:15+00:00",
+    "last_updated": "2026-06-27T21:39:45+00:00",
     "movement": "flat",
     "percent_change": null,
     "previous_line": null
@@ -76,7 +76,7 @@
       "delta_line": null,
       "history": [
         {
-          "captured_at": "2026-06-16T03:58:15+00:00",
+          "captured_at": "2026-06-27T21:39:45+00:00",
           "current_line": NaN,
           "date": "2026-06-07",
           "delta": null,
@@ -109,7 +109,7 @@
             "selection": null,
             "source_path": "raw_outputs\\by_date\\2026-06-07\\odds_2026-06-07.csv",
             "sport": "ncaab",
-            "timestamp": "2026-06-16T03:58:15+00:00"
+            "timestamp": "2026-06-27T21:39:45+00:00"
           },
           "odds": -140.0,
           "percent_change": null,
@@ -129,13 +129,13 @@
           },
           "source_path": "raw_outputs\\by_date\\2026-06-07\\odds_2026-06-07.csv",
           "sport": "ncaab",
-          "timestamp": "2026-06-16T03:58:15+00:00"
+          "timestamp": "2026-06-27T21:39:45+00:00"
         }
       ],
       "last_line": NaN,
       "last_odds": -140.0,
       "last_source_path": "raw_outputs\\by_date\\2026-06-07\\odds_2026-06-07.csv",
-      "last_updated": "2026-06-16T03:58:15+00:00",
+      "last_updated": "2026-06-27T21:39:45+00:00",
       "movement": "flat",
       "percent_change": null,
       "previous_line": null
@@ -143,5 +143,5 @@
   },
   "schema_version": 1,
   "sport": "ncaab",
-  "updated_at": "2026-06-16T03:58:15+00:00"
+  "updated_at": "2026-06-27T21:39:45+00:00"
 }

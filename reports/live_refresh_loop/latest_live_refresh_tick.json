@@ -1,5 +1,5 @@
 {
-  "startedAt": "2026-06-21T16:32:26Z",
+  "startedAt": "2026-06-28T15:11:49Z",
   "date": "2026-06-07",
   "phase": "live",
   "regions": "us",
@@ -12,5 +12,5 @@
     "ok": true,
     "state": "running"
   },
-  "finishedAt": "2026-06-21T16:32:26Z"
+  "finishedAt": "2026-06-28T10:11:49-05:00"
 }
