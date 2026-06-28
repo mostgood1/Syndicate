@@ -323,17 +323,45 @@ def _assert_no_active_refresh_run() -> None:
         try:
             if _pid_is_running(pid):
                 raise ValueError(f"A refresh run is already active (pid={pid}). Cancel it before starting a new run.")
+        except ValueError:
+            raise
         except Exception:
             pass
     external_runner = manifest.get("externalRunner") if isinstance(manifest.get("externalRunner"), dict) else {}
     queue_state = str(external_runner.get("queue_state") or "").strip().lower()
+
+    def _terminal_refresh_state() -> tuple[str | None, int | None, str | None]:
+        run_summary_path = context.get("run_summary_path")
+        if not isinstance(run_summary_path, Path):
+            return None, None, None
+        run_summary = read_json_file(run_summary_path) or {}
+        if not isinstance(run_summary, dict):
+            return None, None, None
+        run_summary_state = str(run_summary.get("state") or "").strip().lower()
+        if run_summary_state not in {"finished", "failed", "canceled"}:
+            return None, None, None
+        exit_code_raw = run_summary.get("exitCode")
+        exit_code = int(exit_code_raw) if isinstance(exit_code_raw, int) or (isinstance(exit_code_raw, str) and str(exit_code_raw).strip().isdigit()) else None
+        finished_at = str(run_summary.get("finishedAt") or "").strip() or _utc_now()
+        return run_summary_state, exit_code, finished_at
+
+    if state in {"pending_external", "running"} and queue_state in {"queued", "running"}:
+        terminal_state, exit_code, finished_at = _terminal_refresh_state()
+        if terminal_state is not None:
+            _update_latest_state(state=terminal_state, exit_code=exit_code, finished_at=finished_at)
+            context = _latest_refresh_manifest_context()
+            manifest = context["manifest"] if isinstance(context.get("manifest"), dict) else {}
+            state = str(manifest.get("state") or "").strip().lower()
+            external_runner = manifest.get("externalRunner") if isinstance(manifest.get("externalRunner"), dict) else {}
+            queue_state = str(external_runner.get("queue_state") or "").strip().lower()
+
     if state == "pending_external":
         raise ValueError("A refresh run is already queued for the external runner. Cancel it before starting a new run.")
     if state == "running" and queue_state in {"queued", "running"}:
         raise ValueError("A refresh run is already queued for the external runner. Cancel it before starting a new run.")
 
 
-def _update_latest_state(*, state: str, exit_code: int | None = None, canceled_at: str | None = None) -> dict[str, Any]:
+def _update_latest_state(*, state: str, exit_code: int | None = None, canceled_at: str | None = None, finished_at: str | None = None) -> dict[str, Any]:
     context = _latest_refresh_manifest_context()
     manifest_path: Path = context["manifest_path"]
     manifest: dict[str, Any] = context["manifest"]
@@ -344,6 +372,8 @@ def _update_latest_state(*, state: str, exit_code: int | None = None, canceled_a
     if canceled_at:
         manifest["canceledAt"] = canceled_at
         manifest["finishedAt"] = canceled_at
+    elif finished_at:
+        manifest["finishedAt"] = finished_at
     write_json_file(manifest_path, manifest)
     if run_summary_path is not None:
         run_summary = read_json_file(run_summary_path) or {}
@@ -353,6 +383,8 @@ def _update_latest_state(*, state: str, exit_code: int | None = None, canceled_a
         if canceled_at:
             run_summary["canceledAt"] = canceled_at
             run_summary["finishedAt"] = canceled_at
+        elif finished_at:
+            run_summary["finishedAt"] = finished_at
         write_json_file(run_summary_path, run_summary)
     return manifest
 

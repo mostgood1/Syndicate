@@ -1269,8 +1269,8 @@ class OpsRefreshApiTests(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            with patch("syndicate.features.shared.ops_refresh.REPO_ROOT", repo_root), patch(
-                "syndicate.features.shared.ops_refresh.REPORTS_ROOT", reports_root
+            with patch.dict(os.environ, {"SYNDICATE_REPORTS_ROOT": str(reports_root)}, clear=False), patch(
+                "syndicate.features.shared.ops_refresh.REPO_ROOT", repo_root
             ):
                 from syndicate.features.shared import ops_refresh
 
@@ -1279,6 +1279,65 @@ class OpsRefreshApiTests(unittest.TestCase):
             self.assertTrue(result["ok"])
             self.assertIsNone(result["pid"])
             self.assertEqual(result["state"], "canceled")
+
+    def test_assert_no_active_refresh_run_blocks_alive_pid(self) -> None:
+        with TemporaryDirectory() as tmp_dir:
+            repo_root = Path(tmp_dir)
+            reports_root = repo_root / "reports"
+            latest_dir = reports_root / "refresh_status" / "latest"
+            latest_dir.mkdir(parents=True, exist_ok=True)
+            (latest_dir / "refresh_status_latest.json").write_text(
+                json.dumps({"state": "running", "pid": 4321, "externalRunner": {"kind": "external_runner", "queue_state": "running"}}),
+                encoding="utf-8",
+            )
+
+            with patch.dict(os.environ, {"SYNDICATE_REPORTS_ROOT": str(reports_root)}, clear=False), patch(
+                "syndicate.features.shared.ops_refresh.REPO_ROOT", repo_root
+            ), patch("syndicate.features.shared.ops_refresh._pid_is_running", return_value=True):
+                from syndicate.features.shared import ops_refresh
+
+                with self.assertRaises(ValueError):
+                    ops_refresh._assert_no_active_refresh_run()
+
+    def test_assert_no_active_refresh_run_heals_terminal_pending_external_contract(self) -> None:
+        with TemporaryDirectory() as tmp_dir:
+            repo_root = Path(tmp_dir)
+            reports_root = repo_root / "reports"
+            latest_dir = reports_root / "refresh_status" / "latest"
+            run_dir = reports_root / "migration_runs" / "2026-05-22" / "odds_refresh_20260522_120000"
+            latest_dir.mkdir(parents=True, exist_ok=True)
+            run_dir.mkdir(parents=True, exist_ok=True)
+            run_summary_path = run_dir / "refresh_and_gate_run.json"
+            run_summary_path.write_text(
+                json.dumps({"state": "finished", "exitCode": 0, "finishedAt": "2026-05-22T12:05:00Z"}),
+                encoding="utf-8",
+            )
+            (latest_dir / "refresh_status_latest.json").write_text(
+                json.dumps(
+                    {
+                        "date": "2026-05-22",
+                        "runStamp": "20260522_120000",
+                        "artifactsDir": str(run_dir),
+                        "runSummaryPath": str(run_summary_path),
+                        "state": "pending_external",
+                        "externalRunner": {"kind": "external_runner", "queue_state": "queued"},
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            with patch.dict(os.environ, {"SYNDICATE_REPORTS_ROOT": str(reports_root)}, clear=False), patch(
+                "syndicate.features.shared.ops_refresh.REPO_ROOT", repo_root
+            ), patch("syndicate.features.shared.ops_refresh._pid_is_running", return_value=False):
+                from syndicate.features.shared import ops_refresh
+
+                ops_refresh._assert_no_active_refresh_run()
+
+            healed_payload = json.loads((latest_dir / "refresh_status_latest.json").read_text(encoding="utf-8"))
+            healed_run_summary = json.loads(run_summary_path.read_text(encoding="utf-8"))
+            self.assertEqual(healed_payload["state"], "finished")
+            self.assertTrue(str(healed_payload.get("finishedAt") or "").strip())
+            self.assertEqual(healed_run_summary["state"], "finished")
 
     def test_ops_page_renders_recent_history(self) -> None:
         fake_status = {
