@@ -22,194 +22,28 @@ class HomePageCommandCenterTests(unittest.TestCase):
         self.client = app.test_client()
 
     def test_home_page_renders_daily_command_center(self) -> None:
-        payload = {
-            "selected_date": "2026-06-13",
-            "sports": [],
-            "dashboard": {
-                "summary_cards": [
-                    {"label": "Board date", "value": "2026-06-13", "meta": "Polled now"},
-                    {"label": "Live sports", "value": "2", "meta": "2 game reads surfaced"},
-                ],
-                "live_watch": [
-                    {
-                        "sport": "NBA",
-                        "matchup": "BOS at NYK",
-                        "status": "Live",
-                        "detail": "Q4 07:12",
-                        "signal": "Momentum +12.3%",
-                        "summary": "In-progress board read.",
-                        "href": "/nba/live-lens",
-                        "href_label": "Open board",
-                        "is_live": True,
-                    }
-                ],
-                "top_props": [
-                    {
-                        "sport": "NBA",
-                        "surface": "Pregame props",
-                        "market": "Points",
-                        "name": "Jayson Tatum Over 28.5",
-                        "matchup": "BOS at NYK",
-                        "pick": "Over 28.5",
-                        "signal": "Sim edge +50.5%",
-                        "detail": "Projection is clearing the number.",
-                        "href": "/nba/prop-ladders",
-                        "href_label": "Open matchup",
-                    }
-                ],
-                "top_game_bets": [
-                    {
-                        "sport": "MLB",
-                        "market": "Moneyline",
-                        "pick": "Home ML",
-                        "matchup": "NYY at BOS",
-                        "status": "Tracked",
-                        "signal": "Edge +6.8%",
-                        "detail": "Best side on the board.",
-                        "href": "/mlb/game-center",
-                        "href_label": "Open board",
-                    }
-                ],
-                "sport_summaries": [
-                    {
-                        "sport": "NBA",
-                        "sport_slug": "nba",
-                        "context": "2026-06-13",
-                        "games": 1,
-                        "props": 1,
-                        "top_game_bet": "Home ML",
-                        "top_prop": "Jayson Tatum Over 28.5",
-                        "best_signal": "Momentum +12.3%",
-                        "status": "Live",
-                        "hub_href": "/nba",
-                        "availability_reason": "NBA props are active on this slate.",
-                    }
-                ],
-            },
-            "command_center": {
-                "schema": "home_command_center_v1",
-                "headline": "Syndicate main page",
-                "lede": "One hub for the day across all sports.",
-                "shortcuts": [
-                    {"label": "Live games", "href": "#home-live-lane"},
-                    {"label": "Pregame props", "href": "#home-pregame-lane"},
-                ],
-                "summary_cards": [
-                    {"label": "Board date", "value": "2026-06-13", "meta": "Polled now"},
-                ],
-                "live_watch": [
-                    {
-                        "sport": "NBA",
-                        "matchup": "BOS at NYK",
-                        "status": "Live",
-                        "detail": "Q4 07:12",
-                        "signal": "Momentum +12.3%",
-                        "summary": "In-progress board read.",
-                        "href": "/nba/live-lens",
-                        "href_label": "Open board",
-                        "is_live": True,
-                    }
-                ],
-                "top_props": [
-                    {
-                        "sport": "NBA",
-                        "surface": "Pregame props",
-                        "market": "Points",
-                        "name": "Jayson Tatum Over 28.5",
-                        "matchup": "BOS at NYK",
-                        "pick": "Over 28.5",
-                        "signal": "Sim edge +50.5%",
-                        "detail": "Projection is clearing the number.",
-                        "href": "/nba/prop-ladders",
-                        "href_label": "Open matchup",
-                    }
-                ],
-                "top_game_bets": [
-                    {
-                        "sport": "MLB",
-                        "market": "Moneyline",
-                        "pick": "Home ML",
-                        "matchup": "NYY at BOS",
-                        "status": "Tracked",
-                        "signal": "Edge +6.8%",
-                        "detail": "Best side on the board.",
-                        "href": "/mlb/game-center",
-                        "href_label": "Open board",
-                    }
-                ],
-                "sport_summaries": [
-                    {
-                        "sport": "NBA",
-                        "sport_slug": "nba",
-                        "context": "2026-06-13",
-                        "games": 1,
-                        "props": 1,
-                        "top_game_bet": "Home ML",
-                        "top_prop": "Jayson Tatum Over 28.5",
-                        "best_signal": "Momentum +12.3%",
-                        "status": "Live",
-                        "hub_href": "/nba",
-                        "availability_reason": "NBA props are active on this slate.",
-                    }
-                ],
-            },
-        }
+        light_sports = [{"slug": "nba", "name": "NBA", "home_anchor": "nba-home", "data_health": "partial", "freshness_label": "Stored slate", "games_count": "—", "props_count": "—", "overview_stats": [], "home_rails": {"compact": {"title": "", "items": [], "links": [], "empty_summary": ""}, "pregame": {"title": "", "items": [], "links": [], "empty_summary": ""}, "live": {"title": "", "items": [], "links": [], "empty_summary": "", "links": []}}, "game_bar": {"opportunity_tags": []}, "props_bar": {"opportunity_tags": []}, "feature_links": []}]
 
-        with patch("syndicate.blueprints.home._home_payload", return_value=payload):
+        with patch("syndicate.blueprints.home._build_light_home_sports", return_value=light_sports):
             response = self.client.get("/")
 
         self.assertEqual(response.status_code, 200)
         html = response.get_data(as_text=True)
-        self.assertIn("Daily command center", html)
-        self.assertIn("Syndicate main page", html)
-        self.assertIn("Selected slate: 2026-06-13", html)
-        self.assertIn("Contract: home_command_center_v1", html)
-        self.assertIn("Live game updates", html)
-        self.assertIn("Pregame props", html)
-        self.assertIn("Game bets", html)
-        self.assertIn("Open sport hub", html)
-        self.assertIn("NBA props are active on this slate.", html)
+        self.assertNotIn("Daily command center", html)
+        self.assertIn("syndicate-home-shell", html)
 
     def test_home_page_defaults_to_current_local_date_and_active_payload(self) -> None:
-        payload = {
-            "selected_date": "2026-06-21",
-            "sports": [
-                {
-                    "slug": "nba",
-                    "name": "NBA",
-                    "home_anchor": "home-sport-nba",
-                    "data_health": "healthy",
-                    "freshness_label": "Live · Polled now",
-                    "games_count": 1,
-                    "props_count": 2,
-                    "overview_stats": [],
-                    "home_rails": {
-                        "compact": {"title": "Compact game rail", "items": [], "links": [], "empty_summary": ""},
-                        "pregame": {"title": "Pregame props", "items": [], "links": [], "empty_summary": ""},
-                        "live": {"title": "Top Live Props", "items": [], "links": [], "empty_summary": ""},
-                    },
-                    "game_bar": {"opportunity_tags": []},
-                    "props_bar": {"opportunity_tags": []},
-                }
-            ],
-            "dashboard": {"summary_cards": [], "live_watch": [], "top_props": [], "top_game_bets": [], "sport_summaries": []},
-            "command_center": {"schema": "home_command_center_v1"},
-            "html": "<section />",
-            "polled_at": 123.0,
-        }
-
         with patch("syndicate.blueprints.home.central_today_iso", return_value="2026-06-21"):
-            with patch("syndicate.blueprints.home._home_payload", return_value=payload) as mocked_payload:
+            with patch("syndicate.blueprints.home._build_light_home_sports", return_value=[] ) as mocked_light:
                 with patch("syndicate.blueprints.home.render_template", return_value="ok") as mocked_render:
                     response = self.client.get("/")
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.get_data(as_text=True), "ok")
-        mocked_payload.assert_called_once_with(selected_date="2026-06-21", force_refresh=True)
+        mocked_light.assert_called_once_with("2026-06-21")
         self.assertEqual(mocked_render.call_args.kwargs["selected_home_date"], "2026-06-21")
-        self.assertEqual(len(mocked_render.call_args.kwargs["sports"]), 1)
-        self.assertEqual(mocked_render.call_args.kwargs["sports"][0]["name"], "NBA")
-        self.assertTrue(mocked_render.call_args.kwargs["show_command_center"])
+        self.assertEqual(mocked_render.call_args.kwargs["sports"], [])
+        self.assertFalse(mocked_render.call_args.kwargs["show_command_center"])
 
     def test_home_payload_uses_light_shell_on_render_web_dyno(self) -> None:
         from syndicate.blueprints import home as home_module

@@ -4621,21 +4621,20 @@ def _build_light_home_sports(selected_date: str | None = None) -> list[dict[str,
 @home_bp.get("/")
 def home():
     selected_date = _home_selected_date(request.args.get("date"))
-    refresh_requested = str(request.args.get("refresh") or "").strip().lower() in {"1", "true", "yes", "on"}
-    payload = _home_payload(selected_date=selected_date, force_refresh=refresh_requested or selected_date == central_today_iso())
+    sports = _build_light_home_sports(selected_date)
     return render_template(
         "home.html",
-        selected_home_date=payload.get("selected_date"),
-        sports=payload.get("sports") or [],
-        dashboard=payload.get("dashboard") or {
+        selected_home_date=selected_date,
+        sports=sports,
+        dashboard={
             "summary_cards": [],
             "live_watch": [],
             "top_props": [],
             "top_game_bets": [],
             "sport_summaries": [],
         },
-        command_center=payload.get("command_center") or {},
-        show_command_center=bool(payload.get("command_center")),
+        command_center={},
+        show_command_center=False,
     )
 
 
