@@ -35,6 +35,9 @@ class RefreshWorkerTests(unittest.TestCase):
             latest_manifest_path.write_text(json.dumps({"state": "running", "externalRunner": {}}), encoding="utf-8")
             self.assertFalse(module._has_pending_external_contract(latest_manifest_path))
 
+            latest_manifest_path.write_text(json.dumps({"state": "claimed", "externalRunner": {"kind": "external_runner"}}), encoding="utf-8")
+            self.assertFalse(module._has_pending_external_contract(latest_manifest_path))
+
             latest_manifest_path.write_text(
                 json.dumps(
                     {
@@ -57,21 +60,27 @@ class RefreshWorkerTests(unittest.TestCase):
                 encoding="utf-8",
             )
 
+            fake_process = unittest.mock.MagicMock()
+            fake_process.pid = 4321
+            fake_process.poll.return_value = 0
+
             with patch.object(
                 sys,
                 "argv",
                 ["run_refresh_worker.py", "--latest-manifest", str(latest_manifest_path), "--run-once"],
             ), patch.object(
                 module.subprocess,
-                "run",
-                return_value=subprocess.CompletedProcess(args=["python"], returncode=0),
-            ) as mocked_run:
+                "Popen",
+                return_value=fake_process,
+            ) as mocked_popen:
                 exit_code = module.main()
 
             self.assertEqual(exit_code, 0)
-            mocked_run.assert_called_once()
-            called_command = mocked_run.call_args.args[0]
+            mocked_popen.assert_called_once()
+            called_command = mocked_popen.call_args.args[0]
             self.assertIn(str(repo_root / "scripts" / "run_queued_refresh_job.py"), called_command)
+            latest_payload = json.loads(latest_manifest_path.read_text(encoding="utf-8"))
+            self.assertEqual(latest_payload["state"], "claimed")
 
     def test_main_run_once_skips_runner_when_nothing_is_pending(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]
@@ -116,6 +125,10 @@ class RefreshWorkerTests(unittest.TestCase):
             )
             worker_status_path = reports_root / "refresh_status" / "latest" / "refresh_worker_status.json"
 
+            fake_process = unittest.mock.MagicMock()
+            fake_process.pid = 4321
+            fake_process.poll.return_value = 0
+
             with patch.dict(module.os.environ, {"SYNDICATE_REPORTS_ROOT": str(reports_root)}, clear=True), patch.object(
                 sys,
                 "argv",
@@ -127,19 +140,28 @@ class RefreshWorkerTests(unittest.TestCase):
                     str(worker_status_path),
                     "--run-once",
                 ],
-            ), patch.object(
-                module.subprocess,
-                "run",
-                return_value=subprocess.CompletedProcess(args=["python"], returncode=0),
-            ) as mocked_run:
+            ), patch.object(module.subprocess, "Popen", return_value=fake_process) as mocked_popen:
                 exit_code = module.main()
 
             self.assertEqual(exit_code, 0)
-            mocked_run.assert_called_once()
+            mocked_popen.assert_called_once()
             worker_status = json.loads(worker_status_path.read_text(encoding="utf-8"))
-            self.assertEqual(worker_status["state"], "finished")
+            self.assertEqual(worker_status["state"], "launched")
             self.assertTrue(worker_status["ranJob"])
-            self.assertEqual(worker_status["runExitCode"], 0)
+            self.assertEqual(worker_status["launchPid"], 4321)
+
+    def test_main_run_once_rejects_claimed_state_as_pending(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        module = self._load_module(repo_root)
+
+        with TemporaryDirectory() as tmp_dir:
+            latest_manifest_path = Path(tmp_dir) / "refresh_status_latest.json"
+            latest_manifest_path.write_text(
+                json.dumps({"state": "claimed", "externalRunner": {"kind": "external_runner"}}),
+                encoding="utf-8",
+            )
+
+            self.assertFalse(module._has_pending_external_contract(latest_manifest_path))
 
     def test_default_poll_seconds_is_thirty(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]

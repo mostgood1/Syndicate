@@ -29,6 +29,7 @@ from syndicate.blueprints.mlb import mlb_bp
 from syndicate.blueprints.sports import sports_bp
 from syndicate.blueprints.wnba import wnba_bp
 from syndicate.features.shared.live_refresh_loop import start_live_refresh_background_loop
+from syndicate.features.shared.refresh_state_store import assert_refresh_state_backend_ready
 from pipeline.intelligence_state import start_intelligence_state_background_loop
 
 
@@ -64,6 +65,7 @@ def _is_render_web_dyno() -> bool:
 
 
 def create_app() -> Flask:
+    assert_refresh_state_backend_ready(process_name="web")
     _bootstrap_render_data()
 
     app = Flask(

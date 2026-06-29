@@ -8,6 +8,8 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
+from syndicate.features.shared.refresh_state_store import assert_refresh_state_backend_ready
+
 _SUBJOB_TIMEOUT_SECONDS = 120
 
 
@@ -108,6 +110,7 @@ def run_intelligence_state_job() -> None:
 
 
 def main() -> int:
+    assert_refresh_state_backend_ready(process_name="orchestrator-worker")
     while True:
         run_refresh_job()
         time.sleep(5)

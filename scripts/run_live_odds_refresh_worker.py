@@ -15,6 +15,7 @@ from syndicate.features.shared.live_refresh_loop import _run_live_refresh_tick
 from syndicate.features.shared.live_refresh_loop import _acquire_process_lock
 from syndicate.features.shared.live_refresh_loop import _release_process_lock
 from syndicate.features.shared.live_refresh_loop import _LIVE_REFRESH_LOOP_STOP
+from syndicate.features.shared.refresh_state_store import assert_refresh_state_backend_ready
 
 
 def _handle_stop(_signum: int, _frame: object) -> None:
@@ -30,6 +31,7 @@ def _run_tick() -> None:
 
 
 def main() -> int:
+    assert_refresh_state_backend_ready(process_name="live-odds-worker")
     parser = argparse.ArgumentParser(description="Run the Syndicate live odds refresh worker loop.")
     parser.add_argument("--run-once", action="store_true")
     args = parser.parse_args()

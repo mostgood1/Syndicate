@@ -139,6 +139,9 @@ class LiveRefreshLoopTests(unittest.TestCase):
                 "RENDER": "true",
                 "RENDER_SERVICE_ID": "svc-test",
                 "SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP": "true",
+                "SYNDICATE_REFRESH_STATE_BACKEND": "keyvalue",
+                "SYNDICATE_REFRESH_STATE_URL": "redis://example",
+                "SYNDICATE_REQUIRE_HOSTED_STORAGE": "true",
             },
             clear=False,
         ), patch("syndicate.app.start_live_refresh_background_loop") as mocked_start, patch(

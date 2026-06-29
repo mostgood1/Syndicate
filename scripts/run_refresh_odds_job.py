@@ -13,6 +13,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from syndicate.features.shared.refresh_state_store import read_json_file
+from syndicate.features.shared.refresh_state_store import assert_refresh_state_backend_ready
 from syndicate.features.shared.refresh_state_store import write_text_file
 from syndicate.features.shared.refresh_state_store import write_json_file
 
@@ -89,6 +90,7 @@ def _safe_write_json(path: Path, payload: dict[str, Any]) -> None:
 
 
 def main() -> int:
+    assert_refresh_state_backend_ready(process_name="refresh-job")
     parser = argparse.ArgumentParser(description="Run the shared odds refresh command and update Syndicate status manifests on completion.")
     parser.add_argument("--manifest-path", required=True)
     parser.add_argument("--latest-path", required=True)

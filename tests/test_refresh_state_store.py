@@ -60,6 +60,38 @@ class RefreshStateStoreTests(unittest.TestCase):
                 with self.assertRaises(RuntimeError):
                     preferred_artifact_roots(probe_file, env_var="SYNDICATE_ARTIFACT_ROOT_NBA", local_dir_name="nba_source")
 
+    def test_hosted_refresh_state_backend_rejects_filesystem_and_logs_backend(self) -> None:
+        with patch.dict(
+            os.environ,
+            {
+                "RENDER": "true",
+                "SYNDICATE_REFRESH_STATE_BACKEND": "filesystem",
+                "SYNDICATE_REQUIRE_HOSTED_STORAGE": "true",
+            },
+            clear=False,
+        ), patch("builtins.print") as mocked_print:
+            with self.assertRaises(RuntimeError):
+                refresh_state_store.assert_refresh_state_backend_ready(process_name="web")
+
+        printed_text = "\n".join(str(call.args[0]) for call in mocked_print.call_args_list if call.args)
+        self.assertIn("REFRESH_STATE_BACKEND = filesystem", printed_text)
+
+    def test_hosted_refresh_state_backend_accepts_keyvalue_and_logs_backend(self) -> None:
+        with patch.dict(
+            os.environ,
+            {
+                "RENDER": "true",
+                "SYNDICATE_REFRESH_STATE_BACKEND": "keyvalue",
+                "SYNDICATE_REQUIRE_HOSTED_STORAGE": "true",
+            },
+            clear=False,
+        ), patch("builtins.print") as mocked_print:
+            backend_name = refresh_state_store.assert_refresh_state_backend_ready(process_name="web")
+
+        self.assertEqual(backend_name, "keyvalue")
+        printed_text = "\n".join(str(call.args[0]) for call in mocked_print.call_args_list if call.args)
+        self.assertIn("REFRESH_STATE_BACKEND = keyvalue", printed_text)
+
     def test_render_hosted_reports_root_falls_back_to_repo_reports(self) -> None:
         with patch.dict(
             os.environ,

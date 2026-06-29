@@ -14,6 +14,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from syndicate.features.shared.refresh_state_store import read_json_file
+from syndicate.features.shared.refresh_state_store import assert_refresh_state_backend_ready
 from syndicate.features.shared.refresh_state_store import reports_root
 from syndicate.features.shared.refresh_state_store import write_json_file
 
@@ -44,7 +45,7 @@ def _claim_external_runner_contract(*, latest_manifest_path: Path, expected_run_
         raise ValueError(f"Latest refresh manifest not found or invalid: {latest_manifest_path}")
 
     manifest_state = str(latest_manifest.get("state") or "").strip().lower()
-    if manifest_state != "pending_external" and not _is_stale_running_external_contract(latest_manifest):
+    if manifest_state not in {"pending_external", "claimed"} and not _is_stale_running_external_contract(latest_manifest):
         raise ValueError(f"Latest refresh manifest is not queued for an external runner: {manifest_state or 'missing state'}")
 
     contract = latest_manifest.get("externalRunner")
@@ -135,6 +136,7 @@ def _build_wrapper_command(contract: dict[str, Any]) -> list[str]:
 
 
 def main() -> int:
+    assert_refresh_state_backend_ready(process_name="queued-refresh-job")
     parser = argparse.ArgumentParser(description="Claim the latest queued Syndicate refresh contract and run it through the refresh job wrapper.")
     parser.add_argument("--latest-manifest", default=str(_default_latest_manifest_path()))
     parser.add_argument("--run-stamp", default="")

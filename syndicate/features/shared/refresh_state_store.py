@@ -27,6 +27,11 @@ REPO_ROOT = repo_root_from(__file__)
 REPORTS_ROOT = REPO_ROOT / "reports"
 REFRESH_STATE_PATH = REPORTS_ROOT / "refresh_state.json"
 
+
+def _refresh_state_backend_name() -> str:
+    value = str(os.environ.get("SYNDICATE_REFRESH_STATE_BACKEND") or "filesystem").strip().lower()
+    return value or "filesystem"
+
 def _strict_hosted_storage_enabled() -> bool:
     raw_value = str(os.environ.get("SYNDICATE_REQUIRE_HOSTED_STORAGE") or "").strip().lower()
     if raw_value in {"1", "true", "yes", "on"}:
@@ -35,7 +40,9 @@ def _strict_hosted_storage_enabled() -> bool:
 
 
 def _state_backend_kind() -> str:
-    value = str(os.environ.get("SYNDICATE_REFRESH_STATE_BACKEND") or "filesystem").strip().lower()
+    value = _refresh_state_backend_name()
+    if value in {"filesystem", "local_file"}:
+        return "filesystem"
     if value in {"redis", "keyvalue", "valkey"}:
         return "keyvalue"
     return "filesystem"
@@ -72,6 +79,16 @@ def _state_key_for_path(path: Path) -> str:
 
 def _history_index_key() -> str:
     return f"{_state_namespace()}:refresh-state-history"
+
+
+def assert_refresh_state_backend_ready(*, process_name: str | None = None) -> str:
+    backend_name = _refresh_state_backend_name()
+    print(f"REFRESH_STATE_BACKEND = {backend_name}")
+    hosted = _strict_hosted_storage_enabled() or bool(str(os.environ.get("RENDER") or "").strip().lower() in {"1", "true", "yes", "on"})
+    if hosted and backend_name not in {"redis", "keyvalue", "valkey"}:
+        owner = f" for {process_name}" if process_name else ""
+        raise RuntimeError(f"Local state backend not allowed in multi-service deployment{owner}: {backend_name}")
+    return backend_name
 
 
 def _refresh_status_history_relative_path(path: Path) -> str | None:
