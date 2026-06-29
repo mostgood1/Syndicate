@@ -201,6 +201,31 @@ class BasketballPropsPredictionsTests(unittest.TestCase):
             self.assertEqual(sorted(home_rows["player_name"].tolist()), ["Chet Holmgren", "Shai Gilgeous-Alexander"])
             self.assertEqual(sorted(away_rows["player_name"].tolist()), ["Victor Wembanyama"])
 
+    def test_team_players_from_props_local_normalizes_team_opponent_values(self) -> None:
+        import pandas as pd
+
+        props_df = pd.DataFrame(
+            [
+                {"team": "Oklahoma City Thunder", "opponent": "San Antonio Spurs", "player_name": "Shai Gilgeous-Alexander"},
+                {"team": "Oklahoma City Thunder", "opponent": "San Antonio Spurs", "player_name": "Chet Holmgren"},
+                {"team": "San Antonio Spurs", "opponent": "Oklahoma City Thunder", "player_name": "Victor Wembanyama"},
+            ]
+        )
+
+        home_rows = smart_sim_module._team_players_from_props_local(
+            props_df=props_df,
+            team_tri="OKC",
+            opp_tri="SAS",
+        )
+        away_rows = smart_sim_module._team_players_from_props_local(
+            props_df=props_df,
+            team_tri="SAS",
+            opp_tri="OKC",
+        )
+
+        self.assertEqual(sorted(home_rows["player_name"].tolist()), ["Chet Holmgren", "Shai Gilgeous-Alexander"])
+        self.assertEqual(sorted(away_rows["player_name"].tolist()), ["Victor Wembanyama"])
+
     def test_export_props_predictions_local_invokes_local_smart_sim_helper(self) -> None:
         with TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
