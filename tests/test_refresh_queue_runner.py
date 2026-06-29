@@ -204,6 +204,50 @@ class RefreshQueueRunnerTests(unittest.TestCase):
             self.assertIn(str(repo_root / "scripts" / "run_refresh_odds_job.py"), called_command)
             self.assertIn("--manifest-path", called_command)
 
+    def test_main_writes_failure_artifacts_when_wrapper_launch_fails(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        module = self._load_module(repo_root)
+
+        with TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            latest_manifest_path = root / "reports" / "refresh_status" / "latest" / "refresh_status_latest.json"
+            manifest_path = root / "reports" / "refresh_status" / "2026-05-22" / "20260522_120000" / "refresh_status_manifest.json"
+            run_summary_path = root / "reports" / "migration_runs" / "2026-05-22" / "odds_refresh_20260522_120000" / "refresh_and_gate_run.json"
+            latest_manifest_path.parent.mkdir(parents=True, exist_ok=True)
+            manifest_path.parent.mkdir(parents=True, exist_ok=True)
+            run_summary_path.parent.mkdir(parents=True, exist_ok=True)
+
+            contract = {
+                "kind": "external_runner",
+                "queue_state": "queued",
+                "runStamp": "20260522_120000",
+                "manifestPath": str(manifest_path),
+                "latestPath": str(latest_manifest_path),
+                "runSummaryPath": str(run_summary_path),
+                "jobStatusPath": str(run_summary_path.parent / "refresh_job_status.json"),
+                "stdoutPath": str(run_summary_path.parent / "odds_refresh.json"),
+                "stderrPath": str(run_summary_path.parent / "odds_refresh.stderr.txt"),
+                "command": [sys.executable, "-c", "print('ok')"],
+            }
+            latest_manifest_path.write_text(json.dumps({"state": "pending_external", "externalRunner": contract}), encoding="utf-8")
+            manifest_path.write_text(json.dumps({"state": "pending_external"}), encoding="utf-8")
+            run_summary_path.write_text(json.dumps({"state": "pending_external"}), encoding="utf-8")
+
+            with patch.object(sys, "argv", ["run_queued_refresh_job.py", "--latest-manifest", str(latest_manifest_path)]), patch.object(
+                module.subprocess,
+                "run",
+                side_effect=OSError("wrapper spawn failed"),
+            ):
+                exit_code = module.main()
+
+            self.assertEqual(exit_code, 1)
+            stderr_payload = Path(contract["stderrPath"]).read_text(encoding="utf-8")
+            stdout_payload = json.loads(Path(contract["stdoutPath"]).read_text(encoding="utf-8"))
+            job_status_payload = json.loads(Path(contract["jobStatusPath"]).read_text(encoding="utf-8"))
+            self.assertIn("wrapper spawn failed", stderr_payload)
+            self.assertFalse(stdout_payload["ok"])
+            self.assertEqual(job_status_payload["state"], "failed")
+
 
 if __name__ == "__main__":
     unittest.main()

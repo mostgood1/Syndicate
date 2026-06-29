@@ -105,6 +105,7 @@ def _safe_write_json(path: Path, payload: dict[str, Any]) -> None:
 
 
 def main() -> int:
+    print("[refresh_job] script entry reached", flush=True)
     store = _refresh_state_store()
     assert_refresh_state_backend_ready = store["assert_refresh_state_backend_ready"]
     read_json_file = store["read_json_file"]

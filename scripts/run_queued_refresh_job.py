@@ -5,6 +5,7 @@ import json
 import os
 import subprocess
 import sys
+import traceback
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -17,6 +18,7 @@ from syndicate.features.shared.refresh_state_store import read_json_file
 from syndicate.features.shared.refresh_state_store import assert_refresh_state_backend_ready
 from syndicate.features.shared.refresh_state_store import reports_root
 from syndicate.features.shared.refresh_state_store import write_json_file
+from syndicate.features.shared.refresh_state_store import write_text_file
 
 
 def _utc_now() -> str:
@@ -135,6 +137,49 @@ def _build_wrapper_command(contract: dict[str, Any]) -> list[str]:
     ]
 
 
+def _mark_wrapper_failure(*, contract: dict[str, Any], error_message: str, trace_text: str) -> None:
+    finished_at = _utc_now()
+    manifest_path = Path(str(contract.get("manifestPath") or "").strip())
+    latest_path = Path(str(contract.get("latestPath") or "").strip())
+    run_summary_path = Path(str(contract.get("runSummaryPath") or "").strip())
+    job_status_path = Path(str(contract.get("jobStatusPath") or "").strip())
+    stderr_path = Path(str(contract.get("stderrPath") or "").strip())
+    stdout_path = Path(str(contract.get("stdoutPath") or "").strip())
+    failure_payload = {
+        "ok": False,
+        "returnCode": 1,
+        "startedAt": contract.get("runnerClaimedAt") or finished_at,
+        "finishedAt": finished_at,
+        "command": contract.get("command") or [],
+        "error": error_message,
+        "traceback": trace_text,
+    }
+    try:
+        write_text_file(stderr_path, f"{error_message}\n\n{trace_text}")
+    except Exception:
+        pass
+    try:
+        write_json_file(stdout_path, failure_payload)
+    except Exception:
+        pass
+    try:
+        write_json_file(job_status_path, {"state": "failed", "exitCode": 1, "error": error_message, "finishedAt": finished_at})
+    except Exception:
+        pass
+    try:
+        if manifest_path.exists() or latest_path.exists() or run_summary_path.exists():
+            for path in (manifest_path, latest_path, run_summary_path):
+                if path.exists():
+                    payload = read_json_file(path) or {}
+                    if isinstance(payload, dict):
+                        payload["state"] = "failed"
+                        payload["exitCode"] = 1
+                        payload["finishedAt"] = finished_at
+                        write_json_file(path, payload)
+    except Exception:
+        pass
+
+
 def main() -> int:
     assert_refresh_state_backend_ready(process_name="queued-refresh-job")
     parser = argparse.ArgumentParser(description="Claim the latest queued Syndicate refresh contract and run it through the refresh job wrapper.")
@@ -154,8 +199,18 @@ def main() -> int:
         print(json.dumps({"ok": True, "latest_manifest": str(latest_manifest_path), "wrapper_command": wrapper_command}, indent=2))
         return 0
 
-    result = subprocess.run(wrapper_command)
-    return int(result.returncode)
+    try:
+        print(f"[queue_runner] launching refresh job: {json.dumps(wrapper_command)}", flush=True)
+        result = subprocess.run(wrapper_command)
+        print(f"[queue_runner] return code: {result.returncode}", flush=True)
+        return int(result.returncode)
+    except Exception as exc:
+        trace_text = traceback.format_exc()
+        error_message = f"{type(exc).__name__}: {exc}"
+        print(f"[queue_runner_fatal] {error_message}", file=sys.stderr, flush=True)
+        print(trace_text, file=sys.stderr, flush=True)
+        _mark_wrapper_failure(contract=contract, error_message=error_message, trace_text=trace_text)
+        return 1
 
 
 if __name__ == "__main__":
