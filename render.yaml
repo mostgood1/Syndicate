@@ -261,6 +261,124 @@ services:
         value: "30"
 
   - type: worker
+    name: orchestrator-worker
+    env: python
+    plan: standard
+    autoDeploy: true
+    buildCommand: pip install -r requirements.txt
+    startCommand: python scripts/run_orchestrator_worker.py
+    disk:
+      name: syndicate-data-orchestrator-worker
+      mountPath: /opt/render/project/data
+      sizeGB: 50
+    envVars:
+      - key: TZ
+        value: America/Chicago
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: ADMIN_TOKEN
+        generateValue: true
+      - key: ODDS_API_KEY
+        value: 77ae1c35140c82da1675af85dde36a44
+      - key: SYNDICATE_REFRESH_LAUNCH_MODE
+        value: manifest_only
+      - key: SYNDICATE_REQUIRE_HOSTED_STORAGE
+        value: "true"
+      - key: SYNDICATE_REFRESH_STATE_BACKEND
+        value: keyvalue
+      - key: SYNDICATE_REFRESH_STATE_URL
+        fromService:
+          name: syndicate-refresh-state
+          type: keyvalue
+          property: connectionString
+      - key: SYNDICATE_BOOTSTRAP_ON_START
+        value: "0"
+      - key: SYNDICATE_DATA_ROOT
+        value: ./data
+      - key: SYNDICATE_MLB_SOURCE_ROOT
+        value: ./data/mlb_source
+      - key: SYNDICATE_NBA_SOURCE_ROOT
+        value: ./data/nba_source
+      - key: SYNDICATE_NBA_ARTIFACT_ROOT
+        value: ./data/nba_source/source_artifacts
+      - key: SYNDICATE_NHL_SOURCE_ROOT
+        value: ./data/nhl_source
+      - key: SYNDICATE_NFL_SOURCE_ROOT
+        value: ./data/nfl_source
+      - key: SYNDICATE_NCAAF_SOURCE_ROOT
+        value: ./data/ncaaf_source
+      - key: SYNDICATE_NCAAB_SOURCE_ROOT
+        value: ./data/ncaab_source
+      - key: SYNDICATE_WNBA_SOURCE_ROOT
+        value: ./data/wnba_source
+      - key: SYNDICATE_REPORTS_ROOT
+        value: ./reports
+      - key: SYNDICATE_NBA_SOURCE_APP_FALLBACK
+        value: "false"
+      - key: SYNDICATE_WNBA_SOURCE_APP_FALLBACK
+        value: "false"
+      - key: SYNDICATE_NHL_SOURCE_CLI_GENERATION
+        value: "false"
+      - key: WEB_CONCURRENCY
+        value: "1"
+      - key: GUNICORN_THREADS
+        value: "1"
+      - key: GUNICORN_TIMEOUT
+        value: "60"
+      - key: GUNICORN_GRACEFUL_TIMEOUT
+        value: "30"
+      - key: GUNICORN_KEEPALIVE
+        value: "5"
+      - key: SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP
+        value: "false"
+      - key: SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP
+        value: "false"
+      - key: SYNDICATE_BOOTSTRAP_WNBA_TODAY
+        value: "0"
+      - key: SYNDICATE_LIVE_ODDS_REFRESH_INTERVAL_SECONDS
+        value: "30"
+      - key: SYNDICATE_INTELLIGENCE_REFRESH_INTERVAL_SECONDS
+        value: "60"
+      - key: SYNDICATE_LIVE_ODDS_REFRESH_LAUNCH_MODE
+        value: manifest_only
+      - key: SYNDICATE_LIVE_ODDS_REFRESH_PHASE
+        value: "live"
+      - key: SYNDICATE_LIVE_ODDS_REFRESH_EXECUTION_MODE
+        value: "source"
+      - key: SYNDICATE_LIVE_ODDS_REFRESH_MODE
+        value: "full"
+      - key: SYNDICATE_LIVE_ODDS_REFRESH_REGIONS
+        value: us
+      - key: SYNDICATE_LIVE_ODDS_REFRESH_SKIP_MIRROR
+        value: "true"
+      - key: MLB_BETTING_DATA_ROOT
+        value: ./data/mlb_source/source_artifacts/data
+      - key: MLB_LIVE_LENS_DIR
+        value: ./data/mlb_source/source_artifacts/data/live_lens
+      - key: NBA_BETTING_DATA_ROOT
+        value: ./data/nba_source/source_artifacts/data
+      - key: NBA_LIVE_LENS_DIR
+        value: ./data/nba_source/source_artifacts/data/live_lens
+      - key: NHL_DATA_DIR
+        value: ./data/nhl_source/source_artifacts/data
+      - key: NHL_LIVE_LENS_DIR
+        value: ./data/nhl_source/source_artifacts/data/live_lens
+      - key: WNBA_BETTING_DATA_ROOT
+        value: ./data/wnba_source/source_artifacts/data
+      - key: WNBA_LIVE_LENS_DIR
+        value: ./data/wnba_source/source_artifacts/data/live_lens
+      - key: MLB_ENABLE_LIVE_LENS_LOOP
+        value: "false"
+      - key: MLB_ENABLE_LIVE_LENS_BACKGROUND_REPORTS
+        value: "false"
+      - key: MLB_LIVE_LENS_LOOP_INTERVAL_SECONDS
+        value: "30"
+      - key: MLB_LIVE_LENS_REPORT_REFRESH_INTERVAL_SECONDS
+        value: "30"
+      - key: MLB_LIVE_ODDSAPI_REFRESH_INTERVAL_SECONDS
+        value: "30"
+
+  - type: worker
     name: live-odds-worker
     env: python
     plan: standard
