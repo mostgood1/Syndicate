@@ -83,10 +83,11 @@ Render setup:
 1. In Render, choose New + and create a Blueprint instance from the GitHub repo `mostgood1/Syndicate`.
 2. Let Render read [render.yaml](c:/Users/mostg/OneDrive/Coding/Syndicate/render.yaml), which now defines three resources:
   - `syndicate`: the public Flask web service that reads the repo-local `data/` and `reports/` trees.
-  - `orchestrator-worker`: the background worker that owns the persistent disk and polls for queued refresh jobs.
+  - `refresh-worker`: the background worker that polls for queued refresh jobs and owns the refresh state contract.
+  - `live-odds-worker`: the live odds refresh worker used for the separate odds loop.
   - `syndicate-refresh-state`: the shared Render Key Value instance used for refresh state and logs.
 3. Set `ADMIN_TOKEN` in Render if you want the protected ops/status endpoints enabled for the deployed instance.
-4. Deploy the Blueprint and verify that all three resources become healthy.
+4. Deploy the Blueprint and verify that the web service, refresh worker, live odds worker, and keyvalue service become healthy.
 5. Verify the root page plus any needed public module routes from the web service.
 
 Hosted state overrides:
