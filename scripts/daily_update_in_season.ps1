@@ -280,14 +280,10 @@ if ($SkipRefreshGate) { $dailyArgs += '-SkipRefreshGate' }
 if ($SkipGitPush) { $dailyArgs += '-SkipGitPush' }
 if ($DryRun) { $dailyArgs += '-WhatIf' }
 if ($ForceRebuildToday) { $dailyArgs += '-ForceRebuildToday' }
-
-if (-not $activeSports.MLB) { $dailyArgs += '-SkipMLB' }
-if (-not $activeSports.NBA) { $dailyArgs += '-SkipNBA' }
-if (-not $activeSports.NHL) { $dailyArgs += '-SkipNHL' }
-if (-not $activeSports.WNBA) { $dailyArgs += '-SkipWNBA' }
-if (-not $activeSports.NFL) { $dailyArgs += '-SkipNFL' }
-if (-not $activeSports.NCAAF) { $dailyArgs += '-SkipNCAAF' }
-if (-not $activeSports.NCAAB) { $dailyArgs += '-SkipNCAAB' }
+if ($activeList.Count -gt 0) {
+    $dailyArgs += '-ActiveSports'
+    $dailyArgs += @($activeList)
+}
 
 Write-Host '==> In-season daily update' -ForegroundColor Cyan
 Write-Host ("    date: {0}" -f $Date) -ForegroundColor DarkGray

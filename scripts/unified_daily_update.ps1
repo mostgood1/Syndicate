@@ -13,6 +13,7 @@ param(
     [string]$Date,
     [string]$BaseUrl,
     [int]$EventSimForceWindowMinutes = 30,
+    [string[]]$ActiveSports,
     [switch]$SkipGitPush,
     [switch]$ForceRebuildToday,
     [switch]$DryRun
@@ -80,6 +81,51 @@ $runtimePolicy = [ordered]@{
 $runtimePolicy.MLB.workers = Get-ReasonableWorkerCount -Requested $runtimePolicy.MLB.workers
 $runtimePolicy.NBA.smartsimWorkers = Get-ReasonableWorkerCount -Requested $runtimePolicy.NBA.smartsimWorkers
 $runtimePolicy.WNBA.smartsimWorkers = Get-ReasonableWorkerCount -Requested $runtimePolicy.WNBA.smartsimWorkers
+
+$normalizedActiveSports = @(
+    $ActiveSports |
+        ForEach-Object { [string]$_ } |
+        Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+)
+$activeSportsLookup = @{}
+foreach ($sport in $normalizedActiveSports) {
+    $activeSportsLookup[$sport.ToUpperInvariant()] = $true
+}
+$useActiveSportsGate = $normalizedActiveSports.Count -gt 0
+
+if ($useActiveSportsGate) {
+    $SkipMLB = -not $activeSportsLookup.ContainsKey('MLB')
+    $SkipNBA = -not $activeSportsLookup.ContainsKey('NBA')
+    $SkipNHL = -not $activeSportsLookup.ContainsKey('NHL')
+    $SkipWNBA = -not $activeSportsLookup.ContainsKey('WNBA')
+    $SkipNFL = -not $activeSportsLookup.ContainsKey('NFL')
+    $SkipNCAAF = -not $activeSportsLookup.ContainsKey('NCAAF')
+    $SkipNCAAB = -not $activeSportsLookup.ContainsKey('NCAAB')
+}
+
+function Test-SportEnabled {
+    param([string]$Sport)
+
+    if ([string]::IsNullOrWhiteSpace($Sport)) {
+        return $false
+    }
+
+    $sportKey = $Sport.ToUpperInvariant()
+    if ($useActiveSportsGate) {
+        return $activeSportsLookup.ContainsKey($sportKey)
+    }
+
+    switch ($sportKey) {
+        'MLB' { return -not [bool]$SkipMLB }
+        'NBA' { return -not [bool]$SkipNBA }
+        'NHL' { return -not [bool]$SkipNHL }
+        'WNBA' { return -not [bool]$SkipWNBA }
+        'NFL' { return -not [bool]$SkipNFL }
+        'NCAAF' { return -not [bool]$SkipNCAAF }
+        'NCAAB' { return -not [bool]$SkipNCAAB }
+        default { return $false }
+    }
+}
 
 $eventSimPolicyConfig = [ordered]@{
     sport = [ordered]@{
@@ -3786,7 +3832,7 @@ $resolveForcedPublishArtifactPaths = {
 $sharedOddsApiKey = Get-ProcessEnvValue -Names @('ODDS_API_KEY', 'ODDSAPI_KEY', 'THEODDS_API_KEY', 'THEODDSAPI_KEY', 'NCAAB_THEODDS_API_KEY')
 $ncaabOddsApiKey = Get-ProcessEnvValue -Names @('NCAAB_THEODDS_API_KEY', 'THEODDSAPI_KEY', 'THEODDS_API_KEY')
 
-if (-not $SkipMLB) {
+if (Test-SportEnabled 'MLB') {
     $mlbVendoredRoot = Resolve-VendoredRepoPath -RelativePath 'vendor\mlb_bettingv2'
     $mlbVendoredDailyUpdate = if ($mlbVendoredRoot) { Join-Path $mlbVendoredRoot 'tools\daily_update.py' } else { $null }
     if (-not ($mlbVendoredDailyUpdate -and (Test-Path $mlbVendoredDailyUpdate))) {
@@ -3840,7 +3886,7 @@ if (-not $SkipMLB) {
         RuntimePolicy = $runtimePolicy.MLB
     }
 }
-if (-not $SkipNBA) {
+if (Test-SportEnabled 'NBA') {
     $nbaVendoredRoot = Resolve-VendoredRepoPath -RelativePath 'vendor\nba_betting_repo'
     $nbaVendoredApp = if ($nbaVendoredRoot) { Join-Path $nbaVendoredRoot 'app.py' } else { $null }
     if (-not ($nbaVendoredApp -and (Test-Path $nbaVendoredApp))) {
@@ -3900,7 +3946,7 @@ if (-not $SkipNBA) {
     }
     }
 }
-if (-not $SkipWNBA) {
+if (Test-SportEnabled 'WNBA') {
     $wnbaVendoredRoot = Resolve-VendoredRepoPath -RelativePath 'vendor\wnba_betting_repo'
     $wnbaVendoredApp = if ($wnbaVendoredRoot) { Join-Path $wnbaVendoredRoot 'app.py' } else { $null }
     if (-not ($wnbaVendoredApp -and (Test-Path $wnbaVendoredApp))) {
@@ -3954,7 +4000,7 @@ if (-not $SkipWNBA) {
         RuntimePolicy = $runtimePolicy.WNBA
     }
 }
-if (-not $SkipNHL) {
+if (Test-SportEnabled 'NHL') {
     $nhlVendoredRoot = Resolve-VendoredRepoPath -RelativePath 'vendor\nhl_betting_repo'
     $nhlVendoredCli = if ($nhlVendoredRoot) { Join-Path $nhlVendoredRoot 'nhl_betting\cli.py' } else { $null }
     if ($nhlVendoredCli -and (Test-Path $nhlVendoredCli)) {
@@ -4003,7 +4049,7 @@ if (-not $SkipNHL) {
         }
     }
 }
-if (-not $SkipNFL) {
+if (Test-SportEnabled 'NFL') {
     $nflEnvOverrides = @{}
     if (-not [string]::IsNullOrWhiteSpace($sharedOddsApiKey)) {
         $nflEnvOverrides.ODDS_API_KEY = $sharedOddsApiKey
@@ -4019,7 +4065,7 @@ if (-not $SkipNFL) {
         EnvironmentOverrides = $nflEnvOverrides
     }
 }
-if (-not $SkipNCAAF) {
+if (Test-SportEnabled 'NCAAF') {
     $ncaafEnvOverrides = @{}
     if (-not [string]::IsNullOrWhiteSpace($sharedOddsApiKey)) {
         $ncaafEnvOverrides.ODDS_API_KEY = $sharedOddsApiKey
@@ -4045,7 +4091,7 @@ if (-not $SkipNCAAF) {
         }
     }
 }
-if (-not $SkipNCAAB) {
+if (Test-SportEnabled 'NCAAB') {
     $ncaabRawOutputsRoot = Join-Path $repoRoot 'data\ncaab_source\raw_outputs'
     $ncaabApiKey = $ncaabOddsApiKey
     if (-not [string]::IsNullOrWhiteSpace($ncaabApiKey)) {

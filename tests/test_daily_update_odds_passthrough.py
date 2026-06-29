@@ -26,6 +26,9 @@ class DailyUpdateOddsPassthroughTests(unittest.TestCase):
         self.assertIn("if ($OddsSports) { $dailyArgs += @('-OddsSports', $OddsSports) }", content)
         self.assertIn("if ($OddsRegions) { $dailyArgs += @('-OddsRegions', $OddsRegions) }", content)
         self.assertIn("if ($PSBoundParameters.ContainsKey('EventSimForceWindowMinutes')) { $dailyArgs += @('-EventSimForceWindowMinutes', $EventSimForceWindowMinutes) }", content)
+        self.assertIn("if ($activeList.Count -gt 0) {", content)
+        self.assertIn("$dailyArgs += '-ActiveSports'", content)
+        self.assertIn("$dailyArgs += @($activeList)", content)
 
     def test_unified_daily_update_passes_refresh_odds_to_refresh_gate(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]
@@ -36,6 +39,18 @@ class DailyUpdateOddsPassthroughTests(unittest.TestCase):
         self.assertIn("if ($OddsPhase) { $refreshArgs += @('-OddsPhase', $OddsPhase) }", content)
         self.assertIn("if ($OddsSports) { $refreshArgs += @('-OddsSports', $OddsSports) }", content)
         self.assertIn("if ($OddsRegions) { $refreshArgs += @('-OddsRegions', $OddsRegions) }", content)
+        self.assertIn("[string[]]$ActiveSports,", content)
+        self.assertIn("function Test-SportEnabled", content)
+        self.assertIn("if (Test-SportEnabled 'WNBA') {", content)
+
+    def test_daily_update_wrapper_forwards_active_sports_to_unified_runner(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        script_path = repo_root / "scripts" / "daily_update.ps1"
+        content = script_path.read_text(encoding="utf-8")
+
+        self.assertIn("[string[]]$ActiveSports,", content)
+        self.assertIn("if ($ActiveSports -and @($ActiveSports).Count -gt 0) {", content)
+        self.assertIn("$unifiedArgs += '-ActiveSports'", content)
 
     def test_refresh_and_gate_points_all_supported_sports_at_source_artifacts(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]

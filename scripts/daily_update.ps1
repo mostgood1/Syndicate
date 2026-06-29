@@ -18,6 +18,7 @@ param(
     [string]$OddsPhase = 'all',
     [string]$OddsSports = 'all',
     [string]$OddsRegions = 'us',
+    [string[]]$ActiveSports,
     [switch]$SkipTests,
     [switch]$SkipSmoke,
     [switch]$SkipSourceUpdates,
@@ -55,19 +56,25 @@ if ($RefreshOdds) { $unifiedArgs += '-RefreshOdds' }
 if ($OddsPhase) { $unifiedArgs += @('-OddsPhase', $OddsPhase) }
 if ($OddsSports) { $unifiedArgs += @('-OddsSports', $OddsSports) }
 if ($OddsRegions) { $unifiedArgs += @('-OddsRegions', $OddsRegions) }
+if ($ActiveSports -and @($ActiveSports).Count -gt 0) {
+    $unifiedArgs += '-ActiveSports'
+    $unifiedArgs += @($ActiveSports | ForEach-Object { [string]$_ } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+}
 if ($SkipTests) { $unifiedArgs += '-SkipTests' }
 if ($SkipSmoke) { $unifiedArgs += '-SkipSmoke' }
 if ($SkipGitPush) { $unifiedArgs += '-SkipGitPush' }
 if ($WhatIf) { $unifiedArgs += '-DryRun' }
 if ($SkipSourceUpdates) { $unifiedArgs += '-SkipSourceUpdates' }
 if ($SkipRefreshGate) { $unifiedArgs += '-SkipRefreshGate' }
-if ($SkipNFL) { $unifiedArgs += '-SkipNFL' }
-if ($SkipNCAAF) { $unifiedArgs += '-SkipNCAAF' }
-if ($SkipNCAAB) { $unifiedArgs += '-SkipNCAAB' }
-if ($SkipMLB) { $unifiedArgs += '-SkipMLB' }
-if ($SkipNBA) { $unifiedArgs += '-SkipNBA' }
-if ($SkipNHL) { $unifiedArgs += '-SkipNHL' }
-if ($SkipWNBA) { $unifiedArgs += '-SkipWNBA' }
+if (-not ($ActiveSports -and @($ActiveSports).Count -gt 0)) {
+    if ($SkipNFL) { $unifiedArgs += '-SkipNFL' }
+    if ($SkipNCAAF) { $unifiedArgs += '-SkipNCAAF' }
+    if ($SkipNCAAB) { $unifiedArgs += '-SkipNCAAB' }
+    if ($SkipMLB) { $unifiedArgs += '-SkipMLB' }
+    if ($SkipNBA) { $unifiedArgs += '-SkipNBA' }
+    if ($SkipNHL) { $unifiedArgs += '-SkipNHL' }
+    if ($SkipWNBA) { $unifiedArgs += '-SkipWNBA' }
+}
 if ($ForceRebuildToday) { $unifiedArgs += '-ForceRebuildToday' }
 
 Push-Location $repoRoot
