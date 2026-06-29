@@ -4,6 +4,7 @@ import argparse
 import json
 import subprocess
 import sys
+import traceback
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -90,7 +91,6 @@ def _safe_write_json(path: Path, payload: dict[str, Any]) -> None:
 
 
 def main() -> int:
-    assert_refresh_state_backend_ready(process_name="refresh-job")
     parser = argparse.ArgumentParser(description="Run the shared odds refresh command and update Syndicate status manifests on completion.")
     parser.add_argument("--manifest-path", required=True)
     parser.add_argument("--latest-path", required=True)
@@ -114,27 +114,30 @@ def main() -> int:
     stdout_path = Path(args.stdout_path)
     stderr_path = Path(args.stderr_path)
 
-    started_at = _utc_now()
-    _update_job_status(
-        status_path=status_path,
-        manifest_path=manifest_path,
-        latest_path=latest_path,
-        run_summary_path=run_summary_path,
-        state="running",
-        started_at=started_at,
-        command=command,
-    )
-    return_code = 1
-    stdout_text = ""
-    stderr_text = ""
-    failure_error = None
     try:
+        assert_refresh_state_backend_ready(process_name="refresh-job")
+        started_at = _utc_now()
+        _update_job_status(
+            status_path=status_path,
+            manifest_path=manifest_path,
+            latest_path=latest_path,
+            run_summary_path=run_summary_path,
+            state="running",
+            started_at=started_at,
+            command=command,
+        )
+        return_code = 1
+        stdout_text = ""
+        stderr_text = ""
+        failure_error = None
         result = subprocess.run(command, capture_output=True, text=True)
         return_code = int(result.returncode)
         stdout_text = str(result.stdout or "")
         stderr_text = str(result.stderr or "")
     except Exception as exc:
+        started_at = locals().get("started_at", _utc_now())
         failure_error = f"{type(exc).__name__}: {exc}"
+        trace_text = traceback.format_exc()
         stdout_text = json.dumps(
             {
                 "ok": False,
@@ -144,7 +147,35 @@ def main() -> int:
             },
             indent=2,
         )
-        stderr_text = failure_error
+        stderr_text = f"{failure_error}\n\n{trace_text}"
+        _safe_write_text(stderr_path, stderr_text)
+        _safe_write_json(
+            stdout_path,
+            {
+                "ok": False,
+                "returnCode": 1,
+                "startedAt": started_at,
+                "finishedAt": _utc_now(),
+                "command": command,
+                "error": failure_error,
+                "traceback": trace_text,
+            },
+        )
+        try:
+            _update_job_status(
+                status_path=status_path,
+                manifest_path=manifest_path,
+                latest_path=latest_path,
+                run_summary_path=run_summary_path,
+                state="failed",
+                exit_code=1,
+                started_at=started_at,
+                finished_at=_utc_now(),
+                command=command,
+            )
+        except Exception:
+            pass
+        return 1
 
     state = "finished" if return_code == 0 else "failed"
     finished_at = _utc_now()
