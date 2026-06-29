@@ -10,13 +10,22 @@ from pathlib import Path
 from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-if str(REPO_ROOT) not in sys.path:
-    sys.path.insert(0, str(REPO_ROOT))
 
-from syndicate.features.shared.refresh_state_store import read_json_file
-from syndicate.features.shared.refresh_state_store import assert_refresh_state_backend_ready
-from syndicate.features.shared.refresh_state_store import write_text_file
-from syndicate.features.shared.refresh_state_store import write_json_file
+
+def _refresh_state_store():
+    if str(REPO_ROOT) not in sys.path:
+        sys.path.insert(0, str(REPO_ROOT))
+    from syndicate.features.shared.refresh_state_store import assert_refresh_state_backend_ready
+    from syndicate.features.shared.refresh_state_store import read_json_file
+    from syndicate.features.shared.refresh_state_store import write_json_file
+    from syndicate.features.shared.refresh_state_store import write_text_file
+
+    return {
+        "assert_refresh_state_backend_ready": assert_refresh_state_backend_ready,
+        "read_json_file": read_json_file,
+        "write_json_file": write_json_file,
+        "write_text_file": write_text_file,
+    }
 
 
 def _utc_now() -> str:
@@ -31,7 +40,10 @@ def _update_state(
     state: str,
     exit_code: int,
 ) -> None:
+    store = _refresh_state_store()
     finished_at = _utc_now()
+    read_json_file = store["read_json_file"]
+    write_json_file = store["write_json_file"]
     manifest = read_json_file(manifest_path) or {}
     manifest["state"] = state
     manifest["exitCode"] = int(exit_code)
@@ -58,6 +70,8 @@ def _update_job_status(
     finished_at: str | None = None,
     command: list[str] | None = None,
 ) -> None:
+    store = _refresh_state_store()
+    write_json_file = store["write_json_file"]
     payload: dict[str, Any] = {
         "state": state,
         "manifestPath": str(manifest_path),
@@ -78,19 +92,22 @@ def _update_job_status(
 
 def _safe_write_text(path: Path, payload: str) -> None:
     try:
-        write_text_file(path, payload)
+        _refresh_state_store()["write_text_file"](path, payload)
     except Exception:
         pass
 
 
 def _safe_write_json(path: Path, payload: dict[str, Any]) -> None:
     try:
-        write_text_file(path, json.dumps(payload, indent=2))
+        _refresh_state_store()["write_text_file"](path, json.dumps(payload, indent=2))
     except Exception:
         pass
 
 
 def main() -> int:
+    store = _refresh_state_store()
+    assert_refresh_state_backend_ready = store["assert_refresh_state_backend_ready"]
+    read_json_file = store["read_json_file"]
     parser = argparse.ArgumentParser(description="Run the shared odds refresh command and update Syndicate status manifests on completion.")
     parser.add_argument("--manifest-path", required=True)
     parser.add_argument("--latest-path", required=True)

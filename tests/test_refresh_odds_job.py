@@ -164,7 +164,16 @@ class RefreshOddsJobTests(unittest.TestCase):
                     "-c",
                     "print('ok')",
                 ],
-            ), patch.object(module, "assert_refresh_state_backend_ready", side_effect=RuntimeError("guard failed")):
+            ), patch.object(
+                module,
+                "_refresh_state_store",
+                return_value={
+                    "assert_refresh_state_backend_ready": lambda **kwargs: (_ for _ in ()).throw(RuntimeError("guard failed")),
+                    "read_json_file": lambda path: json.loads(Path(path).read_text(encoding="utf-8")),
+                    "write_json_file": lambda path, payload: Path(path).write_text(json.dumps(payload, indent=2), encoding="utf-8"),
+                    "write_text_file": lambda path, payload: Path(path).write_text(str(payload), encoding="utf-8"),
+                },
+            ):
                 exit_code = module.main()
 
             self.assertEqual(exit_code, 1)
