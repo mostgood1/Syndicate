@@ -222,16 +222,16 @@ class HomePageCommandCenterTests(unittest.TestCase):
                 return_value="2026-06-29",
             ), patch(
                 "syndicate.blueprints.home._load_home_game_items",
-                return_value=([], 0),
+                side_effect=AssertionError("WNBA home should not load game items directly"),
             ), patch(
                 "syndicate.blueprints.home._load_home_games",
-                return_value=[],
+                side_effect=AssertionError("WNBA home should not load games directly"),
             ), patch(
                 "syndicate.blueprints.home._load_home_prop_items",
-                side_effect=[[], []],
+                side_effect=AssertionError("WNBA home should not load prop items directly"),
             ), patch(
                 "syndicate.blueprints.home._finalize_home_prop_rows",
-                side_effect=lambda rows, **kwargs: rows,
+                side_effect=AssertionError("WNBA home should not finalize prop rows directly"),
             ), patch(
                 "syndicate.blueprints.home._link_lookup_any",
                 return_value=(None, None),

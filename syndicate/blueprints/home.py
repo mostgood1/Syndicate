@@ -33,6 +33,7 @@ from syndicate.features.nhl.sources import scoreboard_snapshot_path
 from syndicate.features.nhl.sources import slate_summaries as nhl_slate_summaries
 from syndicate.features.wnba.sources import available_dates as wnba_available_dates
 from syndicate.features.wnba.sources import build_module_links as build_wnba_module_links
+from syndicate.features.wnba.cards import get_wnba_overview
 from syndicate.features.nfl.sources import build_module_links as build_nfl_module_links
 from syndicate.features.nfl.sources import default_week as nfl_default_week
 from syndicate.features.nfl.sources import latest_season as nfl_latest_season
@@ -4307,8 +4308,6 @@ def _build_sport_overview(
         ]
 
     active_today = _is_active_today(slug, today_value, context_label)
-    if slug == "wnba" and wnba_has_games_for_date(context_label) is False:
-        active_today = False
     game_bar = _choose_game_bar(
         links,
         is_active_today=active_today,
@@ -4338,48 +4337,73 @@ def _build_sport_overview(
             props_bar["title"] = "Pitcher + hitter top props"
             props_bar["summary"] = "Mirror the standalone MLB pregame props structure by keeping pitcher and hitter top-props lanes distinct on the main Syndicate page."
             props_bar["opportunity_tags"] = ["Pitcher top props", "Hitter top props", "Pregame props"]
-    game_items, game_count = _load_home_game_items(
-        slug,
-        context_label=context_label,
-        season=season,
-        week=selected_week,
-        is_active_today=active_today,
-    )
-    home_games = _load_home_games(slug, context_label=context_label, season=season, week=selected_week, is_active_today=active_today) if active_today else []
+    if slug == "wnba":
+        wnba_overview = get_wnba_overview(context_label)
+        if wnba_overview.get("status") == "no_games":
+            active_today = False
+            game_items = []
+            game_count = 0
+            home_games = []
+            pregame_prop_items = []
+            live_prop_items = []
+            source_title = str(wnba_overview.get("source_title") or "WNBA cards unavailable").strip()
+            source_path = str(wnba_overview.get("source_path") or "").strip()
+        else:
+            home_games = list(wnba_overview.get("games") or [])
+            game_items = _compact_game_cards(home_games)
+            game_count = len(game_items)
+            pregame_prop_items = _finalize_home_prop_rows(
+                list(wnba_overview.get("prop_rows") or []),
+                slug=slug,
+                context_label=context_label,
+                home_games=home_games,
+            )
+            live_prop_items = list(pregame_prop_items)
+            source_title = str(wnba_overview.get("source_title") or "WNBA cards").strip()
+            source_path = str(wnba_overview.get("source_path") or "").strip()
+    else:
+        game_items, game_count = _load_home_game_items(
+            slug,
+            context_label=context_label,
+            season=season,
+            week=selected_week,
+            is_active_today=active_today,
+        )
+        home_games = _load_home_games(slug, context_label=context_label, season=season, week=selected_week, is_active_today=active_today) if active_today else []
+        pregame_prop_items = _finalize_home_prop_rows(
+            _load_home_prop_items(
+                slug,
+                context_label=context_label,
+                home_games=home_games,
+                season=season,
+                week=selected_week,
+                is_active_today=active_today,
+                lane="pregame",
+            ),
+            slug=slug,
+            context_label=context_label,
+            home_games=home_games,
+        )
+        live_prop_items = _finalize_home_prop_rows(
+            _load_home_prop_items(
+                slug,
+                context_label=context_label,
+                home_games=home_games,
+                season=season,
+                week=selected_week,
+                is_active_today=active_today,
+                lane="live",
+            ),
+            slug=slug,
+            context_label=context_label,
+            home_games=home_games,
+        )
     live_href, live_label = _link_lookup_any(links, ["Live Lens", "Live Prop Audit"])
     cards_href, cards_label = _link_lookup_any(links, ["Cards"])
     props_href, props_label = _link_lookup_any(links, ["Props", "Top props", "Prop Ladders", "Pitcher top props", "Hitter top props", "Pitcher ladders", "Hitter ladders"])
     betting_href, betting_label = _link_lookup_any(links, ["Betting Card"])
     picks_href, picks_label = _link_lookup_any(links, ["Picks", "Season Review"])
     game_bar["items"] = game_items
-    pregame_prop_items = _finalize_home_prop_rows(
-        _load_home_prop_items(
-            slug,
-            context_label=context_label,
-            home_games=home_games,
-            season=season,
-            week=selected_week,
-            is_active_today=active_today,
-            lane="pregame",
-        ),
-        slug=slug,
-        context_label=context_label,
-        home_games=home_games,
-    )
-    live_prop_items = _finalize_home_prop_rows(
-        _load_home_prop_items(
-            slug,
-            context_label=context_label,
-            home_games=home_games,
-            season=season,
-            week=selected_week,
-            is_active_today=active_today,
-            lane="live",
-        ),
-        slug=slug,
-        context_label=context_label,
-        home_games=home_games,
-    )
     live_odds_game_ids = _game_identity_set(live_prop_items)
     props_bar["items"] = list(pregame_prop_items)
     if game_bar["items"]:

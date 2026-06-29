@@ -1437,6 +1437,43 @@ def build_source_cards_props_strip_payload(selected_date: str, *, limit: int = 2
     }
 
 
+def get_wnba_overview(selected_date: str) -> dict[str, Any]:
+    requested_date = str(selected_date or "").strip() or parse_iso_date(selected_date).isoformat()
+    if has_games_for_date(requested_date) is False:
+        return {
+            "status": "no_games",
+            "date": requested_date,
+            "games": [],
+            "prop_rows": [],
+            "source_title": "WNBA cards unavailable",
+            "source_path": str(processed_root() / f"game_cards_{requested_date}.csv"),
+        }
+
+    cards_context = build_cards_page_context(requested_date, allow_stored_date_fallback=False)
+    prop_strip = build_source_cards_props_strip_payload(requested_date)
+    games = list(cards_context.get("games") or [])
+    if not games:
+        return {
+            "status": "no_games",
+            "date": requested_date,
+            "games": [],
+            "prop_rows": [],
+            "source_title": _safe_text(cards_context.get("source_title"), "WNBA cards unavailable"),
+            "source_path": _safe_text(cards_context.get("source_path"), str(processed_root() / f"game_cards_{requested_date}.csv")),
+        }
+
+    return {
+        "status": "ok",
+        "date": str(cards_context.get("date") or requested_date).strip() or requested_date,
+        "requested_date": requested_date,
+        "games": games,
+        "prop_rows": list(prop_strip.get("items") or []),
+        "source_title": _safe_text(cards_context.get("source_title"), "WNBA cards"),
+        "source_path": _safe_text(cards_context.get("source_path"), str(processed_root() / f"game_cards_{requested_date}.csv")),
+        "board_contract": cards_context.get("board_contract"),
+    }
+
+
 def _game_from_row(
     row: dict[str, str],
     *,
