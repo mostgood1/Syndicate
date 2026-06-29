@@ -6,26 +6,36 @@ import os
 import subprocess
 import sys
 import time
+import traceback
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-if str(REPO_ROOT) not in sys.path:
-    sys.path.insert(0, str(REPO_ROOT))
 
-from syndicate.features.shared.refresh_state_store import read_json_file
-from syndicate.features.shared.refresh_state_store import assert_refresh_state_backend_ready
-from syndicate.features.shared.refresh_state_store import reports_root
-from syndicate.features.shared.refresh_state_store import write_json_file
+
+def _refresh_state_store() -> dict[str, Any]:
+    if str(REPO_ROOT) not in sys.path:
+        sys.path.insert(0, str(REPO_ROOT))
+    from syndicate.features.shared.refresh_state_store import assert_refresh_state_backend_ready
+    from syndicate.features.shared.refresh_state_store import read_json_file
+    from syndicate.features.shared.refresh_state_store import reports_root
+    from syndicate.features.shared.refresh_state_store import write_json_file
+
+    return {
+        "assert_refresh_state_backend_ready": assert_refresh_state_backend_ready,
+        "read_json_file": read_json_file,
+        "reports_root": reports_root,
+        "write_json_file": write_json_file,
+    }
 
 
 def _default_latest_manifest_path() -> Path:
-    return reports_root() / "refresh_status" / "latest" / "refresh_status_latest.json"
+    return _refresh_state_store()["reports_root"]() / "refresh_status" / "latest" / "refresh_status_latest.json"
 
 
 def _default_worker_status_path() -> Path:
-    return reports_root() / "refresh_status" / "latest" / "refresh_worker_status.json"
+    return _refresh_state_store()["reports_root"]() / "refresh_status" / "latest" / "refresh_worker_status.json"
 
 
 def _default_poll_seconds() -> float:
@@ -80,7 +90,7 @@ def _parse_utc_timestamp(value: str | None) -> datetime | None:
 
 
 def _latest_manifest_payload(latest_manifest_path: Path) -> dict[str, Any]:
-    payload = read_json_file(latest_manifest_path) or {}
+    payload = _refresh_state_store()["read_json_file"](latest_manifest_path) or {}
     return payload if isinstance(payload, dict) else {}
 
 
@@ -115,12 +125,12 @@ def _recover_stuck_claim(latest_manifest_path: Path, *, timeout_minutes: int) ->
     payload["workerRecoveryReason"] = f"stuck_claim_timeout_{timeout_minutes}m"
     for key in ("workerClaimedAt", "workerKind", "launchPid"):
         payload.pop(key, None)
-    write_json_file(latest_manifest_path, payload)
+    _refresh_state_store()["write_json_file"](latest_manifest_path, payload)
     return True
 
 
 def _has_pending_external_contract(latest_manifest_path: Path) -> bool:
-    payload = read_json_file(latest_manifest_path) or {}
+    payload = _refresh_state_store()["read_json_file"](latest_manifest_path) or {}
     state = str(payload.get("state") or "").strip().lower()
     if state == "pending_external":
         return isinstance(payload.get("externalRunner"), dict)
@@ -135,7 +145,7 @@ def _has_pending_external_contract(latest_manifest_path: Path) -> bool:
 
 
 def _build_runner_command(latest_manifest_path: Path) -> list[str]:
-    payload = read_json_file(latest_manifest_path) or {}
+    payload = _refresh_state_store()["read_json_file"](latest_manifest_path) or {}
     run_stamp = str(payload.get("runStamp") or "").strip()
     return [
         sys.executable,
@@ -158,7 +168,7 @@ def _write_worker_status(
     launch_pid: int | None = None,
     refresh_cycle: dict[str, int] | None = None,
 ) -> None:
-    write_json_file(
+    _refresh_state_store()["write_json_file"](
         worker_status_path,
         {
             "state": state,
@@ -189,14 +199,14 @@ def _spawn_pending_job(latest_manifest_path: Path) -> subprocess.Popen[Any]:
 
 
 def _mark_claimed_external_contract(latest_manifest_path: Path) -> None:
-    latest_manifest = read_json_file(latest_manifest_path) or {}
+    latest_manifest = _refresh_state_store()["read_json_file"](latest_manifest_path) or {}
     if not latest_manifest:
         return
     claimed_at = datetime.utcnow().isoformat(timespec="seconds") + "Z"
     latest_manifest["state"] = "claimed"
     latest_manifest["workerClaimedAt"] = claimed_at
     latest_manifest["workerKind"] = "refresh_worker"
-    write_json_file(latest_manifest_path, latest_manifest)
+    _refresh_state_store()["write_json_file"](latest_manifest_path, latest_manifest)
 
 
 def _mark_throttled_worker_status(*, worker_status_path: Path, latest_manifest_path: Path, active_jobs: int, max_active_jobs: int) -> None:
@@ -212,6 +222,10 @@ def _mark_throttled_worker_status(*, worker_status_path: Path, latest_manifest_p
 
 
 def main() -> int:
+    store = _refresh_state_store()
+    assert_refresh_state_backend_ready = store["assert_refresh_state_backend_ready"]
+    read_json_file = store["read_json_file"]
+    print("[refresh_worker] BOOTED", flush=True)
     assert_refresh_state_backend_ready(process_name="refresh-worker")
     parser = argparse.ArgumentParser(description="Poll Syndicate refresh state and execute queued external-runner jobs.")
     parser.add_argument("--latest-manifest", default=str(_default_latest_manifest_path()))
@@ -312,4 +326,9 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    try:
+        raise SystemExit(main())
+    except Exception as exc:
+        print(f"[refresh_worker_fatal] {type(exc).__name__}: {exc}", file=sys.stderr, flush=True)
+        print(traceback.format_exc(), file=sys.stderr, flush=True)
+        raise
