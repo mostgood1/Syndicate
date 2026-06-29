@@ -188,8 +188,6 @@ def _spawn_pending_job(latest_manifest_path: Path) -> subprocess.Popen[Any]:
     command = _build_runner_command(latest_manifest_path)
     popen_kwargs: dict[str, Any] = {
         "cwd": str(REPO_ROOT),
-        "stdout": subprocess.DEVNULL,
-        "stderr": subprocess.DEVNULL,
     }
     if os.name == "nt":
         popen_kwargs["creationflags"] = getattr(subprocess, "DETACHED_PROCESS", 0) | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
