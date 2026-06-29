@@ -2489,6 +2489,8 @@ function Assert-AdvancedDataReady {
         }
         'wnba' {
             $scheduleCheck = Get-BasketballScheduledGamesCheck -Sport 'wnba' -DateValue $DateValue
+            $scheduledGameCount = if ($scheduleCheck.known -and $null -ne $scheduleCheck.count) { [int]$scheduleCheck.count } else { $null }
+            $requireSmartSimArtifacts = ($null -eq $scheduledGameCount) -or ($scheduledGameCount -gt 0)
             if ($scheduleCheck.known -and [int]$scheduleCheck.count -eq 0) {
                 Write-Host ("WNBA advanced-data gate: no scheduled games for {0} ({1}); skipping artifact assertions" -f $DateValue, $scheduleCheck.source) -ForegroundColor DarkGray
                 return
@@ -2509,9 +2511,12 @@ function Assert-AdvancedDataReady {
                 }
             }
 
-            $smartSimFiles = @(Get-ChildItem -Path $processedRoot -File -Filter ("smart_sim_{0}_*.json" -f $DateValue) -ErrorAction SilentlyContinue)
-            if ($smartSimFiles.Count -eq 0) {
-                throw "WNBA advanced-data gate failed: missing smart_sim artifacts for $DateValue"
+            $smartSimFiles = @()
+            if ($requireSmartSimArtifacts) {
+                $smartSimFiles = @(Get-ChildItem -Path $processedRoot -File -Filter ("smart_sim_{0}_*.json" -f $DateValue) -ErrorAction SilentlyContinue)
+                if ($smartSimFiles.Count -eq 0) {
+                    throw "WNBA advanced-data gate failed: missing smart_sim artifacts for $DateValue"
+                }
             }
             $advancedFiles = @(Get-ChildItem -Path $processedRoot -File -Filter 'team_advanced_stats_*.csv' -ErrorAction SilentlyContinue)
             if ($advancedFiles.Count -eq 0) {
@@ -2519,39 +2524,41 @@ function Assert-AdvancedDataReady {
             }
             $foundNonBaselinePace = $false
             $foundUsableSmartSimPayload = $false
-            foreach ($smartSimFile in $smartSimFiles) {
-                try {
-                    $payload = Get-Content -Path $smartSimFile.FullName -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
-                    $homePace = Convert-ToDoubleOrNull $payload.home_pace
-                    $awayPace = Convert-ToDoubleOrNull $payload.away_pace
-                    if (($null -ne $homePace -and [Math]::Abs($homePace - 79.5) -gt 0.01) -or ($null -ne $awayPace -and [Math]::Abs($awayPace - 79.5) -gt 0.01)) {
-                        $foundNonBaselinePace = $true
-                        break
-                    }
+            if ($requireSmartSimArtifacts) {
+                foreach ($smartSimFile in $smartSimFiles) {
+                    try {
+                        $payload = Get-Content -Path $smartSimFile.FullName -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
+                        $homePace = Convert-ToDoubleOrNull $payload.home_pace
+                        $awayPace = Convert-ToDoubleOrNull $payload.away_pace
+                        if (($null -ne $homePace -and [Math]::Abs($homePace - 79.5) -gt 0.01) -or ($null -ne $awayPace -and [Math]::Abs($awayPace - 79.5) -gt 0.01)) {
+                            $foundNonBaselinePace = $true
+                            break
+                        }
 
-                    $quarters = @()
-                    if ($null -ne $payload.quarters) {
-                        $quarters = @($payload.quarters)
-                    }
-                    $homePlayers = @()
-                    $awayPlayers = @()
-                    if ($null -ne $payload.players) {
-                        if ($null -ne $payload.players.home) {
-                            $homePlayers = @($payload.players.home)
+                        $quarters = @()
+                        if ($null -ne $payload.quarters) {
+                            $quarters = @($payload.quarters)
                         }
-                        if ($null -ne $payload.players.away) {
-                            $awayPlayers = @($payload.players.away)
+                        $homePlayers = @()
+                        $awayPlayers = @()
+                        if ($null -ne $payload.players) {
+                            if ($null -ne $payload.players.home) {
+                                $homePlayers = @($payload.players.home)
+                            }
+                            if ($null -ne $payload.players.away) {
+                                $awayPlayers = @($payload.players.away)
+                            }
+                        }
+                        if ($quarters.Count -gt 0 -or $homePlayers.Count -gt 0 -or $awayPlayers.Count -gt 0) {
+                            $foundUsableSmartSimPayload = $true
                         }
                     }
-                    if ($quarters.Count -gt 0 -or $homePlayers.Count -gt 0 -or $awayPlayers.Count -gt 0) {
-                        $foundUsableSmartSimPayload = $true
+                    catch {
                     }
                 }
-                catch {
+                if (-not $foundNonBaselinePace -and -not $foundUsableSmartSimPayload) {
+                    throw "WNBA advanced-data gate failed: smart_sim pace remained at baseline for all artifacts on $DateValue"
                 }
-            }
-            if (-not $foundNonBaselinePace -and -not $foundUsableSmartSimPayload) {
-                throw "WNBA advanced-data gate failed: smart_sim pace remained at baseline for all artifacts on $DateValue"
             }
             return
         }
