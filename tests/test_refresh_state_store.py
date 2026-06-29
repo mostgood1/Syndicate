@@ -92,6 +92,22 @@ class RefreshStateStoreTests(unittest.TestCase):
         printed_text = "\n".join(str(call.args[0]) for call in mocked_print.call_args_list if call.args)
         self.assertIn("REFRESH_STATE_BACKEND = keyvalue", printed_text)
 
+    def test_hosted_refresh_state_backend_defaults_to_keyvalue_when_url_is_present(self) -> None:
+        with patch.dict(
+            os.environ,
+            {
+                "RENDER": "true",
+                "SYNDICATE_REQUIRE_HOSTED_STORAGE": "true",
+                "SYNDICATE_REFRESH_STATE_URL": "redis://example",
+            },
+            clear=False,
+        ), patch("builtins.print") as mocked_print:
+            backend_name = refresh_state_store.assert_refresh_state_backend_ready(process_name="refresh-worker")
+
+        self.assertEqual(backend_name, "keyvalue")
+        printed_text = "\n".join(str(call.args[0]) for call in mocked_print.call_args_list if call.args)
+        self.assertIn("REFRESH_STATE_BACKEND = keyvalue", printed_text)
+
     def test_render_hosted_reports_root_falls_back_to_repo_reports(self) -> None:
         with patch.dict(
             os.environ,

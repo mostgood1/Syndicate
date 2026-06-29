@@ -29,8 +29,13 @@ REFRESH_STATE_PATH = REPORTS_ROOT / "refresh_state.json"
 
 
 def _refresh_state_backend_name() -> str:
-    value = str(os.environ.get("SYNDICATE_REFRESH_STATE_BACKEND") or "filesystem").strip().lower()
-    return value or "filesystem"
+    value = str(os.environ.get("SYNDICATE_REFRESH_STATE_BACKEND") or "").strip().lower()
+    if value:
+        return value
+    hosted = _strict_hosted_storage_enabled() or bool(str(os.environ.get("RENDER") or "").strip().lower() in {"1", "true", "yes", "on"})
+    if hosted and str(os.environ.get("SYNDICATE_REFRESH_STATE_URL") or os.environ.get("REDIS_URL") or "").strip():
+        return "keyvalue"
+    return "filesystem"
 
 def _strict_hosted_storage_enabled() -> bool:
     raw_value = str(os.environ.get("SYNDICATE_REQUIRE_HOSTED_STORAGE") or "").strip().lower()
