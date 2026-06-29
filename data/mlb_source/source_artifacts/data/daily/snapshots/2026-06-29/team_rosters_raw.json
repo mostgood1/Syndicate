@@ -5191,6 +5191,7 @@
               "type": "Pitcher",
               "abbreviation": "P"
             },
+            "note": "Right wrist surgery",
             "status": {
               "code": "D60",
               "description": "Injured 60-Day"
@@ -24009,6 +24010,25 @@
             "status": {
               "code": "A",
               "description": "Active"
+            },
+            "parentTeamId": 136
+          },
+          {
+            "person": {
+              "id": 671083,
+              "fullName": "Buddy Kennedy",
+              "link": "/api/v1/people/671083"
+            },
+            "jerseyNumber": "",
+            "position": {
+              "code": "3",
+              "name": "First Base",
+              "type": "Infielder",
+              "abbreviation": "1B"
+            },
+            "status": {
+              "code": "NYR",
+              "description": "Not Yet Reported"
             },
             "parentTeamId": 136
           },

@@ -1,0 +1,70 @@
+{
+  "date": "2026-06-30",
+  "season": 2026,
+  "generated_at": "2026-06-29T07:51:27.026958",
+  "tool": "tools/daily_update_multi_profile.py",
+  "locked": true,
+  "source_profile": "game_recos",
+  "source_sim_dir": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-30",
+  "thresholds": {
+    "nrfi_min_prob": 0.55,
+    "nrfi_max_mean_runs": 0.8,
+    "yrfi_max_nrfi_prob": 0.5,
+    "yrfi_min_mean_runs": 0.95,
+    "yrfi_min_side_lead_prob": 0.24
+  },
+  "counts": {
+    "rows": 2,
+    "games": 2
+  },
+  "signals": [
+    {
+      "game_pk": 824742,
+      "date": "2026-06-30",
+      "away": "Washington Nationals",
+      "home": "Boston Red Sox",
+      "away_abbr": "WSH",
+      "home_abbr": "BOS",
+      "away_team_id": 120,
+      "home_team_id": 111,
+      "starter_names": {
+        "away": "Cade Cavalli",
+        "home": "Connelly Early"
+      },
+      "signal": {
+        "label": "F1 YRFI",
+        "tone": "yrfi",
+        "summary": "F1 mean 1.18 | side lead 25.5%",
+        "detail": "Season filter qualified: only 49.5% simulated NRFI, 1.18 expected first-inning runs, and one side reaches a 25.5% chance to be ahead after one.",
+        "nrfiProb": 0.495,
+        "yrfiProb": 0.505,
+        "meanTotalRuns": 1.175,
+        "maxSideLeadProb": 0.255
+      }
+    },
+    {
+      "game_pk": 823768,
+      "date": "2026-06-30",
+      "away": "Cincinnati Reds",
+      "home": "Milwaukee Brewers",
+      "away_abbr": "CIN",
+      "home_abbr": "MIL",
+      "away_team_id": 113,
+      "home_team_id": 158,
+      "starter_names": {
+        "away": "Rhett Lowder",
+        "home": "Brandon Sproat"
+      },
+      "signal": {
+        "label": "F1 YRFI",
+        "tone": "yrfi",
+        "summary": "F1 mean 1.13 | side lead 25.3%",
+        "detail": "Season filter qualified: only 49.0% simulated NRFI, 1.13 expected first-inning runs, and one side reaches a 25.3% chance to be ahead after one.",
+        "nrfiProb": 0.49,
+        "yrfiProb": 0.51,
+        "meanTotalRuns": 1.128,
+        "maxSideLeadProb": 0.253
+      }
+    }
+  ]
+}

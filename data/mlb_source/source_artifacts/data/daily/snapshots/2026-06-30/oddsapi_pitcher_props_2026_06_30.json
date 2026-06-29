@@ -1,0 +1,23 @@
+{
+  "date": "2026-06-30",
+  "mode": "live",
+  "retrieved_at": "2026-06-29T07:48:38.392311",
+  "pitcher_props": {},
+  "meta": {
+    "markets": [
+      "pitcher_strikeouts",
+      "pitcher_outs",
+      "pitcher_hits_allowed",
+      "pitcher_walks",
+      "pitcher_earned_runs"
+    ],
+    "regions": "us",
+    "bookmakers": null,
+    "counts": {
+      "players": 0,
+      "markets": {},
+      "events_matched": 0
+    },
+    "warnings": []
+  }
+}

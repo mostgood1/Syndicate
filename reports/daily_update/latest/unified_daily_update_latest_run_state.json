@@ -3,11 +3,11 @@
     "date":  "2026-06-29",
     "runMode":  "standard",
     "overallStatus":  "ok",
-    "generatedAt":  "2026-06-29T02:07:14.6424982+00:00",
-    "updatedAt":  "2026-06-29T02:21:25.2608326+00:00",
-    "runManifestPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-06-29\\20260629_020714\\unified_daily_update_run.json",
+    "generatedAt":  "2026-06-29T07:38:19.2453804+00:00",
+    "updatedAt":  "2026-06-29T07:53:46.7592568+00:00",
+    "runManifestPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-06-29\\20260629_073819\\unified_daily_update_run.json",
     "latestManifestPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest.json",
-    "runCheckpointPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-06-29\\20260629_020714\\unified_daily_update_checkpoint.json",
+    "runCheckpointPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-06-29\\20260629_073819\\unified_daily_update_checkpoint.json",
     "latestCheckpointPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest_checkpoint.json",
     "currentStage":  "completed",
     "completedStages":  [
@@ -15,7 +15,7 @@
                             "refresh_gate"
                         ],
     "failedStage":  null,
-    "lastUpdatedAt":  "2026-06-29T02:21:25.2608326+00:00",
+    "lastUpdatedAt":  "2026-06-29T07:53:46.7574794+00:00",
     "replayContext":  {
                           "latestCheckpointLoaded":  true,
                           "latestCheckpointPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest_checkpoint.json",
@@ -81,9 +81,10 @@
     "runTrace":  {
                      "eventSimExecutionCount":  21,
                      "artifactUpdateCount":  21,
-                     "inputFingerprintCount":  2,
+                     "inputFingerprintCount":  3,
                      "artifactPathCount":  21,
                      "inputFingerprints":  [
+                                               "a3452b7224e953e755b74c8676af2a6d745af14880f5ea013f31b2f17c13888f",
                                                "b6978cd8f47bbebfa4c1028933e311366607f79c460fde585a3b5bd93afea73f",
                                                "563a06b8e8830bba5d1cdcf73bb91ad105470d2e01ba859ebaa44c2126a6045d"
                                            ],
@@ -113,7 +114,7 @@
                      "simExecutionDecision":  null
                  },
     "simulationContractPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest_simulation_contract.json",
-    "simulationContractRunPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-06-29\\20260629_020714\\unified_daily_update_simulation_contract.json",
+    "simulationContractRunPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-06-29\\20260629_073819\\unified_daily_update_simulation_contract.json",
     "simulationContractSportCount":  1,
     "simulationContractAdvancedBySport":  {
                                               "mlb":  {
@@ -135,13 +136,13 @@
                                                                                                                  "team":  "HOU",
                                                                                                                  "opponent":  "MIN",
                                                                                                                  "matchup":  "MIN @ HOU",
-                                                                                                                 "probability":  "15.9%",
+                                                                                                                 "probability":  "15.0%",
                                                                                                                  "support":  "73",
                                                                                                                  "summary":  "Expected opportunity is strong at about 4.8 PA. He is tracking toward a premium lineup slot (2).",
-                                                                                                                 "p_hr_1plus":  0.159,
+                                                                                                                 "p_hr_1plus":  0.15,
                                                                                                                  "support_score":  73.0,
                                                                                                                  "support_label":  "strong",
-                                                                                                                 "pa_mean":  4.795,
+                                                                                                                 "pa_mean":  4.79,
                                                                                                                  "lineup_order":  2,
                                                                                                                  "opponent_pitcher_name":  "Zebby Matthews",
                                                                                                                  "writeup":  "Expected opportunity is strong at about 4.8 PA. He is tracking toward a premium lineup slot (2).",
@@ -187,19 +188,19 @@
                                                                                                                  "matchup":  "MIN @ HOU",
                                                                                                                  "probability":  "13.5%",
                                                                                                                  "support":  "77",
-                                                                                                                 "summary":  "Expected opportunity is strong at about 4.9 PA. He is tracking toward a premium lineup slot (2).",
+                                                                                                                 "summary":  "Expected opportunity is strong at about 5.0 PA. He is tracking toward a premium lineup slot (2).",
                                                                                                                  "p_hr_1plus":  0.135,
                                                                                                                  "support_score":  77.0,
                                                                                                                  "support_label":  "strong",
-                                                                                                                 "pa_mean":  4.927,
+                                                                                                                 "pa_mean":  4.955,
                                                                                                                  "lineup_order":  2,
                                                                                                                  "opponent_pitcher_name":  "Peter Lambert",
-                                                                                                                 "writeup":  "Expected opportunity is strong at about 4.9 PA. He is tracking toward a premium lineup slot (2).",
+                                                                                                                 "writeup":  "Expected opportunity is strong at about 5.0 PA. He is tracking toward a premium lineup slot (2).",
                                                                                                                  "headshot_url":  "https://img.mlbstatic.com/mlb-photos/image/upload/w_180,q_auto:best/v1/people/621439/headshot/67/current",
                                                                                                                  "team_logo_url":  "https://www.mlbstatic.com/team-logos/142.svg",
                                                                                                                  "opponent_logo_url":  "https://www.mlbstatic.com/team-logos/117.svg",
                                                                                                                  "drivers":  [
-                                                                                                                                 "Expected opportunity is strong at about 4.9 PA.",
+                                                                                                                                 "Expected opportunity is strong at about 5.0 PA.",
                                                                                                                                  "He is tracking toward a premium lineup slot (2).",
                                                                                                                                  "The handedness split is leaning toward extra damage in this matchup."
                                                                                                                              ]
@@ -235,67 +236,67 @@
                                                                                                 {
                                                                                                     "target_id":  "game-824822",
                                                                                                     "label":  "CWS @ BAL",
-                                                                                                    "status":  "2026-06-29"
+                                                                                                    "status":  "5:35 PM"
                                                                                                 },
                                                                                                 {
                                                                                                     "target_id":  "game-823444",
                                                                                                     "label":  "PIT @ PHI",
-                                                                                                    "status":  "2026-06-29"
+                                                                                                    "status":  "5:40 PM"
                                                                                                 },
                                                                                                 {
                                                                                                     "target_id":  "game-823529",
                                                                                                     "label":  "DET @ NYY",
-                                                                                                    "status":  "2026-06-29"
+                                                                                                    "status":  "6:05 PM"
                                                                                                 },
                                                                                                 {
                                                                                                     "target_id":  "game-822792",
                                                                                                     "label":  "NYM @ TOR",
-                                                                                                    "status":  "2026-06-29"
+                                                                                                    "status":  "6:07 PM"
                                                                                                 },
                                                                                                 {
                                                                                                     "target_id":  "game-824741",
                                                                                                     "label":  "WSH @ BOS",
-                                                                                                    "status":  "2026-06-29"
+                                                                                                    "status":  "6:10 PM"
                                                                                                 },
                                                                                                 {
                                                                                                     "target_id":  "game-824420",
                                                                                                     "label":  "TEX @ CLE",
-                                                                                                    "status":  "2026-06-29"
+                                                                                                    "status":  "6:10 PM"
                                                                                                 },
                                                                                                 {
                                                                                                     "target_id":  "game-823771",
                                                                                                     "label":  "CIN @ MIL",
-                                                                                                    "status":  "2026-06-29"
+                                                                                                    "status":  "6:40 PM"
                                                                                                 },
                                                                                                 {
                                                                                                     "target_id":  "game-824662",
                                                                                                     "label":  "SD @ CHC",
-                                                                                                    "status":  "2026-06-29"
+                                                                                                    "status":  "7:05 PM"
                                                                                                 },
                                                                                                 {
                                                                                                     "target_id":  "game-824176",
                                                                                                     "label":  "MIN @ HOU",
-                                                                                                    "status":  "2026-06-29"
+                                                                                                    "status":  "7:10 PM"
                                                                                                 },
                                                                                                 {
                                                                                                     "target_id":  "game-824339",
                                                                                                     "label":  "MIA @ COL",
-                                                                                                    "status":  "2026-06-29"
+                                                                                                    "status":  "7:40 PM"
                                                                                                 },
                                                                                                 {
                                                                                                     "target_id":  "game-824986",
                                                                                                     "label":  "LAD @ ATH",
-                                                                                                    "status":  "2026-06-29"
+                                                                                                    "status":  "8:40 PM"
                                                                                                 },
                                                                                                 {
                                                                                                     "target_id":  "game-823121",
                                                                                                     "label":  "LAA @ SEA",
-                                                                                                    "status":  "2026-06-29"
+                                                                                                    "status":  "8:40 PM"
                                                                                                 },
                                                                                                 {
                                                                                                     "target_id":  "game-825065",
                                                                                                     "label":  "SF @ AZ",
-                                                                                                    "status":  "2026-06-29"
+                                                                                                    "status":  "8:40 PM"
                                                                                                 }
                                                                                             ],
                                                                        "module_links":  [

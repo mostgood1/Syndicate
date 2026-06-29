@@ -3752,10 +3752,10 @@
             "bat_side": "S",
             "throw_side": "R"
           },
-          "k_rate": 0.3333333333333333,
-          "bb_rate": 0.0,
-          "hbp_rate": 0.0,
-          "hr_rate": 0.0,
+          "k_rate": 0.22,
+          "bb_rate": 0.08,
+          "hbp_rate": 0.008,
+          "hr_rate": 0.03,
           "inplay_hit_rate": 0.0,
           "xb_hit_share": 0.22,
           "triple_share_of_xb": 0.12,
@@ -4075,7 +4075,7 @@
           "arsenal_sample_size": 579,
           "stamina_pitches": 25,
           "role": "MR",
-          "availability_mult": 1.0,
+          "availability_mult": 0.9166666666666666,
           "platoon_mult_vs_lhb": {
             "k": 0.9435194416749751,
             "bb": 1.0458960328317375,

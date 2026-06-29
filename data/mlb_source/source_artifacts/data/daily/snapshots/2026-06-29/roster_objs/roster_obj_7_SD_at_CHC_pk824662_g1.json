@@ -1133,60 +1133,60 @@
             "bat_side": "R",
             "throw_side": "R"
           },
-          "k_rate": 0.21152779916833514,
-          "bb_rate": 0.11662559679655013,
-          "hbp_rate": 0.013245033112582781,
-          "hr_rate": 0.027352533497612814,
-          "inplay_hit_rate": 0.1382142857142857,
+          "k_rate": 0.2032289628180039,
+          "bb_rate": 0.10161448140900195,
+          "hbp_rate": 0.0136986301369863,
+          "hr_rate": 0.028180039138943243,
+          "inplay_hit_rate": 0.1387878787878788,
           "xb_hit_share": 0.2777777777777778,
           "triple_share_of_xb": 0.02,
-          "sb_attempt_rate": 0.034482758620689655,
+          "sb_attempt_rate": 0.037037037037037035,
           "sb_success_rate": 0.4,
           "vs_pitch_type": {},
           "vs_pitch_type_hr": {},
           "platoon_mult_vs_lhp": {
-            "k": 0.9227511012413994,
-            "bb": 1.0216298008143503,
+            "k": 0.872860495907559,
+            "bb": 1.1265767934520945,
             "hr": 1.275,
             "inplay": 1.1925000000000001
           },
           "platoon_mult_vs_rhp": {
-            "k": 1.0229102328603399,
-            "bb": 0.9695533570960937,
+            "k": 1.0434884153088546,
+            "bb": 0.9722698054717922,
             "hr": 0.78,
-            "inplay": 0.966795865633075
+            "inplay": 0.9714318547460353
           },
           "venue_mult_home": {
-            "k": 0.9091587362226948,
-            "bb": 1.0115730667801612,
-            "hr": 1.1125020351676977,
-            "inplay": 0.9504423422239741
+            "k": 0.8928737207263929,
+            "bb": 1.003270866511117,
+            "hr": 1.1276976495726496,
+            "inplay": 0.9543592832404758
           },
           "venue_mult_away": {
-            "k": 1.1123227681257801,
-            "bb": 0.9589322820577555,
+            "k": 1.1225,
+            "bb": 1.0045696564615254,
             "hr": 0.86,
             "inplay": 1.1225
           },
           "vs_venue_hr_mult": {
-            "135": 1.1125020351676977
+            "135": 1.1276976495726496
           },
           "vs_venue_k_mult": {
-            "135": 0.9091587362226948
+            "135": 0.8928737207263929
           },
           "vs_venue_bb_mult": {
-            "135": 1.0115730667801612
+            "135": 1.003270866511117
           },
           "vs_venue_inplay_mult": {
-            "135": 0.9454349698535746
+            "135": 0.9543592832404758
           },
           "vs_venue_history": {
             "135": {
-              "pa": 83.0,
-              "k_mult": 0.7404535320648424,
-              "bb_mult": 1.033065905086175,
-              "hr_mult": 1.3214343861934224,
-              "inplay_mult": 0.8440999138673558
+              "pa": 78.0,
+              "k_mult": 0.6939249163611225,
+              "bb_mult": 1.0093453328889055,
+              "hr_mult": 1.3648504273504276,
+              "inplay_mult": 0.8695979521156453
             }
           },
           "statcast_quality_mult": {},
@@ -1310,7 +1310,7 @@
         "statcast_splits_end_date": "",
         "arsenal_source": "statsapi_pitchArsenal",
         "arsenal_sample_size": 81,
-        "stamina_pitches": 89,
+        "stamina_pitches": 91,
         "role": "SP",
         "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
@@ -4786,20 +4786,20 @@
             "bat_side": "R",
             "throw_side": "R"
           },
-          "k_rate": 0.32,
+          "k_rate": 0.2857142857142857,
           "bb_rate": 0.0,
           "hbp_rate": 0.0,
-          "hr_rate": 0.12,
-          "inplay_hit_rate": 0.47058823529411764,
-          "batters_faced": 25.0,
-          "balls_in_play": 17.0,
+          "hr_rate": 0.14285714285714285,
+          "inplay_hit_rate": 0.4666666666666667,
+          "batters_faced": 21.0,
+          "balls_in_play": 15.0,
           "arsenal": {
-            "FF": 0.46875,
-            "OTHER": 0.21875,
-            "CH": 0.03125,
-            "SI": 0.09375,
-            "SL": 0.083333336,
-            "FC": 0.104166664
+            "FF": 0.42307692492307686,
+            "OTHER": 0.23076922723076923,
+            "CH": 0.03846153953846152,
+            "SI": 0.10256410276923075,
+            "SL": 0.10256410276923075,
+            "FC": 0.10256410276923075
           },
           "pitch_type_whiff_mult": {},
           "pitch_type_inplay_mult": {},
@@ -4809,8 +4809,8 @@
           "statcast_splits_start_date": "",
           "statcast_splits_end_date": "",
           "arsenal_source": "statsapi_pitchArsenal",
-          "arsenal_sample_size": 96,
-          "stamina_pitches": 24,
+          "arsenal_sample_size": 78,
+          "stamina_pitches": 25,
           "role": "MR",
           "availability_mult": 0.9333333333333333,
           "platoon_mult_vs_lhb": {

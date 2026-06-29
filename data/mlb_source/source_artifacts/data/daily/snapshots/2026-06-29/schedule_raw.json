@@ -494,9 +494,9 @@
         },
         "leagueRecord": {
           "wins": 48,
-          "losses": 34,
+          "losses": 35,
           "ties": 0,
-          "pct": ".585"
+          "pct": ".578"
         },
         "probablePitcher": {
           "id": 677960,
@@ -853,10 +853,10 @@
           "active": true
         },
         "leagueRecord": {
-          "wins": 35,
+          "wins": 36,
           "losses": 46,
           "ties": 0,
-          "pct": ".432"
+          "pct": ".439"
         },
         "probablePitcher": {
           "id": 624133,
