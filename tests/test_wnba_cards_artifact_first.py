@@ -3,6 +3,7 @@ from __future__ import annotations
 import unittest
 from unittest.mock import patch
 
+from syndicate.features.wnba.cards import build_cards_page_context
 from syndicate.features.wnba.cards import build_live_state_payload
 from syndicate.features.wnba.cards import build_source_cards_sim_detail_payload
 
@@ -42,6 +43,16 @@ class WnbaCardsArtifactFirstTests(unittest.TestCase):
 
         self.assertEqual(payload["source"], "syndicate_cards_fallback")
         self.assertEqual(payload["games"], [])
+
+    def test_cards_page_context_skips_artifact_loading_on_no_game_dates(self) -> None:
+        with patch("syndicate.features.wnba.cards.has_games_for_date", return_value=False), patch(
+            "syndicate.features.wnba.cards._artifact_bundle",
+            side_effect=AssertionError("artifact bundle should not load for no-game dates"),
+        ):
+            context = build_cards_page_context("2026-06-29")
+
+        self.assertEqual(context["games"], [])
+        self.assertEqual(context["source_title"], "WNBA cards unavailable")
 
 
 if __name__ == "__main__":

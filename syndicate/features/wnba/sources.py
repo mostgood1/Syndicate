@@ -7,6 +7,8 @@ from datetime import datetime
 import json
 from pathlib import Path
 from typing import Any
+from urllib import parse as urllib_parse
+from urllib import request as urllib_request
 
 from syndicate.features.shared.odds_control_plane import current_odds_root_for_sport
 from syndicate.features.shared.source_roots import preferred_artifact_roots
@@ -49,6 +51,27 @@ def _strict_artifact_path(filename: str, subdir: tuple[str, ...]) -> Path:
     missing_path = processed_root().joinpath(*subdir, filename)
     _LOG.error("Missing WNBA artifact: %s", missing_path)
     raise FileNotFoundError(f"Missing WNBA artifact: {missing_path}")
+
+
+@lru_cache(maxsize=128)
+def has_games_for_date(date_str: str) -> bool | None:
+    selected_date = str(date_str or "").strip()
+    if not selected_date:
+        return None
+
+    score_date = selected_date.replace("-", "")
+    url = f"https://site.api.espn.com/apis/site/v2/sports/basketball/wnba/scoreboard?dates={score_date}"
+    request = urllib_request.Request(url, headers={"User-Agent": "Syndicate-WNBA/1.0"})
+    try:
+        with urllib_request.urlopen(request, timeout=8) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except Exception:
+        return None
+
+    events = payload.get("events") if isinstance(payload, dict) else []
+    if not isinstance(events, list):
+        return None
+    return bool(events)
 
 
 def processed_path(filename: str) -> Path:

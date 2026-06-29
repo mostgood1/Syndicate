@@ -46,6 +46,7 @@ from syndicate.features.ncaab.sources import available_dates as ncaab_available_
 from syndicate.features.ncaab.sources import build_module_links as build_ncaab_module_links
 from syndicate.features.ncaab.sources import latest_date as ncaab_latest_date
 from syndicate.features.ncaab.sources import season_for_date as ncaab_season_for_date
+from syndicate.features.wnba.sources import has_games_for_date as wnba_has_games_for_date
 from syndicate.features.shared.timezone import central_datetime_from_epoch
 from syndicate.features.shared.timezone import CENTRAL_TIMEZONE
 from syndicate.features.shared.timezone import central_today_iso
@@ -4306,6 +4307,8 @@ def _build_sport_overview(
         ]
 
     active_today = _is_active_today(slug, today_value, context_label)
+    if slug == "wnba" and wnba_has_games_for_date(context_label) is False:
+        active_today = False
     game_bar = _choose_game_bar(
         links,
         is_active_today=active_today,
@@ -4468,13 +4471,14 @@ def _build_sport_overview(
     overview["props_count"] = props_count
     overview["show_on_home"] = bool(active_game_count or hydrated_game_count or props_count)
     data_warnings: list[str] = []
-    if active_today and active_game_count <= 0:
+    wnba_no_games_today = slug == "wnba" and wnba_has_games_for_date(context_label) is False
+    if active_today and active_game_count <= 0 and not wnba_no_games_today:
         data_warnings.append("No game rows surfaced")
-    if active_today and hydrated_game_count <= 0:
+    if active_today and hydrated_game_count <= 0 and not wnba_no_games_today:
         data_warnings.append("Active games did not fully hydrate")
-    if props_count <= 0:
+    if props_count <= 0 and not wnba_no_games_today:
         data_warnings.append("No prop rows surfaced")
-    if active_today and slug == "wnba" and active_game_count <= 0:
+    if active_today and slug == "wnba" and active_game_count <= 0 and not wnba_no_games_today:
         _LOGGER.warning(
             "WNBA overview source missing for %s: games=%s pregame=%s live=%s dashboard_games=%s",
             context_label,

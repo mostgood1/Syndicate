@@ -28,6 +28,7 @@ from syndicate.features.wnba.sources import format_moneyline
 from syndicate.features.wnba.sources import format_num
 from syndicate.features.wnba.sources import format_signed_num
 from syndicate.features.wnba.sources import load_json
+from syndicate.features.wnba.sources import has_games_for_date
 from syndicate.features.wnba.sources import live_snapshot_path
 from syndicate.features.wnba.sources import market_label
 from syndicate.features.wnba.sources import parse_iso_date
@@ -261,6 +262,8 @@ def _nearest_available_cards_date(selected_date: str) -> str | None:
 
 def _resolved_source_cards_date(selected_date: str, *, allow_stored_date_fallback: bool = False) -> str:
     requested_date = str(selected_date or "").strip() or parse_iso_date(selected_date).isoformat()
+    if has_games_for_date(requested_date) is False:
+        return requested_date
     resolved_date = requested_date
     bundle = _artifact_bundle(resolved_date)
     if bundle["rows"]:
@@ -721,6 +724,21 @@ def _artifact_bundle(selected_date: str) -> dict[str, Any]:
     csv_name = f"game_cards_{selected_date}.csv"
     repo_data_root = _repo_root_from(__file__) / "data" / "wnba_source"
     candidate_roots = list(_wnba_source_roots()) + [repo_data_root]
+
+    if has_games_for_date(selected_date) is False:
+        safe_root = processed_root()
+        return {
+            "paths": {
+                "cards": safe_root / csv_name,
+                "recommendations": safe_root / f"recommendations_slate_{selected_date}.json",
+                "sim": safe_root / f"cards_sim_detail_{selected_date}.json",
+                "props": safe_root / f"cards_props_snapshot_{selected_date}.json",
+            },
+            "rows": [],
+            "recommendations": {},
+            "sim": {},
+            "props": {},
+        }
 
     if selected_date == central_today_iso():
         paths = {
@@ -1800,6 +1818,67 @@ def _supplement_games_with_live_state(games: list[dict[str, Any]], selected_date
 
 def build_cards_page_context(selected_date: str, *, allow_stored_date_fallback: bool = False) -> dict[str, Any]:
     requested_date = str(selected_date or "").strip() or parse_iso_date(selected_date).isoformat()
+    schedule_has_games = has_games_for_date(requested_date)
+    if schedule_has_games is False:
+        parsed_date = parse_iso_date(requested_date)
+        prev_date = (parsed_date - timedelta(days=1)).isoformat()
+        next_date = (parsed_date + timedelta(days=1)).isoformat()
+        return apply_game_board_contract(
+            {
+                "date": requested_date,
+                "requested_date": requested_date,
+                "lookahead_applied": False,
+                "prev_date": prev_date,
+                "next_date": next_date,
+                "games": [],
+                "scoreboard_items": [],
+                "using_sample_data": False,
+                "source_path": str(processed_root() / f"game_cards_{requested_date}.csv"),
+                "source_title": "WNBA cards unavailable",
+                "empty_state": {
+                    "eyebrow": "WNBA cards",
+                    "title": "No WNBA games were scheduled for this date",
+                    "body": "WNBA cards are only published when the slate has games, so there is nothing to validate or load for this date.",
+                    "list_items": [
+                        f"Requested date: {requested_date}",
+                        "Choose another date with a published WNBA slate.",
+                    ],
+                },
+                "header_stats": [
+                    {"label": "Games", "value": "0"},
+                    {"label": "Recommendations", "value": "No data"},
+                ],
+                "route_path": "/wnba/cards",
+                "intro_title": "WNBA Cards",
+                "intro_body": "This is the first non-MLB Syndicate module, mapped into the shared game-card shell from committed WNBA processed artifacts.",
+                "cards_control_links": [
+                    {"label": "Betting Card", "href": f"/wnba/season/{parse_iso_date(requested_date).year}/betting-card?date={requested_date}"},
+                    {"label": "Props", "href": f"/wnba/props?date={requested_date}"},
+                    {"label": "Live Lens", "href": f"/wnba/live-lens?date={requested_date}"},
+                ],
+                "cards_grid_class": "wnba-cards-grid",
+                "cards_stylesheet": "wnba/cards.css",
+                "teaser": {
+                    "label": "WNBA picks",
+                    "body": "Use the dedicated picks module for the strongest processed recommendation slate cards.",
+                    "href": f"/wnba/picks?date={requested_date}",
+                    "cta": "Open WNBA picks",
+                },
+                "module_links": build_module_links(requested_date, "Cards"),
+                "active_sport_name": "WNBA",
+                "wnba_advanced_contract": _wnba_advanced_contract(
+                    selected_date=requested_date,
+                    requested_date=requested_date,
+                    source_title="WNBA cards unavailable",
+                    source_path=str(processed_root() / f"game_cards_{requested_date}.csv"),
+                    games=[],
+                ),
+            },
+            sport="wnba",
+            module="cards",
+            source_kind="artifact_backed",
+            live_lens_integrated=True,
+        )
     cache_key = (
         requested_date,
         bool(allow_stored_date_fallback),
