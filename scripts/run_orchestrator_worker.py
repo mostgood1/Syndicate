@@ -4,11 +4,19 @@ import os
 import subprocess
 import sys
 import time
+import traceback
 from pathlib import Path
+from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
-from syndicate.features.shared.refresh_state_store import assert_refresh_state_backend_ready
+
+def _refresh_state_store() -> dict[str, Any]:
+    if str(REPO_ROOT) not in sys.path:
+        sys.path.insert(0, str(REPO_ROOT))
+    from syndicate.features.shared.refresh_state_store import assert_refresh_state_backend_ready
+
+    return {"assert_refresh_state_backend_ready": assert_refresh_state_backend_ready}
 
 _SUBJOB_TIMEOUT_SECONDS = 120
 
@@ -110,6 +118,9 @@ def run_intelligence_state_job() -> None:
 
 
 def main() -> int:
+    store = _refresh_state_store()
+    assert_refresh_state_backend_ready = store["assert_refresh_state_backend_ready"]
+    print("[orchestrator_worker] BOOTED", flush=True)
     assert_refresh_state_backend_ready(process_name="orchestrator-worker")
     while True:
         run_refresh_job()
@@ -127,4 +138,9 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    try:
+        raise SystemExit(main())
+    except Exception as exc:
+        print(f"[orchestrator_worker_fatal] {type(exc).__name__}: {exc}", file=sys.stderr, flush=True)
+        print(traceback.format_exc(), file=sys.stderr, flush=True)
+        raise
