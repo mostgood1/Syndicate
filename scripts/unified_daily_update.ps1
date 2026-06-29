@@ -3455,9 +3455,35 @@ function Invoke-GitPublish {
     Push-Location $RepoPath
     try {
         $result.branch = Get-CurrentBranch -RepoPath $RepoPath
-        & git add -A
+
+        $stagedDeletePaths = @(& git diff --cached --name-only --diff-filter=D --relative)
         if ($LASTEXITCODE -ne 0) {
-            throw "git add failed for $RepoPath with exit code $LASTEXITCODE"
+            throw "git diff --cached failed for $RepoPath with exit code $LASTEXITCODE"
+        }
+        foreach ($stagedDeletePath in $stagedDeletePaths) {
+            if ([string]::IsNullOrWhiteSpace($stagedDeletePath)) {
+                continue
+            }
+            & git restore --staged -- $stagedDeletePath
+            if ($LASTEXITCODE -ne 0) {
+                throw "git restore --staged failed for $RepoPath path $stagedDeletePath with exit code $LASTEXITCODE"
+            }
+        }
+
+        $appendOnlyChangePaths = @()
+        $appendOnlyChangePaths += @(& git diff --name-only --diff-filter=ACMRTUXB --relative)
+        if ($LASTEXITCODE -ne 0) {
+            throw "git diff failed for $RepoPath with exit code $LASTEXITCODE"
+        }
+        $appendOnlyChangePaths += @(& git ls-files --others --exclude-standard)
+        if ($LASTEXITCODE -ne 0) {
+            throw "git ls-files failed for $RepoPath with exit code $LASTEXITCODE"
+        }
+        foreach ($relativePath in @($appendOnlyChangePaths | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Sort-Object -Unique)) {
+            & git add -- $relativePath
+            if ($LASTEXITCODE -ne 0) {
+                throw "git add failed for $RepoPath path $relativePath with exit code $LASTEXITCODE"
+            }
         }
 
         $defaultExcludeRegexes = @(
@@ -3499,6 +3525,15 @@ function Invoke-GitPublish {
             if ($LASTEXITCODE -ne 0) {
                 throw "git add -f failed for $RepoPath path $repoRelativePath with exit code $LASTEXITCODE"
             }
+        }
+
+        $stagedDeletePaths = @(& git diff --cached --name-only --diff-filter=D --relative)
+        if ($LASTEXITCODE -ne 0) {
+            throw "git diff --cached failed for $RepoPath with exit code $LASTEXITCODE"
+        }
+        if ($stagedDeletePaths.Count -gt 0) {
+            $sampleDeletePaths = ($stagedDeletePaths | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -First 5) -join ', '
+            throw ("Historical artifact deletion detected for {0}; refusing to publish delete paths: {1}" -f $RepoPath, $sampleDeletePaths)
         }
 
         # Only attempt commit when there are staged changes.

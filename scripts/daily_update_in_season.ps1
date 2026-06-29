@@ -341,7 +341,7 @@ function Sync-SportSourceArtifacts {
     $robocopyArgs = @(
         $sourceDataRoot
         $artifactDataRoot
-        '/MIR'
+        '/E'
         '/FFT'
         '/R:1'
         '/W:1'

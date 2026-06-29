@@ -36,7 +36,26 @@ if ([string]::IsNullOrWhiteSpace($porcelain)) {
     Write-Host "No changes to commit." -ForegroundColor Yellow
 } else {
     Write-Host "Staging changes..." -ForegroundColor Cyan
-    git add -A
+    $deletedPaths = @(git diff --cached --name-only --diff-filter=D --relative)
+    foreach ($deletedPath in $deletedPaths) {
+        if ([string]::IsNullOrWhiteSpace($deletedPath)) {
+            continue
+        }
+        git restore --staged -- $deletedPath
+    }
+
+    $pathsToStage = @()
+    $pathsToStage += @(git diff --name-only --diff-filter=ACMRTUXB --relative)
+    $pathsToStage += @(git ls-files --others --exclude-standard)
+    foreach ($path in ($pathsToStage | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Sort-Object -Unique)) {
+        git add -- $path
+    }
+
+    $stagedDeletes = @(git diff --cached --name-only --diff-filter=D --relative)
+    if ($stagedDeletes.Count -gt 0) {
+        $sampleDeletes = ($stagedDeletes | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -First 5) -join ', '
+        throw "Historical artifact deletion detected; refusing to stage delete paths: $sampleDeletes"
+    }
     Write-Host "Committing: $CommitMessage" -ForegroundColor Cyan
     git commit -m "$CommitMessage"
     if ($LASTEXITCODE -ne 0) {

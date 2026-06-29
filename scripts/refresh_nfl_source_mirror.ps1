@@ -73,9 +73,6 @@ function Copy-IfExists {
     }
 
     if ($Recurse) {
-        if (Test-Path $DestinationPath) {
-            Remove-Item -Path $DestinationPath -Recurse -Force
-        }
         Copy-Item -Path $SourcePath -Destination $DestinationPath -Recurse -Force
     }
     else {
