@@ -6,7 +6,7 @@ import os
 import subprocess
 import sys
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -35,6 +35,88 @@ def _default_poll_seconds() -> float:
     except ValueError:
         poll_seconds = 30.0
     return max(1.0, poll_seconds)
+
+
+def _default_max_active_jobs() -> int:
+    raw_value = str(os.environ.get("SYNDICATE_REFRESH_WORKER_MAX_ACTIVE_JOBS") or "1").strip()
+    try:
+        value = int(raw_value)
+    except ValueError:
+        value = 1
+    return max(1, value)
+
+
+def _default_stuck_claim_timeout_minutes() -> int:
+    raw_value = str(os.environ.get("SYNDICATE_REFRESH_WORKER_STUCK_CLAIM_TIMEOUT_MINUTES") or "15").strip()
+    try:
+        value = int(raw_value)
+    except ValueError:
+        value = 15
+    return max(1, value)
+
+
+def _pid_is_running(pid: int | None) -> bool:
+    if not isinstance(pid, int) or pid <= 0:
+        return False
+    try:
+        os.kill(int(pid), 0)
+        return True
+    except Exception:
+        return False
+
+
+def _parse_utc_timestamp(value: str | None) -> datetime | None:
+    raw = str(value or "").strip()
+    if not raw:
+        return None
+    candidate = raw[:-1] + "+00:00" if raw.endswith("Z") else raw
+    try:
+        parsed = datetime.fromisoformat(candidate)
+    except Exception:
+        return None
+    if parsed.tzinfo is not None:
+        parsed = parsed.astimezone(timezone.utc).replace(tzinfo=None)
+    return parsed
+
+
+def _latest_manifest_payload(latest_manifest_path: Path) -> dict[str, Any]:
+    payload = read_json_file(latest_manifest_path) or {}
+    return payload if isinstance(payload, dict) else {}
+
+
+def _current_active_job_count(latest_manifest_path: Path) -> int:
+    payload = _latest_manifest_payload(latest_manifest_path)
+    state = str(payload.get("state") or "").strip().lower()
+    if state not in {"claimed", "launched", "running"}:
+        return 0
+    pid = payload.get("launchPid")
+    if isinstance(pid, int) and _pid_is_running(pid):
+        return 1
+    pid = payload.get("pid")
+    if isinstance(pid, int) and _pid_is_running(pid):
+        return 1
+    return 0
+
+
+def _recover_stuck_claim(latest_manifest_path: Path, *, timeout_minutes: int) -> bool:
+    payload = _latest_manifest_payload(latest_manifest_path)
+    if str(payload.get("state") or "").strip().lower() != "claimed":
+        return False
+    if _current_active_job_count(latest_manifest_path) > 0:
+        return False
+    claimed_at = _parse_utc_timestamp(str(payload.get("workerClaimedAt") or "") or str(payload.get("runnerClaimedAt") or "") or str(payload.get("claimedAt") or ""))
+    if claimed_at is None:
+        return False
+    age_minutes = max(0, int((datetime.utcnow() - claimed_at).total_seconds() // 60))
+    if age_minutes < int(timeout_minutes):
+        return False
+    payload["state"] = "pending_external"
+    payload["workerRecoveredAt"] = datetime.utcnow().isoformat(timespec="seconds") + "Z"
+    payload["workerRecoveryReason"] = f"stuck_claim_timeout_{timeout_minutes}m"
+    for key in ("workerClaimedAt", "workerKind", "launchPid"):
+        payload.pop(key, None)
+    write_json_file(latest_manifest_path, payload)
+    return True
 
 
 def _has_pending_external_contract(latest_manifest_path: Path) -> bool:
@@ -74,6 +156,7 @@ def _write_worker_status(
     run_exit_code: int | None = None,
     latest_manifest_state: str | None = None,
     launch_pid: int | None = None,
+    refresh_cycle: dict[str, int] | None = None,
 ) -> None:
     write_json_file(
         worker_status_path,
@@ -85,6 +168,7 @@ def _write_worker_status(
             "runExitCode": int(run_exit_code) if run_exit_code is not None else None,
             "latestManifestState": latest_manifest_state,
             "launchPid": int(launch_pid) if launch_pid is not None else None,
+            "refreshCycle": refresh_cycle or {"claimed_count": 0, "reclaimed_count": 0, "skipped_due_to_cap": 0},
             "updatedAt": datetime.utcnow().isoformat(timespec="seconds") + "Z",
         },
     )
@@ -115,12 +199,26 @@ def _mark_claimed_external_contract(latest_manifest_path: Path) -> None:
     write_json_file(latest_manifest_path, latest_manifest)
 
 
+def _mark_throttled_worker_status(*, worker_status_path: Path, latest_manifest_path: Path, active_jobs: int, max_active_jobs: int) -> None:
+    _write_worker_status(
+        worker_status_path=worker_status_path,
+        latest_manifest_path=latest_manifest_path,
+        state="throttled",
+        detail=f"Active refresh jobs {active_jobs} reached the configured limit {max_active_jobs}.",
+        ran_job=False,
+        latest_manifest_state=str((_latest_manifest_payload(latest_manifest_path).get("state") or "")).strip().lower() or None,
+        refresh_cycle={"claimed_count": 0, "reclaimed_count": 0, "skipped_due_to_cap": 1},
+    )
+
+
 def main() -> int:
     assert_refresh_state_backend_ready(process_name="refresh-worker")
     parser = argparse.ArgumentParser(description="Poll Syndicate refresh state and execute queued external-runner jobs.")
     parser.add_argument("--latest-manifest", default=str(_default_latest_manifest_path()))
     parser.add_argument("--worker-status", default=str(_default_worker_status_path()))
     parser.add_argument("--poll-seconds", type=float, default=_default_poll_seconds())
+    parser.add_argument("--max-active-jobs", type=int, default=_default_max_active_jobs())
+    parser.add_argument("--stuck-claim-timeout-minutes", type=int, default=_default_stuck_claim_timeout_minutes())
     parser.add_argument("--run-once", action="store_true")
     parser.add_argument("--max-iterations", type=int, default=0)
     args = parser.parse_args()
@@ -128,11 +226,39 @@ def main() -> int:
     latest_manifest_path = Path(str(args.latest_manifest or "").strip()).expanduser().resolve()
     worker_status_path = Path(str(args.worker_status or "").strip()).expanduser().resolve()
     poll_seconds = max(1.0, float(args.poll_seconds))
+    max_active_jobs = max(1, int(args.max_active_jobs))
+    stuck_claim_timeout_minutes = max(1, int(args.stuck_claim_timeout_minutes))
     max_iterations = max(0, int(args.max_iterations))
 
     iterations = 0
     while True:
+        refresh_cycle = {"claimed_count": 0, "reclaimed_count": 0, "skipped_due_to_cap": 0}
+        if _recover_stuck_claim(latest_manifest_path, timeout_minutes=stuck_claim_timeout_minutes):
+            refresh_cycle["reclaimed_count"] = 1
+            _write_worker_status(
+                worker_status_path=worker_status_path,
+                latest_manifest_path=latest_manifest_path,
+                state="recovered",
+                detail=f"Recovered a stuck claimed refresh contract older than {stuck_claim_timeout_minutes} minutes.",
+                ran_job=False,
+                latest_manifest_state=str((_latest_manifest_payload(latest_manifest_path).get("state") or "")).strip().lower() or None,
+                refresh_cycle=refresh_cycle,
+            )
+
+        active_jobs = _current_active_job_count(latest_manifest_path)
+        if active_jobs >= max_active_jobs:
+            refresh_cycle["skipped_due_to_cap"] = 1
+            _mark_throttled_worker_status(
+                worker_status_path=worker_status_path,
+                latest_manifest_path=latest_manifest_path,
+                active_jobs=active_jobs,
+                max_active_jobs=max_active_jobs,
+            )
+            if args.run_once:
+                return 0
+
         if _has_pending_external_contract(latest_manifest_path):
+            refresh_cycle["claimed_count"] = 1
             _mark_claimed_external_contract(latest_manifest_path)
             _write_worker_status(
                 worker_status_path=worker_status_path,
@@ -140,6 +266,7 @@ def main() -> int:
                 state="claimed",
                 detail="Queued refresh contract detected; job runner launched asynchronously.",
                 ran_job=False,
+                refresh_cycle=refresh_cycle,
             )
             process = _spawn_pending_job(latest_manifest_path)
             _write_worker_status(
@@ -151,6 +278,7 @@ def main() -> int:
                 run_exit_code=None,
                 latest_manifest_state=str((read_json_file(latest_manifest_path) or {}).get("state") or "").strip().lower() or None,
                 launch_pid=int(getattr(process, "pid", 0) or 0) or None,
+                refresh_cycle=refresh_cycle,
             )
             if args.run_once:
                 return 0
@@ -163,6 +291,7 @@ def main() -> int:
                 ran_job=False,
                 run_exit_code=None,
                 latest_manifest_state=str((read_json_file(latest_manifest_path) or {}).get("state") or "").strip().lower() or None,
+                refresh_cycle=refresh_cycle,
             )
             return 0
 
@@ -176,6 +305,7 @@ def main() -> int:
                 state="idle",
                 detail="Worker reached the configured max iterations.",
                 ran_job=False,
+                refresh_cycle=refresh_cycle,
             )
             return 0
         time.sleep(poll_seconds)

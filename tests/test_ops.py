@@ -195,7 +195,11 @@ class OpsRefreshApiTests(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            with patch.dict(os.environ, {"ADMIN_TOKEN": "secret-token"}, clear=False), patch(
+            with patch.dict(
+                os.environ,
+                {"ADMIN_TOKEN": "secret-token", "SYNDICATE_REPORTS_ROOT": str(reports_root)},
+                clear=False,
+            ), patch(
                 "syndicate.features.shared.ops_refresh.REPO_ROOT", repo_root
             ), patch("syndicate.features.shared.ops_refresh.REPORTS_ROOT", reports_root), patch(
                 "syndicate.features.shared.ops_refresh._pid_is_running",
@@ -219,7 +223,7 @@ class OpsRefreshApiTests(unittest.TestCase):
             refresh_latest.mkdir(parents=True, exist_ok=True)
             artifacts_dir.mkdir(parents=True, exist_ok=True)
             (refresh_latest / "refresh_worker_status.json").write_text(
-                json.dumps({"state": "finished", "detail": "worker finished", "ranJob": True, "runExitCode": 0}),
+                json.dumps({"state": "finished", "detail": "worker finished", "ranJob": True, "runExitCode": 0, "refreshCycle": {"claimed_count": 1, "reclaimed_count": 0, "skipped_due_to_cap": 0}}),
                 encoding="utf-8",
             )
             (artifacts_dir / "refresh_job_status.json").write_text(
@@ -239,7 +243,11 @@ class OpsRefreshApiTests(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            with patch.dict(os.environ, {"ADMIN_TOKEN": "secret-token"}, clear=False), patch(
+            with patch.dict(
+                os.environ,
+                {"ADMIN_TOKEN": "secret-token", "SYNDICATE_REPORTS_ROOT": str(reports_root)},
+                clear=False,
+            ), patch(
                 "syndicate.features.shared.ops_refresh.REPO_ROOT", repo_root
             ), patch("syndicate.features.shared.ops_refresh.REPORTS_ROOT", reports_root):
                 response = self.client.get(
@@ -253,6 +261,7 @@ class OpsRefreshApiTests(unittest.TestCase):
         self.assertEqual(runtime["state"], "pending_external")
         self.assertEqual(runtime["launch_owner"], "external_runner")
         self.assertEqual((runtime.get("external_runner") or {}).get("queue_state"), "queued")
+        self.assertEqual(runtime["refresh_cycle"], {"claimed_count": 1, "reclaimed_count": 0, "skipped_due_to_cap": 0})
         self.assertEqual((payload["status"]["refresh_status"]["artifacts"]["refresh_worker_status"]["payload"] or {}).get("state"), "finished")
         self.assertEqual((payload["status"]["refresh_status"]["artifacts"]["refresh_job_status"]["payload"] or {}).get("state"), "finished")
 

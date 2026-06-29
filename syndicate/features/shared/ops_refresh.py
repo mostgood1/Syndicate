@@ -207,6 +207,11 @@ def _derive_refresh_runtime_state(
     odds_refresh_stderr = ((artifacts.get("odds_refresh_stderr") or {}).get("payload") if isinstance(artifacts.get("odds_refresh_stderr"), dict) else None)
     launch_owner = str(manifest.get("launchOwner") or "").strip() or None
     external_runner = manifest.get("externalRunner") if isinstance(manifest.get("externalRunner"), dict) else None
+    refresh_cycle = None
+    refresh_worker_status = artifacts.get("refresh_worker_status") if isinstance(artifacts.get("refresh_worker_status"), dict) else {}
+    refresh_worker_payload = refresh_worker_status.get("payload") if isinstance(refresh_worker_status, dict) else None
+    if isinstance(refresh_worker_payload, dict) and isinstance(refresh_worker_payload.get("refreshCycle"), dict):
+        refresh_cycle = refresh_worker_payload.get("refreshCycle")
 
     pid_running = False
     if pid is not None:
@@ -261,6 +266,7 @@ def _derive_refresh_runtime_state(
             elapsed_seconds=elapsed_seconds,
             budget_seconds=_runtime_budget_seconds("SYNDICATE_REFRESH_RUNTIME_BUDGET_SECONDS"),
         ),
+        "refresh_cycle": refresh_cycle,
     }
 
 
