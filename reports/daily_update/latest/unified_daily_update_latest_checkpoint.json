@@ -1,13 +1,13 @@
 ﻿{
     "scope":  "daily_update",
-    "date":  "2026-06-28",
+    "date":  "2026-06-29",
     "runMode":  "standard",
     "overallStatus":  "ok",
-    "generatedAt":  "2026-06-28T07:20:47.8131741+00:00",
-    "updatedAt":  "2026-06-28T07:40:23.9342168+00:00",
-    "runDir":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-06-28\\20260628_072046",
+    "generatedAt":  "2026-06-29T02:07:14.6424982+00:00",
+    "updatedAt":  "2026-06-29T02:21:25.2666445+00:00",
+    "runDir":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-06-29\\20260629_020714",
     "latestDir":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest",
-    "lastUpdatedAt":  "2026-06-28T07:40:23.9203740+00:00",
+    "lastUpdatedAt":  "2026-06-29T02:21:25.2608326+00:00",
     "currentStage":  "completed",
     "completedStages":  [
                             "source_update",
@@ -28,46 +28,6 @@
                                "sport":  "mlb",
                                "workflow":  "syndicate_refresh",
                                "name":  "MLB current-day live-lens refresh",
-                               "decision":  "planned",
-                               "status":  "pending"
-                           },
-                           {
-                               "stage":  "source_update",
-                               "sport":  "wnba",
-                               "workflow":  "vendored_daily_update",
-                               "name":  "WNBA vendored daily update",
-                               "decision":  "planned",
-                               "status":  "pending"
-                           },
-                           {
-                               "stage":  "source_update",
-                               "sport":  "wnba",
-                               "workflow":  "syndicate_mirror",
-                               "name":  "WNBA source mirror refresh",
-                               "decision":  "planned",
-                               "status":  "pending"
-                           },
-                           {
-                               "stage":  "source_update",
-                               "sport":  "nhl",
-                               "workflow":  "vendored_daily_update",
-                               "name":  "NHL vendored daily update",
-                               "decision":  "planned",
-                               "status":  "pending"
-                           },
-                           {
-                               "stage":  "source_update",
-                               "sport":  null,
-                               "workflow":  null,
-                               "name":  "NFL local odds refresh",
-                               "decision":  "planned",
-                               "status":  "pending"
-                           },
-                           {
-                               "stage":  "source_update",
-                               "sport":  "ncaab",
-                               "workflow":  "syndicate_mirror",
-                               "name":  "NCAAB source mirror export",
                                "decision":  "planned",
                                "status":  "pending"
                            },
@@ -103,7 +63,7 @@
                            }
                        ],
     "provenance":  {
-                       "sourceStepCount":  7,
+                       "sourceStepCount":  2,
                        "sourceSteps":  [
                                            {
                                                "sport":  "mlb",
@@ -114,46 +74,20 @@
                                                "sport":  "mlb",
                                                "workflow":  "syndicate_refresh",
                                                "name":  "MLB current-day live-lens refresh"
-                                           },
-                                           {
-                                               "sport":  "wnba",
-                                               "workflow":  "vendored_daily_update",
-                                               "name":  "WNBA vendored daily update"
-                                           },
-                                           {
-                                               "sport":  "wnba",
-                                               "workflow":  "syndicate_mirror",
-                                               "name":  "WNBA source mirror refresh"
-                                           },
-                                           {
-                                               "sport":  "nhl",
-                                               "workflow":  "vendored_daily_update",
-                                               "name":  "NHL vendored daily update"
-                                           },
-                                           {
-                                               "sport":  null,
-                                               "workflow":  null,
-                                               "name":  "NFL local odds refresh"
-                                           },
-                                           {
-                                               "sport":  "ncaab",
-                                               "workflow":  "syndicate_mirror",
-                                               "name":  "NCAAB source mirror export"
                                            }
                                        ],
                        "latestManifestLoaded":  true,
                        "latestEventSimExecutionPlanCount":  21,
                        "latestArtifactUpdateCount":  21,
-                       "oddsHistoryTriggerPlanCount":  7,
-                       "simExecutionDecision":  true
+                       "oddsHistoryTriggerPlanCount":  2,
+                       "simExecutionDecision":  null
                    },
     "trace":  {
                   "eventSimExecutionCount":  21,
                   "artifactUpdateCount":  21,
-                  "inputFingerprintCount":  3,
+                  "inputFingerprintCount":  2,
                   "artifactPathCount":  21,
                   "inputFingerprints":  [
-                                            "202737b9f0d501f71d0891612e066946a07c36ddfe8add7f6056e0aab344894e",
                                             "b6978cd8f47bbebfa4c1028933e311366607f79c460fde585a3b5bd93afea73f",
                                             "563a06b8e8830bba5d1cdcf73bb91ad105470d2e01ba859ebaa44c2126a6045d"
                                         ],
@@ -180,7 +114,7 @@
                                         "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_POR_SEA.json",
                                         "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_bundle.json"
                                     ],
-                  "simExecutionDecision":  true
+                  "simExecutionDecision":  null
               },
     "replayContext":  {
                           "latestCheckpointLoaded":  true,
@@ -197,7 +131,7 @@
                           "forceRebuildToday":  false
                       },
     "runPlan":  {
-                    "simExecution":  true,
+                    "simExecution":  null,
                     "sourceUpdates":  true,
                     "refreshGate":  true,
                     "artifactGeneration":  false,

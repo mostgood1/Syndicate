@@ -1,0 +1,2190 @@
+{
+  "season": 2026,
+  "date": "2026-06-29",
+  "profile": "retuned",
+  "available_profiles": {
+    "retuned": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/eval/seasons/2026/season_betting_cards_retuned_manifest.json"
+  },
+  "found": true,
+  "games": [
+    {
+      "game_pk": 823444,
+      "game_date": "2026-06-29T22:40:00Z",
+      "start_time": "5:40 PM",
+      "official_date": "2026-06-29",
+      "status": {
+        "abstract": "Preview",
+        "detailed": "Scheduled"
+      },
+      "away": {
+        "id": 134,
+        "abbr": "PIT",
+        "name": "Pittsburgh Pirates"
+      },
+      "home": {
+        "id": 143,
+        "abbr": "PHI",
+        "name": "Philadelphia Phillies"
+      },
+      "starter_names": {
+        "away": "Braxton Ashcraft",
+        "home": "Aaron Nola"
+      },
+      "matchup": {
+        "isLive": false,
+        "isFinal": false,
+        "liveText": "",
+        "displayState": "Scheduled",
+        "inning": null,
+        "halfInning": "",
+        "count": {
+          "balls": null,
+          "strikes": null,
+          "outs": null
+        },
+        "batter": "",
+        "pitcher": "",
+        "score": {
+          "away": null,
+          "home": null
+        }
+      },
+      "betting": {
+        "markets": {
+          "totals": null,
+          "ml": null,
+          "pitcherProps": [],
+          "hitterProps": [
+            {
+              "date": "2026-06-29",
+              "game_pk": 823444,
+              "away": "Pittsburgh Pirates",
+              "home": "Philadelphia Phillies",
+              "away_abbr": "PIT",
+              "home_abbr": "PHI",
+              "double_header": "N",
+              "game_number": 1,
+              "event_id": null,
+              "commence_time": null,
+              "batter_id": 693304,
+              "batter_hand": "R",
+              "opponent_pitcher_id": 605400,
+              "opponent_pitcher_hand": "R",
+              "opponent_pitcher_name": "Aaron Nola",
+              "opponent": "PHI",
+              "opponent_team_id": 143,
+              "lineup_source": "projected_rotowire_today_lineup",
+              "lineup_confidence": 0.72,
+              "lineup_status": "projected",
+              "batter_k_rate": 0.18586937641132534,
+              "batter_bb_rate": 0.04751606739621331,
+              "batter_hr_rate": 0.011047420531526837,
+              "batter_inplay_hit_rate": 0.3438776531838206,
+              "batter_xb_hit_share": 0.14457831325301204,
+              "pitcher_k_rate": 0.2326618861364624,
+              "pitcher_bb_rate": 0.07521512385919166,
+              "pitcher_hr_rate": 0.05004997827031725,
+              "pitcher_inplay_hit_rate": 0.36185792349726775,
+              "pitcher_availability_mult": 1.0,
+              "pitcher_stamina_pitches": 94.0,
+              "pitcher_platoon_k_mult": 1.120094764552802,
+              "pitcher_platoon_bb_mult": 0.8075,
+              "pitcher_platoon_hr_mult": 0.8826384157478948,
+              "pitcher_platoon_inplay_mult": 1.0135708686401135,
+              "batter_platoon_k_mult": 0.9454717395296677,
+              "batter_platoon_bb_mult": 0.8806988646265934,
+              "batter_platoon_hr_mult": 1.1446796840719613,
+              "batter_platoon_inplay_mult": 1.0377335496031848,
+              "opponent_primary_pitch_type": "KC",
+              "weather_source": "statsapi_live_feed",
+              "weather_wind_direction": "unknown",
+              "weather_hr_mult": 1.0,
+              "weather_inplay_hit_mult": 1.0,
+              "weather_xb_share_mult": 1.0,
+              "park_source": "statsapi_live_feed",
+              "venue_id": 2681,
+              "venue_name": "Citizens Bank Park",
+              "roof_type": "Open",
+              "park_hr_mult": 1.0333333333333334,
+              "park_inplay_hit_mult": 0.9866666666666667,
+              "park_xb_share_mult": 0.9833333333333333,
+              "market": "hitter_total_bases",
+              "market_label": "Hitter Total Bases",
+              "market_group": "hitter_props",
+              "player_name": "Nick Gonzales",
+              "team": "PIT",
+              "prop": "batter_total_bases",
+              "prop_market_key": "batter_total_bases",
+              "selection": "over",
+              "edge": 0.03297446961524636,
+              "market_line": 1.5,
+              "model_prob_over": 0.442,
+              "market_prob_over": 0.40902553038475364,
+              "market_prob_under": 0.5909744696152462,
+              "market_prob_mode": "no_vig_two_way",
+              "market_no_vig_prob_over": 0.40902553038475364,
+              "selected_side_market_prob": 0.40902553038475364,
+              "selected_side_model_prob": 0.442,
+              "mean_support": 0.20700000000000007,
+              "tb_mean": 1.707,
+              "pa_mean": 4.92,
+              "ab_mean": 4.346,
+              "lineup_order": 4,
+              "market_alternates": [],
+              "odds": "+128",
+              "stake_u": 0.5,
+              "sim_sample_size": 1000,
+              "baseball_reasons": [
+                "Over his last 10 games, he has cleared 1.5 total bases in 6 of 10 games.",
+                "The handedness matchup leans his way here, with his expected damage against R-handed pitching grading above baseline."
+              ],
+              "explanation_diagnostic": {
+                "status": "supported",
+                "flag_sparse_support": false,
+                "support_min_reasons": 2,
+                "baseball_reasons_n": 2,
+                "reason_sentences_n": 5,
+                "market": "hitter_total_bases",
+                "subject": "Nick Gonzales",
+                "supporting_reasons": [
+                  "Over his last 10 games, he has cleared 1.5 total bases in 6 of 10 games.",
+                  "The handedness matchup leans his way here, with his expected damage against R-handed pitching grading above baseline."
+                ]
+              },
+              "reasons": [
+                "The model lands on the over side in 44.2% of sims, while the market is pricing it closer to 40.9%. Over his last 10 games, he has cleared 1.5 total bases in 6 of 10 games. The handedness matchup leans his way here, with his expected damage against R-handed pitching grading above baseline. The model baseline comes in around 1.7 batter total bases against a line of 1.5. He is projected to hit in the 4 spot, which points to about 4.9 plate appearances."
+              ],
+              "reason_summary": "The model lands on the over side in 44.2% of sims, while the market is pricing it closer to 40.9%. Over his last 10 games, he has cleared 1.5 total bases in 6 of 10 games. The handedness matchup leans his way here, with his expected damage against R-handed pitching grading above baseline. The model baseline comes in around 1.7 batter total bases against a line of 1.5. He is projected to hit in the 4 spot, which points to about 4.9 plate appearances.",
+              "rank": 2,
+              "recommendation_tier": "official"
+            },
+            {
+              "date": "2026-06-29",
+              "game_pk": 823444,
+              "away": "Pittsburgh Pirates",
+              "home": "Philadelphia Phillies",
+              "away_abbr": "PIT",
+              "home_abbr": "PHI",
+              "double_header": "N",
+              "game_number": 1,
+              "event_id": null,
+              "commence_time": null,
+              "batter_id": 702222,
+              "batter_hand": "L",
+              "opponent_pitcher_id": 677952,
+              "opponent_pitcher_hand": "R",
+              "opponent_pitcher_name": "Braxton Ashcraft",
+              "opponent": "PIT",
+              "opponent_team_id": 134,
+              "lineup_source": "projected_rotowire_default_vs_rhp",
+              "lineup_confidence": 0.66,
+              "lineup_status": "projected",
+              "batter_k_rate": 0.22753459929192146,
+              "batter_bb_rate": 0.06459607338268425,
+              "batter_hr_rate": 0.00711297071129707,
+              "batter_inplay_hit_rate": 0.315,
+              "batter_xb_hit_share": 0.24528301886792453,
+              "pitcher_k_rate": 0.27516599105395584,
+              "pitcher_bb_rate": 0.053868465194296895,
+              "pitcher_hr_rate": 0.019401733296058148,
+              "pitcher_inplay_hit_rate": 0.3280850472484714,
+              "pitcher_availability_mult": 1.0,
+              "pitcher_stamina_pitches": 94.0,
+              "pitcher_platoon_k_mult": 1.0734768779761112,
+              "pitcher_platoon_bb_mult": 1.1056916145658198,
+              "pitcher_platoon_hr_mult": 1.2302197075853318,
+              "pitcher_platoon_inplay_mult": 1.051454549452127,
+              "batter_platoon_k_mult": 0.960165936834608,
+              "batter_platoon_bb_mult": 1.0062203143269914,
+              "batter_platoon_hr_mult": 1.2271208986107007,
+              "batter_platoon_inplay_mult": 1.0116605616605616,
+              "opponent_primary_pitch_type": "FF",
+              "weather_source": "statsapi_live_feed",
+              "weather_wind_direction": "unknown",
+              "weather_hr_mult": 1.0,
+              "weather_inplay_hit_mult": 1.0,
+              "weather_xb_share_mult": 1.0,
+              "park_source": "statsapi_live_feed",
+              "venue_id": 2681,
+              "venue_name": "Citizens Bank Park",
+              "roof_type": "Open",
+              "park_hr_mult": 1.0333333333333334,
+              "park_inplay_hit_mult": 0.9866666666666667,
+              "park_xb_share_mult": 0.9833333333333333,
+              "market": "hitter_hits",
+              "market_label": "Hitter Hits",
+              "market_group": "hitter_props",
+              "player_name": "Justin Crawford",
+              "team": "PHI",
+              "prop": "batter_hits",
+              "prop_market_key": "batter_hits",
+              "selection": "over",
+              "edge": 0.09987177467008079,
+              "market_line": 0.5,
+              "model_prob_over": 0.637,
+              "market_prob_over": 0.5371282253299192,
+              "market_prob_under": 0.4628717746700807,
+              "market_prob_mode": "no_vig_two_way",
+              "market_no_vig_prob_over": 0.5371282253299192,
+              "selected_side_market_prob": 0.5371282253299192,
+              "selected_side_model_prob": 0.637,
+              "mean_support": 0.42000000000000004,
+              "h_mean": 0.92,
+              "pa_mean": 3.994,
+              "ab_mean": 3.542,
+              "lineup_order": 9,
+              "market_alternates": [],
+              "odds": "-135",
+              "stake_u": 0.5,
+              "sim_sample_size": 1000,
+              "baseball_reasons": [
+                "Over his last 10 games, he has recorded a hit in 6 of 10 games.",
+                "The handedness matchup leans his way here, with his expected damage against R-handed pitching grading above baseline."
+              ],
+              "explanation_diagnostic": {
+                "status": "supported",
+                "flag_sparse_support": false,
+                "support_min_reasons": 2,
+                "baseball_reasons_n": 2,
+                "reason_sentences_n": 5,
+                "market": "hitter_hits",
+                "subject": "Justin Crawford",
+                "supporting_reasons": [
+                  "Over his last 10 games, he has recorded a hit in 6 of 10 games.",
+                  "The handedness matchup leans his way here, with his expected damage against R-handed pitching grading above baseline."
+                ]
+              },
+              "reasons": [
+                "The model lands on the over side in 63.7% of sims, while the market is pricing it closer to 53.7%. Over his last 10 games, he has recorded a hit in 6 of 10 games. The handedness matchup leans his way here, with his expected damage against R-handed pitching grading above baseline. The model baseline comes in around 0.9 batter hits against a line of 0.5. He is projected to hit in the 9 spot, which points to about 4.0 plate appearances."
+              ],
+              "reason_summary": "The model lands on the over side in 63.7% of sims, while the market is pricing it closer to 53.7%. Over his last 10 games, he has recorded a hit in 6 of 10 games. The handedness matchup leans his way here, with his expected damage against R-handed pitching grading above baseline. The model baseline comes in around 0.9 batter hits against a line of 0.5. He is projected to hit in the 9 spot, which points to about 4.0 plate appearances.",
+              "rank": 4,
+              "recommendation_tier": "official"
+            }
+          ],
+          "extraPitcherProps": [
+            {
+              "date": "2026-06-29",
+              "game_pk": 823444,
+              "away": "Pittsburgh Pirates",
+              "home": "Philadelphia Phillies",
+              "away_abbr": "PIT",
+              "home_abbr": "PHI",
+              "double_header": "N",
+              "game_number": 1,
+              "event_id": null,
+              "commence_time": null,
+              "market": "pitcher_props",
+              "pitcher_id": 677952,
+              "pitcher_name": "Braxton Ashcraft",
+              "team": "PIT",
+              "team_side": "away",
+              "prop": "outs",
+              "selection": "over",
+              "edge": 0.3283467048710601,
+              "market_line": 17.5,
+              "model_prob_over": 0.857,
+              "market_prob_over": 0.5286532951289399,
+              "market_prob_under": 0.4713467048710602,
+              "market_prob_mode": "no_vig_two_way",
+              "market_no_vig_prob_over": 0.5286532951289399,
+              "selected_side_market_prob": 0.5286532951289399,
+              "selected_side_model_prob": 0.857,
+              "mean_support": 3.4250000000000007,
+              "outs_mean": 20.925,
+              "market_alternates": [],
+              "odds": "-135",
+              "stake_u": 1.0,
+              "sim_sample_size": 1000,
+              "baseball_reasons": [
+                "Across his last 5 starts, he has averaged 16.8 outs.",
+                "His modeled workload cap still reaches roughly 94 pitches, so the deeper-start path is still available if the outing stays efficient."
+              ],
+              "explanation_diagnostic": {
+                "status": "supported",
+                "flag_sparse_support": false,
+                "support_min_reasons": 2,
+                "baseball_reasons_n": 2,
+                "reason_sentences_n": 5,
+                "market": "pitcher_props:outs",
+                "subject": "Braxton Ashcraft",
+                "supporting_reasons": [
+                  "Across his last 5 starts, he has averaged 16.8 outs.",
+                  "His modeled workload cap still reaches roughly 94 pitches, so the deeper-start path is still available if the outing stays efficient."
+                ]
+              },
+              "reasons": [
+                "The model lands on the over side in 85.7% of sims, while the market is pricing it closer to 52.9%. Across his last 5 starts, he has averaged 16.8 outs. His modeled workload cap still reaches roughly 94 pitches, so the deeper-start path is still available if the outing stays efficient. The model baseline sits around 20.9 outs against a line of 17.5. If he stays on his normal starter path, the matchup against PHI gives him a fair shot to reach full workload volume."
+              ],
+              "reason_summary": "The model lands on the over side in 85.7% of sims, while the market is pricing it closer to 52.9%. Across his last 5 starts, he has averaged 16.8 outs. His modeled workload cap still reaches roughly 94 pitches, so the deeper-start path is still available if the outing stays efficient. The model baseline sits around 20.9 outs against a line of 17.5. If he stays on his normal starter path, the matchup against PHI gives him a fair shot to reach full workload volume.",
+              "rank": 4,
+              "recommendation_tier": "candidate"
+            },
+            {
+              "date": "2026-06-29",
+              "game_pk": 823444,
+              "away": "Pittsburgh Pirates",
+              "home": "Philadelphia Phillies",
+              "away_abbr": "PIT",
+              "home_abbr": "PHI",
+              "double_header": "N",
+              "game_number": 1,
+              "event_id": null,
+              "commence_time": null,
+              "market": "pitcher_props",
+              "pitcher_id": 605400,
+              "pitcher_name": "Aaron Nola",
+              "team": "PHI",
+              "team_side": "home",
+              "prop": "outs",
+              "selection": "over",
+              "edge": 0.34797669185018487,
+              "market_line": 16.5,
+              "model_prob_over": 0.853,
+              "market_prob_over": 0.5050233081498151,
+              "market_prob_under": 0.4949766918501849,
+              "market_prob_mode": "no_vig_two_way",
+              "market_no_vig_prob_over": 0.5050233081498151,
+              "selected_side_market_prob": 0.5050233081498151,
+              "selected_side_model_prob": 0.853,
+              "mean_support": 3.814,
+              "outs_mean": 20.314,
+              "market_alternates": [],
+              "odds": "-118",
+              "stake_u": 1.0,
+              "sim_sample_size": 1000,
+              "baseball_reasons": [
+                "The projected lineup is mostly 3 left-handed, 4 right-handed, and 2 switch-hitting, and the damage profile is lighter than average.",
+                "His modeled workload cap still reaches roughly 94 pitches, so the deeper-start path is still available if the outing stays efficient."
+              ],
+              "explanation_diagnostic": {
+                "status": "supported",
+                "flag_sparse_support": false,
+                "support_min_reasons": 2,
+                "baseball_reasons_n": 2,
+                "reason_sentences_n": 5,
+                "market": "pitcher_props:outs",
+                "subject": "Aaron Nola",
+                "supporting_reasons": [
+                  "The projected lineup is mostly 3 left-handed, 4 right-handed, and 2 switch-hitting, and the damage profile is lighter than average.",
+                  "His modeled workload cap still reaches roughly 94 pitches, so the deeper-start path is still available if the outing stays efficient."
+                ]
+              },
+              "reasons": [
+                "The model lands on the over side in 85.3% of sims, while the market is pricing it closer to 50.5%. The projected lineup is mostly 3 left-handed, 4 right-handed, and 2 switch-hitting, and the damage profile is lighter than average. His modeled workload cap still reaches roughly 94 pitches, so the deeper-start path is still available if the outing stays efficient. The model baseline sits around 20.3 outs against a line of 16.5. If he stays on his normal starter path, the matchup against PIT gives him a fair shot to reach full workload volume."
+              ],
+              "reason_summary": "The model lands on the over side in 85.3% of sims, while the market is pricing it closer to 50.5%. The projected lineup is mostly 3 left-handed, 4 right-handed, and 2 switch-hitting, and the damage profile is lighter than average. His modeled workload cap still reaches roughly 94 pitches, so the deeper-start path is still available if the outing stays efficient. The model baseline sits around 20.3 outs against a line of 16.5. If he stays on his normal starter path, the matchup against PIT gives him a fair shot to reach full workload volume.",
+              "rank": 5,
+              "recommendation_tier": "candidate"
+            },
+            {
+              "date": "2026-06-29",
+              "game_pk": 823444,
+              "away": "Pittsburgh Pirates",
+              "home": "Philadelphia Phillies",
+              "away_abbr": "PIT",
+              "home_abbr": "PHI",
+              "double_header": "N",
+              "game_number": 1,
+              "event_id": null,
+              "commence_time": null,
+              "market": "pitcher_props",
+              "pitcher_id": 605400,
+              "pitcher_name": "Aaron Nola",
+              "team": "PHI",
+              "team_side": "home",
+              "prop": "strikeouts",
+              "selection": "over",
+              "edge": 0.020165763813651205,
+              "market_line": 5.5,
+              "model_prob_over": 0.531,
+              "market_prob_over": 0.5108342361863488,
+              "market_prob_under": 0.4891657638136511,
+              "market_prob_mode": "no_vig_two_way",
+              "market_no_vig_prob_over": 0.5108342361863488,
+              "selected_side_market_prob": 0.5108342361863488,
+              "selected_side_model_prob": 0.531,
+              "mean_support": 0.2190000000000003,
+              "so_mean": 5.719,
+              "market_alternates": [],
+              "odds": "-115",
+              "stake_u": 1.0,
+              "sim_sample_size": 1000,
+              "baseball_reasons": [
+                "The projected lineup is mostly 3 left-handed, 4 right-handed, and 2 switch-hitting, and the handedness split adds some strikeout lift.",
+                "His modeled workload cap still reaches roughly 94 pitches, so the deeper-start path is still available if the outing stays efficient."
+              ],
+              "explanation_diagnostic": {
+                "status": "supported",
+                "flag_sparse_support": false,
+                "support_min_reasons": 2,
+                "baseball_reasons_n": 2,
+                "reason_sentences_n": 5,
+                "market": "pitcher_props:strikeouts",
+                "subject": "Aaron Nola",
+                "supporting_reasons": [
+                  "The projected lineup is mostly 3 left-handed, 4 right-handed, and 2 switch-hitting, and the handedness split adds some strikeout lift.",
+                  "His modeled workload cap still reaches roughly 94 pitches, so the deeper-start path is still available if the outing stays efficient."
+                ]
+              },
+              "reasons": [
+                "The model lands on the over side in 53.1% of sims, while the market is pricing it closer to 51.1%. The projected lineup is mostly 3 left-handed, 4 right-handed, and 2 switch-hitting, and the handedness split adds some strikeout lift. His modeled workload cap still reaches roughly 94 pitches, so the deeper-start path is still available if the outing stays efficient. The model baseline sits around 5.7 strikeouts against a line of 5.5. If he stays on his normal starter path, the matchup against PIT gives him a fair shot to reach full workload volume."
+              ],
+              "reason_summary": "The model lands on the over side in 53.1% of sims, while the market is pricing it closer to 51.1%. The projected lineup is mostly 3 left-handed, 4 right-handed, and 2 switch-hitting, and the handedness split adds some strikeout lift. His modeled workload cap still reaches roughly 94 pitches, so the deeper-start path is still available if the outing stays efficient. The model baseline sits around 5.7 strikeouts against a line of 5.5. If he stays on his normal starter path, the matchup against PIT gives him a fair shot to reach full workload volume.",
+              "rank": 14,
+              "recommendation_tier": "candidate"
+            }
+          ],
+          "extraHitterProps": []
+        },
+        "results": {
+          "combined": {
+            "n": 0,
+            "wins": 0,
+            "losses": 0,
+            "stake_u": 0.0,
+            "profit_u": 0.0,
+            "roi": null
+          }
+        },
+        "playable_results": {
+          "combined": {
+            "n": 0,
+            "wins": 0,
+            "losses": 0,
+            "stake_u": 0.0,
+            "profit_u": 0.0,
+            "roi": null
+          }
+        },
+        "all_results": {
+          "combined": {
+            "n": 0,
+            "wins": 0,
+            "losses": 0,
+            "stake_u": 0.0,
+            "profit_u": 0.0,
+            "roi": null
+          }
+        },
+        "settled_rows": [],
+        "playable_settled_rows": [],
+        "all_settled_rows": [],
+        "unresolved_rows": [
+          {
+            "path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\daily_summary_2026_06_29_locked_policy.json",
+            "date": "2026-06-29",
+            "game_pk": 823444,
+            "market": "hitter_hits",
+            "player_name": "Justin Crawford",
+            "selection": "over",
+            "market_line": 0.5,
+            "reason": "game not final",
+            "recommendation_tier": "official"
+          },
+          {
+            "path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\daily_summary_2026_06_29_locked_policy.json",
+            "date": "2026-06-29",
+            "game_pk": 823444,
+            "market": "hitter_total_bases",
+            "player_name": "Nick Gonzales",
+            "selection": "over",
+            "market_line": 1.5,
+            "reason": "game not final",
+            "recommendation_tier": "official"
+          }
+        ],
+        "playable_unresolved_rows": [
+          {
+            "path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\daily_summary_2026_06_29_locked_policy.json",
+            "date": "2026-06-29",
+            "game_pk": 823444,
+            "market": "pitcher_props",
+            "player_name": "Braxton Ashcraft",
+            "selection": "over",
+            "market_line": 17.5,
+            "reason": "game not final",
+            "recommendation_tier": "candidate"
+          },
+          {
+            "path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\daily_summary_2026_06_29_locked_policy.json",
+            "date": "2026-06-29",
+            "game_pk": 823444,
+            "market": "pitcher_props",
+            "player_name": "Aaron Nola",
+            "selection": "over",
+            "market_line": 16.5,
+            "reason": "game not final",
+            "recommendation_tier": "candidate"
+          },
+          {
+            "path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\daily_summary_2026_06_29_locked_policy.json",
+            "date": "2026-06-29",
+            "game_pk": 823444,
+            "market": "pitcher_props",
+            "player_name": "Aaron Nola",
+            "selection": "over",
+            "market_line": 5.5,
+            "reason": "game not final",
+            "recommendation_tier": "candidate"
+          }
+        ],
+        "all_unresolved_rows": [
+          {
+            "path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\daily_summary_2026_06_29_locked_policy.json",
+            "date": "2026-06-29",
+            "game_pk": 823444,
+            "market": "hitter_hits",
+            "player_name": "Justin Crawford",
+            "selection": "over",
+            "market_line": 0.5,
+            "reason": "game not final",
+            "recommendation_tier": "official"
+          },
+          {
+            "path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\daily_summary_2026_06_29_locked_policy.json",
+            "date": "2026-06-29",
+            "game_pk": 823444,
+            "market": "hitter_total_bases",
+            "player_name": "Nick Gonzales",
+            "selection": "over",
+            "market_line": 1.5,
+            "reason": "game not final",
+            "recommendation_tier": "official"
+          },
+          {
+            "path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\daily_summary_2026_06_29_locked_policy.json",
+            "date": "2026-06-29",
+            "game_pk": 823444,
+            "market": "pitcher_props",
+            "player_name": "Braxton Ashcraft",
+            "selection": "over",
+            "market_line": 17.5,
+            "reason": "game not final",
+            "recommendation_tier": "candidate"
+          },
+          {
+            "path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\daily_summary_2026_06_29_locked_policy.json",
+            "date": "2026-06-29",
+            "game_pk": 823444,
+            "market": "pitcher_props",
+            "player_name": "Aaron Nola",
+            "selection": "over",
+            "market_line": 16.5,
+            "reason": "game not final",
+            "recommendation_tier": "candidate"
+          },
+          {
+            "path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\daily_summary_2026_06_29_locked_policy.json",
+            "date": "2026-06-29",
+            "game_pk": 823444,
+            "market": "pitcher_props",
+            "player_name": "Aaron Nola",
+            "selection": "over",
+            "market_line": 5.5,
+            "reason": "game not final",
+            "recommendation_tier": "candidate"
+          }
+        ],
+        "counts": {
+          "official": 2,
+          "playable": 3,
+          "pitcher": 0,
+          "hitter": 2,
+          "extra_pitcher": 3,
+          "extra_hitter": 0
+        },
+        "flags": {
+          "hasAnyRecommendations": true,
+          "hasOfficialRecommendations": true,
+          "hasPlayableCandidates": true
+        }
+      }
+    },
+    {
+      "game_pk": 824662,
+      "game_date": "2026-06-30T00:05:00Z",
+      "start_time": "7:05 PM",
+      "official_date": "2026-06-29",
+      "status": {
+        "abstract": "Preview",
+        "detailed": "Scheduled"
+      },
+      "away": {
+        "id": 135,
+        "abbr": "SD",
+        "name": "San Diego Padres"
+      },
+      "home": {
+        "id": 112,
+        "abbr": "CHC",
+        "name": "Chicago Cubs"
+      },
+      "starter_names": {
+        "away": "",
+        "home": "Shota Imanaga"
+      },
+      "matchup": {
+        "isLive": false,
+        "isFinal": false,
+        "liveText": "",
+        "displayState": "Scheduled",
+        "inning": null,
+        "halfInning": "",
+        "count": {
+          "balls": null,
+          "strikes": null,
+          "outs": null
+        },
+        "batter": "",
+        "pitcher": "",
+        "score": {
+          "away": null,
+          "home": null
+        }
+      },
+      "betting": {
+        "markets": {
+          "totals": null,
+          "ml": null,
+          "pitcherProps": [
+            {
+              "date": "2026-06-29",
+              "game_pk": 824662,
+              "away": "San Diego Padres",
+              "home": "Chicago Cubs",
+              "away_abbr": "SD",
+              "home_abbr": "CHC",
+              "double_header": "N",
+              "game_number": 1,
+              "event_id": null,
+              "commence_time": null,
+              "market": "pitcher_props",
+              "pitcher_id": 684007,
+              "pitcher_name": "Shota Imanaga",
+              "team": "CHC",
+              "team_side": "home",
+              "prop": "outs",
+              "selection": "over",
+              "edge": 0.37634670487106014,
+              "market_line": 16.5,
+              "model_prob_over": 0.905,
+              "market_prob_over": 0.5286532951289399,
+              "market_prob_under": 0.4713467048710602,
+              "market_prob_mode": "no_vig_two_way",
+              "market_no_vig_prob_over": 0.5286532951289399,
+              "selected_side_market_prob": 0.5286532951289399,
+              "selected_side_model_prob": 0.905,
+              "mean_support": 4.481000000000002,
+              "outs_mean": 20.981,
+              "market_alternates": [],
+              "odds": "-135",
+              "stake_u": 1.0,
+              "sim_sample_size": 1000,
+              "baseball_reasons": [
+                "The projected lineup is mostly 1 left-handed and 8 right-handed, and the damage profile is lighter than average.",
+                "His modeled workload cap still reaches roughly 94 pitches, so the deeper-start path is still available if the outing stays efficient."
+              ],
+              "explanation_diagnostic": {
+                "status": "supported",
+                "flag_sparse_support": false,
+                "support_min_reasons": 2,
+                "baseball_reasons_n": 2,
+                "reason_sentences_n": 5,
+                "market": "pitcher_props:outs",
+                "subject": "Shota Imanaga",
+                "supporting_reasons": [
+                  "The projected lineup is mostly 1 left-handed and 8 right-handed, and the damage profile is lighter than average.",
+                  "His modeled workload cap still reaches roughly 94 pitches, so the deeper-start path is still available if the outing stays efficient."
+                ]
+              },
+              "reasons": [
+                "The model lands on the over side in 90.5% of sims, while the market is pricing it closer to 52.9%. The projected lineup is mostly 1 left-handed and 8 right-handed, and the damage profile is lighter than average. His modeled workload cap still reaches roughly 94 pitches, so the deeper-start path is still available if the outing stays efficient. The model baseline sits around 21.0 outs against a line of 16.5. If he stays on his normal starter path, the matchup against SD gives him a fair shot to reach full workload volume."
+              ],
+              "reason_summary": "The model lands on the over side in 90.5% of sims, while the market is pricing it closer to 52.9%. The projected lineup is mostly 1 left-handed and 8 right-handed, and the damage profile is lighter than average. His modeled workload cap still reaches roughly 94 pitches, so the deeper-start path is still available if the outing stays efficient. The model baseline sits around 21.0 outs against a line of 16.5. If he stays on his normal starter path, the matchup against SD gives him a fair shot to reach full workload volume.",
+              "rank": 1,
+              "recommendation_tier": "official"
+            }
+          ],
+          "hitterProps": [],
+          "extraPitcherProps": [],
+          "extraHitterProps": []
+        },
+        "results": {
+          "combined": {
+            "n": 0,
+            "wins": 0,
+            "losses": 0,
+            "stake_u": 0.0,
+            "profit_u": 0.0,
+            "roi": null
+          }
+        },
+        "playable_results": {
+          "combined": {
+            "n": 0,
+            "wins": 0,
+            "losses": 0,
+            "stake_u": 0.0,
+            "profit_u": 0.0,
+            "roi": null
+          }
+        },
+        "all_results": {
+          "combined": {
+            "n": 0,
+            "wins": 0,
+            "losses": 0,
+            "stake_u": 0.0,
+            "profit_u": 0.0,
+            "roi": null
+          }
+        },
+        "settled_rows": [],
+        "playable_settled_rows": [],
+        "all_settled_rows": [],
+        "unresolved_rows": [
+          {
+            "path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\daily_summary_2026_06_29_locked_policy.json",
+            "date": "2026-06-29",
+            "game_pk": 824662,
+            "market": "pitcher_props",
+            "player_name": "Shota Imanaga",
+            "selection": "over",
+            "market_line": 16.5,
+            "reason": "game not final",
+            "recommendation_tier": "official"
+          }
+        ],
+        "playable_unresolved_rows": [],
+        "all_unresolved_rows": [
+          {
+            "path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\daily_summary_2026_06_29_locked_policy.json",
+            "date": "2026-06-29",
+            "game_pk": 824662,
+            "market": "pitcher_props",
+            "player_name": "Shota Imanaga",
+            "selection": "over",
+            "market_line": 16.5,
+            "reason": "game not final",
+            "recommendation_tier": "official"
+          }
+        ],
+        "counts": {
+          "official": 1,
+          "playable": 0,
+          "pitcher": 1,
+          "hitter": 0,
+          "extra_pitcher": 0,
+          "extra_hitter": 0
+        },
+        "flags": {
+          "hasAnyRecommendations": true,
+          "hasOfficialRecommendations": true,
+          "hasPlayableCandidates": false
+        }
+      }
+    },
+    {
+      "game_pk": 823121,
+      "game_date": "2026-06-30T01:40:00Z",
+      "start_time": "8:40 PM",
+      "official_date": "2026-06-29",
+      "status": {
+        "abstract": "Preview",
+        "detailed": "Scheduled"
+      },
+      "away": {
+        "id": 108,
+        "abbr": "LAA",
+        "name": "Los Angeles Angels"
+      },
+      "home": {
+        "id": 136,
+        "abbr": "SEA",
+        "name": "Seattle Mariners"
+      },
+      "starter_names": {
+        "away": "Ryan Johnson",
+        "home": "George Kirby"
+      },
+      "matchup": {
+        "isLive": false,
+        "isFinal": false,
+        "liveText": "",
+        "displayState": "Scheduled",
+        "inning": null,
+        "halfInning": "",
+        "count": {
+          "balls": null,
+          "strikes": null,
+          "outs": null
+        },
+        "batter": "",
+        "pitcher": "",
+        "score": {
+          "away": null,
+          "home": null
+        }
+      },
+      "betting": {
+        "markets": {
+          "totals": null,
+          "ml": null,
+          "pitcherProps": [],
+          "hitterProps": [
+            {
+              "date": "2026-06-29",
+              "game_pk": 823121,
+              "away": "Los Angeles Angels",
+              "home": "Seattle Mariners",
+              "away_abbr": "LAA",
+              "home_abbr": "SEA",
+              "double_header": "N",
+              "game_number": 1,
+              "event_id": null,
+              "commence_time": null,
+              "batter_id": 622268,
+              "batter_hand": "L",
+              "opponent_pitcher_id": 669923,
+              "opponent_pitcher_hand": "R",
+              "opponent_pitcher_name": "George Kirby",
+              "opponent": "SEA",
+              "opponent_team_id": 136,
+              "lineup_source": "projected_rotowire_default_vs_rhp",
+              "lineup_confidence": 0.66,
+              "lineup_status": "projected",
+              "batter_k_rate": 0.16260426320667282,
+              "batter_bb_rate": 0.034569045412418904,
+              "batter_hr_rate": 0.0422613531047266,
+              "batter_inplay_hit_rate": 0.35075757575757577,
+              "batter_xb_hit_share": 0.2692307692307692,
+              "pitcher_k_rate": 0.20940001976870615,
+              "pitcher_bb_rate": 0.055585483180125864,
+              "pitcher_hr_rate": 0.022009983196599782,
+              "pitcher_inplay_hit_rate": 0.36755393710385176,
+              "pitcher_availability_mult": 1.0,
+              "pitcher_stamina_pitches": 94.0,
+              "pitcher_platoon_k_mult": 0.8877586342537959,
+              "pitcher_platoon_bb_mult": 1.1925000000000001,
+              "pitcher_platoon_hr_mult": 1.0907348872825464,
+              "pitcher_platoon_inplay_mult": 0.8885938505296853,
+              "batter_platoon_k_mult": 1.0523532442993946,
+              "batter_platoon_bb_mult": 1.103843328803849,
+              "batter_platoon_hr_mult": 0.8065549146839701,
+              "batter_platoon_inplay_mult": 1.0552063203364783,
+              "opponent_primary_pitch_type": "FF",
+              "weather_source": "statsapi_live_feed",
+              "weather_wind_direction": "unknown",
+              "weather_hr_mult": 1.0,
+              "weather_inplay_hit_mult": 1.0,
+              "weather_xb_share_mult": 1.0,
+              "park_source": "statsapi_live_feed",
+              "venue_id": 680,
+              "venue_name": "T-Mobile Park",
+              "roof_type": "Retractable",
+              "park_hr_mult": 1.0313333333333334,
+              "park_inplay_hit_mult": 0.9874666666666666,
+              "park_xb_share_mult": 0.9843333333333333,
+              "market": "hitter_hits",
+              "market_label": "Hitter Hits",
+              "market_group": "hitter_props",
+              "player_name": "Donovan Walton",
+              "team": "LAA",
+              "prop": "batter_hits",
+              "prop_market_key": "batter_hits",
+              "selection": "over",
+              "edge": 0.18300000000000005,
+              "market_line": 0.5,
+              "model_prob_over": 0.683,
+              "market_prob_over": 0.5,
+              "market_prob_under": 0.5,
+              "market_prob_mode": "no_vig_two_way",
+              "market_no_vig_prob_over": 0.5,
+              "selected_side_market_prob": 0.5,
+              "selected_side_model_prob": 0.683,
+              "mean_support": 0.573,
+              "h_mean": 1.073,
+              "pa_mean": 4.427,
+              "ab_mean": 3.962,
+              "lineup_order": 7,
+              "market_alternates": [],
+              "odds": "-115",
+              "stake_u": 0.5,
+              "sim_sample_size": 1000,
+              "baseball_reasons": [
+                "Over his last 10 games, he has recorded a hit in 8 of 10 games.",
+                "The handedness matchup leans his way here, with his expected damage against R-handed pitching grading above baseline."
+              ],
+              "explanation_diagnostic": {
+                "status": "supported",
+                "flag_sparse_support": false,
+                "support_min_reasons": 2,
+                "baseball_reasons_n": 2,
+                "reason_sentences_n": 5,
+                "market": "hitter_hits",
+                "subject": "Donovan Walton",
+                "supporting_reasons": [
+                  "Over his last 10 games, he has recorded a hit in 8 of 10 games.",
+                  "The handedness matchup leans his way here, with his expected damage against R-handed pitching grading above baseline."
+                ]
+              },
+              "reasons": [
+                "The model lands on the over side in 68.3% of sims, while the market is pricing it closer to 50.0%. Over his last 10 games, he has recorded a hit in 8 of 10 games. The handedness matchup leans his way here, with his expected damage against R-handed pitching grading above baseline. The model baseline comes in around 1.1 batter hits against a line of 0.5. He is projected to hit in the 7 spot, which points to about 4.4 plate appearances."
+              ],
+              "reason_summary": "The model lands on the over side in 68.3% of sims, while the market is pricing it closer to 50.0%. Over his last 10 games, he has recorded a hit in 8 of 10 games. The handedness matchup leans his way here, with his expected damage against R-handed pitching grading above baseline. The model baseline comes in around 1.1 batter hits against a line of 0.5. He is projected to hit in the 7 spot, which points to about 4.4 plate appearances.",
+              "rank": 1,
+              "recommendation_tier": "official"
+            },
+            {
+              "date": "2026-06-29",
+              "game_pk": 823121,
+              "away": "Los Angeles Angels",
+              "home": "Seattle Mariners",
+              "away_abbr": "LAA",
+              "home_abbr": "SEA",
+              "double_header": "N",
+              "game_number": 1,
+              "event_id": null,
+              "commence_time": null,
+              "batter_id": 624585,
+              "batter_hand": "R",
+              "opponent_pitcher_id": 669923,
+              "opponent_pitcher_hand": "R",
+              "opponent_pitcher_name": "George Kirby",
+              "opponent": "SEA",
+              "opponent_team_id": 136,
+              "lineup_source": "projected_rotowire_default_vs_rhp",
+              "lineup_confidence": 0.66,
+              "lineup_status": "projected",
+              "batter_k_rate": 0.31394531249999996,
+              "batter_bb_rate": 0.0980078125,
+              "batter_hr_rate": 0.041523437499999996,
+              "batter_inplay_hit_rate": 0.2670662100456621,
+              "batter_xb_hit_share": 0.22448979591836735,
+              "pitcher_k_rate": 0.20940001976870615,
+              "pitcher_bb_rate": 0.055585483180125864,
+              "pitcher_hr_rate": 0.022009983196599782,
+              "pitcher_inplay_hit_rate": 0.36755393710385176,
+              "pitcher_availability_mult": 1.0,
+              "pitcher_stamina_pitches": 94.0,
+              "pitcher_platoon_k_mult": 1.0519181220989693,
+              "pitcher_platoon_bb_mult": 0.8075,
+              "pitcher_platoon_hr_mult": 0.970597095917069,
+              "pitcher_platoon_inplay_mult": 1.000554544893534,
+              "batter_platoon_k_mult": 1.021671807364623,
+              "batter_platoon_bb_mult": 0.981643976421724,
+              "batter_platoon_hr_mult": 1.147133237609546,
+              "batter_platoon_inplay_mult": 0.9504184534997293,
+              "opponent_primary_pitch_type": "FF",
+              "weather_source": "statsapi_live_feed",
+              "weather_wind_direction": "unknown",
+              "weather_hr_mult": 1.0,
+              "weather_inplay_hit_mult": 1.0,
+              "weather_xb_share_mult": 1.0,
+              "park_source": "statsapi_live_feed",
+              "venue_id": 680,
+              "venue_name": "T-Mobile Park",
+              "roof_type": "Retractable",
+              "park_hr_mult": 1.0313333333333334,
+              "park_inplay_hit_mult": 0.9874666666666666,
+              "park_xb_share_mult": 0.9843333333333333,
+              "market": "hitter_hits",
+              "market_label": "Hitter Hits",
+              "market_group": "hitter_props",
+              "player_name": "Jorge Soler",
+              "team": "LAA",
+              "prop": "batter_hits",
+              "prop_market_key": "batter_hits",
+              "selection": "over",
+              "edge": 0.1076336318555251,
+              "market_line": 0.5,
+              "model_prob_over": 0.658,
+              "market_prob_over": 0.5503663681444749,
+              "market_prob_under": 0.4496336318555252,
+              "market_prob_mode": "no_vig_two_way",
+              "market_no_vig_prob_over": 0.5503663681444749,
+              "selected_side_market_prob": 0.5503663681444749,
+              "selected_side_model_prob": 0.658,
+              "mean_support": 0.5189999999999999,
+              "h_mean": 1.019,
+              "pa_mean": 4.767,
+              "ab_mean": 4.195,
+              "lineup_order": 4,
+              "market_alternates": [],
+              "odds": "-143",
+              "stake_u": 0.5,
+              "sim_sample_size": 1000,
+              "baseball_reasons": [
+                "Against SEA, he has recorded a hit in 5 of 8 games.",
+                "Over his last 10 games, he has recorded a hit in 7 of 10 games.",
+                "The handedness matchup leans his way here, with his expected damage against R-handed pitching grading above baseline."
+              ],
+              "explanation_diagnostic": {
+                "status": "strong",
+                "flag_sparse_support": false,
+                "support_min_reasons": 2,
+                "baseball_reasons_n": 3,
+                "reason_sentences_n": 6,
+                "market": "hitter_hits",
+                "subject": "Jorge Soler",
+                "supporting_reasons": [
+                  "Against SEA, he has recorded a hit in 5 of 8 games.",
+                  "Over his last 10 games, he has recorded a hit in 7 of 10 games.",
+                  "The handedness matchup leans his way here, with his expected damage against R-handed pitching grading above baseline."
+                ]
+              },
+              "reasons": [
+                "The model lands on the over side in 65.8% of sims, while the market is pricing it closer to 55.0%. Against SEA, he has recorded a hit in 5 of 8 games. Over his last 10 games, he has recorded a hit in 7 of 10 games. The handedness matchup leans his way here, with his expected damage against R-handed pitching grading above baseline. The model baseline comes in around 1.0 batter hits against a line of 0.5. He is projected to hit in the 4 spot, which points to about 4.8 plate appearances."
+              ],
+              "reason_summary": "The model lands on the over side in 65.8% of sims, while the market is pricing it closer to 55.0%. Against SEA, he has recorded a hit in 5 of 8 games. Over his last 10 games, he has recorded a hit in 7 of 10 games. The handedness matchup leans his way here, with his expected damage against R-handed pitching grading above baseline. The model baseline comes in around 1.0 batter hits against a line of 0.5. He is projected to hit in the 4 spot, which points to about 4.8 plate appearances.",
+              "rank": 2,
+              "recommendation_tier": "official"
+            },
+            {
+              "date": "2026-06-29",
+              "game_pk": 823121,
+              "away": "Los Angeles Angels",
+              "home": "Seattle Mariners",
+              "away_abbr": "LAA",
+              "home_abbr": "SEA",
+              "double_header": "N",
+              "game_number": 1,
+              "event_id": null,
+              "commence_time": null,
+              "batter_id": 666139,
+              "batter_hand": "L",
+              "opponent_pitcher_id": 669923,
+              "opponent_pitcher_hand": "R",
+              "opponent_pitcher_name": "George Kirby",
+              "opponent": "SEA",
+              "opponent_team_id": 136,
+              "lineup_source": "projected_rotowire_default_vs_rhp",
+              "lineup_confidence": 0.66,
+              "lineup_status": "projected",
+              "batter_k_rate": 0.28506108848574596,
+              "batter_bb_rate": 0.03898556090336912,
+              "batter_hr_rate": 0.04303961495742317,
+              "batter_inplay_hit_rate": 0.25047581284694687,
+              "batter_xb_hit_share": 0.07142857142857142,
+              "pitcher_k_rate": 0.20940001976870615,
+              "pitcher_bb_rate": 0.055585483180125864,
+              "pitcher_hr_rate": 0.022009983196599782,
+              "pitcher_inplay_hit_rate": 0.36755393710385176,
+              "pitcher_availability_mult": 1.0,
+              "pitcher_stamina_pitches": 94.0,
+              "pitcher_platoon_k_mult": 0.8877586342537959,
+              "pitcher_platoon_bb_mult": 1.1925000000000001,
+              "pitcher_platoon_hr_mult": 1.0907348872825464,
+              "pitcher_platoon_inplay_mult": 0.8885938505296853,
+              "batter_platoon_k_mult": 0.9859475001984257,
+              "batter_platoon_bb_mult": 1.1217993940216162,
+              "batter_platoon_hr_mult": 1.0585202252944188,
+              "batter_platoon_inplay_mult": 0.9466737526101148,
+              "opponent_primary_pitch_type": "FF",
+              "weather_source": "statsapi_live_feed",
+              "weather_wind_direction": "unknown",
+              "weather_hr_mult": 1.0,
+              "weather_inplay_hit_mult": 1.0,
+              "weather_xb_share_mult": 1.0,
+              "park_source": "statsapi_live_feed",
+              "venue_id": 680,
+              "venue_name": "T-Mobile Park",
+              "roof_type": "Retractable",
+              "park_hr_mult": 1.0313333333333334,
+              "park_inplay_hit_mult": 0.9874666666666666,
+              "park_xb_share_mult": 0.9843333333333333,
+              "market": "hitter_hits",
+              "market_label": "Hitter Hits",
+              "market_group": "hitter_props",
+              "player_name": "Josh Lowe",
+              "team": "LAA",
+              "prop": "batter_hits",
+              "prop_market_key": "batter_hits",
+              "selection": "over",
+              "edge": 0.12792047649710225,
+              "market_line": 0.5,
+              "model_prob_over": 0.641,
+              "market_prob_over": 0.5130795235028978,
+              "market_prob_under": 0.4869204764971024,
+              "market_prob_mode": "no_vig_two_way",
+              "market_no_vig_prob_over": 0.5130795235028978,
+              "selected_side_market_prob": 0.5130795235028978,
+              "selected_side_model_prob": 0.641,
+              "mean_support": 0.43899999999999995,
+              "h_mean": 0.939,
+              "pa_mean": 4.208,
+              "ab_mean": 3.793,
+              "lineup_order": 9,
+              "market_alternates": [],
+              "odds": "-122",
+              "stake_u": 0.5,
+              "sim_sample_size": 1000,
+              "baseball_reasons": [
+                "Against SEA, he has recorded a hit in 5 of 9 games.",
+                "Over his last 10 games, he has recorded a hit in 9 of 10 games.",
+                "The handedness matchup leans his way here, with his expected damage against R-handed pitching grading above baseline."
+              ],
+              "explanation_diagnostic": {
+                "status": "strong",
+                "flag_sparse_support": false,
+                "support_min_reasons": 2,
+                "baseball_reasons_n": 3,
+                "reason_sentences_n": 6,
+                "market": "hitter_hits",
+                "subject": "Josh Lowe",
+                "supporting_reasons": [
+                  "Against SEA, he has recorded a hit in 5 of 9 games.",
+                  "Over his last 10 games, he has recorded a hit in 9 of 10 games.",
+                  "The handedness matchup leans his way here, with his expected damage against R-handed pitching grading above baseline."
+                ]
+              },
+              "reasons": [
+                "The model lands on the over side in 64.1% of sims, while the market is pricing it closer to 51.3%. Against SEA, he has recorded a hit in 5 of 9 games. Over his last 10 games, he has recorded a hit in 9 of 10 games. The handedness matchup leans his way here, with his expected damage against R-handed pitching grading above baseline. The model baseline comes in around 0.9 batter hits against a line of 0.5. He is projected to hit in the 9 spot, which points to about 4.2 plate appearances."
+              ],
+              "reason_summary": "The model lands on the over side in 64.1% of sims, while the market is pricing it closer to 51.3%. Against SEA, he has recorded a hit in 5 of 9 games. Over his last 10 games, he has recorded a hit in 9 of 10 games. The handedness matchup leans his way here, with his expected damage against R-handed pitching grading above baseline. The model baseline comes in around 0.9 batter hits against a line of 0.5. He is projected to hit in the 9 spot, which points to about 4.2 plate appearances.",
+              "rank": 3,
+              "recommendation_tier": "official"
+            }
+          ],
+          "extraPitcherProps": [],
+          "extraHitterProps": []
+        },
+        "results": {
+          "combined": {
+            "n": 0,
+            "wins": 0,
+            "losses": 0,
+            "stake_u": 0.0,
+            "profit_u": 0.0,
+            "roi": null
+          }
+        },
+        "playable_results": {
+          "combined": {
+            "n": 0,
+            "wins": 0,
+            "losses": 0,
+            "stake_u": 0.0,
+            "profit_u": 0.0,
+            "roi": null
+          }
+        },
+        "all_results": {
+          "combined": {
+            "n": 0,
+            "wins": 0,
+            "losses": 0,
+            "stake_u": 0.0,
+            "profit_u": 0.0,
+            "roi": null
+          }
+        },
+        "settled_rows": [],
+        "playable_settled_rows": [],
+        "all_settled_rows": [],
+        "unresolved_rows": [
+          {
+            "path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\daily_summary_2026_06_29_locked_policy.json",
+            "date": "2026-06-29",
+            "game_pk": 823121,
+            "market": "hitter_hits",
+            "player_name": "Donovan Walton",
+            "selection": "over",
+            "market_line": 0.5,
+            "reason": "game not final",
+            "recommendation_tier": "official"
+          },
+          {
+            "path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\daily_summary_2026_06_29_locked_policy.json",
+            "date": "2026-06-29",
+            "game_pk": 823121,
+            "market": "hitter_hits",
+            "player_name": "Jorge Soler",
+            "selection": "over",
+            "market_line": 0.5,
+            "reason": "game not final",
+            "recommendation_tier": "official"
+          },
+          {
+            "path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\daily_summary_2026_06_29_locked_policy.json",
+            "date": "2026-06-29",
+            "game_pk": 823121,
+            "market": "hitter_hits",
+            "player_name": "Josh Lowe",
+            "selection": "over",
+            "market_line": 0.5,
+            "reason": "game not final",
+            "recommendation_tier": "official"
+          }
+        ],
+        "playable_unresolved_rows": [],
+        "all_unresolved_rows": [
+          {
+            "path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\daily_summary_2026_06_29_locked_policy.json",
+            "date": "2026-06-29",
+            "game_pk": 823121,
+            "market": "hitter_hits",
+            "player_name": "Donovan Walton",
+            "selection": "over",
+            "market_line": 0.5,
+            "reason": "game not final",
+            "recommendation_tier": "official"
+          },
+          {
+            "path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\daily_summary_2026_06_29_locked_policy.json",
+            "date": "2026-06-29",
+            "game_pk": 823121,
+            "market": "hitter_hits",
+            "player_name": "Jorge Soler",
+            "selection": "over",
+            "market_line": 0.5,
+            "reason": "game not final",
+            "recommendation_tier": "official"
+          },
+          {
+            "path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\daily_summary_2026_06_29_locked_policy.json",
+            "date": "2026-06-29",
+            "game_pk": 823121,
+            "market": "hitter_hits",
+            "player_name": "Josh Lowe",
+            "selection": "over",
+            "market_line": 0.5,
+            "reason": "game not final",
+            "recommendation_tier": "official"
+          }
+        ],
+        "counts": {
+          "official": 3,
+          "playable": 0,
+          "pitcher": 0,
+          "hitter": 3,
+          "extra_pitcher": 0,
+          "extra_hitter": 0
+        },
+        "flags": {
+          "hasAnyRecommendations": true,
+          "hasOfficialRecommendations": true,
+          "hasPlayableCandidates": false
+        }
+      }
+    },
+    {
+      "game_pk": 824986,
+      "game_date": "2026-06-30T01:40:00Z",
+      "start_time": "8:40 PM",
+      "official_date": "2026-06-29",
+      "status": {
+        "abstract": "Preview",
+        "detailed": "Scheduled"
+      },
+      "away": {
+        "id": 119,
+        "abbr": "LAD",
+        "name": "Los Angeles Dodgers"
+      },
+      "home": {
+        "id": 133,
+        "abbr": "ATH",
+        "name": "Athletics"
+      },
+      "starter_names": {
+        "away": "Eric Lauer",
+        "home": "Gage Jump"
+      },
+      "matchup": {
+        "isLive": false,
+        "isFinal": false,
+        "liveText": "",
+        "displayState": "Scheduled",
+        "inning": null,
+        "halfInning": "",
+        "count": {
+          "balls": null,
+          "strikes": null,
+          "outs": null
+        },
+        "batter": "",
+        "pitcher": "",
+        "score": {
+          "away": null,
+          "home": null
+        }
+      },
+      "betting": {
+        "markets": {
+          "totals": null,
+          "ml": null,
+          "pitcherProps": [],
+          "hitterProps": [
+            {
+              "date": "2026-06-29",
+              "game_pk": 824986,
+              "away": "Los Angeles Dodgers",
+              "home": "Athletics",
+              "away_abbr": "LAD",
+              "home_abbr": "ATH",
+              "double_header": "N",
+              "game_number": 1,
+              "event_id": null,
+              "commence_time": null,
+              "batter_id": 605141,
+              "batter_hand": "R",
+              "opponent_pitcher_id": 695611,
+              "opponent_pitcher_hand": "L",
+              "opponent_pitcher_name": "Gage Jump",
+              "opponent": "ATH",
+              "opponent_team_id": 133,
+              "lineup_source": "projected_rotowire_default_vs_lhp",
+              "lineup_confidence": 0.66,
+              "lineup_status": "projected",
+              "batter_k_rate": 0.13934016393442622,
+              "batter_bb_rate": 0.0735860655737705,
+              "batter_hr_rate": 0.04562704918032787,
+              "batter_inplay_hit_rate": 0.22653476080769752,
+              "batter_xb_hit_share": 0.16666666666666666,
+              "pitcher_k_rate": 0.25735294117647056,
+              "pitcher_bb_rate": 0.07352941176470588,
+              "pitcher_hr_rate": 0.0,
+              "pitcher_inplay_hit_rate": 0.26877392270650696,
+              "pitcher_availability_mult": 1.0,
+              "pitcher_stamina_pitches": 94.0,
+              "pitcher_platoon_k_mult": 0.9033333333333333,
+              "pitcher_platoon_bb_mult": 0.8075,
+              "pitcher_platoon_hr_mult": 1.0,
+              "pitcher_platoon_inplay_mult": 1.1617667737244939,
+              "batter_platoon_k_mult": 0.9433968646136651,
+              "batter_platoon_bb_mult": 1.1925000000000001,
+              "batter_platoon_hr_mult": 0.8805090400482478,
+              "batter_platoon_inplay_mult": 0.8452368431303806,
+              "opponent_primary_pitch_type": "FF",
+              "weather_source": "statsapi_live_feed",
+              "weather_wind_direction": "unknown",
+              "weather_hr_mult": 1.0,
+              "weather_inplay_hit_mult": 1.0,
+              "weather_xb_share_mult": 1.0,
+              "park_source": "statsapi_live_feed",
+              "venue_id": 2529,
+              "venue_name": "Sutter Health Park",
+              "roof_type": "Open",
+              "park_hr_mult": 1.0346666666666666,
+              "park_inplay_hit_mult": 0.9861333333333333,
+              "park_xb_share_mult": 0.9826666666666667,
+              "market": "hitter_total_bases",
+              "market_label": "Hitter Total Bases",
+              "market_group": "hitter_props",
+              "player_name": "Mookie Betts",
+              "team": "LAD",
+              "prop": "batter_total_bases",
+              "prop_market_key": "batter_total_bases",
+              "selection": "under",
+              "edge": 0.1428467741935483,
+              "market_line": 1.5,
+              "model_prob_over": 0.338,
+              "market_prob_over": 0.4808467741935484,
+              "market_prob_under": 0.5191532258064516,
+              "market_prob_mode": "no_vig_two_way",
+              "market_no_vig_prob_over": 0.4808467741935484,
+              "selected_side_market_prob": 0.5191532258064516,
+              "selected_side_model_prob": 0.6619999999999999,
+              "mean_support": 0.12200000000000011,
+              "tb_mean": 1.378,
+              "pa_mean": 4.783,
+              "ab_mean": 4.259,
+              "lineup_order": 4,
+              "market_alternates": [],
+              "odds": "-125",
+              "stake_u": 0.5,
+              "sim_sample_size": 1000,
+              "baseball_reasons": [
+                "Against ATH, he has been held to one total base or fewer in 2 of 3 games.",
+                "The handedness matchup is a little tougher than usual, so this spot comes with more swing-and-miss risk against L-handed pitching."
+              ],
+              "explanation_diagnostic": {
+                "status": "supported",
+                "flag_sparse_support": false,
+                "support_min_reasons": 2,
+                "baseball_reasons_n": 2,
+                "reason_sentences_n": 5,
+                "market": "hitter_total_bases",
+                "subject": "Mookie Betts",
+                "supporting_reasons": [
+                  "Against ATH, he has been held to one total base or fewer in 2 of 3 games.",
+                  "The handedness matchup is a little tougher than usual, so this spot comes with more swing-and-miss risk against L-handed pitching."
+                ]
+              },
+              "reasons": [
+                "The model lands on the under side in 66.2% of sims, while the market is pricing it closer to 51.9%. Against ATH, he has been held to one total base or fewer in 2 of 3 games. The handedness matchup is a little tougher than usual, so this spot comes with more swing-and-miss risk against L-handed pitching. The model baseline comes in around 1.4 batter total bases against a line of 1.5. He is projected to hit in the 4 spot, which points to about 4.8 plate appearances."
+              ],
+              "reason_summary": "The model lands on the under side in 66.2% of sims, while the market is pricing it closer to 51.9%. Against ATH, he has been held to one total base or fewer in 2 of 3 games. The handedness matchup is a little tougher than usual, so this spot comes with more swing-and-miss risk against L-handed pitching. The model baseline comes in around 1.4 batter total bases against a line of 1.5. He is projected to hit in the 4 spot, which points to about 4.8 plate appearances.",
+              "rank": 1,
+              "recommendation_tier": "official"
+            }
+          ],
+          "extraPitcherProps": [
+            {
+              "date": "2026-06-29",
+              "game_pk": 824986,
+              "away": "Los Angeles Dodgers",
+              "home": "Athletics",
+              "away_abbr": "LAD",
+              "home_abbr": "ATH",
+              "double_header": "N",
+              "game_number": 1,
+              "event_id": null,
+              "commence_time": null,
+              "market": "pitcher_props",
+              "pitcher_id": 695611,
+              "pitcher_name": "Gage Jump",
+              "team": "ATH",
+              "team_side": "home",
+              "prop": "outs",
+              "selection": "over",
+              "edge": 0.3970135004821601,
+              "market_line": 15.5,
+              "model_prob_over": 0.894,
+              "market_prob_over": 0.4969864995178399,
+              "market_prob_under": 0.5030135004821601,
+              "market_prob_mode": "no_vig_two_way",
+              "market_no_vig_prob_over": 0.4969864995178399,
+              "selected_side_market_prob": 0.4969864995178399,
+              "selected_side_model_prob": 0.894,
+              "mean_support": 5.222999999999999,
+              "outs_mean": 20.723,
+              "market_alternates": [],
+              "odds": "-114",
+              "stake_u": 1.0,
+              "sim_sample_size": 1000,
+              "baseball_reasons": [
+                "Across his last 5 starts, he has averaged 18.2 outs.",
+                "His modeled workload cap still reaches roughly 94 pitches, so the deeper-start path is still available if the outing stays efficient."
+              ],
+              "explanation_diagnostic": {
+                "status": "supported",
+                "flag_sparse_support": false,
+                "support_min_reasons": 2,
+                "baseball_reasons_n": 2,
+                "reason_sentences_n": 5,
+                "market": "pitcher_props:outs",
+                "subject": "Gage Jump",
+                "supporting_reasons": [
+                  "Across his last 5 starts, he has averaged 18.2 outs.",
+                  "His modeled workload cap still reaches roughly 94 pitches, so the deeper-start path is still available if the outing stays efficient."
+                ]
+              },
+              "reasons": [
+                "The model lands on the over side in 89.4% of sims, while the market is pricing it closer to 49.7%. Across his last 5 starts, he has averaged 18.2 outs. His modeled workload cap still reaches roughly 94 pitches, so the deeper-start path is still available if the outing stays efficient. The model baseline sits around 20.7 outs against a line of 15.5. If he stays on his normal starter path, the matchup against LAD gives him a fair shot to reach full workload volume."
+              ],
+              "reason_summary": "The model lands on the over side in 89.4% of sims, while the market is pricing it closer to 49.7%. Across his last 5 starts, he has averaged 18.2 outs. His modeled workload cap still reaches roughly 94 pitches, so the deeper-start path is still available if the outing stays efficient. The model baseline sits around 20.7 outs against a line of 15.5. If he stays on his normal starter path, the matchup against LAD gives him a fair shot to reach full workload volume.",
+              "rank": 1,
+              "recommendation_tier": "candidate"
+            },
+            {
+              "date": "2026-06-29",
+              "game_pk": 824986,
+              "away": "Los Angeles Dodgers",
+              "home": "Athletics",
+              "away_abbr": "LAD",
+              "home_abbr": "ATH",
+              "double_header": "N",
+              "game_number": 1,
+              "event_id": null,
+              "commence_time": null,
+              "market": "pitcher_props",
+              "pitcher_id": 695611,
+              "pitcher_name": "Gage Jump",
+              "team": "ATH",
+              "team_side": "home",
+              "prop": "strikeouts",
+              "selection": "over",
+              "edge": 0.11158262967430643,
+              "market_line": 4.5,
+              "model_prob_over": 0.663,
+              "market_prob_over": 0.5514173703256936,
+              "market_prob_under": 0.4485826296743064,
+              "market_prob_mode": "no_vig_two_way",
+              "market_no_vig_prob_over": 0.5514173703256936,
+              "selected_side_market_prob": 0.5514173703256936,
+              "selected_side_model_prob": 0.663,
+              "mean_support": 0.9459999999999997,
+              "so_mean": 5.446,
+              "market_alternates": [],
+              "odds": "-138",
+              "stake_u": 1.0,
+              "sim_sample_size": 1000,
+              "baseball_reasons": [
+                "Across his last 5 starts, he has averaged 6 strikeouts.",
+                "His modeled workload cap still reaches roughly 94 pitches, so the deeper-start path is still available if the outing stays efficient."
+              ],
+              "explanation_diagnostic": {
+                "status": "supported",
+                "flag_sparse_support": false,
+                "support_min_reasons": 2,
+                "baseball_reasons_n": 2,
+                "reason_sentences_n": 5,
+                "market": "pitcher_props:strikeouts",
+                "subject": "Gage Jump",
+                "supporting_reasons": [
+                  "Across his last 5 starts, he has averaged 6 strikeouts.",
+                  "His modeled workload cap still reaches roughly 94 pitches, so the deeper-start path is still available if the outing stays efficient."
+                ]
+              },
+              "reasons": [
+                "The model lands on the over side in 66.3% of sims, while the market is pricing it closer to 55.1%. Across his last 5 starts, he has averaged 6 strikeouts. His modeled workload cap still reaches roughly 94 pitches, so the deeper-start path is still available if the outing stays efficient. The model baseline sits around 5.4 strikeouts against a line of 4.5. If he stays on his normal starter path, the matchup against LAD gives him a fair shot to reach full workload volume."
+              ],
+              "reason_summary": "The model lands on the over side in 66.3% of sims, while the market is pricing it closer to 55.1%. Across his last 5 starts, he has averaged 6 strikeouts. His modeled workload cap still reaches roughly 94 pitches, so the deeper-start path is still available if the outing stays efficient. The model baseline sits around 5.4 strikeouts against a line of 4.5. If he stays on his normal starter path, the matchup against LAD gives him a fair shot to reach full workload volume.",
+              "rank": 11,
+              "recommendation_tier": "candidate"
+            },
+            {
+              "date": "2026-06-29",
+              "game_pk": 824986,
+              "away": "Los Angeles Dodgers",
+              "home": "Athletics",
+              "away_abbr": "LAD",
+              "home_abbr": "ATH",
+              "double_header": "N",
+              "game_number": 1,
+              "event_id": null,
+              "commence_time": null,
+              "market": "pitcher_props",
+              "pitcher_id": 641778,
+              "pitcher_name": "Eric Lauer",
+              "team": "LAD",
+              "team_side": "away",
+              "prop": "strikeouts",
+              "selection": "over",
+              "edge": 0.2162847920831012,
+              "market_line": 4.5,
+              "model_prob_over": 0.639,
+              "market_prob_over": 0.4227152079168988,
+              "market_prob_under": 0.5772847920831012,
+              "market_prob_mode": "no_vig_two_way",
+              "market_no_vig_prob_over": 0.4227152079168988,
+              "selected_side_market_prob": 0.4227152079168988,
+              "selected_side_model_prob": 0.639,
+              "mean_support": 0.8520000000000003,
+              "so_mean": 5.352,
+              "market_alternates": [
+                {
+                  "line": 3.5,
+                  "over_odds": "-160",
+                  "under_odds": "+130",
+                  "_src": "oddsapi"
+                }
+              ],
+              "odds": "+123",
+              "stake_u": 1.0,
+              "sim_sample_size": 1000,
+              "baseball_reasons": [
+                "The projected lineup is mostly 4 left-handed, 4 right-handed, and 1 switch-hitting, and the handedness split adds some strikeout lift.",
+                "His modeled workload cap still reaches roughly 100 pitches, so the deeper-start path is still available if the outing stays efficient."
+              ],
+              "explanation_diagnostic": {
+                "status": "supported",
+                "flag_sparse_support": false,
+                "support_min_reasons": 2,
+                "baseball_reasons_n": 2,
+                "reason_sentences_n": 5,
+                "market": "pitcher_props:strikeouts",
+                "subject": "Eric Lauer",
+                "supporting_reasons": [
+                  "The projected lineup is mostly 4 left-handed, 4 right-handed, and 1 switch-hitting, and the handedness split adds some strikeout lift.",
+                  "His modeled workload cap still reaches roughly 100 pitches, so the deeper-start path is still available if the outing stays efficient."
+                ]
+              },
+              "reasons": [
+                "The model lands on the over side in 63.9% of sims, while the market is pricing it closer to 42.3%. The projected lineup is mostly 4 left-handed, 4 right-handed, and 1 switch-hitting, and the handedness split adds some strikeout lift. His modeled workload cap still reaches roughly 100 pitches, so the deeper-start path is still available if the outing stays efficient. The model baseline sits around 5.4 strikeouts against a line of 4.5. If he stays on his normal starter path, the matchup against ATH gives him a fair shot to reach full workload volume."
+              ],
+              "reason_summary": "The model lands on the over side in 63.9% of sims, while the market is pricing it closer to 42.3%. The projected lineup is mostly 4 left-handed, 4 right-handed, and 1 switch-hitting, and the handedness split adds some strikeout lift. His modeled workload cap still reaches roughly 100 pitches, so the deeper-start path is still available if the outing stays efficient. The model baseline sits around 5.4 strikeouts against a line of 4.5. If he stays on his normal starter path, the matchup against ATH gives him a fair shot to reach full workload volume.",
+              "rank": 13,
+              "recommendation_tier": "candidate"
+            }
+          ],
+          "extraHitterProps": [
+            {
+              "date": "2026-06-29",
+              "game_pk": 824986,
+              "away": "Los Angeles Dodgers",
+              "home": "Athletics",
+              "away_abbr": "LAD",
+              "home_abbr": "ATH",
+              "double_header": "N",
+              "game_number": 1,
+              "event_id": null,
+              "commence_time": null,
+              "batter_id": 500743,
+              "batter_hand": "R",
+              "opponent_pitcher_id": 695611,
+              "opponent_pitcher_hand": "L",
+              "opponent_pitcher_name": "Gage Jump",
+              "opponent": "ATH",
+              "opponent_team_id": 133,
+              "lineup_source": "projected_rotowire_default_vs_lhp",
+              "lineup_confidence": 0.66,
+              "lineup_status": "projected",
+              "batter_k_rate": 0.10188328912466843,
+              "batter_bb_rate": 0.07436339522546419,
+              "batter_hr_rate": 0.018249336870026528,
+              "batter_inplay_hit_rate": 0.2785119047619048,
+              "batter_xb_hit_share": 0.1935483870967742,
+              "pitcher_k_rate": 0.25735294117647056,
+              "pitcher_bb_rate": 0.07352941176470588,
+              "pitcher_hr_rate": 0.0,
+              "pitcher_inplay_hit_rate": 0.26877392270650696,
+              "pitcher_availability_mult": 1.0,
+              "pitcher_stamina_pitches": 94.0,
+              "pitcher_platoon_k_mult": 0.9033333333333333,
+              "pitcher_platoon_bb_mult": 0.8075,
+              "pitcher_platoon_hr_mult": 1.0,
+              "pitcher_platoon_inplay_mult": 1.1617667737244939,
+              "batter_platoon_k_mult": 1.1697778356330817,
+              "batter_platoon_bb_mult": 1.0416889602282862,
+              "batter_platoon_hr_mult": 1.2536821705426355,
+              "batter_platoon_inplay_mult": 1.0969109963077874,
+              "opponent_primary_pitch_type": "FF",
+              "weather_source": "statsapi_live_feed",
+              "weather_wind_direction": "unknown",
+              "weather_hr_mult": 1.0,
+              "weather_inplay_hit_mult": 1.0,
+              "weather_xb_share_mult": 1.0,
+              "park_source": "statsapi_live_feed",
+              "venue_id": 2529,
+              "venue_name": "Sutter Health Park",
+              "roof_type": "Open",
+              "park_hr_mult": 1.0346666666666666,
+              "park_inplay_hit_mult": 0.9861333333333333,
+              "park_xb_share_mult": 0.9826666666666667,
+              "market": "hitter_hits",
+              "market_label": "Hitter Hits",
+              "market_group": "hitter_props",
+              "player_name": "Miguel Rojas",
+              "team": "LAD",
+              "prop": "batter_hits",
+              "prop_market_key": "batter_hits",
+              "selection": "over",
+              "edge": 0.08484231697506028,
+              "market_line": 0.5,
+              "model_prob_over": 0.613,
+              "market_prob_over": 0.5281576830249397,
+              "market_prob_under": 0.4718423169750604,
+              "market_prob_mode": "no_vig_two_way",
+              "market_no_vig_prob_over": 0.5281576830249397,
+              "selected_side_market_prob": 0.5281576830249397,
+              "selected_side_model_prob": 0.613,
+              "mean_support": 0.4,
+              "h_mean": 0.9,
+              "pa_mean": 4.461,
+              "ab_mean": 3.918,
+              "lineup_order": 7,
+              "market_alternates": [],
+              "odds": "-130",
+              "stake_u": 0.5,
+              "sim_sample_size": 1000,
+              "baseball_reasons": [
+                "Against ATH, he has recorded a hit in 2 of 3 games.",
+                "Over his last 10 games, he has recorded a hit in 6 of 10 games.",
+                "The handedness matchup leans his way here, with his expected damage against L-handed pitching grading above baseline."
+              ],
+              "explanation_diagnostic": {
+                "status": "strong",
+                "flag_sparse_support": false,
+                "support_min_reasons": 2,
+                "baseball_reasons_n": 3,
+                "reason_sentences_n": 6,
+                "market": "hitter_hits",
+                "subject": "Miguel Rojas",
+                "supporting_reasons": [
+                  "Against ATH, he has recorded a hit in 2 of 3 games.",
+                  "Over his last 10 games, he has recorded a hit in 6 of 10 games.",
+                  "The handedness matchup leans his way here, with his expected damage against L-handed pitching grading above baseline."
+                ]
+              },
+              "reasons": [
+                "The model lands on the over side in 61.3% of sims, while the market is pricing it closer to 52.8%. Against ATH, he has recorded a hit in 2 of 3 games. Over his last 10 games, he has recorded a hit in 6 of 10 games. The handedness matchup leans his way here, with his expected damage against L-handed pitching grading above baseline. The model baseline comes in around 0.9 batter hits against a line of 0.5. He is projected to hit in the 7 spot, which points to about 4.5 plate appearances."
+              ],
+              "reason_summary": "The model lands on the over side in 61.3% of sims, while the market is pricing it closer to 52.8%. Against ATH, he has recorded a hit in 2 of 3 games. Over his last 10 games, he has recorded a hit in 6 of 10 games. The handedness matchup leans his way here, with his expected damage against L-handed pitching grading above baseline. The model baseline comes in around 0.9 batter hits against a line of 0.5. He is projected to hit in the 7 spot, which points to about 4.5 plate appearances.",
+              "rank": 1,
+              "recommendation_tier": "candidate"
+            }
+          ]
+        },
+        "results": {
+          "combined": {
+            "n": 0,
+            "wins": 0,
+            "losses": 0,
+            "stake_u": 0.0,
+            "profit_u": 0.0,
+            "roi": null
+          }
+        },
+        "playable_results": {
+          "combined": {
+            "n": 0,
+            "wins": 0,
+            "losses": 0,
+            "stake_u": 0.0,
+            "profit_u": 0.0,
+            "roi": null
+          }
+        },
+        "all_results": {
+          "combined": {
+            "n": 0,
+            "wins": 0,
+            "losses": 0,
+            "stake_u": 0.0,
+            "profit_u": 0.0,
+            "roi": null
+          }
+        },
+        "settled_rows": [],
+        "playable_settled_rows": [],
+        "all_settled_rows": [],
+        "unresolved_rows": [
+          {
+            "path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\daily_summary_2026_06_29_locked_policy.json",
+            "date": "2026-06-29",
+            "game_pk": 824986,
+            "market": "hitter_total_bases",
+            "player_name": "Mookie Betts",
+            "selection": "under",
+            "market_line": 1.5,
+            "reason": "game not final",
+            "recommendation_tier": "official"
+          }
+        ],
+        "playable_unresolved_rows": [
+          {
+            "path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\daily_summary_2026_06_29_locked_policy.json",
+            "date": "2026-06-29",
+            "game_pk": 824986,
+            "market": "pitcher_props",
+            "player_name": "Gage Jump",
+            "selection": "over",
+            "market_line": 15.5,
+            "reason": "game not final",
+            "recommendation_tier": "candidate"
+          },
+          {
+            "path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\daily_summary_2026_06_29_locked_policy.json",
+            "date": "2026-06-29",
+            "game_pk": 824986,
+            "market": "pitcher_props",
+            "player_name": "Gage Jump",
+            "selection": "over",
+            "market_line": 4.5,
+            "reason": "game not final",
+            "recommendation_tier": "candidate"
+          },
+          {
+            "path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\daily_summary_2026_06_29_locked_policy.json",
+            "date": "2026-06-29",
+            "game_pk": 824986,
+            "market": "pitcher_props",
+            "player_name": "Eric Lauer",
+            "selection": "over",
+            "market_line": 4.5,
+            "reason": "game not final",
+            "recommendation_tier": "candidate"
+          },
+          {
+            "path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\daily_summary_2026_06_29_locked_policy.json",
+            "date": "2026-06-29",
+            "game_pk": 824986,
+            "market": "hitter_hits",
+            "player_name": "Miguel Rojas",
+            "selection": "over",
+            "market_line": 0.5,
+            "reason": "game not final",
+            "recommendation_tier": "candidate"
+          }
+        ],
+        "all_unresolved_rows": [
+          {
+            "path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\daily_summary_2026_06_29_locked_policy.json",
+            "date": "2026-06-29",
+            "game_pk": 824986,
+            "market": "hitter_total_bases",
+            "player_name": "Mookie Betts",
+            "selection": "under",
+            "market_line": 1.5,
+            "reason": "game not final",
+            "recommendation_tier": "official"
+          },
+          {
+            "path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\daily_summary_2026_06_29_locked_policy.json",
+            "date": "2026-06-29",
+            "game_pk": 824986,
+            "market": "pitcher_props",
+            "player_name": "Gage Jump",
+            "selection": "over",
+            "market_line": 15.5,
+            "reason": "game not final",
+            "recommendation_tier": "candidate"
+          },
+          {
+            "path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\daily_summary_2026_06_29_locked_policy.json",
+            "date": "2026-06-29",
+            "game_pk": 824986,
+            "market": "pitcher_props",
+            "player_name": "Gage Jump",
+            "selection": "over",
+            "market_line": 4.5,
+            "reason": "game not final",
+            "recommendation_tier": "candidate"
+          },
+          {
+            "path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\daily_summary_2026_06_29_locked_policy.json",
+            "date": "2026-06-29",
+            "game_pk": 824986,
+            "market": "pitcher_props",
+            "player_name": "Eric Lauer",
+            "selection": "over",
+            "market_line": 4.5,
+            "reason": "game not final",
+            "recommendation_tier": "candidate"
+          },
+          {
+            "path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\daily_summary_2026_06_29_locked_policy.json",
+            "date": "2026-06-29",
+            "game_pk": 824986,
+            "market": "hitter_hits",
+            "player_name": "Miguel Rojas",
+            "selection": "over",
+            "market_line": 0.5,
+            "reason": "game not final",
+            "recommendation_tier": "candidate"
+          }
+        ],
+        "counts": {
+          "official": 1,
+          "playable": 4,
+          "pitcher": 0,
+          "hitter": 1,
+          "extra_pitcher": 3,
+          "extra_hitter": 1
+        },
+        "flags": {
+          "hasAnyRecommendations": true,
+          "hasOfficialRecommendations": true,
+          "hasPlayableCandidates": true
+        }
+      }
+    },
+    {
+      "game_pk": 825065,
+      "game_date": "2026-06-30T01:40:00Z",
+      "start_time": "8:40 PM",
+      "official_date": "2026-06-29",
+      "status": {
+        "abstract": "Preview",
+        "detailed": "Scheduled"
+      },
+      "away": {
+        "id": 137,
+        "abbr": "SF",
+        "name": "San Francisco Giants"
+      },
+      "home": {
+        "id": 109,
+        "abbr": "AZ",
+        "name": "Arizona Diamondbacks"
+      },
+      "starter_names": {
+        "away": "Tyler Mahle",
+        "home": "Eduardo Rodriguez"
+      },
+      "matchup": {
+        "isLive": false,
+        "isFinal": false,
+        "liveText": "",
+        "displayState": "Scheduled",
+        "inning": null,
+        "halfInning": "",
+        "count": {
+          "balls": null,
+          "strikes": null,
+          "outs": null
+        },
+        "batter": "",
+        "pitcher": "",
+        "score": {
+          "away": null,
+          "home": null
+        }
+      },
+      "betting": {
+        "markets": {
+          "totals": null,
+          "ml": {
+            "date": "2026-06-29",
+            "game_pk": 825065,
+            "away": "San Francisco Giants",
+            "home": "Arizona Diamondbacks",
+            "away_abbr": "SF",
+            "home_abbr": "AZ",
+            "double_header": "N",
+            "game_number": 1,
+            "event_id": "bc5ac70107417075ffd9dda7565caff3",
+            "commence_time": "2026-06-30T01:41:00Z",
+            "market": "ml",
+            "selection": "home",
+            "edge": 0.037042640990371356,
+            "model_prob": 0.59,
+            "selected_side_model_prob": 0.59,
+            "selected_side_market_prob": 0.5529573590096286,
+            "market_no_vig_prob": 0.5529573590096286,
+            "odds": "-134",
+            "stake_u": 1.0,
+            "sim_sample_size": 1000,
+            "baseball_reasons": [
+              "Across his last 5 starts, Eduardo Rodriguez has allowed about 1.4 earned runs per outing.",
+              "The projected lineup is mostly 4 left-handed and 5 right-handed, and the power risk also comes in lighter than baseline."
+            ],
+            "explanation_diagnostic": {
+              "status": "supported",
+              "flag_sparse_support": false,
+              "support_min_reasons": 2,
+              "baseball_reasons_n": 2,
+              "reason_sentences_n": 4,
+              "market": "ml",
+              "subject": "SF @ AZ",
+              "supporting_reasons": [
+                "Across his last 5 starts, Eduardo Rodriguez has allowed about 1.4 earned runs per outing.",
+                "The projected lineup is mostly 4 left-handed and 5 right-handed, and the power risk also comes in lighter than baseline."
+              ]
+            },
+            "reasons": [
+              "The model lands on the home side in 59.0% of sims, while the market is pricing it closer to 55.3%. Across his last 5 starts, Eduardo Rodriguez has allowed about 1.4 earned runs per outing. The projected lineup is mostly 4 left-handed and 5 right-handed, and the power risk also comes in lighter than baseline. AZ wins this matchup in about 59.0% of model runs."
+            ],
+            "reason_summary": "The model lands on the home side in 59.0% of sims, while the market is pricing it closer to 55.3%. Across his last 5 starts, Eduardo Rodriguez has allowed about 1.4 earned runs per outing. The projected lineup is mostly 4 left-handed and 5 right-handed, and the power risk also comes in lighter than baseline. AZ wins this matchup in about 59.0% of model runs.",
+            "rank": 1,
+            "recommendation_tier": "official"
+          },
+          "pitcherProps": [],
+          "hitterProps": [],
+          "extraPitcherProps": [
+            {
+              "date": "2026-06-29",
+              "game_pk": 825065,
+              "away": "San Francisco Giants",
+              "home": "Arizona Diamondbacks",
+              "away_abbr": "SF",
+              "home_abbr": "AZ",
+              "double_header": "N",
+              "game_number": 1,
+              "event_id": null,
+              "commence_time": null,
+              "market": "pitcher_props",
+              "pitcher_id": 641816,
+              "pitcher_name": "Tyler Mahle",
+              "team": "SF",
+              "team_side": "away",
+              "prop": "strikeouts",
+              "selection": "over",
+              "edge": 0.2553756420421248,
+              "market_line": 4.5,
+              "model_prob_over": 0.688,
+              "market_prob_over": 0.4326243579578751,
+              "market_prob_under": 0.5673756420421249,
+              "market_prob_mode": "no_vig_two_way",
+              "market_no_vig_prob_over": 0.4326243579578751,
+              "selected_side_market_prob": 0.4326243579578751,
+              "selected_side_model_prob": 0.688,
+              "mean_support": 1.0279999999999996,
+              "so_mean": 5.528,
+              "market_alternates": [],
+              "odds": "+118",
+              "stake_u": 1.0,
+              "sim_sample_size": 1000,
+              "baseball_reasons": [
+                "Across his last 5 starts, he has averaged 5.4 strikeouts.",
+                "His modeled workload cap still reaches roughly 94 pitches, so the deeper-start path is still available if the outing stays efficient."
+              ],
+              "explanation_diagnostic": {
+                "status": "supported",
+                "flag_sparse_support": false,
+                "support_min_reasons": 2,
+                "baseball_reasons_n": 2,
+                "reason_sentences_n": 5,
+                "market": "pitcher_props:strikeouts",
+                "subject": "Tyler Mahle",
+                "supporting_reasons": [
+                  "Across his last 5 starts, he has averaged 5.4 strikeouts.",
+                  "His modeled workload cap still reaches roughly 94 pitches, so the deeper-start path is still available if the outing stays efficient."
+                ]
+              },
+              "reasons": [
+                "The model lands on the over side in 68.8% of sims, while the market is pricing it closer to 43.3%. Across his last 5 starts, he has averaged 5.4 strikeouts. His modeled workload cap still reaches roughly 94 pitches, so the deeper-start path is still available if the outing stays efficient. The model baseline sits around 5.5 strikeouts against a line of 4.5. If he stays on his normal starter path, the matchup against AZ gives him a fair shot to reach full workload volume."
+              ],
+              "reason_summary": "The model lands on the over side in 68.8% of sims, while the market is pricing it closer to 43.3%. Across his last 5 starts, he has averaged 5.4 strikeouts. His modeled workload cap still reaches roughly 94 pitches, so the deeper-start path is still available if the outing stays efficient. The model baseline sits around 5.5 strikeouts against a line of 4.5. If he stays on his normal starter path, the matchup against AZ gives him a fair shot to reach full workload volume.",
+              "rank": 10,
+              "recommendation_tier": "candidate"
+            }
+          ],
+          "extraHitterProps": []
+        },
+        "results": {
+          "combined": {
+            "n": 0,
+            "wins": 0,
+            "losses": 0,
+            "stake_u": 0.0,
+            "profit_u": 0.0,
+            "roi": null
+          }
+        },
+        "playable_results": {
+          "combined": {
+            "n": 0,
+            "wins": 0,
+            "losses": 0,
+            "stake_u": 0.0,
+            "profit_u": 0.0,
+            "roi": null
+          }
+        },
+        "all_results": {
+          "combined": {
+            "n": 0,
+            "wins": 0,
+            "losses": 0,
+            "stake_u": 0.0,
+            "profit_u": 0.0,
+            "roi": null
+          }
+        },
+        "settled_rows": [],
+        "playable_settled_rows": [],
+        "all_settled_rows": [],
+        "unresolved_rows": [
+          {
+            "path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\daily_summary_2026_06_29_locked_policy.json",
+            "date": "2026-06-29",
+            "game_pk": 825065,
+            "market": "ml",
+            "player_name": null,
+            "selection": "home",
+            "market_line": null,
+            "reason": "game not final",
+            "recommendation_tier": "official"
+          }
+        ],
+        "playable_unresolved_rows": [
+          {
+            "path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\daily_summary_2026_06_29_locked_policy.json",
+            "date": "2026-06-29",
+            "game_pk": 825065,
+            "market": "pitcher_props",
+            "player_name": "Tyler Mahle",
+            "selection": "over",
+            "market_line": 4.5,
+            "reason": "game not final",
+            "recommendation_tier": "candidate"
+          }
+        ],
+        "all_unresolved_rows": [
+          {
+            "path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\daily_summary_2026_06_29_locked_policy.json",
+            "date": "2026-06-29",
+            "game_pk": 825065,
+            "market": "ml",
+            "player_name": null,
+            "selection": "home",
+            "market_line": null,
+            "reason": "game not final",
+            "recommendation_tier": "official"
+          },
+          {
+            "path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\daily_summary_2026_06_29_locked_policy.json",
+            "date": "2026-06-29",
+            "game_pk": 825065,
+            "market": "pitcher_props",
+            "player_name": "Tyler Mahle",
+            "selection": "over",
+            "market_line": 4.5,
+            "reason": "game not final",
+            "recommendation_tier": "candidate"
+          }
+        ],
+        "counts": {
+          "official": 1,
+          "playable": 1,
+          "pitcher": 0,
+          "hitter": 0,
+          "extra_pitcher": 1,
+          "extra_hitter": 0
+        },
+        "flags": {
+          "hasAnyRecommendations": true,
+          "hasOfficialRecommendations": true,
+          "hasPlayableCandidates": true
+        }
+      }
+    }
+  ],
+  "manifest_source": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/eval/seasons/2026/season_betting_cards_retuned_manifest.json",
+  "card_source": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_29_locked_policy.json",
+  "source_kind": "canonical_daily_fallback",
+  "summary": {
+    "date": "2026-06-29",
+    "month": "2026-06",
+    "card_path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_29_locked_policy.json",
+    "selected_counts": {
+      "totals": 0,
+      "ml": 1,
+      "pitcher_props": 1,
+      "hitter_props": 6,
+      "hitter_home_runs": 0,
+      "hitter_hits": 4,
+      "hitter_strikeouts": 0,
+      "hitter_total_bases": 2,
+      "hitter_runs": 0,
+      "hitter_rbis": 0,
+      "combined": 8
+    },
+    "results": {
+      "combined": {
+        "n": 0,
+        "wins": 0,
+        "losses": 0,
+        "stake_u": 0.0,
+        "profit_u": 0.0,
+        "roi": null
+      }
+    },
+    "profit_u": 0.0,
+    "roi": null,
+    "settled_n": 0,
+    "unresolved_n": 8
+  },
+  "cap_profile": "nototals_p1_tbheavy11_r1_nohr",
+  "selected_counts": {
+    "totals": 0,
+    "ml": 1,
+    "pitcher_props": 1,
+    "hitter_props": 6,
+    "hitter_home_runs": 0,
+    "hitter_hits": 4,
+    "hitter_strikeouts": 0,
+    "hitter_total_bases": 2,
+    "hitter_runs": 0,
+    "hitter_rbis": 0,
+    "combined": 8
+  },
+  "results": {
+    "combined": {
+      "n": 0,
+      "wins": 0,
+      "losses": 0,
+      "stake_u": 0.0,
+      "profit_u": 0.0,
+      "roi": null
+    }
+  },
+  "cards_available": true,
+  "cards_url": "/?date=2026-06-29",
+  "artifactDate": "2026-06-29"
+}
