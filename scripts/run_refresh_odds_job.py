@@ -212,6 +212,13 @@ def main() -> int:
     }
     if failure_error:
         failure_payload["error"] = failure_error
+    if return_code != 0:
+        if stdout_text.strip():
+            print("[refresh_job_child_stdout]", flush=True)
+            print(stdout_text, flush=True)
+        if stderr_text.strip():
+            print("[refresh_job_child_stderr]", flush=True)
+            print(stderr_text, flush=True)
     if return_code == 0 and stdout_payload:
         _safe_write_json(stdout_path, stdout_payload)
     else:
