@@ -393,6 +393,29 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
         self.assertEqual(top_payload["data"][0]["top_play"]["market"], "reb")
         self.assertEqual(top_payload["data"][0]["top_play"]["projected_minutes"], 34.5)
 
+    def test_cards_props_snapshot_writes_empty_structure_when_props_missing(self) -> None:
+        module = self._load_module()
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            processed_root = Path(tmp_dir) / "data" / "processed"
+            processed_root.mkdir(parents=True, exist_ok=True)
+            date_str = "2026-05-22"
+            game_row = {"home_tri": "CHI", "away_tri": "MIN", "game_id": "12345"}
+            by_team = {
+                "CHI": {"home_tri": "CHI", "away_tri": "MIN", "side": "home", "opponent": "MIN"},
+                "MIN": {"home_tri": "CHI", "away_tri": "MIN", "side": "away", "opponent": "CHI"},
+            }
+
+            with patch.object(module, "_local_game_cards_index", return_value=([game_row], by_team, None)), patch.object(module, "_load_local_props_recommendations", return_value=[]):
+                rows, out_path = module._build_local_cards_props_snapshot_artifact(processed_root=processed_root, date_str=date_str)
+
+            self.assertEqual(rows, 0)
+            self.assertEqual(out_path, processed_root / f"cards_props_snapshot_{date_str}.json")
+            payload = json.loads(out_path.read_text(encoding="utf-8"))
+
+        self.assertEqual(payload["date"], date_str)
+        self.assertEqual(payload["games"], [])
+
     def test_recon_games_export_uses_local_boxscores_and_game_cards(self) -> None:
         module = self._load_module()
 

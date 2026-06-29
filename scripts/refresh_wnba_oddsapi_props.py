@@ -1410,7 +1410,7 @@ def _build_local_top_by_game_snapshot(*, processed_root: Path, date_str: str) ->
 def _build_local_cards_props_snapshot_artifact(*, processed_root: Path, date_str: str) -> tuple[int, Path | None]:
     rows, by_team, _ = _local_game_cards_index(processed_root=processed_root, date_str=date_str)
     prop_rows = _load_local_props_recommendations(processed_root=processed_root, date_str=date_str)
-    if not rows or not by_team or not prop_rows:
+    if not rows or not by_team:
         return 0, None
 
     grouped: dict[tuple[str, str], dict[str, list[dict[str, object]]]] = {}
@@ -1457,9 +1457,6 @@ def _build_local_cards_props_snapshot_artifact(*, processed_root: Path, date_str
         if not home_rows and not away_rows:
             continue
         games_out.append({"home_tri": home_tri, "away_tri": away_tri, "game_id": game_row.get("game_id"), "prop_recommendations": {"home": home_rows, "away": away_rows}})
-
-    if not games_out:
-        return 0, None
 
     out_path = processed_root / f"cards_props_snapshot_{date_str}.json"
     out_path.parent.mkdir(parents=True, exist_ok=True)
