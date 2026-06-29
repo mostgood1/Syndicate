@@ -41,6 +41,17 @@ class OrchestratorWorkerTests(unittest.TestCase):
         self.assertIn("run_intelligence_state_worker.py STDERR:", printed_text)
         self.assertIn("child stderr", printed_text)
 
+    def test_main_prioritizes_refresh_poll_before_live_odds_job(self) -> None:
+        with patch.object(orchestrator_worker, "run_refresh_job", side_effect=SystemExit(0)) as mocked_refresh, patch.object(
+            orchestrator_worker,
+            "run_live_odds_refresh_job",
+        ) as mocked_live:
+            with self.assertRaises(SystemExit):
+                orchestrator_worker.main()
+
+        mocked_refresh.assert_called_once()
+        mocked_live.assert_not_called()
+
 
 if __name__ == "__main__":
     unittest.main()

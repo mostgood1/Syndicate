@@ -109,9 +109,9 @@ def run_intelligence_state_job() -> None:
 
 def main() -> int:
     while True:
-        run_live_odds_refresh_job()
-        time.sleep(5)
         run_refresh_job()
+        time.sleep(5)
+        run_live_odds_refresh_job()
         time.sleep(5)
         run_mlb_live_lens_job()
         time.sleep(5)
