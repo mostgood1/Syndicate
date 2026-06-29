@@ -1,0 +1,3618 @@
+{
+  "schema_version": 1,
+  "date": "2026-06-18",
+  "generated_at": "2026-06-18T15:18:55.782712",
+  "include_baseline": false,
+  "teams": {
+    "108": {
+      "team_id": 108,
+      "team_abbr": "LAA",
+      "roster_types": {
+        "40Man": {
+          "prev_date": "2026-06-09",
+          "n_players": 47,
+          "n_added": 3,
+          "n_removed": 1,
+          "added": [
+            {
+              "full_name": "Brett Kerry",
+              "player_id": 695049,
+              "position": "P",
+              "status": {
+                "code": "RM",
+                "description": "Reassigned to Minors"
+              }
+            },
+            {
+              "full_name": "Logan Porter",
+              "player_id": 682515,
+              "position": "C",
+              "status": {
+                "code": "RM",
+                "description": "Reassigned to Minors"
+              }
+            },
+            {
+              "full_name": "Tyler Heineman",
+              "player_id": 623168,
+              "position": "C",
+              "status": {
+                "code": "NYR",
+                "description": "Not Yet Reported"
+              }
+            }
+          ],
+          "removed": [
+            {
+              "full_name": "Drew Pomeranz",
+              "player_id": 519141,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            }
+          ],
+          "added_ids": [
+            623168,
+            682515,
+            695049
+          ],
+          "removed_ids": [
+            519141
+          ]
+        },
+        "active": {
+          "prev_date": "2026-06-09",
+          "n_players": 24,
+          "n_added": 3,
+          "n_removed": 5,
+          "added": [
+            {
+              "full_name": "Denzer Guzman",
+              "player_id": 694203,
+              "position": "3B",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Jos\u00e9 Fermin",
+              "player_id": 820862,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Sam Aldegheri",
+              "player_id": 691951,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            }
+          ],
+          "removed": [
+            {
+              "full_name": "Adam Frazier",
+              "player_id": 624428,
+              "position": "2B",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Drew Pomeranz",
+              "player_id": 519141,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Grayson Rodriguez",
+              "player_id": 680570,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Jack Kochanowicz",
+              "player_id": 686799,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Sebasti\u00e1n Rivero",
+              "player_id": 665861,
+              "position": "C",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            }
+          ],
+          "added_ids": [
+            691951,
+            694203,
+            820862
+          ],
+          "removed_ids": [
+            519141,
+            624428,
+            665861,
+            680570,
+            686799
+          ]
+        }
+      }
+    },
+    "109": {
+      "team_id": 109,
+      "team_abbr": "AZ",
+      "roster_types": {
+        "40Man": {
+          "prev_date": "2026-06-09",
+          "n_players": 47,
+          "n_added": 0,
+          "n_removed": 1,
+          "added": [],
+          "removed": [
+            {
+              "full_name": "Aramis Garcia",
+              "player_id": 605244,
+              "position": "C",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            }
+          ],
+          "added_ids": [],
+          "removed_ids": [
+            605244
+          ]
+        },
+        "active": {
+          "prev_date": "2026-06-09",
+          "n_players": 26,
+          "n_added": 2,
+          "n_removed": 2,
+          "added": [
+            {
+              "full_name": "Jordan Lawlar",
+              "player_id": 691783,
+              "position": "LF",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Lourdes Gurriel Jr.",
+              "player_id": 666971,
+              "position": "LF",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            }
+          ],
+          "removed": [
+            {
+              "full_name": "Aramis Garcia",
+              "player_id": 605244,
+              "position": "C",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Ryan Waldschmidt",
+              "player_id": 814439,
+              "position": "CF",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            }
+          ],
+          "added_ids": [
+            666971,
+            691783
+          ],
+          "removed_ids": [
+            605244,
+            814439
+          ]
+        }
+      }
+    },
+    "110": {
+      "team_id": 110,
+      "team_abbr": "BAL",
+      "roster_types": {
+        "40Man": {
+          "prev_date": "2026-06-09",
+          "n_players": 47,
+          "n_added": 0,
+          "n_removed": 0
+        },
+        "active": {
+          "prev_date": "2026-06-09",
+          "n_players": 26,
+          "n_added": 2,
+          "n_removed": 2,
+          "added": [
+            {
+              "full_name": "Ryan Helsley",
+              "player_id": 664854,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Trey Gibson",
+              "player_id": 694346,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            }
+          ],
+          "removed": [
+            {
+              "full_name": "Anthony Nunez",
+              "player_id": 689296,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Chris Bassitt",
+              "player_id": 605135,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            }
+          ],
+          "added_ids": [
+            664854,
+            694346
+          ],
+          "removed_ids": [
+            605135,
+            689296
+          ]
+        }
+      }
+    },
+    "111": {
+      "team_id": 111,
+      "team_abbr": "BOS",
+      "roster_types": {
+        "40Man": {
+          "prev_date": "2026-06-09",
+          "n_players": 48,
+          "n_added": 0,
+          "n_removed": 0
+        },
+        "active": {
+          "prev_date": "2026-06-09",
+          "n_players": 26,
+          "n_added": 3,
+          "n_removed": 3,
+          "added": [
+            {
+              "full_name": "Garrett Whitlock",
+              "player_id": 676477,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Jake Bennett",
+              "player_id": 687562,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Nate Eaton",
+              "player_id": 681987,
+              "position": "OF",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            }
+          ],
+          "removed": [
+            {
+              "full_name": "Alec Gamboa",
+              "player_id": 687941,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Anthony Seigler",
+              "player_id": 678011,
+              "position": "2B",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Joe La Sorsa",
+              "player_id": 686747,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            }
+          ],
+          "added_ids": [
+            676477,
+            681987,
+            687562
+          ],
+          "removed_ids": [
+            678011,
+            686747,
+            687941
+          ]
+        }
+      }
+    },
+    "112": {
+      "team_id": 112,
+      "team_abbr": "CHC",
+      "roster_types": {
+        "40Man": {
+          "prev_date": "2026-06-09",
+          "n_players": 47,
+          "n_added": 3,
+          "n_removed": 1,
+          "added": [
+            {
+              "full_name": "Antoine Kelly",
+              "player_id": 681520,
+              "position": "P",
+              "status": {
+                "code": "RM",
+                "description": "Reassigned to Minors"
+              }
+            },
+            {
+              "full_name": "Eduarniel N\u00fa\u00f1ez",
+              "player_id": 674384,
+              "position": "P",
+              "status": {
+                "code": "RM",
+                "description": "Reassigned to Minors"
+              }
+            },
+            {
+              "full_name": "Yosver Zulueta",
+              "player_id": 691172,
+              "position": "P",
+              "status": {
+                "code": "RM",
+                "description": "Reassigned to Minors"
+              }
+            }
+          ],
+          "removed": [
+            {
+              "full_name": "Doug Nikhazy",
+              "player_id": 680951,
+              "position": "P",
+              "status": {
+                "code": "RM",
+                "description": "Reassigned to Minors"
+              }
+            }
+          ],
+          "added_ids": [
+            674384,
+            681520,
+            691172
+          ],
+          "removed_ids": [
+            680951
+          ]
+        },
+        "active": {
+          "prev_date": "2026-06-09",
+          "n_players": 26,
+          "n_added": 3,
+          "n_removed": 3,
+          "added": [
+            {
+              "full_name": "Ethan Roberts",
+              "player_id": 681799,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Gavin Hollowell",
+              "player_id": 668970,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Matt Shaw",
+              "player_id": 807713,
+              "position": "RF",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            }
+          ],
+          "removed": [
+            {
+              "full_name": "Daniel Palencia",
+              "player_id": 694037,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Jameson Taillon",
+              "player_id": 592791,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Kevin Alc\u00e1ntara",
+              "player_id": 682634,
+              "position": "RF",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            }
+          ],
+          "added_ids": [
+            668970,
+            681799,
+            807713
+          ],
+          "removed_ids": [
+            592791,
+            682634,
+            694037
+          ]
+        }
+      }
+    },
+    "113": {
+      "team_id": 113,
+      "team_abbr": "CIN",
+      "roster_types": {
+        "40Man": {
+          "prev_date": "2026-06-09",
+          "n_players": 42,
+          "n_added": 1,
+          "n_removed": 1,
+          "added": [
+            {
+              "full_name": "Will Banfield",
+              "player_id": 677943,
+              "position": "C",
+              "status": {
+                "code": "RM",
+                "description": "Reassigned to Minors"
+              }
+            }
+          ],
+          "removed": [
+            {
+              "full_name": "P.J. Higgins",
+              "player_id": 664731,
+              "position": "C",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            }
+          ],
+          "added_ids": [
+            677943
+          ],
+          "removed_ids": [
+            664731
+          ]
+        },
+        "active": {
+          "prev_date": "2026-06-09",
+          "n_players": 26,
+          "n_added": 2,
+          "n_removed": 2,
+          "added": [
+            {
+              "full_name": "Chase Petty",
+              "player_id": 695534,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Jose Trevino",
+              "player_id": 624431,
+              "position": "C",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            }
+          ],
+          "removed": [
+            {
+              "full_name": "P.J. Higgins",
+              "player_id": 664731,
+              "position": "C",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Zach McCambley",
+              "player_id": 685112,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            }
+          ],
+          "added_ids": [
+            624431,
+            695534
+          ],
+          "removed_ids": [
+            664731,
+            685112
+          ]
+        }
+      }
+    },
+    "114": {
+      "team_id": 114,
+      "team_abbr": "CLE",
+      "roster_types": {
+        "40Man": {
+          "prev_date": "2026-06-09",
+          "n_players": 40,
+          "n_added": 0,
+          "n_removed": 1,
+          "added": [],
+          "removed": [
+            {
+              "full_name": "George Valera",
+              "player_id": 671655,
+              "position": "LF",
+              "status": {
+                "code": "RM",
+                "description": "Reassigned to Minors"
+              }
+            }
+          ],
+          "added_ids": [],
+          "removed_ids": [
+            671655
+          ]
+        },
+        "active": {
+          "prev_date": "2026-06-09",
+          "n_players": 26,
+          "n_added": 4,
+          "n_removed": 4,
+          "added": [
+            {
+              "full_name": "Daniel Espino",
+              "player_id": 682982,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Gabriel Arias",
+              "player_id": 672356,
+              "position": "SS",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Kahlil Watson",
+              "player_id": 696135,
+              "position": "LF",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Petey Halpin",
+              "player_id": 690984,
+              "position": "CF",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            }
+          ],
+          "removed": [
+            {
+              "full_name": "Angel Mart\u00ednez",
+              "player_id": 682657,
+              "position": "LF",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Chase DeLauter",
+              "player_id": 800050,
+              "position": "RF",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Codi Heuer",
+              "player_id": 676051,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Jos\u00e9 Ram\u00edrez",
+              "player_id": 608070,
+              "position": "3B",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            }
+          ],
+          "added_ids": [
+            672356,
+            682982,
+            690984,
+            696135
+          ],
+          "removed_ids": [
+            608070,
+            676051,
+            682657,
+            800050
+          ]
+        }
+      }
+    },
+    "115": {
+      "team_id": 115,
+      "team_abbr": "COL",
+      "roster_types": {
+        "40Man": {
+          "prev_date": "2026-06-09",
+          "n_players": 46,
+          "n_added": 3,
+          "n_removed": 2,
+          "added": [
+            {
+              "full_name": "Cole Carrigg",
+              "player_id": 694249,
+              "position": "CF",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Eiberson Castellano",
+              "player_id": 682769,
+              "position": "P",
+              "status": {
+                "code": "RM",
+                "description": "Reassigned to Minors"
+              }
+            },
+            {
+              "full_name": "Sean Sullivan",
+              "player_id": 807743,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            }
+          ],
+          "removed": [
+            {
+              "full_name": "Keegan Thompson",
+              "player_id": 624522,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Valente Bellozo",
+              "player_id": 678368,
+              "position": "P",
+              "status": {
+                "code": "RM",
+                "description": "Reassigned to Minors"
+              }
+            }
+          ],
+          "added_ids": [
+            682769,
+            694249,
+            807743
+          ],
+          "removed_ids": [
+            624522,
+            678368
+          ]
+        },
+        "active": {
+          "prev_date": "2026-06-09",
+          "n_players": 26,
+          "n_added": 4,
+          "n_removed": 4,
+          "added": [
+            {
+              "full_name": "Cole Carrigg",
+              "player_id": 694249,
+              "position": "CF",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Jimmy Herget",
+              "player_id": 623474,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Sean Sullivan",
+              "player_id": 807743,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Victor Vodnik",
+              "player_id": 680767,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            }
+          ],
+          "removed": [
+            {
+              "full_name": "Chad Stevens",
+              "player_id": 677060,
+              "position": "2B",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Keegan Thompson",
+              "player_id": 624522,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Seth Halvorsen",
+              "player_id": 678020,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "TJ Shook",
+              "player_id": 669298,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            }
+          ],
+          "added_ids": [
+            623474,
+            680767,
+            694249,
+            807743
+          ],
+          "removed_ids": [
+            624522,
+            669298,
+            677060,
+            678020
+          ]
+        }
+      }
+    },
+    "116": {
+      "team_id": 116,
+      "team_abbr": "DET",
+      "roster_types": {
+        "40Man": {
+          "prev_date": "2026-06-09",
+          "n_players": 48,
+          "n_added": 2,
+          "n_removed": 1,
+          "added": [
+            {
+              "full_name": "Jacob Waguespack",
+              "player_id": 621097,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "James Outman",
+              "player_id": 681546,
+              "position": "CF",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            }
+          ],
+          "removed": [
+            {
+              "full_name": "Zack Short",
+              "player_id": 670097,
+              "position": "SS",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            }
+          ],
+          "added_ids": [
+            621097,
+            681546
+          ],
+          "removed_ids": [
+            670097
+          ]
+        },
+        "active": {
+          "prev_date": "2026-06-09",
+          "n_players": 26,
+          "n_added": 6,
+          "n_removed": 6,
+          "added": [
+            {
+              "full_name": "Casey Mize",
+              "player_id": 663554,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Hao-Yu  Lee",
+              "player_id": 701678,
+              "position": "2B",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Jacob Waguespack",
+              "player_id": 621097,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "James Outman",
+              "player_id": 681546,
+              "position": "CF",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Kenley Jansen",
+              "player_id": 445276,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Tarik Skubal",
+              "player_id": 669373,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            }
+          ],
+          "removed": [
+            {
+              "full_name": "Beau Brieske",
+              "player_id": 689225,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Brenan Hanifee",
+              "player_id": 669724,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Gleyber Torres",
+              "player_id": 650402,
+              "position": "2B",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Jack Flaherty",
+              "player_id": 656427,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Ty Madden",
+              "player_id": 680744,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Zack Short",
+              "player_id": 670097,
+              "position": "SS",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            }
+          ],
+          "added_ids": [
+            445276,
+            621097,
+            663554,
+            669373,
+            681546,
+            701678
+          ],
+          "removed_ids": [
+            650402,
+            656427,
+            669724,
+            670097,
+            680744,
+            689225
+          ]
+        }
+      }
+    },
+    "117": {
+      "team_id": 117,
+      "team_abbr": "HOU",
+      "roster_types": {
+        "40Man": {
+          "prev_date": "2026-06-09",
+          "n_players": 45,
+          "n_added": 1,
+          "n_removed": 2,
+          "added": [
+            {
+              "full_name": "Raynel Delgado",
+              "player_id": 669384,
+              "position": "2B",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            }
+          ],
+          "removed": [
+            {
+              "full_name": "Jayden Murray",
+              "player_id": 681151,
+              "position": "P",
+              "status": {
+                "code": "RM",
+                "description": "Reassigned to Minors"
+              }
+            },
+            {
+              "full_name": "Ryan Weiss",
+              "player_id": 680802,
+              "position": "P",
+              "status": {
+                "code": "RM",
+                "description": "Reassigned to Minors"
+              }
+            }
+          ],
+          "added_ids": [
+            669384
+          ],
+          "removed_ids": [
+            680802,
+            681151
+          ]
+        },
+        "active": {
+          "prev_date": "2026-06-09",
+          "n_players": 26,
+          "n_added": 4,
+          "n_removed": 4,
+          "added": [
+            {
+              "full_name": "Hunter Brown",
+              "player_id": 686613,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Joey Loperfido",
+              "player_id": 694388,
+              "position": "LF",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Raynel Delgado",
+              "player_id": 669384,
+              "position": "2B",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Yainer Diaz",
+              "player_id": 673237,
+              "position": "C",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            }
+          ],
+          "removed": [
+            {
+              "full_name": "Alimber Santa",
+              "player_id": 695001,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Collin Price",
+              "player_id": 805672,
+              "position": "C",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "LaMonte Wade Jr.",
+              "player_id": 664774,
+              "position": "1B",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Nick Allen",
+              "player_id": 669397,
+              "position": "SS",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            }
+          ],
+          "added_ids": [
+            669384,
+            673237,
+            686613,
+            694388
+          ],
+          "removed_ids": [
+            664774,
+            669397,
+            695001,
+            805672
+          ]
+        }
+      }
+    },
+    "118": {
+      "team_id": 118,
+      "team_abbr": "KC",
+      "roster_types": {
+        "40Man": {
+          "prev_date": "2026-06-09",
+          "n_players": 45,
+          "n_added": 2,
+          "n_removed": 0,
+          "added": [
+            {
+              "full_name": "Connor Seabold",
+              "player_id": 657756,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Randy Dobnak",
+              "player_id": 677976,
+              "position": "P",
+              "status": {
+                "code": "RM",
+                "description": "Reassigned to Minors"
+              }
+            }
+          ],
+          "removed": [],
+          "added_ids": [
+            657756,
+            677976
+          ],
+          "removed_ids": []
+        },
+        "active": {
+          "prev_date": "2026-06-09",
+          "n_players": 26,
+          "n_added": 4,
+          "n_removed": 4,
+          "added": [
+            {
+              "full_name": "Connor Seabold",
+              "player_id": 657756,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "John Rave",
+              "player_id": 670231,
+              "position": "RF",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Kameron Misner",
+              "player_id": 670224,
+              "position": "CF",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Stephen Kolek",
+              "player_id": 663568,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            }
+          ],
+          "removed": [
+            {
+              "full_name": "Josh Rojas",
+              "player_id": 668942,
+              "position": "3B",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Kyle Isbel",
+              "player_id": 664728,
+              "position": "CF",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Seth Lugo",
+              "player_id": 607625,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Vinnie Pasquantino",
+              "player_id": 686469,
+              "position": "1B",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            }
+          ],
+          "added_ids": [
+            657756,
+            663568,
+            670224,
+            670231
+          ],
+          "removed_ids": [
+            607625,
+            664728,
+            668942,
+            686469
+          ]
+        }
+      }
+    },
+    "119": {
+      "team_id": 119,
+      "team_abbr": "LAD",
+      "roster_types": {
+        "40Man": {
+          "prev_date": "2026-06-09",
+          "n_players": 50,
+          "n_added": 1,
+          "n_removed": 2,
+          "added": [
+            {
+              "full_name": "Chuckie Robinson",
+              "player_id": 642020,
+              "position": "C",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            }
+          ],
+          "removed": [
+            {
+              "full_name": "Santiago Espinal",
+              "player_id": 669289,
+              "position": "3B",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Tyler Fitzgerald",
+              "player_id": 666149,
+              "position": "2B",
+              "status": {
+                "code": "RM",
+                "description": "Reassigned to Minors"
+              }
+            }
+          ],
+          "added_ids": [
+            642020
+          ],
+          "removed_ids": [
+            666149,
+            669289
+          ]
+        },
+        "active": {
+          "prev_date": "2026-06-09",
+          "n_players": 26,
+          "n_added": 2,
+          "n_removed": 2,
+          "added": [
+            {
+              "full_name": "Chuckie Robinson",
+              "player_id": 642020,
+              "position": "C",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Tommy Edman",
+              "player_id": 669242,
+              "position": "2B",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            }
+          ],
+          "removed": [
+            {
+              "full_name": "Santiago Espinal",
+              "player_id": 669289,
+              "position": "3B",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Will Smith",
+              "player_id": 669257,
+              "position": "C",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            }
+          ],
+          "added_ids": [
+            642020,
+            669242
+          ],
+          "removed_ids": [
+            669257,
+            669289
+          ]
+        }
+      }
+    },
+    "120": {
+      "team_id": 120,
+      "team_abbr": "WSH",
+      "roster_types": {
+        "40Man": {
+          "prev_date": "2026-06-09",
+          "n_players": 45,
+          "n_added": 1,
+          "n_removed": 1,
+          "added": [
+            {
+              "full_name": "Jhancarlos Lara",
+              "player_id": 702910,
+              "position": "P",
+              "status": {
+                "code": "RM",
+                "description": "Reassigned to Minors"
+              }
+            }
+          ],
+          "removed": [
+            {
+              "full_name": "Julian Fern\u00e1ndez",
+              "player_id": 642759,
+              "position": "P",
+              "status": {
+                "code": "RM",
+                "description": "Reassigned to Minors"
+              }
+            }
+          ],
+          "added_ids": [
+            702910
+          ],
+          "removed_ids": [
+            642759
+          ]
+        },
+        "active": {
+          "prev_date": "2026-06-09",
+          "n_players": 26,
+          "n_added": 1,
+          "n_removed": 1,
+          "added": [
+            {
+              "full_name": "PJ Poulin",
+              "player_id": 676571,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            }
+          ],
+          "removed": [
+            {
+              "full_name": "Riley Cornelio",
+              "player_id": 683000,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            }
+          ],
+          "added_ids": [
+            676571
+          ],
+          "removed_ids": [
+            683000
+          ]
+        }
+      }
+    },
+    "121": {
+      "team_id": 121,
+      "team_abbr": "NYM",
+      "roster_types": {
+        "40Man": {
+          "prev_date": "2026-06-09",
+          "n_players": 46,
+          "n_added": 1,
+          "n_removed": 1,
+          "added": [
+            {
+              "full_name": "Zack Short",
+              "player_id": 670097,
+              "position": "SS",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            }
+          ],
+          "removed": [
+            {
+              "full_name": "Vidal Bruj\u00e1n",
+              "player_id": 660644,
+              "position": "SS",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            }
+          ],
+          "added_ids": [
+            670097
+          ],
+          "removed_ids": [
+            660644
+          ]
+        },
+        "active": {
+          "prev_date": "2026-06-09",
+          "n_players": 26,
+          "n_added": 4,
+          "n_removed": 4,
+          "added": [
+            {
+              "full_name": "Francisco Alvarez",
+              "player_id": 682626,
+              "position": "C",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Kodai Senga",
+              "player_id": 673540,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Tobias Myers",
+              "player_id": 668964,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Zack Short",
+              "player_id": 670097,
+              "position": "SS",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            }
+          ],
+          "removed": [
+            {
+              "full_name": "Christian Scott",
+              "player_id": 681035,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Hayden Senger",
+              "player_id": 663584,
+              "position": "C",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Joey Gerber",
+              "player_id": 680702,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Vidal Bruj\u00e1n",
+              "player_id": 660644,
+              "position": "SS",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            }
+          ],
+          "added_ids": [
+            668964,
+            670097,
+            673540,
+            682626
+          ],
+          "removed_ids": [
+            660644,
+            663584,
+            680702,
+            681035
+          ]
+        }
+      }
+    },
+    "133": {
+      "team_id": 133,
+      "team_abbr": "ATH",
+      "roster_types": {
+        "40Man": {
+          "prev_date": "2026-06-09",
+          "n_players": 42,
+          "n_added": 0,
+          "n_removed": 0
+        },
+        "active": {
+          "prev_date": "2026-06-09",
+          "n_players": 26,
+          "n_added": 3,
+          "n_removed": 3,
+          "added": [
+            {
+              "full_name": "Aaron Civale",
+              "player_id": 650644,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Jacob Wilson",
+              "player_id": 805779,
+              "position": "SS",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Max Muncy",
+              "player_id": 691777,
+              "position": "3B",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            }
+          ],
+          "removed": [
+            {
+              "full_name": "Brent Rooker",
+              "player_id": 667670,
+              "position": "DH",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Darell Hernaiz",
+              "player_id": 687231,
+              "position": "SS",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Kade Morris",
+              "player_id": 695034,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            }
+          ],
+          "added_ids": [
+            650644,
+            691777,
+            805779
+          ],
+          "removed_ids": [
+            667670,
+            687231,
+            695034
+          ]
+        }
+      }
+    },
+    "134": {
+      "team_id": 134,
+      "team_abbr": "PIT",
+      "roster_types": {
+        "40Man": {
+          "prev_date": "2026-06-09",
+          "n_players": 41,
+          "n_added": 1,
+          "n_removed": 0,
+          "added": [
+            {
+              "full_name": "Davis Wendzel",
+              "player_id": 673995,
+              "position": "3B",
+              "status": {
+                "code": "RM",
+                "description": "Reassigned to Minors"
+              }
+            }
+          ],
+          "removed": [],
+          "added_ids": [
+            673995
+          ],
+          "removed_ids": []
+        },
+        "active": {
+          "prev_date": "2026-06-09",
+          "n_players": 26,
+          "n_added": 3,
+          "n_removed": 3,
+          "added": [
+            {
+              "full_name": "Billy Cook",
+              "player_id": 695257,
+              "position": "RF",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Esmerlyn Valdez",
+              "player_id": 699013,
+              "position": "RF",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Isaac Mattson",
+              "player_id": 676755,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            }
+          ],
+          "removed": [
+            {
+              "full_name": "Davis Wendzel",
+              "player_id": 673995,
+              "position": "3B",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Oneil Cruz",
+              "player_id": 665833,
+              "position": "CF",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Wilber Dotel",
+              "player_id": 696062,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            }
+          ],
+          "added_ids": [
+            676755,
+            695257,
+            699013
+          ],
+          "removed_ids": [
+            665833,
+            673995,
+            696062
+          ]
+        }
+      }
+    },
+    "135": {
+      "team_id": 135,
+      "team_abbr": "SD",
+      "roster_types": {
+        "40Man": {
+          "prev_date": "2026-06-09",
+          "n_players": 44,
+          "n_added": 2,
+          "n_removed": 2,
+          "added": [
+            {
+              "full_name": "Blake Hunt",
+              "player_id": 675448,
+              "position": "C",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Nick Solak",
+              "player_id": 669256,
+              "position": "1B",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            }
+          ],
+          "removed": [
+            {
+              "full_name": "Bryce Johnson",
+              "player_id": 669369,
+              "position": "RF",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Ty Adcock",
+              "player_id": 686654,
+              "position": "P",
+              "status": {
+                "code": "RM",
+                "description": "Reassigned to Minors"
+              }
+            }
+          ],
+          "added_ids": [
+            669256,
+            675448
+          ],
+          "removed_ids": [
+            669369,
+            686654
+          ]
+        },
+        "active": {
+          "prev_date": "2026-06-09",
+          "n_players": 25,
+          "n_added": 4,
+          "n_removed": 5,
+          "added": [
+            {
+              "full_name": "Blake Hunt",
+              "player_id": 675448,
+              "position": "C",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Kyle Hart",
+              "player_id": 606996,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Nick Solak",
+              "player_id": 669256,
+              "position": "1B",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Will Wagner",
+              "player_id": 695238,
+              "position": "DH",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            }
+          ],
+          "removed": [
+            {
+              "full_name": "Bryce Johnson",
+              "player_id": 669369,
+              "position": "RF",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Freddy Fermin",
+              "player_id": 666023,
+              "position": "C",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Mason Miller",
+              "player_id": 695243,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Miguel Andujar",
+              "player_id": 609280,
+              "position": "DH",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Ron Marinaccio",
+              "player_id": 676760,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            }
+          ],
+          "added_ids": [
+            606996,
+            669256,
+            675448,
+            695238
+          ],
+          "removed_ids": [
+            609280,
+            666023,
+            669369,
+            676760,
+            695243
+          ]
+        }
+      }
+    },
+    "136": {
+      "team_id": 136,
+      "team_abbr": "SEA",
+      "roster_types": {
+        "40Man": {
+          "prev_date": "2026-06-09",
+          "n_players": 43,
+          "n_added": 2,
+          "n_removed": 2,
+          "added": [
+            {
+              "full_name": "Curtis Washington Jr.",
+              "player_id": 690944,
+              "position": "CF",
+              "status": {
+                "code": "RM",
+                "description": "Reassigned to Minors"
+              }
+            },
+            {
+              "full_name": "Michael Rucker",
+              "player_id": 621074,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            }
+          ],
+          "removed": [
+            {
+              "full_name": "Domingo Gonzalez",
+              "player_id": 682445,
+              "position": "P",
+              "status": {
+                "code": "RM",
+                "description": "Reassigned to Minors"
+              }
+            },
+            {
+              "full_name": "Yosver Zulueta",
+              "player_id": 691172,
+              "position": "P",
+              "status": {
+                "code": "RM",
+                "description": "Reassigned to Minors"
+              }
+            }
+          ],
+          "added_ids": [
+            621074,
+            690944
+          ],
+          "removed_ids": [
+            682445,
+            691172
+          ]
+        },
+        "active": {
+          "prev_date": "2026-06-09",
+          "n_players": 26,
+          "n_added": 5,
+          "n_removed": 5,
+          "added": [
+            {
+              "full_name": "Cal Raleigh",
+              "player_id": 663728,
+              "position": "C",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Connor Joe",
+              "player_id": 656582,
+              "position": "RF",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Michael Rucker",
+              "player_id": 621074,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Miles Mastrobuoni",
+              "player_id": 670156,
+              "position": "3B",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Nick Davila",
+              "player_id": 689546,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            }
+          ],
+          "removed": [
+            {
+              "full_name": "Cooper Criswell",
+              "player_id": 681867,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Jhonny Pereda",
+              "player_id": 640902,
+              "position": "C",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Matt Brash",
+              "player_id": 666374,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Patrick Wisdom",
+              "player_id": 621550,
+              "position": "3B",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Randy Arozarena",
+              "player_id": 668227,
+              "position": "LF",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            }
+          ],
+          "added_ids": [
+            621074,
+            656582,
+            663728,
+            670156,
+            689546
+          ],
+          "removed_ids": [
+            621550,
+            640902,
+            666374,
+            668227,
+            681867
+          ]
+        }
+      }
+    },
+    "137": {
+      "team_id": 137,
+      "team_abbr": "SF",
+      "roster_types": {
+        "40Man": {
+          "prev_date": "2026-06-09",
+          "n_players": 47,
+          "n_added": 0,
+          "n_removed": 1,
+          "added": [],
+          "removed": [
+            {
+              "full_name": "Will Brennan",
+              "player_id": 686823,
+              "position": "LF",
+              "status": {
+                "code": "RM",
+                "description": "Reassigned to Minors"
+              }
+            }
+          ],
+          "added_ids": [],
+          "removed_ids": [
+            686823
+          ]
+        },
+        "active": {
+          "prev_date": "2026-06-09",
+          "n_players": 26,
+          "n_added": 2,
+          "n_removed": 2,
+          "added": [
+            {
+              "full_name": "Matt Gage",
+              "player_id": 657424,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Ryan Walker",
+              "player_id": 676254,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            }
+          ],
+          "removed": [
+            {
+              "full_name": "Carson Seymour",
+              "player_id": 693313,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Keaton Winn",
+              "player_id": 676775,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            }
+          ],
+          "added_ids": [
+            657424,
+            676254
+          ],
+          "removed_ids": [
+            676775,
+            693313
+          ]
+        }
+      }
+    },
+    "138": {
+      "team_id": 138,
+      "team_abbr": "STL",
+      "roster_types": {
+        "40Man": {
+          "prev_date": "2026-06-09",
+          "n_players": 41,
+          "n_added": 2,
+          "n_removed": 1,
+          "added": [
+            {
+              "full_name": "Blaze Jordan",
+              "player_id": 691458,
+              "position": "1B",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Max Rajcic",
+              "player_id": 691008,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            }
+          ],
+          "removed": [
+            {
+              "full_name": "Chris Roycroft",
+              "player_id": 688297,
+              "position": "P",
+              "status": {
+                "code": "RM",
+                "description": "Reassigned to Minors"
+              }
+            }
+          ],
+          "added_ids": [
+            691008,
+            691458
+          ],
+          "removed_ids": [
+            688297
+          ]
+        },
+        "active": {
+          "prev_date": "2026-06-09",
+          "n_players": 26,
+          "n_added": 3,
+          "n_removed": 3,
+          "added": [
+            {
+              "full_name": "Blaze Jordan",
+              "player_id": 691458,
+              "position": "1B",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Max Rajcic",
+              "player_id": 691008,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Nathan Church",
+              "player_id": 701675,
+              "position": "LF",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            }
+          ],
+          "removed": [
+            {
+              "full_name": "Hunter Dobbins",
+              "player_id": 690928,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Nolan Gorman",
+              "player_id": 669357,
+              "position": "3B",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Victor Scott II",
+              "player_id": 687363,
+              "position": "CF",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            }
+          ],
+          "added_ids": [
+            691008,
+            691458,
+            701675
+          ],
+          "removed_ids": [
+            669357,
+            687363,
+            690928
+          ]
+        }
+      }
+    },
+    "139": {
+      "team_id": 139,
+      "team_abbr": "TB",
+      "roster_types": {
+        "40Man": {
+          "prev_date": "2026-06-09",
+          "n_players": 47,
+          "n_added": 1,
+          "n_removed": 0,
+          "added": [
+            {
+              "full_name": "Austin Slater",
+              "player_id": 596103,
+              "position": "RF",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            }
+          ],
+          "removed": [],
+          "added_ids": [
+            596103
+          ],
+          "removed_ids": []
+        },
+        "active": {
+          "prev_date": "2026-06-09",
+          "n_players": 26,
+          "n_added": 2,
+          "n_removed": 2,
+          "added": [
+            {
+              "full_name": "Austin Slater",
+              "player_id": 596103,
+              "position": "RF",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Craig Kimbrel",
+              "player_id": 518886,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            }
+          ],
+          "removed": [
+            {
+              "full_name": "Mason Englert",
+              "player_id": 669438,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Oliver Dunn",
+              "player_id": 686554,
+              "position": "3B",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            }
+          ],
+          "added_ids": [
+            518886,
+            596103
+          ],
+          "removed_ids": [
+            669438,
+            686554
+          ]
+        }
+      }
+    },
+    "140": {
+      "team_id": 140,
+      "team_abbr": "TEX",
+      "roster_types": {
+        "40Man": {
+          "prev_date": "2026-06-09",
+          "n_players": 44,
+          "n_added": 1,
+          "n_removed": 1,
+          "added": [
+            {
+              "full_name": "Joe Ross",
+              "player_id": 605452,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            }
+          ],
+          "removed": [
+            {
+              "full_name": "Michel Ota\u00f1ez",
+              "player_id": 671305,
+              "position": "P",
+              "status": {
+                "code": "RM",
+                "description": "Reassigned to Minors"
+              }
+            }
+          ],
+          "added_ids": [
+            605452
+          ],
+          "removed_ids": [
+            671305
+          ]
+        },
+        "active": {
+          "prev_date": "2026-06-09",
+          "n_players": 26,
+          "n_added": 5,
+          "n_removed": 5,
+          "added": [
+            {
+              "full_name": "Alejandro Osuna",
+              "player_id": 696030,
+              "position": "LF",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Cody Freeman",
+              "player_id": 683227,
+              "position": "3B",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Cole Winn",
+              "player_id": 668390,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Joe Ross",
+              "player_id": 605452,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Josh Smith",
+              "player_id": 669701,
+              "position": "2B",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            }
+          ],
+          "removed": [
+            {
+              "full_name": "Corey Seager",
+              "player_id": 608369,
+              "position": "SS",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Evan Carter",
+              "player_id": 694497,
+              "position": "CF",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Jalen Beeks",
+              "player_id": 656222,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Luis Curvelo",
+              "player_id": 681168,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Michael Helman",
+              "player_id": 680737,
+              "position": "CF",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            }
+          ],
+          "added_ids": [
+            605452,
+            668390,
+            669701,
+            683227,
+            696030
+          ],
+          "removed_ids": [
+            608369,
+            656222,
+            680737,
+            681168,
+            694497
+          ]
+        }
+      }
+    },
+    "141": {
+      "team_id": 141,
+      "team_abbr": "TOR",
+      "roster_types": {
+        "40Man": {
+          "prev_date": "2026-06-09",
+          "n_players": 46,
+          "n_added": 0,
+          "n_removed": 3,
+          "added": [],
+          "removed": [
+            {
+              "full_name": "Connor Seabold",
+              "player_id": 657756,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Tyler Heineman",
+              "player_id": 623168,
+              "position": "C",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Yariel Rodr\u00edguez",
+              "player_id": 684320,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            }
+          ],
+          "added_ids": [],
+          "removed_ids": [
+            623168,
+            657756,
+            684320
+          ]
+        },
+        "active": {
+          "prev_date": "2026-06-09",
+          "n_players": 26,
+          "n_added": 5,
+          "n_removed": 5,
+          "added": [
+            {
+              "full_name": "Alejandro Kirk",
+              "player_id": 672386,
+              "position": "C",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Chad Dallas",
+              "player_id": 689149,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Davis Schneider",
+              "player_id": 676914,
+              "position": "LF",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Dylan Cease",
+              "player_id": 656302,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Tommy Nance",
+              "player_id": 667297,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            }
+          ],
+          "removed": [
+            {
+              "full_name": "Adam Macko",
+              "player_id": 671936,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Connor Seabold",
+              "player_id": 657756,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Daulton Varsho",
+              "player_id": 662139,
+              "position": "CF",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Tyler Heineman",
+              "player_id": 623168,
+              "position": "C",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Yariel Rodr\u00edguez",
+              "player_id": 684320,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            }
+          ],
+          "added_ids": [
+            656302,
+            667297,
+            672386,
+            676914,
+            689149
+          ],
+          "removed_ids": [
+            623168,
+            657756,
+            662139,
+            671936,
+            684320
+          ]
+        }
+      }
+    },
+    "142": {
+      "team_id": 142,
+      "team_abbr": "MIN",
+      "roster_types": {
+        "40Man": {
+          "prev_date": "2026-06-09",
+          "n_players": 43,
+          "n_added": 2,
+          "n_removed": 1,
+          "added": [
+            {
+              "full_name": "Kyler Fedko",
+              "player_id": 693459,
+              "position": "LF",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Taylor Rashi",
+              "player_id": 688497,
+              "position": "P",
+              "status": {
+                "code": "RM",
+                "description": "Reassigned to Minors"
+              }
+            }
+          ],
+          "removed": [
+            {
+              "full_name": "Orlando Arcia",
+              "player_id": 606115,
+              "position": "SS",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            }
+          ],
+          "added_ids": [
+            688497,
+            693459
+          ],
+          "removed_ids": [
+            606115
+          ]
+        },
+        "active": {
+          "prev_date": "2026-06-09",
+          "n_players": 26,
+          "n_added": 1,
+          "n_removed": 1,
+          "added": [
+            {
+              "full_name": "Kyler Fedko",
+              "player_id": 693459,
+              "position": "LF",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            }
+          ],
+          "removed": [
+            {
+              "full_name": "Orlando Arcia",
+              "player_id": 606115,
+              "position": "SS",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            }
+          ],
+          "added_ids": [
+            693459
+          ],
+          "removed_ids": [
+            606115
+          ]
+        }
+      }
+    },
+    "143": {
+      "team_id": 143,
+      "team_abbr": "PHI",
+      "roster_types": {
+        "40Man": {
+          "prev_date": "2026-06-09",
+          "n_players": 41,
+          "n_added": 2,
+          "n_removed": 1,
+          "added": [
+            {
+              "full_name": "Bryse Wilson",
+              "player_id": 669060,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Derek Hill",
+              "player_id": 656537,
+              "position": "RF",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            }
+          ],
+          "removed": [
+            {
+              "full_name": "Jackson Rutledge",
+              "player_id": 671131,
+              "position": "P",
+              "status": {
+                "code": "RM",
+                "description": "Reassigned to Minors"
+              }
+            }
+          ],
+          "added_ids": [
+            656537,
+            669060
+          ],
+          "removed_ids": [
+            671131
+          ]
+        },
+        "active": {
+          "prev_date": "2026-06-09",
+          "n_players": 26,
+          "n_added": 5,
+          "n_removed": 5,
+          "added": [
+            {
+              "full_name": "Bryse Wilson",
+              "player_id": 669060,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Derek Hill",
+              "player_id": 656537,
+              "position": "RF",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Gabriel Rincones Jr.",
+              "player_id": 687282,
+              "position": "RF",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Max Lazar",
+              "player_id": 676661,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Seth Johnson",
+              "player_id": 686751,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            }
+          ],
+          "removed": [
+            {
+              "full_name": "Adolis Garc\u00eda",
+              "player_id": 666969,
+              "position": "RF",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Andrew Painter",
+              "player_id": 691725,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Brad Keller",
+              "player_id": 641745,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Steward Berroa",
+              "player_id": 672642,
+              "position": "RF",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Tanner Banks",
+              "player_id": 621383,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            }
+          ],
+          "added_ids": [
+            656537,
+            669060,
+            676661,
+            686751,
+            687282
+          ],
+          "removed_ids": [
+            621383,
+            641745,
+            666969,
+            672642,
+            691725
+          ]
+        }
+      }
+    },
+    "144": {
+      "team_id": 144,
+      "team_abbr": "ATL",
+      "roster_types": {
+        "40Man": {
+          "prev_date": "2026-06-09",
+          "n_players": 47,
+          "n_added": 4,
+          "n_removed": 4,
+          "added": [
+            {
+              "full_name": "Brewer Hicklen",
+              "player_id": 676551,
+              "position": "CF",
+              "status": {
+                "code": "RM",
+                "description": "Reassigned to Minors"
+              }
+            },
+            {
+              "full_name": "Jair Camargo",
+              "player_id": 665856,
+              "position": "C",
+              "status": {
+                "code": "RM",
+                "description": "Reassigned to Minors"
+              }
+            },
+            {
+              "full_name": "James Karinchak",
+              "player_id": 675916,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Rowdy Tellez",
+              "player_id": 642133,
+              "position": "1B",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            }
+          ],
+          "removed": [
+            {
+              "full_name": "Austin Wynns",
+              "player_id": 642851,
+              "position": "C",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Hunter Stratton",
+              "player_id": 676702,
+              "position": "P",
+              "status": {
+                "code": "RM",
+                "description": "Reassigned to Minors"
+              }
+            },
+            {
+              "full_name": "Jhancarlos Lara",
+              "player_id": 702910,
+              "position": "P",
+              "status": {
+                "code": "RM",
+                "description": "Reassigned to Minors"
+              }
+            },
+            {
+              "full_name": "Maverick Handley",
+              "player_id": 668974,
+              "position": "C",
+              "status": {
+                "code": "RM",
+                "description": "Reassigned to Minors"
+              }
+            }
+          ],
+          "added_ids": [
+            642133,
+            665856,
+            675916,
+            676551
+          ],
+          "removed_ids": [
+            642851,
+            668974,
+            676702,
+            702910
+          ]
+        },
+        "active": {
+          "prev_date": "2026-06-09",
+          "n_players": 26,
+          "n_added": 4,
+          "n_removed": 4,
+          "added": [
+            {
+              "full_name": "Drake Baldwin",
+              "player_id": 686948,
+              "position": "C",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "JR Ritchie",
+              "player_id": 702275,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "James Karinchak",
+              "player_id": 675916,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Rowdy Tellez",
+              "player_id": 642133,
+              "position": "1B",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            }
+          ],
+          "removed": [
+            {
+              "full_name": "Austin Wynns",
+              "player_id": 642851,
+              "position": "C",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Ronald Acu\u00f1a Jr.",
+              "player_id": 660670,
+              "position": "RF",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Spencer Strider",
+              "player_id": 675911,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Tyler Kinley",
+              "player_id": 641755,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            }
+          ],
+          "added_ids": [
+            642133,
+            675916,
+            686948,
+            702275
+          ],
+          "removed_ids": [
+            641755,
+            642851,
+            660670,
+            675911
+          ]
+        }
+      }
+    },
+    "145": {
+      "team_id": 145,
+      "team_abbr": "CWS",
+      "roster_types": {
+        "40Man": {
+          "prev_date": "2026-06-09",
+          "n_players": 48,
+          "n_added": 1,
+          "n_removed": 1,
+          "added": [
+            {
+              "full_name": "Braden Montgomery",
+              "player_id": 695731,
+              "position": "RF",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            }
+          ],
+          "removed": [
+            {
+              "full_name": "Derek Hill",
+              "player_id": 656537,
+              "position": "RF",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            }
+          ],
+          "added_ids": [
+            695731
+          ],
+          "removed_ids": [
+            656537
+          ]
+        },
+        "active": {
+          "prev_date": "2026-06-09",
+          "n_players": 26,
+          "n_added": 4,
+          "n_removed": 4,
+          "added": [
+            {
+              "full_name": "Braden Montgomery",
+              "player_id": 695731,
+              "position": "RF",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Chris Murphy",
+              "player_id": 669684,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Joe Rock",
+              "player_id": 697812,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Junior Perez",
+              "player_id": 678577,
+              "position": "CF",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            }
+          ],
+          "removed": [
+            {
+              "full_name": "David Sandlin",
+              "player_id": 689818,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Derek Hill",
+              "player_id": 656537,
+              "position": "RF",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Rikuu Nishida",
+              "player_id": 807747,
+              "position": "RF",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Tyler Gilbert",
+              "player_id": 656457,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            }
+          ],
+          "added_ids": [
+            669684,
+            678577,
+            695731,
+            697812
+          ],
+          "removed_ids": [
+            656457,
+            656537,
+            689818,
+            807747
+          ]
+        }
+      }
+    },
+    "146": {
+      "team_id": 146,
+      "team_abbr": "MIA",
+      "roster_types": {
+        "40Man": {
+          "prev_date": "2026-06-09",
+          "n_players": 45,
+          "n_added": 0,
+          "n_removed": 0
+        },
+        "active": {
+          "prev_date": "2026-06-09",
+          "n_players": 26,
+          "n_added": 1,
+          "n_removed": 1,
+          "added": [
+            {
+              "full_name": "Dax Fulton",
+              "player_id": 690978,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            }
+          ],
+          "removed": [
+            {
+              "full_name": "William Kempner",
+              "player_id": 687531,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            }
+          ],
+          "added_ids": [
+            690978
+          ],
+          "removed_ids": [
+            687531
+          ]
+        }
+      }
+    },
+    "147": {
+      "team_id": 147,
+      "team_abbr": "NYY",
+      "roster_types": {
+        "40Man": {
+          "prev_date": "2026-06-09",
+          "n_players": 41,
+          "n_added": 0,
+          "n_removed": 0
+        },
+        "active": {
+          "prev_date": "2026-06-09",
+          "n_players": 26,
+          "n_added": 1,
+          "n_removed": 1,
+          "added": [
+            {
+              "full_name": "Jasson Dom\u00ednguez",
+              "player_id": 691176,
+              "position": "DH",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            }
+          ],
+          "removed": [
+            {
+              "full_name": "Trent Grisham",
+              "player_id": 663757,
+              "position": "CF",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            }
+          ],
+          "added_ids": [
+            691176
+          ],
+          "removed_ids": [
+            663757
+          ]
+        }
+      }
+    },
+    "158": {
+      "team_id": 158,
+      "team_abbr": "MIL",
+      "roster_types": {
+        "40Man": {
+          "prev_date": "2026-06-09",
+          "n_players": 42,
+          "n_added": 1,
+          "n_removed": 1,
+          "added": [
+            {
+              "full_name": "Luis Lara",
+              "player_id": 800325,
+              "position": "CF",
+              "status": {
+                "code": "RM",
+                "description": "Reassigned to Minors"
+              }
+            }
+          ],
+          "removed": [
+            {
+              "full_name": "Luis Rengifo",
+              "player_id": 650859,
+              "position": "3B",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            }
+          ],
+          "added_ids": [
+            800325
+          ],
+          "removed_ids": [
+            650859
+          ]
+        },
+        "active": {
+          "prev_date": "2026-06-09",
+          "n_players": 26,
+          "n_added": 2,
+          "n_removed": 2,
+          "added": [
+            {
+              "full_name": "Cooper Pratt",
+              "player_id": 806198,
+              "position": "SS",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Joel Kuhnel",
+              "player_id": 669270,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            }
+          ],
+          "removed": [
+            {
+              "full_name": "Coleman Crow",
+              "player_id": 689441,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            },
+            {
+              "full_name": "Luis Rengifo",
+              "player_id": 650859,
+              "position": "3B",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            }
+          ],
+          "added_ids": [
+            669270,
+            806198
+          ],
+          "removed_ids": [
+            650859,
+            689441
+          ]
+        }
+      }
+    }
+  },
+  "moves_between_teams": [
+    {
+      "player_id": 670097,
+      "full_name": "Zack Short",
+      "from_team_id": 116,
+      "to_team_id": 121,
+      "roster_type": "40Man"
+    },
+    {
+      "player_id": 691172,
+      "full_name": "Yosver Zulueta",
+      "from_team_id": 136,
+      "to_team_id": 112,
+      "roster_type": "40Man"
+    },
+    {
+      "player_id": 623168,
+      "full_name": "Tyler Heineman",
+      "from_team_id": 141,
+      "to_team_id": 108,
+      "roster_type": "40Man"
+    },
+    {
+      "player_id": 657756,
+      "full_name": "Connor Seabold",
+      "from_team_id": 141,
+      "to_team_id": 118,
+      "roster_type": "40Man"
+    },
+    {
+      "player_id": 702910,
+      "full_name": "Jhancarlos Lara",
+      "from_team_id": 144,
+      "to_team_id": 120,
+      "roster_type": "40Man"
+    },
+    {
+      "player_id": 656537,
+      "full_name": "Derek Hill",
+      "from_team_id": 145,
+      "to_team_id": 143,
+      "roster_type": "40Man"
+    }
+  ]
+}

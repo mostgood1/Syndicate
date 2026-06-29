@@ -1,0 +1,48 @@
+{
+  "meta": {
+    "date": "2026-06-25",
+    "season": 2026,
+    "sims_per_game": 0,
+    "jobs": 0,
+    "use_raw": true,
+    "skipped_games": 0,
+    "generated_at": "2026-06-26T14:05:59.875397",
+    "tool": "tools/eval/reconcile_daily_sim_artifacts.py",
+    "source_sim_dir": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-25",
+    "prop_lines_source": "auto",
+    "market_push_policy": "skip",
+    "warnings": [
+      "sim_dir_empty:C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-25"
+    ]
+  },
+  "assessment": {},
+  "aggregate": {
+    "full": {
+      "games": 0,
+      "brier_home_win": null,
+      "mae_total_runs": null,
+      "mae_run_margin": null
+    },
+    "first1": {
+      "games": 0,
+      "brier_home_win": null,
+      "mae_total_runs": null,
+      "mae_run_margin": null
+    },
+    "first5": {
+      "games": 0,
+      "brier_home_win": null,
+      "mae_total_runs": null,
+      "mae_run_margin": null
+    },
+    "first3": {
+      "games": 0,
+      "brier_home_win": null,
+      "mae_total_runs": null,
+      "mae_run_margin": null
+    }
+  },
+  "games": [],
+  "failures": [],
+  "failures_n": 0
+}

@@ -1,0 +1,32 @@
+{
+  "date": "2026-06-26",
+  "games": [
+    {
+      "home_tri": "CHI",
+      "away_tri": "POR",
+      "game_id": "01456eb2d3d5295f1aebe9883f2b15604",
+      "prop_recommendations": {
+        "away": [],
+        "home": []
+      }
+    },
+    {
+      "home_tri": "CON",
+      "away_tri": "WSH",
+      "game_id": "072f392cc087c7a061b9939d13bd6ec6e",
+      "prop_recommendations": {
+        "away": [],
+        "home": []
+      }
+    },
+    {
+      "home_tri": "GSV",
+      "away_tri": "ATL",
+      "game_id": "401857026",
+      "prop_recommendations": {
+        "away": [],
+        "home": []
+      }
+    }
+  ]
+}

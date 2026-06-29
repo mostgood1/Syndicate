@@ -1,0 +1,140 @@
+{
+  "date": "2026-06-26",
+  "games": [
+    {
+      "home_tri": "CHI",
+      "away_tri": "POR",
+      "sim": {
+        "game_id": "01456eb2d3d5295f1aebe9883f2b15604",
+        "players_loaded": false,
+        "players_summary": {
+          "away": 0,
+          "home": 0,
+          "missing_away": 0,
+          "missing_home": 0,
+          "injured_away": 0,
+          "injured_home": 0
+        },
+        "players": {
+          "away": [],
+          "home": []
+        },
+        "missing_prop_players": {
+          "away": [],
+          "home": []
+        },
+        "injuries": {
+          "away": [],
+          "home": []
+        },
+        "pregame_context": {},
+        "quarters": [],
+        "score": {
+          "away_mean": null,
+          "home_mean": null,
+          "total_mean": null,
+          "margin_mean": null
+        },
+        "periods": {},
+        "intervals": {
+          "quarters": {},
+          "halves": {}
+        },
+        "market": {
+          "market_home_spread": null,
+          "market_total": null
+        }
+      }
+    },
+    {
+      "home_tri": "CON",
+      "away_tri": "WSH",
+      "sim": {
+        "game_id": "072f392cc087c7a061b9939d13bd6ec6e",
+        "players_loaded": false,
+        "players_summary": {
+          "away": 0,
+          "home": 0,
+          "missing_away": 0,
+          "missing_home": 0,
+          "injured_away": 0,
+          "injured_home": 0
+        },
+        "players": {
+          "away": [],
+          "home": []
+        },
+        "missing_prop_players": {
+          "away": [],
+          "home": []
+        },
+        "injuries": {
+          "away": [],
+          "home": []
+        },
+        "pregame_context": {},
+        "quarters": [],
+        "score": {
+          "away_mean": null,
+          "home_mean": null,
+          "total_mean": null,
+          "margin_mean": null
+        },
+        "periods": {},
+        "intervals": {
+          "quarters": {},
+          "halves": {}
+        },
+        "market": {
+          "market_home_spread": null,
+          "market_total": null
+        }
+      }
+    },
+    {
+      "home_tri": "GSV",
+      "away_tri": "ATL",
+      "sim": {
+        "game_id": "401857026",
+        "players_loaded": false,
+        "players_summary": {
+          "away": 0,
+          "home": 0,
+          "missing_away": 0,
+          "missing_home": 0,
+          "injured_away": 0,
+          "injured_home": 0
+        },
+        "players": {
+          "away": [],
+          "home": []
+        },
+        "missing_prop_players": {
+          "away": [],
+          "home": []
+        },
+        "injuries": {
+          "away": [],
+          "home": []
+        },
+        "pregame_context": {},
+        "quarters": [],
+        "score": {
+          "away_mean": null,
+          "home_mean": null,
+          "total_mean": null,
+          "margin_mean": null
+        },
+        "periods": {},
+        "intervals": {
+          "quarters": {},
+          "halves": {}
+        },
+        "market": {
+          "market_home_spread": null,
+          "market_total": null
+        }
+      }
+    }
+  ]
+}

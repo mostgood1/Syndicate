@@ -1,0 +1,997 @@
+{
+  "date": "2026-06-25",
+  "mode": "live",
+  "retrieved_at": "2026-06-25T17:47:49.388982",
+  "games": [
+    {
+      "event_id": "76bea7124df1feb6b3f3a11292d41157",
+      "commence_time": "2026-06-25T16:11:00Z",
+      "home_team": "Tampa Bay Rays",
+      "away_team": "Kansas City Royals",
+      "bookmaker": "betmgm",
+      "markets": {
+        "h2h": {
+          "home_odds": "-10000",
+          "away_odds": "+3300"
+        },
+        "spreads": {
+          "home_line": -7.5,
+          "home_odds": "+154",
+          "away_line": 7.5,
+          "away_odds": "-200"
+        },
+        "totals": {
+          "line": 8.5,
+          "over_odds": "-105",
+          "under_odds": "-120"
+        },
+        "segments": {
+          "full": {
+            "h2h": {
+              "home_odds": "-10000",
+              "away_odds": "+3300"
+            },
+            "spreads": {
+              "home_line": -7.5,
+              "home_odds": "+154",
+              "away_line": 7.5,
+              "away_odds": "-200"
+            },
+            "totals": {
+              "line": 8.5,
+              "over_odds": "-105",
+              "under_odds": "-120"
+            }
+          },
+          "first1": {
+            "h2h": null,
+            "spreads": null,
+            "totals": null
+          },
+          "first3": {
+            "h2h": null,
+            "spreads": null,
+            "totals": null
+          },
+          "first5": {
+            "h2h": null,
+            "spreads": null,
+            "totals": null
+          },
+          "first7": {
+            "h2h": null,
+            "spreads": {
+              "home_line": -7.5,
+              "home_odds": "+175",
+              "away_line": 7.5,
+              "away_odds": "-250"
+            },
+            "totals": {
+              "line": 7.5,
+              "over_odds": "-145",
+              "under_odds": "+105"
+            }
+          }
+        }
+      }
+    },
+    {
+      "event_id": "8d5a08315d4db8e350ce94bb65f91c0b",
+      "commence_time": "2026-06-25T16:36:00Z",
+      "home_team": "Pittsburgh Pirates",
+      "away_team": "Seattle Mariners",
+      "bookmaker": "williamhill_us",
+      "markets": {
+        "h2h": {
+          "home_odds": "-500",
+          "away_odds": "+350"
+        },
+        "spreads": {
+          "home_line": -2.5,
+          "home_odds": "-105",
+          "away_line": 2.5,
+          "away_odds": "-125"
+        },
+        "totals": {
+          "line": 7.5,
+          "over_odds": "+100",
+          "under_odds": "-130"
+        },
+        "segments": {
+          "full": {
+            "h2h": {
+              "home_odds": "-500",
+              "away_odds": "+350"
+            },
+            "spreads": {
+              "home_line": -2.5,
+              "home_odds": "-105",
+              "away_line": 2.5,
+              "away_odds": "-125"
+            },
+            "totals": {
+              "line": 7.5,
+              "over_odds": "+100",
+              "under_odds": "-130"
+            }
+          },
+          "first1": {
+            "h2h": null,
+            "spreads": null,
+            "totals": null
+          },
+          "first3": {
+            "h2h": null,
+            "spreads": null,
+            "totals": null
+          },
+          "first5": {
+            "h2h": {
+              "home_odds": "-2504",
+              "away_odds": "+762"
+            },
+            "spreads": {
+              "home_line": -2.5,
+              "home_odds": "-224",
+              "away_line": 2.5,
+              "away_odds": "+159"
+            },
+            "totals": {
+              "line": 4.5,
+              "over_odds": "+116",
+              "under_odds": "-160"
+            }
+          },
+          "first7": {
+            "h2h": {
+              "home_odds": "-1604",
+              "away_odds": "+634"
+            },
+            "spreads": {
+              "home_line": -2.5,
+              "home_odds": "-166",
+              "away_line": 2.5,
+              "away_odds": "+120"
+            },
+            "totals": {
+              "line": 5.5,
+              "over_odds": "+112",
+              "under_odds": "-154"
+            }
+          }
+        }
+      }
+    },
+    {
+      "event_id": "2167fbe64e2ec78d184d2dfe0b94ac02",
+      "commence_time": "2026-06-25T19:46:00Z",
+      "home_team": "San Francisco Giants",
+      "away_team": "Athletics",
+      "bookmaker": "draftkings",
+      "markets": {
+        "h2h": {
+          "home_odds": "-136",
+          "away_odds": "+113"
+        },
+        "spreads": {
+          "home_line": -1.5,
+          "home_odds": "+153",
+          "away_line": 1.5,
+          "away_odds": "-186"
+        },
+        "totals": {
+          "line": 8.0,
+          "over_odds": "-114",
+          "under_odds": "-105"
+        },
+        "segments": {
+          "full": {
+            "h2h": {
+              "home_odds": "-136",
+              "away_odds": "+113"
+            },
+            "spreads": {
+              "home_line": -1.5,
+              "home_odds": "+153",
+              "away_line": 1.5,
+              "away_odds": "-186"
+            },
+            "totals": {
+              "line": 8.0,
+              "over_odds": "-114",
+              "under_odds": "-105"
+            }
+          },
+          "first1": {
+            "h2h": {
+              "home_odds": "+290",
+              "away_odds": "+330",
+              "draw_odds": "-150",
+              "is_3_way": true
+            },
+            "spreads": {
+              "home_line": -0.5,
+              "home_odds": "+280",
+              "away_line": 0.5,
+              "away_odds": "-400"
+            },
+            "totals": {
+              "line": 0.5,
+              "over_odds": "+100",
+              "under_odds": "-130"
+            }
+          },
+          "first3": {
+            "h2h": {
+              "home_odds": "-140",
+              "away_odds": "+110"
+            },
+            "spreads": {
+              "home_line": -0.5,
+              "home_odds": "+130",
+              "away_line": 0.5,
+              "away_odds": "-166"
+            },
+            "totals": {
+              "line": 2.5,
+              "over_odds": "-105",
+              "under_odds": "-125"
+            }
+          },
+          "first5": {
+            "h2h": {
+              "home_odds": "-145",
+              "away_odds": "+114"
+            },
+            "spreads": {
+              "home_line": -0.5,
+              "home_odds": "-105",
+              "away_line": 0.5,
+              "away_odds": "-125"
+            },
+            "totals": {
+              "line": 4.5,
+              "over_odds": "+100",
+              "under_odds": "-130"
+            }
+          },
+          "first7": {
+            "h2h": {
+              "home_odds": "-154",
+              "away_odds": "+120"
+            },
+            "spreads": {
+              "home_line": -0.5,
+              "home_odds": "-115",
+              "away_line": 0.5,
+              "away_odds": "-115"
+            },
+            "totals": {
+              "line": 6.5,
+              "over_odds": "-105",
+              "under_odds": "-125"
+            }
+          }
+        }
+      }
+    },
+    {
+      "event_id": "b2ba85e7ee80f20971faf8f275bcfb90",
+      "commence_time": "2026-06-25T22:41:00Z",
+      "home_team": "Detroit Tigers",
+      "away_team": "Houston Astros",
+      "bookmaker": "draftkings",
+      "markets": {
+        "h2h": {
+          "home_odds": "-114",
+          "away_odds": "-105"
+        },
+        "spreads": {
+          "home_line": 1.5,
+          "home_odds": "-191",
+          "away_line": -1.5,
+          "away_odds": "+157"
+        },
+        "totals": {
+          "line": 9.0,
+          "over_odds": "-104",
+          "under_odds": "-115"
+        },
+        "segments": {
+          "full": {
+            "h2h": {
+              "home_odds": "-114",
+              "away_odds": "-105"
+            },
+            "spreads": {
+              "home_line": 1.5,
+              "home_odds": "-191",
+              "away_line": -1.5,
+              "away_odds": "+157"
+            },
+            "totals": {
+              "line": 9.0,
+              "over_odds": "-104",
+              "under_odds": "-115"
+            }
+          },
+          "first1": {
+            "h2h": {
+              "home_odds": "+295",
+              "away_odds": "+255",
+              "draw_odds": "-125",
+              "is_3_way": true
+            },
+            "spreads": {
+              "home_line": 0.5,
+              "home_odds": "-350",
+              "away_line": -0.5,
+              "away_odds": "+245"
+            },
+            "totals": {
+              "line": 0.5,
+              "over_odds": "-125",
+              "under_odds": "-105"
+            }
+          },
+          "first3": {
+            "h2h": {
+              "home_odds": "-120",
+              "away_odds": "-110"
+            },
+            "spreads": {
+              "home_line": -0.5,
+              "home_odds": "+135",
+              "away_line": 0.5,
+              "away_odds": "-175"
+            },
+            "totals": {
+              "line": 2.5,
+              "over_odds": "-135",
+              "under_odds": "+105"
+            }
+          },
+          "first5": {
+            "h2h": {
+              "home_odds": "-120",
+              "away_odds": "-110"
+            },
+            "spreads": {
+              "home_line": -0.5,
+              "home_odds": "+110",
+              "away_line": 0.5,
+              "away_odds": "-140"
+            },
+            "totals": {
+              "line": 4.5,
+              "over_odds": "-135",
+              "under_odds": "+105"
+            }
+          },
+          "first7": {
+            "h2h": {
+              "home_odds": "-125",
+              "away_odds": "-105"
+            },
+            "spreads": {
+              "home_line": -0.5,
+              "home_odds": "+105",
+              "away_line": 0.5,
+              "away_odds": "-135"
+            },
+            "totals": {
+              "line": 6.5,
+              "over_odds": "-140",
+              "under_odds": "+110"
+            }
+          }
+        }
+      }
+    },
+    {
+      "event_id": "c35d300c49e37e20f594b68819c65af4",
+      "commence_time": "2026-06-25T22:46:00Z",
+      "home_team": "Washington Nationals",
+      "away_team": "Philadelphia Phillies",
+      "bookmaker": "draftkings",
+      "markets": {
+        "h2h": {
+          "home_odds": "+141",
+          "away_odds": "-171"
+        },
+        "spreads": {
+          "home_line": 1.5,
+          "home_odds": "-122",
+          "away_line": -1.5,
+          "away_odds": "+101"
+        },
+        "totals": {
+          "line": 8.5,
+          "over_odds": "-119",
+          "under_odds": "-101"
+        },
+        "segments": {
+          "full": {
+            "h2h": {
+              "home_odds": "+141",
+              "away_odds": "-171"
+            },
+            "spreads": {
+              "home_line": 1.5,
+              "home_odds": "-122",
+              "away_line": -1.5,
+              "away_odds": "+101"
+            },
+            "totals": {
+              "line": 8.5,
+              "over_odds": "-119",
+              "under_odds": "-101"
+            }
+          },
+          "first1": {
+            "h2h": {
+              "home_odds": "+425",
+              "away_odds": "+230",
+              "draw_odds": "-150",
+              "is_3_way": true
+            },
+            "spreads": {
+              "home_line": 0.5,
+              "home_odds": "-310",
+              "away_line": -0.5,
+              "away_odds": "+220"
+            },
+            "totals": {
+              "line": 0.5,
+              "over_odds": "+100",
+              "under_odds": "-125"
+            }
+          },
+          "first3": {
+            "h2h": {
+              "home_odds": "+135",
+              "away_odds": "-175"
+            },
+            "spreads": {
+              "home_line": 0.5,
+              "home_odds": "-140",
+              "away_line": -0.5,
+              "away_odds": "+110"
+            },
+            "totals": {
+              "line": 2.5,
+              "over_odds": "+100",
+              "under_odds": "-130"
+            }
+          },
+          "first5": {
+            "h2h": {
+              "home_odds": "+140",
+              "away_odds": "-180"
+            },
+            "spreads": {
+              "home_line": 0.5,
+              "home_odds": "-105",
+              "away_line": -0.5,
+              "away_odds": "-125"
+            },
+            "totals": {
+              "line": 4.5,
+              "over_odds": "+105",
+              "under_odds": "-135"
+            }
+          },
+          "first7": {
+            "h2h": {
+              "home_odds": "+154",
+              "away_odds": "-200"
+            },
+            "spreads": {
+              "home_line": 1.5,
+              "home_odds": "-140",
+              "away_line": -1.5,
+              "away_odds": "+110"
+            },
+            "totals": {
+              "line": 6.5,
+              "over_odds": "+100",
+              "under_odds": "-130"
+            }
+          }
+        }
+      }
+    },
+    {
+      "event_id": "96d5d5f79ecf6da3f4476ede6c7c5be2",
+      "commence_time": "2026-06-25T23:08:00Z",
+      "home_team": "Toronto Blue Jays",
+      "away_team": "Texas Rangers",
+      "bookmaker": "draftkings",
+      "markets": {
+        "h2h": {
+          "home_odds": "-156",
+          "away_odds": "+129"
+        },
+        "spreads": {
+          "home_line": -1.5,
+          "home_odds": "+141",
+          "away_line": 1.5,
+          "away_odds": "-171"
+        },
+        "totals": {
+          "line": 8.0,
+          "over_odds": "-104",
+          "under_odds": "-115"
+        },
+        "segments": {
+          "full": {
+            "h2h": {
+              "home_odds": "-156",
+              "away_odds": "+129"
+            },
+            "spreads": {
+              "home_line": -1.5,
+              "home_odds": "+141",
+              "away_line": 1.5,
+              "away_odds": "-171"
+            },
+            "totals": {
+              "line": 8.0,
+              "over_odds": "-104",
+              "under_odds": "-115"
+            }
+          },
+          "first1": {
+            "h2h": {
+              "home_odds": "+270",
+              "away_odds": "+330",
+              "draw_odds": "-145",
+              "is_3_way": true
+            },
+            "spreads": {
+              "home_line": -0.5,
+              "home_odds": "+255",
+              "away_line": 0.5,
+              "away_odds": "-370"
+            },
+            "totals": {
+              "line": 0.5,
+              "over_odds": "-105",
+              "under_odds": "-125"
+            }
+          },
+          "first3": {
+            "h2h": {
+              "home_odds": "-140",
+              "away_odds": "+110"
+            },
+            "spreads": {
+              "home_line": -0.5,
+              "home_odds": "+124",
+              "away_line": 0.5,
+              "away_odds": "-160"
+            },
+            "totals": {
+              "line": 2.5,
+              "over_odds": "-105",
+              "under_odds": "-125"
+            }
+          },
+          "first5": {
+            "h2h": {
+              "home_odds": "-145",
+              "away_odds": "+114"
+            },
+            "spreads": {
+              "home_line": -0.5,
+              "home_odds": "-105",
+              "away_line": 0.5,
+              "away_odds": "-125"
+            },
+            "totals": {
+              "line": 4.5,
+              "over_odds": "+100",
+              "under_odds": "-130"
+            }
+          },
+          "first7": {
+            "h2h": {
+              "home_odds": "-154",
+              "away_odds": "+120"
+            },
+            "spreads": {
+              "home_line": -0.5,
+              "home_odds": "-120",
+              "away_line": 0.5,
+              "away_odds": "-110"
+            },
+            "totals": {
+              "line": 6.5,
+              "over_odds": "+105",
+              "under_odds": "-135"
+            }
+          }
+        }
+      }
+    },
+    {
+      "event_id": "e72272fad7813989b91104d828e36032",
+      "commence_time": "2026-06-25T23:11:00Z",
+      "home_team": "Boston Red Sox",
+      "away_team": "New York Yankees",
+      "bookmaker": "draftkings",
+      "markets": {
+        "h2h": {
+          "home_odds": "+123",
+          "away_odds": "-148"
+        },
+        "spreads": {
+          "home_line": 1.5,
+          "home_odds": "-137",
+          "away_line": -1.5,
+          "away_odds": "+114"
+        },
+        "totals": {
+          "line": 8.0,
+          "over_odds": "-109",
+          "under_odds": "-110"
+        },
+        "segments": {
+          "full": {
+            "h2h": {
+              "home_odds": "+123",
+              "away_odds": "-148"
+            },
+            "spreads": {
+              "home_line": 1.5,
+              "home_odds": "-137",
+              "away_line": -1.5,
+              "away_odds": "+114"
+            },
+            "totals": {
+              "line": 8.0,
+              "over_odds": "-109",
+              "under_odds": "-110"
+            }
+          },
+          "first1": {
+            "h2h": {
+              "home_odds": "+400",
+              "away_odds": "+250",
+              "draw_odds": "-160",
+              "is_3_way": true
+            },
+            "spreads": {
+              "home_line": 0.5,
+              "home_odds": "-340",
+              "away_line": -0.5,
+              "away_odds": "+240"
+            },
+            "totals": {
+              "line": 0.5,
+              "over_odds": "+105",
+              "under_odds": "-135"
+            }
+          },
+          "first3": {
+            "h2h": {
+              "home_odds": "+120",
+              "away_odds": "-154"
+            },
+            "spreads": {
+              "home_line": 0.5,
+              "home_odds": "-154",
+              "away_line": -0.5,
+              "away_odds": "+120"
+            },
+            "totals": {
+              "line": 2.5,
+              "over_odds": "+114",
+              "under_odds": "-145"
+            }
+          },
+          "first5": {
+            "h2h": {
+              "home_odds": "+124",
+              "away_odds": "-160"
+            },
+            "spreads": {
+              "home_line": 0.5,
+              "home_odds": "-120",
+              "away_line": -0.5,
+              "away_odds": "-110"
+            },
+            "totals": {
+              "line": 3.5,
+              "over_odds": "-140",
+              "under_odds": "+110"
+            }
+          },
+          "first7": {
+            "h2h": {
+              "home_odds": "+120",
+              "away_odds": "-154"
+            },
+            "spreads": {
+              "home_line": 0.5,
+              "home_odds": "-115",
+              "away_line": -0.5,
+              "away_odds": "-115"
+            },
+            "totals": {
+              "line": 5.5,
+              "over_odds": "-135",
+              "under_odds": "+105"
+            }
+          }
+        }
+      }
+    },
+    {
+      "event_id": "9d5fd110499e6b1d6f77bbf502fd6570",
+      "commence_time": "2026-06-25T23:11:00Z",
+      "home_team": "New York Mets",
+      "away_team": "Chicago Cubs",
+      "bookmaker": "draftkings",
+      "markets": {
+        "h2h": {
+          "home_odds": "-110",
+          "away_odds": "-109"
+        },
+        "spreads": {
+          "home_line": 1.5,
+          "home_odds": "-181",
+          "away_line": -1.5,
+          "away_odds": "+149"
+        },
+        "totals": {
+          "line": 8.5,
+          "over_odds": "-114",
+          "under_odds": "-105"
+        },
+        "segments": {
+          "full": {
+            "h2h": {
+              "home_odds": "-110",
+              "away_odds": "-109"
+            },
+            "spreads": {
+              "home_line": 1.5,
+              "home_odds": "-181",
+              "away_line": -1.5,
+              "away_odds": "+149"
+            },
+            "totals": {
+              "line": 8.5,
+              "over_odds": "-114",
+              "under_odds": "-105"
+            }
+          },
+          "first1": {
+            "h2h": {
+              "home_odds": "+275",
+              "away_odds": "+295",
+              "draw_odds": "-135",
+              "is_3_way": true
+            },
+            "spreads": {
+              "home_line": -0.5,
+              "home_odds": "+255",
+              "away_line": 0.5,
+              "away_odds": "-370"
+            },
+            "totals": {
+              "line": 0.5,
+              "over_odds": "-115",
+              "under_odds": "-110"
+            }
+          },
+          "first3": {
+            "h2h": {
+              "home_odds": "-115",
+              "away_odds": "-115"
+            },
+            "spreads": {
+              "home_line": 0.5,
+              "home_odds": "-180",
+              "away_line": -0.5,
+              "away_odds": "+140"
+            },
+            "totals": {
+              "line": 2.5,
+              "over_odds": "-120",
+              "under_odds": "-110"
+            }
+          },
+          "first5": {
+            "h2h": {
+              "home_odds": "-110",
+              "away_odds": "-120"
+            },
+            "spreads": {
+              "home_line": 0.5,
+              "home_odds": "-145",
+              "away_line": -0.5,
+              "away_odds": "+114"
+            },
+            "totals": {
+              "line": 4.5,
+              "over_odds": "-130",
+              "under_odds": "+100"
+            }
+          },
+          "first7": {
+            "h2h": {
+              "home_odds": "-115",
+              "away_odds": "-115"
+            },
+            "spreads": {
+              "home_line": 0.5,
+              "home_odds": "-140",
+              "away_line": -0.5,
+              "away_odds": "+110"
+            },
+            "totals": {
+              "line": 6.5,
+              "over_odds": "-120",
+              "under_odds": "-110"
+            }
+          }
+        }
+      }
+    },
+    {
+      "event_id": "2d1b7c93683707610697cb82155f1c21",
+      "commence_time": "2026-06-25T23:46:00Z",
+      "home_team": "St. Louis Cardinals",
+      "away_team": "Arizona Diamondbacks",
+      "bookmaker": "draftkings",
+      "markets": {
+        "h2h": {
+          "home_odds": "-136",
+          "away_odds": "+113"
+        },
+        "spreads": {
+          "home_line": -1.5,
+          "home_odds": "+152",
+          "away_line": 1.5,
+          "away_odds": "-185"
+        },
+        "totals": {
+          "line": 9.0,
+          "over_odds": "-108",
+          "under_odds": "-111"
+        },
+        "segments": {
+          "full": {
+            "h2h": {
+              "home_odds": "-136",
+              "away_odds": "+113"
+            },
+            "spreads": {
+              "home_line": -1.5,
+              "home_odds": "+152",
+              "away_line": 1.5,
+              "away_odds": "-185"
+            },
+            "totals": {
+              "line": 9.0,
+              "over_odds": "-108",
+              "under_odds": "-111"
+            }
+          },
+          "first1": {
+            "h2h": {
+              "home_odds": "+255",
+              "away_odds": "+285",
+              "draw_odds": "-125",
+              "is_3_way": true
+            },
+            "spreads": {
+              "home_line": -0.5,
+              "home_odds": "+245",
+              "away_line": 0.5,
+              "away_odds": "-350"
+            },
+            "totals": {
+              "line": 0.5,
+              "over_odds": "-125",
+              "under_odds": "-105"
+            }
+          },
+          "first3": {
+            "h2h": {
+              "home_odds": "-135",
+              "away_odds": "+105"
+            },
+            "spreads": {
+              "home_line": -0.5,
+              "home_odds": "+120",
+              "away_line": 0.5,
+              "away_odds": "-154"
+            },
+            "totals": {
+              "line": 2.5,
+              "over_odds": "-145",
+              "under_odds": "+114"
+            }
+          },
+          "first5": {
+            "h2h": {
+              "home_odds": "-145",
+              "away_odds": "+114"
+            },
+            "spreads": {
+              "home_line": -0.5,
+              "home_odds": "-105",
+              "away_line": 0.5,
+              "away_odds": "-125"
+            },
+            "totals": {
+              "line": 5.5,
+              "over_odds": "+100",
+              "under_odds": "-130"
+            }
+          },
+          "first7": {
+            "h2h": {
+              "home_odds": "-140",
+              "away_odds": "+110"
+            },
+            "spreads": {
+              "home_line": -0.5,
+              "home_odds": "-110",
+              "away_line": 0.5,
+              "away_odds": "-120"
+            },
+            "totals": {
+              "line": 7.5,
+              "over_odds": "+105",
+              "under_odds": "-135"
+            }
+          }
+        }
+      }
+    }
+  ],
+  "meta": {
+    "markets": [
+      "h2h",
+      "spreads",
+      "totals",
+      "h2h_1st_1_innings",
+      "h2h_3_way_1st_1_innings",
+      "spreads_1st_1_innings",
+      "alternate_spreads_1st_1_innings",
+      "totals_1st_1_innings",
+      "alternate_totals_1st_1_innings",
+      "h2h_1st_3_innings",
+      "h2h_3_way_1st_3_innings",
+      "spreads_1st_3_innings",
+      "alternate_spreads_1st_3_innings",
+      "totals_1st_3_innings",
+      "alternate_totals_1st_3_innings",
+      "h2h_1st_5_innings",
+      "h2h_3_way_1st_5_innings",
+      "spreads_1st_5_innings",
+      "alternate_spreads_1st_5_innings",
+      "totals_1st_5_innings",
+      "alternate_totals_1st_5_innings",
+      "h2h_1st_7_innings",
+      "h2h_3_way_1st_7_innings",
+      "spreads_1st_7_innings",
+      "alternate_spreads_1st_7_innings",
+      "totals_1st_7_innings",
+      "alternate_totals_1st_7_innings"
+    ],
+    "regions": "us",
+    "bookmakers": null,
+    "counts": {
+      "events_matched": 9,
+      "games": 9,
+      "h2h_games": 9,
+      "totals_games": 9,
+      "spreads_games": 9
+    }
+  }
+}

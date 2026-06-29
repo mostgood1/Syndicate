@@ -1,0 +1,59 @@
+{
+  "recordedAt": "2026-06-22T21:27:09-05:00",
+  "date": "2026-06-22",
+  "archiveDir": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\data\\market\\oddsapi\\refresh_history\\2026_06_22\\20260622T212709_879974Z",
+  "result": {
+    "status": "ok",
+    "date": "2026-06-22",
+    "mode": "live",
+    "incremental": true,
+    "out_dir": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\data\\market\\oddsapi",
+    "game_lines_path": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\data\\market\\oddsapi\\oddsapi_game_lines_2026_06_22.json",
+    "pitcher_props_path": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\data\\market\\oddsapi\\oddsapi_pitcher_props_2026_06_22.json",
+    "hitter_props_path": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\data\\market\\oddsapi\\oddsapi_hitter_props_2026_06_22.json",
+    "updated_games": 5,
+    "reused_games": 1,
+    "written_files": [
+      "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\data\\market\\oddsapi\\oddsapi_game_lines_2026_06_22.json",
+      "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\data\\market\\oddsapi\\oddsapi_pitcher_props_2026_06_22.json",
+      "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\data\\market\\oddsapi\\oddsapi_hitter_props_2026_06_22.json"
+    ],
+    "counts": {
+      "game_lines": {
+        "events_matched": 6,
+        "games": 6,
+        "h2h_games": 6,
+        "totals_games": 6,
+        "spreads_games": 6
+      },
+      "pitcher_props": {
+        "players": 4,
+        "markets": {
+          "earned_runs": 2,
+          "hits_allowed": 3,
+          "outs": 4,
+          "strikeouts": 3,
+          "walks_allowed": 2
+        },
+        "events_matched": 6
+      },
+      "hitter_props": {
+        "players": 48,
+        "markets": {
+          "batter_hits": 35,
+          "batter_hits_runs_rbis": 34,
+          "batter_home_runs": 43,
+          "batter_rbis": 34,
+          "batter_runs_scored": 33,
+          "batter_total_bases": 21
+        },
+        "events_matched": 6
+      }
+    }
+  },
+  "files": {
+    "game_lines_path": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\data\\market\\oddsapi\\refresh_history\\2026_06_22\\20260622T212709_879974Z\\oddsapi_game_lines_2026_06_22.json",
+    "pitcher_props_path": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\data\\market\\oddsapi\\refresh_history\\2026_06_22\\20260622T212709_879974Z\\oddsapi_pitcher_props_2026_06_22.json",
+    "hitter_props_path": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\data\\market\\oddsapi\\refresh_history\\2026_06_22\\20260622T212709_879974Z\\oddsapi_hitter_props_2026_06_22.json"
+  }
+}

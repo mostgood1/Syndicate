@@ -1,0 +1,5 @@
+market,side,home,away,date,ev,price,implied_prob,edge,line,pred_margin,market_home_margin,pred_total,tier
+ATS,Phoenix Mercury,Portland Fire,Phoenix Mercury,2026-06-05,0.005866,-110.0,0.52381,0.586636,2.5,-1.913364,2.5,,Low
+TOTAL,Over,Portland Fire,Phoenix Mercury,2026-06-05,0.149625,-110.0,0.52381,14.962507,143.5,,,158.462507,High
+ATS,Los Angeles Sparks,Los Angeles Sparks,Dallas Wings,2026-06-05,0.043438,-110.0,0.52381,4.343768,1.5,2.843768,-1.5,,High
+TOTAL,Under,Los Angeles Sparks,Dallas Wings,2026-06-05,0.438655,-110.0,0.52381,-43.865518,203.5,,,159.634482,High

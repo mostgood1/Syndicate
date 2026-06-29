@@ -1,0 +1,44 @@
+{
+  "date": "2026-06-21",
+  "mode": "live",
+  "retrieved_at": "2026-06-20T22:22:07.073806",
+  "hitter_props": {
+    "spencer jones": {
+      "batter_hits_runs_rbis": {
+        "line": 0.5,
+        "over_odds": "-140",
+        "under_odds": "+100",
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 0.5,
+            "over_odds": "-140",
+            "under_odds": "+100",
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": []
+      }
+    }
+  },
+  "meta": {
+    "markets": [
+      "batter_hits",
+      "batter_hits_runs_rbis",
+      "batter_total_bases",
+      "batter_home_runs",
+      "batter_rbis",
+      "batter_runs_scored",
+      "batter_strikeouts"
+    ],
+    "regions": "us",
+    "bookmakers": null,
+    "counts": {
+      "players": 1,
+      "markets": {
+        "batter_hits_runs_rbis": 1
+      },
+      "events_matched": 12
+    }
+  }
+}

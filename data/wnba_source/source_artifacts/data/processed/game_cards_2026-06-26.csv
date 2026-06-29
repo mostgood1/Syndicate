@@ -1,0 +1,3 @@
+date,game_id,home_team,visitor_team,commence_time,home_ml,away_ml,home_spread,away_spread,total,bookmaker,home_tri,away_tri
+2026-06-26,01456eb2d3d5295f1aebe9883f2b15604,Chicago Sky,Portland Fire,2026-06-26T23:30:00Z,,,,,,oddsapi_consensus,CHI,POR
+2026-06-26,072f392cc087c7a061b9939d13bd6ec6e,Connecticut Sun,Washington Mystics,2026-06-26T23:30:00Z,,,,,,oddsapi_consensus,CON,WSH
