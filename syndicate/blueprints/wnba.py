@@ -422,7 +422,7 @@ def api_source_team_logo(team_id: str):
 def api_source_cards():
     selected_date = _selected_date()
     try:
-        payload = build_source_cards_payload(selected_date, allow_stored_date_fallback=False)
+        payload = build_source_cards_payload(selected_date, allow_stored_date_fallback=True)
         return jsonify(payload)
     except Exception:
         return jsonify(_snapshot_unavailable_payload())

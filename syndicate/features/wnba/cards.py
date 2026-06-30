@@ -209,9 +209,9 @@ def _props_index_from_recommendations_rows(
 
 
 def _raw_smart_sim_index(selected_date: str) -> dict[tuple[str, str], dict[str, Any]]:
-    processed_root = processed_path(f"game_cards_{selected_date}.csv").parent
+    processed_root_path = processed_root()
     index: dict[tuple[str, str], dict[str, Any]] = {}
-    for path in processed_root.glob(f"smart_sim_{selected_date}_*.json"):
+    for path in processed_root_path.glob(f"smart_sim_{selected_date}_*.json"):
         payload = load_json(path)
         if not isinstance(payload, dict):
             continue
@@ -263,13 +263,14 @@ def _nearest_available_cards_date(selected_date: str) -> str | None:
 def _resolved_source_cards_date(selected_date: str, *, allow_stored_date_fallback: bool = False) -> str:
     requested_date = str(selected_date or "").strip() or parse_iso_date(selected_date).isoformat()
     if has_games_for_date(requested_date) is False:
-        return requested_date
+        if not allow_stored_date_fallback:
+            return requested_date
     resolved_date = requested_date
     bundle = _artifact_bundle(resolved_date)
     if bundle["rows"]:
         return resolved_date
     if not allow_stored_date_fallback:
-        return resolved_date
+        return requested_date
     fallback_date = None
     dates = available_dates()
     if resolved_date == central_today_iso():
@@ -720,69 +721,50 @@ def _artifact_paths(selected_date: str) -> dict[str, Path]:
     }
 
 
+def _artifact_root_paths(selected_date: str) -> dict[str, Path]:
+    root = processed_root()
+    return {
+        "cards": root / f"game_cards_{selected_date}.csv",
+        "recommendations": root / f"recommendations_slate_{selected_date}.json",
+        "sim": root / f"cards_sim_detail_{selected_date}.json",
+        "props": root / f"cards_props_snapshot_{selected_date}.json",
+    }
+
+
 def _artifact_bundle(selected_date: str) -> dict[str, Any]:
     csv_name = f"game_cards_{selected_date}.csv"
     repo_data_root = _repo_root_from(__file__) / "data" / "wnba_source"
     candidate_roots = list(_wnba_source_roots()) + [repo_data_root]
 
     if has_games_for_date(selected_date) is False:
-        safe_root = processed_root()
+        safe_paths = _artifact_root_paths(selected_date)
         return {
-            "paths": {
-                "cards": safe_root / csv_name,
-                "recommendations": safe_root / f"recommendations_slate_{selected_date}.json",
-                "sim": safe_root / f"cards_sim_detail_{selected_date}.json",
-                "props": safe_root / f"cards_props_snapshot_{selected_date}.json",
-            },
+            "paths": safe_paths,
             "rows": [],
             "recommendations": {},
             "sim": {},
             "props": {},
         }
 
-    if selected_date == central_today_iso():
-        paths = {
-            "cards": candidate_roots[0] / "data" / "processed" / csv_name,
-            "recommendations": candidate_roots[0] / "data" / "processed" / f"recommendations_slate_{selected_date}.json",
-            "sim": candidate_roots[0] / "data" / "processed" / f"cards_sim_detail_{selected_date}.json",
-            "props": candidate_roots[0] / "data" / "processed" / f"cards_props_snapshot_{selected_date}.json",
-        }
-        rows = []
-        for root in candidate_roots:
-            alt_path = root / "data" / "processed" / csv_name
-            if alt_path.exists():
-                alt_rows = _load_csv_rows(alt_path)
-                if alt_rows:
-                    rows = alt_rows
-                    paths = {
-                        "cards": alt_path,
-                        "recommendations": root / "data" / "processed" / f"recommendations_slate_{selected_date}.json",
-                        "sim": root / "data" / "processed" / f"cards_sim_detail_{selected_date}.json",
-                        "props": root / "data" / "processed" / f"cards_props_snapshot_{selected_date}.json",
-                    }
-                    break
-    else:
-        paths = _artifact_paths(selected_date)
-        rows = _load_csv_rows(paths["cards"])
-
-        # ✅ Existing: search alternate artifact roots
-        if not rows:
-            for root in candidate_roots:
-                alt_path = root / "data" / "processed" / csv_name
-                if alt_path != paths["cards"] and alt_path.exists():
-                    alt_rows = _load_csv_rows(alt_path)
-                    if alt_rows:
-                        rows = alt_rows
-                        paths = {
-                            "cards": alt_path,
-                            "recommendations": root / "data" / "processed" / f"recommendations_slate_{selected_date}.json",
-                            "sim": root / "data" / "processed" / f"cards_sim_detail_{selected_date}.json",
-                            "props": root / "data" / "processed" / f"cards_props_snapshot_{selected_date}.json",
-                        }
-                        break
+    paths = _artifact_root_paths(selected_date)
+    rows = []
+    for root in candidate_roots:
+        alt_path = root / "data" / "processed" / csv_name
+        if not alt_path.exists():
+            continue
+        alt_rows = _load_csv_rows(alt_path)
+        if alt_rows:
+            rows = alt_rows
+            paths = {
+                "cards": alt_path,
+                "recommendations": root / "data" / "processed" / f"recommendations_slate_{selected_date}.json",
+                "sim": root / "data" / "processed" / f"cards_sim_detail_{selected_date}.json",
+                "props": root / "data" / "processed" / f"cards_props_snapshot_{selected_date}.json",
+            }
+            break
 
     # ✅ Existing
-    rec_summary = load_json(paths["recommendations"])
+    rec_summary = load_json(paths["recommendations"]) if paths["recommendations"].exists() else None
 
     # Runtime WNBA fallback is disabled on Render so the deployed app only
     # serves published artifacts.
@@ -792,18 +774,20 @@ def _artifact_bundle(selected_date: str) -> dict[str, Any]:
         except Exception:
             rows = []
 
-    props_index = _artifact_games_index(paths["props"])
+    props_index = _artifact_games_index(paths["props"]) if paths["props"].exists() else {}
     if not props_index:
-        props_rows = _load_csv_rows(processed_path(f"props_recommendations_{selected_date}.csv"))
-        if props_rows:
-            props_index = _props_index_from_recommendations_rows(rows, props_rows)
+        props_rows_path = processed_root() / f"props_recommendations_{selected_date}.csv"
+        if props_rows_path.exists():
+            props_rows = _load_csv_rows(props_rows_path)
+            if props_rows:
+                props_index = _props_index_from_recommendations_rows(rows, props_rows)
 
     return {
         "paths": paths,
         "rows": rows,
         "recommendations": _recommendation_index(rec_summary),
         "sim": _merge_sim_indexes(
-            _artifact_games_index(paths["sim"]),
+            _artifact_games_index(paths["sim"]) if paths["sim"].exists() else {},
             _raw_smart_sim_index(selected_date),
         ),
         "props": props_index,
@@ -1671,10 +1655,7 @@ def _games_from_live_state_fallback(selected_date: str, ttl: int = 12) -> tuple[
             if source_name:
                 source_path = source_name
             else:
-                try:
-                    source_path = str(live_snapshot_path(f"live_state_{selected_date}.jsonl"))
-                except FileNotFoundError:
-                    source_path = None
+                source_path = str(processed_root() / "live_snapshots" / f"live_state_{selected_date}.jsonl")
             break
     if payload is None:
         payload = {}
@@ -1856,7 +1837,7 @@ def _supplement_games_with_live_state(games: list[dict[str, Any]], selected_date
 def build_cards_page_context(selected_date: str, *, allow_stored_date_fallback: bool = False) -> dict[str, Any]:
     requested_date = str(selected_date or "").strip() or parse_iso_date(selected_date).isoformat()
     schedule_has_games = has_games_for_date(requested_date)
-    if schedule_has_games is False:
+    if schedule_has_games is False and not allow_stored_date_fallback:
         parsed_date = parse_iso_date(requested_date)
         prev_date = (parsed_date - timedelta(days=1)).isoformat()
         next_date = (parsed_date + timedelta(days=1)).isoformat()
@@ -1920,11 +1901,11 @@ def build_cards_page_context(selected_date: str, *, allow_stored_date_fallback: 
         requested_date,
         bool(allow_stored_date_fallback),
         tuple(available_dates()),
-        _path_cache_signature(_artifact_paths(requested_date)["cards"]),
-        _path_cache_signature(_artifact_paths(requested_date)["recommendations"]),
-        _path_cache_signature(_artifact_paths(requested_date)["sim"]),
-        _path_cache_signature(_artifact_paths(requested_date)["props"]),
-        _path_cache_signature(live_snapshot_path(f"live_state_{requested_date}.jsonl")),
+        _path_cache_signature(_artifact_root_paths(requested_date)["cards"]),
+        _path_cache_signature(_artifact_root_paths(requested_date)["recommendations"]),
+        _path_cache_signature(_artifact_root_paths(requested_date)["sim"]),
+        _path_cache_signature(_artifact_root_paths(requested_date)["props"]),
+        _path_cache_signature(processed_root() / "live_snapshots" / f"live_state_{requested_date}.jsonl"),
     )
     cached_context = _WNBA_CARDS_CONTEXT_CACHE.get(cache_key)
     if cached_context is not None:
@@ -2059,9 +2040,8 @@ def build_cards_page_context(selected_date: str, *, allow_stored_date_fallback: 
 
 @lru_cache(maxsize=64)
 def _local_live_state_payload_cached(selected_date: str, snapshot_mtime_ns: int | None, snapshot_size: int | None) -> dict[str, Any] | None:
-    try:
-        path = live_snapshot_path(f"live_state_{selected_date}.jsonl")
-    except FileNotFoundError:
+    path = processed_root() / "live_snapshots" / f"live_state_{selected_date}.jsonl"
+    if not path.exists():
         return None
     try:
         lines = path.read_text(encoding="utf-8").splitlines()
@@ -2084,9 +2064,8 @@ def _local_live_state_payload_cached(selected_date: str, snapshot_mtime_ns: int 
 
 
 def _local_live_state_payload(selected_date: str) -> dict[str, Any] | None:
-    try:
-        path = live_snapshot_path(f"live_state_{selected_date}.jsonl")
-    except FileNotFoundError:
+    path = processed_root() / "live_snapshots" / f"live_state_{selected_date}.jsonl"
+    if not path.exists():
         return _local_live_state_payload_cached(selected_date, None, None)
     try:
         stat = path.stat()
