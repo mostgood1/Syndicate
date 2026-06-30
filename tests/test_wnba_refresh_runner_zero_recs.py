@@ -77,6 +77,65 @@ class WnbaRefreshRunnerZeroRecsTests(unittest.TestCase):
 
         self.assertEqual(rc, 0)
 
+    def test_main_does_not_fail_when_refresh_produces_no_rows(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        module = self._load_module(repo_root)
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_root = Path(tmp_dir)
+            source_root = tmp_root / "source"
+            artifact_root = tmp_root / "bundle"
+            source_root.mkdir(parents=True, exist_ok=True)
+            artifact_root.mkdir(parents=True, exist_ok=True)
+
+            argv = [
+                "refresh_wnba_oddsapi_props.py",
+                "--date",
+                "2026-06-29",
+                "--regions",
+                "us",
+                "--source-root",
+                str(source_root),
+                "--artifact-root",
+                str(artifact_root),
+                "--log-file",
+                str(tmp_root / "refresh.log"),
+                "--do-edges",
+                "--do-export",
+                "--mode",
+                "full",
+            ]
+            fake_state = {
+                "date": "2026-06-29",
+                "started_at": "2026-06-23T02:00:00Z",
+                "ended_at": "2026-06-23T02:00:05Z",
+                "phase": "done",
+                "phase_started_at": "2026-06-23T02:00:05Z",
+                "heartbeat_at": "2026-06-23T02:00:05Z",
+                "rc_snapshot": 2,
+                "rc_edges": 1,
+                "rc_export": 1,
+                "snapshot_rows": 0,
+                "predictions_rows": 0,
+                "edges_rows": 0,
+                "recs_rows": 0,
+                "game_cards_rows": 0,
+                "snapshot_path": str(source_root / "data" / "raw" / "odds_wnba_player_props_2026-06-29.csv"),
+                "predictions_path": str(artifact_root / "data" / "processed" / "props_predictions_2026-06-29.csv"),
+                "edges_path": str(artifact_root / "data" / "processed" / "props_edges_2026-06-29.csv"),
+                "recs_path": str(artifact_root / "data" / "processed" / "props_recommendations_2026-06-29.csv"),
+                "snapshot_alias_path": str(artifact_root / "data" / "processed" / "oddsapi_player_props_2026-06-29.csv"),
+                "snapshot_alias_rows": 0,
+                "duration_s": 5.0,
+                "error": None,
+                "mode": "full",
+            }
+
+            with patch.object(module, "_existing_refresh_state", return_value=None), patch.object(module, "_existing_artifact_bundle_state", return_value=None), patch.object(module, "_run_refresh_via_cli", return_value=fake_state), patch.object(module, "_run_playoff_transition_if_needed", return_value={"status": "unavailable"}), patch.object(sys, "argv", argv):
+                rc = module.main()
+
+        self.assertEqual(rc, 0)
+
     def test_zero_recs_refresh_still_writes_recommendations_slate(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]
         module = self._load_module(repo_root)

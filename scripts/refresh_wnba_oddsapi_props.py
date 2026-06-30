@@ -3051,20 +3051,34 @@ def _run_refresh_via_cli(
         _append_log(log_file, f"Export stage finished for {date_str}: rc_export={state['rc_export']}, game_cards_rows={game_cards_rows}, recs_rows={state['recs_rows']}")
         source_game_cards_rows = int(_count_csv_rows_quick(source_root / 'data' / 'processed' / f'game_cards_{date_str}.csv'))
         if int(rc_export) != 0:
-            export_artifacts_ready = (
-                int(state.get("snapshot_rows") or 0) > 0
-                and int(state.get("predictions_rows") or 0) > 0
-                and (not do_edges or int(state.get("edges_rows") or 0) > 0)
-                and int(state.get("recs_rows") or 0) > 0
-                and int(game_cards_rows or 0) > 0
-                and source_game_cards_rows > 0
+            no_data_export = (
+                int(state.get("snapshot_rows") or 0) <= 0
+                and int(state.get("predictions_rows") or 0) <= 0
+                and int(state.get("edges_rows") or 0) <= 0
+                and int(state.get("recs_rows") or 0) <= 0
+                and int(game_cards_rows or 0) <= 0
+                and source_game_cards_rows <= 0
             )
-            if export_artifacts_ready:
-                _append_log(log_file, f"Export stage returned {rc_export} but required WNBA artifacts were present; treating as warning for {date_str}")
+            if no_data_export:
+                _append_log(log_file, f"Export stage returned {rc_export} with no WNBA input rows; treating as a warning for {date_str}")
+                state["warning"] = f"WNBA odds refresh produced no rows for {date_str}; export was skipped as a no-data run"
                 state["rc_export"] = 0
                 rc_export = 0
             else:
-                state["error"] = f"export-props-recommendations failed with exit code {int(rc_export)}"
+                export_artifacts_ready = (
+                    int(state.get("snapshot_rows") or 0) > 0
+                    and int(state.get("predictions_rows") or 0) > 0
+                    and (not do_edges or int(state.get("edges_rows") or 0) > 0)
+                    and int(state.get("recs_rows") or 0) > 0
+                    and int(game_cards_rows or 0) > 0
+                    and source_game_cards_rows > 0
+                )
+                if export_artifacts_ready:
+                    _append_log(log_file, f"Export stage returned {rc_export} but required WNBA artifacts were present; treating as warning for {date_str}")
+                    state["rc_export"] = 0
+                    rc_export = 0
+                else:
+                    state["error"] = f"export-props-recommendations failed with exit code {int(rc_export)}"
         elif int(state["snapshot_rows"] or 0) > 0 and source_game_cards_rows <= 0:
             state["error"] = f"local game_cards builder completed without writing rows to game_cards_{date_str}.csv"
 
