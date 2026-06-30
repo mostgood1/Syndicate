@@ -1038,26 +1038,11 @@ def main() -> int:
     required_live_lens_paths = _required_live_lens_relative_paths(date_str=str(args.date))
     missing_source_live_lens = [str(path) for path in required_live_lens_paths if not (source_root / path).exists()]
     missing_artifact_live_lens = [str(path) for path in required_live_lens_paths if not (artifact_root / path).exists()]
-    if not fast_mode and (missing_source_live_lens or missing_artifact_live_lens):
-        print(
-            json.dumps(
-                {
-                    "ok": False,
-                    "date": args.date,
-                    "error": "mlb_live_lens_artifacts_missing",
-                    "missing_source_live_lens": missing_source_live_lens,
-                    "missing_artifact_live_lens": missing_artifact_live_lens,
-                    "refresh": refresh_payload,
-                    "artifact_bundle_root": str(artifact_root),
-                    "artifact_bundle_files": copied,
-                },
-                indent=2,
-            )
-        )
-        return 1
-    if fast_mode and (missing_source_live_lens or missing_artifact_live_lens):
+    if missing_source_live_lens or missing_artifact_live_lens:
         refresh_payload["warnings"] = list(refresh_payload.get("warnings") or []) + [
-            "fast mode skipped live-lens rebuild; existing live-lens artifacts were not fully present",
+            "fast mode skipped live-lens rebuild; existing live-lens artifacts were not fully present"
+            if fast_mode
+            else "live-lens artifacts were not fully present after refresh",
         ]
 
     print(

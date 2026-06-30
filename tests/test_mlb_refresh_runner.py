@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import importlib.util
+import io
 import json
 import os
 import sys
 import tempfile
 import unittest
+from contextlib import redirect_stdout
 from datetime import datetime
 from pathlib import Path
 from unittest.mock import patch
@@ -62,6 +64,42 @@ class MlbRefreshRunnerTests(unittest.TestCase):
         self.assertEqual(len(odds_module.calls), 1)
         self.assertEqual(odds_module.calls[0]["date"], "2026-05-22")
         self.assertEqual(odds_module.calls[0]["regions"], "us,eu")
+
+    def test_main_warns_when_live_lens_artifacts_are_missing(self) -> None:
+        module = self._load_module()
+
+        class _FakeOddsModule:
+            pass
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            source_root = Path(tmp_dir) / "source"
+            artifact_root = Path(tmp_dir) / "bundle"
+            source_root.mkdir(parents=True)
+            artifact_root.mkdir(parents=True)
+            argv = [
+                "refresh_mlb_oddsapi.py",
+                "--date",
+                "2026-05-22",
+                "--source-root",
+                str(source_root),
+                "--artifact-root",
+                str(artifact_root),
+                "--regions",
+                "us",
+            ]
+            stdout = io.StringIO()
+            with (
+                patch.object(module, "_load_local_fetcher", return_value=_FakeOddsModule()),
+                patch.object(module, "_refresh_source_artifacts", return_value={"market_refresh": {"ok": True}, "live_lens": {"ok": True}}),
+                patch.object(module, "_materialize_artifact_bundle", return_value={"files": [str(artifact_root / "dummy.json")]}),
+                patch.object(module, "_required_live_lens_relative_paths", return_value=[Path("data/live_lens/required.json")]),
+                patch("sys.argv", argv),
+                redirect_stdout(stdout),
+            ):
+                rc = module.main()
+
+        self.assertEqual(rc, 0)
+        self.assertIn("live-lens artifacts were not fully present after refresh", stdout.getvalue())
 
     def test_reconcile_module_resolves_daily_sims_directory(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]
