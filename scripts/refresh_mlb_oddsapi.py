@@ -578,7 +578,9 @@ def fetch_live_odds_incremental(*, odds_module, source_root: Path, date_str: str
     existing_pitcher_props_doc = _read_json_if_exists(pitcher_props_path)
     existing_hitter_props_doc = _read_json_if_exists(hitter_props_path)
 
+    print("[mlb_fetch_start]", flush=True)
     live_events = list(odds_module._fetch_live_events_for_date(api_key, date_str))
+    print(f"[mlb_fetch_events] events_count={len(live_events) if live_events else 0}", flush=True)
     game_market_keys = [
         "h2h",
         "spreads",
@@ -695,6 +697,7 @@ def fetch_live_odds_incremental(*, odds_module, source_root: Path, date_str: str
         "totals_games": int(sum(1 for row in game_rows if isinstance((row.get("markets") or {}).get("totals"), dict))),
         "spreads_games": int(sum(1 for row in game_rows if isinstance((row.get("markets") or {}).get("spreads"), dict))),
     }
+    print(f"[mlb_counts] events_matched={game_counts['events_matched']} games={game_counts['games']}", flush=True)
     pitcher_counts = dict(odds_module._prop_market_counts(finalized_pitcher_props))
     pitcher_counts["events_matched"] = int(len(live_events))
     hitter_counts = dict(odds_module._prop_market_counts(finalized_hitter_props))
