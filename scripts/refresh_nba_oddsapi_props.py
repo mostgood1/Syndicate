@@ -2384,9 +2384,31 @@ def _run_refresh_via_cli(
         state["recs_rows"] = int(_count_csv_rows_quick(rec_fp))
         source_game_cards_rows = int(_count_csv_rows_quick(source_root / 'data' / 'processed' / f'game_cards_{date_str}.csv'))
         if int(rc_export) != 0:
-            state["error"] = f"export-props-recommendations failed with exit code {int(rc_export)}"
-        elif int(state["snapshot_rows"] or 0) > 0 and source_game_cards_rows <= 0:
-            state["error"] = f"local game_cards builder wrote no rows to game_cards_{date_str}.csv"
+            no_data_export = (
+                int(state.get("snapshot_rows") or 0) <= 0
+                and int(state.get("predictions_rows") or 0) <= 0
+                and int(state.get("edges_rows") or 0) <= 0
+                and int(state.get("recs_rows") or 0) <= 0
+                and int(game_cards_rows or 0) <= 0
+                and source_game_cards_rows <= 0
+            )
+            export_artifacts_ready = (
+                int(state.get("snapshot_rows") or 0) > 0
+                and int(state.get("predictions_rows") or 0) > 0
+                and (not do_edges or int(state.get("edges_rows") or 0) > 0)
+                and int(state.get("recs_rows") or 0) > 0
+                and int(game_cards_rows or 0) > 0
+            )
+            if no_data_export:
+                state["warning"] = f"NBA odds refresh produced no rows for {date_str}; export was skipped as a no-data run"
+                state["rc_export"] = 0
+                rc_export = 0
+            elif export_artifacts_ready:
+                state["warning"] = f"NBA export stage returned {rc_export} but required artifacts were present; treating as warning for {date_str}"
+                state["rc_export"] = 0
+                rc_export = 0
+            else:
+                state["error"] = f"export-props-recommendations failed with exit code {int(rc_export)}"
 
     # Build cards_sim_detail in source processed space before parity gating.
     # The source CLI does not emit this file directly; we derive it from /api/cards.

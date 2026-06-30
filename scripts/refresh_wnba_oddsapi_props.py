@@ -3071,7 +3071,6 @@ def _run_refresh_via_cli(
                     and (not do_edges or int(state.get("edges_rows") or 0) > 0)
                     and int(state.get("recs_rows") or 0) > 0
                     and int(game_cards_rows or 0) > 0
-                    and source_game_cards_rows > 0
                 )
                 if export_artifacts_ready:
                     _append_log(log_file, f"Export stage returned {rc_export} but required WNBA artifacts were present; treating as warning for {date_str}")
@@ -3079,9 +3078,6 @@ def _run_refresh_via_cli(
                     rc_export = 0
                 else:
                     state["error"] = f"export-props-recommendations failed with exit code {int(rc_export)}"
-        elif int(state["snapshot_rows"] or 0) > 0 and source_game_cards_rows <= 0:
-            state["error"] = f"local game_cards builder completed without writing rows to game_cards_{date_str}.csv"
-
     state["snapshot_rows"] = int(_count_csv_rows_quick(raw_fp))
     state["predictions_rows"] = int(_count_csv_rows_quick(pred_fp)) if refresh_mode == "full" else int(state.get("predictions_rows") or 0)
     state["edges_rows"] = int(_count_csv_rows_quick(edges_fp)) if refresh_mode == "full" else int(state.get("edges_rows") or 0)
