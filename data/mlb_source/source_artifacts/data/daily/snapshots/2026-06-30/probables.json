@@ -2,7 +2,7 @@
   "date": "2026-06-30",
   "season": 2026,
   "spring_mode": false,
-  "generated_at": "2026-06-29T07:51:26.539352",
+  "generated_at": "2026-06-30T07:19:45.030341",
   "games": [
     {
       "idx": 0,
@@ -720,7 +720,7 @@
         "abbr": "COL"
       },
       "away_probable_id": 691587,
-      "home_probable_id": 607536,
+      "home_probable_id": 685299,
       "away_source": "feed_gameData_probablePitchers",
       "home_source": "feed_gameData_probablePitchers",
       "away_confidence": 0.75,
@@ -745,8 +745,8 @@
       },
       "home_validation": {
         "status": "ok",
-        "selected_id": 607536,
-        "selected_name": "Kyle Freeland",
+        "selected_id": 685299,
+        "selected_name": "Tanner Gordon",
         "selected_source": "feed_gameData_probablePitchers",
         "override_reason": "",
         "roster_team_ids": [
@@ -763,13 +763,13 @@
       },
       "raw": {
         "away_schedule_id": 691587,
-        "home_schedule_id": 607536,
+        "home_schedule_id": 685299,
         "away_schedule_name": "Eury P\u00e9rez",
-        "home_schedule_name": "Kyle Freeland",
+        "home_schedule_name": "Tanner Gordon",
         "away_feed_id": 691587,
-        "home_feed_id": 607536,
+        "home_feed_id": 685299,
         "away_feed_name": "Eury P\u00e9rez",
-        "home_feed_name": "Kyle Freeland"
+        "home_feed_name": "Tanner Gordon"
       }
     },
     {

@@ -440,30 +440,30 @@
         "vs_pitcher_history": {}
       },
       {
-        "id": 669899,
-        "name": "Ryan Ward",
+        "id": 606192,
+        "name": "Teoscar Hern\u00e1ndez",
         "pos": "LF",
-        "bat": "L",
+        "bat": "R",
         "throw": "R",
-        "k_rate": 0.29264252696456083,
-        "bb_rate": 0.08567026194144838,
-        "hbp_rate": 0.0,
-        "hr_rate": 0.05003852080123267,
-        "inplay_hit_rate": 0.21262993762993765,
-        "xb_hit_share": 0.36363636363636365,
+        "k_rate": 0.2597222222222222,
+        "bb_rate": 0.09027777777777778,
+        "hbp_rate": 0.00980392156862745,
+        "hr_rate": 0.0375,
+        "inplay_hit_rate": 0.3432391826923077,
+        "xb_hit_share": 0.16,
         "vs_pitch_type": {},
         "vs_pitch_type_hr": {},
         "platoon_mult_vs_lhp": {
-          "k": 1.1925000000000001,
-          "bb": 0.8075,
+          "k": 0.925390156062425,
+          "bb": 1.1925000000000001,
           "hr": 0.78,
-          "inplay": 0.8075
+          "inplay": 0.9078231888045422
         },
         "platoon_mult_vs_rhp": {
-          "k": 0.9534177024765416,
-          "bb": 1.0232110739979445,
-          "hr": 1.0388320686242163,
-          "inplay": 1.0248119177598523
+          "k": 1.0511385199240988,
+          "bb": 0.8430521091811414,
+          "hr": 1.017741935483871,
+          "inplay": 1.0108334062855642
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -552,7 +552,7 @@
         "role": "SU",
         "leverage_skill": 0.7,
         "stamina_pitches": 25,
-        "availability_mult": 0.9400000000000001,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 0.9477122347066167,
           "bb": 0.9972067805915861,
@@ -637,7 +637,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.945,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 0.9125031589588072,
           "bb": 1.1925000000000001,
@@ -681,7 +681,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.9,
         "platoon_mult_vs_lhb": {
           "k": 0.8075,
           "bb": 0.9245324979673825,
@@ -723,7 +723,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.75,
         "platoon_mult_vs_lhb": {
           "k": 0.8156294200848657,
           "bb": 1.072591522157996,
@@ -766,7 +766,7 @@
         "role": "SU",
         "leverage_skill": 0.7,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.875,
         "platoon_mult_vs_lhb": {
           "k": 1.1026142516785793,
           "bb": 1.1025294525294527,
@@ -808,7 +808,7 @@
         "role": "CL",
         "leverage_skill": 0.85,
         "stamina_pitches": 25,
-        "availability_mult": 0.915,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 1.0769337768815226,
           "bb": 1.0865375418460068,
@@ -849,7 +849,7 @@
         "role": "LR",
         "leverage_skill": 0.35,
         "stamina_pitches": 25,
-        "availability_mult": 0.89,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 0.9982084690553746,
           "bb": 1.1557425742574257,
@@ -907,15 +907,15 @@
       703607,
       701762,
       669127,
-      691016,
       641680,
       671732,
       691777,
       643446,
-      675961
+      675961,
+      666126
     ],
     "lineup_source": "projected_rotowire_today_lineup",
-    "lineup_confidence": 0.72,
+    "lineup_confidence": 0.48000000000000004,
     "probable_pitcher": {
       "id": 605488,
       "source": "feed_gameData_probablePitchers",
@@ -950,14 +950,14 @@
         "lev": 0.85
       },
       {
-        "id": 660761,
-        "name": "Jos\u00e9 Suarez",
+        "id": 686993,
+        "name": "Justin Sterner",
         "role": "MR",
         "lev": 0.5
       },
       {
-        "id": 686993,
-        "name": "Justin Sterner",
+        "id": 695034,
+        "name": "Kade Morris",
         "role": "MR",
         "lev": 0.5
       },
@@ -1070,35 +1070,6 @@
           "bb": 0.9975658123110749,
           "hr": 0.9358214613146859,
           "inplay": 0.9826336994078152
-        },
-        "statcast_quality_mult": {},
-        "vs_pitcher_history": {}
-      },
-      {
-        "id": 691016,
-        "name": "Tyler Soderstrom",
-        "pos": "LF",
-        "bat": "L",
-        "throw": "R",
-        "k_rate": 0.1749681697612732,
-        "bb_rate": 0.12792042440318302,
-        "hbp_rate": 0.006153846153846154,
-        "hr_rate": 0.041758620689655176,
-        "inplay_hit_rate": 0.24529072299651566,
-        "xb_hit_share": 0.3235294117647059,
-        "vs_pitch_type": {},
-        "vs_pitch_type_hr": {},
-        "platoon_mult_vs_lhp": {
-          "k": 1.1925000000000001,
-          "bb": 0.8321820410382597,
-          "hr": 1.275,
-          "inplay": 0.9139111583926159
-        },
-        "platoon_mult_vs_rhp": {
-          "k": 0.9047939673466202,
-          "bb": 1.0537663095125698,
-          "hr": 0.8423256671996064,
-          "inplay": 1.0308204965015986
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -1247,9 +1218,7 @@
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
-      }
-    ],
-    "bench": [
+      },
       {
         "id": 666126,
         "name": "Carlos Cortes",
@@ -1278,7 +1247,9 @@
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
-      },
+      }
+    ],
+    "bench": [
       {
         "id": 687515,
         "name": "Colby Thomas",
@@ -1309,30 +1280,30 @@
         "vs_pitcher_history": {}
       },
       {
-        "id": 805779,
-        "name": "Jacob Wilson",
+        "id": 687231,
+        "name": "Darell Hernaiz",
         "pos": "SS",
         "bat": "R",
         "throw": "R",
-        "k_rate": 0.12035169699950811,
-        "bb_rate": 0.05550909985243482,
-        "hbp_rate": 0.0,
-        "hr_rate": 0.01851942941465814,
-        "inplay_hit_rate": 0.28529946732493183,
-        "xb_hit_share": 0.17857142857142858,
+        "k_rate": 0.1758955223880597,
+        "bb_rate": 0.09579601990049752,
+        "hbp_rate": 0.007462686567164179,
+        "hr_rate": 0.006343283582089552,
+        "inplay_hit_rate": 0.2694104381443299,
+        "xb_hit_share": 0.10714285714285714,
         "vs_pitch_type": {},
         "vs_pitch_type_hr": {},
         "platoon_mult_vs_lhp": {
-          "k": 0.906993971594973,
-          "bb": 0.9454142667257421,
-          "hr": 0.9449756529437804,
-          "inplay": 0.9413997202514968
+          "k": 0.9502969876962241,
+          "bb": 1.1389639054790963,
+          "hr": 1.275,
+          "inplay": 1.0170818800863644
         },
         "platoon_mult_vs_rhp": {
-          "k": 1.013823731188603,
-          "bb": 0.900376606114311,
-          "hr": 1.0285429709732499,
-          "inplay": 1.0373762281131174
+          "k": 1.0083671737681072,
+          "bb": 0.9284471565827057,
+          "hr": 0.78,
+          "inplay": 1.0189411649391065
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -1362,6 +1333,35 @@
           "bb": 1.1925000000000001,
           "hr": 1.0,
           "inplay": 0.8075
+        },
+        "statcast_quality_mult": {},
+        "vs_pitcher_history": {}
+      },
+      {
+        "id": 811965,
+        "name": "Joshua Kuroda-Grauer",
+        "pos": "SS",
+        "bat": "R",
+        "throw": "R",
+        "k_rate": 0.0,
+        "bb_rate": 0.0,
+        "hbp_rate": 0.0,
+        "hr_rate": 0.0,
+        "inplay_hit_rate": 0.75,
+        "xb_hit_share": 0.3333333333333333,
+        "vs_pitch_type": {},
+        "vs_pitch_type_hr": {},
+        "platoon_mult_vs_lhp": {
+          "k": 1.0,
+          "bb": 1.0,
+          "hr": 1.0,
+          "inplay": 0.9388888888888889
+        },
+        "platoon_mult_vs_rhp": {
+          "k": 1.0,
+          "bb": 1.0,
+          "hr": 1.0,
+          "inplay": 1.1833333333333333
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -1419,7 +1419,7 @@
         "role": "SU",
         "leverage_skill": 0.7,
         "stamina_pitches": 25,
-        "availability_mult": 0.95,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 1.1572376357056695,
           "bb": 1.0996998799519808,
@@ -1543,58 +1543,13 @@
         "pitch_type_hr_mult": {}
       },
       {
-        "id": 660761,
-        "name": "Jos\u00e9 Suarez",
-        "throw": "L",
-        "role": "MR",
-        "leverage_skill": 0.5,
-        "stamina_pitches": 28,
-        "availability_mult": 0.895,
-        "platoon_mult_vs_lhb": {
-          "k": 1.0424739264005907,
-          "bb": 0.9255997066672715,
-          "hr": 1.1157702807317769,
-          "inplay": 0.9483368409436654
-        },
-        "platoon_mult_vs_rhb": {
-          "k": 0.9741414158851883,
-          "bb": 1.1063649949156449,
-          "hr": 0.78,
-          "inplay": 1.0825190719529059
-        },
-        "statcast_quality_mult": {},
-        "arsenal_source": "statsapi_pitchArsenal",
-        "arsenal_sample_size": 749,
-        "statcast_splits_found": false,
-        "statcast_splits_source": "",
-        "statcast_splits_n_pitches": 0,
-        "statcast_splits_start_date": "",
-        "statcast_splits_end_date": "",
-        "k_rate": 0.2406731946144431,
-        "bb_rate": 0.09993880048959607,
-        "hbp_rate": 0.015789473684210527,
-        "hr_rate": 0.02039779681762546,
-        "inplay_hit_rate": 0.4032644628099173,
-        "arsenal": {
-          "FF": 0.37783711508811757,
-          "OTHER": 0.009345793878504679,
-          "CH": 0.24699599678905204,
-          "SI": 0.09345794378504674,
-          "SL": 0.26301735658077435,
-          "FC": 0.009345793878504679
-        },
-        "pitch_type_whiff_mult": {},
-        "pitch_type_inplay_mult": {},
-        "pitch_type_hr_mult": {}
-      },
-      {
         "id": 686993,
         "name": "Justin Sterner",
         "throw": "R",
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.875,
         "platoon_mult_vs_lhb": {
           "k": 1.0113433997825074,
           "bb": 0.954273962484438,
@@ -1624,6 +1579,51 @@
           "FF": 0.4040747,
           "OTHER": 0.2886248,
           "FC": 0.3073005
+        },
+        "pitch_type_whiff_mult": {},
+        "pitch_type_inplay_mult": {},
+        "pitch_type_hr_mult": {}
+      },
+      {
+        "id": 695034,
+        "name": "Kade Morris",
+        "throw": "R",
+        "role": "MR",
+        "leverage_skill": 0.5,
+        "stamina_pitches": 28,
+        "availability_mult": 0.575,
+        "platoon_mult_vs_lhb": {
+          "k": 0.8075,
+          "bb": 1.1925000000000001,
+          "hr": 1.275,
+          "inplay": 1.1833333333333333
+        },
+        "platoon_mult_vs_rhb": {
+          "k": 1.1925000000000001,
+          "bb": 0.8075,
+          "hr": 0.78,
+          "inplay": 0.9083333333333333
+        },
+        "statcast_quality_mult": {},
+        "arsenal_source": "statsapi_pitchArsenal",
+        "arsenal_sample_size": 90,
+        "statcast_splits_found": false,
+        "statcast_splits_source": "",
+        "statcast_splits_n_pitches": 0,
+        "statcast_splits_start_date": "",
+        "statcast_splits_end_date": "",
+        "k_rate": 0.18181818181818182,
+        "bb_rate": 0.13636363636363635,
+        "hbp_rate": 0.0,
+        "hr_rate": 0.13636363636363635,
+        "inplay_hit_rate": 0.6,
+        "arsenal": {
+          "FF": 0.12222221926666668,
+          "OTHER": 0.17777777893333332,
+          "CU": 0.06666666959999998,
+          "CH": 0.05555555566666666,
+          "SI": 0.3999999976,
+          "SL": 0.17777777893333332
         },
         "pitch_type_whiff_mult": {},
         "pitch_type_inplay_mult": {},
@@ -1724,7 +1724,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.85,
         "platoon_mult_vs_lhb": {
           "k": 1.06875,
           "bb": 1.06875,

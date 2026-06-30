@@ -93,6 +93,12 @@
         "lev": 0.85
       },
       {
+        "id": 680702,
+        "name": "Joey Gerber",
+        "role": "MR",
+        "lev": 0.5
+      },
+      {
         "id": 596133,
         "name": "Luke Weaver",
         "role": "MR",
@@ -655,7 +661,7 @@
         "role": "SU",
         "leverage_skill": 0.7,
         "stamina_pitches": 25,
-        "availability_mult": 0.955,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 0.8771383684394274,
           "bb": 0.9134343434343434,
@@ -729,6 +735,48 @@
           "CH": 0.4852940993205883,
           "SL": 0.0063025209911764715,
           "FC": 0.0021008403970588234
+        },
+        "pitch_type_whiff_mult": {},
+        "pitch_type_inplay_mult": {},
+        "pitch_type_hr_mult": {}
+      },
+      {
+        "id": 680702,
+        "name": "Joey Gerber",
+        "throw": "R",
+        "role": "MR",
+        "leverage_skill": 0.5,
+        "stamina_pitches": 26,
+        "availability_mult": 0.925,
+        "platoon_mult_vs_lhb": {
+          "k": 0.8899999999999999,
+          "bb": 0.8075,
+          "hr": 1.0,
+          "inplay": 0.8625
+        },
+        "platoon_mult_vs_rhb": {
+          "k": 1.1099999999999999,
+          "bb": 1.1925000000000001,
+          "hr": 1.0,
+          "inplay": 1.1925000000000001
+        },
+        "statcast_quality_mult": {},
+        "arsenal_source": "statsapi_pitchArsenal",
+        "arsenal_sample_size": 57,
+        "statcast_splits_found": false,
+        "statcast_splits_source": "",
+        "statcast_splits_n_pitches": 0,
+        "statcast_splits_start_date": "",
+        "statcast_splits_end_date": "",
+        "k_rate": 0.4166666666666667,
+        "bb_rate": 0.08333333333333333,
+        "hbp_rate": 0.0,
+        "hr_rate": 0.0,
+        "inplay_hit_rate": 0.3333333333333333,
+        "arsenal": {
+          "FF": 0.6315789378947363,
+          "SL": 0.05263158315789498,
+          "FC": 0.3157894789473687
         },
         "pitch_type_whiff_mult": {},
         "pitch_type_inplay_mult": {},
@@ -1359,7 +1407,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.875,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 1.0953978731206453,
           "bb": 0.8985219164118247,
@@ -1402,7 +1450,7 @@
         "role": "SU",
         "leverage_skill": 0.7,
         "stamina_pitches": 25,
-        "availability_mult": 0.88,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 1.023725910524897,
           "bb": 1.1835991301196085,
@@ -1445,7 +1493,7 @@
         "role": "CL",
         "leverage_skill": 0.85,
         "stamina_pitches": 25,
-        "availability_mult": 0.885,
+        "availability_mult": 0.8083333333333333,
         "platoon_mult_vs_lhb": {
           "k": 0.9256795468602493,
           "bb": 0.8913395672501904,
@@ -1531,7 +1579,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.925,
         "platoon_mult_vs_lhb": {
           "k": 1.0401640735922375,
           "bb": 1.0774085104462796,

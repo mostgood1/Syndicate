@@ -105,6 +105,12 @@
         "lev": 0.7
       },
       {
+        "id": 694680,
+        "name": "Trevor Martin",
+        "role": "MR",
+        "lev": 0.5
+      },
+      {
         "id": 693855,
         "name": "Ian Seymour",
         "role": "LR",
@@ -673,7 +679,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.95,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 0.8339081358331921,
           "bb": 1.1925000000000001,
@@ -717,7 +723,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.92,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 0.9189746343881682,
           "bb": 1.1925000000000001,
@@ -792,6 +798,50 @@
           "CH": 0.23643410626550382,
           "SI": 0.5930232557151162,
           "FC": 0.005813953654069772
+        },
+        "pitch_type_whiff_mult": {},
+        "pitch_type_inplay_mult": {},
+        "pitch_type_hr_mult": {}
+      },
+      {
+        "id": 694680,
+        "name": "Trevor Martin",
+        "throw": "R",
+        "role": "MR",
+        "leverage_skill": 0.5,
+        "stamina_pitches": 27,
+        "availability_mult": 1.0,
+        "platoon_mult_vs_lhb": {
+          "k": 0.9410714285714286,
+          "bb": 0.9410714285714286,
+          "hr": 0.78,
+          "inplay": 0.9429951222799761
+        },
+        "platoon_mult_vs_rhb": {
+          "k": 1.075,
+          "bb": 1.0750000000000002,
+          "hr": 1.275,
+          "inplay": 1.0979364464251113
+        },
+        "statcast_quality_mult": {},
+        "arsenal_source": "statsapi_pitchArsenal",
+        "arsenal_sample_size": 166,
+        "statcast_splits_found": false,
+        "statcast_splits_source": "",
+        "statcast_splits_n_pitches": 0,
+        "statcast_splits_start_date": "",
+        "statcast_splits_end_date": "",
+        "k_rate": 0.12,
+        "bb_rate": 0.08,
+        "hbp_rate": 0.04,
+        "hr_rate": 0.08,
+        "inplay_hit_rate": 0.33953947368421056,
+        "arsenal": {
+          "FF": 0.4397590376867469,
+          "CU": 0.04216867181927718,
+          "SI": 0.06024096331325302,
+          "FC": 0.2409638532530121,
+          "FS": 0.21686747392771072
         },
         "pitch_type_whiff_mult": {},
         "pitch_type_inplay_mult": {},
@@ -1374,7 +1424,7 @@
         "role": "SU",
         "leverage_skill": 0.7,
         "stamina_pitches": 25,
-        "availability_mult": 0.95,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 1.0168828836021075,
           "bb": 0.8225541156365708,
@@ -1418,7 +1468,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.895,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 1.132045026061883,
           "bb": 1.073479318734793,
@@ -1635,7 +1685,7 @@
         "role": "CL",
         "leverage_skill": 0.85,
         "stamina_pitches": 25,
-        "availability_mult": 0.91,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 0.9452763819095478,
           "bb": 0.8851434878587197,
@@ -1678,7 +1728,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.955,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 0.9578859197515731,
           "bb": 0.8075,
@@ -1722,7 +1772,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.945,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 1.0460887140828146,
           "bb": 1.0339197324414717,

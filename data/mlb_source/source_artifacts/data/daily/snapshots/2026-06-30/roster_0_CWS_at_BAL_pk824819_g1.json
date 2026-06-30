@@ -544,7 +544,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.965,
+        "availability_mult": 0.9,
         "platoon_mult_vs_lhb": {
           "k": 0.8797129328203611,
           "bb": 1.1925000000000001,
@@ -589,7 +589,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.935,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 1.1422320550639136,
           "bb": 1.0383476599808978,
@@ -677,7 +677,7 @@
         "role": "CL",
         "leverage_skill": 0.85,
         "stamina_pitches": 25,
-        "availability_mult": 0.91,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 1.055289439338862,
           "bb": 0.9270298248559118,
@@ -721,7 +721,7 @@
         "role": "SU",
         "leverage_skill": 0.7,
         "stamina_pitches": 25,
-        "availability_mult": 0.92,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 0.8075,
           "bb": 1.1048340108797952,
@@ -762,7 +762,7 @@
         "throw": "L",
         "role": "MR",
         "leverage_skill": 0.5,
-        "stamina_pitches": 25,
+        "stamina_pitches": 24,
         "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 0.8075,
@@ -807,7 +807,7 @@
         "role": "SU",
         "leverage_skill": 0.7,
         "stamina_pitches": 25,
-        "availability_mult": 0.925,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 1.0186705257925373,
           "bb": 1.1201436130007558,
@@ -908,6 +908,12 @@
         "lev": 0.5
       },
       {
+        "id": 677020,
+        "name": "Josh Walker",
+        "role": "MR",
+        "lev": 0.5
+      },
+      {
         "id": 670329,
         "name": "Rico Garcia",
         "role": "SU",
@@ -930,12 +936,6 @@
         "name": "Yennier Cano",
         "role": "MR",
         "lev": 0.5
-      },
-      {
-        "id": 669211,
-        "name": "Keegan Akin",
-        "role": "LR",
-        "lev": 0.35
       }
     ],
     "lineup": [
@@ -1295,25 +1295,25 @@
         "pos": "RF",
         "bat": "L",
         "throw": "R",
-        "k_rate": 0.2536972445064527,
-        "bb_rate": 0.13004011161492848,
+        "k_rate": 0.2627480158730159,
+        "bb_rate": 0.1261904761904762,
         "hbp_rate": 0.0,
-        "hr_rate": 0.013934426229508197,
-        "inplay_hit_rate": 0.3018961038961039,
+        "hr_rate": 0.013492063492063491,
+        "inplay_hit_rate": 0.2954683544303797,
         "xb_hit_share": 0.28,
         "vs_pitch_type": {},
         "vs_pitch_type_hr": {},
         "platoon_mult_vs_lhp": {
-          "k": 0.9317640903431789,
+          "k": 0.9733150840098168,
           "bb": 0.8075,
           "hr": 0.78,
-          "inplay": 1.0105596330882403
+          "inplay": 0.9818432745388448
         },
         "platoon_mult_vs_rhp": {
-          "k": 0.9919846016360763,
-          "bb": 1.0193509534788956,
-          "hr": 1.209049773755656,
-          "inplay": 0.9908524584874817
+          "k": 0.983188953519436,
+          "bb": 1.0256496974012104,
+          "hr": 1.2191453940066594,
+          "inplay": 0.9941165808743566
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -1372,7 +1372,7 @@
         "role": "SU",
         "leverage_skill": 0.7,
         "stamina_pitches": 31,
-        "availability_mult": 0.815,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 0.9152653441237556,
           "bb": 1.0204313467237405,
@@ -1458,7 +1458,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.955,
+        "availability_mult": 0.8,
         "platoon_mult_vs_lhb": {
           "k": 0.9679386088425795,
           "bb": 0.8075,
@@ -1496,13 +1496,55 @@
         "pitch_type_hr_mult": {}
       },
       {
+        "id": 677020,
+        "name": "Josh Walker",
+        "throw": "L",
+        "role": "MR",
+        "leverage_skill": 0.5,
+        "stamina_pitches": 24,
+        "availability_mult": 0.9083333333333333,
+        "platoon_mult_vs_lhb": {
+          "k": 1.1466666666666667,
+          "bb": 0.9725000000000001,
+          "hr": 0.78,
+          "inplay": 0.8533333333333334
+        },
+        "platoon_mult_vs_rhb": {
+          "k": 0.837037037037037,
+          "bb": 1.0305555555555557,
+          "hr": 1.275,
+          "inplay": 1.1222222222222222
+        },
+        "statcast_quality_mult": {},
+        "arsenal_source": "statsapi_pitchArsenal",
+        "arsenal_sample_size": 80,
+        "statcast_splits_found": false,
+        "statcast_splits_source": "",
+        "statcast_splits_n_pitches": 0,
+        "statcast_splits_start_date": "",
+        "statcast_splits_end_date": "",
+        "k_rate": 0.3157894736842105,
+        "bb_rate": 0.10526315789473682,
+        "hbp_rate": 0.0,
+        "hr_rate": 0.05263157894736841,
+        "inplay_hit_rate": 0.2727272727272727,
+        "arsenal": {
+          "FF": 0.1875,
+          "SI": 0.2375,
+          "SL": 0.575
+        },
+        "pitch_type_whiff_mult": {},
+        "pitch_type_inplay_mult": {},
+        "pitch_type_hr_mult": {}
+      },
+      {
         "id": 670329,
         "name": "Rico Garcia",
         "throw": "R",
         "role": "SU",
         "leverage_skill": 0.7,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.95,
         "platoon_mult_vs_lhb": {
           "k": 1.104924076437975,
           "bb": 1.144400606022347,
@@ -1588,7 +1630,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.92,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 0.9728032091736911,
           "bb": 0.8745308331133191,
@@ -1632,7 +1674,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.8666666666666667,
         "platoon_mult_vs_lhb": {
           "k": 0.8075,
           "bb": 1.1447368421052633,
@@ -1664,48 +1706,6 @@
           "SI": 0.5036319474818404,
           "SL": 0.00968522995157385,
           "FS": 0.2857142985714285
-        },
-        "pitch_type_whiff_mult": {},
-        "pitch_type_inplay_mult": {},
-        "pitch_type_hr_mult": {}
-      },
-      {
-        "id": 669211,
-        "name": "Keegan Akin",
-        "throw": "L",
-        "role": "LR",
-        "leverage_skill": 0.35,
-        "stamina_pitches": 25,
-        "availability_mult": 1.0,
-        "platoon_mult_vs_lhb": {
-          "k": 0.916506630086877,
-          "bb": 0.8075,
-          "hr": 1.275,
-          "inplay": 0.9283218758399504
-        },
-        "platoon_mult_vs_rhb": {
-          "k": 1.1382884706199825,
-          "bb": 1.1243550374894142,
-          "hr": 0.824799099967856,
-          "inplay": 1.1366576262057955
-        },
-        "statcast_quality_mult": {},
-        "arsenal_source": "statsapi_pitchArsenal",
-        "arsenal_sample_size": 408,
-        "statcast_splits_found": false,
-        "statcast_splits_source": "",
-        "statcast_splits_n_pitches": 0,
-        "statcast_splits_start_date": "",
-        "statcast_splits_end_date": "",
-        "k_rate": 0.13099730458221023,
-        "bb_rate": 0.08022237196765498,
-        "hbp_rate": 0.0,
-        "hr_rate": 0.024056603773584907,
-        "inplay_hit_rate": 0.3025929806181247,
-        "arsenal": {
-          "FF": 0.49509803485294107,
-          "CH": 0.26225490786764727,
-          "SL": 0.24264705727941174
         },
         "pitch_type_whiff_mult": {},
         "pitch_type_inplay_mult": {},

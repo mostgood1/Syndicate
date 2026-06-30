@@ -1,19 +1,19 @@
 {
-  "recordedAt": "2026-06-29T07:53:06+00:00",
-  "date": "2026-06-29",
+  "recordedAt": "2026-06-30T07:32:14+00:00",
+  "date": "2026-06-30",
   "counts": {
-    "games": 13,
+    "games": 15,
     "live": 0,
     "final": 0,
-    "pregame": 13,
-    "props": 15,
+    "pregame": 15,
+    "props": 20,
     "archivedLiveProps": 0
   },
   "marketsRefreshed": true,
-  "reportPath": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\live_lens\\live_lens_report_2026_06_29.json",
-  "syncPath": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\live_lens\\render_sync\\live_lens_reports_2026_06_29.json",
-  "logPath": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\live_lens\\live_lens_2026_06_29.jsonl",
-  "propObservationLogPath": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\live_lens\\prop_registry\\live_prop_observations_2026_06_29.jsonl",
+  "reportPath": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\live_lens\\live_lens_report_2026_06_30.json",
+  "syncPath": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\live_lens\\render_sync\\live_lens_reports_2026_06_30.json",
+  "logPath": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\live_lens\\live_lens_2026_06_30.jsonl",
+  "propObservationLogPath": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\live_lens\\prop_registry\\live_prop_observations_2026_06_30.jsonl",
   "trigger": "syndicate_refresh",
   "reused": false,
   "synced": true

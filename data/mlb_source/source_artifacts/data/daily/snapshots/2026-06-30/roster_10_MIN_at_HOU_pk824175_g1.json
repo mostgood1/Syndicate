@@ -69,8 +69,8 @@
     },
     "bullpen": [
       {
-        "id": 607455,
-        "name": "Anthony Banda",
+        "id": 689520,
+        "name": "Cody Laweryson",
         "role": "MR",
         "lev": 0.5
       },
@@ -545,43 +545,42 @@
     },
     "bullpen_profiles": [
       {
-        "id": 607455,
-        "name": "Anthony Banda",
-        "throw": "L",
+        "id": 689520,
+        "name": "Cody Laweryson",
+        "throw": "R",
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.9299999999999999,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
-          "k": 1.0094948520949332,
-          "bb": 1.0800686562981645,
-          "hr": 1.1766968325791856,
-          "inplay": 1.0592049629167533
+          "k": 1.0572342793544798,
+          "bb": 1.1362893081761007,
+          "hr": 1.2272079772079774,
+          "inplay": 0.9666629389398345
         },
         "platoon_mult_vs_rhb": {
-          "k": 0.9951867826850977,
-          "bb": 0.955610650115811,
-          "hr": 1.0331517792302107,
-          "inplay": 0.9799001748447499
+          "k": 0.9893199191635181,
+          "bb": 0.8563555114200596,
+          "hr": 0.78,
+          "inplay": 1.01212927756654
         },
         "statcast_quality_mult": {},
         "arsenal_source": "statsapi_pitchArsenal",
-        "arsenal_sample_size": 583,
+        "arsenal_sample_size": 259,
         "statcast_splits_found": false,
         "statcast_splits_source": "",
         "statcast_splits_n_pitches": 0,
         "statcast_splits_start_date": "",
         "statcast_splits_end_date": "",
-        "k_rate": 0.21172945205479451,
-        "bb_rate": 0.09400684931506849,
-        "hbp_rate": 0.04794520547945205,
-        "hr_rate": 0.011643835616438355,
-        "inplay_hit_rate": 0.2794430538172716,
+        "k_rate": 0.24153225806451611,
+        "bb_rate": 0.10685483870967741,
+        "hbp_rate": 0.029411764705882353,
+        "hr_rate": 0.047177419354838705,
+        "inplay_hit_rate": 0.3130952380952381,
         "arsenal": {
-          "FF": 0.26415094867924527,
-          "CH": 0.060034304699828483,
-          "SI": 0.260720398696398,
-          "SL": 0.41509434792452826
+          "FF": 0.6795366932046331,
+          "CH": 0.14671813853281862,
+          "FC": 0.17374516826254832
         },
         "pitch_type_whiff_mult": {},
         "pitch_type_inplay_mult": {},
@@ -757,7 +756,7 @@
         "role": "SU",
         "leverage_skill": 0.7,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.7083333333333333,
         "platoon_mult_vs_lhb": {
           "k": 0.9425046431414168,
           "bb": 1.1925000000000001,
@@ -801,7 +800,7 @@
         "role": "CL",
         "leverage_skill": 0.85,
         "stamina_pitches": 25,
-        "availability_mult": 0.98,
+        "availability_mult": 0.9416666666666667,
         "platoon_mult_vs_lhb": {
           "k": 1.0940090186815548,
           "bb": 0.9976149176062445,
@@ -845,7 +844,7 @@
         "role": "LR",
         "leverage_skill": 0.35,
         "stamina_pitches": 25,
-        "availability_mult": 0.925,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 0.9691264940254603,
           "bb": 1.0005128435720607,
@@ -958,6 +957,12 @@
         "name": "Josh Hader",
         "role": "SU",
         "lev": 0.7
+      },
+      {
+        "id": 699044,
+        "name": "Miguel Ullola",
+        "role": "MR",
+        "lev": 0.5
       },
       {
         "id": 663878,
@@ -1295,30 +1300,30 @@
         "vs_pitcher_history": {}
       },
       {
-        "id": 669384,
-        "name": "Raynel Delgado",
-        "pos": "2B",
-        "bat": "L",
+        "id": 669397,
+        "name": "Nick Allen",
+        "pos": "SS",
+        "bat": "R",
         "throw": "R",
-        "k_rate": 0.13636363636363635,
-        "bb_rate": 0.0,
-        "hbp_rate": 0.0,
-        "hr_rate": 0.0,
-        "inplay_hit_rate": 0.3157894736842105,
-        "xb_hit_share": 0.05,
+        "k_rate": 0.20636363636363636,
+        "bb_rate": 0.03642857142857143,
+        "hbp_rate": 0.014285714285714285,
+        "hr_rate": 0.01668831168831169,
+        "inplay_hit_rate": 0.30953846153846154,
+        "xb_hit_share": 0.11764705882352941,
         "vs_pitch_type": {},
         "vs_pitch_type_hr": {},
         "platoon_mult_vs_lhp": {
-          "k": 1.1222222222222222,
-          "bb": 1.0,
-          "hr": 1.0,
-          "inplay": 0.8075
+          "k": 0.8307426054122089,
+          "bb": 0.8075,
+          "hr": 1.275,
+          "inplay": 1.0771196351303942
         },
         "platoon_mult_vs_rhp": {
-          "k": 0.9541666666666667,
-          "bb": 1.0,
-          "hr": 1.0,
-          "inplay": 1.0720238095238095
+          "k": 1.0483098085048999,
+          "bb": 1.1925000000000001,
+          "hr": 0.78,
+          "inplay": 0.957668276057938
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -1449,7 +1454,7 @@
         "role": "CL",
         "leverage_skill": 0.85,
         "stamina_pitches": 25,
-        "availability_mult": 0.925,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 0.9039429717086211,
           "bb": 1.1925000000000001,
@@ -1491,7 +1496,7 @@
         "role": "SU",
         "leverage_skill": 0.7,
         "stamina_pitches": 25,
-        "availability_mult": 0.96,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 1.0735138662738104,
           "bb": 1.046069238478656,
@@ -1534,7 +1539,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.875,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 0.8618564742589704,
           "bb": 0.8075,
@@ -1576,7 +1581,7 @@
         "role": "SU",
         "leverage_skill": 0.7,
         "stamina_pitches": 25,
-        "availability_mult": 0.855,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 0.8448717948717949,
           "bb": 0.8075,
@@ -1611,13 +1616,54 @@
         "pitch_type_hr_mult": {}
       },
       {
+        "id": 699044,
+        "name": "Miguel Ullola",
+        "throw": "R",
+        "role": "MR",
+        "leverage_skill": 0.5,
+        "stamina_pitches": 25,
+        "availability_mult": 0.75,
+        "platoon_mult_vs_lhb": {
+          "k": 0.89,
+          "bb": 1.0,
+          "hr": 1.0,
+          "inplay": 0.8166666666666667
+        },
+        "platoon_mult_vs_rhb": {
+          "k": 1.1833333333333333,
+          "bb": 1.0,
+          "hr": 1.0,
+          "inplay": 1.1925000000000001
+        },
+        "statcast_quality_mult": {},
+        "arsenal_source": "statsapi_pitchArsenal",
+        "arsenal_sample_size": 30,
+        "statcast_splits_found": false,
+        "statcast_splits_source": "",
+        "statcast_splits_n_pitches": 0,
+        "statcast_splits_start_date": "",
+        "statcast_splits_end_date": "",
+        "k_rate": 0.5,
+        "bb_rate": 0.0,
+        "hbp_rate": 0.0,
+        "hr_rate": 0.0,
+        "inplay_hit_rate": 0.5,
+        "arsenal": {
+          "FF": 0.7666666653333333,
+          "SL": 0.2333333346666667
+        },
+        "pitch_type_whiff_mult": {},
+        "pitch_type_inplay_mult": {},
+        "pitch_type_hr_mult": {}
+      },
+      {
         "id": 663878,
         "name": "Nate Pearson",
         "throw": "R",
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.85,
         "platoon_mult_vs_lhb": {
           "k": 1.0019178612940722,
           "bb": 0.8472023422251138,
@@ -1661,7 +1707,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.985,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 0.8500893655049151,
           "bb": 0.8990189932927974,

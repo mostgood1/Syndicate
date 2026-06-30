@@ -593,7 +593,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.87,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 0.8585183579398946,
           "bb": 1.1925000000000001,
@@ -678,7 +678,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 30,
-        "availability_mult": 1.0,
+        "availability_mult": 0.6166666666666667,
         "platoon_mult_vs_lhb": {
           "k": 1.153259559486105,
           "bb": 0.9926383595432027,
@@ -721,7 +721,7 @@
         "role": "CL",
         "leverage_skill": 0.85,
         "stamina_pitches": 25,
-        "availability_mult": 0.905,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 0.9763347616528195,
           "bb": 1.0126491646778042,
@@ -807,7 +807,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.88,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 0.8969727752945957,
           "bb": 0.9945544554455447,
@@ -1239,6 +1239,35 @@
     ],
     "bench": [
       {
+        "id": 671083,
+        "name": "Buddy Kennedy",
+        "pos": "1B",
+        "bat": "R",
+        "throw": "R",
+        "k_rate": 0.375,
+        "bb_rate": 0.125,
+        "hbp_rate": 0.0,
+        "hr_rate": 0.0,
+        "inplay_hit_rate": 0.0,
+        "xb_hit_share": 0.22,
+        "vs_pitch_type": {},
+        "vs_pitch_type_hr": {},
+        "platoon_mult_vs_lhp": {
+          "k": 0.9388888888888889,
+          "bb": 1.1833333333333333,
+          "hr": 1.0,
+          "inplay": 1.0
+        },
+        "platoon_mult_vs_rhp": {
+          "k": 1.1833333333333333,
+          "bb": 0.8075,
+          "hr": 1.0,
+          "inplay": 1.0
+        },
+        "statcast_quality_mult": {},
+        "vs_pitcher_history": {}
+      },
+      {
         "id": 686527,
         "name": "Dominic Canzone",
         "pos": "DH",
@@ -1263,35 +1292,6 @@
           "bb": 0.9187357904719837,
           "hr": 0.9839518463906319,
           "inplay": 1.0212679856115108
-        },
-        "statcast_quality_mult": {},
-        "vs_pitcher_history": {}
-      },
-      {
-        "id": 608701,
-        "name": "Rob Refsnyder",
-        "pos": "DH",
-        "bat": "R",
-        "throw": "R",
-        "k_rate": 0.25345475910693305,
-        "bb_rate": 0.05579318448883666,
-        "hbp_rate": 0.02608695652173913,
-        "hr_rate": 0.026227967097532313,
-        "inplay_hit_rate": 0.15635135135135136,
-        "xb_hit_share": 0.05,
-        "vs_pitch_type": {},
-        "vs_pitch_type_hr": {},
-        "platoon_mult_vs_lhp": {
-          "k": 1.027130988820638,
-          "bb": 1.079223502841062,
-          "hr": 1.1192547471974377,
-          "inplay": 0.9776577355229039
-        },
-        "platoon_mult_vs_rhp": {
-          "k": 1.0700035765615996,
-          "bb": 0.9194207084687287,
-          "hr": 0.78,
-          "inplay": 0.95253117668848
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -1450,7 +1450,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.95,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 0.9986836576230931,
           "bb": 1.1526000497141438,
@@ -1493,7 +1493,7 @@
         "role": "SU",
         "leverage_skill": 0.7,
         "stamina_pitches": 25,
-        "availability_mult": 0.935,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 1.107320793726835,
           "bb": 0.8075,
@@ -1537,7 +1537,7 @@
         "role": "SU",
         "leverage_skill": 0.7,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.8416666666666667,
         "platoon_mult_vs_lhb": {
           "k": 1.036940778524456,
           "bb": 0.8075,
@@ -1579,8 +1579,8 @@
         "throw": "L",
         "role": "MR",
         "leverage_skill": 0.5,
-        "stamina_pitches": 25,
-        "availability_mult": 0.91,
+        "stamina_pitches": 23,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 1.1925000000000001,
           "bb": 0.965625,
@@ -1623,7 +1623,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.895,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 1.05,
           "bb": 0.8075,

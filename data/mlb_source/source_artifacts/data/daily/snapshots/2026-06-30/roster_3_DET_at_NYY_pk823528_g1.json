@@ -538,7 +538,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.8083333333333333,
         "platoon_mult_vs_lhb": {
           "k": 1.00391532409142,
           "bb": 0.8075,
@@ -581,7 +581,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.975,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 0.8075,
           "bb": 1.1925000000000001,
@@ -624,7 +624,7 @@
         "role": "CL",
         "leverage_skill": 0.85,
         "stamina_pitches": 25,
-        "availability_mult": 0.86,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 1.1407951333415263,
           "bb": 1.1925000000000001,
@@ -666,7 +666,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.865,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 0.8952648322689395,
           "bb": 0.949063341529095,
@@ -751,7 +751,7 @@
         "role": "SU",
         "leverage_skill": 0.7,
         "stamina_pitches": 28,
-        "availability_mult": 1.0,
+        "availability_mult": 0.9333333333333333,
         "platoon_mult_vs_lhb": {
           "k": 0.9184085903083701,
           "bb": 0.8804807692307692,
@@ -846,38 +846,32 @@
         "lev": 0.7
       },
       {
-        "id": 670280,
-        "name": "David Bednar",
-        "role": "CL",
-        "lev": 0.85
-      },
-      {
         "id": 518585,
         "name": "Fernando Cruz",
         "role": "MR",
         "lev": 0.5
       },
       {
-        "id": 621112,
-        "name": "Paul Blackburn",
+        "id": 656234,
+        "name": "Jake Bird",
         "role": "MR",
         "lev": 0.5
       },
       {
-        "id": 642232,
-        "name": "Ryan Yarbrough",
+        "id": 621112,
+        "name": "Paul Blackburn",
         "role": "SU",
         "lev": 0.7
       },
       {
-        "id": 657612,
-        "name": "Tim Hill",
-        "role": "MR",
-        "lev": 0.5
+        "id": 642232,
+        "name": "Ryan Yarbrough",
+        "role": "CL",
+        "lev": 0.85
       },
       {
-        "id": 660787,
-        "name": "Yerry De los Santos",
+        "id": 657612,
+        "name": "Tim Hill",
         "role": "MR",
         "lev": 0.5
       }
@@ -1305,7 +1299,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.925,
         "platoon_mult_vs_lhb": {
           "k": 1.049964851938792,
           "bb": 1.0531485629554846,
@@ -1348,7 +1342,7 @@
         "role": "SU",
         "leverage_skill": 0.7,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.875,
         "platoon_mult_vs_lhb": {
           "k": 0.9204202340938995,
           "bb": 1.008651026392962,
@@ -1385,55 +1379,13 @@
         "pitch_type_hr_mult": {}
       },
       {
-        "id": 670280,
-        "name": "David Bednar",
-        "throw": "R",
-        "role": "CL",
-        "leverage_skill": 0.85,
-        "stamina_pitches": 25,
-        "availability_mult": 0.835,
-        "platoon_mult_vs_lhb": {
-          "k": 0.9535188294122046,
-          "bb": 1.1008705259348153,
-          "hr": 1.0544891640866874,
-          "inplay": 0.9985372340425531
-        },
-        "platoon_mult_vs_rhb": {
-          "k": 1.0008190830842603,
-          "bb": 0.9853480516346965,
-          "hr": 1.146078431372549,
-          "inplay": 1.0768996960486321
-        },
-        "statcast_quality_mult": {},
-        "arsenal_source": "statsapi_pitchArsenal",
-        "arsenal_sample_size": 580,
-        "statcast_splits_found": false,
-        "statcast_splits_source": "",
-        "statcast_splits_n_pitches": 0,
-        "statcast_splits_start_date": "",
-        "statcast_splits_end_date": "",
-        "k_rate": 0.2874507042253521,
-        "bb_rate": 0.07783098591549296,
-        "hbp_rate": 0.007042253521126761,
-        "hr_rate": 0.011971830985915493,
-        "inplay_hit_rate": 0.31333333333333335,
-        "arsenal": {
-          "FF": 0.40517241215517236,
-          "CU": 0.2258620767758623,
-          "FS": 0.36896551106896536
-        },
-        "pitch_type_whiff_mult": {},
-        "pitch_type_inplay_mult": {},
-        "pitch_type_hr_mult": {}
-      },
-      {
         "id": 518585,
         "name": "Fernando Cruz",
         "throw": "R",
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.95,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 0.9435194416749751,
           "bb": 1.0458960328317375,
@@ -1470,13 +1422,56 @@
         "pitch_type_hr_mult": {}
       },
       {
-        "id": 621112,
-        "name": "Paul Blackburn",
+        "id": 656234,
+        "name": "Jake Bird",
         "throw": "R",
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.9299999999999999,
+        "availability_mult": 0.8833333333333333,
+        "platoon_mult_vs_lhb": {
+          "k": 0.901686823007004,
+          "bb": 0.9391139037861203,
+          "hr": 0.8250959147969675,
+          "inplay": 1.1457367876908107
+        },
+        "platoon_mult_vs_rhb": {
+          "k": 1.0215221025802905,
+          "bb": 0.9915189649060616,
+          "hr": 0.9483417153731141,
+          "inplay": 0.925689803676973
+        },
+        "statcast_quality_mult": {},
+        "arsenal_source": "statsapi_pitchArsenal",
+        "arsenal_sample_size": 414,
+        "statcast_splits_found": false,
+        "statcast_splits_source": "",
+        "statcast_splits_n_pitches": 0,
+        "statcast_splits_start_date": "",
+        "statcast_splits_end_date": "",
+        "k_rate": 0.27495499549954994,
+        "bb_rate": 0.07254725472547255,
+        "hbp_rate": 0.0297029702970297,
+        "hr_rate": 0.0472997299729973,
+        "inplay_hit_rate": 0.3764423076923077,
+        "arsenal": {
+          "FF": 0.1352657,
+          "OTHER": 0.3937198,
+          "CU": 0.13043478,
+          "SI": 0.34057972
+        },
+        "pitch_type_whiff_mult": {},
+        "pitch_type_inplay_mult": {},
+        "pitch_type_hr_mult": {}
+      },
+      {
+        "id": 621112,
+        "name": "Paul Blackburn",
+        "throw": "R",
+        "role": "SU",
+        "leverage_skill": 0.7,
+        "stamina_pitches": 25,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 0.9912460615916252,
           "bb": 1.149982912242158,
@@ -1519,10 +1514,10 @@
         "id": 642232,
         "name": "Ryan Yarbrough",
         "throw": "L",
-        "role": "SU",
-        "leverage_skill": 0.7,
+        "role": "CL",
+        "leverage_skill": 0.85,
         "stamina_pitches": 26,
-        "availability_mult": 1.0,
+        "availability_mult": 0.8416666666666667,
         "platoon_mult_vs_lhb": {
           "k": 0.9412007184789852,
           "bb": 1.1482818899210867,
@@ -1566,7 +1561,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.925,
         "platoon_mult_vs_lhb": {
           "k": 1.078626561951799,
           "bb": 0.8075,
@@ -1596,49 +1591,6 @@
           "FF": 0.08651399496183207,
           "SI": 0.7989821904122137,
           "SL": 0.11450381462595423
-        },
-        "pitch_type_whiff_mult": {},
-        "pitch_type_inplay_mult": {},
-        "pitch_type_hr_mult": {}
-      },
-      {
-        "id": 660787,
-        "name": "Yerry De los Santos",
-        "throw": "R",
-        "role": "MR",
-        "leverage_skill": 0.5,
-        "stamina_pitches": 25,
-        "availability_mult": 1.0,
-        "platoon_mult_vs_lhb": {
-          "k": 1.1925000000000001,
-          "bb": 1.0916666666666668,
-          "hr": 1.275,
-          "inplay": 1.1925000000000001
-        },
-        "platoon_mult_vs_rhb": {
-          "k": 0.835,
-          "bb": 0.9633333333333334,
-          "hr": 0.78,
-          "inplay": 0.9450000000000001
-        },
-        "statcast_quality_mult": {},
-        "arsenal_source": "statsapi_pitchArsenal",
-        "arsenal_sample_size": 98,
-        "statcast_splits_found": false,
-        "statcast_splits_source": "",
-        "statcast_splits_n_pitches": 0,
-        "statcast_splits_start_date": "",
-        "statcast_splits_end_date": "",
-        "k_rate": 0.2857142857142857,
-        "bb_rate": 0.14285714285714285,
-        "hbp_rate": 0.0,
-        "hr_rate": 0.047619047619047616,
-        "inplay_hit_rate": 0.3333333333333333,
-        "arsenal": {
-          "FF": 0.04081632616326531,
-          "CH": 0.24489796097959188,
-          "SI": 0.6632653026530613,
-          "SL": 0.05102041020408165
         },
         "pitch_type_whiff_mult": {},
         "pitch_type_inplay_mult": {},

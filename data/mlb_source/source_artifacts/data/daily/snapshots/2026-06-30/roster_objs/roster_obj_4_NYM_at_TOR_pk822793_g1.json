@@ -2042,7 +2042,7 @@
           "arsenal_sample_size": 480,
           "stamina_pitches": 25,
           "role": "SU",
-          "availability_mult": 0.955,
+          "availability_mult": 1.0,
           "platoon_mult_vs_lhb": {
             "k": 0.8771383684394274,
             "bb": 0.9134343434343434,
@@ -2192,6 +2192,70 @@
           "bb_pu_rate": 0.11,
           "bb_inplay_n": 0,
           "leverage_skill": 0.85
+        },
+        {
+          "player": {
+            "mlbam_id": 680702,
+            "full_name": "Joey Gerber",
+            "primary_position": "P",
+            "bat_side": "R",
+            "throw_side": "R"
+          },
+          "k_rate": 0.4166666666666667,
+          "bb_rate": 0.08333333333333333,
+          "hbp_rate": 0.0,
+          "hr_rate": 0.0,
+          "inplay_hit_rate": 0.3333333333333333,
+          "batters_faced": 12.0,
+          "balls_in_play": 6.0,
+          "arsenal": {
+            "FF": 0.6315789378947363,
+            "SL": 0.05263158315789498,
+            "FC": 0.3157894789473687
+          },
+          "pitch_type_whiff_mult": {},
+          "pitch_type_inplay_mult": {},
+          "pitch_type_hr_mult": {},
+          "statcast_splits_source": "",
+          "statcast_splits_n_pitches": 0,
+          "statcast_splits_start_date": "",
+          "statcast_splits_end_date": "",
+          "arsenal_source": "statsapi_pitchArsenal",
+          "arsenal_sample_size": 57,
+          "stamina_pitches": 26,
+          "role": "MR",
+          "availability_mult": 0.925,
+          "platoon_mult_vs_lhb": {
+            "k": 0.8899999999999999,
+            "bb": 0.8075,
+            "hr": 1.0,
+            "inplay": 0.8625
+          },
+          "platoon_mult_vs_rhb": {
+            "k": 1.1099999999999999,
+            "bb": 1.1925000000000001,
+            "hr": 1.0,
+            "inplay": 1.1925000000000001
+          },
+          "venue_mult_home": {},
+          "venue_mult_away": {
+            "k": 1.0,
+            "bb": 1.0,
+            "hr": 1.0,
+            "inplay": 1.0
+          },
+          "vs_venue_hr_mult": {},
+          "vs_venue_k_mult": {},
+          "vs_venue_bb_mult": {},
+          "vs_venue_inplay_mult": {},
+          "vs_venue_history": {},
+          "statcast_quality_mult": {},
+          "bb_gb_rate": 0.44,
+          "bb_fb_rate": 0.25,
+          "bb_ld_rate": 0.2,
+          "bb_pu_rate": 0.11,
+          "bb_inplay_n": 0,
+          "leverage_skill": 0.5
         },
         {
           "player": {
@@ -4152,7 +4216,7 @@
           "arsenal_sample_size": 211,
           "stamina_pitches": 25,
           "role": "MR",
-          "availability_mult": 0.875,
+          "availability_mult": 1.0,
           "platoon_mult_vs_lhb": {
             "k": 1.0953978731206453,
             "bb": 0.8985219164118247,
@@ -4222,7 +4286,7 @@
           "arsenal_sample_size": 647,
           "stamina_pitches": 25,
           "role": "SU",
-          "availability_mult": 0.88,
+          "availability_mult": 1.0,
           "platoon_mult_vs_lhb": {
             "k": 1.023725910524897,
             "bb": 1.1835991301196085,
@@ -4309,7 +4373,7 @@
           "arsenal_sample_size": 669,
           "stamina_pitches": 25,
           "role": "CL",
-          "availability_mult": 0.885,
+          "availability_mult": 0.8083333333333333,
           "platoon_mult_vs_lhb": {
             "k": 0.9256795468602493,
             "bb": 0.8913395672501904,
@@ -4478,7 +4542,7 @@
           "arsenal_sample_size": 552,
           "stamina_pitches": 25,
           "role": "MR",
-          "availability_mult": 1.0,
+          "availability_mult": 0.925,
           "platoon_mult_vs_lhb": {
             "k": 1.0401640735922375,
             "bb": 1.0774085104462796,
