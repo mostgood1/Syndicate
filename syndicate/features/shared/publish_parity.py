@@ -34,8 +34,12 @@ def _normalize_paths(paths: Iterable[str] | None) -> list[str]:
     return normalized
 
 
+def _path_matches_prefix(path: str, prefix: str) -> bool:
+    return path.startswith(prefix) or f"/{prefix}" in path
+
+
 def _count_prefixed_paths(paths: list[str], prefix: str) -> int:
-    return sum(1 for path in paths if path.startswith(prefix))
+    return sum(1 for path in paths if _path_matches_prefix(path, prefix))
 
 
 def build_publish_parity_summary(

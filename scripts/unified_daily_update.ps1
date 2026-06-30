@@ -2916,11 +2916,11 @@ function Get-PublishParitySummary {
     $sports = @()
     foreach ($entry in $sportPrefixes.GetEnumerator()) {
         $prefix = [string]$entry.Value
-        $forcedCount = @($forcedPaths | Where-Object { $_.StartsWith($prefix) }).Count
-        $intelligenceCount = @($intelligencePaths | Where-Object { $_.StartsWith($prefix) }).Count
+        $forcedCount = @($forcedPaths | Where-Object { $_.StartsWith($prefix) -or $_.Contains("/$prefix") }).Count
+        $intelligenceCount = @($intelligencePaths | Where-Object { $_.StartsWith($prefix) -or $_.Contains("/$prefix") }).Count
         $totalCount = @(
             ($forcedPaths + $intelligencePaths) |
-                Where-Object { $_.StartsWith($prefix) } |
+                Where-Object { $_.StartsWith($prefix) -or $_.Contains("/$prefix") } |
                 Select-Object -Unique
         ).Count
 

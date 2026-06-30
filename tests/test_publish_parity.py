@@ -12,13 +12,13 @@ class PublishParitySummaryTests(unittest.TestCase):
         summary = build_publish_parity_summary(
             date="2026-06-14",
             forced_paths=[
-                "data/mlb_source/data/daily/daily_summary_2026_06_14.json",
-                "data/nba_source/data/processed/game_cards_2026-06-14.csv",
-                "data/nba_source/data/processed/props_edges_2026-06-14.csv",
-                "data/wnba_source/data/processed/recommendations_2026-06-14.csv",
+                "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/data/daily/daily_summary_2026_06_14.json",
+                "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/nba_source/data/processed/game_cards_2026-06-14.csv",
+                "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/nba_source/data/processed/props_edges_2026-06-14.csv",
+                "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/wnba_source/data/processed/recommendations_2026-06-14.csv",
             ],
             intelligence_paths=[
-                "reports/intelligence/example.json",
+                "C:/Users/tempadmin/OneDrive/Coding/Syndicate/reports/intelligence/example.json",
             ],
         )
 
@@ -72,7 +72,10 @@ class PublishParitySummaryTests(unittest.TestCase):
 
         self.assertEqual(snapshot["date"], "2026-06-14")
         self.assertEqual((snapshot.get("publish_parity") or {}).get("totalForcedPublishPaths"), 2)
-        self.assertEqual(snapshot["sports"][0]["odds_history"]["source_precedence"], ["artifact_history", "tracking_history"])
+        self.assertEqual(
+            snapshot["sports"][0]["odds_history"]["source_precedence"],
+            ["shared_history", "artifact_history", "tracking_history"],
+        )
 
 
 if __name__ == "__main__":
