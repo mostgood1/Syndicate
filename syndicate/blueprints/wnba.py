@@ -18,7 +18,6 @@ from syndicate.features.wnba.archive import build_archive_api_payload
 from syndicate.features.wnba.archive import build_archive_page_context
 from syndicate.features.wnba.cards import build_cards_page_context
 from syndicate.features.wnba.cards import build_source_cards_payload
-from syndicate.features.wnba.cards import build_source_cards_props_strip_payload
 from syndicate.features.wnba.cards import build_source_cards_sim_detail_payload
 from syndicate.features.wnba.cards import _public_scoreboard_source_cards_payload
 from syndicate.features.wnba.cards import build_live_lens_tuning_payload
@@ -441,22 +440,6 @@ def api_source_cards_sim_detail():
         return jsonify({"error": "missing home/away"}), 400
     selected_date = _selected_date()
     return jsonify(build_source_cards_sim_detail_payload(selected_date, away_tri, home_tri))
-
-
-@wnba_bp.get("/api/source/cards/props-strip")
-def api_source_cards_props_strip():
-    try:
-        limit = int(float(str(request.args.get("limit") or "24").strip()))
-    except Exception:
-        limit = 24
-    try:
-        per_game_limit = int(float(str(request.args.get("per_game_limit") or "8").strip()))
-    except Exception:
-        per_game_limit = 8
-    limit = max(1, min(24, limit))
-    per_game_limit = max(1, min(8, per_game_limit))
-    selected_date = _selected_date()
-    return jsonify(build_source_cards_props_strip_payload(selected_date, limit=limit, per_game_limit=per_game_limit))
 
 
 @wnba_bp.get("/game/<game_pk>")

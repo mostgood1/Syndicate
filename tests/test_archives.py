@@ -2783,24 +2783,13 @@ class DateArchiveHelperTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.get_json(), local_payload)
 
-    def test_wnba_api_source_cards_props_strip_uses_local_builder_without_source_proxy(self) -> None:
+    def test_wnba_api_source_cards_props_strip_route_is_removed(self) -> None:
         app = create_app()
         app.config.update(TESTING=True)
         client = app.test_client()
+        response = client.get("/wnba/api/source/cards/props-strip?date=2026-05-21&limit=12&per_game_limit=4")
 
-        local_payload = {"ok": True, "date": "2026-05-21", "items": [{"game_key": "GSV@NYL"}]}
-
-        with patch(
-            "syndicate.blueprints.wnba.build_source_cards_props_strip_payload",
-            return_value=local_payload,
-        ), patch(
-            "syndicate.features.wnba.source_proxy.source_web_text",
-            side_effect=AssertionError("WNBA source proxy assets should not be used for source props strip"),
-        ):
-            response = client.get("/wnba/api/source/cards/props-strip?date=2026-05-21&limit=12&per_game_limit=4")
-
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.get_json(), local_payload)
+        self.assertEqual(response.status_code, 404)
 
     def test_wnba_source_asset_routes_use_vendored_static_files_without_sibling_lookup(self) -> None:
         app = create_app()

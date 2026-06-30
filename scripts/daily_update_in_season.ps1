@@ -239,7 +239,11 @@ foreach ($sport in @('MLB', 'NBA', 'NHL', 'WNBA')) {
         checker = $check.source
         count = $check.count
     }
-    if ($check.known -and -not $check.hasGames) {
+    if ($sport -eq 'WNBA' -and $check.known -and -not $check.hasGames) {
+        $scheduledChecks[-1].skipped = $false
+        $scheduledChecks[-1].reason = 'WNBA schedule probe returned no games; keeping sport active to avoid false-negative skips'
+    }
+    if ($check.known -and -not $check.hasGames -and $sport -ne 'WNBA') {
         $activeSports[$sport] = $false
         $noSlateSkips += $sport
     }

@@ -1345,88 +1345,6 @@ def build_source_cards_sim_detail_payload(selected_date: str, away_tri: str, hom
     }
 
 
-def build_source_cards_props_strip_payload(selected_date: str, *, limit: int = 24, per_game_limit: int = 8) -> dict[str, Any]:
-    resolved_date = _resolved_source_cards_date(selected_date, allow_stored_date_fallback=True)
-    bundle = _artifact_bundle(resolved_date)
-    items: list[dict[str, Any]] = []
-    for key, game in (bundle.get("props") or {}).items():
-        if not isinstance(key, tuple) or not isinstance(game, dict):
-            continue
-        away_tri, home_tri = key
-        prop_recommendations = game.get("prop_recommendations") if isinstance(game.get("prop_recommendations"), dict) else {}
-        game_key = f"{away_tri}@{home_tri}"
-        for side_key, team_tri in (("away", away_tri), ("home", home_tri)):
-            rows = prop_recommendations.get(side_key) if isinstance(prop_recommendations.get(side_key), list) else []
-            for row in rows:
-                if not isinstance(row, dict):
-                    continue
-                picks = row.get("picks") if isinstance(row.get("picks"), list) else []
-                base_picks = picks if picks else ([row.get("best")] if isinstance(row.get("best"), dict) else [])
-                for pick in base_picks:
-                    if not isinstance(pick, dict):
-                        continue
-                    items.append(
-                        {
-                            "game_key": game_key,
-                            "away_tri": away_tri,
-                            "home_tri": home_tri,
-                            "team_tri": team_tri,
-                            "opponent_tri": home_tri if side_key == "away" else away_tri,
-                            "player": str(row.get("player") or pick.get("player") or "").strip(),
-                            "player_id": row.get("player_id") or pick.get("player_id"),
-                            "photo": row.get("player_photo") or row.get("photo"),
-                            "market": str(pick.get("market") or row.get("market") or "").strip().lower(),
-                            "side": str(pick.get("side") or row.get("side") or "").strip().upper(),
-                            "line": _safe_float(pick.get("line") or row.get("line")),
-                            "price": _safe_float(pick.get("price") or row.get("price")),
-                            "edge": _safe_float(pick.get("edge") or row.get("edge")),
-                            "ev": _safe_float(pick.get("ev") or row.get("ev")),
-                            "ev_pct": _safe_float(pick.get("ev_pct") or row.get("ev_pct")),
-                            "prob_calib": _safe_float(pick.get("prob_calib") or row.get("prob_calib") or row.get("p_win")),
-                            "book": pick.get("book") or row.get("book"),
-                            "score": _safe_float(row.get("score") or row.get("locked_policy_score") or row.get("ev_pct")),
-                            "score_adj": _safe_float(row.get("recommendation_priority_score") or row.get("basketball_priority_score") or row.get("score") or row.get("ev_pct")),
-                            "tier": row.get("tier"),
-                            "opponent": row.get("opponent") or (home_tri if side_key == "away" else away_tri),
-                            "event_id": None,
-                            "game_id": game.get("game_id"),
-                        }
-                    )
-
-    items.sort(
-        key=lambda item: (
-            float(item.get("ev_pct") or float("-inf")),
-            float(item.get("edge") or float("-inf")),
-            float(item.get("score_adj") or item.get("score") or float("-inf")),
-        ),
-        reverse=True,
-    )
-
-    selected_items: list[dict[str, Any]] = []
-    by_game_counts: dict[str, int] = {}
-    for item in items:
-        game_key = str(item.get("game_key") or "")
-        if game_key and by_game_counts.get(game_key, 0) >= per_game_limit:
-            continue
-        selected_items.append(item)
-        if game_key:
-            by_game_counts[game_key] = int(by_game_counts.get(game_key, 0) + 1)
-        if len(selected_items) >= limit:
-            break
-
-    return {
-        "ok": True,
-        "mode": "pregame",
-        "date": resolved_date,
-        "requested_date": selected_date,
-        "title": "Pregame prop movement",
-        "subtitle": "Top same-day prop cards from the saved cards props snapshot.",
-        "items": selected_items,
-        "rows": len(selected_items),
-        "source": "cards_props_snapshot",
-    }
-
-
 def get_wnba_overview(selected_date: str) -> dict[str, Any]:
     requested_date = str(selected_date or "").strip() or parse_iso_date(selected_date).isoformat()
     if has_games_for_date(requested_date) is False:
@@ -1440,7 +1358,6 @@ def get_wnba_overview(selected_date: str) -> dict[str, Any]:
         }
 
     cards_context = build_cards_page_context(requested_date, allow_stored_date_fallback=False)
-    prop_strip = build_source_cards_props_strip_payload(requested_date)
     games = list(cards_context.get("games") or [])
     if not games:
         return {
@@ -1457,7 +1374,7 @@ def get_wnba_overview(selected_date: str) -> dict[str, Any]:
         "date": str(cards_context.get("date") or requested_date).strip() or requested_date,
         "requested_date": requested_date,
         "games": games,
-        "prop_rows": list(prop_strip.get("items") or []),
+        "prop_rows": [],
         "source_title": _safe_text(cards_context.get("source_title"), "WNBA cards"),
         "source_path": _safe_text(cards_context.get("source_path"), str(processed_root() / f"game_cards_{requested_date}.csv")),
         "board_contract": cards_context.get("board_contract"),
