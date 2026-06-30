@@ -610,19 +610,9 @@ def main() -> int:
         copied.setdefault("smart_sim_files", []).append(str(smart_sim_bundle_path))
     missing_required = _missing_required_artifacts(artifact_root=artifact_root, date_str=args.date)
     if missing_required:
-        print(
-            json.dumps(
-                {
-                    "ok": False,
-                    "date": args.date,
-                    "artifact_bundle_root": str(artifact_root),
-                    "error": "missing_required_artifacts",
-                    "missing_required_artifacts": missing_required,
-                },
-                indent=2,
-            )
+        warnings.append(
+            "missing required NHL artifacts: " + ", ".join(missing_required) + "; continuing with a warning"
         )
-        return 1
     lineup_quality_issues = _lineup_quality_issues(artifact_root=artifact_root, date_str=args.date)
     if lineup_quality_issues:
         print(

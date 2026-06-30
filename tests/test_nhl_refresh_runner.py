@@ -52,6 +52,22 @@ class NhlRefreshRunnerTests(unittest.TestCase):
         self.assertEqual(rc, 0)
         self.assertEqual(calls, [("2026-05-22", "h2h,spreads,totals", "oddsapi")])
 
+    def test_main_treats_missing_required_artifacts_as_warning(self) -> None:
+        module = self._load_module()
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            argv = [
+                "refresh_nhl_oddsapi.py",
+                "--date",
+                "2026-05-22",
+                "--artifact-root",
+                str(Path(tmp_dir) / "bundle"),
+            ]
+            with patch.object(module, "_collect_owned_nhl_artifacts", side_effect=lambda **kwargs: None), patch.object(module, "_run_source_generation_multi", return_value=None), patch.object(module, "_missing_required_artifacts", return_value=["data/processed/props_predictions_2026-05-22.csv"]), patch.object(module, "_lineup_quality_issues", return_value=[]), patch("sys.argv", argv):
+                rc = module.main()
+
+        self.assertEqual(rc, 0)
+
     def test_main_materializes_nhl_artifacts_into_bundle_root(self) -> None:
         module = self._load_module()
 

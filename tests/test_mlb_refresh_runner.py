@@ -101,6 +101,40 @@ class MlbRefreshRunnerTests(unittest.TestCase):
         self.assertEqual(rc, 0)
         self.assertIn("live-lens artifacts were not fully present after refresh", stdout.getvalue())
 
+    def test_main_treats_quota_failure_as_warning(self) -> None:
+        module = self._load_module()
+
+        class _FakeOddsModule:
+            pass
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            source_root = Path(tmp_dir) / "source"
+            artifact_root = Path(tmp_dir) / "bundle"
+            source_root.mkdir(parents=True)
+            artifact_root.mkdir(parents=True)
+            argv = [
+                "refresh_mlb_oddsapi.py",
+                "--date",
+                "2026-05-22",
+                "--source-root",
+                str(source_root),
+                "--artifact-root",
+                str(artifact_root),
+                "--regions",
+                "us",
+            ]
+            stdout = io.StringIO()
+            with (
+                patch.object(module, "_load_local_fetcher", return_value=_FakeOddsModule()),
+                patch.object(module, "_refresh_source_artifacts", side_effect=RuntimeError("OddsAPI live odds request failed: Usage quota has been reached. See usage plans at https://the-odds-api.com")),
+                patch("sys.argv", argv),
+                redirect_stdout(stdout),
+            ):
+                rc = module.main()
+
+        self.assertEqual(rc, 0)
+        self.assertIn("Usage quota has been reached", stdout.getvalue())
+
     def test_reconcile_module_resolves_daily_sims_directory(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]
         module_path = repo_root / "vendor" / "mlb_bettingv2" / "tools" / "eval" / "reconcile_daily_sim_artifacts.py"

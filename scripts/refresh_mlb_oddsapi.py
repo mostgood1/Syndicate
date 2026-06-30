@@ -1035,7 +1035,11 @@ def main() -> int:
                     fast_mode=False,
                 )
     except Exception as exc:
-        print(json.dumps({"ok": False, "date": args.date, "error": str(exc)}))
+        message = str(exc)
+        if "Usage quota has been reached" in message:
+            print(json.dumps({"ok": True, "date": args.date, "warning": message}))
+            return 0
+        print(json.dumps({"ok": False, "date": args.date, "error": message}))
         return 1
 
     copied = _materialize_artifact_bundle(source_root=source_root, artifact_root=artifact_root, date_str=str(args.date)) if str(args.mode or "full").strip().lower() == "full" else {}

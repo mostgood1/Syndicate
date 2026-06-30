@@ -141,6 +141,20 @@ class NbaRefreshRunnerTests(unittest.TestCase):
         self.assertEqual(written[0].get("away_tri"), "NYK")
         self.assertEqual(written[0].get("bookmaker"), "oddsapi_consensus")
 
+    def test_export_team_advanced_stats_artifacts_skips_self_copy(self) -> None:
+        module = self._load_module()
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            source_root = Path(tmp_dir)
+            processed_root = source_root / "data" / "processed"
+            processed_root.mkdir(parents=True, exist_ok=True)
+            target_file = processed_root / "team_advanced_stats_2025.csv"
+            target_file.write_text("team_id,stat\n1,2\n", encoding="utf-8")
+
+            copied = module._export_team_advanced_stats_artifacts(source_root=source_root, processed_root=processed_root)
+
+        self.assertEqual(copied, [str(target_file)])
+
     def test_ensure_source_game_cards_export_invokes_source_cli(self) -> None:
         module = self._load_module()
 

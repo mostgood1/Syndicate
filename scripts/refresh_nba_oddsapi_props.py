@@ -100,6 +100,11 @@ def _copy_existing_processed_artifact(*, source_root: Path, processed_root: Path
 
 def _copy_file_with_fallback(source: Path, destination: Path) -> None:
     try:
+        if source.resolve() == destination.resolve():
+            return
+    except Exception:
+        pass
+    try:
         shutil.copy2(source, destination)
         return
     except OSError as exc:
