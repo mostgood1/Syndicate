@@ -554,6 +554,7 @@ def _source_cli_generation_enabled() -> bool:
 
 
 def main() -> int:
+    print("=== NHL RUNNER HIT ===", flush=True)
     parser = argparse.ArgumentParser(description="Refresh NHL OddsAPI snapshots through a Syndicate-owned runner.")
     parser.add_argument("--date", required=True)
     parser.add_argument("--source-root")
