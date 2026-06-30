@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import argparse
 import importlib.util
 import sys
@@ -169,9 +170,19 @@ class RefreshOddsSourcesTests(unittest.TestCase):
 
         sport_result = {
             "ok": True,
-            "artifact_bundle_files": {
-                "boxscores_history_path": r"C:\render\data\mlb_source\source_artifacts\data\processed\boxscores_history.csv",
-                "cards_snapshot_path": r"C:\render\data\mlb_source\source_artifacts\data\processed\cards_snapshot.json",
+            "generation": {
+                "steps": [
+                    {
+                            "stdout": json.dumps(
+                                {
+                                    "artifact_bundle_files": {
+                                        "boxscores_history_path": r"C:\render\data\mlb_source\source_artifacts\data\processed\boxscores_history.csv",
+                                        "cards_snapshot_path": r"C:\render\data\mlb_source\source_artifacts\data\processed\cards_snapshot.json",
+                                    }
+                                }
+                            ),
+                    }
+                ]
             },
         }
 

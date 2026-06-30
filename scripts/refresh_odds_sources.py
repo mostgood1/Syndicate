@@ -748,6 +748,18 @@ def _sport_artifact_paths(sport_result: dict[str, Any]) -> list[str]:
         seen.add(path_text)
         paths.append(path_text)
 
+    def walk_json_text(value: Any) -> None:
+        if not isinstance(value, str):
+            return
+        text = value.strip()
+        if not text or text[0] not in "[{":
+            return
+        try:
+            parsed = json.loads(text)
+        except Exception:
+            return
+        walk(parsed)
+
     def walk(value: Any, key_name: str = "") -> None:
         if isinstance(value, dict):
             for nested_key, nested_value in value.items():
@@ -766,6 +778,7 @@ def _sport_artifact_paths(sport_result: dict[str, Any]) -> list[str]:
                     "cwd",
                 }:
                     add_path(nested_value)
+                    walk_json_text(nested_value)
                 elif nested_key_text in {"artifact_paths", "updated_files", "signal_paths"} and isinstance(nested_value, list):
                     for item in nested_value:
                         add_path(item)
@@ -773,6 +786,8 @@ def _sport_artifact_paths(sport_result: dict[str, Any]) -> list[str]:
         elif isinstance(value, list):
             for item in value:
                 walk(item, key_name)
+        elif key_name == "stdout":
+            walk_json_text(value)
         elif isinstance(value, str) and (
             key_name in {"output", "file", "manifest", "artifact", "path"} or key_name.endswith("_path") or key_name.endswith("_paths")
         ):
