@@ -986,6 +986,7 @@ def _materialize_artifact_bundle(*, source_root: Path, artifact_root: Path, date
 
 
 def main() -> int:
+    print("=== MLB RUNNER HIT ===", flush=True)
     parser = argparse.ArgumentParser(description="Refresh MLB OddsAPI snapshots through a Syndicate-owned runner.")
     parser.add_argument("--date", required=True)
     parser.add_argument("--source-root", required=True)
