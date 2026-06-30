@@ -53,7 +53,6 @@ def _strict_artifact_path(filename: str, subdir: tuple[str, ...]) -> Path:
     raise FileNotFoundError(f"Missing WNBA artifact: {missing_path}")
 
 
-@lru_cache(maxsize=128)
 def has_games_for_date(date_str: str) -> bool | None:
     selected_date = str(date_str or "").strip()
     if not selected_date:

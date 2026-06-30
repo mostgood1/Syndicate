@@ -1279,6 +1279,10 @@ def build_source_cards_payload(selected_date: str, *, allow_stored_date_fallback
         )
         for idx, row in enumerate(rows, start=1)
     ]
+    if not games and resolved_date == central_today_iso():
+        public_games, _ = _games_from_public_scoreboard(resolved_date)
+        if public_games:
+            games = public_games
     if resolved_date == central_today_iso():
         games, _, _, _ = _supplement_games_with_live_state(games, resolved_date)
     return {
@@ -1643,6 +1647,42 @@ def _games_from_artifacts(selected_date: str) -> tuple[list[dict[str, Any]], str
     return _dedupe_wnba_games(games), str(bundle["paths"]["cards"]), str(bundle["paths"]["recommendations"])
 
 
+def _games_from_public_scoreboard(selected_date: str) -> tuple[list[dict[str, Any]], str]:
+    payload = _public_scoreboard_live_state_payload(selected_date)
+    games_payload = payload.get("games") if isinstance(payload, dict) and isinstance(payload.get("games"), list) else []
+    games: list[dict[str, Any]] = []
+    for idx, game in enumerate(games_payload, start=1):
+        if not isinstance(game, dict):
+            continue
+        away_tri = _canonical_wnba_tri(str(game.get("away") or "").strip().upper())
+        home_tri = _canonical_wnba_tri(str(game.get("home") or "").strip().upper())
+        if not away_tri or not home_tri:
+            continue
+        row = {
+            "event_id": game.get("event_id") or f"{away_tri}@{home_tri}",
+            "visitor_team": away_tri,
+            "home_team": home_tri,
+            "away_tri": away_tri,
+            "home_tri": home_tri,
+            "bookmaker": "ESPN",
+            "commence_time": selected_date,
+            "status": game.get("status") or "Scheduled",
+            "in_progress": bool(game.get("in_progress")),
+            "final": bool(game.get("final")),
+        }
+        games.append(
+            _game_from_row(
+                row,
+                idx=idx,
+                selected_date=selected_date,
+                rec_index={},
+                sim_index={},
+                props_index={},
+            )
+        )
+    return _dedupe_wnba_games(games), "espn_scoreboard_fallback"
+
+
 def _games_from_live_state_fallback(selected_date: str, ttl: int = 12) -> tuple[list[dict[str, Any]], str]:
     is_today = str(selected_date).strip() == central_today_iso()
     candidate_payloads: list[dict[str, Any] | None] = [_local_live_state_payload(selected_date)]
@@ -1921,6 +1961,14 @@ def build_cards_page_context(selected_date: str, *, allow_stored_date_fallback: 
         games = []
     source_title = "WNBA processed game cards"
     had_artifact_games = bool(games)
+    if not games and allow_stored_date_fallback and resolved_date == central_today_iso():
+        public_games, public_source_path = _games_from_public_scoreboard(resolved_date)
+        if public_games:
+            games = public_games
+            cards_path = public_source_path
+            recs_path = public_source_path
+            source_title = "WNBA live scoreboard fallback"
+            had_artifact_games = False
     if not _render_web_dyno():
         games, live_source_path, supplemented_count, updated_count = _supplement_games_with_live_state(games, resolved_date)
         if supplemented_count > 0 or updated_count > 0:
