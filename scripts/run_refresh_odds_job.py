@@ -93,14 +93,20 @@ def _update_job_status(
 def _safe_write_text(path: Path, payload: str) -> None:
     try:
         _refresh_state_store()["write_text_file"](path, payload)
+        print(f"[refresh_job_write_text_ok] path={path}", flush=True)
     except Exception:
+        print(f"[refresh_job_write_text_failed] path={path}", file=sys.stderr, flush=True)
+        print(traceback.format_exc(), file=sys.stderr, flush=True)
         pass
 
 
 def _safe_write_json(path: Path, payload: dict[str, Any]) -> None:
     try:
         _refresh_state_store()["write_text_file"](path, json.dumps(payload, indent=2))
+        print(f"[refresh_job_write_json_ok] path={path}", flush=True)
     except Exception:
+        print(f"[refresh_job_write_json_failed] path={path}", file=sys.stderr, flush=True)
+        print(traceback.format_exc(), file=sys.stderr, flush=True)
         pass
 
 
