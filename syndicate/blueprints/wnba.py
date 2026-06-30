@@ -20,6 +20,7 @@ from syndicate.features.wnba.cards import build_cards_page_context
 from syndicate.features.wnba.cards import build_source_cards_payload
 from syndicate.features.wnba.cards import build_source_cards_props_strip_payload
 from syndicate.features.wnba.cards import build_source_cards_sim_detail_payload
+from syndicate.features.wnba.cards import _public_scoreboard_source_cards_payload
 from syndicate.features.wnba.cards import build_live_lens_tuning_payload
 from syndicate.features.wnba.cards import build_live_lines_payload
 from syndicate.features.wnba.cards import build_live_pbp_stats_payload
@@ -422,6 +423,10 @@ def api_source_team_logo(team_id: str):
 def api_source_cards():
     selected_date = _selected_date()
     try:
+        if selected_date == central_today_iso():
+            public_payload = _public_scoreboard_source_cards_payload(selected_date)
+            if isinstance(public_payload, dict) and public_payload.get("games"):
+                return jsonify(public_payload)
         payload = build_source_cards_payload(selected_date, allow_stored_date_fallback=True)
         return jsonify(payload)
     except Exception:

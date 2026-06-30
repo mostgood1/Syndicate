@@ -1268,6 +1268,7 @@ def build_source_cards_payload(selected_date: str, *, allow_stored_date_fallback
     rec_index = bundle["recommendations"]
     sim_index = bundle["sim"]
     props_index = bundle["props"]
+    used_public_scoreboard_fallback = False
     games = [
         _source_game_from_row(
             row,
@@ -1283,7 +1284,8 @@ def build_source_cards_payload(selected_date: str, *, allow_stored_date_fallback
         public_games, _ = _games_from_public_scoreboard(resolved_date)
         if public_games:
             games = public_games
-    if resolved_date == central_today_iso():
+            used_public_scoreboard_fallback = True
+    if resolved_date == central_today_iso() and not used_public_scoreboard_fallback:
         games, _, _, _ = _supplement_games_with_live_state(games, resolved_date)
     return {
         "date": resolved_date,
@@ -1683,6 +1685,41 @@ def _games_from_public_scoreboard(selected_date: str) -> tuple[list[dict[str, An
     return _dedupe_wnba_games(games), "espn_scoreboard_fallback"
 
 
+def _public_scoreboard_source_cards_payload(selected_date: str) -> dict[str, Any] | None:
+    games, source_path = _games_from_public_scoreboard(selected_date)
+    if not games:
+        return None
+    parsed_date = parse_iso_date(selected_date)
+    prev_date = (parsed_date - timedelta(days=1)).isoformat()
+    next_date = (parsed_date + timedelta(days=1)).isoformat()
+    return {
+        "date": selected_date,
+        "requested_date": selected_date,
+        "lookahead_applied": False,
+        "players_included": False,
+        "pregame_portfolio": {"enabled": False, "selected": 0, "candidates": 0},
+        "games": games,
+        "module_links": build_module_links(selected_date, "Cards"),
+        "route_path": "/wnba/cards",
+        "control_label": "Date",
+        "control_type": "date",
+        "control_name": "date",
+        "control_value": selected_date,
+        "prev_date": prev_date,
+        "next_date": next_date,
+        "board_contract": {
+            "schema": "game_board_v1",
+            "surface": "wnba_dense_board_v1",
+            "sport": "wnba",
+            "module": "cards",
+            "source_kind": "live_scoreboard_fallback",
+            "live_lens_integrated": True,
+        },
+        "source_title": "WNBA live scoreboard fallback",
+        "source_path": source_path,
+    }
+
+
 def _games_from_live_state_fallback(selected_date: str, ttl: int = 12) -> tuple[list[dict[str, Any]], str]:
     is_today = str(selected_date).strip() == central_today_iso()
     candidate_payloads: list[dict[str, Any] | None] = [_local_live_state_payload(selected_date)]
@@ -1961,6 +1998,7 @@ def build_cards_page_context(selected_date: str, *, allow_stored_date_fallback: 
         games = []
     source_title = "WNBA processed game cards"
     had_artifact_games = bool(games)
+    used_public_scoreboard_fallback = False
     if not games and allow_stored_date_fallback and resolved_date == central_today_iso():
         public_games, public_source_path = _games_from_public_scoreboard(resolved_date)
         if public_games:
@@ -1969,7 +2007,8 @@ def build_cards_page_context(selected_date: str, *, allow_stored_date_fallback: 
             recs_path = public_source_path
             source_title = "WNBA live scoreboard fallback"
             had_artifact_games = False
-    if not _render_web_dyno():
+            used_public_scoreboard_fallback = True
+    if not _render_web_dyno() and not used_public_scoreboard_fallback:
         games, live_source_path, supplemented_count, updated_count = _supplement_games_with_live_state(games, resolved_date)
         if supplemented_count > 0 or updated_count > 0:
             if had_artifact_games:
