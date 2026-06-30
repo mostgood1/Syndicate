@@ -627,7 +627,16 @@ def _run_command(step: RefreshStep, *, dry_run: bool = False) -> dict[str, Any]:
     if step.env_updates:
         env.update({key: value for key, value in step.env_updates.items() if value is not None})
     started = _utc_now()
+    timeout_seconds: int | None = None
+    timeout_value = str(os.environ.get("SYNDICATE_REFRESH_STEP_TIMEOUT_SECONDS") or "").strip()
+    if timeout_value:
+        try:
+            timeout_seconds = max(1, int(timeout_value))
+        except ValueError:
+            timeout_seconds = None
+    print(f"[refresh_odds_sources] START step={step.name} cwd={step.cwd}", flush=True)
     if dry_run:
+        print(f"[refresh_odds_sources] END step={step.name} dry_run=true", flush=True)
         return {
             "name": step.name,
             "description": step.description,
@@ -647,8 +656,13 @@ def _run_command(step: RefreshStep, *, dry_run: bool = False) -> dict[str, Any]:
         env=env,
         capture_output=True,
         text=True,
+        timeout=timeout_seconds,
     )
     finished = _utc_now()
+    print(
+        f"[refresh_odds_sources] END step={step.name} return_code={result.returncode} timeout_seconds={timeout_seconds if timeout_seconds is not None else 'none'}",
+        flush=True,
+    )
     return {
         "name": step.name,
         "description": step.description,
@@ -662,6 +676,7 @@ def _run_command(step: RefreshStep, *, dry_run: bool = False) -> dict[str, Any]:
         "ok": result.returncode == 0,
         "dry_run": False,
     }
+    
 
 
 def _sync_post_refresh_tracking_step(*, sport: str, source_root: Path, date_str: str, dry_run: bool = False) -> dict[str, Any]:
