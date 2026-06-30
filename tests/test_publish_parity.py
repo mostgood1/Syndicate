@@ -30,6 +30,9 @@ class PublishParitySummaryTests(unittest.TestCase):
         self.assertEqual(sports["nba"]["forcedPublishPathCount"], 2)
         self.assertEqual(sports["wnba"]["forcedPublishPathCount"], 1)
         self.assertEqual(sports["nhl"]["forcedPublishPathCount"], 0)
+        self.assertEqual(sports["mlb"]["totalPublishPathCount"], 1)
+        self.assertEqual(sports["nba"]["totalPublishPathCount"], 2)
+        self.assertEqual(sports["wnba"]["totalPublishPathCount"], 1)
         self.assertEqual(sports["mlb"]["intelligencePublishPathCount"], 0)
 
     def test_odds_control_plane_snapshot_carries_publish_parity(self) -> None:

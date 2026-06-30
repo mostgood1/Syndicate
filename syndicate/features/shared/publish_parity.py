@@ -64,7 +64,7 @@ def build_publish_parity_summary(
                     {
                         path
                         for path in forced + intelligence
-                        if path.startswith(root_prefix)
+                        if _path_matches_prefix(path, root_prefix)
                     }
                 ),
             }
