@@ -3,13 +3,13 @@
     "date":  "2026-06-30",
     "runMode":  "standard",
     "overallStatus":  "ok",
-    "generatedAt":  "2026-06-30T19:59:21.5043168+00:00",
-    "updatedAt":  "2026-06-30T20:03:13.9809431+00:00",
-    "runManifestPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-06-30\\20260630_195921\\unified_daily_update_run.json",
+    "generatedAt":  "2026-06-30T20:37:07.4199777+00:00",
+    "updatedAt":  "2026-06-30T20:41:24.0054577+00:00",
+    "runManifestPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-06-30\\20260630_203707\\unified_daily_update_run.json",
     "latestManifestPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest.json",
-    "runCheckpointPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-06-30\\20260630_195921\\unified_daily_update_checkpoint.json",
+    "runCheckpointPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-06-30\\20260630_203707\\unified_daily_update_checkpoint.json",
     "latestCheckpointPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest_checkpoint.json",
-    "runStatePath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-06-30\\20260630_195921\\unified_daily_update_run_state.json",
+    "runStatePath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-06-30\\20260630_203707\\unified_daily_update_run_state.json",
     "latestRunStatePath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest_run_state.json",
     "trace":  {
                   "eventSimExecutionCount":  21,
@@ -47,7 +47,7 @@
                   "simExecutionDecision":  null
               },
     "simulationContractPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest_simulation_contract.json",
-    "simulationContractRunPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-06-30\\20260630_195921\\unified_daily_update_simulation_contract.json",
+    "simulationContractRunPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-06-30\\20260630_203707\\unified_daily_update_simulation_contract.json",
     "simulationContractSportCount":  1,
     "simulationContractAdvancedBySport":  {
                                               "mlb":  {

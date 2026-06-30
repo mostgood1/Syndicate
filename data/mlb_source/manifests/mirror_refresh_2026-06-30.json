@@ -1,7 +1,7 @@
 ﻿{
     "sport":  "mlb",
     "date":  "2026-06-30",
-    "refreshedAtUtc":  "2026-06-30T20:03:01.4904357Z",
+    "refreshedAtUtc":  "2026-06-30T20:41:14.2979381Z",
     "sourceRepo":  null,
     "sourceArtifactRoot":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts",
     "sourceRootEnvVar":  "SYNDICATE_SOURCE_ROOT_MLB",

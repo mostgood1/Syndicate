@@ -1,14 +1,14 @@
 {
   "tool": "tools/daily_update.py",
   "workflow": "ui-daily",
-  "generated_at": "2026-06-30T19:59:25.018026",
+  "generated_at": "2026-06-30T20:37:10.524683",
   "date": "2026-06-30",
   "season": 2026,
   "run_lock": {
     "status": "acquired",
     "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/runtime/locks/daily_update_ui-daily_2026_2026-06-30_1166be09fd3e.lock",
-    "pid": 8732,
-    "created_at": "2026-06-30T19:59:25.015987"
+    "pid": 10148,
+    "created_at": "2026-06-30T20:37:10.522673"
   },
   "seed": {
     "value": 1337,
