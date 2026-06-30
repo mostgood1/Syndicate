@@ -173,14 +173,18 @@ class RefreshOddsSourcesTests(unittest.TestCase):
             "generation": {
                 "steps": [
                     {
-                            "stdout": json.dumps(
-                                {
-                                    "artifact_bundle_files": {
-                                        "boxscores_history_path": r"C:\render\data\mlb_source\source_artifacts\data\processed\boxscores_history.csv",
-                                        "cards_snapshot_path": r"C:\render\data\mlb_source\source_artifacts\data\processed\cards_snapshot.json",
-                                    }
+                        "stdout": json.dumps(
+                            {
+                                "artifact_bundle_files": {
+                                    "files": [
+                                        r"C:\render\data\mlb_source\source_artifacts\data\processed\boxscores_history.csv",
+                                        r"C:\render\data\mlb_source\source_artifacts\data\processed\cards_snapshot.json",
+                                    ],
+                                    "directories": [r"C:\render\data\mlb_source\source_artifacts\data\processed"],
+                                    "report_path": r"C:\render\data\mlb_source\source_artifacts\reports\mlb_bundle_report.json",
                                 }
-                            ),
+                            }
+                        ),
                     }
                 ]
             },
@@ -190,3 +194,6 @@ class RefreshOddsSourcesTests(unittest.TestCase):
 
         self.assertIn(r"C:\render\data\mlb_source\source_artifacts\data\processed\boxscores_history.csv", artifact_paths)
         self.assertIn(r"C:\render\data\mlb_source\source_artifacts\data\processed\cards_snapshot.json", artifact_paths)
+        self.assertIn(r"C:\render\data\mlb_source\source_artifacts\data\processed", artifact_paths)
+        self.assertIn(r"C:\render\data\mlb_source\source_artifacts\reports\mlb_bundle_report.json", artifact_paths)
+        self.assertEqual(len(artifact_paths), 4)

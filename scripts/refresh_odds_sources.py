@@ -779,6 +779,13 @@ def _sport_artifact_paths(sport_result: dict[str, Any]) -> list[str]:
                 }:
                     add_path(nested_value)
                     walk_json_text(nested_value)
+                elif nested_key_text == "artifact_bundle_files" and isinstance(nested_value, dict):
+                    for bundle_value in nested_value.values():
+                        if isinstance(bundle_value, list):
+                            for item in bundle_value:
+                                add_path(item)
+                        elif isinstance(bundle_value, str):
+                            add_path(bundle_value)
                 elif nested_key_text in {"artifact_paths", "updated_files", "signal_paths"} and isinstance(nested_value, list):
                     for item in nested_value:
                         add_path(item)
