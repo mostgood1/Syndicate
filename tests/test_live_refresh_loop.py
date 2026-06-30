@@ -118,6 +118,12 @@ class LiveRefreshLoopTests(unittest.TestCase):
         self.assertTrue(payload["skipped"])
         self.assertIn("already active", payload["error"])
 
+    def test_live_refresh_loop_interval_defaults_to_sixty_seconds(self) -> None:
+        with patch.dict(os.environ, {}, clear=True):
+            interval_seconds = live_refresh_loop._live_refresh_loop_interval_seconds()
+
+        self.assertEqual(interval_seconds, 60)
+
     def test_start_loop_returns_false_when_disabled(self) -> None:
         with patch.dict(os.environ, {}, clear=True):
             started = live_refresh_loop.start_live_refresh_background_loop()

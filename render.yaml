@@ -336,7 +336,7 @@ services:
       - key: SYNDICATE_BOOTSTRAP_WNBA_TODAY
         value: "1"
       - key: SYNDICATE_LIVE_ODDS_REFRESH_INTERVAL_SECONDS
-        value: "30"
+        value: "60"
       - key: SYNDICATE_INTELLIGENCE_REFRESH_INTERVAL_SECONDS
         value: "60"
       - key: SYNDICATE_LIVE_ODDS_REFRESH_LAUNCH_MODE

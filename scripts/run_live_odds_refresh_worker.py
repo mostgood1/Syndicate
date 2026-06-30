@@ -49,7 +49,7 @@ def main() -> int:
     try:
         interval_seconds = max(5, int(_live_refresh_loop_interval_seconds()))
     except Exception:
-        interval_seconds = 30
+        interval_seconds = 60
 
     if args.run_once:
         try:

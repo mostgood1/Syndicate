@@ -119,9 +119,9 @@ def _is_live_refresh_loop_enabled() -> bool:
 def _live_refresh_loop_interval_seconds() -> int:
 	raw = str(os.environ.get("SYNDICATE_LIVE_ODDS_REFRESH_INTERVAL_SECONDS") or "").strip()
 	try:
-		value = int(raw or 30)
+		value = int(raw or 60)
 	except Exception:
-		value = 30
+		value = 60
 	return max(5, int(value))
 
 
