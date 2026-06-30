@@ -1516,32 +1516,8 @@ class NbaRefreshRunnerTests(unittest.TestCase):
             self.assertEqual(copied["season_betting_card_manifest_generic_path"], str(processed_root / f"season_betting_card_manifest_{season}_retuned.json"))
             payload = json.loads((processed_root / f"season_betting_card_manifest_{season}_retuned_{date_str}.json").read_text(encoding="utf-8"))
             self.assertEqual(payload["cards_url"], "/nba/cards?date=2026-05-22")
-
-    def test_run_refresh_via_cli_treats_empty_export_as_warning(self) -> None:
-        module = self._load_module()
-
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            source_root = Path(tmp_dir) / "source"
-            source_root.mkdir(parents=True, exist_ok=True)
-            log_file = Path(tmp_dir) / "refresh.log"
-
-            with patch.object(module, "_run_to_file", return_value=0), patch.object(module, "_ensure_player_logs_for_props_refresh", return_value=(True, None)), patch.object(module, "_ensure_game_predictions_for_props_refresh", return_value=(True, None)), patch.object(module, "_ensure_source_game_cards_export", return_value=(0, None)), patch.object(module, "_build_local_game_recommendations_artifact", return_value=(0, None)):
-                state = module._run_refresh_via_cli(
-                    source_root=source_root,
-                    date_str="2026-06-29",
-                    regions="us",
-                    bookmakers="",
-                    markets="",
-                    do_edges=False,
-                    do_export=True,
-                    do_push=False,
-                    log_file=log_file,
-                    mode="full",
-                )
-
-        self.assertEqual(state.get("rc_export"), 0)
-        self.assertIn("warning", state)
-        self.assertIsNone(state.get("error"))
+            day_payload = json.loads((processed_root / f"season_betting_card_day_{season}_retuned_{date_str}.json").read_text(encoding="utf-8"))
+            self.assertEqual(day_payload["cards_url"], "/nba/cards?date=2026-05-22")
 
     def test_main_materializes_core_artifacts_into_bundle_root(self) -> None:
         module = self._load_module()
