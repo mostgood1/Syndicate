@@ -202,6 +202,30 @@ class NhlRefreshRunnerTests(unittest.TestCase):
             self.assertEqual(rc, 0)
             self.assertEqual(calls, ["collect"])
 
+    def test_main_treats_missing_required_artifacts_as_no_data_warning(self) -> None:
+        module = self._load_module()
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            artifact_root = Path(tmp_dir) / "bundle"
+            source_root = Path(tmp_dir) / "source"
+
+            def _fake_collect_owned_nhl_artifacts(*, artifact_root, date_str, team_markets, props_source):
+                return None
+
+            argv = [
+                "refresh_nhl_oddsapi.py",
+                "--date",
+                "2026-05-22",
+                "--source-root",
+                str(source_root),
+                "--artifact-root",
+                str(artifact_root),
+            ]
+            with patch.object(module, "_collect_owned_nhl_artifacts", side_effect=_fake_collect_owned_nhl_artifacts), patch.object(module, "_run_source_generation_multi", return_value=None), patch.object(module, "_missing_required_artifacts", return_value=["data/processed/props_predictions_2026-05-22.csv"]), patch.object(module, "_lineup_quality_issues", return_value=[]), patch("sys.argv", argv):
+                rc = module.main()
+
+            self.assertEqual(rc, 0)
+
 
 class NhlMarketIdTests(unittest.TestCase):
     def test_nhl_market_id_helpers_cover_team_props_and_scoreboard_rows(self) -> None:

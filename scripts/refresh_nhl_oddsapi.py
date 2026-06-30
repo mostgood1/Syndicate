@@ -610,19 +610,37 @@ def main() -> int:
         copied.setdefault("smart_sim_files", []).append(str(smart_sim_bundle_path))
     missing_required = _missing_required_artifacts(artifact_root=artifact_root, date_str=args.date)
     if missing_required:
-        print(
-            json.dumps(
-                {
-                    "ok": False,
-                    "date": args.date,
-                    "artifact_bundle_root": str(artifact_root),
-                    "error": "missing_required_artifacts",
-                    "missing_required_artifacts": missing_required,
-                },
-                indent=2,
-            )
+        no_data_run = all(
+            not path.exists()
+            for path in [
+                artifact_root / "data" / "processed" / f"predictions_{args.date}.csv",
+                artifact_root / "data" / "processed" / f"predictions_sim_{args.date}.csv",
+                artifact_root / "data" / "processed" / f"recommendations_sim_{args.date}.csv",
+                artifact_root / "data" / "processed" / f"props_projections_all_{args.date}.csv",
+                artifact_root / "data" / "processed" / f"props_boxscores_sim_{args.date}.csv",
+                artifact_root / "data" / "processed" / f"props_boxscores_sim_hist_{args.date}.csv",
+                artifact_root / "data" / "processed" / f"props_recommendations_{args.date}.csv",
+                artifact_root / "data" / "processed" / f"props_predictions_{args.date}.csv",
+                artifact_root / "data" / "processed" / f"roster_snapshot_{args.date}.csv",
+                artifact_root / "data" / "processed" / f"lineups_{args.date}.csv",
+            ]
         )
-        return 1
+        if no_data_run:
+            warnings.append(f"NHL odds refresh produced no rows for {args.date}; required artifacts were skipped as a no-data run")
+        else:
+            print(
+                json.dumps(
+                    {
+                        "ok": False,
+                        "date": args.date,
+                        "artifact_bundle_root": str(artifact_root),
+                        "error": "missing_required_artifacts",
+                        "missing_required_artifacts": missing_required,
+                    },
+                    indent=2,
+                )
+            )
+            return 1
     lineup_quality_issues = _lineup_quality_issues(artifact_root=artifact_root, date_str=args.date)
     if lineup_quality_issues:
         print(
