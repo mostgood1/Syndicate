@@ -163,3 +163,19 @@ class RefreshOddsSourcesTests(unittest.TestCase):
         self.assertIsInstance(message, str)
         self.assertIn("Render data disk is missing", message)
         self.assertIn(r"C:\render\data\mlb_source", message)
+
+    def test_sport_artifact_paths_include_bundle_file_outputs(self) -> None:
+        module = self._load_module()
+
+        sport_result = {
+            "ok": True,
+            "artifact_bundle_files": {
+                "boxscores_history_path": r"C:\render\data\mlb_source\source_artifacts\data\processed\boxscores_history.csv",
+                "cards_snapshot_path": r"C:\render\data\mlb_source\source_artifacts\data\processed\cards_snapshot.json",
+            },
+        }
+
+        artifact_paths = module._sport_artifact_paths(sport_result)
+
+        self.assertIn(r"C:\render\data\mlb_source\source_artifacts\data\processed\boxscores_history.csv", artifact_paths)
+        self.assertIn(r"C:\render\data\mlb_source\source_artifacts\data\processed\cards_snapshot.json", artifact_paths)

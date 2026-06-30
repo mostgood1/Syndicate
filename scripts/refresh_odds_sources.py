@@ -773,7 +773,9 @@ def _sport_artifact_paths(sport_result: dict[str, Any]) -> list[str]:
         elif isinstance(value, list):
             for item in value:
                 walk(item, key_name)
-        elif isinstance(value, str) and key_name in {"output", "file", "manifest", "artifact", "path"}:
+        elif isinstance(value, str) and (
+            key_name in {"output", "file", "manifest", "artifact", "path"} or key_name.endswith("_path") or key_name.endswith("_paths")
+        ):
             add_path(value)
 
     walk(sport_result)
