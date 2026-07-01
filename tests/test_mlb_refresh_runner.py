@@ -65,6 +65,24 @@ class MlbRefreshRunnerTests(unittest.TestCase):
         self.assertEqual(odds_module.calls[0]["date"], "2026-05-22")
         self.assertEqual(odds_module.calls[0]["regions"], "us,eu")
 
+    def test_same_doc_considers_retrieved_at_freshness(self) -> None:
+        module = self._load_module()
+
+        existing = {
+            "date": "2026-07-01",
+            "mode": "live",
+            "retrieved_at": "2026-07-01T07:42:15Z",
+            "games": [{"event_id": "1", "markets": {"h2h": {"home": 1.0, "away": 2.0}}}],
+        }
+        candidate = {
+            "date": "2026-07-01",
+            "mode": "live",
+            "retrieved_at": "2026-07-01T08:15:00Z",
+            "games": [{"event_id": "1", "markets": {"h2h": {"home": 1.0, "away": 2.0}}}],
+        }
+
+        self.assertFalse(module._same_doc(existing, candidate))
+
     def test_main_warns_when_live_lens_artifacts_are_missing(self) -> None:
         module = self._load_module()
 

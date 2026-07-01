@@ -386,7 +386,7 @@ def _doc_without_retrieved_at(doc: dict[str, object] | None) -> dict[str, object
 def _same_doc(existing: dict[str, object] | None, candidate: dict[str, object] | None) -> bool:
     if not isinstance(existing, dict) or not isinstance(candidate, dict):
         return False
-    return _stable_doc_hash(_doc_without_retrieved_at(existing)) == _stable_doc_hash(_doc_without_retrieved_at(candidate))
+    return _stable_doc_hash(existing) == _stable_doc_hash(candidate)
 
 
 def _market_entry_hash(entry: dict[str, object]) -> str:
