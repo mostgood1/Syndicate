@@ -95,10 +95,10 @@ services:
         value: "1"
       - key: SYNDICATE_LIVE_ODDS_REFRESH_INTERVAL_SECONDS
         value: "30"
+      - key: SYNDICATE_LIVE_ODDS_REFRESH_LAUNCH_MODE
+        value: detached_subprocess
       - key: SYNDICATE_INTELLIGENCE_REFRESH_INTERVAL_SECONDS
         value: "60"
-      - key: SYNDICATE_LIVE_ODDS_REFRESH_LAUNCH_MODE
-        value: manifest_only
       - key: SYNDICATE_LIVE_ODDS_REFRESH_PHASE
         value: "live"
       - key: SYNDICATE_LIVE_ODDS_REFRESH_EXECUTION_MODE
