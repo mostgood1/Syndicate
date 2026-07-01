@@ -856,9 +856,10 @@ def _norm_split_local(value: Any) -> list[float] | None:
         return None
 
 
-def _quarter_splits_for_team_local(*, processed_root: Path, team_tri: str, is_home: bool | None = None) -> list[float]:
+def _quarter_splits_for_team_local(*, processed_root: Path, team_tri: str, is_home: bool | None = None, league: Any | None = None) -> list[float]:
     cal = _load_quarters_calibration_local(processed_root=processed_root) or {}
     team = str(team_tri or "").strip().upper()
+    league_obj = league or _league_for_code_local("nba")
     try:
         if is_home is not None and isinstance(cal, dict):
             if bool(is_home):
@@ -890,7 +891,7 @@ def _quarter_splits_for_team_local(*, processed_root: Path, team_tri: str, is_ho
             return split
     except Exception:
         pass
-    return _quarter_splits_local(league=league)
+    return _quarter_splits_local(league=league_obj)
 
 
 def _target_quarter_total_sd_local(*, processed_root: Path, quarter: int) -> float | None:
@@ -1063,8 +1064,8 @@ def _simulate_quarters_local(*, processed_root: Path, inp: GameInputsLocal, leag
         if away_mu < min_team_pts:
             away_mu = min_team_pts
             home_mu = cur_total_mu - away_mu
-    home_splits = _quarter_splits_for_team_local(processed_root=processed_root, team_tri=home.team, is_home=True)
-    away_splits = _quarter_splits_for_team_local(processed_root=processed_root, team_tri=away.team, is_home=False)
+    home_splits = _quarter_splits_for_team_local(processed_root=processed_root, team_tri=home.team, is_home=True, league=league)
+    away_splits = _quarter_splits_for_team_local(processed_root=processed_root, team_tri=away.team, is_home=False, league=league)
     cur_total_mu = float(home_mu + away_mu)
     q_means: list[tuple[float, float]] = []
     for quarter_idx in range(1, 5):

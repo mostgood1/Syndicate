@@ -248,6 +248,27 @@ def fetch_player_props_current(*, api_key: str, league: str, date_str: str, regi
     return pd.DataFrame(rows)
 
 
+def _latest_existing_snapshot_path(*, out_path: Path, target_date: str) -> Path | None:
+    target_value = pd.to_datetime(target_date, errors="coerce")
+    if pd.isna(target_value):
+        target_value = None
+    candidates: list[tuple[pd.Timestamp, Path]] = []
+    for candidate in sorted(out_path.parent.glob("odds_wnba_player_props_*.csv")):
+        if not candidate.is_file():
+            continue
+        date_text = candidate.stem.replace("odds_wnba_player_props_", "", 1)
+        parsed = pd.to_datetime(date_text, errors="coerce")
+        if pd.isna(parsed):
+            continue
+        if target_value is not None and parsed > target_value:
+            continue
+        candidates.append((parsed, candidate))
+    if not candidates:
+        return None
+    candidates.sort(key=lambda item: item[0])
+    return candidates[-1][1]
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Fetch NBA/WNBA player props from OddsAPI to CSV")
     parser.add_argument("--league", type=str, choices=sorted(SPORT_KEYS.keys()), required=True)
@@ -288,7 +309,20 @@ def main(argv: list[str] | None = None) -> int:
         if existing_has_rows:
             print(f"WARNING: No player props fetched for {args.date}; preserving existing snapshot at {out_path}")
             return 0
-        print(f"ERROR: No player props fetched for {args.date} and no same-day snapshot exists to preserve")
+        fallback_path = _latest_existing_snapshot_path(out_path=out_path, target_date=args.date)
+        if fallback_path is not None and fallback_path.exists():
+            try:
+                out_path.write_bytes(fallback_path.read_bytes())
+            except Exception:
+                pass
+            try:
+                copied_rows = len(pd.read_csv(out_path))
+            except Exception:
+                copied_rows = 0
+            if copied_rows > 0:
+                print(f"WARNING: No player props fetched for {args.date}; reusing latest snapshot at {fallback_path}")
+                return 0
+        print(f"ERROR: No player props fetched for {args.date} and no prior snapshot exists to preserve")
         return 2
 
     df.to_csv(out_path, index=False)

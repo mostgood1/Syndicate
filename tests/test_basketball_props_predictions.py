@@ -329,6 +329,25 @@ class BasketballPropsPredictionsTests(unittest.TestCase):
             self.assertEqual(finalize_calls[0]["player_min_pairs"], 6)
             self.assertEqual(finalize_calls[0]["player_shrink_k"], 8)
 
+    def test_quarter_splits_for_team_local_uses_passed_league(self) -> None:
+        fake_league = SimpleNamespace(code="wnba")
+
+        with patch.object(smart_sim_module, "_load_quarters_calibration_local", return_value={}), patch.object(
+            smart_sim_module,
+            "_quarter_splits_local",
+            return_value=[0.25, 0.25, 0.25, 0.25],
+        ) as quarter_splits_mock:
+            splits = smart_sim_module._quarter_splits_for_team_local(
+                processed_root=Path("C:/tmp"),
+                team_tri="NYL",
+                is_home=True,
+                league=fake_league,
+            )
+
+        self.assertEqual(splits, [0.25, 0.25, 0.25, 0.25])
+        self.assertEqual(quarter_splits_mock.call_count, 1)
+        self.assertIs(quarter_splits_mock.call_args.kwargs["league"], fake_league)
+
     def test_local_event_wrappers_route_usage_helper(self) -> None:
         usage_calls: list[dict[str, object]] = []
         entrypoint_calls: list[tuple[str, object]] = []
