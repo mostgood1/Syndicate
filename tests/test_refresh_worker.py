@@ -4,6 +4,7 @@ import importlib.util
 import json
 import subprocess
 import sys
+import time
 import unittest
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -111,6 +112,68 @@ class RefreshWorkerTests(unittest.TestCase):
             worker_status = json.loads((reports_root / "refresh_status" / "latest" / "refresh_worker_status.json").read_text(encoding="utf-8"))
             self.assertEqual(worker_status["state"], "idle")
             self.assertFalse(worker_status["ranJob"])
+
+    def test_main_run_once_autolaunches_stale_mlb_refresh_when_enabled(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        module = self._load_module(repo_root)
+
+        with TemporaryDirectory() as tmp_dir:
+            reports_root = Path(tmp_dir) / "reports"
+            data_root = Path(tmp_dir) / "data"
+            latest_manifest_path = reports_root / "refresh_status" / "latest" / "refresh_status_latest.json"
+            worker_status_path = reports_root / "refresh_status" / "latest" / "refresh_worker_status.json"
+            latest_manifest_path.parent.mkdir(parents=True, exist_ok=True)
+            latest_manifest_path.write_text(json.dumps({"state": "idle"}), encoding="utf-8")
+
+            stale_report_path = data_root / "mlb_source" / "source_artifacts" / "data" / "live_lens" / "live_lens_report_2026_07_01.json"
+            stale_report_path.parent.mkdir(parents=True, exist_ok=True)
+            stale_report_path.write_text(json.dumps({"generatedAt": "2026-07-01T07:42:15Z", "games": []}), encoding="utf-8")
+            stale_at = time.time() - 600.0
+            stale_times = (stale_at, stale_at)
+            stale_report_path.touch()
+            import os
+
+            os.utime(stale_report_path, stale_times)
+
+            fake_launch_result = {"ok": True, "pid": 9876, "state": "running"}
+
+            with patch.dict(
+                module.os.environ,
+                {
+                    "SYNDICATE_REPORTS_ROOT": str(reports_root),
+                    "SYNDICATE_DATA_ROOT": str(data_root),
+                    "MLB_ENABLE_REFRESH_WORKER_AUTORUN": "1",
+                    "MLB_LIVE_ODDSAPI_REFRESH_INTERVAL_SECONDS": "30",
+                },
+                clear=True,
+            ), patch.object(
+                sys,
+                "argv",
+                [
+                    "run_refresh_worker.py",
+                    "--latest-manifest",
+                    str(latest_manifest_path),
+                    "--worker-status",
+                    str(worker_status_path),
+                    "--run-once",
+                ],
+            ), patch.object(module, "launch_refresh_run", return_value=fake_launch_result) as mocked_launch, patch.object(
+                module.subprocess,
+                "Popen",
+            ) as mocked_popen:
+                exit_code = module.main()
+
+            self.assertEqual(exit_code, 0)
+            mocked_launch.assert_called_once()
+            called_kwargs = mocked_launch.call_args.kwargs
+            self.assertEqual(called_kwargs["sports"], "mlb")
+            self.assertEqual(called_kwargs["phase"], "live")
+            self.assertEqual(called_kwargs["launch_mode"], "web_process")
+            mocked_popen.assert_not_called()
+            worker_status = json.loads(worker_status_path.read_text(encoding="utf-8"))
+            self.assertEqual(worker_status["state"], "launched")
+            self.assertTrue(worker_status["ranJob"])
+            self.assertEqual(worker_status["launchPid"], 9876)
 
     def test_main_run_once_marks_worker_status_claimed_when_pending(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]

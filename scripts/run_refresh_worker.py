@@ -12,18 +12,23 @@ from pathlib import Path
 from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from syndicate.features.shared.ops_refresh import launch_refresh_run
+from syndicate.features.shared.timezone import central_today_iso
 
 
 def _refresh_state_store() -> dict[str, Any]:
-    if str(REPO_ROOT) not in sys.path:
-        sys.path.insert(0, str(REPO_ROOT))
     from syndicate.features.shared.refresh_state_store import assert_refresh_state_backend_ready
+    from syndicate.features.shared.refresh_state_store import data_root
     from syndicate.features.shared.refresh_state_store import read_json_file
     from syndicate.features.shared.refresh_state_store import reports_root
     from syndicate.features.shared.refresh_state_store import write_json_file
 
     return {
         "assert_refresh_state_backend_ready": assert_refresh_state_backend_ready,
+        "data_root": data_root,
         "read_json_file": read_json_file,
         "reports_root": reports_root,
         "write_json_file": write_json_file,
@@ -63,6 +68,86 @@ def _default_stuck_claim_timeout_minutes() -> int:
     except ValueError:
         value = 15
     return max(1, value)
+
+
+def _mlb_auto_refresh_enabled() -> bool:
+    raw_value = str(os.environ.get("MLB_ENABLE_REFRESH_WORKER_AUTORUN") or "").strip().lower()
+    return raw_value in {"1", "true", "yes", "on"}
+
+
+def _mlb_live_lens_report_path(selected_date: str) -> Path:
+    data_root = _refresh_state_store()["data_root"]()
+    date_slug = str(selected_date or "").replace("-", "_")
+    return data_root / "mlb_source" / "source_artifacts" / "data" / "live_lens" / f"live_lens_report_{date_slug}.json"
+
+
+def _file_age_seconds(path: Path) -> float | None:
+    try:
+        stat_result = path.stat()
+    except Exception:
+        return None
+    return max(0.0, time.time() - float(stat_result.st_mtime))
+
+
+def _mlb_live_refresh_interval_seconds() -> int:
+    raw_value = str(os.environ.get("MLB_LIVE_ODDSAPI_REFRESH_INTERVAL_SECONDS") or "").strip()
+    try:
+        value = int(raw_value or 30)
+    except ValueError:
+        value = 30
+    return max(1, value)
+
+
+def _launch_autorun_mlb_refresh(
+    *,
+    latest_manifest_path: Path,
+    worker_status_path: Path,
+    refresh_cycle: dict[str, int],
+) -> bool:
+    if not _mlb_auto_refresh_enabled():
+        return False
+    selected_date = central_today_iso()
+    report_path = _mlb_live_lens_report_path(selected_date)
+    report_age_seconds = _file_age_seconds(report_path)
+    if report_age_seconds is not None and report_age_seconds < float(_mlb_live_refresh_interval_seconds()):
+        return False
+
+    try:
+        result = launch_refresh_run(
+            date=selected_date,
+            sports="mlb",
+            phase="live",
+            execution_mode="source",
+            regions="us",
+            skip_mirror=True,
+            mode=str(os.environ.get("SYNDICATE_LIVE_ODDS_REFRESH_MODE") or "full"),
+            launch_mode="web_process",
+        )
+    except Exception as exc:
+        _write_worker_status(
+            worker_status_path=worker_status_path,
+            latest_manifest_path=latest_manifest_path,
+            state="error",
+            detail=f"Failed to auto-launch MLB refresh: {type(exc).__name__}: {exc}",
+            ran_job=False,
+            latest_manifest_state=str((_latest_manifest_payload(latest_manifest_path).get("state") or "")).strip().lower() or None,
+            refresh_cycle=refresh_cycle,
+        )
+        return False
+
+    refresh_cycle["claimed_count"] = int(refresh_cycle.get("claimed_count") or 0) + 1
+    _write_worker_status(
+        worker_status_path=worker_status_path,
+        latest_manifest_path=latest_manifest_path,
+        state="launched",
+        detail=f"Auto-launched MLB refresh because {selected_date} report was stale.",
+        ran_job=True,
+        run_exit_code=None,
+        latest_manifest_state=str((_latest_manifest_payload(latest_manifest_path).get("state") or "")).strip().lower() or None,
+        launch_pid=int(result.get("pid") or 0) or None,
+        refresh_cycle=refresh_cycle,
+    )
+    return True
 
 
 def _pid_is_running(pid: int | None) -> bool:
@@ -292,6 +377,13 @@ def main() -> int:
                 launch_pid=int(getattr(process, "pid", 0) or 0) or None,
                 refresh_cycle=refresh_cycle,
             )
+            if args.run_once:
+                return 0
+        elif _launch_autorun_mlb_refresh(
+            latest_manifest_path=latest_manifest_path,
+            worker_status_path=worker_status_path,
+            refresh_cycle=refresh_cycle,
+        ):
             if args.run_once:
                 return 0
         elif args.run_once:

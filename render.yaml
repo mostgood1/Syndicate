@@ -131,6 +131,8 @@ services:
         value: "false"
       - key: MLB_ENABLE_LIVE_LENS_BACKGROUND_REPORTS
         value: "false"
+      - key: MLB_ENABLE_REFRESH_WORKER_AUTORUN
+        value: "true"
       - key: MLB_LIVE_LENS_LOOP_INTERVAL_SECONDS
         value: "30"
       - key: MLB_LIVE_LENS_REPORT_REFRESH_INTERVAL_SECONDS
