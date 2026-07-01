@@ -1,0 +1,974 @@
+{
+  "date": "2026-06-30",
+  "home": "SEA",
+  "away": "ATL",
+  "market_total": null,
+  "market_home_spread": null,
+  "quarters": [
+    {
+      "q": 1,
+      "home_pts_mu": 21.411421827855783,
+      "home_pts_sigma": 5.0,
+      "away_pts_mu": 20.403610163744144,
+      "away_pts_sigma": 5.0,
+      "corr": 0.25
+    },
+    {
+      "q": 2,
+      "home_pts_mu": 21.85289444286312,
+      "home_pts_sigma": 5.0,
+      "away_pts_mu": 20.824303156811034,
+      "away_pts_sigma": 5.0,
+      "corr": 0.25
+    },
+    {
+      "q": 3,
+      "home_pts_mu": 22.294367057870456,
+      "home_pts_sigma": 5.0,
+      "away_pts_mu": 21.244996149877927,
+      "away_pts_sigma": 5.0,
+      "corr": 0.25
+    },
+    {
+      "q": 4,
+      "home_pts_mu": 22.735839672877795,
+      "home_pts_sigma": 5.0,
+      "away_pts_mu": 21.665689142944817,
+      "away_pts_sigma": 5.0,
+      "corr": 0.25
+    }
+  ],
+  "players": {
+    "home": [
+      {
+        "team": "SEA",
+        "opponent": "ATL",
+        "player_name": "Natisha Hiedeman",
+        "player_id": 3906753,
+        "pts_mean": 16.763333333333332,
+        "reb_mean": 1.3033333333333332,
+        "ast_mean": 4.67111111111111,
+        "threes_mean": 2.5066666666666664,
+        "pra_mean": 22.737777777777776,
+        "stl_mean": 0.5901866666666666,
+        "blk_mean": 0.48288,
+        "tov_mean": 1.6096,
+        "pts_sd": 4.190833333333333,
+        "reb_sd": 1.0,
+        "ast_sd": 1.1677777777777776,
+        "threes_sd": 1.0,
+        "pra_sd": 5.684444444444444,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "position": "G",
+        "minutes": 26.826666666666668
+      },
+      {
+        "team": "SEA",
+        "opponent": "ATL",
+        "player_name": "Flau'jae Johnson",
+        "player_id": 4698736,
+        "pts_mean": 13.316666666666666,
+        "reb_mean": 5.415555555555556,
+        "ast_mean": 1.5766666666666669,
+        "threes_mean": 1.4388888888888889,
+        "pra_mean": 20.30888888888889,
+        "stl_mean": 0.5505377777777777,
+        "blk_mean": 0.4504399999999999,
+        "tov_mean": 1.5014666666666665,
+        "pts_sd": 3.3291666666666666,
+        "reb_sd": 1.353888888888889,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 5.077222222222223,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "position": "G",
+        "minutes": 25.02444444444444
+      },
+      {
+        "team": "SEA",
+        "opponent": "ATL",
+        "player_name": "Zia Cooke",
+        "player_id": 4432832,
+        "pts_mean": 13.105555555555556,
+        "reb_mean": 2.663333333333333,
+        "ast_mean": 1.7333333333333334,
+        "threes_mean": 1.501111111111111,
+        "pra_mean": 17.502222222222223,
+        "stl_mean": 0.42262,
+        "blk_mean": 0.34578,
+        "tov_mean": 1.1526,
+        "pts_sd": 3.276388888888889,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 4.375555555555556,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "position": "G",
+        "minutes": 19.21
+      },
+      {
+        "team": "SEA",
+        "opponent": "ATL",
+        "player_name": "Stefanie Dolson",
+        "player_id": 2529183,
+        "pts_mean": 9.442222222222222,
+        "reb_mean": 3.398888888888889,
+        "ast_mean": 2.088888888888889,
+        "threes_mean": 1.0833333333333333,
+        "pra_mean": 14.93,
+        "stl_mean": 0.5654733333333333,
+        "blk_mean": 0.4626599999999999,
+        "tov_mean": 1.5422,
+        "pts_sd": 2.3605555555555555,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 3.7325,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "position": "C",
+        "minutes": 25.703333333333333
+      },
+      {
+        "team": "SEA",
+        "opponent": "ATL",
+        "player_name": "Jade Melbourne",
+        "player_id": 5017726,
+        "pts_mean": 7.218888888888889,
+        "reb_mean": 1.9188888888888889,
+        "ast_mean": 4.54,
+        "threes_mean": 0.1811111111111111,
+        "pra_mean": 13.677777777777775,
+        "stl_mean": 0.5524688888888889,
+        "blk_mean": 0.45202,
+        "tov_mean": 1.5067333333333333,
+        "pts_sd": 1.8047222222222223,
+        "reb_sd": 1.0,
+        "ast_sd": 1.135,
+        "threes_sd": 1.0,
+        "pra_sd": 3.419444444444444,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "position": "G",
+        "minutes": 25.112222222222226
+      },
+      {
+        "team": "SEA",
+        "opponent": "ATL",
+        "player_name": "Mackenzie Holmes",
+        "player_id": 4433643,
+        "pts_mean": 5.297777777777777,
+        "reb_mean": 4.348888888888889,
+        "ast_mean": 0.4288888888888889,
+        "threes_mean": 0.2366666666666666,
+        "pra_mean": 10.075555555555557,
+        "stl_mean": 0.3551533333333333,
+        "blk_mean": 0.29058,
+        "tov_mean": 0.9686,
+        "pts_sd": 1.3244444444444443,
+        "reb_sd": 1.0872222222222223,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 2.518888888888889,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "position": "F",
+        "minutes": 16.143333333333334
+      },
+      {
+        "team": "SEA",
+        "opponent": "ATL",
+        "player_name": "Jaelyn Brown",
+        "player_id": 4066527,
+        "pts_mean": 6.85,
+        "reb_mean": 0.8499999999999999,
+        "ast_mean": 0.4249999999999999,
+        "threes_mean": 1.0,
+        "pra_mean": 8.125,
+        "stl_mean": 0.2639999999999999,
+        "blk_mean": 0.2159999999999999,
+        "tov_mean": 0.7199999999999999,
+        "pts_sd": 1.7125,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 2.03125,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "position": "nan",
+        "minutes": 11.999999999999998
+      },
+      {
+        "team": "SEA",
+        "opponent": "ATL",
+        "player_name": "Lexie Brown",
+        "player_id": 3058892,
+        "pts_mean": 4.921111111111111,
+        "reb_mean": 1.4666666666666668,
+        "ast_mean": 0.93,
+        "threes_mean": 0.7822222222222222,
+        "pra_mean": 7.317777777777778,
+        "stl_mean": 0.3177288888888889,
+        "blk_mean": 0.2599599999999999,
+        "tov_mean": 0.8665333333333333,
+        "pts_sd": 1.2302777777777778,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 1.8294444444444444,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "position": "G",
+        "minutes": 14.442222222222222
+      },
+      {
+        "team": "SEA",
+        "opponent": "ATL",
+        "player_name": "Jordan Horston",
+        "player_id": 4432830,
+        "pts_mean": 3.614444444444445,
+        "reb_mean": 2.8966666666666665,
+        "ast_mean": 0.7333333333333333,
+        "threes_mean": 0.3422222222222222,
+        "pra_mean": 7.2444444444444445,
+        "stl_mean": 0.3971244444444444,
+        "blk_mean": 0.32492,
+        "tov_mean": 1.0830666666666666,
+        "pts_sd": 1.0,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 1.8111111111111111,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "position": "F",
+        "minutes": 18.051111111111112
+      }
+    ],
+    "away": [
+      {
+        "team": "ATL",
+        "opponent": "SEA",
+        "player_name": "Angel Reese",
+        "player_id": 4433402,
+        "pts_mean": 13.472857142857142,
+        "reb_mean": 10.132857142857144,
+        "ast_mean": 2.838571428571429,
+        "threes_mean": 0.0,
+        "pra_mean": 26.444285714285712,
+        "stl_mean": 0.6700885714285713,
+        "blk_mean": 0.5482542857142856,
+        "tov_mean": 1.8275142857142848,
+        "pts_sd": 3.3682142857142856,
+        "reb_sd": 2.533214285714286,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 6.611071428571428,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "position": "F",
+        "minutes": 30.458571428571425
+      },
+      {
+        "team": "ATL",
+        "opponent": "SEA",
+        "player_name": "Rhyne Howard",
+        "player_id": 4398674,
+        "pts_mean": 17.406666666666666,
+        "reb_mean": 4.87,
+        "ast_mean": 3.333333333333333,
+        "threes_mean": 3.14,
+        "pra_mean": 25.61,
+        "stl_mean": 0.7111133333333333,
+        "blk_mean": 0.5818199999999999,
+        "tov_mean": 1.9394,
+        "pts_sd": 4.351666666666667,
+        "reb_sd": 1.2175,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 6.4025,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "position": "G",
+        "minutes": 32.32333333333333
+      },
+      {
+        "team": "ATL",
+        "opponent": "SEA",
+        "player_name": "Allisha Gray",
+        "player_id": 3058901,
+        "pts_mean": 19.572857142857146,
+        "reb_mean": 4.141428571428572,
+        "ast_mean": 0.6928571428571428,
+        "threes_mean": 1.417142857142857,
+        "pra_mean": 24.40714285714286,
+        "stl_mean": 0.744102857142857,
+        "blk_mean": 0.6088114285714284,
+        "tov_mean": 2.0293714285714284,
+        "pts_sd": 4.893214285714286,
+        "reb_sd": 1.035357142857143,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 6.101785714285715,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "position": "G",
+        "minutes": 33.82285714285714
+      },
+      {
+        "team": "ATL",
+        "opponent": "SEA",
+        "player_name": "Jordin Canada",
+        "player_id": 3142250,
+        "pts_mean": 11.004285714285714,
+        "reb_mean": 4.944285714285714,
+        "ast_mean": 8.29142857142857,
+        "threes_mean": 0.6214285714285714,
+        "pra_mean": 24.24,
+        "stl_mean": 0.6512942857142856,
+        "blk_mean": 0.5328771428571428,
+        "tov_mean": 1.7762571428571428,
+        "pts_sd": 2.7510714285714286,
+        "reb_sd": 1.2360714285714285,
+        "ast_sd": 2.0728571428571425,
+        "threes_sd": 1.0,
+        "pra_sd": 6.06,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "position": "G",
+        "minutes": 29.604285714285712
+      },
+      {
+        "team": "ATL",
+        "opponent": "SEA",
+        "player_name": "Maite Cazorla",
+        "player_id": 3907713,
+        "pts_mean": 5.0,
+        "reb_mean": 4.0,
+        "ast_mean": 4.0,
+        "threes_mean": 0.0,
+        "pra_mean": 13.0,
+        "stl_mean": 0.484,
+        "blk_mean": 0.3959999999999999,
+        "tov_mean": 1.3199999999999998,
+        "pts_sd": 1.25,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 3.25,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "position": "nan",
+        "minutes": 22.0
+      },
+      {
+        "team": "ATL",
+        "opponent": "SEA",
+        "player_name": "Te-Hina Paopao",
+        "player_id": 4433431,
+        "pts_mean": 7.994285714285714,
+        "reb_mean": 2.0742857142857143,
+        "ast_mean": 2.0985714285714288,
+        "threes_mean": 1.8814285714285712,
+        "pra_mean": 12.167142857142856,
+        "stl_mean": 0.4158942857142856,
+        "blk_mean": 0.3402771428571428,
+        "tov_mean": 1.1342571428571426,
+        "pts_sd": 1.9985714285714284,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 3.041785714285714,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "position": "G",
+        "minutes": 18.90428571428572
+      },
+      {
+        "team": "ATL",
+        "opponent": "SEA",
+        "player_name": "Naz Hillmon",
+        "player_id": 4398915,
+        "pts_mean": 5.506666666666666,
+        "reb_mean": 4.1066666666666665,
+        "ast_mean": 0.75,
+        "threes_mean": 0.2066666666666666,
+        "pra_mean": 10.363333333333332,
+        "stl_mean": 0.63822,
+        "blk_mean": 0.52218,
+        "tov_mean": 1.7406,
+        "pts_sd": 1.3766666666666665,
+        "reb_sd": 1.0266666666666666,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 2.590833333333333,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "position": "F",
+        "minutes": 29.01
+      },
+      {
+        "team": "ATL",
+        "opponent": "SEA",
+        "player_name": "Stephanie Jones",
+        "player_id": 4065785,
+        "pts_mean": 3.0,
+        "reb_mean": 5.999999999999999,
+        "ast_mean": 1.0,
+        "threes_mean": 0.0,
+        "pra_mean": 9.999999999999998,
+        "stl_mean": 0.4399999999999999,
+        "blk_mean": 0.36,
+        "tov_mean": 1.2,
+        "pts_sd": 1.0,
+        "reb_sd": 1.4999999999999998,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 2.4999999999999996,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "position": "nan",
+        "minutes": 20.0
+      },
+      {
+        "team": "ATL",
+        "opponent": "SEA",
+        "player_name": "Madina Okot",
+        "player_id": 5108587,
+        "pts_mean": 4.225714285714286,
+        "reb_mean": 5.247142857142856,
+        "ast_mean": 0.2271428571428571,
+        "threes_mean": 0.0285714285714285,
+        "pra_mean": 9.7,
+        "stl_mean": 0.2273857142857142,
+        "blk_mean": 0.1860428571428571,
+        "tov_mean": 0.6201428571428571,
+        "pts_sd": 1.0564285714285715,
+        "reb_sd": 1.311785714285714,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 2.425,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "position": "C",
+        "minutes": 10.335714285714284
+      },
+      {
+        "team": "ATL",
+        "opponent": "SEA",
+        "player_name": "Laila Phelia",
+        "player_id": 4433541,
+        "pts_mean": 0.0,
+        "reb_mean": 0.0,
+        "ast_mean": 0.0,
+        "threes_mean": 0.0,
+        "pra_mean": 0.0,
+        "stl_mean": 0.242,
+        "blk_mean": 0.1979999999999999,
+        "tov_mean": 0.6599999999999999,
+        "pts_sd": 1.0,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 1.0,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "position": "nan",
+        "minutes": 11.0
+      }
+    ]
+  },
+  "home_team_total_pts_mean": 80.53,
+  "away_team_total_pts_mean": 87.18333333333334,
+  "excluded_player_keys_by_team": {
+    "SEA": [],
+    "ATL": []
+  },
+  "pregame_context": {
+    "home_injuries_out": 0,
+    "away_injuries_out": 0,
+    "home_pace": 81.48857142857142,
+    "away_pace": 82.83,
+    "home_b2b": false,
+    "away_b2b": false
+  },
+  "n_sims": 150
+}

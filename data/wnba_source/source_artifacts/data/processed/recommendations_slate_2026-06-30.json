@@ -1,0 +1,107 @@
+{
+  "date": "2026-06-30",
+  "counts": {
+    "games": 2,
+    "picks": 6
+  },
+  "per_game": [
+    {
+      "home": "IND",
+      "away": "LAS",
+      "matchup": "LAS @ IND",
+      "picks": [
+        {
+          "market": "PROPS",
+          "team": "IND",
+          "display_pick": "Damiris Dantas OVER -",
+          "selection": "OVER -",
+          "price": null,
+          "score": null,
+          "ev_pct": null,
+          "win_prob": 0.5,
+          "p_win": 0.5,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [],
+          "matchup": "LAS @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "IND",
+          "display_pick": "Shatori Walker-Kimbrough OVER -",
+          "selection": "OVER -",
+          "price": null,
+          "score": null,
+          "ev_pct": null,
+          "win_prob": 0.5,
+          "p_win": 0.5,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [],
+          "matchup": "LAS @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "IND",
+          "display_pick": "Myisha Hines-Allen OVER -",
+          "selection": "OVER -",
+          "price": null,
+          "score": null,
+          "ev_pct": null,
+          "win_prob": 0.5,
+          "p_win": 0.5,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [],
+          "matchup": "LAS @ IND"
+        }
+      ]
+    },
+    {
+      "home": "SEA",
+      "away": "ATL",
+      "matchup": "ATL @ SEA",
+      "picks": [
+        {
+          "market": "PROPS",
+          "team": "ATL",
+          "display_pick": "Brionna Jones OVER -",
+          "selection": "OVER -",
+          "price": null,
+          "score": null,
+          "ev_pct": null,
+          "win_prob": 0.5,
+          "p_win": 0.5,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [],
+          "matchup": "ATL @ SEA"
+        },
+        {
+          "market": "PROPS",
+          "team": "ATL",
+          "display_pick": "Allisha Gray OVER -",
+          "selection": "OVER -",
+          "price": null,
+          "score": null,
+          "ev_pct": null,
+          "win_prob": 0.5,
+          "p_win": 0.5,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [],
+          "matchup": "ATL @ SEA"
+        },
+        {
+          "market": "PROPS",
+          "team": "ATL",
+          "display_pick": "Jordin Canada OVER -",
+          "selection": "OVER -",
+          "price": null,
+          "score": null,
+          "ev_pct": null,
+          "win_prob": 0.5,
+          "p_win": 0.5,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [],
+          "matchup": "ATL @ SEA"
+        }
+      ]
+    }
+  ]
+}
