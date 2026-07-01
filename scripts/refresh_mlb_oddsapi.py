@@ -375,14 +375,6 @@ def _stable_doc_hash(payload: object) -> str:
     return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
 
 
-def _doc_without_retrieved_at(doc: dict[str, object] | None) -> dict[str, object] | None:
-    if not isinstance(doc, dict):
-        return None
-    cleaned = dict(doc)
-    cleaned.pop("retrieved_at", None)
-    return cleaned
-
-
 def _same_doc(existing: dict[str, object] | None, candidate: dict[str, object] | None) -> bool:
     if not isinstance(existing, dict) or not isinstance(candidate, dict):
         return False
