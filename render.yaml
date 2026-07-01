@@ -95,6 +95,7 @@ services:
         value: "1"
       - key: SYNDICATE_LIVE_ODDS_REFRESH_INTERVAL_SECONDS
         value: "30"
+      # Execute refresh jobs directly so MLB odds updates can publish on Render.
       - key: SYNDICATE_LIVE_ODDS_REFRESH_LAUNCH_MODE
         value: detached_subprocess
       - key: SYNDICATE_INTELLIGENCE_REFRESH_INTERVAL_SECONDS
