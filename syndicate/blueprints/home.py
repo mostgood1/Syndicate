@@ -171,11 +171,7 @@ def _public_health_version_payload() -> dict[str, str] | None:
 
 @home_bp.get("/healthz")
 def healthz():
-    payload: dict[str, Any] = {"ok": True, "service": "syndicate"}
-    version = _public_health_version_payload()
-    if version:
-        payload["version"] = version
-    return jsonify(payload)
+    return jsonify({"ok": True, "service": "syndicate"})
 
 
 @home_bp.get("/api/health")

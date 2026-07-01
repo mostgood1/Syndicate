@@ -56,6 +56,8 @@ Sport-specific live-lens and betting roots should point at the same mounted disk
 - NBA and WNBA source-app fallback is a compatibility path, not the normal Render data path.
 - On Render, fallback should remain disabled unless explicitly required for a recovery workflow.
 - Repo-local mirrors are acceptable only as a non-Render fallback.
+- Render health checks must stay lightweight: `/healthz` should return a constant OK payload and must not call git or build deploy metadata.
+- Use `/versionz` for detailed deploy parity checks, branch/commit inspection, and Render runtime metadata.
 
 ## WNBA artifact identity requirements
 
