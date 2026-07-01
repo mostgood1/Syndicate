@@ -42,16 +42,16 @@
     "confirmed_lineup_ids": [],
     "projected_lineup_ids": [
       682829,
-      667472,
-      701398,
-      668715,
       668709,
+      701398,
+      663993,
+      668715,
       553993,
       663886,
       680574,
       695490
     ],
-    "lineup_source": "projected_rotowire_default_vs_lhp",
+    "lineup_source": "projected_rotowire_default_vs_rhp",
     "lineup_confidence": 0.48000000000000004,
     "probable_pitcher": {
       "id": 671096,
@@ -71,14 +71,20 @@
       {
         "id": 656271,
         "name": "Brock Burke",
-        "role": "CL",
-        "lev": 0.85
+        "role": "SU",
+        "lev": 0.7
       },
       {
         "id": 657571,
         "name": "Caleb Ferguson",
         "role": "MR",
         "lev": 0.5
+      },
+      {
+        "id": 641941,
+        "name": "Emilio Pag\u00e1n",
+        "role": "CL",
+        "lev": 0.85
       },
       {
         "id": 670062,
@@ -95,18 +101,12 @@
       {
         "id": 594580,
         "name": "Sam Moll",
-        "role": "SU",
-        "lev": 0.7
-      },
-      {
-        "id": 622088,
-        "name": "Tejay Antone",
         "role": "MR",
         "lev": 0.5
       },
       {
-        "id": 685112,
-        "name": "Zach McCambley",
+        "id": 622088,
+        "name": "Tejay Antone",
         "role": "MR",
         "lev": 0.5
       },
@@ -148,30 +148,30 @@
         "vs_pitcher_history": {}
       },
       {
-        "id": 667472,
-        "name": "Dane Myers",
-        "pos": "CF",
-        "bat": "R",
-        "throw": "R",
-        "k_rate": 0.24173506611947104,
-        "bb_rate": 0.12307341541267669,
-        "hbp_rate": 0.015503875968992248,
-        "hr_rate": 0.019767441860465116,
-        "inplay_hit_rate": 0.3211612548156301,
-        "xb_hit_share": 0.17857142857142858,
+        "id": 668709,
+        "name": "JJ Bleday",
+        "pos": "LF",
+        "bat": "L",
+        "throw": "L",
+        "k_rate": 0.19740345174522095,
+        "bb_rate": 0.13543843355777416,
+        "hbp_rate": 0.0091324200913242,
+        "hr_rate": 0.058083739648634,
+        "inplay_hit_rate": 0.20337568058076225,
+        "xb_hit_share": 0.26666666666666666,
         "vs_pitch_type": {},
         "vs_pitch_type_hr": {},
         "platoon_mult_vs_lhp": {
-          "k": 1.070514029709974,
-          "bb": 0.9723363150373154,
-          "hr": 1.1726890756302522,
-          "inplay": 0.9827887736935805
+          "k": 1.0072344304392997,
+          "bb": 0.8560885714285714,
+          "hr": 0.923454363757495,
+          "inplay": 0.9651152018901439
         },
         "platoon_mult_vs_rhp": {
-          "k": 0.9312961384288901,
-          "bb": 1.0515796448827202,
-          "hr": 0.9850678733031675,
-          "inplay": 1.0040555524754673
+          "k": 0.9932159542018332,
+          "bb": 1.03742371967655,
+          "hr": 1.045540080198107,
+          "inplay": 1.0801409265840596
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -206,6 +206,35 @@
         "vs_pitcher_history": {}
       },
       {
+        "id": 663993,
+        "name": "Nathaniel Lowe",
+        "pos": "DH",
+        "bat": "L",
+        "throw": "R",
+        "k_rate": 0.24735050142379597,
+        "bb_rate": 0.1407948495728612,
+        "hbp_rate": 0.0,
+        "hr_rate": 0.03883248730964467,
+        "inplay_hit_rate": 0.30420506912442397,
+        "xb_hit_share": 0.25,
+        "vs_pitch_type": {},
+        "vs_pitch_type_hr": {},
+        "platoon_mult_vs_lhp": {
+          "k": 1.067657036870191,
+          "bb": 0.8075,
+          "hr": 0.78,
+          "inplay": 0.8075
+        },
+        "platoon_mult_vs_rhp": {
+          "k": 0.9841525659637183,
+          "bb": 0.9737621758430488,
+          "hr": 1.1621261912586265,
+          "inplay": 1.0149971596288583
+        },
+        "statcast_quality_mult": {},
+        "vs_pitcher_history": {}
+      },
+      {
         "id": 668715,
         "name": "Spencer Steer",
         "pos": "LF",
@@ -230,35 +259,6 @@
           "bb": 0.9137847947542459,
           "hr": 0.8500267850146391,
           "inplay": 1.0520289855072464
-        },
-        "statcast_quality_mult": {},
-        "vs_pitcher_history": {}
-      },
-      {
-        "id": 668709,
-        "name": "JJ Bleday",
-        "pos": "LF",
-        "bat": "L",
-        "throw": "L",
-        "k_rate": 0.19740345174522095,
-        "bb_rate": 0.13543843355777416,
-        "hbp_rate": 0.0091324200913242,
-        "hr_rate": 0.058083739648634,
-        "inplay_hit_rate": 0.20337568058076225,
-        "xb_hit_share": 0.26666666666666666,
-        "vs_pitch_type": {},
-        "vs_pitch_type_hr": {},
-        "platoon_mult_vs_lhp": {
-          "k": 1.0072344304392997,
-          "bb": 0.8560885714285714,
-          "hr": 0.923454363757495,
-          "inplay": 0.9651152018901439
-        },
-        "platoon_mult_vs_rhp": {
-          "k": 0.9932159542018332,
-          "bb": 1.03742371967655,
-          "hr": 1.045540080198107,
-          "inplay": 1.0801409265840596
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -382,6 +382,30 @@
     ],
     "bench": [
       {
+        "id": 671155,
+        "name": "Ivan Johnson",
+        "pos": "2B",
+        "bat": "S",
+        "throw": "R",
+        "k_rate": 1.0,
+        "bb_rate": 0.0,
+        "hbp_rate": 0.0,
+        "hr_rate": 0.0,
+        "inplay_hit_rate": 0.0,
+        "xb_hit_share": 0.22,
+        "vs_pitch_type": {},
+        "vs_pitch_type_hr": {},
+        "platoon_mult_vs_lhp": {},
+        "platoon_mult_vs_rhp": {
+          "k": 1.0,
+          "bb": 1.0,
+          "hr": 1.0,
+          "inplay": 1.0
+        },
+        "statcast_quality_mult": {},
+        "vs_pitcher_history": {}
+      },
+      {
         "id": 624431,
         "name": "Jose Trevino",
         "pos": "C",
@@ -406,35 +430,6 @@
           "bb": 1.1925000000000001,
           "hr": 1.0,
           "inplay": 0.8666666666666667
-        },
-        "statcast_quality_mult": {},
-        "vs_pitcher_history": {}
-      },
-      {
-        "id": 663993,
-        "name": "Nathaniel Lowe",
-        "pos": "DH",
-        "bat": "L",
-        "throw": "R",
-        "k_rate": 0.24735050142379597,
-        "bb_rate": 0.1407948495728612,
-        "hbp_rate": 0.0,
-        "hr_rate": 0.03883248730964467,
-        "inplay_hit_rate": 0.30420506912442397,
-        "xb_hit_share": 0.25,
-        "vs_pitch_type": {},
-        "vs_pitch_type_hr": {},
-        "platoon_mult_vs_lhp": {
-          "k": 1.067657036870191,
-          "bb": 0.8075,
-          "hr": 0.78,
-          "inplay": 0.8075
-        },
-        "platoon_mult_vs_rhp": {
-          "k": 0.9841525659637183,
-          "bb": 0.9737621758430488,
-          "hr": 1.1621261912586265,
-          "inplay": 1.0149971596288583
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -547,8 +542,8 @@
         "id": 656271,
         "name": "Brock Burke",
         "throw": "L",
-        "role": "CL",
-        "leverage_skill": 0.85,
+        "role": "SU",
+        "leverage_skill": 0.7,
         "stamina_pitches": 25,
         "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
@@ -593,7 +588,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.85,
         "platoon_mult_vs_lhb": {
           "k": 0.9321428571428572,
           "bb": 0.8075,
@@ -630,13 +625,55 @@
         "pitch_type_hr_mult": {}
       },
       {
+        "id": 641941,
+        "name": "Emilio Pag\u00e1n",
+        "throw": "R",
+        "role": "CL",
+        "leverage_skill": 0.85,
+        "stamina_pitches": 21,
+        "availability_mult": 1.0,
+        "platoon_mult_vs_lhb": {
+          "k": 1.097347302719572,
+          "bb": 1.0970588235294119,
+          "hr": 1.275,
+          "inplay": 1.1308803301237966
+        },
+        "platoon_mult_vs_rhb": {
+          "k": 0.9894560855996433,
+          "bb": 1.0970588235294119,
+          "hr": 0.78,
+          "inplay": 0.8282668500687758
+        },
+        "statcast_quality_mult": {},
+        "arsenal_source": "statsapi_pitchArsenal",
+        "arsenal_sample_size": 229,
+        "statcast_splits_found": false,
+        "statcast_splits_source": "",
+        "statcast_splits_n_pitches": 0,
+        "statcast_splits_start_date": "",
+        "statcast_splits_end_date": "",
+        "k_rate": 0.16444281524926688,
+        "bb_rate": 0.08225806451612903,
+        "hbp_rate": 0.016129032258064516,
+        "hr_rate": 0.04794721407624634,
+        "inplay_hit_rate": 0.33045454545454545,
+        "arsenal": {
+          "FF": 0.5895196646288201,
+          "FS": 0.20524016768558992,
+          "FC": 0.20524016768558992
+        },
+        "pitch_type_whiff_mult": {},
+        "pitch_type_inplay_mult": {},
+        "pitch_type_hr_mult": {}
+      },
+      {
         "id": 670062,
         "name": "Julian Garcia",
         "throw": "R",
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.7083333333333333,
         "platoon_mult_vs_lhb": {
           "k": 0.8075,
           "bb": 0.8075,
@@ -716,10 +753,10 @@
         "id": 594580,
         "name": "Sam Moll",
         "throw": "L",
-        "role": "SU",
-        "leverage_skill": 0.7,
+        "role": "MR",
+        "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.95,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 1.0870373657584096,
           "bb": 0.8465720013891957,
@@ -762,7 +799,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.955,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 0.8075,
           "bb": 1.1779411764705883,
@@ -801,56 +838,13 @@
         "pitch_type_hr_mult": {}
       },
       {
-        "id": 685112,
-        "name": "Zach McCambley",
-        "throw": "R",
-        "role": "MR",
-        "leverage_skill": 0.5,
-        "stamina_pitches": 25,
-        "availability_mult": 1.0,
-        "platoon_mult_vs_lhb": {
-          "k": 1.0916666666666668,
-          "bb": 1.1925000000000001,
-          "hr": 1.0,
-          "inplay": 0.8075
-        },
-        "platoon_mult_vs_rhb": {
-          "k": 0.93125,
-          "bb": 0.8075,
-          "hr": 1.0,
-          "inplay": 1.1925000000000001
-        },
-        "statcast_quality_mult": {},
-        "arsenal_source": "statsapi_pitchArsenal",
-        "arsenal_sample_size": 81,
-        "statcast_splits_found": false,
-        "statcast_splits_source": "",
-        "statcast_splits_n_pitches": 0,
-        "statcast_splits_start_date": "",
-        "statcast_splits_end_date": "",
-        "k_rate": 0.19047619047619047,
-        "bb_rate": 0.09523809523809523,
-        "hbp_rate": 0.047619047619047616,
-        "hr_rate": 0.0,
-        "inplay_hit_rate": 0.42428571428571427,
-        "arsenal": {
-          "FF": 0.2469135879012348,
-          "OTHER": 0.18518518592592595,
-          "SI": 0.02469135879012348,
-          "FC": 0.5432098673827157
-        },
-        "pitch_type_whiff_mult": {},
-        "pitch_type_inplay_mult": {},
-        "pitch_type_hr_mult": {}
-      },
-      {
         "id": 695534,
         "name": "Chase Petty",
         "throw": "R",
         "role": "LR",
         "leverage_skill": 0.35,
         "stamina_pitches": 28,
-        "availability_mult": 0.785,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 1.0091902670503308,
           "bb": 1.0562944718117133,
@@ -944,6 +938,12 @@
         "name": "Abner Uribe",
         "role": "SU",
         "lev": 0.7
+      },
+      {
+        "id": 668831,
+        "name": "Garrett Stallings",
+        "role": "MR",
+        "lev": 0.5
       },
       {
         "id": 681982,
@@ -1410,7 +1410,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.925,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 1.0122391143499323,
           "bb": 0.8882850470239222,
@@ -1489,13 +1489,47 @@
         "pitch_type_hr_mult": {}
       },
       {
+        "id": 668831,
+        "name": "Garrett Stallings",
+        "throw": "R",
+        "role": "MR",
+        "leverage_skill": 0.5,
+        "stamina_pitches": 25,
+        "availability_mult": 1.0,
+        "platoon_mult_vs_lhb": {},
+        "platoon_mult_vs_rhb": {},
+        "statcast_quality_mult": {},
+        "arsenal_source": "default",
+        "arsenal_sample_size": 0,
+        "statcast_splits_found": false,
+        "statcast_splits_source": "",
+        "statcast_splits_n_pitches": 0,
+        "statcast_splits_start_date": "",
+        "statcast_splits_end_date": "",
+        "k_rate": 0.24,
+        "bb_rate": 0.08,
+        "hbp_rate": 0.008,
+        "hr_rate": 0.03,
+        "inplay_hit_rate": 0.0,
+        "arsenal": {
+          "FF": 0.45,
+          "SL": 0.22,
+          "CH": 0.12,
+          "SI": 0.13,
+          "CU": 0.08
+        },
+        "pitch_type_whiff_mult": {},
+        "pitch_type_inplay_mult": {},
+        "pitch_type_hr_mult": {}
+      },
+      {
         "id": 681982,
         "name": "Grant Anderson",
         "throw": "R",
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.9083333333333333,
         "platoon_mult_vs_lhb": {
           "k": 0.9647556881760537,
           "bb": 1.1925000000000001,
@@ -1538,7 +1572,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.8666666666666667,
         "platoon_mult_vs_lhb": {
           "k": 1.1925000000000001,
           "bb": 0.8075,
@@ -1627,7 +1661,7 @@
         "role": "CL",
         "leverage_skill": 0.85,
         "stamina_pitches": 25,
-        "availability_mult": 0.95,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 0.8647634698578572,
           "bb": 0.9495052226498076,
@@ -1668,7 +1702,7 @@
         "role": "LR",
         "leverage_skill": 0.35,
         "stamina_pitches": 36,
-        "availability_mult": 0.895,
+        "availability_mult": 0.85,
         "platoon_mult_vs_lhb": {
           "k": 0.9468797104444229,
           "bb": 0.9228948648506521,

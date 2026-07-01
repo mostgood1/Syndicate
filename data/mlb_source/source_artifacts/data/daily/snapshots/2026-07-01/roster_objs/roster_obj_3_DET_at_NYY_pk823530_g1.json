@@ -1706,7 +1706,7 @@
           "arsenal_sample_size": 110,
           "stamina_pitches": 25,
           "role": "MR",
-          "availability_mult": 0.885,
+          "availability_mult": 1.0,
           "platoon_mult_vs_lhb": {
             "k": 1.00391532409142,
             "bb": 0.8075,
@@ -1776,7 +1776,7 @@
           "arsenal_sample_size": 73,
           "stamina_pitches": 25,
           "role": "MR",
-          "availability_mult": 1.0,
+          "availability_mult": 0.7083333333333333,
           "platoon_mult_vs_lhb": {
             "k": 0.8075,
             "bb": 1.1925000000000001,
@@ -2102,7 +2102,7 @@
           "arsenal_sample_size": 821,
           "stamina_pitches": 28,
           "role": "SU",
-          "availability_mult": 0.96,
+          "availability_mult": 1.0,
           "platoon_mult_vs_lhb": {
             "k": 0.9184085903083701,
             "bb": 0.8804807692307692,
@@ -3819,7 +3819,7 @@
           "arsenal_sample_size": 598,
           "stamina_pitches": 25,
           "role": "MR",
-          "availability_mult": 0.955,
+          "availability_mult": 1.0,
           "platoon_mult_vs_lhb": {
             "k": 1.049964851938792,
             "bb": 1.0531485629554846,
@@ -3905,7 +3905,7 @@
           "arsenal_sample_size": 490,
           "stamina_pitches": 25,
           "role": "SU",
-          "availability_mult": 0.925,
+          "availability_mult": 1.0,
           "platoon_mult_vs_lhb": {
             "k": 0.9204202340938995,
             "bb": 1.008651026392962,
@@ -4077,7 +4077,7 @@
           "arsenal_sample_size": 414,
           "stamina_pitches": 25,
           "role": "MR",
-          "availability_mult": 0.9299999999999999,
+          "availability_mult": 0.9333333333333333,
           "platoon_mult_vs_lhb": {
             "k": 0.901686823007004,
             "bb": 0.9391139037861203,
@@ -4253,7 +4253,7 @@
           "arsenal_sample_size": 477,
           "stamina_pitches": 26,
           "role": "CL",
-          "availability_mult": 0.905,
+          "availability_mult": 0.7833333333333333,
           "platoon_mult_vs_lhb": {
             "k": 0.9412007184789852,
             "bb": 1.1482818899210867,
@@ -4338,7 +4338,7 @@
           "arsenal_sample_size": 393,
           "stamina_pitches": 25,
           "role": "MR",
-          "availability_mult": 0.955,
+          "availability_mult": 1.0,
           "platoon_mult_vs_lhb": {
             "k": 1.078626561951799,
             "bb": 0.8075,
@@ -4384,6 +4384,70 @@
               "inplay_mult": 1.35
             }
           },
+          "statcast_quality_mult": {},
+          "bb_gb_rate": 0.44,
+          "bb_fb_rate": 0.25,
+          "bb_ld_rate": 0.2,
+          "bb_pu_rate": 0.11,
+          "bb_inplay_n": 0,
+          "leverage_skill": 0.5
+        },
+        {
+          "player": {
+            "mlbam_id": 672442,
+            "full_name": "Yovanny Cruz",
+            "primary_position": "P",
+            "bat_side": "R",
+            "throw_side": "R"
+          },
+          "k_rate": 0.4,
+          "bb_rate": 0.0,
+          "hbp_rate": 0.06666666666666667,
+          "hr_rate": 0.0,
+          "inplay_hit_rate": 0.12291666666666666,
+          "batters_faced": 15.0,
+          "balls_in_play": 8.0,
+          "arsenal": {
+            "FF": 0.3913043439130434,
+            "SL": 0.4565217545652176,
+            "FS": 0.152173901521739
+          },
+          "pitch_type_whiff_mult": {},
+          "pitch_type_inplay_mult": {},
+          "pitch_type_hr_mult": {},
+          "statcast_splits_source": "",
+          "statcast_splits_n_pitches": 0,
+          "statcast_splits_start_date": "",
+          "statcast_splits_end_date": "",
+          "arsenal_source": "statsapi_pitchArsenal",
+          "arsenal_sample_size": 46,
+          "stamina_pitches": 24,
+          "role": "MR",
+          "availability_mult": 0.8333333333333334,
+          "platoon_mult_vs_lhb": {
+            "k": 0.9083333333333333,
+            "bb": 1.0,
+            "hr": 1.0,
+            "inplay": 0.8075
+          },
+          "platoon_mult_vs_rhb": {
+            "k": 1.1375,
+            "bb": 1.0,
+            "hr": 1.0,
+            "inplay": 1.1925000000000001
+          },
+          "venue_mult_home": {
+            "k": 1.0,
+            "bb": 1.0,
+            "hr": 1.0,
+            "inplay": 1.0059322033898306
+          },
+          "venue_mult_away": {},
+          "vs_venue_hr_mult": {},
+          "vs_venue_k_mult": {},
+          "vs_venue_bb_mult": {},
+          "vs_venue_inplay_mult": {},
+          "vs_venue_history": {},
           "statcast_quality_mult": {},
           "bb_gb_rate": 0.44,
           "bb_fb_rate": 0.25,

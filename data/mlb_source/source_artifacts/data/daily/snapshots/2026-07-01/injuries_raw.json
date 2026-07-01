@@ -993,9 +993,9 @@
         "abbreviation": "CIN"
       },
       "injured_ids": [
-        641941,
         663574,
         663647,
+        667472,
         668881,
         668933,
         682227,
@@ -1033,17 +1033,17 @@
           "roster_type_source": "40Man"
         },
         {
-          "player_id": 641941,
-          "full_name": "Emilio Pag\u00e1n",
+          "player_id": 667472,
+          "full_name": "Dane Myers",
           "status": {
-            "code": "D15",
-            "description": "Injured 15-Day"
+            "code": "D10",
+            "description": "Injured 10-Day"
           },
           "position": {
-            "code": "1",
-            "name": "Pitcher",
-            "type": "Pitcher",
-            "abbreviation": "P"
+            "code": "8",
+            "name": "Outfielder",
+            "type": "Outfielder",
+            "abbreviation": "CF"
           },
           "roster_type_source": "40Man"
         },
@@ -1163,7 +1163,6 @@
         592178,
         677955,
         680604,
-        685299,
         685326,
         686668,
         700327,
@@ -1282,21 +1281,6 @@
           "status": {
             "code": "D60",
             "description": "Injured 60-Day"
-          },
-          "position": {
-            "code": "1",
-            "name": "Pitcher",
-            "type": "Pitcher",
-            "abbreviation": "P"
-          },
-          "roster_type_source": "40Man"
-        },
-        {
-          "player_id": 685299,
-          "full_name": "Tanner Gordon",
-          "status": {
-            "code": "D15",
-            "description": "Injured 15-Day"
           },
           "position": {
             "code": "1",
@@ -1522,6 +1506,7 @@
         656986,
         664299,
         664774,
+        665161,
         669699,
         669713,
         669854,
@@ -1615,6 +1600,21 @@
             "name": "Pitcher",
             "type": "Pitcher",
             "abbreviation": "P"
+          },
+          "roster_type_source": "40Man"
+        },
+        {
+          "player_id": 665161,
+          "full_name": "Jeremy Pe\u00f1a",
+          "status": {
+            "code": "D10",
+            "description": "Injured 10-Day"
+          },
+          "position": {
+            "code": "6",
+            "name": "Shortstop",
+            "type": "Infielder",
+            "abbreviation": "SS"
           },
           "roster_type_source": "40Man"
         },
@@ -3019,8 +3019,7 @@
         "abbreviation": "STL"
       },
       "injured_ids": [
-        602104,
-        681676
+        602104
       ],
       "injured": [
         {
@@ -3035,21 +3034,6 @@
             "name": "Third Base",
             "type": "Infielder",
             "abbreviation": "3B"
-          },
-          "roster_type_source": "40Man"
-        },
-        {
-          "player_id": 681676,
-          "full_name": "Ryan Fernandez",
-          "status": {
-            "code": "D15",
-            "description": "Injured 15-Day"
-          },
-          "position": {
-            "code": "1",
-            "name": "Pitcher",
-            "type": "Pitcher",
-            "abbreviation": "P"
           },
           "roster_type_source": "40Man"
         }
@@ -4147,10 +4131,10 @@
         "abbreviation": "MIA"
       },
       "injured_ids": [
+        669622,
         676083,
         677053,
         678692,
-        689414,
         694795,
         702281,
         800049
@@ -4187,6 +4171,21 @@
           "roster_type_source": "40Man"
         },
         {
+          "player_id": 669622,
+          "full_name": "Anthony Bender",
+          "status": {
+            "code": "D15",
+            "description": "Injured 15-Day"
+          },
+          "position": {
+            "code": "1",
+            "name": "Pitcher",
+            "type": "Pitcher",
+            "abbreviation": "P"
+          },
+          "roster_type_source": "40Man"
+        },
+        {
           "player_id": 676083,
           "full_name": "Janson Junk",
           "status": {
@@ -4213,21 +4212,6 @@
             "name": "Pitcher",
             "type": "Pitcher",
             "abbreviation": "P"
-          },
-          "roster_type_source": "40Man"
-        },
-        {
-          "player_id": 689414,
-          "full_name": "Liam Hicks",
-          "status": {
-            "code": "D10",
-            "description": "Injured 10-Day"
-          },
-          "position": {
-            "code": "2",
-            "name": "Catcher",
-            "type": "Catcher",
-            "abbreviation": "C"
           },
           "roster_type_source": "40Man"
         },
@@ -5489,17 +5473,17 @@
     },
     {
       "team_id": 113,
-      "player_id": 641941,
-      "full_name": "Emilio Pag\u00e1n",
+      "player_id": 667472,
+      "full_name": "Dane Myers",
       "status": {
-        "code": "D15",
-        "description": "Injured 15-Day"
+        "code": "D10",
+        "description": "Injured 10-Day"
       },
       "position": {
-        "code": "1",
-        "name": "Pitcher",
-        "type": "Pitcher",
-        "abbreviation": "P"
+        "code": "8",
+        "name": "Outfielder",
+        "type": "Outfielder",
+        "abbreviation": "CF"
       },
       "roster_type_source": "40Man"
     },
@@ -5718,22 +5702,6 @@
       "status": {
         "code": "D60",
         "description": "Injured 60-Day"
-      },
-      "position": {
-        "code": "1",
-        "name": "Pitcher",
-        "type": "Pitcher",
-        "abbreviation": "P"
-      },
-      "roster_type_source": "40Man"
-    },
-    {
-      "team_id": 115,
-      "player_id": 685299,
-      "full_name": "Tanner Gordon",
-      "status": {
-        "code": "D15",
-        "description": "Injured 15-Day"
       },
       "position": {
         "code": "1",
@@ -6028,6 +5996,22 @@
         "name": "Pitcher",
         "type": "Pitcher",
         "abbreviation": "P"
+      },
+      "roster_type_source": "40Man"
+    },
+    {
+      "team_id": 117,
+      "player_id": 665161,
+      "full_name": "Jeremy Pe\u00f1a",
+      "status": {
+        "code": "D10",
+        "description": "Injured 10-Day"
+      },
+      "position": {
+        "code": "6",
+        "name": "Shortstop",
+        "type": "Infielder",
+        "abbreviation": "SS"
       },
       "roster_type_source": "40Man"
     },
@@ -7344,22 +7328,6 @@
       "roster_type_source": "40Man"
     },
     {
-      "team_id": 138,
-      "player_id": 681676,
-      "full_name": "Ryan Fernandez",
-      "status": {
-        "code": "D15",
-        "description": "Injured 15-Day"
-      },
-      "position": {
-        "code": "1",
-        "name": "Pitcher",
-        "type": "Pitcher",
-        "abbreviation": "P"
-      },
-      "roster_type_source": "40Man"
-    },
-    {
       "team_id": 139,
       "player_id": 670955,
       "full_name": "Edwin Uceta",
@@ -8401,6 +8369,22 @@
     },
     {
       "team_id": 146,
+      "player_id": 669622,
+      "full_name": "Anthony Bender",
+      "status": {
+        "code": "D15",
+        "description": "Injured 15-Day"
+      },
+      "position": {
+        "code": "1",
+        "name": "Pitcher",
+        "type": "Pitcher",
+        "abbreviation": "P"
+      },
+      "roster_type_source": "40Man"
+    },
+    {
+      "team_id": 146,
       "player_id": 676083,
       "full_name": "Janson Junk",
       "status": {
@@ -8428,22 +8412,6 @@
         "name": "Pitcher",
         "type": "Pitcher",
         "abbreviation": "P"
-      },
-      "roster_type_source": "40Man"
-    },
-    {
-      "team_id": 146,
-      "player_id": 689414,
-      "full_name": "Liam Hicks",
-      "status": {
-        "code": "D10",
-        "description": "Injured 10-Day"
-      },
-      "position": {
-        "code": "2",
-        "name": "Catcher",
-        "type": "Catcher",
-        "abbreviation": "C"
       },
       "roster_type_source": "40Man"
     },

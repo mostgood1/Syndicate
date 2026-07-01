@@ -2,7 +2,7 @@
   "date": "2026-07-01",
   "season": 2026,
   "spring_mode": false,
-  "generated_at": "2026-06-30T07:30:42.123954",
+  "generated_at": "2026-07-01T07:31:27.494911",
   "games": [
     {
       "idx": 0,
@@ -15,23 +15,27 @@
         "team_id": 110,
         "abbr": "BAL"
       },
-      "away_probable_id": null,
+      "away_probable_id": 702273,
       "home_probable_id": null,
-      "away_source": "none",
+      "away_source": "feed_gameData_probablePitchers",
       "home_source": "none",
-      "away_confidence": 0.0,
+      "away_confidence": 0.75,
       "home_confidence": 0.0,
       "away_validation": {
-        "status": "none",
-        "selected_id": null,
-        "selected_name": "",
-        "selected_source": "none",
+        "status": "ok",
+        "selected_id": 702273,
+        "selected_name": "Noah Schultz",
+        "selected_source": "feed_gameData_probablePitchers",
         "override_reason": "",
-        "roster_team_ids": [],
-        "registry_team_ids": [],
-        "on_expected_team": false,
+        "roster_team_ids": [
+          145
+        ],
+        "registry_team_ids": [
+          145
+        ],
+        "on_expected_team": true,
         "on_opponent_team": false,
-        "on_expected_registry_team": false,
+        "on_expected_registry_team": true,
         "on_opponent_registry_team": false,
         "rejected_candidates": []
       },
@@ -50,13 +54,13 @@
         "rejected_candidates": []
       },
       "raw": {
-        "away_schedule_id": null,
+        "away_schedule_id": 702273,
         "home_schedule_id": null,
-        "away_schedule_name": "",
+        "away_schedule_name": "Noah Schultz",
         "home_schedule_name": "",
-        "away_feed_id": null,
+        "away_feed_id": 702273,
         "home_feed_id": null,
-        "away_feed_name": "",
+        "away_feed_name": "Noah Schultz",
         "home_feed_name": ""
       }
     },
@@ -328,7 +332,7 @@
         "abbr": "TOR"
       },
       "away_probable_id": 642547,
-      "home_probable_id": 571578,
+      "home_probable_id": 680755,
       "away_source": "feed_gameData_probablePitchers",
       "home_source": "feed_gameData_probablePitchers",
       "away_confidence": 0.75,
@@ -353,8 +357,8 @@
       },
       "home_validation": {
         "status": "ok",
-        "selected_id": 571578,
-        "selected_name": "Patrick Corbin",
+        "selected_id": 680755,
+        "selected_name": "Braydon Fisher",
         "selected_source": "feed_gameData_probablePitchers",
         "override_reason": "",
         "roster_team_ids": [
@@ -371,13 +375,13 @@
       },
       "raw": {
         "away_schedule_id": 642547,
-        "home_schedule_id": 571578,
+        "home_schedule_id": 680755,
         "away_schedule_name": "Freddy Peralta",
-        "home_schedule_name": "Patrick Corbin",
+        "home_schedule_name": "Braydon Fisher",
         "away_feed_id": 642547,
-        "home_feed_id": 571578,
+        "home_feed_id": 680755,
         "away_feed_name": "Freddy Peralta",
-        "home_feed_name": "Patrick Corbin"
+        "home_feed_name": "Braydon Fisher"
       }
     },
     {
@@ -775,27 +779,23 @@
         "team_id": 133,
         "abbr": "ATH"
       },
-      "away_probable_id": 660271,
+      "away_probable_id": null,
       "home_probable_id": 669372,
-      "away_source": "feed_gameData_probablePitchers",
+      "away_source": "none",
       "home_source": "feed_gameData_probablePitchers",
-      "away_confidence": 0.75,
+      "away_confidence": 0.0,
       "home_confidence": 0.75,
       "away_validation": {
-        "status": "ok",
-        "selected_id": 660271,
-        "selected_name": "Shohei Ohtani",
-        "selected_source": "feed_gameData_probablePitchers",
+        "status": "none",
+        "selected_id": null,
+        "selected_name": "",
+        "selected_source": "none",
         "override_reason": "",
-        "roster_team_ids": [
-          119
-        ],
-        "registry_team_ids": [
-          119
-        ],
-        "on_expected_team": true,
+        "roster_team_ids": [],
+        "registry_team_ids": [],
+        "on_expected_team": false,
         "on_opponent_team": false,
-        "on_expected_registry_team": true,
+        "on_expected_registry_team": false,
         "on_opponent_registry_team": false,
         "rejected_candidates": []
       },
@@ -818,13 +818,13 @@
         "rejected_candidates": []
       },
       "raw": {
-        "away_schedule_id": 660271,
+        "away_schedule_id": null,
         "home_schedule_id": 669372,
-        "away_schedule_name": "Shohei Ohtani",
+        "away_schedule_name": "",
         "home_schedule_name": "J.T. Ginn",
-        "away_feed_id": 660271,
+        "away_feed_id": null,
         "home_feed_id": 669372,
-        "away_feed_name": "Shohei Ohtani",
+        "away_feed_name": "",
         "home_feed_name": "J.T. Ginn"
       }
     },

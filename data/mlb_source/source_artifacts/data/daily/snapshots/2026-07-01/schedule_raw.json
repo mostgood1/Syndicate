@@ -65,10 +65,15 @@
           "active": true
         },
         "leagueRecord": {
-          "wins": 44,
+          "wins": 45,
           "losses": 39,
           "ties": 0,
-          "pct": ".530"
+          "pct": ".536"
+        },
+        "probablePitcher": {
+          "id": 702273,
+          "fullName": "Noah Schultz",
+          "link": "/api/v1/people/702273"
         },
         "splitSquad": false,
         "seriesNumber": 28,
@@ -129,9 +134,9 @@
         },
         "leagueRecord": {
           "wins": 39,
-          "losses": 47,
+          "losses": 48,
           "ties": 0,
-          "pct": ".453"
+          "pct": ".448"
         },
         "splitSquad": false,
         "seriesNumber": 28,
@@ -235,10 +240,10 @@
           "active": true
         },
         "leagueRecord": {
-          "wins": 43,
+          "wins": 44,
           "losses": 42,
           "ties": 0,
-          "pct": ".506"
+          "pct": ".512"
         },
         "probablePitcher": {
           "id": 669022,
@@ -304,9 +309,9 @@
         },
         "leagueRecord": {
           "wins": 44,
-          "losses": 41,
+          "losses": 42,
           "ties": 0,
-          "pct": ".518"
+          "pct": ".512"
         },
         "probablePitcher": {
           "id": 676282,
@@ -415,10 +420,10 @@
           "active": true
         },
         "leagueRecord": {
-          "wins": 43,
+          "wins": 44,
           "losses": 43,
           "ties": 0,
-          "pct": ".500"
+          "pct": ".506"
         },
         "probablePitcher": {
           "id": 674841,
@@ -484,9 +489,9 @@
         },
         "leagueRecord": {
           "wins": 37,
-          "losses": 46,
+          "losses": 47,
           "ties": 0,
-          "pct": ".446"
+          "pct": ".440"
         },
         "probablePitcher": {
           "id": 801139,
@@ -595,10 +600,10 @@
           "active": true
         },
         "leagueRecord": {
-          "wins": 36,
+          "wins": 37,
           "losses": 49,
           "ties": 0,
-          "pct": ".424"
+          "pct": ".430"
         },
         "probablePitcher": {
           "id": 675512,
@@ -664,9 +669,9 @@
         },
         "leagueRecord": {
           "wins": 48,
-          "losses": 36,
+          "losses": 37,
           "ties": 0,
-          "pct": ".571"
+          "pct": ".565"
         },
         "probablePitcher": {
           "id": 701542,
@@ -776,9 +781,9 @@
         },
         "leagueRecord": {
           "wins": 43,
-          "losses": 40,
+          "losses": 41,
           "ties": 0,
-          "pct": ".518"
+          "pct": ".512"
         },
         "probablePitcher": {
           "id": 621111,
@@ -843,10 +848,10 @@
           "active": true
         },
         "leagueRecord": {
-          "wins": 47,
+          "wins": 48,
           "losses": 38,
           "ties": 0,
-          "pct": ".553"
+          "pct": ".558"
         },
         "probablePitcher": {
           "id": 607067,
@@ -955,10 +960,10 @@
           "active": true
         },
         "leagueRecord": {
-          "wins": 35,
+          "wins": 36,
           "losses": 50,
           "ties": 0,
-          "pct": ".412"
+          "pct": ".419"
         },
         "probablePitcher": {
           "id": 642547,
@@ -1024,14 +1029,14 @@
         },
         "leagueRecord": {
           "wins": 40,
-          "losses": 45,
+          "losses": 46,
           "ties": 0,
-          "pct": ".471"
+          "pct": ".465"
         },
         "probablePitcher": {
-          "id": 571578,
-          "fullName": "Patrick Corbin",
-          "link": "/api/v1/people/571578"
+          "id": 680755,
+          "fullName": "Braydon Fisher",
+          "link": "/api/v1/people/680755"
         },
         "splitSquad": false,
         "seriesNumber": 28,
@@ -1136,9 +1141,9 @@
         },
         "leagueRecord": {
           "wins": 43,
-          "losses": 42,
+          "losses": 43,
           "ties": 0,
-          "pct": ".506"
+          "pct": ".500"
         },
         "probablePitcher": {
           "id": 694973,
@@ -1203,10 +1208,10 @@
           "active": true
         },
         "leagueRecord": {
-          "wins": 47,
+          "wins": 48,
           "losses": 38,
           "ties": 0,
-          "pct": ".553"
+          "pct": ".558"
         },
         "probablePitcher": {
           "id": 554430,
@@ -1315,10 +1320,10 @@
           "active": true
         },
         "leagueRecord": {
-          "wins": 43,
+          "wins": 44,
           "losses": 38,
           "ties": 0,
-          "pct": ".531"
+          "pct": ".537"
         },
         "probablePitcher": {
           "id": 700241,
@@ -1384,9 +1389,9 @@
         },
         "leagueRecord": {
           "wins": 49,
-          "losses": 33,
+          "losses": 34,
           "ties": 0,
-          "pct": ".598"
+          "pct": ".590"
         },
         "probablePitcher": {
           "id": 625643,
@@ -1495,10 +1500,10 @@
           "active": true
         },
         "leagueRecord": {
-          "wins": 48,
+          "wins": 49,
           "losses": 33,
           "ties": 0,
-          "pct": ".593"
+          "pct": ".598"
         },
         "probablePitcher": {
           "id": 663556,
@@ -1564,9 +1569,9 @@
         },
         "leagueRecord": {
           "wins": 35,
-          "losses": 50,
+          "losses": 51,
           "ties": 0,
-          "pct": ".412"
+          "pct": ".407"
         },
         "probablePitcher": {
           "id": 607625,
@@ -1676,9 +1681,9 @@
         },
         "leagueRecord": {
           "wins": 41,
-          "losses": 45,
+          "losses": 46,
           "ties": 0,
-          "pct": ".477"
+          "pct": ".471"
         },
         "probablePitcher": {
           "id": 671737,
@@ -1743,10 +1748,10 @@
           "active": true
         },
         "leagueRecord": {
-          "wins": 42,
+          "wins": 43,
           "losses": 45,
           "ties": 0,
-          "pct": ".483"
+          "pct": ".489"
         },
         "probablePitcher": {
           "id": 837227,
@@ -1856,9 +1861,9 @@
         },
         "leagueRecord": {
           "wins": 39,
-          "losses": 44,
+          "losses": 45,
           "ties": 0,
-          "pct": ".470"
+          "pct": ".464"
         },
         "probablePitcher": {
           "id": 671096,
@@ -1923,10 +1928,10 @@
           "active": true
         },
         "leagueRecord": {
-          "wins": 51,
+          "wins": 52,
           "losses": 31,
           "ties": 0,
-          "pct": ".622"
+          "pct": ".627"
         },
         "probablePitcher": {
           "id": 675660,
@@ -2035,10 +2040,10 @@
           "active": true
         },
         "leagueRecord": {
-          "wins": 45,
+          "wins": 46,
           "losses": 40,
           "ties": 0,
-          "pct": ".529"
+          "pct": ".535"
         },
         "probablePitcher": {
           "id": 676974,
@@ -2104,9 +2109,9 @@
         },
         "leagueRecord": {
           "wins": 33,
-          "losses": 52,
+          "losses": 53,
           "ties": 0,
-          "pct": ".388"
+          "pct": ".384"
         },
         "probablePitcher": {
           "id": 607536,
@@ -2215,15 +2220,10 @@
           "active": true
         },
         "leagueRecord": {
-          "wins": 55,
+          "wins": 56,
           "losses": 30,
           "ties": 0,
-          "pct": ".647"
-        },
-        "probablePitcher": {
-          "id": 660271,
-          "fullName": "Shohei Ohtani",
-          "link": "/api/v1/people/660271"
+          "pct": ".651"
         },
         "splitSquad": false,
         "seriesNumber": 28,
@@ -2284,9 +2284,9 @@
         },
         "leagueRecord": {
           "wins": 40,
-          "losses": 45,
+          "losses": 46,
           "ties": 0,
-          "pct": ".471"
+          "pct": ".465"
         },
         "probablePitcher": {
           "id": 669372,
@@ -2396,9 +2396,9 @@
         },
         "leagueRecord": {
           "wins": 35,
-          "losses": 49,
+          "losses": 50,
           "ties": 0,
-          "pct": ".417"
+          "pct": ".412"
         },
         "probablePitcher": {
           "id": 686790,
@@ -2463,10 +2463,10 @@
           "active": true
         },
         "leagueRecord": {
-          "wins": 42,
+          "wins": 43,
           "losses": 42,
           "ties": 0,
-          "pct": ".500"
+          "pct": ".506"
         },
         "probablePitcher": {
           "id": 668678,

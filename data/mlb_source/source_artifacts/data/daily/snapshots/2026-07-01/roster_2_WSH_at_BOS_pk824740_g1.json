@@ -93,6 +93,12 @@
         "lev": 0.7
       },
       {
+        "id": 683000,
+        "name": "Riley Cornelio",
+        "role": "MR",
+        "lev": 0.5
+      },
+      {
         "id": 687849,
         "name": "Zak Kent",
         "role": "MR",
@@ -665,7 +671,7 @@
         "role": "SU",
         "leverage_skill": 0.7,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.85,
         "platoon_mult_vs_lhb": {
           "k": 1.008465874376712,
           "bb": 1.1925000000000001,
@@ -702,13 +708,54 @@
         "pitch_type_hr_mult": {}
       },
       {
+        "id": 683000,
+        "name": "Riley Cornelio",
+        "throw": "R",
+        "role": "MR",
+        "leverage_skill": 0.5,
+        "stamina_pitches": 27,
+        "availability_mult": 1.0,
+        "platoon_mult_vs_lhb": {
+          "k": 0.8075,
+          "bb": 1.006043956043956,
+          "hr": 1.0,
+          "inplay": 0.8075
+        },
+        "platoon_mult_vs_rhb": {
+          "k": 1.1925000000000001,
+          "bb": 0.9921428571428571,
+          "hr": 1.0,
+          "inplay": 1.1925000000000001
+        },
+        "statcast_quality_mult": {},
+        "arsenal_source": "statsapi_pitchArsenal",
+        "arsenal_sample_size": 86,
+        "statcast_splits_found": false,
+        "statcast_splits_source": "",
+        "statcast_splits_n_pitches": 0,
+        "statcast_splits_start_date": "",
+        "statcast_splits_end_date": "",
+        "k_rate": 0.08695652173913042,
+        "bb_rate": 0.30434782608695654,
+        "hbp_rate": 0.0,
+        "hr_rate": 0.0,
+        "inplay_hit_rate": 0.2857142857142857,
+        "arsenal": {
+          "FF": 0.60465115,
+          "SL": 0.39534885
+        },
+        "pitch_type_whiff_mult": {},
+        "pitch_type_inplay_mult": {},
+        "pitch_type_hr_mult": {}
+      },
+      {
         "id": 687849,
         "name": "Zak Kent",
         "throw": "R",
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 26,
-        "availability_mult": 0.905,
+        "availability_mult": 0.925,
         "platoon_mult_vs_lhb": {
           "k": 1.0512422360248448,
           "bb": 1.0813043478260869,
@@ -751,7 +798,7 @@
         "role": "LR",
         "leverage_skill": 0.35,
         "stamina_pitches": 46,
-        "availability_mult": 0.515,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 0.9954907350362543,
           "bb": 1.130213517625519,
@@ -1212,25 +1259,25 @@
         "pos": "1B",
         "bat": "R",
         "throw": "R",
-        "k_rate": 0.0,
+        "k_rate": 0.14285714285714285,
         "bb_rate": 0.0,
         "hbp_rate": 0.0,
         "hr_rate": 0.0,
-        "inplay_hit_rate": 0.0,
-        "xb_hit_share": 0.22,
+        "inplay_hit_rate": 0.16666666666666666,
+        "xb_hit_share": 0.05,
         "vs_pitch_type": {},
         "vs_pitch_type_hr": {},
         "platoon_mult_vs_lhp": {
-          "k": 1.0,
+          "k": 0.8075,
           "bb": 1.0,
           "hr": 1.0,
-          "inplay": 1.0
+          "inplay": 0.8075
         },
         "platoon_mult_vs_rhp": {
-          "k": 1.0,
+          "k": 1.1925000000000001,
           "bb": 1.0,
           "hr": 1.0,
-          "inplay": 1.0
+          "inplay": 1.1925000000000001
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -1241,11 +1288,11 @@
         "pos": "SS",
         "bat": "L",
         "throw": "R",
-        "k_rate": 0.21428571428571427,
-        "bb_rate": 0.07142857142857142,
+        "k_rate": 0.1764705882352941,
+        "bb_rate": 0.058823529411764705,
         "hbp_rate": 0.0,
         "hr_rate": 0.0,
-        "inplay_hit_rate": 0.2,
+        "inplay_hit_rate": 0.15384615384615385,
         "xb_hit_share": 0.45,
         "vs_pitch_type": {},
         "vs_pitch_type_hr": {},
@@ -1257,7 +1304,7 @@
         },
         "platoon_mult_vs_rhp": {
           "k": 0.8075,
-          "bb": 1.1500000000000001,
+          "bb": 1.1178571428571429,
           "hr": 1.0,
           "inplay": 1.0
         },
@@ -1360,7 +1407,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.905,
+        "availability_mult": 0.8833333333333333,
         "platoon_mult_vs_lhb": {
           "k": 1.0563947078280045,
           "bb": 1.1190997566909977,
@@ -1404,7 +1451,7 @@
         "role": "SU",
         "leverage_skill": 0.7,
         "stamina_pitches": 25,
-        "availability_mult": 0.945,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 1.1469418795111328,
           "bb": 1.1925000000000001,
@@ -1446,7 +1493,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.7666666666666666,
         "platoon_mult_vs_lhb": {
           "k": 0.8075,
           "bb": 1.1925000000000001,
@@ -1491,7 +1538,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.8916666666666666,
         "platoon_mult_vs_lhb": {
           "k": 1.0902116402116404,
           "bb": 0.8075,
@@ -1535,7 +1582,7 @@
         "role": "SU",
         "leverage_skill": 0.7,
         "stamina_pitches": 27,
-        "availability_mult": 1.0,
+        "availability_mult": 0.9166666666666666,
         "platoon_mult_vs_lhb": {
           "k": 0.9288048077010563,
           "bb": 1.1925000000000001,
@@ -1580,7 +1627,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.75,
         "platoon_mult_vs_lhb": {
           "k": 0.9046666666666666,
           "bb": 1.1320000000000001,
@@ -1622,7 +1669,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.925,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 1.182461355529132,
           "bb": 1.1925000000000001,
