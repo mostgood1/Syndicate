@@ -19,7 +19,7 @@ services:
     name: syndicate
     env: python
     plan: standard
-    autoDeploy: true
+    autoDeploy: false
     buildCommand: pip install -r requirements.txt
     startCommand: sh -c 'PORT=${PORT:-10000}; exec gunicorn wsgi:application --bind 0.0.0.0:$PORT --workers ${WEB_CONCURRENCY:-1} --threads ${GUNICORN_THREADS:-1} --timeout ${GUNICORN_TIMEOUT:-60} --graceful-timeout ${GUNICORN_GRACEFUL_TIMEOUT:-30} --keep-alive ${GUNICORN_KEEPALIVE:-5}'
     healthCheckPath: /healthz
@@ -145,7 +145,7 @@ services:
     name: refresh-worker
     env: python
     plan: standard
-    autoDeploy: true
+    autoDeploy: false
     buildCommand: pip install -r requirements.txt
     startCommand: python scripts/run_refresh_worker.py
     disk:
@@ -267,7 +267,7 @@ services:
     name: live-odds-worker
     env: python
     plan: standard
-    autoDeploy: true
+    autoDeploy: false
     buildCommand: pip install -r requirements.txt
     startCommand: python scripts/run_live_odds_refresh_worker.py
     disk:
