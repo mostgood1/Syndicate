@@ -422,11 +422,13 @@ def api_source_team_logo(team_id: str):
 def api_source_cards():
     selected_date = _selected_date()
     try:
+        payload = build_source_cards_payload(selected_date, allow_stored_date_fallback=True)
+        if isinstance(payload, dict) and payload.get("games"):
+            return jsonify(payload)
         if selected_date == central_today_iso():
             public_payload = _public_scoreboard_source_cards_payload(selected_date)
             if isinstance(public_payload, dict) and public_payload.get("games"):
                 return jsonify(public_payload)
-        payload = build_source_cards_payload(selected_date, allow_stored_date_fallback=True)
         return jsonify(payload)
     except Exception:
         return jsonify(_snapshot_unavailable_payload())

@@ -2755,6 +2755,12 @@ class DateArchiveHelperTests(unittest.TestCase):
         with patch(
             "syndicate.blueprints.wnba.build_source_cards_payload",
             return_value=local_payload,
+        ) as build_payload_mock, patch(
+            "syndicate.blueprints.wnba._public_scoreboard_source_cards_payload",
+            side_effect=AssertionError("WNBA source cards should prefer artifact-backed payloads before public scoreboard fallback"),
+        ), patch(
+            "syndicate.blueprints.wnba.central_today_iso",
+            return_value="2026-05-21",
         ), patch(
             "syndicate.features.wnba.source_proxy.source_web_text",
             side_effect=AssertionError("WNBA source proxy assets should not be used for source cards"),
@@ -2763,6 +2769,7 @@ class DateArchiveHelperTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.get_json(), local_payload)
+        build_payload_mock.assert_called_once_with("2026-05-21", allow_stored_date_fallback=True)
 
     def test_wnba_api_source_cards_sim_detail_uses_local_builder_without_source_proxy(self) -> None:
         app = create_app()
