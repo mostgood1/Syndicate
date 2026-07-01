@@ -81,6 +81,34 @@ class WnbaApiSnapshotErrorTests(unittest.TestCase):
         self.assertIsInstance(payload, dict)
         self.assertEqual(payload, {"ok": False, "error": "snapshot_unavailable", "cards": []})
 
+    def test_wnba_live_state_api_uses_stored_date_fallback(self) -> None:
+        app = create_app()
+        app.config.update(TESTING=True)
+        client = app.test_client()
+
+        payload = {"ok": True, "date": "2026-07-01", "games": [{"event_id": "evt-1"}]}
+        with patch("syndicate.blueprints.wnba.build_live_state_payload", return_value=payload) as build_payload:
+            response = client.get("/wnba/api/live_state?date=2026-07-01")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json(), payload)
+        self.assertEqual(build_payload.call_count, 1)
+        self.assertEqual(build_payload.call_args.kwargs.get("allow_stored_date_fallback"), True)
+
+    def test_wnba_live_lines_api_uses_stored_date_fallback(self) -> None:
+        app = create_app()
+        app.config.update(TESTING=True)
+        client = app.test_client()
+
+        payload = {"ok": True, "date": "2026-07-01", "games": [{"event_id": "evt-1"}]}
+        with patch("syndicate.blueprints.wnba.build_live_lines_payload", return_value=payload) as build_payload:
+            response = client.get("/wnba/api/live_lines?date=2026-07-01")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json(), payload)
+        self.assertEqual(build_payload.call_count, 1)
+        self.assertEqual(build_payload.call_args.kwargs.get("allow_stored_date_fallback"), True)
+
     def test_wnba_live_lens_api_throttles_burst_requests(self) -> None:
         app = create_app()
         app.config.update(TESTING=True)

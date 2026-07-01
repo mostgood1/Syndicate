@@ -3585,7 +3585,7 @@ def build_live_state_payload(selected_date: str, ttl: int = 12, *, allow_stored_
         local_payload = _local_live_state_payload(selected_date)
         if isinstance(local_payload, dict) and isinstance(local_payload.get("games"), list) and bool(local_payload.get("games")):
             return _attach_odds_refresh_timestamp(local_payload)
-        context_for_event_ids = build_cards_page_context(selected_date, allow_stored_date_fallback=False)
+        context_for_event_ids = build_cards_page_context(selected_date, allow_stored_date_fallback=allow_stored_date_fallback)
         context_games = context_for_event_ids.get("games") if isinstance(context_for_event_ids.get("games"), list) else []
         out_games: list[dict[str, Any]] = []
         for game in context_games:

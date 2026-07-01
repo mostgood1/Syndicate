@@ -617,7 +617,7 @@ def api_live_state():
         ttl = 12
     ttl = max(1, min(300, ttl))
     try:
-        return jsonify(build_live_state_payload(selected_date, ttl=ttl, allow_stored_date_fallback=_allow_stored_date_fallback()))
+        return jsonify(build_live_state_payload(selected_date, ttl=ttl, allow_stored_date_fallback=True))
     except Exception:
         return jsonify({"ok": True, "ttl": int(ttl), "date": selected_date or None, "games": [], "generated_at": central_now().isoformat(timespec="seconds")})
 
@@ -638,7 +638,7 @@ def api_live_player_boxscore():
                 selected_date,
                 event_ids,
                 ttl=ttl,
-                allow_stored_date_fallback=_allow_stored_date_fallback(),
+                allow_stored_date_fallback=True,
             )
         )
     except Exception:
@@ -661,7 +661,7 @@ def api_live_player_lens():
                 selected_date,
                 event_ids,
                 ttl=ttl,
-                allow_stored_date_fallback=_allow_stored_date_fallback(),
+                allow_stored_date_fallback=True,
             )
         )
     except Exception:
@@ -686,7 +686,7 @@ def api_live_lines():
                 event_ids,
                 ttl=ttl,
                 include_period_totals=include_period_totals,
-                allow_stored_date_fallback=_allow_stored_date_fallback(),
+                allow_stored_date_fallback=True,
             )
         )
     except Exception:
@@ -709,7 +709,7 @@ def api_live_pbp_stats():
                 selected_date,
                 event_ids,
                 ttl=ttl,
-                allow_stored_date_fallback=_allow_stored_date_fallback(),
+                allow_stored_date_fallback=True,
             )
         )
     except Exception:
