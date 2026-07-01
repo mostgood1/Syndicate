@@ -8,6 +8,7 @@ from unittest.mock import patch
 from syndicate.features.shared.odds_control_plane import build_odds_control_plane_snapshot
 from syndicate.features.shared.odds_control_plane import load_odds_history_payload_for_sport
 from syndicate.features.shared.odds_control_plane import odds_history_paths_for_sport
+from syndicate.features.shared.odds_control_plane import odds_history_roots_for_sport
 from syndicate.features.shared.odds_control_plane import write_odds_control_plane_snapshot
 
 

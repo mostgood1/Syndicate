@@ -135,6 +135,24 @@ class MlbRefreshRunnerTests(unittest.TestCase):
         self.assertEqual(rc, 0)
         self.assertIn("Usage quota has been reached", stdout.getvalue())
 
+    def test_materialize_artifact_bundle_allows_same_source_and_artifact_root(self) -> None:
+        module = self._load_module()
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            bundle_root = Path(tmp_dir)
+            live_lens_file = bundle_root / "data" / "live_lens" / "live_lens_2026_07_01.jsonl"
+            live_lens_file.parent.mkdir(parents=True, exist_ok=True)
+            live_lens_file.write_text("{}\n", encoding="utf-8")
+
+            copied = module._materialize_artifact_bundle(
+                source_root=bundle_root,
+                artifact_root=bundle_root,
+                date_str="2026-07-01",
+            )
+
+            self.assertIn(str(live_lens_file), copied.get("files", []))
+            self.assertEqual(live_lens_file.read_text(encoding="utf-8"), "{}\n")
+
     def test_reconcile_module_resolves_daily_sims_directory(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]
         module_path = repo_root / "vendor" / "mlb_bettingv2" / "tools" / "eval" / "reconcile_daily_sim_artifacts.py"

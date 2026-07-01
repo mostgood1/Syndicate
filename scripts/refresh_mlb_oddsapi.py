@@ -81,6 +81,11 @@ SEASON_MANIFEST_FILES = (
 def _copy_if_exists(source: Path, destination: Path) -> bool:
     if not source.exists() or not source.is_file():
         return False
+    try:
+        if source.resolve() == destination.resolve():
+            return True
+    except Exception:
+        pass
     destination.parent.mkdir(parents=True, exist_ok=True)
     _copy_file_with_fallback(source, destination)
     return True

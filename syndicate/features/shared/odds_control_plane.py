@@ -130,7 +130,7 @@ def build_odds_control_plane_snapshot(summary: dict[str, Any]) -> dict[str, Any]
         "dry_run": bool(summary.get("dry_run")) if isinstance(summary, dict) else False,
         "publish_parity": summary.get("publish_parity") if isinstance(summary, dict) else None,
         "sports": sport_snapshots,
-        "source_precedence": ["artifact_history", "tracking_history"],
+        "source_precedence": ["shared_history", "artifact_history", "tracking_history"],
         "summary_ok": bool(summary.get("ok")) if isinstance(summary, dict) else False,
     }
 
