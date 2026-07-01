@@ -81,6 +81,28 @@ class WnbaApiSnapshotErrorTests(unittest.TestCase):
         self.assertIsInstance(payload, dict)
         self.assertEqual(payload, {"ok": False, "error": "snapshot_unavailable", "cards": []})
 
+    def test_wnba_api_cards_uses_stored_date_fallback(self) -> None:
+        app = create_app()
+        app.config.update(TESTING=True)
+        client = app.test_client()
+
+        payload = {"ok": True, "date": "2026-07-01", "cards": [], "games": [{"gamePk": "evt-1"}]}
+
+        def fake_build_cards_page_context(selected_date: str, *, allow_stored_date_fallback: bool = False):
+            self.assertTrue(allow_stored_date_fallback)
+            self.assertEqual(selected_date, "2026-07-01")
+            return {"date": selected_date, "games": [{"gamePk": "evt-1"}]}
+
+        with patch("syndicate.blueprints.wnba.build_cards_page_context", side_effect=fake_build_cards_page_context) as build_context, patch(
+            "syndicate.blueprints.wnba.build_game_board_api_payload", return_value=payload
+        ) as build_payload:
+            response = client.get("/wnba/api/cards?date=2026-07-01")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json(), payload)
+        self.assertEqual(build_context.call_count, 1)
+        self.assertEqual(build_payload.call_count, 1)
+
     def test_wnba_live_state_api_uses_stored_date_fallback(self) -> None:
         app = create_app()
         app.config.update(TESTING=True)

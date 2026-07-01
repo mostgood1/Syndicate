@@ -84,7 +84,7 @@ def _selected_date() -> str:
 
 
 def _allow_stored_date_fallback() -> bool:
-    return False
+    return True
 
 
 def _official_wnba_logo_team_id(team_ref: str) -> int | None:
@@ -462,7 +462,7 @@ def api_game_detail(game_pk: str):
 def api_cards():
     selected_date = _selected_date()
     try:
-        context = build_cards_page_context(selected_date, allow_stored_date_fallback=False)
+        context = build_cards_page_context(selected_date, allow_stored_date_fallback=_allow_stored_date_fallback())
         return jsonify(build_game_board_api_payload(context))
     except Exception as error:
         print("WNBA SNAPSHOT ERROR:", error)
