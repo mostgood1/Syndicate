@@ -111,9 +111,9 @@ services:
       - key: SYNDICATE_LIVE_ODDS_REFRESH_SKIP_MIRROR
         value: "true"
       - key: MLB_BETTING_DATA_ROOT
-        value: ./data/mlb_source/source_artifacts/data
+        value: /opt/render/project/data/mlb_source/source_artifacts/data
       - key: MLB_LIVE_LENS_DIR
-        value: ./data/mlb_source/source_artifacts/data/live_lens
+        value: /opt/render/project/data/mlb_source/source_artifacts/data/live_lens
       - key: NBA_BETTING_DATA_ROOT
         value: ./data/nba_source/source_artifacts/data
       - key: NBA_LIVE_LENS_DIR
@@ -237,9 +237,9 @@ services:
       - key: SYNDICATE_LIVE_ODDS_REFRESH_SKIP_MIRROR
         value: "true"
       - key: MLB_BETTING_DATA_ROOT
-        value: ./data/mlb_source/source_artifacts/data
+        value: /opt/render/project/data/mlb_source/source_artifacts/data
       - key: MLB_LIVE_LENS_DIR
-        value: ./data/mlb_source/source_artifacts/data/live_lens
+        value: /opt/render/project/data/mlb_source/source_artifacts/data/live_lens
       - key: NBA_BETTING_DATA_ROOT
         value: ./data/nba_source/source_artifacts/data
       - key: NBA_LIVE_LENS_DIR
@@ -355,9 +355,9 @@ services:
       - key: SYNDICATE_LIVE_ODDS_REFRESH_SKIP_MIRROR
         value: "true"
       - key: MLB_BETTING_DATA_ROOT
-        value: ./data/mlb_source/source_artifacts/data
+        value: /opt/render/project/data/mlb_source/source_artifacts/data
       - key: MLB_LIVE_LENS_DIR
-        value: ./data/mlb_source/source_artifacts/data/live_lens
+        value: /opt/render/project/data/mlb_source/source_artifacts/data/live_lens
       - key: NBA_BETTING_DATA_ROOT
         value: ./data/nba_source/source_artifacts/data
       - key: NBA_LIVE_LENS_DIR
