@@ -88,27 +88,56 @@ class WnbaCardsMergeAliasTests(unittest.TestCase):
         self.assertEqual(len(merged_games), 1)
         self.assertEqual(supplemented_count, 0)
 
-    def test_source_cards_payload_falls_back_to_latest_stored_slate_for_today(self) -> None:
-        empty_bundle = {"rows": [], "recommendations": {}, "sim": {}, "props": {}}
-        fallback_bundle = {
-            "rows": [{"away_tri": "LAS", "home_tri": "CON", "gamePk": "1", "commence_time": "2026-06-11T18:00:00Z"}],
-            "recommendations": {},
-            "sim": {},
-            "props": {},
-        }
+    def test_artifact_bundle_loads_rows_even_when_schedule_probe_says_no_games(self) -> None:
+        from syndicate.features.wnba.cards import _artifact_bundle
 
-        with patch("syndicate.features.wnba.cards.central_today_iso", return_value="2026-06-15"), patch(
-            "syndicate.features.wnba.cards.available_dates",
-            return_value=["2026-06-11", "2026-06-15"],
+        with TemporaryDirectory() as temp_dir:
+            processed_dir = Path(temp_dir) / "data" / "processed"
+            processed_dir.mkdir(parents=True, exist_ok=True)
+            (processed_dir / "game_cards_2026-07-02.csv").write_text(
+                "away_tri,home_tri,visitor_team,home_team,commence_time\n"
+                "LAS,IND,Las Vegas Aces,Indiana Fever,2026-07-02T23:00:00Z\n",
+                encoding="utf-8",
+            )
+
+            with patch("syndicate.features.wnba.cards._wnba_source_roots", return_value=[Path(temp_dir)]), patch(
+                "syndicate.features.wnba.cards.has_games_for_date",
+                return_value=False,
+            ):
+                bundle = _artifact_bundle("2026-07-02")
+
+        self.assertEqual(len(bundle.get("rows") or []), 1)
+        self.assertEqual((bundle.get("rows") or [{}])[0].get("away_tri"), "LAS")
+
+    def test_source_cards_payload_uses_public_scoreboard_for_today_when_artifacts_are_missing(self) -> None:
+        public_games = [
+            {
+                "gamePk": "401857500",
+                "event_id": "401857500",
+                "away_tri": "LAS",
+                "home_tri": "IND",
+                "status": "Scheduled",
+                "detail": "Scheduled",
+                "live_state": {"event_id": "401857500", "away": "LAS", "home": "IND"},
+            }
+        ]
+
+        with patch("syndicate.features.wnba.cards.central_today_iso", return_value="2026-07-02"), patch(
+            "syndicate.features.wnba.cards.has_games_for_date",
+            return_value=False,
         ), patch(
             "syndicate.features.wnba.cards._artifact_bundle",
-            side_effect=lambda selected_date: fallback_bundle if selected_date == "2026-06-11" else empty_bundle,
+            return_value={"rows": [], "recommendations": {}, "sim": {}, "props": {}},
+        ), patch(
+            "syndicate.features.wnba.cards._games_from_public_scoreboard",
+            return_value=(public_games, "espn_scoreboard_fallback"),
         ):
-            payload = build_source_cards_payload("2026-06-15", allow_stored_date_fallback=True)
+            payload = build_source_cards_payload("2026-07-02", allow_stored_date_fallback=True)
 
-        self.assertEqual(payload["date"], "2026-06-11")
-        self.assertTrue(payload["lookahead_applied"])
-        self.assertEqual(len(payload["games"]), 1)
+        self.assertEqual(payload["date"], "2026-07-02")
+        self.assertEqual(payload["requested_date"], "2026-07-02")
+        self.assertEqual(len(payload.get("games") or []), 1)
+        self.assertEqual((payload.get("games") or [{}])[0].get("event_id"), "401857500")
 
 
     def test_cards_page_context_keeps_explicit_today_empty_without_live_fallback(self) -> None:

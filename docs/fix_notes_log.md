@@ -1,5 +1,12 @@
 # Fix Notes Log
 
+## 2026-07-02 - WNBA slate fell back to the prior board instead of today's games
+- Symptom: The WNBA cards route showed the last stored slate or a stale "no slate" state for 2026-07-02 even though the current day had games available.
+- Root cause: WNBA source selection was still letting the ESPN schedule probe and stored-slate fallback decide the active board before the public-scoreboard path could hydrate today's slate, and artifact loading could be short-circuited by the same live gate.
+- Fix: Stop using the live schedule probe as a hard artifact gate, keep today's WNBA source date on today so the public-scoreboard fallback can run, and preserve the stored-slate fallback only when no live or artifact slate is available.
+- Validation: `python -m pytest tests/test_wnba_cards_merge_aliases.py -q` passed with regressions covering artifact-first loading and today's public-scoreboard hydration.
+- Follow-up: Keep WNBA cards artifact-first, with live scoreboard data as a fallback for today's slate rather than a blocker.
+
 ## 2026-07-02 - MLB cards stayed on a stale odds badge
 - Symptom: The MLB game cards page kept showing `Odds updated 7/1, 7:42 AM` even after the odds-history refresh artifact had advanced.
 - Root cause: The cards payload promoted the live-lens refresh timestamp only, so the visible badge ignored the shared odds-history artifact timestamp that the worker was updating every 60 seconds.

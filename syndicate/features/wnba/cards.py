@@ -269,6 +269,8 @@ def _resolved_source_cards_date(selected_date: str, *, allow_stored_date_fallbac
     bundle = _artifact_bundle(resolved_date)
     if bundle["rows"]:
         return resolved_date
+    if resolved_date == central_today_iso():
+        return resolved_date
     if not allow_stored_date_fallback:
         return requested_date
     fallback_date = None
@@ -735,16 +737,6 @@ def _artifact_bundle(selected_date: str) -> dict[str, Any]:
     csv_name = f"game_cards_{selected_date}.csv"
     repo_data_root = _repo_root_from(__file__) / "data" / "wnba_source"
     candidate_roots = list(_wnba_source_roots()) + [repo_data_root]
-
-    if has_games_for_date(selected_date) is False:
-        safe_paths = _artifact_root_paths(selected_date)
-        return {
-            "paths": safe_paths,
-            "rows": [],
-            "recommendations": {},
-            "sim": {},
-            "props": {},
-        }
 
     paths = _artifact_root_paths(selected_date)
     rows = []
