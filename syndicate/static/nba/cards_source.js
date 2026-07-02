@@ -42,8 +42,6 @@
   const filtersEl = document.getElementById('cardsFilters');
   const propsStripEl = document.getElementById('cardsPropsStrip');
   const note = document.getElementById('note');
-  const pollIntervalMs = (window.SyndicatePolling && window.SyndicatePolling.DEFAULT_INTERVAL_MS) || 30000;
-
   const state = {
     activeTabs: new Map(),
     boardInitialized: false,
@@ -6379,17 +6377,17 @@
     if (state.pollHandle && typeof state.pollHandle.stop === 'function') {
       state.pollHandle.stop();
     }
-    if (!window.SyndicatePolling) {
+    if (!window.SyndicatePolling || typeof window.SyndicatePolling.startFromPolicy !== 'function') {
       state.pollHandle = { stop: function () {} };
       return;
     }
-    state.pollHandle = window.SyndicatePolling.start({
-      intervalMs: pollIntervalMs,
+    state.pollHandle = window.SyndicatePolling.startFromPolicy(window.NBACardsBootstrap, {
       onTick: () => {
         syncFromControls();
         loadBoard({ silent: true });
       },
     });
+    return;
   }
 
   boardShell.addEventListener('click', (event) => {

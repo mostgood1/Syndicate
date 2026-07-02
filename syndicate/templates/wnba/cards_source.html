@@ -80,6 +80,12 @@
   </div>
 
   <script src="{{ url_for('static', filename='shared/polling.js', v=asset_version) }}"></script>
+  <script>
+    window.WNBACardsBootstrap = {
+      refreshPolicy: {{ refresh_policy|default({})|tojson }},
+      date: {{ date|tojson }},
+    };
+  </script>
   <script src="/wnba/cards-parity.js?v={{ asset_version }}"></script>
 </body>
 </html>

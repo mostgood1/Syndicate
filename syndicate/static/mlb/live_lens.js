@@ -12,8 +12,6 @@
 
   const REFRESH_STATE_KEY = "__SYNDICATE_MLB_LIVE_LENS_REFRESH__";
 
-  const AUTO_REFRESH_MS = (window.SyndicatePolling && window.SyndicatePolling.DEFAULT_INTERVAL_MS) || 30000;
-
   const metaNode = document.getElementById("liveLensMeta");
   const overviewNode = document.getElementById("liveLensOverview");
   const gamesNode = document.getElementById("liveLensGames");
@@ -466,22 +464,23 @@
     if (previousRefresh && typeof previousRefresh.stop === "function") {
       previousRefresh.stop();
     }
-    if (window.SyndicatePolling && typeof window.SyndicatePolling.start === "function") {
-      state.autoRefreshHandle = window.SyndicatePolling.start({
-        intervalMs: AUTO_REFRESH_MS,
+    if (window.SyndicatePolling && typeof window.SyndicatePolling.startFromPolicy === "function") {
+      state.autoRefreshHandle = window.SyndicatePolling.startFromPolicy(window.MLBLiveLensBootstrap, {
         skipWhenHidden: false,
-        refreshOnVisible: true,
-        refreshOnFocus: true,
         onTick: function () {
           return load();
         },
+      }, {
+        intervalMs: window.SyndicatePolling.DEFAULT_INTERVAL_MS,
+        refreshOnVisible: true,
+        refreshOnFocus: true,
       });
       window[REFRESH_STATE_KEY] = state.autoRefreshHandle;
       return;
     }
     const fallbackTimer = window.setInterval(function () {
       void load();
-    }, AUTO_REFRESH_MS);
+    }, (window.SyndicatePolling && window.SyndicatePolling.DEFAULT_INTERVAL_MS) || 30000);
     state.autoRefreshHandle = {
       stop: function () {
         window.clearInterval(fallbackTimer);

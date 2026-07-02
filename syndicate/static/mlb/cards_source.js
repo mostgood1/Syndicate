@@ -16,7 +16,6 @@
     hydrationGeneration: 0,
   };
 
-  const AUTO_REFRESH_MS = (window.SyndicatePolling && window.SyndicatePolling.DEFAULT_INTERVAL_MS) || 30000;
   const CARDS_REQUEST_TIMEOUT_MS = 25000;
   const DETAIL_REQUEST_TIMEOUT_MS = 15000;
   const HYDRATE_CARD_CONCURRENCY = 2;
@@ -3739,15 +3738,16 @@
       window[refreshStateKey] = state.autoRefreshHandle;
       return;
     }
-    if (!window.SyndicatePolling) {
+    if (!window.SyndicatePolling || typeof window.SyndicatePolling.startFromPolicy !== 'function') {
       state.autoRefreshHandle = { stop: function () {} };
       window[refreshStateKey] = state.autoRefreshHandle;
       return;
     }
-    state.autoRefreshHandle = window.SyndicatePolling.start({
-      intervalMs: AUTO_REFRESH_MS,
+    state.autoRefreshHandle = window.SyndicatePolling.startFromPolicy(window.MLBCardsBootstrap, {
       onTick: refreshSilently,
       onFocus: refreshSilently,
+    }, {
+      intervalMs: window.SyndicatePolling.DEFAULT_INTERVAL_MS,
       refreshOnVisible: true,
       refreshOnFocus: true,
     });

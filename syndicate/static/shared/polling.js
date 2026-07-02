@@ -1,6 +1,22 @@
 (function () {
   const DEFAULT_INTERVAL_MS = 30000;
 
+  function normalizePolicy(policy, fallback) {
+    const source = policy && typeof policy === 'object' ? policy : {};
+    const defaults = fallback && typeof fallback === 'object' ? fallback : {};
+    const intervalMs = Number(source.intervalMs ?? source.interval_ms ?? defaults.intervalMs ?? defaults.interval_ms);
+    return {
+      enabled: source.enabled !== undefined ? Boolean(source.enabled) : (defaults.enabled !== undefined ? Boolean(defaults.enabled) : true),
+      intervalMs: Number.isFinite(intervalMs) && intervalMs > 0 ? intervalMs : DEFAULT_INTERVAL_MS,
+      refreshOnVisible: source.refreshOnVisible !== undefined ? Boolean(source.refreshOnVisible) : (defaults.refreshOnVisible !== undefined ? Boolean(defaults.refreshOnVisible) : true),
+      refreshOnFocus: source.refreshOnFocus !== undefined ? Boolean(source.refreshOnFocus) : (defaults.refreshOnFocus !== undefined ? Boolean(defaults.refreshOnFocus) : true),
+      stopOnPageHide: source.stopOnPageHide !== undefined ? Boolean(source.stopOnPageHide) : (defaults.stopOnPageHide !== undefined ? Boolean(defaults.stopOnPageHide) : true),
+      preventOverlap: source.preventOverlap !== undefined ? Boolean(source.preventOverlap) : (defaults.preventOverlap !== undefined ? Boolean(defaults.preventOverlap) : true),
+      skipWhenHidden: source.skipWhenHidden !== undefined ? Boolean(source.skipWhenHidden) : Boolean(defaults.skipWhenHidden),
+      poller: String(source.poller || defaults.poller || 'shared.polling'),
+    };
+  }
+
   function reloadCurrentPage(queryKey) {
     const url = new URL(window.location.href);
     url.searchParams.set(queryKey || '_poll_ts', String(Date.now()));
@@ -93,9 +109,39 @@
     };
   }
 
+  function resolvePolicy(bootstrap, fallbackPolicy) {
+    const source = bootstrap && typeof bootstrap === 'object'
+      ? (bootstrap.refreshPolicy || bootstrap.refresh_policy || bootstrap.refresh || null)
+      : null;
+    return normalizePolicy(source, fallbackPolicy);
+  }
+
+  function startFromPolicy(bootstrap, handlers, fallbackPolicy) {
+    const policy = resolvePolicy(bootstrap, fallbackPolicy);
+    if (!policy.enabled) {
+      return {
+        stop: function () {},
+        tick: function () {},
+        intervalMs: policy.intervalMs,
+      };
+    }
+    const settings = Object.assign({}, handlers || {}, {
+      intervalMs: policy.intervalMs,
+      skipWhenHidden: policy.skipWhenHidden,
+      refreshOnVisible: policy.refreshOnVisible,
+      refreshOnFocus: policy.refreshOnFocus,
+      stopOnPageHide: policy.stopOnPageHide,
+      preventOverlap: policy.preventOverlap,
+    });
+    return start(settings);
+  }
+
   window.SyndicatePolling = {
     DEFAULT_INTERVAL_MS: DEFAULT_INTERVAL_MS,
+    normalizePolicy: normalizePolicy,
     reloadCurrentPage: reloadCurrentPage,
+    resolvePolicy: resolvePolicy,
     start: start,
+    startFromPolicy: startFromPolicy,
   };
 })();

@@ -33,7 +33,6 @@
   const filtersEl = document.getElementById('cardsFilters');
   const propsStripEl = document.getElementById('cardsPropsStrip');
   const note = document.getElementById('note');
-  const pollIntervalMs = (window.SyndicatePolling && window.SyndicatePolling.DEFAULT_INTERVAL_MS) || 30000;
   const API_BASE_PATH = '/wnba/api';
   const SOURCE_CARDS_API_BASE_PATH = `${API_BASE_PATH}/source/cards`;
   const CARDS_PAYLOAD_PATH = document.body?.dataset?.cardsPayloadPath || SOURCE_CARDS_API_BASE_PATH;
@@ -6148,10 +6147,19 @@
     if (state.pollHandle) {
       window.clearInterval(state.pollHandle);
     }
+    if (window.SyndicatePolling && typeof window.SyndicatePolling.startFromPolicy === 'function') {
+      state.pollHandle = window.SyndicatePolling.startFromPolicy(window.WNBACardsBootstrap, {
+        onTick: () => {
+          syncFromControls();
+          loadBoard({ silent: true });
+        },
+      });
+      return;
+    }
     state.pollHandle = window.setInterval(() => {
       syncFromControls();
       loadBoard({ silent: true });
-    }, pollIntervalMs);
+    }, (window.SyndicatePolling && window.SyndicatePolling.DEFAULT_INTERVAL_MS) || 30000);
   }
 
   boardShell.addEventListener('click', (event) => {

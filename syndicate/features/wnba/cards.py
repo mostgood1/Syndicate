@@ -2090,6 +2090,16 @@ def build_cards_page_context(selected_date: str, *, allow_stored_date_fallback: 
         source_kind="artifact_backed",
         live_lens_integrated=True,
     )
+    result["refresh_policy"] = {
+        "enabled": True,
+        "intervalMs": 30000,
+        "refreshOnVisible": True,
+        "refreshOnFocus": True,
+        "stopOnPageHide": True,
+        "preventOverlap": True,
+        "skipWhenHidden": False,
+        "poller": "shared.polling",
+    }
     _WNBA_CARDS_CONTEXT_CACHE[cache_key] = deepcopy(result)
     return deepcopy(result)
 

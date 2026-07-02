@@ -85,6 +85,12 @@
   </div>
 
   <script src="{{ url_for('static', filename='shared/polling.js', v=asset_version) }}"></script>
+  <script>
+    window.NBACardsBootstrap = {
+      refreshPolicy: {{ refresh_policy|default({})|tojson }},
+      date: {{ date|tojson }},
+    };
+  </script>
   <script src="{{ url_for('static', filename='nba/cards_source.js', v=asset_version) }}"></script>
 </body>
 </html>

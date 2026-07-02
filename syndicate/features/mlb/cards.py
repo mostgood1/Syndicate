@@ -4580,6 +4580,16 @@ def build_cards_page_context(selected_date: str) -> dict[str, Any]:
         "cards_stylesheet": "mlb/cards_exact.css",
         "cards_script": "mlb/cards_source.js",
     }, sport="mlb", module="cards")
+    result["refresh_policy"] = {
+        "enabled": True,
+        "intervalMs": 30000,
+        "refreshOnVisible": True,
+        "refreshOnFocus": True,
+        "stopOnPageHide": True,
+        "preventOverlap": True,
+        "skipWhenHidden": False,
+        "poller": "shared.polling",
+    }
     _MLB_CARDS_CONTEXT_CACHE[page_cache_key] = deepcopy(result)
     if cache_key is not None and games:
         _MLB_TODAY_CACHE[cache_key] = result
