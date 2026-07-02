@@ -1,5 +1,12 @@
 # Fix Notes Log
 
+## 2026-07-02 - Render defaults finally aligned with in-place odds refresh
+- Symptom: The MLB odds badge and ops refresh path kept circling back to `manifest_only` even after the live code changes were deployed.
+- Root cause: Render config still seeded `SYNDICATE_REFRESH_LAUNCH_MODE=manifest_only` and `SYNDICATE_LIVE_ODDS_REFRESH_LAUNCH_MODE=manifest_only` in multiple service blocks, so the default production contract remained queued-only.
+- Fix: Change all Render-side launch-mode defaults to `detached_subprocess` so refresh jobs launch in place unless a test or manual request explicitly asks for queued external-runner behavior.
+- Validation: The live-loop and ops refresh regressions already pass for detached-subprocess defaults; this config change makes the production deploy match those tests.
+- Follow-up: Redeploy and verify that no production service keeps writing `manifest_only` into the latest refresh manifest unless it is an explicit test path.
+
 ## 2026-07-02 - Ops refresh still defaulted Render to manifest-only
 - Symptom: The MLB odds refresh stayed pinned because the ops refresh launcher still treated Render as a queued-only external-runner path.
 - Root cause: `ops_refresh._resolve_launch_mode()` and the ops launch handlers still forced `manifest_only` on Render, so refresh jobs were recorded but not executed in place.

@@ -37,7 +37,7 @@ services:
       - key: ODDS_API_KEY
         value: 77ae1c35140c82da1675af85dde36a44
       - key: SYNDICATE_REFRESH_LAUNCH_MODE
-        value: manifest_only
+        value: detached_subprocess
       - key: SYNDICATE_REQUIRE_HOSTED_STORAGE
         value: "true"
       - key: SYNDICATE_REFRESH_STATE_BACKEND
@@ -162,7 +162,7 @@ services:
       - key: ODDS_API_KEY
         value: 77ae1c35140c82da1675af85dde36a44
       - key: SYNDICATE_REFRESH_LAUNCH_MODE
-        value: manifest_only
+        value: detached_subprocess
       - key: SYNDICATE_REQUIRE_HOSTED_STORAGE
         value: "true"
       - key: SYNDICATE_REFRESH_STATE_BACKEND
@@ -225,7 +225,7 @@ services:
       - key: SYNDICATE_INTELLIGENCE_REFRESH_INTERVAL_SECONDS
         value: "60"
       - key: SYNDICATE_LIVE_ODDS_REFRESH_LAUNCH_MODE
-        value: manifest_only
+        value: detached_subprocess
       - key: SYNDICATE_LIVE_ODDS_REFRESH_PHASE
         value: "live"
       - key: SYNDICATE_LIVE_ODDS_REFRESH_EXECUTION_MODE
@@ -284,7 +284,7 @@ services:
       - key: ODDS_API_KEY
         value: 77ae1c35140c82da1675af85dde36a44
       - key: SYNDICATE_REFRESH_LAUNCH_MODE
-        value: manifest_only
+        value: detached_subprocess
       - key: SYNDICATE_REQUIRE_HOSTED_STORAGE
         value: "true"
       - key: SYNDICATE_REFRESH_STATE_BACKEND
