@@ -1,5 +1,12 @@
 # Fix Notes Log
 
+## 2026-07-02 - Stale running refresh manifests blocked new odds launches
+- Symptom: Render kept reporting a failed odds refresh state with an old 2026-06-24 manifest, a dead PID, and no fresh odds updates.
+- Root cause: The refresh guards treated any `running` manifest as active even when the recorded PID was gone and no result payload existed, so the stale contract could block new launches indefinitely.
+- Fix: Auto-heal dead `running` refresh manifests to `failed` before launch checks run, and let the queued-refresh runner reclaim stale running external contracts with dead PIDs.
+- Validation: Focused regressions now pass for stale-running recovery in both `ops_refresh` and `run_queued_refresh_job` paths.
+- Follow-up: Redeploy and confirm the Render status endpoint advances past the old 2026-06-24 contract on the next refresh tick.
+
 ## 2026-07-02 - Render defaults finally aligned with in-place odds refresh
 - Symptom: The MLB odds badge and ops refresh path kept circling back to `manifest_only` even after the live code changes were deployed.
 - Root cause: Render config still seeded `SYNDICATE_REFRESH_LAUNCH_MODE=manifest_only` and `SYNDICATE_LIVE_ODDS_REFRESH_LAUNCH_MODE=manifest_only` in multiple service blocks, so the default production contract remained queued-only.

@@ -1339,6 +1339,43 @@ class OpsRefreshApiTests(unittest.TestCase):
             self.assertTrue(str(healed_payload.get("finishedAt") or "").strip())
             self.assertEqual(healed_run_summary["state"], "finished")
 
+    def test_assert_no_active_refresh_run_heals_stale_running_contract_with_dead_pid(self) -> None:
+        with TemporaryDirectory() as tmp_dir:
+            repo_root = Path(tmp_dir)
+            reports_root = repo_root / "reports"
+            latest_dir = reports_root / "refresh_status" / "latest"
+            run_dir = reports_root / "migration_runs" / "2026-05-22" / "odds_refresh_20260522_120000"
+            latest_dir.mkdir(parents=True, exist_ok=True)
+            run_dir.mkdir(parents=True, exist_ok=True)
+            run_summary_path = run_dir / "refresh_and_gate_run.json"
+            run_summary_path.write_text(json.dumps({"state": "running"}), encoding="utf-8")
+            (latest_dir / "refresh_status_latest.json").write_text(
+                json.dumps(
+                    {
+                        "date": "2026-05-22",
+                        "runStamp": "20260522_120000",
+                        "artifactsDir": str(run_dir),
+                        "runSummaryPath": str(run_summary_path),
+                        "state": "running",
+                        "pid": 22517,
+                        "externalRunner": {"kind": "external_runner", "queue_state": "queued"},
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            with patch.dict(os.environ, {"SYNDICATE_REPORTS_ROOT": str(reports_root)}, clear=False), patch(
+                "syndicate.features.shared.ops_refresh.REPO_ROOT", repo_root
+            ), patch("syndicate.features.shared.ops_refresh._pid_is_running", return_value=False):
+                from syndicate.features.shared import ops_refresh
+
+                ops_refresh._assert_no_active_refresh_run()
+
+            healed_payload = json.loads((latest_dir / "refresh_status_latest.json").read_text(encoding="utf-8"))
+            healed_run_summary = json.loads(run_summary_path.read_text(encoding="utf-8"))
+            self.assertEqual(healed_payload["state"], "failed")
+            self.assertEqual(healed_run_summary["state"], "failed")
+
     def test_ops_page_renders_recent_history(self) -> None:
         fake_status = {
             "refresh_status": {

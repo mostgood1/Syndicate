@@ -323,6 +323,13 @@ def _assert_no_active_refresh_run() -> None:
     state = str(manifest.get("state") or "").strip().lower()
     pid_raw = manifest.get("pid")
     pid = int(pid_raw) if isinstance(pid_raw, int) or (isinstance(pid_raw, str) and str(pid_raw).strip().isdigit()) else None
+    if state == "running" and (pid is None or not _pid_is_running(pid)):
+        _update_latest_state(state="failed", exit_code=1, finished_at=_utc_now())
+        context = _latest_refresh_manifest_context()
+        manifest = context["manifest"] if isinstance(context.get("manifest"), dict) else {}
+        state = str(manifest.get("state") or "").strip().lower()
+        pid_raw = manifest.get("pid")
+        pid = int(pid_raw) if isinstance(pid_raw, int) or (isinstance(pid_raw, str) and str(pid_raw).strip().isdigit()) else None
     if pid is not None:
         try:
             if _pid_is_running(pid):

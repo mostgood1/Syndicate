@@ -138,6 +138,45 @@ class RefreshQueueRunnerTests(unittest.TestCase):
         self.assertEqual(latest_payload["state"], "running")
         self.assertEqual(latest_payload["runnerKind"], "external_runner")
 
+    def test_claim_external_runner_contract_recovers_stale_running_manifest_with_dead_pid(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        module = self._load_module(repo_root)
+
+        with TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            latest_manifest_path = root / "reports" / "refresh_status" / "latest" / "refresh_status_latest.json"
+            manifest_path = root / "reports" / "refresh_status" / "2026-05-22" / "20260522_120000" / "refresh_status_manifest.json"
+            run_summary_path = root / "reports" / "migration_runs" / "2026-05-22" / "odds_refresh_20260522_120000" / "refresh_and_gate_run.json"
+            latest_manifest_path.parent.mkdir(parents=True, exist_ok=True)
+            manifest_path.parent.mkdir(parents=True, exist_ok=True)
+            run_summary_path.parent.mkdir(parents=True, exist_ok=True)
+
+            contract = {
+                "kind": "external_runner",
+                "queue_state": "queued",
+                "runStamp": "20260522_120000",
+                "manifestPath": str(manifest_path),
+                "latestPath": str(latest_manifest_path),
+                "runSummaryPath": str(run_summary_path),
+                "jobStatusPath": str(run_summary_path.parent / "refresh_job_status.json"),
+                "stdoutPath": str(run_summary_path.parent / "odds_refresh.json"),
+                "stderrPath": str(run_summary_path.parent / "odds_refresh.stderr.txt"),
+                "command": [sys.executable, "-c", "print('ok')"],
+            }
+            latest_manifest_path.write_text(
+                json.dumps({"state": "running", "pid": 22517, "externalRunner": contract}),
+                encoding="utf-8",
+            )
+            manifest_path.write_text(json.dumps({"state": "running"}), encoding="utf-8")
+            run_summary_path.write_text(json.dumps({"state": "running"}), encoding="utf-8")
+
+            with patch.object(module, "_pid_is_running", return_value=False):
+                claimed = module._claim_external_runner_contract(latest_manifest_path=latest_manifest_path)
+
+            latest_payload = json.loads(latest_manifest_path.read_text(encoding="utf-8"))
+            self.assertEqual(claimed["runStamp"], "20260522_120000")
+            self.assertEqual(latest_payload["state"], "running")
+
     def test_build_wrapper_command_uses_persisted_contract_paths(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]
         module = self._load_module(repo_root)

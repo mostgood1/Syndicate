@@ -28,10 +28,22 @@ def _utc_now() -> str:
 def _default_latest_manifest_path() -> Path:
     return reports_root() / "refresh_status" / "latest" / "refresh_status_latest.json"
 
+
+def _pid_is_running(pid: int | None) -> bool:
+    if not isinstance(pid, int) or pid <= 0:
+        return False
+    try:
+        os.kill(int(pid), 0)
+        return True
+    except Exception:
+        return False
+
 def _is_stale_running_external_contract(latest_manifest: dict[str, Any]) -> bool:
     if str(latest_manifest.get("state") or "").strip().lower() != "running":
         return False
-    if isinstance(latest_manifest.get("pid"), int) and int(latest_manifest.get("pid") or 0) > 0:
+    pid_raw = latest_manifest.get("pid")
+    pid = int(pid_raw) if isinstance(pid_raw, int) or (isinstance(pid_raw, str) and str(pid_raw).strip().isdigit()) else None
+    if pid is not None and _pid_is_running(pid):
         return False
     contract = latest_manifest.get("externalRunner")
     if not isinstance(contract, dict):
