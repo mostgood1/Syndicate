@@ -45,7 +45,7 @@ class LiveRefreshLoopTests(unittest.TestCase):
             dry_run=False,
         )
 
-    def test_run_tick_defaults_to_manifest_only_on_render(self) -> None:
+    def test_run_tick_defaults_to_detached_subprocess_on_render(self) -> None:
         with patch.dict(
             os.environ,
             {
@@ -70,7 +70,7 @@ class LiveRefreshLoopTests(unittest.TestCase):
             regions="us",
             mode="full",
             execution_mode="source",
-            launch_mode="manifest_only",
+            launch_mode="detached_subprocess",
             skip_mirror=True,
             mirror_only=False,
             dry_run=False,
@@ -138,7 +138,7 @@ class LiveRefreshLoopTests(unittest.TestCase):
 
         mocked_start.assert_called_once()
 
-    def test_create_app_skips_shared_live_refresh_loop_on_render_web(self) -> None:
+    def test_create_app_starts_shared_live_refresh_loop_on_render_web(self) -> None:
         with patch.dict(
             os.environ,
             {
@@ -155,7 +155,7 @@ class LiveRefreshLoopTests(unittest.TestCase):
         ):
             create_app()
 
-        mocked_start.assert_not_called()
+        mocked_start.assert_called_once()
 
     def test_run_live_odds_refresh_worker_run_once_releases_lock(self) -> None:
         with patch.object(run_live_odds_refresh_worker, "_acquire_process_lock", return_value=True) as mocked_acquire, patch.object(

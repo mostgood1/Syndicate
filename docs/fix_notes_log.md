@@ -1,5 +1,12 @@
 # Fix Notes Log
 
+## 2026-07-02 - MLB live refresh loop defaulted to the non-refreshing Render path
+- Symptom: The redeployed MLB page was still pinned to the 7:18 AM odds timestamp even after the web revision was live.
+- Root cause: The live refresh loop still fell back to `manifest_only` on Render when the explicit launch-mode env var was missing, which queued refresh manifests instead of launching the odds job in-place.
+- Fix: Remove the Render-specific `manifest_only` fallback so the live loop defaults to `detached_subprocess` and can actually execute the refresh job on the web dyno.
+- Validation: Updated the live-refresh regression to expect `detached_subprocess` on Render by default.
+- Follow-up: Redeploy and confirm the MLB odds badge advances past 7:18 AM instead of staying fixed on the last captured snapshot.
+
 ## 2026-07-02 - MLB freshness needed to live on the web service disk
 - Symptom: The 7/2 MLB UI stayed on the 7:18 AM odds state even after the 60-second freshness window had passed.
 - Root cause: The web service and refresh-worker service do not share a disk on Render, so the worker could refresh artifacts on its own mount without changing the files the UI actually reads. The web process also skipped the live refresh loop entirely.

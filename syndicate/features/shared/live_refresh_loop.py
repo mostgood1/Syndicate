@@ -151,8 +151,6 @@ def _live_refresh_loop_launch_mode() -> str:
 	fallback = str(os.environ.get("SYNDICATE_REFRESH_LAUNCH_MODE") or "").strip().lower()
 	if fallback in {"detached_subprocess", "manifest_only", "external_runner"}:
 		return fallback
-	if os.environ.get("RENDER") or os.environ.get("RENDER_EXTERNAL_URL") or os.environ.get("RENDER_SERVICE_ID"):
-		return "manifest_only"
 	return "detached_subprocess"
 
 
