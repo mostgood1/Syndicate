@@ -1,11 +1,18 @@
 # Fix Notes Log
 
+## 2026-07-02 - MLB odds timestamps rendered in browser-local time
+- Symptom: MLB cards could show odds freshness in whatever timezone the browser defaulted to, which made the timestamp ambiguous.
+- Root cause: The MLB timestamp formatter used `Intl.DateTimeFormat(undefined, ...)`, so it inherited the viewer's local timezone instead of Central Time.
+- Fix: Force the MLB timestamp formatters in the template and client bundle to use `America/Chicago`.
+- Validation: The patch diff-checks cleanly; once deployed, the MLB cards timestamp should render in Central Time consistently.
+- Follow-up: Confirm the live cards page still shows the newest odds snapshot after deploy and that the displayed clock matches Central Time.
+
 ## 2026-07-02 - Stale running refresh manifests blocked new odds launches
 - Symptom: Render kept reporting a failed odds refresh state with an old 2026-06-24 manifest, a dead PID, and no fresh odds updates.
 - Root cause: The refresh guards treated any `running` manifest as active even when the recorded PID was gone and no result payload existed, so the stale contract could block new launches indefinitely.
 - Fix: Auto-heal dead `running` refresh manifests to `failed` before launch checks run, and let the queued-refresh runner reclaim stale running external contracts with dead PIDs.
-- Validation: Focused regressions now pass for stale-running recovery in both `ops_refresh` and `run_queued_refresh_job` paths.
-- Follow-up: Redeploy and confirm the Render status endpoint advances past the old 2026-06-24 contract on the next refresh tick.
+- Validation: Focused regressions passed, and a live Render MLB refresh launched cleanly, completed successfully, and returned the ops page to `finished` on run `20260702_174014`.
+- Follow-up: Keep the deploy parity check open until the pushed fix is visible in the version endpoint, then confirm the next refresh tick preserves the healed state.
 
 ## 2026-07-02 - Render defaults finally aligned with in-place odds refresh
 - Symptom: The MLB odds badge and ops refresh path kept circling back to `manifest_only` even after the live code changes were deployed.
