@@ -549,7 +549,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.84,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 0.9507461008564829,
           "bb": 1.1925000000000001,
@@ -720,7 +720,7 @@
         "role": "CL",
         "leverage_skill": 0.85,
         "stamina_pitches": 25,
-        "availability_mult": 0.9400000000000001,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 0.9763347616528195,
           "bb": 1.0126491646778042,
@@ -848,7 +848,7 @@
         "role": "SU",
         "leverage_skill": 0.7,
         "stamina_pitches": 25,
-        "availability_mult": 0.815,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 0.9880942747319441,
           "bb": 1.0710713118199227,
@@ -937,6 +937,12 @@
         "lev": 0.85
       },
       {
+        "id": 677961,
+        "name": "Cole Wilcox",
+        "role": "MR",
+        "lev": 0.5
+      },
+      {
         "id": 660825,
         "name": "Eduard Bazardo",
         "role": "MR",
@@ -953,12 +959,6 @@
         "name": "Jos\u00e9 A. Ferrer",
         "role": "SU",
         "lev": 0.7
-      },
-      {
-        "id": 681006,
-        "name": "Josh Simpson",
-        "role": "MR",
-        "lev": 0.5
       },
       {
         "id": 621074,
@@ -1408,7 +1408,7 @@
         "role": "CL",
         "leverage_skill": 0.85,
         "stamina_pitches": 25,
-        "availability_mult": 0.96,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 0.901618254311494,
           "bb": 1.1535013566141865,
@@ -1445,13 +1445,57 @@
         "pitch_type_hr_mult": {}
       },
       {
+        "id": 677961,
+        "name": "Cole Wilcox",
+        "throw": "R",
+        "role": "MR",
+        "leverage_skill": 0.5,
+        "stamina_pitches": 25,
+        "availability_mult": 1.0,
+        "platoon_mult_vs_lhb": {
+          "k": 1.0806306306306308,
+          "bb": 0.8075,
+          "hr": 1.275,
+          "inplay": 0.8847793845012977
+        },
+        "platoon_mult_vs_rhb": {
+          "k": 0.9213804713804714,
+          "bb": 1.1925000000000001,
+          "hr": 0.78,
+          "inplay": 1.1405319636197082
+        },
+        "statcast_quality_mult": {},
+        "arsenal_source": "statsapi_pitchArsenal",
+        "arsenal_sample_size": 270,
+        "statcast_splits_found": false,
+        "statcast_splits_source": "",
+        "statcast_splits_n_pitches": 0,
+        "statcast_splits_start_date": "",
+        "statcast_splits_end_date": "",
+        "k_rate": 0.21214285714285713,
+        "bb_rate": 0.17904761904761904,
+        "hbp_rate": 0.02857142857142857,
+        "hr_rate": 0.012142857142857143,
+        "inplay_hit_rate": 0.4216697936210131,
+        "arsenal": {
+          "FF": 0.24444444,
+          "OTHER": 0.17037037,
+          "CH": 0.07037037,
+          "SI": 0.2037037,
+          "SL": 0.31111112
+        },
+        "pitch_type_whiff_mult": {},
+        "pitch_type_inplay_mult": {},
+        "pitch_type_hr_mult": {}
+      },
+      {
         "id": 660825,
         "name": "Eduard Bazardo",
         "throw": "R",
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.9,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 0.9986836576230931,
           "bb": 1.1526000497141438,
@@ -1575,56 +1619,13 @@
         "pitch_type_hr_mult": {}
       },
       {
-        "id": 681006,
-        "name": "Josh Simpson",
-        "throw": "L",
-        "role": "MR",
-        "leverage_skill": 0.5,
-        "stamina_pitches": 23,
-        "availability_mult": 1.0,
-        "platoon_mult_vs_lhb": {
-          "k": 1.1925000000000001,
-          "bb": 0.965625,
-          "hr": 0.78,
-          "inplay": 0.8075
-        },
-        "platoon_mult_vs_rhb": {
-          "k": 0.8075,
-          "bb": 1.0392857142857144,
-          "hr": 1.275,
-          "inplay": 1.1375
-        },
-        "statcast_quality_mult": {},
-        "arsenal_source": "statsapi_pitchArsenal",
-        "arsenal_sample_size": 58,
-        "statcast_splits_found": false,
-        "statcast_splits_source": "",
-        "statcast_splits_n_pitches": 0,
-        "statcast_splits_start_date": "",
-        "statcast_splits_end_date": "",
-        "k_rate": 0.2,
-        "bb_rate": 0.13333333333333333,
-        "hbp_rate": 0.0,
-        "hr_rate": 0.13333333333333333,
-        "inplay_hit_rate": 0.4,
-        "arsenal": {
-          "FF": 0.05172413896551723,
-          "OTHER": 0.32758619344827616,
-          "CU": 0.20689655586206893,
-          "SI": 0.41379311172413785
-        },
-        "pitch_type_whiff_mult": {},
-        "pitch_type_inplay_mult": {},
-        "pitch_type_hr_mult": {}
-      },
-      {
         "id": 621074,
         "name": "Michael Rucker",
         "throw": "R",
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.9400000000000001,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 1.05,
           "bb": 0.8075,

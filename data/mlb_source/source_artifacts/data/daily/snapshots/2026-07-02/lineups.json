@@ -2,7 +2,7 @@
   "date": "2026-07-02",
   "season": 2026,
   "spring_mode": false,
-  "generated_at": "2026-07-01T07:40:51.507310",
+  "generated_at": "2026-07-02T07:10:16.749685",
   "summary": {
     "games": 9,
     "projected_teams": 18,
@@ -203,7 +203,7 @@
         553993,
         663886,
         680574,
-        667472
+        695490
       ],
       "home_projected_ids": [
         592885,
@@ -237,11 +237,11 @@
           553993,
           663886,
           680574,
-          667472
+          695490
         ],
         "missing_ids": [],
         "backfilled_ids": [
-          667472
+          695490
         ],
         "pool_source": "active+40Man",
         "pool_size": 17,
@@ -409,7 +409,7 @@
         "missing_ids": [],
         "backfilled_ids": [],
         "pool_source": "active+40Man",
-        "pool_size": 19,
+        "pool_size": 20,
         "raw_names": [
           "Xavier Edwards",
           "Otto Lopez",
@@ -491,7 +491,7 @@
       "away_source": "projected_rotowire_default_vs_rhp",
       "home_source": "projected_rotowire_default_vs_rhp",
       "away_confidence": 0.66,
-      "home_confidence": 0.58,
+      "home_confidence": 0.66,
       "away_comparison": {
         "status": "projected_only",
         "is_true_mismatch": false,
@@ -818,7 +818,7 @@
       },
       "away_source": "projected_rotowire_default_vs_rhp",
       "home_source": "projected_rotowire_default_vs_rhp",
-      "away_confidence": 0.58,
+      "away_confidence": 0.66,
       "home_confidence": 0.66,
       "away_comparison": {
         "status": "projected_only",
@@ -1119,7 +1119,7 @@
           695508
         ],
         "pool_source": "active+40Man",
-        "pool_size": 14,
+        "pool_size": 13,
         "raw_names": [
           "Joc Pederson",
           "Wyatt Langford",
@@ -1148,7 +1148,7 @@
       },
       "away_source": "projected_rotowire_default_vs_rhp",
       "home_source": "projected_rotowire_default_vs_rhp",
-      "away_confidence": 0.58,
+      "away_confidence": 0.66,
       "home_confidence": 0.48000000000000004,
       "away_comparison": {
         "status": "projected_only",
@@ -1477,7 +1477,7 @@
       "away_source": "projected_rotowire_default_vs_rhp",
       "home_source": "projected_rotowire_default_vs_rhp",
       "away_confidence": 0.66,
-      "home_confidence": 0.58,
+      "home_confidence": 0.66,
       "away_comparison": {
         "status": "projected_only",
         "is_true_mismatch": false,

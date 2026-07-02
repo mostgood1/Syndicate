@@ -99,12 +99,6 @@
         "lev": 0.7
       },
       {
-        "id": 805326,
-        "name": "Tyler Schweitzer",
-        "role": "MR",
-        "lev": 0.5
-      },
-      {
         "id": 663542,
         "name": "Bryan Hudson",
         "role": "SU",
@@ -590,7 +584,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.8166666666666667,
         "platoon_mult_vs_lhb": {
           "k": 1.1422320550639136,
           "bb": 1.0383476599808978,
@@ -722,7 +716,7 @@
         "role": "SU",
         "leverage_skill": 0.7,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.7416666666666667,
         "platoon_mult_vs_lhb": {
           "k": 0.8075,
           "bb": 1.1048340108797952,
@@ -758,57 +752,13 @@
         "pitch_type_hr_mult": {}
       },
       {
-        "id": 805326,
-        "name": "Tyler Schweitzer",
-        "throw": "L",
-        "role": "MR",
-        "leverage_skill": 0.5,
-        "stamina_pitches": 25,
-        "availability_mult": 0.77,
-        "platoon_mult_vs_lhb": {
-          "k": 1.0515625,
-          "bb": 1.1925000000000001,
-          "hr": 1.0,
-          "inplay": 0.8075
-        },
-        "platoon_mult_vs_rhb": {
-          "k": 0.9565789473684211,
-          "bb": 0.8075,
-          "hr": 1.0,
-          "inplay": 1.1545751633986927
-        },
-        "statcast_quality_mult": {},
-        "arsenal_source": "statsapi_pitchArsenal",
-        "arsenal_sample_size": 122,
-        "statcast_splits_found": false,
-        "statcast_splits_source": "",
-        "statcast_splits_n_pitches": 0,
-        "statcast_splits_start_date": "",
-        "statcast_splits_end_date": "",
-        "k_rate": 0.11428571428571428,
-        "bb_rate": 0.08571428571428572,
-        "hbp_rate": 0.0,
-        "hr_rate": 0.0,
-        "inplay_hit_rate": 0.32142857142857145,
-        "arsenal": {
-          "FF": 0.30327868788524587,
-          "OTHER": 0.13934426362295085,
-          "CH": 0.07377049191803278,
-          "SI": 0.02459016463934428,
-          "SL": 0.45901639193442617
-        },
-        "pitch_type_whiff_mult": {},
-        "pitch_type_inplay_mult": {},
-        "pitch_type_hr_mult": {}
-      },
-      {
         "id": 663542,
         "name": "Bryan Hudson",
         "throw": "L",
         "role": "SU",
         "leverage_skill": 0.7,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.9166666666666666,
         "platoon_mult_vs_lhb": {
           "k": 1.0186705257925373,
           "bb": 1.1201436130007558,
@@ -1435,7 +1385,7 @@
         "role": "SU",
         "leverage_skill": 0.7,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.85,
         "platoon_mult_vs_lhb": {
           "k": 0.9832088141773954,
           "bb": 0.931352121723072,
@@ -1479,7 +1429,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.92,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 0.8625,
           "bb": 1.0,
@@ -1521,7 +1471,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.8666666666666667,
         "platoon_mult_vs_lhb": {
           "k": 0.9879996787798917,
           "bb": 0.8075,
@@ -1563,7 +1513,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.875,
         "platoon_mult_vs_lhb": {
           "k": 0.817588671254632,
           "bb": 1.0450723085163365,
@@ -1606,7 +1556,7 @@
         "role": "SU",
         "leverage_skill": 0.7,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.9166666666666666,
         "platoon_mult_vs_lhb": {
           "k": 1.0576289145279019,
           "bb": 1.0227221279003962,
@@ -1649,7 +1599,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.915,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 1.1925000000000001,
           "bb": 1.0871063266443701,
@@ -1692,7 +1642,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.9833333333333333,
         "platoon_mult_vs_lhb": {
           "k": 1.0912434209276254,
           "bb": 0.8075,

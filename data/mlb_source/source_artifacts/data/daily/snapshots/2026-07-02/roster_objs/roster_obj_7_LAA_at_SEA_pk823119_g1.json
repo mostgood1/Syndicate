@@ -1824,7 +1824,7 @@
           "arsenal_sample_size": 533,
           "stamina_pitches": 25,
           "role": "MR",
-          "availability_mult": 0.84,
+          "availability_mult": 1.0,
           "platoon_mult_vs_lhb": {
             "k": 0.9507461008564829,
             "bb": 1.1925000000000001,
@@ -2167,7 +2167,7 @@
           "arsenal_sample_size": 696,
           "stamina_pitches": 25,
           "role": "CL",
-          "availability_mult": 0.9400000000000001,
+          "availability_mult": 1.0,
           "platoon_mult_vs_lhb": {
             "k": 0.9763347616528195,
             "bb": 1.0126491646778042,
@@ -2408,7 +2408,7 @@
           "arsenal_sample_size": 759,
           "stamina_pitches": 25,
           "role": "SU",
-          "availability_mult": 0.815,
+          "availability_mult": 1.0,
           "platoon_mult_vs_lhb": {
             "k": 0.9880942747319441,
             "bb": 1.0710713118199227,
@@ -4295,7 +4295,7 @@
           "arsenal_sample_size": 510,
           "stamina_pitches": 25,
           "role": "CL",
-          "availability_mult": 0.96,
+          "availability_mult": 1.0,
           "platoon_mult_vs_lhb": {
             "k": 0.901618254311494,
             "bb": 1.1535013566141865,
@@ -4351,6 +4351,93 @@
         },
         {
           "player": {
+            "mlbam_id": 677961,
+            "full_name": "Cole Wilcox",
+            "primary_position": "P",
+            "bat_side": "R",
+            "throw_side": "R"
+          },
+          "k_rate": 0.21214285714285713,
+          "bb_rate": 0.17904761904761904,
+          "hbp_rate": 0.02857142857142857,
+          "hr_rate": 0.012142857142857143,
+          "inplay_hit_rate": 0.4216697936210131,
+          "batters_faced": 70.0,
+          "balls_in_play": 41.0,
+          "arsenal": {
+            "FF": 0.24444444,
+            "OTHER": 0.17037037,
+            "CH": 0.07037037,
+            "SI": 0.2037037,
+            "SL": 0.31111112
+          },
+          "pitch_type_whiff_mult": {},
+          "pitch_type_inplay_mult": {},
+          "pitch_type_hr_mult": {},
+          "statcast_splits_source": "",
+          "statcast_splits_n_pitches": 0,
+          "statcast_splits_start_date": "",
+          "statcast_splits_end_date": "",
+          "arsenal_source": "statsapi_pitchArsenal",
+          "arsenal_sample_size": 270,
+          "stamina_pitches": 25,
+          "role": "MR",
+          "availability_mult": 1.0,
+          "platoon_mult_vs_lhb": {
+            "k": 1.0806306306306308,
+            "bb": 0.8075,
+            "hr": 1.275,
+            "inplay": 0.8847793845012977
+          },
+          "platoon_mult_vs_rhb": {
+            "k": 0.9213804713804714,
+            "bb": 1.1925000000000001,
+            "hr": 0.78,
+            "inplay": 1.1405319636197082
+          },
+          "venue_mult_home": {
+            "k": 0.9530303030303031,
+            "bb": 1.0090425531914893,
+            "hr": 1.175,
+            "inplay": 0.9820133481646274
+          },
+          "venue_mult_away": {
+            "k": 1.1213804713804714,
+            "bb": 0.9292553191489361,
+            "hr": 0.86,
+            "inplay": 1.027287895641622
+          },
+          "vs_venue_hr_mult": {
+            "136": 1.175
+          },
+          "vs_venue_k_mult": {
+            "136": 0.9530303030303031
+          },
+          "vs_venue_bb_mult": {
+            "136": 1.0090425531914893
+          },
+          "vs_venue_inplay_mult": {
+            "136": 0.9820133481646274
+          },
+          "vs_venue_history": {
+            "136": {
+              "bf": 49.0,
+              "k_mult": 0.8658008658008659,
+              "bb_mult": 1.0258358662613982,
+              "hr_mult": 1.5,
+              "inplay_mult": 0.9486095661846498
+            }
+          },
+          "statcast_quality_mult": {},
+          "bb_gb_rate": 0.44,
+          "bb_fb_rate": 0.25,
+          "bb_ld_rate": 0.2,
+          "bb_pu_rate": 0.11,
+          "bb_inplay_n": 0,
+          "leverage_skill": 0.5
+        },
+        {
+          "player": {
             "mlbam_id": 660825,
             "full_name": "Eduard Bazardo",
             "primary_position": "P",
@@ -4381,7 +4468,7 @@
           "arsenal_sample_size": 568,
           "stamina_pitches": 25,
           "role": "MR",
-          "availability_mult": 0.9,
+          "availability_mult": 1.0,
           "platoon_mult_vs_lhb": {
             "k": 0.9986836576230931,
             "bb": 1.1526000497141438,
@@ -4610,71 +4697,6 @@
         },
         {
           "player": {
-            "mlbam_id": 681006,
-            "full_name": "Josh Simpson",
-            "primary_position": "P",
-            "bat_side": "L",
-            "throw_side": "L"
-          },
-          "k_rate": 0.2,
-          "bb_rate": 0.13333333333333333,
-          "hbp_rate": 0.0,
-          "hr_rate": 0.13333333333333333,
-          "inplay_hit_rate": 0.4,
-          "batters_faced": 15.0,
-          "balls_in_play": 10.0,
-          "arsenal": {
-            "FF": 0.05172413896551723,
-            "OTHER": 0.32758619344827616,
-            "CU": 0.20689655586206893,
-            "SI": 0.41379311172413785
-          },
-          "pitch_type_whiff_mult": {},
-          "pitch_type_inplay_mult": {},
-          "pitch_type_hr_mult": {},
-          "statcast_splits_source": "",
-          "statcast_splits_n_pitches": 0,
-          "statcast_splits_start_date": "",
-          "statcast_splits_end_date": "",
-          "arsenal_source": "statsapi_pitchArsenal",
-          "arsenal_sample_size": 58,
-          "stamina_pitches": 23,
-          "role": "MR",
-          "availability_mult": 1.0,
-          "platoon_mult_vs_lhb": {
-            "k": 1.1925000000000001,
-            "bb": 0.965625,
-            "hr": 0.78,
-            "inplay": 0.8075
-          },
-          "platoon_mult_vs_rhb": {
-            "k": 0.8075,
-            "bb": 1.0392857142857144,
-            "hr": 1.275,
-            "inplay": 1.1375
-          },
-          "venue_mult_home": {},
-          "venue_mult_away": {
-            "k": 1.0,
-            "bb": 1.0,
-            "hr": 1.0,
-            "inplay": 1.0
-          },
-          "vs_venue_hr_mult": {},
-          "vs_venue_k_mult": {},
-          "vs_venue_bb_mult": {},
-          "vs_venue_inplay_mult": {},
-          "vs_venue_history": {},
-          "statcast_quality_mult": {},
-          "bb_gb_rate": 0.44,
-          "bb_fb_rate": 0.25,
-          "bb_ld_rate": 0.2,
-          "bb_pu_rate": 0.11,
-          "bb_inplay_n": 0,
-          "leverage_skill": 0.5
-        },
-        {
-          "player": {
             "mlbam_id": 621074,
             "full_name": "Michael Rucker",
             "primary_position": "P",
@@ -4706,7 +4728,7 @@
           "arsenal_sample_size": 90,
           "stamina_pitches": 25,
           "role": "MR",
-          "availability_mult": 0.9400000000000001,
+          "availability_mult": 1.0,
           "platoon_mult_vs_lhb": {
             "k": 1.05,
             "bb": 0.8075,

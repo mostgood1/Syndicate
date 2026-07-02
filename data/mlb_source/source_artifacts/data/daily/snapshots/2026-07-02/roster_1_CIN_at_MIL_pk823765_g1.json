@@ -49,7 +49,7 @@
       553993,
       663886,
       680574,
-      667472
+      695490
     ],
     "lineup_source": "projected_rotowire_default_vs_rhp",
     "lineup_confidence": 0.48000000000000004,
@@ -71,14 +71,20 @@
       {
         "id": 656271,
         "name": "Brock Burke",
-        "role": "CL",
-        "lev": 0.85
+        "role": "SU",
+        "lev": 0.7
       },
       {
         "id": 657571,
         "name": "Caleb Ferguson",
         "role": "MR",
         "lev": 0.5
+      },
+      {
+        "id": 641941,
+        "name": "Emilio Pag\u00e1n",
+        "role": "CL",
+        "lev": 0.85
       },
       {
         "id": 670062,
@@ -95,18 +101,12 @@
       {
         "id": 594580,
         "name": "Sam Moll",
-        "role": "SU",
-        "lev": 0.7
-      },
-      {
-        "id": 622088,
-        "name": "Tejay Antone",
         "role": "MR",
         "lev": 0.5
       },
       {
-        "id": 685112,
-        "name": "Zach McCambley",
+        "id": 622088,
+        "name": "Tejay Antone",
         "role": "MR",
         "lev": 0.5
       },
@@ -351,37 +351,6 @@
         "vs_pitcher_history": {}
       },
       {
-        "id": 667472,
-        "name": "Dane Myers",
-        "pos": "CF",
-        "bat": "R",
-        "throw": "R",
-        "k_rate": 0.24173506611947104,
-        "bb_rate": 0.12307341541267669,
-        "hbp_rate": 0.015503875968992248,
-        "hr_rate": 0.019767441860465116,
-        "inplay_hit_rate": 0.3211612548156301,
-        "xb_hit_share": 0.17857142857142858,
-        "vs_pitch_type": {},
-        "vs_pitch_type_hr": {},
-        "platoon_mult_vs_lhp": {
-          "k": 1.070514029709974,
-          "bb": 0.9723363150373154,
-          "hr": 1.1726890756302522,
-          "inplay": 0.9827887736935805
-        },
-        "platoon_mult_vs_rhp": {
-          "k": 0.9312961384288901,
-          "bb": 1.0515796448827202,
-          "hr": 0.9850678733031675,
-          "inplay": 1.0040555524754673
-        },
-        "statcast_quality_mult": {},
-        "vs_pitcher_history": {}
-      }
-    ],
-    "bench": [
-      {
         "id": 695490,
         "name": "Edwin Arroyo",
         "pos": "2B",
@@ -406,6 +375,37 @@
           "bb": 1.1811138014527844,
           "hr": 1.0,
           "inplay": 1.0515625
+        },
+        "statcast_quality_mult": {},
+        "vs_pitcher_history": {}
+      }
+    ],
+    "bench": [
+      {
+        "id": 671155,
+        "name": "Ivan Johnson",
+        "pos": "2B",
+        "bat": "S",
+        "throw": "R",
+        "k_rate": 0.25,
+        "bb_rate": 0.0,
+        "hbp_rate": 0.0,
+        "hr_rate": 0.0,
+        "inplay_hit_rate": 0.0,
+        "xb_hit_share": 0.22,
+        "vs_pitch_type": {},
+        "vs_pitch_type_hr": {},
+        "platoon_mult_vs_lhp": {
+          "k": 0.8075,
+          "bb": 1.0,
+          "hr": 1.0,
+          "inplay": 1.0
+        },
+        "platoon_mult_vs_rhp": {
+          "k": 1.1925000000000001,
+          "bb": 1.0,
+          "hr": 1.0,
+          "inplay": 1.0
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -546,10 +546,10 @@
         "id": 656271,
         "name": "Brock Burke",
         "throw": "L",
-        "role": "CL",
-        "leverage_skill": 0.85,
+        "role": "SU",
+        "leverage_skill": 0.7,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.7833333333333333,
         "platoon_mult_vs_lhb": {
           "k": 0.9975740325542146,
           "bb": 0.9046207521399884,
@@ -592,7 +592,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.91,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 0.9321428571428572,
           "bb": 0.8075,
@@ -629,13 +629,55 @@
         "pitch_type_hr_mult": {}
       },
       {
+        "id": 641941,
+        "name": "Emilio Pag\u00e1n",
+        "throw": "R",
+        "role": "CL",
+        "leverage_skill": 0.85,
+        "stamina_pitches": 20,
+        "availability_mult": 0.9333333333333333,
+        "platoon_mult_vs_lhb": {
+          "k": 1.14280205655527,
+          "bb": 1.0970588235294119,
+          "hr": 1.275,
+          "inplay": 1.1244352814628902
+        },
+        "platoon_mult_vs_rhb": {
+          "k": 0.9448586118251928,
+          "bb": 1.0970588235294119,
+          "hr": 0.78,
+          "inplay": 0.8246862674793833
+        },
+        "statcast_quality_mult": {},
+        "arsenal_source": "statsapi_pitchArsenal",
+        "arsenal_sample_size": 237,
+        "statcast_splits_found": false,
+        "statcast_splits_source": "",
+        "statcast_splits_n_pitches": 0,
+        "statcast_splits_start_date": "",
+        "statcast_splits_end_date": "",
+        "k_rate": 0.17366071428571428,
+        "bb_rate": 0.0796875,
+        "hbp_rate": 0.03125,
+        "hr_rate": 0.04698660714285714,
+        "inplay_hit_rate": 0.3336124401913875,
+        "arsenal": {
+          "FF": 0.5907173,
+          "FS": 0.19831224,
+          "FC": 0.21097046
+        },
+        "pitch_type_whiff_mult": {},
+        "pitch_type_inplay_mult": {},
+        "pitch_type_hr_mult": {}
+      },
+      {
         "id": 670062,
         "name": "Julian Garcia",
         "throw": "R",
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.825,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 0.8075,
           "bb": 0.8075,
@@ -677,7 +719,7 @@
         "role": "SU",
         "leverage_skill": 0.7,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.875,
         "platoon_mult_vs_lhb": {
           "k": 1.1026123524320912,
           "bb": 1.074104913715054,
@@ -715,8 +757,8 @@
         "id": 594580,
         "name": "Sam Moll",
         "throw": "L",
-        "role": "SU",
-        "leverage_skill": 0.7,
+        "role": "MR",
+        "leverage_skill": 0.5,
         "stamina_pitches": 25,
         "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
@@ -761,7 +803,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.8666666666666667,
         "platoon_mult_vs_lhb": {
           "k": 0.8075,
           "bb": 1.1779411764705883,
@@ -794,49 +836,6 @@
           "SI": 0.07228915407228914,
           "SL": 0.024096385024096386,
           "FC": 0.1927710801927711
-        },
-        "pitch_type_whiff_mult": {},
-        "pitch_type_inplay_mult": {},
-        "pitch_type_hr_mult": {}
-      },
-      {
-        "id": 685112,
-        "name": "Zach McCambley",
-        "throw": "R",
-        "role": "MR",
-        "leverage_skill": 0.5,
-        "stamina_pitches": 25,
-        "availability_mult": 1.0,
-        "platoon_mult_vs_lhb": {
-          "k": 1.0916666666666668,
-          "bb": 1.1925000000000001,
-          "hr": 1.0,
-          "inplay": 0.8075
-        },
-        "platoon_mult_vs_rhb": {
-          "k": 0.93125,
-          "bb": 0.8075,
-          "hr": 1.0,
-          "inplay": 1.1925000000000001
-        },
-        "statcast_quality_mult": {},
-        "arsenal_source": "statsapi_pitchArsenal",
-        "arsenal_sample_size": 81,
-        "statcast_splits_found": false,
-        "statcast_splits_source": "",
-        "statcast_splits_n_pitches": 0,
-        "statcast_splits_start_date": "",
-        "statcast_splits_end_date": "",
-        "k_rate": 0.19047619047619047,
-        "bb_rate": 0.09523809523809523,
-        "hbp_rate": 0.047619047619047616,
-        "hr_rate": 0.0,
-        "inplay_hit_rate": 0.42428571428571427,
-        "arsenal": {
-          "FF": 0.2469135879012348,
-          "OTHER": 0.18518518592592595,
-          "SI": 0.02469135879012348,
-          "FC": 0.5432098673827157
         },
         "pitch_type_whiff_mult": {},
         "pitch_type_inplay_mult": {},
@@ -945,6 +944,12 @@
         "lev": 0.7
       },
       {
+        "id": 668831,
+        "name": "Garrett Stallings",
+        "role": "MR",
+        "lev": 0.5
+      },
+      {
         "id": 681982,
         "name": "Grant Anderson",
         "role": "MR",
@@ -969,8 +974,8 @@
         "lev": 0.85
       },
       {
-        "id": 675660,
-        "name": "Shane Drohan",
+        "id": 694477,
+        "name": "Chad Patrick",
         "role": "LR",
         "lev": 0.35
       }
@@ -1408,7 +1413,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.8333333333333334,
         "platoon_mult_vs_lhb": {
           "k": 1.0122391143499323,
           "bb": 0.8882850470239222,
@@ -1452,7 +1457,7 @@
         "role": "SU",
         "leverage_skill": 0.7,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.9583333333333334,
         "platoon_mult_vs_lhb": {
           "k": 0.8075,
           "bb": 0.8075,
@@ -1487,13 +1492,47 @@
         "pitch_type_hr_mult": {}
       },
       {
+        "id": 668831,
+        "name": "Garrett Stallings",
+        "throw": "R",
+        "role": "MR",
+        "leverage_skill": 0.5,
+        "stamina_pitches": 25,
+        "availability_mult": 1.0,
+        "platoon_mult_vs_lhb": {},
+        "platoon_mult_vs_rhb": {},
+        "statcast_quality_mult": {},
+        "arsenal_source": "default",
+        "arsenal_sample_size": 0,
+        "statcast_splits_found": false,
+        "statcast_splits_source": "",
+        "statcast_splits_n_pitches": 0,
+        "statcast_splits_start_date": "",
+        "statcast_splits_end_date": "",
+        "k_rate": 0.24,
+        "bb_rate": 0.08,
+        "hbp_rate": 0.008,
+        "hr_rate": 0.03,
+        "inplay_hit_rate": 0.0,
+        "arsenal": {
+          "FF": 0.45,
+          "SL": 0.22,
+          "CH": 0.12,
+          "SI": 0.13,
+          "CU": 0.08
+        },
+        "pitch_type_whiff_mult": {},
+        "pitch_type_inplay_mult": {},
+        "pitch_type_hr_mult": {}
+      },
+      {
         "id": 681982,
         "name": "Grant Anderson",
         "throw": "R",
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.945,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 0.9647556881760537,
           "bb": 1.1925000000000001,
@@ -1536,7 +1575,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.92,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 1.1925000000000001,
           "bb": 0.8075,
@@ -1625,7 +1664,7 @@
         "role": "CL",
         "leverage_skill": 0.85,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.9083333333333333,
         "platoon_mult_vs_lhb": {
           "k": 0.8647634698578572,
           "bb": 0.9495052226498076,
@@ -1660,45 +1699,44 @@
         "pitch_type_hr_mult": {}
       },
       {
-        "id": 675660,
-        "name": "Shane Drohan",
-        "throw": "L",
+        "id": 694477,
+        "name": "Chad Patrick",
+        "throw": "R",
         "role": "LR",
         "leverage_skill": 0.35,
-        "stamina_pitches": 37,
+        "stamina_pitches": 36,
         "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
-          "k": 0.938633666231521,
-          "bb": 0.8075,
-          "hr": 0.78,
-          "inplay": 1.0327501655540243
+          "k": 0.9468797104444229,
+          "bb": 0.9228948648506521,
+          "hr": 0.8415259818007663,
+          "inplay": 0.9967307557473726
         },
         "platoon_mult_vs_rhb": {
-          "k": 1.0447945228709155,
-          "bb": 1.116213046181135,
-          "hr": 1.2687132007200197,
-          "inplay": 0.9715286593975061
+          "k": 1.0314912268515302,
+          "bb": 1.026481359056033,
+          "hr": 0.78,
+          "inplay": 0.9290402812262694
         },
         "statcast_quality_mult": {},
         "arsenal_source": "statsapi_pitchArsenal",
-        "arsenal_sample_size": 847,
+        "arsenal_sample_size": 996,
         "statcast_splits_found": false,
         "statcast_splits_source": "",
         "statcast_splits_n_pitches": 0,
         "statcast_splits_start_date": "",
         "statcast_splits_end_date": "",
-        "k_rate": 0.2362344364351245,
-        "bb_rate": 0.0783379750982962,
-        "hbp_rate": 0.0045871559633027525,
-        "hr_rate": 0.0196141874180865,
-        "inplay_hit_rate": 0.3199324324324324,
+        "k_rate": 0.21619291901438062,
+        "bb_rate": 0.09994954167017071,
+        "hbp_rate": 0.0,
+        "hr_rate": 0.03292406021360693,
+        "inplay_hit_rate": 0.3280368338557994,
         "arsenal": {
-          "FF": 0.28217237689610386,
-          "CU": 0.1381345984805194,
-          "CH": 0.04014167555844157,
-          "SI": 0.21959857758441562,
-          "SL": 0.2018890177792208,
-          "FC": 0.11806375370129871
+          "FF": 0.2479919649598393,
+          "OTHER": 0.10341366206827325,
+          "CH": 0.005020080100401602,
+          "SI": 0.2158634543172691,
+          "FC": 0.42771083855421677
         },
         "pitch_type_whiff_mult": {},
         "pitch_type_inplay_mult": {},

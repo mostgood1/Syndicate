@@ -2,7 +2,7 @@
   "date": "2026-07-02",
   "season": 2026,
   "spring_mode": false,
-  "generated_at": "2026-07-01T07:40:51.509074",
+  "generated_at": "2026-07-02T07:10:16.751802",
   "games": [
     {
       "idx": 0,
@@ -143,23 +143,27 @@
         "team_id": 115,
         "abbr": "COL"
       },
-      "away_probable_id": null,
+      "away_probable_id": 687473,
       "home_probable_id": 547179,
-      "away_source": "none",
+      "away_source": "feed_gameData_probablePitchers",
       "home_source": "feed_gameData_probablePitchers",
-      "away_confidence": 0.0,
+      "away_confidence": 0.75,
       "home_confidence": 0.75,
       "away_validation": {
-        "status": "none",
-        "selected_id": null,
-        "selected_name": "",
-        "selected_source": "none",
+        "status": "ok",
+        "selected_id": 687473,
+        "selected_name": "Ryan Gusto",
+        "selected_source": "feed_gameData_probablePitchers",
         "override_reason": "",
-        "roster_team_ids": [],
-        "registry_team_ids": [],
-        "on_expected_team": false,
+        "roster_team_ids": [
+          146
+        ],
+        "registry_team_ids": [
+          146
+        ],
+        "on_expected_team": true,
         "on_opponent_team": false,
-        "on_expected_registry_team": false,
+        "on_expected_registry_team": true,
         "on_opponent_registry_team": false,
         "rejected_candidates": []
       },
@@ -182,13 +186,13 @@
         "rejected_candidates": []
       },
       "raw": {
-        "away_schedule_id": null,
+        "away_schedule_id": 687473,
         "home_schedule_id": 547179,
-        "away_schedule_name": "",
+        "away_schedule_name": "Ryan Gusto",
         "home_schedule_name": "Michael Lorenzen",
-        "away_feed_id": null,
+        "away_feed_id": 687473,
         "home_feed_id": 547179,
-        "away_feed_name": "",
+        "away_feed_name": "Ryan Gusto",
         "home_feed_name": "Michael Lorenzen"
       }
     },
@@ -268,11 +272,11 @@
         "abbr": "ATL"
       },
       "away_probable_id": 669160,
-      "home_probable_id": null,
+      "home_probable_id": 694462,
       "away_source": "feed_gameData_probablePitchers",
-      "home_source": "none",
+      "home_source": "feed_gameData_probablePitchers",
       "away_confidence": 0.75,
-      "home_confidence": 0.0,
+      "home_confidence": 0.75,
       "away_validation": {
         "status": "ok",
         "selected_id": 669160,
@@ -292,28 +296,32 @@
         "rejected_candidates": []
       },
       "home_validation": {
-        "status": "none",
-        "selected_id": null,
-        "selected_name": "",
-        "selected_source": "none",
+        "status": "ok",
+        "selected_id": 694462,
+        "selected_name": "Hurston Waldrep",
+        "selected_source": "feed_gameData_probablePitchers",
         "override_reason": "",
-        "roster_team_ids": [],
-        "registry_team_ids": [],
-        "on_expected_team": false,
+        "roster_team_ids": [
+          144
+        ],
+        "registry_team_ids": [
+          144
+        ],
+        "on_expected_team": true,
         "on_opponent_team": false,
-        "on_expected_registry_team": false,
+        "on_expected_registry_team": true,
         "on_opponent_registry_team": false,
         "rejected_candidates": []
       },
       "raw": {
         "away_schedule_id": 669160,
-        "home_schedule_id": null,
+        "home_schedule_id": 694462,
         "away_schedule_name": "Dustin May",
-        "home_schedule_name": "",
+        "home_schedule_name": "Hurston Waldrep",
         "away_feed_id": 669160,
-        "home_feed_id": null,
+        "home_feed_id": 694462,
         "away_feed_name": "Dustin May",
-        "home_feed_name": ""
+        "home_feed_name": "Hurston Waldrep"
       }
     },
     {
@@ -327,49 +335,57 @@
         "team_id": 118,
         "abbr": "KC"
       },
-      "away_probable_id": null,
-      "home_probable_id": null,
-      "away_source": "none",
-      "home_source": "none",
-      "away_confidence": 0.0,
-      "home_confidence": 0.0,
+      "away_probable_id": 693855,
+      "home_probable_id": 663568,
+      "away_source": "feed_gameData_probablePitchers",
+      "home_source": "feed_gameData_probablePitchers",
+      "away_confidence": 0.75,
+      "home_confidence": 0.75,
       "away_validation": {
-        "status": "none",
-        "selected_id": null,
-        "selected_name": "",
-        "selected_source": "none",
+        "status": "ok",
+        "selected_id": 693855,
+        "selected_name": "Ian Seymour",
+        "selected_source": "feed_gameData_probablePitchers",
         "override_reason": "",
-        "roster_team_ids": [],
-        "registry_team_ids": [],
-        "on_expected_team": false,
+        "roster_team_ids": [
+          139
+        ],
+        "registry_team_ids": [
+          139
+        ],
+        "on_expected_team": true,
         "on_opponent_team": false,
-        "on_expected_registry_team": false,
+        "on_expected_registry_team": true,
         "on_opponent_registry_team": false,
         "rejected_candidates": []
       },
       "home_validation": {
-        "status": "none",
-        "selected_id": null,
-        "selected_name": "",
-        "selected_source": "none",
+        "status": "ok",
+        "selected_id": 663568,
+        "selected_name": "Stephen Kolek",
+        "selected_source": "feed_gameData_probablePitchers",
         "override_reason": "",
-        "roster_team_ids": [],
-        "registry_team_ids": [],
-        "on_expected_team": false,
+        "roster_team_ids": [
+          118
+        ],
+        "registry_team_ids": [
+          118
+        ],
+        "on_expected_team": true,
         "on_opponent_team": false,
-        "on_expected_registry_team": false,
+        "on_expected_registry_team": true,
         "on_opponent_registry_team": false,
         "rejected_candidates": []
       },
       "raw": {
-        "away_schedule_id": null,
-        "home_schedule_id": null,
-        "away_schedule_name": "",
-        "home_schedule_name": "",
-        "away_feed_id": null,
-        "home_feed_id": null,
-        "away_feed_name": "",
-        "home_feed_name": ""
+        "away_schedule_id": 693855,
+        "home_schedule_id": 663568,
+        "away_schedule_name": "Ian Seymour",
+        "home_schedule_name": "Stephen Kolek",
+        "away_feed_id": 693855,
+        "home_feed_id": 663568,
+        "away_feed_name": "Ian Seymour",
+        "home_feed_name": "Stephen Kolek"
       }
     },
     {
@@ -384,11 +400,11 @@
         "abbr": "TEX"
       },
       "away_probable_id": 664285,
-      "home_probable_id": null,
+      "home_probable_id": 543135,
       "away_source": "feed_gameData_probablePitchers",
-      "home_source": "none",
+      "home_source": "feed_gameData_probablePitchers",
       "away_confidence": 0.75,
-      "home_confidence": 0.0,
+      "home_confidence": 0.75,
       "away_validation": {
         "status": "ok",
         "selected_id": 664285,
@@ -408,28 +424,32 @@
         "rejected_candidates": []
       },
       "home_validation": {
-        "status": "none",
-        "selected_id": null,
-        "selected_name": "",
-        "selected_source": "none",
+        "status": "ok",
+        "selected_id": 543135,
+        "selected_name": "Nathan Eovaldi",
+        "selected_source": "feed_gameData_probablePitchers",
         "override_reason": "",
-        "roster_team_ids": [],
-        "registry_team_ids": [],
-        "on_expected_team": false,
+        "roster_team_ids": [
+          140
+        ],
+        "registry_team_ids": [
+          140
+        ],
+        "on_expected_team": true,
         "on_opponent_team": false,
-        "on_expected_registry_team": false,
+        "on_expected_registry_team": true,
         "on_opponent_registry_team": false,
         "rejected_candidates": []
       },
       "raw": {
         "away_schedule_id": 664285,
-        "home_schedule_id": null,
+        "home_schedule_id": 543135,
         "away_schedule_name": "Framber Valdez",
-        "home_schedule_name": "",
+        "home_schedule_name": "Nathan Eovaldi",
         "away_feed_id": 664285,
-        "home_feed_id": null,
+        "home_feed_id": 543135,
         "away_feed_name": "Framber Valdez",
-        "home_feed_name": ""
+        "home_feed_name": "Nathan Eovaldi"
       }
     },
     {
@@ -507,23 +527,27 @@
         "team_id": 119,
         "abbr": "LAD"
       },
-      "away_probable_id": null,
+      "away_probable_id": 681190,
       "home_probable_id": 808963,
-      "away_source": "none",
+      "away_source": "feed_gameData_probablePitchers",
       "home_source": "feed_gameData_probablePitchers",
-      "away_confidence": 0.0,
+      "away_confidence": 0.75,
       "home_confidence": 0.75,
       "away_validation": {
-        "status": "none",
-        "selected_id": null,
-        "selected_name": "",
-        "selected_source": "none",
+        "status": "ok",
+        "selected_id": 681190,
+        "selected_name": "Randy V\u00e1squez",
+        "selected_source": "feed_gameData_probablePitchers",
         "override_reason": "",
-        "roster_team_ids": [],
-        "registry_team_ids": [],
-        "on_expected_team": false,
+        "roster_team_ids": [
+          135
+        ],
+        "registry_team_ids": [
+          135
+        ],
+        "on_expected_team": true,
         "on_opponent_team": false,
-        "on_expected_registry_team": false,
+        "on_expected_registry_team": true,
         "on_opponent_registry_team": false,
         "rejected_candidates": []
       },
@@ -546,13 +570,13 @@
         "rejected_candidates": []
       },
       "raw": {
-        "away_schedule_id": null,
+        "away_schedule_id": 681190,
         "home_schedule_id": 808963,
-        "away_schedule_name": "",
+        "away_schedule_name": "Randy V\u00e1squez",
         "home_schedule_name": "Roki Sasaki",
-        "away_feed_id": null,
+        "away_feed_id": 681190,
         "home_feed_id": 808963,
-        "away_feed_name": "",
+        "away_feed_name": "Randy V\u00e1squez",
         "home_feed_name": "Roki Sasaki"
       }
     }

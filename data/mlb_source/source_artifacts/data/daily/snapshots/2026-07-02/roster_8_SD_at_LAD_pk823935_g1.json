@@ -54,18 +54,18 @@
     "lineup_source": "projected_rotowire_default_vs_rhp",
     "lineup_confidence": 0.66,
     "probable_pitcher": {
-      "id": null,
-      "source": "none",
-      "confidence": 0.0,
-      "raw_schedule_id": null,
-      "raw_feed_id": null
+      "id": 681190,
+      "source": "feed_gameData_probablePitchers",
+      "confidence": 0.75,
+      "raw_schedule_id": 681190,
+      "raw_feed_id": 681190
     },
     "starter": {
-      "id": 676664,
-      "name": "JP Sears",
+      "id": 681190,
+      "name": "Randy V\u00e1squez",
       "role": "SP",
-      "selection_source": "heuristic",
-      "requested_id": null
+      "selection_source": "probable",
+      "requested_id": 681190
     },
     "bullpen": [
       {
@@ -376,25 +376,25 @@
         "pos": "2B",
         "bat": "L",
         "throw": "R",
-        "k_rate": 0.18928571428571428,
-        "bb_rate": 0.11428571428571427,
-        "hbp_rate": 0.025210084033613446,
-        "hr_rate": 0.007142857142857143,
-        "inplay_hit_rate": 0.1592282564311964,
-        "xb_hit_share": 0.14285714285714285,
+        "k_rate": 0.18918699186991872,
+        "bb_rate": 0.11008130081300813,
+        "hbp_rate": 0.024390243902439025,
+        "hr_rate": 0.0069105691056910576,
+        "inplay_hit_rate": 0.19673601147776185,
+        "xb_hit_share": 0.11764705882352941,
         "vs_pitch_type": {},
         "vs_pitch_type_hr": {},
         "platoon_mult_vs_lhp": {
-          "k": 0.8132075471698114,
+          "k": 0.8075,
           "bb": 0.8075,
           "hr": 0.78,
-          "inplay": 0.9681241184767277
+          "inplay": 0.9824998914789251
         },
         "platoon_mult_vs_rhp": {
-          "k": 1.0617179741807348,
-          "bb": 1.1592105263157895,
-          "hr": 1.2605263157894737,
-          "inplay": 1.035450981329636
+          "k": 1.0729664190558044,
+          "bb": 1.163758176830555,
+          "hr": 1.262124849939976,
+          "inplay": 0.9999589043142998
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -517,45 +517,46 @@
       }
     ],
     "starter_profile": {
-      "id": 676664,
-      "name": "JP Sears",
-      "throw": "L",
+      "id": 681190,
+      "name": "Randy V\u00e1squez",
+      "throw": "R",
       "role": "SP",
       "leverage_skill": 0.5,
-      "stamina_pitches": 91,
-      "availability_mult": 0.525,
+      "stamina_pitches": 94,
+      "availability_mult": 1.0,
       "platoon_mult_vs_lhb": {
-        "k": 1.1925000000000001,
-        "bb": 1.1925000000000001,
-        "hr": 1.275,
-        "inplay": 1.1925000000000001
+        "k": 1.0947388714736623,
+        "bb": 0.9578087247543222,
+        "hr": 0.846723139765252,
+        "inplay": 0.9726564709601212
       },
       "platoon_mult_vs_rhb": {
-        "k": 0.8075,
-        "bb": 0.9927631578947368,
-        "hr": 1.275,
-        "inplay": 1.1525806451612903
+        "k": 1.0255929635185157,
+        "bb": 0.8827413480515094,
+        "hr": 1.1140800383027045,
+        "inplay": 0.9099114137926899
       },
       "statcast_quality_mult": {},
       "arsenal_source": "statsapi_pitchArsenal",
-      "arsenal_sample_size": 81,
+      "arsenal_sample_size": 1302,
       "statcast_splits_found": false,
       "statcast_splits_source": "",
       "statcast_splits_n_pitches": 0,
       "statcast_splits_start_date": "",
       "statcast_splits_end_date": "",
-      "k_rate": 0.2,
-      "bb_rate": 0.08,
-      "hbp_rate": 0.0,
-      "hr_rate": 0.04,
-      "inplay_hit_rate": 0.2777777777777778,
+      "k_rate": 0.16618023494994744,
+      "bb_rate": 0.07736321250628513,
+      "hbp_rate": 0.008982035928143712,
+      "hr_rate": 0.03600927915162042,
+      "inplay_hit_rate": 0.3476402544823597,
       "arsenal": {
-        "FF": 0.3456790144938272,
-        "OTHER": 0.20987654272839507,
-        "CH": 0.2592592533703703,
-        "SI": 0.06172839680246916,
-        "SL": 0.07407407596296299,
-        "FC": 0.04938271664197532
+        "FF": 0.3210445351367125,
+        "OTHER": 0.06528418104454688,
+        "CU": 0.11520737584331799,
+        "CH": 0.08218126131490017,
+        "SI": 0.1282642020522272,
+        "SL": 0.056067590897081444,
+        "FC": 0.2319508537112136
       },
       "pitch_type_whiff_mult": {},
       "pitch_type_inplay_mult": {},
@@ -655,7 +656,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.5666666666666667,
         "platoon_mult_vs_lhb": {
           "k": 0.9200000000000002,
           "bb": 0.8130901287553649,
@@ -742,7 +743,7 @@
         "role": "SU",
         "leverage_skill": 0.7,
         "stamina_pitches": 25,
-        "availability_mult": 0.75,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 0.9908238887985106,
           "bb": 1.1925000000000001,
@@ -895,7 +896,7 @@
       669899
     ],
     "lineup_source": "projected_rotowire_default_vs_rhp",
-    "lineup_confidence": 0.58,
+    "lineup_confidence": 0.66,
     "probable_pitcher": {
       "id": 808963,
       "source": "feed_gameData_probablePitchers",
@@ -924,6 +925,12 @@
         "lev": 0.5
       },
       {
+        "id": 656212,
+        "name": "Charlie Barnes",
+        "role": "MR",
+        "lev": 0.5
+      },
+      {
         "id": 683618,
         "name": "Edgardo Henriquez",
         "role": "MR",
@@ -932,12 +939,6 @@
       {
         "id": 676263,
         "name": "Jack Dreyer",
-        "role": "MR",
-        "lev": 0.5
-      },
-      {
-        "id": 642546,
-        "name": "Jonathan Hern\u00e1ndez",
         "role": "MR",
         "lev": 0.5
       },
@@ -1463,7 +1464,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.92,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 0.8075,
           "bb": 1.1925000000000001,
@@ -1494,6 +1495,50 @@
           "OTHER": 0.195652179782609,
           "CH": 0.13043478652173934,
           "SI": 0.1521739076086954
+        },
+        "pitch_type_whiff_mult": {},
+        "pitch_type_inplay_mult": {},
+        "pitch_type_hr_mult": {}
+      },
+      {
+        "id": 656212,
+        "name": "Charlie Barnes",
+        "throw": "L",
+        "role": "MR",
+        "leverage_skill": 0.5,
+        "stamina_pitches": 28,
+        "availability_mult": 0.35,
+        "platoon_mult_vs_lhb": {
+          "k": 0.8363095238095237,
+          "bb": 0.9650793650793651,
+          "hr": 0.78,
+          "inplay": 0.8165199236416826
+        },
+        "platoon_mult_vs_rhb": {
+          "k": 1.0904605263157894,
+          "bb": 1.0192982456140351,
+          "hr": 1.275,
+          "inplay": 1.1032330897162246
+        },
+        "statcast_quality_mult": {},
+        "arsenal_source": "statsapi_pitchArsenal",
+        "arsenal_sample_size": 181,
+        "statcast_splits_found": false,
+        "statcast_splits_source": "",
+        "statcast_splits_n_pitches": 0,
+        "statcast_splits_start_date": "",
+        "statcast_splits_end_date": "",
+        "k_rate": 0.06779661016949153,
+        "bb_rate": 0.10169491525423728,
+        "hbp_rate": 0.01694915254237288,
+        "hr_rate": 0.05084745762711864,
+        "inplay_hit_rate": 0.3530824829931973,
+        "arsenal": {
+          "FF": 0.3370165833701659,
+          "OTHER": 0.07734807077348071,
+          "CH": 0.1712707117127071,
+          "SI": 0.22651933226519333,
+          "SL": 0.18784530187845302
         },
         "pitch_type_whiff_mult": {},
         "pitch_type_inplay_mult": {},
@@ -1550,7 +1595,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.8833333333333333,
         "platoon_mult_vs_lhb": {
           "k": 0.8075,
           "bb": 0.9245324979673825,
@@ -1580,49 +1625,6 @@
           "FF": 0.47540984,
           "CU": 0.12909836,
           "SL": 0.3954918
-        },
-        "pitch_type_whiff_mult": {},
-        "pitch_type_inplay_mult": {},
-        "pitch_type_hr_mult": {}
-      },
-      {
-        "id": 642546,
-        "name": "Jonathan Hern\u00e1ndez",
-        "throw": "R",
-        "role": "MR",
-        "leverage_skill": 0.5,
-        "stamina_pitches": 25,
-        "availability_mult": 1.0,
-        "platoon_mult_vs_lhb": {
-          "k": 0.8156294200848657,
-          "bb": 1.072591522157996,
-          "hr": 0.78,
-          "inplay": 0.8075
-        },
-        "platoon_mult_vs_rhb": {
-          "k": 1.1812588401697313,
-          "bb": 0.8927317490901305,
-          "hr": 1.219345238095238,
-          "inplay": 1.1925000000000001
-        },
-        "statcast_quality_mult": {},
-        "arsenal_source": "statsapi_pitchArsenal",
-        "arsenal_sample_size": 261,
-        "statcast_splits_found": false,
-        "statcast_splits_source": "",
-        "statcast_splits_n_pitches": 0,
-        "statcast_splits_start_date": "",
-        "statcast_splits_end_date": "",
-        "k_rate": 0.188031914893617,
-        "bb_rate": 0.13803191489361702,
-        "hbp_rate": 0.0,
-        "hr_rate": 0.05957446808510638,
-        "inplay_hit_rate": 0.29828190743338007,
-        "arsenal": {
-          "FF": 0.1532567,
-          "CH": 0.01532567,
-          "SI": 0.3908046,
-          "SL": 0.44061303
         },
         "pitch_type_whiff_mult": {},
         "pitch_type_inplay_mult": {},

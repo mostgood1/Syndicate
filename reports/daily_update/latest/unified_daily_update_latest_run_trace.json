@@ -1,15 +1,15 @@
 ﻿{
     "scope":  "daily_update",
-    "date":  "2026-07-01",
+    "date":  "2026-07-02",
     "runMode":  "standard",
     "overallStatus":  "ok",
-    "generatedAt":  "2026-07-01T07:27:53.0948033+00:00",
-    "updatedAt":  "2026-07-01T07:43:10.1031643+00:00",
-    "runManifestPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-01\\20260701_072752\\unified_daily_update_run.json",
+    "generatedAt":  "2026-07-02T07:08:01.1313139+00:00",
+    "updatedAt":  "2026-07-02T07:21:11.2622998+00:00",
+    "runManifestPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-02\\20260702_070800\\unified_daily_update_run.json",
     "latestManifestPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest.json",
-    "runCheckpointPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-01\\20260701_072752\\unified_daily_update_checkpoint.json",
+    "runCheckpointPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-02\\20260702_070800\\unified_daily_update_checkpoint.json",
     "latestCheckpointPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest_checkpoint.json",
-    "runStatePath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-01\\20260701_072752\\unified_daily_update_run_state.json",
+    "runStatePath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-02\\20260702_070800\\unified_daily_update_run_state.json",
     "latestRunStatePath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest_run_state.json",
     "trace":  {
                   "eventSimExecutionCount":  21,
@@ -17,7 +17,7 @@
                   "inputFingerprintCount":  3,
                   "artifactPathCount":  21,
                   "inputFingerprints":  [
-                                            "70836e0d8834fc841ca698548c0451e8db0675db7a2ef95a2afd06c22957bb25",
+                                            "33e15b4bd37345ba5ac069f4b8ce9e3462132ffce6a3d9ff5ffbc0bc0cee3aac",
                                             "b6978cd8f47bbebfa4c1028933e311366607f79c460fde585a3b5bd93afea73f",
                                             "563a06b8e8830bba5d1cdcf73bb91ad105470d2e01ba859ebaa44c2126a6045d"
                                         ],
@@ -47,7 +47,7 @@
                   "simExecutionDecision":  null
               },
     "simulationContractPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest_simulation_contract.json",
-    "simulationContractRunPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-01\\20260701_072752\\unified_daily_update_simulation_contract.json",
+    "simulationContractRunPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-02\\20260702_070800\\unified_daily_update_simulation_contract.json",
     "simulationContractSportCount":  1,
     "simulationContractAdvancedBySport":  {
                                               "mlb":  {
@@ -56,109 +56,108 @@
                                                                                                 "label":  "Home run targets",
                                                                                                 "title":  "HR Targets",
                                                                                                 "kicker":  "Best 1+ HR looks",
-                                                                                                "body":  "28 targets surfaced for the slate.",
-                                                                                                "href":  "/mlb/hr-targets?date=2026-07-01",
+                                                                                                "body":  "18 targets surfaced for the slate.",
+                                                                                                "href":  "/mlb/hr-targets?date=2026-07-02",
                                                                                                 "cta":  "Open board",
-                                                                                                "source_path":  "daily_summary_2026_07_01_hr_targets.json",
-                                                                                                "row_count":  28,
-                                                                                                "game_count":  14,
+                                                                                                "source_path":  "daily_summary_2026_07_02_hr_targets.json",
+                                                                                                "row_count":  18,
+                                                                                                "game_count":  9,
                                                                                                 "rows":  [
                                                                                                              {
                                                                                                                  "rank":  "#1",
-                                                                                                                 "player_name":  "Ben Rice",
-                                                                                                                 "team":  "NYY",
-                                                                                                                 "opponent":  "DET",
-                                                                                                                 "matchup":  "DET @ NYY",
-                                                                                                                 "probability":  "15.7%",
-                                                                                                                 "support":  "80",
-                                                                                                                 "summary":  "Expected opportunity is strong at about 4.7 PA. He is tracking toward a premium lineup slot (1).",
-                                                                                                                 "p_hr_1plus":  0.157,
-                                                                                                                 "support_score":  80.0,
+                                                                                                                 "player_name":  "Kyle Schwarber",
+                                                                                                                 "team":  "PHI",
+                                                                                                                 "opponent":  "PIT",
+                                                                                                                 "matchup":  "PIT @ PHI",
+                                                                                                                 "probability":  "16.3%",
+                                                                                                                 "support":  "76",
+                                                                                                                 "summary":  "Expected opportunity is strong at about 4.8 PA. He is tracking toward a premium lineup slot (2).",
+                                                                                                                 "p_hr_1plus":  0.163,
+                                                                                                                 "support_score":  76.0,
                                                                                                                  "support_label":  "strong",
-                                                                                                                 "pa_mean":  4.74,
-                                                                                                                 "lineup_order":  1,
-                                                                                                                 "opponent_pitcher_name":  "Troy Melton",
-                                                                                                                 "writeup":  "Expected opportunity is strong at about 4.7 PA. He is tracking toward a premium lineup slot (1).",
-                                                                                                                 "headshot_url":  "https://img.mlbstatic.com/mlb-photos/image/upload/w_180,q_auto:best/v1/people/700250/headshot/67/current",
-                                                                                                                 "team_logo_url":  "https://www.mlbstatic.com/team-logos/147.svg",
-                                                                                                                 "opponent_logo_url":  "https://www.mlbstatic.com/team-logos/116.svg",
+                                                                                                                 "pa_mean":  4.827,
+                                                                                                                 "lineup_order":  2,
+                                                                                                                 "opponent_pitcher_name":  "Jared Jones",
+                                                                                                                 "writeup":  "Expected opportunity is strong at about 4.8 PA. He is tracking toward a premium lineup slot (2).",
+                                                                                                                 "headshot_url":  "https://img.mlbstatic.com/mlb-photos/image/upload/w_180,q_auto:best/v1/people/656941/headshot/67/current",
+                                                                                                                 "team_logo_url":  "https://www.mlbstatic.com/team-logos/143.svg",
+                                                                                                                 "opponent_logo_url":  "https://www.mlbstatic.com/team-logos/134.svg",
                                                                                                                  "drivers":  [
-                                                                                                                                 "Expected opportunity is strong at about 4.7 PA.",
-                                                                                                                                 "He is tracking toward a premium lineup slot (1).",
+                                                                                                                                 "Expected opportunity is strong at about 4.8 PA.",
+                                                                                                                                 "He is tracking toward a premium lineup slot (2).",
                                                                                                                                  "The handedness split is leaning toward extra damage in this matchup."
                                                                                                                              ]
                                                                                                              },
                                                                                                              {
                                                                                                                  "rank":  "#2",
-                                                                                                                 "player_name":  "Casey Schmitt",
-                                                                                                                 "team":  "SF",
-                                                                                                                 "opponent":  "AZ",
-                                                                                                                 "matchup":  "SF @ AZ",
-                                                                                                                 "probability":  "12.5%",
-                                                                                                                 "support":  "77",
-                                                                                                                 "summary":  "Expected opportunity is strong at about 4.9 PA. He is tracking toward a premium lineup slot (3).",
-                                                                                                                 "p_hr_1plus":  0.125,
-                                                                                                                 "support_score":  77.0,
-                                                                                                                 "support_label":  "strong",
-                                                                                                                 "pa_mean":  4.927,
-                                                                                                                 "lineup_order":  3,
-                                                                                                                 "opponent_pitcher_name":  "Zac Gallen",
-                                                                                                                 "writeup":  "Expected opportunity is strong at about 4.9 PA. He is tracking toward a premium lineup slot (3).",
-                                                                                                                 "headshot_url":  "https://img.mlbstatic.com/mlb-photos/image/upload/w_180,q_auto:best/v1/people/669477/headshot/67/current",
-                                                                                                                 "team_logo_url":  "https://www.mlbstatic.com/team-logos/137.svg",
-                                                                                                                 "opponent_logo_url":  "https://www.mlbstatic.com/team-logos/109.svg",
+                                                                                                                 "player_name":  "Josh Rojas",
+                                                                                                                 "team":  "KC",
+                                                                                                                 "opponent":  "TB",
+                                                                                                                 "matchup":  "TB @ KC",
+                                                                                                                 "probability":  "17.1%",
+                                                                                                                 "support":  "70",
+                                                                                                                 "summary":  "Expected opportunity is strong at about 4.5 PA. The handedness split is leaning toward extra damage in this matchup.",
+                                                                                                                 "p_hr_1plus":  0.171,
+                                                                                                                 "support_score":  70.0,
+                                                                                                                 "support_label":  "solid",
+                                                                                                                 "pa_mean":  4.473,
+                                                                                                                 "lineup_order":  5,
+                                                                                                                 "opponent_pitcher_name":  "Ian Seymour",
+                                                                                                                 "writeup":  "Expected opportunity is strong at about 4.5 PA. The handedness split is leaning toward extra damage in this matchup.",
+                                                                                                                 "headshot_url":  "https://img.mlbstatic.com/mlb-photos/image/upload/w_180,q_auto:best/v1/people/668942/headshot/67/current",
+                                                                                                                 "team_logo_url":  "https://www.mlbstatic.com/team-logos/118.svg",
+                                                                                                                 "opponent_logo_url":  "https://www.mlbstatic.com/team-logos/139.svg",
                                                                                                                  "drivers":  [
-                                                                                                                                 "Expected opportunity is strong at about 4.9 PA.",
-                                                                                                                                 "He is tracking toward a premium lineup slot (3).",
+                                                                                                                                 "Expected opportunity is strong at about 4.5 PA.",
                                                                                                                                  "The handedness split is leaning toward extra damage in this matchup."
                                                                                                                              ]
                                                                                                              },
                                                                                                              {
                                                                                                                  "rank":  "#3",
-                                                                                                                 "player_name":  "Kyle Schwarber",
-                                                                                                                 "team":  "PHI",
-                                                                                                                 "opponent":  "PIT",
-                                                                                                                 "matchup":  "PIT @ PHI",
+                                                                                                                 "player_name":  "Mickey Moniak",
+                                                                                                                 "team":  "COL",
+                                                                                                                 "opponent":  "MIA",
+                                                                                                                 "matchup":  "MIA @ COL",
                                                                                                                  "probability":  "13.6%",
-                                                                                                                 "support":  "70",
-                                                                                                                 "summary":  "Expected opportunity is strong at about 4.7 PA. He is tracking toward a premium lineup slot (2).",
+                                                                                                                 "support":  "74",
+                                                                                                                 "summary":  "Expected opportunity is strong at about 5.0 PA. He is tracking toward a premium lineup slot (2).",
                                                                                                                  "p_hr_1plus":  0.136,
-                                                                                                                 "support_score":  70.0,
-                                                                                                                 "support_label":  "solid",
-                                                                                                                 "pa_mean":  4.684,
+                                                                                                                 "support_score":  74.0,
+                                                                                                                 "support_label":  "strong",
+                                                                                                                 "pa_mean":  4.963,
                                                                                                                  "lineup_order":  2,
-                                                                                                                 "opponent_pitcher_name":  "Paul Skenes",
-                                                                                                                 "writeup":  "Expected opportunity is strong at about 4.7 PA. He is tracking toward a premium lineup slot (2).",
-                                                                                                                 "headshot_url":  "https://img.mlbstatic.com/mlb-photos/image/upload/w_180,q_auto:best/v1/people/656941/headshot/67/current",
-                                                                                                                 "team_logo_url":  "https://www.mlbstatic.com/team-logos/143.svg",
-                                                                                                                 "opponent_logo_url":  "https://www.mlbstatic.com/team-logos/134.svg",
+                                                                                                                 "opponent_pitcher_name":  "Ryan Gusto",
+                                                                                                                 "writeup":  "Expected opportunity is strong at about 5.0 PA. He is tracking toward a premium lineup slot (2).",
+                                                                                                                 "headshot_url":  "https://img.mlbstatic.com/mlb-photos/image/upload/w_180,q_auto:best/v1/people/666160/headshot/67/current",
+                                                                                                                 "team_logo_url":  "https://www.mlbstatic.com/team-logos/115.svg",
+                                                                                                                 "opponent_logo_url":  "https://www.mlbstatic.com/team-logos/146.svg",
                                                                                                                  "drivers":  [
-                                                                                                                                 "Expected opportunity is strong at about 4.7 PA.",
+                                                                                                                                 "Expected opportunity is strong at about 5.0 PA.",
                                                                                                                                  "He is tracking toward a premium lineup slot (2).",
-                                                                                                                                 "The park is a little better than neutral for home-run carry."
+                                                                                                                                 "The handedness split is leaning toward extra damage in this matchup."
                                                                                                                              ]
                                                                                                              },
                                                                                                              {
                                                                                                                  "rank":  "#4",
-                                                                                                                 "player_name":  "Kody Clemens",
-                                                                                                                 "team":  "MIN",
-                                                                                                                 "opponent":  "HOU",
-                                                                                                                 "matchup":  "MIN @ HOU",
-                                                                                                                 "probability":  "12.4%",
-                                                                                                                 "support":  "76",
-                                                                                                                 "summary":  "Expected opportunity is strong at about 5.0 PA. He is tracking toward a premium lineup slot (3).",
-                                                                                                                 "p_hr_1plus":  0.124,
-                                                                                                                 "support_score":  76.0,
+                                                                                                                 "player_name":  "Jac Caglianone",
+                                                                                                                 "team":  "KC",
+                                                                                                                 "opponent":  "TB",
+                                                                                                                 "matchup":  "TB @ KC",
+                                                                                                                 "probability":  "13.5%",
+                                                                                                                 "support":  "73",
+                                                                                                                 "summary":  "Expected opportunity is strong at about 4.7 PA. He is tracking toward a premium lineup slot (3).",
+                                                                                                                 "p_hr_1plus":  0.135,
+                                                                                                                 "support_score":  73.0,
                                                                                                                  "support_label":  "strong",
-                                                                                                                 "pa_mean":  4.972,
+                                                                                                                 "pa_mean":  4.703,
                                                                                                                  "lineup_order":  3,
-                                                                                                                 "opponent_pitcher_name":  "Tatsuya Imai",
-                                                                                                                 "writeup":  "Expected opportunity is strong at about 5.0 PA. He is tracking toward a premium lineup slot (3).",
-                                                                                                                 "headshot_url":  "https://img.mlbstatic.com/mlb-photos/image/upload/w_180,q_auto:best/v1/people/665019/headshot/67/current",
-                                                                                                                 "team_logo_url":  "https://www.mlbstatic.com/team-logos/142.svg",
-                                                                                                                 "opponent_logo_url":  "https://www.mlbstatic.com/team-logos/117.svg",
+                                                                                                                 "opponent_pitcher_name":  "Ian Seymour",
+                                                                                                                 "writeup":  "Expected opportunity is strong at about 4.7 PA. He is tracking toward a premium lineup slot (3).",
+                                                                                                                 "headshot_url":  "https://img.mlbstatic.com/mlb-photos/image/upload/w_180,q_auto:best/v1/people/695506/headshot/67/current",
+                                                                                                                 "team_logo_url":  "https://www.mlbstatic.com/team-logos/118.svg",
+                                                                                                                 "opponent_logo_url":  "https://www.mlbstatic.com/team-logos/139.svg",
                                                                                                                  "drivers":  [
-                                                                                                                                 "Expected opportunity is strong at about 5.0 PA.",
+                                                                                                                                 "Expected opportunity is strong at about 4.7 PA.",
                                                                                                                                  "He is tracking toward a premium lineup slot (3).",
                                                                                                                                  "The handedness split is leaning toward extra damage in this matchup."
                                                                                                                              ]
@@ -167,140 +166,115 @@
                                                                                             },
                                                                        "scoreboard_items":  [
                                                                                                 {
-                                                                                                    "target_id":  "game-824818",
-                                                                                                    "label":  "CWS @ BAL",
+                                                                                                    "target_id":  "game-823442",
+                                                                                                    "label":  "PIT @ PHI",
                                                                                                     "status":  "11:35 AM"
                                                                                                 },
                                                                                                 {
-                                                                                                    "target_id":  "game-824419",
-                                                                                                    "label":  "TEX @ CLE",
-                                                                                                    "status":  "12:10 PM"
+                                                                                                    "target_id":  "game-823765",
+                                                                                                    "label":  "CIN @ MIL",
+                                                                                                    "status":  "1:10 PM"
                                                                                                 },
                                                                                                 {
-                                                                                                    "target_id":  "game-824740",
-                                                                                                    "label":  "WSH @ BOS",
-                                                                                                    "status":  "12:35 PM"
+                                                                                                    "target_id":  "game-824335",
+                                                                                                    "label":  "MIA @ COL",
+                                                                                                    "status":  "2:10 PM"
                                                                                                 },
                                                                                                 {
-                                                                                                    "target_id":  "game-823530",
-                                                                                                    "label":  "DET @ NYY",
-                                                                                                    "status":  "12:35 PM"
-                                                                                                },
-                                                                                                {
-                                                                                                    "target_id":  "game-824660",
-                                                                                                    "label":  "SD @ CHC",
-                                                                                                    "status":  "1:20 PM"
-                                                                                                },
-                                                                                                {
-                                                                                                    "target_id":  "game-822791",
-                                                                                                    "label":  "NYM @ TOR",
-                                                                                                    "status":  "2:07 PM"
-                                                                                                },
-                                                                                                {
-                                                                                                    "target_id":  "game-823446",
-                                                                                                    "label":  "PIT @ PHI",
+                                                                                                    "target_id":  "game-824416",
+                                                                                                    "label":  "CWS @ CLE",
                                                                                                     "status":  "5:40 PM"
                                                                                                 },
                                                                                                 {
-                                                                                                    "target_id":  "game-824905",
+                                                                                                    "target_id":  "game-824906",
                                                                                                     "label":  "STL @ ATL",
                                                                                                     "status":  "6:15 PM"
                                                                                                 },
                                                                                                 {
-                                                                                                    "target_id":  "game-824094",
+                                                                                                    "target_id":  "game-824093",
                                                                                                     "label":  "TB @ KC",
                                                                                                     "status":  "6:40 PM"
                                                                                                 },
                                                                                                 {
-                                                                                                    "target_id":  "game-824174",
-                                                                                                    "label":  "MIN @ HOU",
-                                                                                                    "status":  "7:10 PM"
+                                                                                                    "target_id":  "game-822884",
+                                                                                                    "label":  "DET @ TEX",
+                                                                                                    "status":  "7:05 PM"
                                                                                                 },
                                                                                                 {
-                                                                                                    "target_id":  "game-823767",
-                                                                                                    "label":  "CIN @ MIL",
-                                                                                                    "status":  "7:10 PM"
-                                                                                                },
-                                                                                                {
-                                                                                                    "target_id":  "game-824337",
-                                                                                                    "label":  "MIA @ COL",
-                                                                                                    "status":  "7:40 PM"
-                                                                                                },
-                                                                                                {
-                                                                                                    "target_id":  "game-824985",
-                                                                                                    "label":  "LAD @ ATH",
+                                                                                                    "target_id":  "game-823119",
+                                                                                                    "label":  "LAA @ SEA",
                                                                                                     "status":  "8:40 PM"
                                                                                                 },
                                                                                                 {
-                                                                                                    "target_id":  "game-825064",
-                                                                                                    "label":  "SF @ AZ",
-                                                                                                    "status":  "8:40 PM"
+                                                                                                    "target_id":  "game-823935",
+                                                                                                    "label":  "SD @ LAD",
+                                                                                                    "status":  "9:10 PM"
                                                                                                 }
                                                                                             ],
                                                                        "module_links":  [
                                                                                             {
                                                                                                 "label":  "Cards",
-                                                                                                "href":  "/mlb/cards?date=2026-07-01",
+                                                                                                "href":  "/mlb/cards?date=2026-07-02",
                                                                                                 "active":  true
                                                                                             },
                                                                                             {
                                                                                                 "label":  "Betting Card",
-                                                                                                "href":  "/mlb/season/2026/betting-card?date=2026-07-01",
+                                                                                                "href":  "/mlb/season/2026/betting-card?date=2026-07-02",
                                                                                                 "active":  false
                                                                                             },
                                                                                             {
                                                                                                 "label":  "Live Lens",
-                                                                                                "href":  "/mlb/live-lens?date=2026-07-01",
+                                                                                                "href":  "/mlb/live-lens?date=2026-07-02",
                                                                                                 "active":  false
                                                                                             },
                                                                                             {
                                                                                                 "label":  "Market Accuracy",
-                                                                                                "href":  "/mlb/market-accuracy?date=2026-07-01",
+                                                                                                "href":  "/mlb/market-accuracy?date=2026-07-02",
                                                                                                 "active":  false
                                                                                             },
                                                                                             {
                                                                                                 "label":  "Daily Archive",
-                                                                                                "href":  "/mlb/archive?date=2026-07-01",
+                                                                                                "href":  "/mlb/archive?date=2026-07-02",
                                                                                                 "active":  false
                                                                                             },
                                                                                             {
                                                                                                 "label":  "Season Review",
-                                                                                                "href":  "/mlb/season/2026?date=2026-07-01",
+                                                                                                "href":  "/mlb/season/2026?date=2026-07-02",
                                                                                                 "active":  false
                                                                                             },
                                                                                             {
                                                                                                 "label":  "Pitcher top props",
-                                                                                                "href":  "/mlb/pitcher-top-props?date=2026-07-01",
+                                                                                                "href":  "/mlb/pitcher-top-props?date=2026-07-02",
                                                                                                 "active":  false
                                                                                             },
                                                                                             {
                                                                                                 "label":  "Hitter top props",
-                                                                                                "href":  "/mlb/hitter-top-props?date=2026-07-01",
+                                                                                                "href":  "/mlb/hitter-top-props?date=2026-07-02",
                                                                                                 "active":  false
                                                                                             },
                                                                                             {
                                                                                                 "label":  "Top props",
-                                                                                                "href":  "/mlb/top-props?date=2026-07-01",
+                                                                                                "href":  "/mlb/top-props?date=2026-07-02",
                                                                                                 "active":  false
                                                                                             },
                                                                                             {
                                                                                                 "label":  "HR targets",
-                                                                                                "href":  "/mlb/hr-targets?date=2026-07-01",
+                                                                                                "href":  "/mlb/hr-targets?date=2026-07-02",
                                                                                                 "active":  false
                                                                                             },
                                                                                             {
                                                                                                 "label":  "RFI targets",
-                                                                                                "href":  "/mlb/rfi-targets?date=2026-07-01",
+                                                                                                "href":  "/mlb/rfi-targets?date=2026-07-02",
                                                                                                 "active":  false
                                                                                             },
                                                                                             {
                                                                                                 "label":  "Pitcher ladders",
-                                                                                                "href":  "/mlb/pitcher-ladders?date=2026-07-01",
+                                                                                                "href":  "/mlb/pitcher-ladders?date=2026-07-02",
                                                                                                 "active":  false
                                                                                             },
                                                                                             {
                                                                                                 "label":  "Hitter ladders",
-                                                                                                "href":  "/mlb/hitter-ladders?date=2026-07-01",
+                                                                                                "href":  "/mlb/hitter-ladders?date=2026-07-02",
                                                                                                 "active":  false
                                                                                             },
                                                                                             {
@@ -312,9 +286,9 @@
                                                                        "cards_control_links":  [
 
                                                                                                ],
-                                                                       "cards_header_meta":  "Artifact-backed slate | 2026-07-01",
+                                                                       "cards_header_meta":  "Artifact-backed slate | 2026-07-02",
                                                                        "cards_header_title":  "MLB Game Cards",
-                                                                       "source_path":  "daily_summary_2026_07_01.json",
+                                                                       "source_path":  "daily_summary_2026_07_02.json",
                                                                        "source_title":  "MLB daily summary artifact"
                                                                    },
                                                           "game":  {

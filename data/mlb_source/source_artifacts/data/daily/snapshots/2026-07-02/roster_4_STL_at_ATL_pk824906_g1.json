@@ -52,7 +52,7 @@
       701675
     ],
     "lineup_source": "projected_rotowire_default_vs_rhp",
-    "lineup_confidence": 0.58,
+    "lineup_confidence": 0.66,
     "probable_pitcher": {
       "id": 669160,
       "source": "feed_gameData_probablePitchers",
@@ -111,8 +111,8 @@
         "lev": 0.85
       },
       {
-        "id": 592773,
-        "name": "Ryne Stanek",
+        "id": 681676,
+        "name": "Ryan Fernandez",
         "role": "MR",
         "lev": 0.5
       }
@@ -551,7 +551,7 @@
         "role": "SU",
         "leverage_skill": 0.7,
         "stamina_pitches": 25,
-        "availability_mult": 0.86,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 1.1270272349592245,
           "bb": 0.918785514054095,
@@ -595,7 +595,7 @@
         "role": "SU",
         "leverage_skill": 0.7,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.9166666666666666,
         "platoon_mult_vs_lhb": {
           "k": 0.8075,
           "bb": 1.0491158267020337,
@@ -639,7 +639,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.89,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 1.1656538297990349,
           "bb": 0.8308966209434594,
@@ -682,7 +682,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.8833333333333333,
         "platoon_mult_vs_lhb": {
           "k": 0.976460104195229,
           "bb": 0.8157142857142857,
@@ -768,7 +768,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.8,
         "platoon_mult_vs_lhb": {
           "k": 0.8075,
           "bb": 1.0611111111111111,
@@ -813,7 +813,7 @@
         "role": "CL",
         "leverage_skill": 0.85,
         "stamina_pitches": 25,
-        "availability_mult": 0.955,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 0.9187207342198914,
           "bb": 0.9304031354983202,
@@ -850,44 +850,43 @@
         "pitch_type_hr_mult": {}
       },
       {
-        "id": 592773,
-        "name": "Ryne Stanek",
+        "id": 681676,
+        "name": "Ryan Fernandez",
         "throw": "R",
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
         "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
-          "k": 1.031100108376029,
-          "bb": 1.0275206257366336,
-          "hr": 0.8826793872614889,
-          "inplay": 0.9792631153340746
+          "k": 1.0516563217413486,
+          "bb": 0.8139490806223479,
+          "hr": 1.275,
+          "inplay": 1.1925000000000001
         },
         "platoon_mult_vs_rhb": {
-          "k": 0.977879472984926,
-          "bb": 1.1507528749896583,
-          "hr": 0.784094210417099,
-          "inplay": 1.0123420600424544
+          "k": 0.9058002437434458,
+          "bb": 1.1925000000000001,
+          "hr": 0.78,
+          "inplay": 0.8075
         },
         "statcast_quality_mult": {},
         "arsenal_source": "statsapi_pitchArsenal",
-        "arsenal_sample_size": 585,
+        "arsenal_sample_size": 167,
         "statcast_splits_found": false,
         "statcast_splits_source": "",
         "statcast_splits_n_pitches": 0,
         "statcast_splits_start_date": "",
         "statcast_splits_end_date": "",
-        "k_rate": 0.26377329192546584,
-        "bb_rate": 0.10928571428571428,
-        "hbp_rate": 0.007142857142857143,
-        "hr_rate": 0.06251552795031055,
-        "inplay_hit_rate": 0.3463935574229692,
+        "k_rate": 0.4022229822161422,
+        "bb_rate": 0.12089603283173735,
+        "hbp_rate": 0.0,
+        "hr_rate": 0.02417920656634747,
+        "inplay_hit_rate": 0.36666666666666664,
         "arsenal": {
-          "FF": 0.5128205197948715,
-          "OTHER": 0.0034188032652991513,
-          "SI": 0.10427350189162403,
-          "SL": 0.23931623057094054,
-          "FS": 0.14017094447726478
+          "FF": 0.42514970467664676,
+          "CH": 0.1017964011197604,
+          "SL": 0.4431137748742515,
+          "FC": 0.029940119329341312
         },
         "pitch_type_whiff_mult": {},
         "pitch_type_inplay_mult": {},
@@ -925,18 +924,18 @@
     "lineup_source": "projected_rotowire_default_vs_rhp",
     "lineup_confidence": 0.66,
     "probable_pitcher": {
-      "id": null,
-      "source": "none",
-      "confidence": 0.0,
-      "raw_schedule_id": null,
-      "raw_feed_id": null
+      "id": 694462,
+      "source": "feed_gameData_probablePitchers",
+      "confidence": 0.75,
+      "raw_schedule_id": 694462,
+      "raw_feed_id": 694462
     },
     "starter": {
-      "id": 693821,
-      "name": "Bryce Elder",
+      "id": 694462,
+      "name": "Hurston Waldrep",
       "role": "SP",
-      "selection_source": "heuristic",
-      "requested_id": null
+      "selection_source": "probable",
+      "requested_id": 694462
     },
     "bullpen": [
       {
@@ -1364,44 +1363,44 @@
       }
     ],
     "starter_profile": {
-      "id": 693821,
-      "name": "Bryce Elder",
+      "id": 694462,
+      "name": "Hurston Waldrep",
       "throw": "R",
       "role": "SP",
       "leverage_skill": 0.5,
-      "stamina_pitches": 91,
+      "stamina_pitches": 98,
       "availability_mult": 1.0,
       "platoon_mult_vs_lhb": {
-        "k": 0.9989004363698717,
-        "bb": 1.175252574768019,
-        "hr": 0.8771309007620393,
-        "inplay": 0.8534097968505521
+        "k": 0.8166666666666667,
+        "bb": 1.0,
+        "hr": 1.0,
+        "inplay": 0.9083333333333333
       },
       "platoon_mult_vs_rhb": {
-        "k": 1.0626827601889324,
-        "bb": 0.8075,
-        "hr": 1.0629817507119341,
-        "inplay": 1.1079760441306348
+        "k": 1.1833333333333333,
+        "bb": 1.0,
+        "hr": 1.0,
+        "inplay": 1.1375
       },
       "statcast_quality_mult": {},
       "arsenal_source": "statsapi_pitchArsenal",
-      "arsenal_sample_size": 1393,
+      "arsenal_sample_size": 55,
       "statcast_splits_found": false,
       "statcast_splits_source": "",
       "statcast_splits_n_pitches": 0,
       "statcast_splits_start_date": "",
       "statcast_splits_end_date": "",
-      "k_rate": 0.1918729553809315,
-      "bb_rate": 0.07099507605139792,
-      "hbp_rate": 0.005025125628140704,
-      "hr_rate": 0.027397052375973827,
-      "inplay_hit_rate": 0.3102297008547008,
+      "k_rate": 0.25,
+      "bb_rate": 0.3333333333333333,
+      "hbp_rate": 0.0,
+      "hr_rate": 0.0,
+      "inplay_hit_rate": 0.4,
       "arsenal": {
-        "FF": 0.24048816,
-        "CH": 0.09260589,
-        "SI": 0.26058865,
-        "SL": 0.2735104,
-        "FC": 0.1328069
+        "CU": 0.09090909,
+        "SI": 0.4,
+        "SL": 0.09090909,
+        "FC": 0.14545454,
+        "FS": 0.27272728
       },
       "pitch_type_whiff_mult": {},
       "pitch_type_inplay_mult": {},
@@ -1415,7 +1414,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.9166666666666666,
         "platoon_mult_vs_lhb": {
           "k": 1.087356102119706,
           "bb": 0.978816331134044,
@@ -1458,7 +1457,7 @@
         "role": "SU",
         "leverage_skill": 0.7,
         "stamina_pitches": 25,
-        "availability_mult": 0.925,
+        "availability_mult": 0.8833333333333333,
         "platoon_mult_vs_lhb": {
           "k": 1.021714428642893,
           "bb": 1.1248776784207861,
@@ -1501,7 +1500,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.875,
         "platoon_mult_vs_lhb": {
           "k": 1.078293545534925,
           "bb": 1.0372553938785751,
@@ -1543,7 +1542,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.9,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 0.8075,
           "bb": 1.0,
@@ -1585,7 +1584,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.91,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 0.8075,
           "bb": 1.1925000000000001,
@@ -1626,7 +1625,7 @@
         "role": "CL",
         "leverage_skill": 0.85,
         "stamina_pitches": 25,
-        "availability_mult": 0.955,
+        "availability_mult": 0.8916666666666666,
         "platoon_mult_vs_lhb": {
           "k": 0.8541659901185312,
           "bb": 1.1638342252749567,
