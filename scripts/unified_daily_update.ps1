@@ -248,33 +248,32 @@ function Invoke-Step {
         if ($null -eq $exitCode) {
             throw "$Name failed because the child process exit code could not be determined (pid $($process.Id))."
         }
-
         if ($exitCode -ne 0) {
-        # ✅ Generic artifact check (all sports)
-            $artifactRoot = Join-Path $repoRoot "data"
             $stepHasArtifacts = $false
+            if ($Name -like "*WNBA*") {
+                $stepHasArtifacts = Test-WnbaDateArtifactsPresent -RepoRootPath $repoRoot -DateValue $Date
+            }
+            else {
+                $artifactRoot = Join-Path $repoRoot "data"
+                if ($Name -like "*MLB*") {
+                    $stepHasArtifacts = Test-Path (Join-Path $artifactRoot "mlb_source")
+                }
+                elseif ($Name -like "*NBA*") {
+                    $stepHasArtifacts = Test-Path (Join-Path $artifactRoot "nba_source")
+                }
+                elseif ($Name -like "*NHL*") {
+                    $stepHasArtifacts = Test-Path (Join-Path $artifactRoot "nhl_source")
+                }
+                elseif ($Name -like "*NFL*") {
+                    $stepHasArtifacts = Test-Path (Join-Path $artifactRoot "nfl_source")
+                }
+            }
 
-        if ($Name -like "*MLB*") {
-            $stepHasArtifacts = Test-Path (Join-Path $artifactRoot "mlb_source")
-        }
-        elseif ($Name -like "*NBA*") {
-            $stepHasArtifacts = Test-Path (Join-Path $artifactRoot "nba_source")
-        }
-        elseif ($Name -like "*WNBA*") {
-            $stepHasArtifacts = Test-Path (Join-Path $artifactRoot "wnba_source")
-        }
-        elseif ($Name -like "*NHL*") {
-            $stepHasArtifacts = Test-Path (Join-Path $artifactRoot "nhl_source")
-        }
-        elseif ($Name -like "*NFL*") {
-            $stepHasArtifacts = Test-Path (Join-Path $artifactRoot "nfl_source")
-        }
-        
-        if ($stepHasArtifacts) {
+            if ($stepHasArtifacts) {
                 Write-Host "$Name returned exit code $exitCode but artifacts exist → treating as success" -ForegroundColor Yellow
                 return
-        }
-            # ❌ real failure
+            }
+
             $exitCodeText = [string]$exitCode
             Write-Host "$Name failed with exit code $exitCodeText (no artifacts found)" -ForegroundColor Red
         }
@@ -293,6 +292,48 @@ function Invoke-Step {
         }
         Pop-Location
     }
+}
+
+function Test-WnbaDateArtifactsPresent {
+    param(
+        [string]$RepoRootPath,
+        [string]$DateValue
+    )
+
+    if ([string]::IsNullOrWhiteSpace($RepoRootPath) -or [string]::IsNullOrWhiteSpace($DateValue)) {
+        return $false
+    }
+
+    $candidateRoots = @(
+        (Join-Path $RepoRootPath 'data\wnba_source\data\processed'),
+        (Join-Path $RepoRootPath 'data\wnba_source\source_artifacts\data\processed')
+    )
+    $requiredFiles = @(
+        "game_cards_$DateValue.csv",
+        "recommendations_slate_$DateValue.json",
+        "cards_sim_detail_$DateValue.json",
+        "cards_props_snapshot_$DateValue.json"
+    )
+
+    foreach ($root in $candidateRoots) {
+        if ([string]::IsNullOrWhiteSpace($root) -or -not (Test-Path $root)) {
+            continue
+        }
+
+        $allPresent = $true
+        foreach ($fileName in $requiredFiles) {
+            if (-not (Test-Path (Join-Path $root $fileName))) {
+                $allPresent = $false
+                break
+            }
+        }
+
+        if ($allPresent) {
+            return $true
+        }
+    }
+
+    return $false
 }
 
 function Test-ProcessIdRunning {
@@ -4217,7 +4258,7 @@ $runManifest = [ordered]@{
         policyPerformance = @()
         sourceUpdates = [bool](-not $SkipSourceUpdates)
         refreshGate = [bool](-not $SkipRefreshGate)
-        artifactGeneration = [bool](-not $SkipGitPush)
+        artifactGeneration = $true
         manifestGeneration = $true
         publish = [bool](-not $SkipGitPush)
         refreshOdds = [bool]$RefreshOdds

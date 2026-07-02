@@ -1,5 +1,19 @@
 # Fix Notes Log
 
+## 2026-07-02 - WNBA artifacts were skipped when git push was disabled
+- Symptom: The 2026-07-02 daily update completed, but the WNBA date-stamped artifact bundle never appeared where Render expects it.
+- Root cause: `scripts/unified_daily_update.ps1` tied `artifactGeneration` to `SkipGitPush`, so no-push runs could mark the artifact stage skipped instead of materializing and publishing the WNBA bundle.
+- Fix: Decouple artifact-generation planning from `SkipGitPush` and keep the WNBA date-specific artifact presence check in the step wrapper.
+- Validation: `scripts/unified_daily_update.ps1` now parses successfully after the change.
+- Follow-up: Re-run the daily update path and confirm the 2026-07-02 WNBA bundle lands in both processed roots.
+
+## 2026-07-02 - Shared cards refresh contract was fragmented across sports
+- Symptom: MLB, NBA, and WNBA cards each had their own polling behavior, so browser hydration did not follow one consistent contract across sports.
+- Root cause: The refresh policy lived in per-sport scripts and templates, and the shared polling helper only accepted ad hoc timers instead of a policy object.
+- Fix: Promote a shared `refresh_policy` payload from the cards builders, expose it through the browser bootstraps, and start polling through the shared policy-aware helper.
+- Validation: The touched Python, JavaScript, and template files passed focused error checks, and the commit was pushed as `547d0a13`.
+- Follow-up: Extend the same policy shape to any remaining live-lens or rank-board surfaces that should share the same browser hydration contract.
+
 ## 2026-07-02 - MLB odds timestamps rendered in browser-local time
 - Symptom: MLB cards could show odds freshness in whatever timezone the browser defaulted to, which made the timestamp ambiguous.
 - Root cause: The MLB timestamp formatter used `Intl.DateTimeFormat(undefined, ...)`, so it inherited the viewer's local timezone instead of Central Time.

@@ -82,6 +82,7 @@ The daily update system is not fully uniform yet. The current contract looks lik
 
 ## Related documentation
 
+- [Shared refresh and hydration contract](shared_refresh_hydration_contract.md)
 - [Unified daily-update audit](../reports/unified_daily_update_audit_2026-05-18.md)
 - [Execution backlog](syndicate_world_class_execution_backlog.md)
 - [Implementation plan](syndicate_world_class_implementation_plan.md)

@@ -202,6 +202,8 @@ class WnbaCardsMergeAliasTests(unittest.TestCase):
                 "home_tri": "IND",
                 "status": "Scheduled",
                 "detail": "Scheduled",
+                "away": {"abbr": "LAS"},
+                "home": {"abbr": "IND"},
                 "live_state": {"event_id": "401857500", "away": "LAS", "home": "IND"},
             }
         ]
@@ -225,6 +227,44 @@ class WnbaCardsMergeAliasTests(unittest.TestCase):
         self.assertEqual(payload["requested_date"], "2026-07-02")
         self.assertEqual(len(payload.get("games") or []), 1)
         self.assertEqual((payload.get("games") or [{}])[0].get("event_id"), "401857500")
+
+    def test_cards_page_context_keeps_today_pinned_for_public_scoreboard_fallback(self) -> None:
+        public_games = [
+            {
+                "gamePk": "401857500",
+                "event_id": "401857500",
+                "away_tri": "LAS",
+                "home_tri": "IND",
+                "status": "Scheduled",
+                "detail": "Scheduled",
+                "away": {"abbr": "LAS"},
+                "home": {"abbr": "IND"},
+                "live_state": {"event_id": "401857500", "away": "LAS", "home": "IND"},
+            }
+        ]
+
+        with patch("syndicate.features.wnba.cards.central_today_iso", return_value="2026-07-02"), patch(
+            "syndicate.features.wnba.cards.has_games_for_date",
+            return_value=True,
+        ), patch(
+            "syndicate.features.wnba.cards.available_dates",
+            return_value=["2026-06-30"],
+        ), patch(
+            "syndicate.features.wnba.cards._artifact_bundle",
+            return_value={"rows": [], "recommendations": {}, "sim": {}, "props": {}},
+        ), patch(
+            "syndicate.features.wnba.cards._render_web_dyno",
+            return_value=True,
+        ), patch(
+            "syndicate.features.wnba.cards._games_from_public_scoreboard",
+            return_value=(public_games, "espn_scoreboard_fallback"),
+        ):
+            context = build_cards_page_context("2026-07-02", allow_stored_date_fallback=True)
+
+        self.assertEqual(context["date"], "2026-07-02")
+        self.assertEqual(context["requested_date"], "2026-07-02")
+        self.assertEqual(context["source_title"], "WNBA live scoreboard fallback")
+        self.assertEqual(len(context.get("games") or []), 1)
 
 
     def test_cards_page_context_keeps_explicit_today_empty_without_live_fallback(self) -> None:
@@ -350,7 +390,7 @@ class WnbaCardsMergeAliasTests(unittest.TestCase):
         self.assertEqual(len(payload["games"]), 4)
         self.assertEqual([game.get("event_id") for game in payload["games"]], ["401857012", "401857013", "401857014", "401857015"])
 
-    def test_cards_page_context_uses_latest_artifact_when_today_bundle_is_empty(self) -> None:
+    def test_cards_page_context_prefers_today_public_scoreboard_over_stored_artifact_fallback(self) -> None:
         fallback_bundle = {
             "paths": {
                 "cards": Path("game_cards_2026-06-27.csv"),
@@ -413,24 +453,33 @@ class WnbaCardsMergeAliasTests(unittest.TestCase):
             return_value=0,
         ), patch(
             "syndicate.features.wnba.cards._games_from_public_scoreboard",
-            side_effect=AssertionError("public scoreboard fallback should not be used when a stored artifact exists"),
+            return_value=(
+                [
+                    {
+                        "gamePk": "401857500",
+                        "event_id": "401857500",
+                        "away_tri": "LAS",
+                        "home_tri": "IND",
+                        "status": "Scheduled",
+                        "detail": "Scheduled",
+                        "away": {"abbr": "LAS"},
+                        "home": {"abbr": "IND"},
+                        "live_state": {"event_id": "401857500", "away": "LAS", "home": "IND"},
+                    }
+                ],
+                "espn_scoreboard_fallback",
+            ),
         ), patch(
             "syndicate.features.wnba.cards._artifact_bundle",
             side_effect=_artifact_bundle_side_effect,
         ):
             context = build_cards_page_context("2026-07-02", allow_stored_date_fallback=True)
 
-        self.assertEqual(context["date"], "2026-06-27")
-        self.assertEqual(context["source_title"], "WNBA processed game cards")
-        self.assertIn("2026-06-27", context["source_path"])
+        self.assertEqual(context["date"], "2026-07-02")
+        self.assertEqual(context["source_title"], "WNBA live scoreboard fallback")
+        self.assertIn("espn_scoreboard_fallback", context["source_path"])
         game = (context.get("games") or [{}])[0]
-        sim = game.get("sim") if isinstance(game, dict) else {}
-        self.assertTrue(sim.get("players_loaded"))
-        self.assertGreater(len((sim.get("players") or {}).get("away") or []), 0)
-        self.assertGreater(len((sim.get("players") or {}).get("home") or []), 0)
-        props = game.get("prop_recommendations") if isinstance(game, dict) else {}
-        self.assertGreater(len((props or {}).get("away") or []), 0)
-        self.assertGreater(len((props or {}).get("home") or []), 0)
+        self.assertEqual(game.get("event_id"), "401857500")
 
     def test_source_cards_payload_keeps_full_sim_player_rows(self) -> None:
         artifact_bundle = {

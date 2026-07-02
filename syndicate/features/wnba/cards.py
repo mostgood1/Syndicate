@@ -1616,7 +1616,10 @@ def _games_from_artifacts(selected_date: str) -> tuple[list[dict[str, Any]], str
         )
         for idx, row in enumerate(rows, start=1)
     ]
-    return _dedupe_wnba_games(games), str(bundle["paths"]["cards"]), str(bundle["paths"]["recommendations"])
+    paths = bundle.get("paths") if isinstance(bundle.get("paths"), dict) else {}
+    cards_path = paths.get("cards") if isinstance(paths, dict) else None
+    recs_path = paths.get("recommendations") if isinstance(paths, dict) else None
+    return _dedupe_wnba_games(games), str(cards_path or processed_root() / f"game_cards_{selected_date}.csv"), str(recs_path or processed_root() / f"recommendations_slate_{selected_date}.json")
 
 
 def _games_from_public_scoreboard(selected_date: str) -> tuple[list[dict[str, Any]], str]:
@@ -1944,6 +1947,67 @@ def build_cards_page_context(selected_date: str, *, allow_stored_date_fallback: 
             source_kind="artifact_backed",
             live_lens_integrated=True,
         )
+    if allow_stored_date_fallback and requested_date == central_today_iso():
+        public_games, public_source_path = _games_from_public_scoreboard(requested_date)
+        if public_games:
+            parsed_date = parse_iso_date(requested_date)
+            prev_date = (parsed_date - timedelta(days=1)).isoformat()
+            next_date = (parsed_date + timedelta(days=1)).isoformat()
+            return apply_game_board_contract(
+                {
+                    "date": requested_date,
+                    "requested_date": requested_date,
+                    "lookahead_applied": False,
+                    "prev_date": prev_date,
+                    "next_date": next_date,
+                    "games": public_games,
+                    "scoreboard_items": [
+                        {
+                            "target_id": f"game-{game['gamePk']}",
+                            "label": f"{game['away']['abbr']} @ {game['home']['abbr']}",
+                            "status": game["detail"],
+                        }
+                        for game in public_games
+                    ],
+                    "using_sample_data": False,
+                    "source_path": public_source_path,
+                    "source_title": "WNBA live scoreboard fallback",
+                    "empty_state": None,
+                    "header_stats": [
+                        {"label": "Games", "value": str(len(public_games))},
+                        {"label": "Recommendations", "value": "No data"},
+                    ],
+                    "route_path": "/wnba/cards",
+                    "intro_title": "WNBA Cards",
+                    "intro_body": "This is the first non-MLB Syndicate module, mapped into the shared game-card shell from committed WNBA processed artifacts.",
+                    "cards_control_links": [
+                        {"label": "Betting Card", "href": f"/wnba/season/{parse_iso_date(requested_date).year}/betting-card?date={requested_date}"},
+                        {"label": "Props", "href": f"/wnba/props?date={requested_date}"},
+                        {"label": "Live Lens", "href": f"/wnba/live-lens?date={requested_date}"},
+                    ],
+                    "cards_grid_class": "wnba-cards-grid",
+                    "cards_stylesheet": "wnba/cards.css",
+                    "teaser": {
+                        "label": "WNBA picks",
+                        "body": "Use the dedicated picks module for the strongest processed recommendation slate cards.",
+                        "href": f"/wnba/picks?date={requested_date}",
+                        "cta": "Open WNBA picks",
+                    },
+                    "module_links": build_module_links(requested_date, "Cards"),
+                    "active_sport_name": "WNBA",
+                    "wnba_advanced_contract": _wnba_advanced_contract(
+                        selected_date=requested_date,
+                        requested_date=requested_date,
+                        source_title="WNBA live scoreboard fallback",
+                        source_path=str(public_source_path),
+                        games=public_games,
+                    ),
+                },
+                sport="wnba",
+                module="cards",
+                source_kind="live_scoreboard_fallback",
+                live_lens_integrated=True,
+            )
     resolved_date = _resolved_source_cards_date(requested_date, allow_stored_date_fallback=allow_stored_date_fallback)
     cache_key = (
         requested_date,

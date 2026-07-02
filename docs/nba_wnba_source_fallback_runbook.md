@@ -97,3 +97,10 @@ If responses remain stale after env setup:
   - phase: `live`
   - execution_mode: `source`
   - skip_mirror: `true`
+
+## Related references
+
+- [Shared refresh and hydration contract](shared_refresh_hydration_contract.md)
+- [Render Data Authority](render_data_authority.md)
+- [Daily Update Control Plane](daily_update_control_plane.md)
+- [Fix Notes Log](fix_notes_log.md)

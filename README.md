@@ -257,6 +257,8 @@ Set `ADMIN_TOKEN` (or `SYNDICATE_ADMIN_TOKEN`) in the environment, then pass it 
 
 For the end-to-end workflow map, artifact contract, and current sport-parity gaps, see [docs/daily_update_control_plane.md](docs/daily_update_control_plane.md).
 
+For the shared browser refresh and hydration contract across sports, see [docs/shared_refresh_hydration_contract.md](docs/shared_refresh_hydration_contract.md).
+
 To run a scheduled-ready global daily update that refreshes mirrors, runs the migration gate, and snapshots module status against the MLB reference contract:
 
 ```powershell
