@@ -1,5 +1,12 @@
 # Fix Notes Log
 
+## 2026-07-02 - Ops refresh still defaulted Render to manifest-only
+- Symptom: The MLB odds refresh stayed pinned because the ops refresh launcher still treated Render as a queued-only external-runner path.
+- Root cause: `ops_refresh._resolve_launch_mode()` and the ops launch handlers still forced `manifest_only` on Render, so refresh jobs were recorded but not executed in place.
+- Fix: Remove the Render-specific `manifest_only` fallback and stop hardcoding `manifest_only` in the ops launch endpoints so Render uses `detached_subprocess` by default.
+- Validation: Updated the ops refresh regression to expect `detached_subprocess` on Render and `web_process` ownership for the default launch.
+- Follow-up: Redeploy and verify the ops refresh route and the live loop both launch refresh work instead of queueing it indefinitely.
+
 ## 2026-07-02 - MLB live refresh loop defaulted to the non-refreshing Render path
 - Symptom: The redeployed MLB page was still pinned to the 7:18 AM odds timestamp even after the web revision was live.
 - Root cause: The live refresh loop still fell back to `manifest_only` on Render when the explicit launch-mode env var was missing, which queued refresh manifests instead of launching the odds job in-place.

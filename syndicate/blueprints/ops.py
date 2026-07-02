@@ -96,7 +96,6 @@ def _start_refresh_job(payload: dict[str, Any], *, mode: str = "fast") -> tuple[
             mirror_only=_coerce_bool(_payload_value(launch_payload, "mirror_only")),
             dry_run=_coerce_bool(_payload_value(launch_payload, "dry_run")),
             mode=str(_payload_value(launch_payload, "mode", "fast") or "fast"),
-            launch_mode="manifest_only",
         )
     except Exception as exc:
         return job_id, _store_ops_job(
@@ -519,7 +518,6 @@ def page_ops_odds_refresh_run() -> Any:
             mirror_only=_coerce_bool(_payload_value(payload, "mirror_only")),
             dry_run=_coerce_bool(_payload_value(payload, "dry_run")),
             mode=str(_payload_value(payload, "mode", "fast") or "fast"),
-            launch_mode="manifest_only",
         )
     except ValueError as exc:
         return jsonify({"ok": False, "error": str(exc)}), 400

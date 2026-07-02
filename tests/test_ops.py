@@ -1179,7 +1179,7 @@ class OpsRefreshApiTests(unittest.TestCase):
             self.assertEqual(payload["launchOwner"], "external_runner")
             self.assertEqual((payload.get("externalRunner") or {}).get("queue_state"), "queued")
 
-    def test_launch_refresh_run_defaults_to_manifest_only_on_render(self) -> None:
+    def test_launch_refresh_run_defaults_to_detached_subprocess_on_render(self) -> None:
         with TemporaryDirectory() as tmp_dir:
             repo_root = Path(tmp_dir)
             reports_root = repo_root / "reports"
@@ -1194,12 +1194,12 @@ class OpsRefreshApiTests(unittest.TestCase):
 
                 result = ops_refresh.launch_refresh_run(sports="mlb", phase="live", dry_run=True)
 
-            mocked_popen.assert_not_called()
+            mocked_popen.assert_called_once()
             self.assertTrue(result["ok"])
-            self.assertIsNone(result["pid"])
-            self.assertEqual(result["launch_mode"], "manifest_only")
-            self.assertEqual(result["launch_owner"], "external_runner")
-            self.assertEqual(result["state"], "pending_external")
+            self.assertIsNotNone(result["pid"])
+            self.assertEqual(result["launch_mode"], "detached_subprocess")
+            self.assertEqual(result["launch_owner"], "web_process")
+            self.assertEqual(result["state"], "running")
 
     def test_launch_refresh_run_supports_external_runner_mode_alias(self) -> None:
         with TemporaryDirectory() as tmp_dir:

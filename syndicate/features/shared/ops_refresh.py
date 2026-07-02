@@ -157,8 +157,6 @@ def _remaining_budget_seconds(*, elapsed_seconds: int | None, budget_seconds: in
 
 def _resolve_launch_mode(override: str | None = None) -> str:
     value = str(override or os.environ.get("SYNDICATE_REFRESH_LAUNCH_MODE") or "").strip().lower()
-    if not value and (os.environ.get("RENDER") or os.environ.get("RENDER_EXTERNAL_URL") or os.environ.get("RENDER_SERVICE_ID")):
-        value = "manifest_only"
     if not value:
         value = "detached_subprocess"
     if value in {"detached_subprocess", "manifest_only", "external_runner"}:
