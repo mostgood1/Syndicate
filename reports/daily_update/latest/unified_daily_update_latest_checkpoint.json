@@ -2,16 +2,15 @@
     "scope":  "daily_update",
     "date":  "2026-07-02",
     "runMode":  "standard",
-    "overallStatus":  "ok",
-    "generatedAt":  "2026-07-02T07:08:01.1313139+00:00",
-    "updatedAt":  "2026-07-02T07:21:11.2643343+00:00",
-    "runDir":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-02\\20260702_070800",
+    "overallStatus":  "started",
+    "generatedAt":  "2026-07-02T20:14:34.4124890+00:00",
+    "updatedAt":  "2026-07-02T20:14:34.7196548+00:00",
+    "runDir":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-02\\20260702_201434",
     "latestDir":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest",
-    "lastUpdatedAt":  "2026-07-02T07:21:11.2582353+00:00",
-    "currentStage":  "completed",
+    "lastUpdatedAt":  "2026-07-02T20:14:34.6573929+00:00",
+    "currentStage":  "queued",
     "completedStages":  [
-                            "source_update",
-                            "refresh_gate"
+
                         ],
     "failedStage":  null,
     "stageDecisions":  [
@@ -135,7 +134,7 @@
                     "simExecution":  null,
                     "sourceUpdates":  true,
                     "refreshGate":  true,
-                    "artifactGeneration":  false,
+                    "artifactGeneration":  true,
                     "manifestGeneration":  true,
                     "publish":  false,
                     "refreshOdds":  false,

@@ -1,12 +1,12 @@
 ﻿{
     "date":  "2026-07-02",
-    "generatedAt":  "2026-07-02T07:08:01.1313139+00:00",
-    "lastUpdatedAt":  "2026-07-02T07:21:11.2582353+00:00",
-    "completedAt":  "2026-07-02T07:21:11.2444810+00:00",
+    "generatedAt":  "2026-07-02T20:14:34.4124890+00:00",
+    "lastUpdatedAt":  "2026-07-02T20:14:34.6573929+00:00",
+    "completedAt":  null,
     "runMode":  "standard",
-    "overallStatus":  "ok",
+    "overallStatus":  "started",
     "error":  null,
-    "runDir":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-02\\20260702_070800",
+    "runDir":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-02\\20260702_201434",
     "latestDir":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest",
     "runtimePolicy":  {
                           "MLB":  {
@@ -772,21 +772,39 @@
                                         ],
                     "policyPerformance":  [
                                               {
-                                                  "policyId":  "",
+                                                  "policyId":  "sport:mlb:default",
                                                   "policySource":  "sport",
                                                   "keyParameters":  {
                                                                         "forceWithinMinutes":  20
                                                                     },
-                                                  "recordCount":  14,
-                                                  "sampleSize":  14,
-                                                  "exploratoryCount":  2,
-                                                  "exploratoryRate":  0.1429,
-                                                  "plannedCount":  14,
+                                                  "recordCount":  12,
+                                                  "sampleSize":  12,
+                                                  "exploratoryCount":  0,
+                                                  "exploratoryRate":  0,
+                                                  "plannedCount":  12,
                                                   "skippedCount":  0,
                                                   "dryRunCount":  0,
                                                   "withinWindowCount":  0,
                                                   "averageTimeToStartMinutes":  null,
-                                                  "averageForceWithinMinutes":  21.43,
+                                                  "averageForceWithinMinutes":  20,
+                                                  "roi":  null
+                                              },
+                                              {
+                                                  "policyId":  "sport:mlb:balanced",
+                                                  "policySource":  "sport",
+                                                  "keyParameters":  {
+                                                                        "forceWithinMinutes":  30
+                                                                    },
+                                                  "recordCount":  2,
+                                                  "sampleSize":  2,
+                                                  "exploratoryCount":  2,
+                                                  "exploratoryRate":  1,
+                                                  "plannedCount":  2,
+                                                  "skippedCount":  0,
+                                                  "dryRunCount":  0,
+                                                  "withinWindowCount":  0,
+                                                  "averageTimeToStartMinutes":  null,
+                                                  "averageForceWithinMinutes":  30,
                                                   "roi":  null
                                               },
                                               {
@@ -828,7 +846,7 @@
                                           ],
                     "sourceUpdates":  true,
                     "refreshGate":  true,
-                    "artifactGeneration":  false,
+                    "artifactGeneration":  true,
                     "manifestGeneration":  true,
                     "publish":  false,
                     "refreshOdds":  false,
@@ -888,13 +906,12 @@
                           "forceRebuildToday":  false
                       },
     "runState":  {
-                     "currentStage":  "completed",
+                     "currentStage":  "queued",
                      "completedStages":  [
-                                             "source_update",
-                                             "refresh_gate"
+
                                          ],
                      "failedStage":  null,
-                     "lastUpdatedAt":  "2026-07-02T07:21:11.2582353+00:00",
+                     "lastUpdatedAt":  "2026-07-02T20:14:34.6573929+00:00",
                      "simulationContractPath":  null,
                      "simulationContractRunPath":  null,
                      "simulationContractSportCount":  0,
@@ -1641,21 +1658,39 @@
                         ],
     "policyPerformance":  [
                               {
-                                  "policyId":  "",
+                                  "policyId":  "sport:mlb:default",
                                   "policySource":  "sport",
                                   "keyParameters":  {
                                                         "forceWithinMinutes":  20
                                                     },
-                                  "recordCount":  14,
-                                  "sampleSize":  14,
-                                  "exploratoryCount":  2,
-                                  "exploratoryRate":  0.1429,
-                                  "plannedCount":  14,
+                                  "recordCount":  12,
+                                  "sampleSize":  12,
+                                  "exploratoryCount":  0,
+                                  "exploratoryRate":  0,
+                                  "plannedCount":  12,
                                   "skippedCount":  0,
                                   "dryRunCount":  0,
                                   "withinWindowCount":  0,
                                   "averageTimeToStartMinutes":  null,
-                                  "averageForceWithinMinutes":  21.43,
+                                  "averageForceWithinMinutes":  20,
+                                  "roi":  null
+                              },
+                              {
+                                  "policyId":  "sport:mlb:balanced",
+                                  "policySource":  "sport",
+                                  "keyParameters":  {
+                                                        "forceWithinMinutes":  30
+                                                    },
+                                  "recordCount":  2,
+                                  "sampleSize":  2,
+                                  "exploratoryCount":  2,
+                                  "exploratoryRate":  1,
+                                  "plannedCount":  2,
+                                  "skippedCount":  0,
+                                  "dryRunCount":  0,
+                                  "withinWindowCount":  0,
+                                  "averageTimeToStartMinutes":  null,
+                                  "averageForceWithinMinutes":  30,
                                   "roi":  null
                               },
                               {
@@ -1822,36 +1857,53 @@
     "statusArtifact":  {
                            "format":  "json",
                            "scope":  "daily_update",
-                           "runManifestPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-02\\20260702_070800\\unified_daily_update_run.json",
+                           "runManifestPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-02\\20260702_201434\\unified_daily_update_run.json",
                            "latestManifestPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest.json",
-                           "runCheckpointPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-02\\20260702_070800\\unified_daily_update_checkpoint.json",
+                           "runCheckpointPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-02\\20260702_201434\\unified_daily_update_checkpoint.json",
                            "latestCheckpointPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest_checkpoint.json",
                            "state":  {
                                          "runMode":  "standard",
-                                         "overallStatus":  "ok",
-                                         "currentStage":  "completed",
+                                         "overallStatus":  "started",
+                                         "currentStage":  "queued",
                                          "completedStages":  [
-                                                                 "source_update",
-                                                                 "refresh_gate"
+
                                                              ],
                                          "failedStage":  null,
                                          "policyPerformance":  [
                                                                    {
-                                                                       "policyId":  "",
+                                                                       "policyId":  "sport:mlb:default",
                                                                        "policySource":  "sport",
                                                                        "keyParameters":  {
                                                                                              "forceWithinMinutes":  20
                                                                                          },
-                                                                       "recordCount":  14,
-                                                                       "sampleSize":  14,
-                                                                       "exploratoryCount":  2,
-                                                                       "exploratoryRate":  0.1429,
-                                                                       "plannedCount":  14,
+                                                                       "recordCount":  12,
+                                                                       "sampleSize":  12,
+                                                                       "exploratoryCount":  0,
+                                                                       "exploratoryRate":  0,
+                                                                       "plannedCount":  12,
                                                                        "skippedCount":  0,
                                                                        "dryRunCount":  0,
                                                                        "withinWindowCount":  0,
                                                                        "averageTimeToStartMinutes":  null,
-                                                                       "averageForceWithinMinutes":  21.43,
+                                                                       "averageForceWithinMinutes":  20,
+                                                                       "roi":  null
+                                                                   },
+                                                                   {
+                                                                       "policyId":  "sport:mlb:balanced",
+                                                                       "policySource":  "sport",
+                                                                       "keyParameters":  {
+                                                                                             "forceWithinMinutes":  30
+                                                                                         },
+                                                                       "recordCount":  2,
+                                                                       "sampleSize":  2,
+                                                                       "exploratoryCount":  2,
+                                                                       "exploratoryRate":  1,
+                                                                       "plannedCount":  2,
+                                                                       "skippedCount":  0,
+                                                                       "dryRunCount":  0,
+                                                                       "withinWindowCount":  0,
+                                                                       "averageTimeToStartMinutes":  null,
+                                                                       "averageForceWithinMinutes":  30,
                                                                        "roi":  null
                                                                    },
                                                                    {
@@ -1918,84 +1970,11 @@
                                                                                                            ],
                                                                "status":  "skipped"
                                                            },
-                                         "lastUpdatedAt":  "2026-07-02T07:21:11.2582353+00:00"
+                                         "lastUpdatedAt":  "2026-07-02T20:14:34.6573929+00:00"
                                      }
                        },
     "sportRuns":  [
-                      {
-                          "sport":  "mlb",
-                          "workflow":  "vendored_daily_update",
-                          "name":  "MLB vendored daily update",
-                          "startedAt":  "2026-07-02T07:08:01.6576829+00:00",
-                          "completedAt":  "2026-07-02T07:18:49.2152806+00:00",
-                          "status":  "ok",
-                          "error":  null,
-                          "workingDirectory":  "D:\\a\\Syndicate\\Syndicate\\vendor\\mlb_bettingv2",
-                          "environmentOverrides":  {
-                                                       "MLB_BETTING_DATA_ROOT":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data",
-                                                       "MLB_LIVE_LENS_DIR":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\live_lens",
-                                                       "ODDS_API_KEY":  "77ae1c35140c82da1675af85dde36a44"
-                                                   },
-                          "runtimePolicy":  {
-                                                "simsPerGame":  1000,
-                                                "workers":  3
-                                            },
-                          "command":  [
-                                          "C:\\hostedtoolcache\\windows\\Python\\3.11.9\\x64\\python.exe",
-                                          "tools\\daily_update.py",
-                                          "--workflow",
-                                          "ui-daily",
-                                          "--date",
-                                          "2026-07-02",
-                                          "--season",
-                                          "2026",
-                                          "--sims",
-                                          "1000",
-                                          "--workers",
-                                          "3",
-                                          "--git-push",
-                                          "off",
-                                          "--validate-render-frontend",
-                                          "off",
-                                          "--build-next-day",
-                                          "on"
-                                      ],
-                          "mirrorManifestPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\manifests\\mirror_refresh_2026-07-02.json",
-                          "mirrorManifestExists":  true
-                      },
-                      {
-                          "sport":  "mlb",
-                          "workflow":  "syndicate_refresh",
-                          "name":  "MLB current-day live-lens refresh",
-                          "startedAt":  "2026-07-02T07:18:49.2363201+00:00",
-                          "completedAt":  "2026-07-02T07:19:06.3567372+00:00",
-                          "status":  "ok",
-                          "error":  null,
-                          "workingDirectory":  "D:\\a\\Syndicate\\Syndicate",
-                          "environmentOverrides":  {
-                                                       "MLB_BETTING_DATA_ROOT":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data",
-                                                       "MLB_LIVE_LENS_DIR":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\live_lens",
-                                                       "ODDS_API_KEY":  "77ae1c35140c82da1675af85dde36a44"
-                                                   },
-                          "runtimePolicy":  {
-                                                "simsPerGame":  1000,
-                                                "workers":  3
-                                            },
-                          "command":  [
-                                          "C:\\hostedtoolcache\\windows\\Python\\3.11.9\\x64\\python.exe",
-                                          "scripts\\refresh_mlb_oddsapi.py",
-                                          "--date",
-                                          "2026-07-02",
-                                          "--source-root",
-                                          "data\\mlb_source\\source_artifacts",
-                                          "--artifact-root",
-                                          "data\\mlb_source",
-                                          "--overwrite",
-                                          "on"
-                                      ],
-                          "mirrorManifestPath":  "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\manifests\\mirror_refresh_2026-07-02.json",
-                          "mirrorManifestExists":  true
-                      }
+
                   ],
     "skipGitPush":  true,
     "gitRemote":  null,
@@ -2018,9 +1997,8 @@
                         "oddsPhase":  null,
                         "oddsSports":  null,
                         "oddsRegions":  null,
-                        "manifestPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-02\\20260702_070800\\migration\\refresh_status_manifest.json",
-                        "runSummaryPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-02\\20260702_070800\\migration\\refresh_and_gate_run.json",
-                        "status":  "ok"
+                        "manifestPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-02\\20260702_201434\\migration\\refresh_status_manifest.json",
+                        "runSummaryPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-02\\20260702_201434\\migration\\refresh_and_gate_run.json"
                     },
     "pushResults":  [
 
@@ -2059,256 +2037,5 @@
                                            "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_bundle.json"
                                        ],
                      "simExecutionDecision":  null
-                 },
-    "simulationContractPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest_simulation_contract.json",
-    "simulationContractRunPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-02\\20260702_070800\\unified_daily_update_simulation_contract.json",
-    "simulationContractSportCount":  1,
-    "simulationContractAdvancedBySport":  {
-                                              "mlb":  {
-                                                          "page":  {
-                                                                       "hr_targets_shelf":  {
-                                                                                                "label":  "Home run targets",
-                                                                                                "title":  "HR Targets",
-                                                                                                "kicker":  "Best 1+ HR looks",
-                                                                                                "body":  "18 targets surfaced for the slate.",
-                                                                                                "href":  "/mlb/hr-targets?date=2026-07-02",
-                                                                                                "cta":  "Open board",
-                                                                                                "source_path":  "daily_summary_2026_07_02_hr_targets.json",
-                                                                                                "row_count":  18,
-                                                                                                "game_count":  9,
-                                                                                                "rows":  [
-                                                                                                             {
-                                                                                                                 "rank":  "#1",
-                                                                                                                 "player_name":  "Kyle Schwarber",
-                                                                                                                 "team":  "PHI",
-                                                                                                                 "opponent":  "PIT",
-                                                                                                                 "matchup":  "PIT @ PHI",
-                                                                                                                 "probability":  "16.3%",
-                                                                                                                 "support":  "76",
-                                                                                                                 "summary":  "Expected opportunity is strong at about 4.8 PA. He is tracking toward a premium lineup slot (2).",
-                                                                                                                 "p_hr_1plus":  0.163,
-                                                                                                                 "support_score":  76.0,
-                                                                                                                 "support_label":  "strong",
-                                                                                                                 "pa_mean":  4.827,
-                                                                                                                 "lineup_order":  2,
-                                                                                                                 "opponent_pitcher_name":  "Jared Jones",
-                                                                                                                 "writeup":  "Expected opportunity is strong at about 4.8 PA. He is tracking toward a premium lineup slot (2).",
-                                                                                                                 "headshot_url":  "https://img.mlbstatic.com/mlb-photos/image/upload/w_180,q_auto:best/v1/people/656941/headshot/67/current",
-                                                                                                                 "team_logo_url":  "https://www.mlbstatic.com/team-logos/143.svg",
-                                                                                                                 "opponent_logo_url":  "https://www.mlbstatic.com/team-logos/134.svg",
-                                                                                                                 "drivers":  [
-                                                                                                                                 "Expected opportunity is strong at about 4.8 PA.",
-                                                                                                                                 "He is tracking toward a premium lineup slot (2).",
-                                                                                                                                 "The handedness split is leaning toward extra damage in this matchup."
-                                                                                                                             ]
-                                                                                                             },
-                                                                                                             {
-                                                                                                                 "rank":  "#2",
-                                                                                                                 "player_name":  "Josh Rojas",
-                                                                                                                 "team":  "KC",
-                                                                                                                 "opponent":  "TB",
-                                                                                                                 "matchup":  "TB @ KC",
-                                                                                                                 "probability":  "17.1%",
-                                                                                                                 "support":  "70",
-                                                                                                                 "summary":  "Expected opportunity is strong at about 4.5 PA. The handedness split is leaning toward extra damage in this matchup.",
-                                                                                                                 "p_hr_1plus":  0.171,
-                                                                                                                 "support_score":  70.0,
-                                                                                                                 "support_label":  "solid",
-                                                                                                                 "pa_mean":  4.473,
-                                                                                                                 "lineup_order":  5,
-                                                                                                                 "opponent_pitcher_name":  "Ian Seymour",
-                                                                                                                 "writeup":  "Expected opportunity is strong at about 4.5 PA. The handedness split is leaning toward extra damage in this matchup.",
-                                                                                                                 "headshot_url":  "https://img.mlbstatic.com/mlb-photos/image/upload/w_180,q_auto:best/v1/people/668942/headshot/67/current",
-                                                                                                                 "team_logo_url":  "https://www.mlbstatic.com/team-logos/118.svg",
-                                                                                                                 "opponent_logo_url":  "https://www.mlbstatic.com/team-logos/139.svg",
-                                                                                                                 "drivers":  [
-                                                                                                                                 "Expected opportunity is strong at about 4.5 PA.",
-                                                                                                                                 "The handedness split is leaning toward extra damage in this matchup."
-                                                                                                                             ]
-                                                                                                             },
-                                                                                                             {
-                                                                                                                 "rank":  "#3",
-                                                                                                                 "player_name":  "Mickey Moniak",
-                                                                                                                 "team":  "COL",
-                                                                                                                 "opponent":  "MIA",
-                                                                                                                 "matchup":  "MIA @ COL",
-                                                                                                                 "probability":  "13.6%",
-                                                                                                                 "support":  "74",
-                                                                                                                 "summary":  "Expected opportunity is strong at about 5.0 PA. He is tracking toward a premium lineup slot (2).",
-                                                                                                                 "p_hr_1plus":  0.136,
-                                                                                                                 "support_score":  74.0,
-                                                                                                                 "support_label":  "strong",
-                                                                                                                 "pa_mean":  4.963,
-                                                                                                                 "lineup_order":  2,
-                                                                                                                 "opponent_pitcher_name":  "Ryan Gusto",
-                                                                                                                 "writeup":  "Expected opportunity is strong at about 5.0 PA. He is tracking toward a premium lineup slot (2).",
-                                                                                                                 "headshot_url":  "https://img.mlbstatic.com/mlb-photos/image/upload/w_180,q_auto:best/v1/people/666160/headshot/67/current",
-                                                                                                                 "team_logo_url":  "https://www.mlbstatic.com/team-logos/115.svg",
-                                                                                                                 "opponent_logo_url":  "https://www.mlbstatic.com/team-logos/146.svg",
-                                                                                                                 "drivers":  [
-                                                                                                                                 "Expected opportunity is strong at about 5.0 PA.",
-                                                                                                                                 "He is tracking toward a premium lineup slot (2).",
-                                                                                                                                 "The handedness split is leaning toward extra damage in this matchup."
-                                                                                                                             ]
-                                                                                                             },
-                                                                                                             {
-                                                                                                                 "rank":  "#4",
-                                                                                                                 "player_name":  "Jac Caglianone",
-                                                                                                                 "team":  "KC",
-                                                                                                                 "opponent":  "TB",
-                                                                                                                 "matchup":  "TB @ KC",
-                                                                                                                 "probability":  "13.5%",
-                                                                                                                 "support":  "73",
-                                                                                                                 "summary":  "Expected opportunity is strong at about 4.7 PA. He is tracking toward a premium lineup slot (3).",
-                                                                                                                 "p_hr_1plus":  0.135,
-                                                                                                                 "support_score":  73.0,
-                                                                                                                 "support_label":  "strong",
-                                                                                                                 "pa_mean":  4.703,
-                                                                                                                 "lineup_order":  3,
-                                                                                                                 "opponent_pitcher_name":  "Ian Seymour",
-                                                                                                                 "writeup":  "Expected opportunity is strong at about 4.7 PA. He is tracking toward a premium lineup slot (3).",
-                                                                                                                 "headshot_url":  "https://img.mlbstatic.com/mlb-photos/image/upload/w_180,q_auto:best/v1/people/695506/headshot/67/current",
-                                                                                                                 "team_logo_url":  "https://www.mlbstatic.com/team-logos/118.svg",
-                                                                                                                 "opponent_logo_url":  "https://www.mlbstatic.com/team-logos/139.svg",
-                                                                                                                 "drivers":  [
-                                                                                                                                 "Expected opportunity is strong at about 4.7 PA.",
-                                                                                                                                 "He is tracking toward a premium lineup slot (3).",
-                                                                                                                                 "The handedness split is leaning toward extra damage in this matchup."
-                                                                                                                             ]
-                                                                                                             }
-                                                                                                         ]
-                                                                                            },
-                                                                       "scoreboard_items":  [
-                                                                                                {
-                                                                                                    "target_id":  "game-823442",
-                                                                                                    "label":  "PIT @ PHI",
-                                                                                                    "status":  "11:35 AM"
-                                                                                                },
-                                                                                                {
-                                                                                                    "target_id":  "game-823765",
-                                                                                                    "label":  "CIN @ MIL",
-                                                                                                    "status":  "1:10 PM"
-                                                                                                },
-                                                                                                {
-                                                                                                    "target_id":  "game-824335",
-                                                                                                    "label":  "MIA @ COL",
-                                                                                                    "status":  "2:10 PM"
-                                                                                                },
-                                                                                                {
-                                                                                                    "target_id":  "game-824416",
-                                                                                                    "label":  "CWS @ CLE",
-                                                                                                    "status":  "5:40 PM"
-                                                                                                },
-                                                                                                {
-                                                                                                    "target_id":  "game-824906",
-                                                                                                    "label":  "STL @ ATL",
-                                                                                                    "status":  "6:15 PM"
-                                                                                                },
-                                                                                                {
-                                                                                                    "target_id":  "game-824093",
-                                                                                                    "label":  "TB @ KC",
-                                                                                                    "status":  "6:40 PM"
-                                                                                                },
-                                                                                                {
-                                                                                                    "target_id":  "game-822884",
-                                                                                                    "label":  "DET @ TEX",
-                                                                                                    "status":  "7:05 PM"
-                                                                                                },
-                                                                                                {
-                                                                                                    "target_id":  "game-823119",
-                                                                                                    "label":  "LAA @ SEA",
-                                                                                                    "status":  "8:40 PM"
-                                                                                                },
-                                                                                                {
-                                                                                                    "target_id":  "game-823935",
-                                                                                                    "label":  "SD @ LAD",
-                                                                                                    "status":  "9:10 PM"
-                                                                                                }
-                                                                                            ],
-                                                                       "module_links":  [
-                                                                                            {
-                                                                                                "label":  "Cards",
-                                                                                                "href":  "/mlb/cards?date=2026-07-02",
-                                                                                                "active":  true
-                                                                                            },
-                                                                                            {
-                                                                                                "label":  "Betting Card",
-                                                                                                "href":  "/mlb/season/2026/betting-card?date=2026-07-02",
-                                                                                                "active":  false
-                                                                                            },
-                                                                                            {
-                                                                                                "label":  "Live Lens",
-                                                                                                "href":  "/mlb/live-lens?date=2026-07-02",
-                                                                                                "active":  false
-                                                                                            },
-                                                                                            {
-                                                                                                "label":  "Market Accuracy",
-                                                                                                "href":  "/mlb/market-accuracy?date=2026-07-02",
-                                                                                                "active":  false
-                                                                                            },
-                                                                                            {
-                                                                                                "label":  "Daily Archive",
-                                                                                                "href":  "/mlb/archive?date=2026-07-02",
-                                                                                                "active":  false
-                                                                                            },
-                                                                                            {
-                                                                                                "label":  "Season Review",
-                                                                                                "href":  "/mlb/season/2026?date=2026-07-02",
-                                                                                                "active":  false
-                                                                                            },
-                                                                                            {
-                                                                                                "label":  "Pitcher top props",
-                                                                                                "href":  "/mlb/pitcher-top-props?date=2026-07-02",
-                                                                                                "active":  false
-                                                                                            },
-                                                                                            {
-                                                                                                "label":  "Hitter top props",
-                                                                                                "href":  "/mlb/hitter-top-props?date=2026-07-02",
-                                                                                                "active":  false
-                                                                                            },
-                                                                                            {
-                                                                                                "label":  "Top props",
-                                                                                                "href":  "/mlb/top-props?date=2026-07-02",
-                                                                                                "active":  false
-                                                                                            },
-                                                                                            {
-                                                                                                "label":  "HR targets",
-                                                                                                "href":  "/mlb/hr-targets?date=2026-07-02",
-                                                                                                "active":  false
-                                                                                            },
-                                                                                            {
-                                                                                                "label":  "RFI targets",
-                                                                                                "href":  "/mlb/rfi-targets?date=2026-07-02",
-                                                                                                "active":  false
-                                                                                            },
-                                                                                            {
-                                                                                                "label":  "Pitcher ladders",
-                                                                                                "href":  "/mlb/pitcher-ladders?date=2026-07-02",
-                                                                                                "active":  false
-                                                                                            },
-                                                                                            {
-                                                                                                "label":  "Hitter ladders",
-                                                                                                "href":  "/mlb/hitter-ladders?date=2026-07-02",
-                                                                                                "active":  false
-                                                                                            },
-                                                                                            {
-                                                                                                "label":  "Hub",
-                                                                                                "href":  "/mlb/hub",
-                                                                                                "active":  false
-                                                                                            }
-                                                                                        ],
-                                                                       "cards_control_links":  [
-
-                                                                                               ],
-                                                                       "cards_header_meta":  "Artifact-backed slate | 2026-07-02",
-                                                                       "cards_header_title":  "MLB Game Cards",
-                                                                       "source_path":  "daily_summary_2026_07_02.json",
-                                                                       "source_title":  "MLB daily summary artifact"
-                                                                   },
-                                                          "game":  {
-
-                                                                   },
-                                                          "available":  true
-                                                      }
-                                          }
+                 }
 }
