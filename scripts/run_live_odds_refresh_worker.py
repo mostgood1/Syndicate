@@ -16,6 +16,7 @@ from syndicate.features.shared.live_refresh_loop import _acquire_process_lock
 from syndicate.features.shared.live_refresh_loop import _release_process_lock
 from syndicate.features.shared.live_refresh_loop import _LIVE_REFRESH_LOOP_STOP
 from syndicate.features.shared.refresh_state_store import assert_refresh_state_backend_ready
+from vendor.mlb_bettingv2.tools.web.flask_frontend import start_live_lens_background_loop
 
 
 def _handle_stop(_signum: int, _frame: object) -> None:
@@ -28,6 +29,13 @@ def _run_tick() -> None:
         print(f"LIVE ODDS REFRESH TICK: {meta.get('ok', False)}")
     except Exception as exc:
         print(f"LIVE ODDS REFRESH ERROR: {exc}")
+
+
+def _start_live_lens_reports() -> None:
+    try:
+        start_live_lens_background_loop()
+    except Exception:
+        pass
 
 
 def main() -> int:
@@ -45,6 +53,8 @@ def main() -> int:
     if not _acquire_process_lock():
         print("LIVE ODDS REFRESH WORKER SKIPPED: lock_unavailable")
         return 0
+
+    _start_live_lens_reports()
 
     try:
         interval_seconds = max(5, int(_live_refresh_loop_interval_seconds()))

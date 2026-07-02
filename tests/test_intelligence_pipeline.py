@@ -121,7 +121,7 @@ class IntelligencePipelineTests(unittest.TestCase):
             "execution_mode": "source",
             "dry_run": False,
             "summary_ok": True,
-            "source_precedence": ["artifact_history", "tracking_history"],
+            "source_precedence": ["shared_history", "artifact_history", "tracking_history"],
             "sports": [
                 {"sport": "nba", "ok": True},
                 {"sport": "wnba", "ok": True},
@@ -146,7 +146,7 @@ class IntelligencePipelineTests(unittest.TestCase):
         structured = result.to_dict()["structured_response"]
         odds_evidence = next((section for section in structured.get("supporting_evidence", []) if isinstance(section, dict) and section.get("title") == "Odds control plane"), None)
         self.assertIsNotNone(odds_evidence)
-        self.assertEqual((structured.get("odds_control_plane") or {}).get("source_precedence"), ["artifact_history", "tracking_history"])
+        self.assertEqual((structured.get("odds_control_plane") or {}).get("source_precedence"), ["shared_history", "artifact_history", "tracking_history"])
 
     def test_intelligence_result_round_trips_top_level_fields(self) -> None:
         raw = {

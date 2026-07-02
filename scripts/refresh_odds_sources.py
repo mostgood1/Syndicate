@@ -815,7 +815,7 @@ def _sport_control_plane_metadata(sport_result: dict[str, Any], *, date: str, ph
         "post_refresh_ok": bool((sport_result.get("post_refresh") or {}).get("ok")) if isinstance(sport_result.get("post_refresh"), dict) else None,
         "mirror_ok": bool((sport_result.get("mirror") or {}).get("ok")) if isinstance(sport_result.get("mirror"), dict) else None,
         "odds_control_plane": {
-            "source_precedence": ["artifact_history", "tracking_history"],
+            "source_precedence": ["shared_history", "artifact_history", "tracking_history"],
             "artifact_paths": artifact_paths,
             "has_post_refresh": bool(sport_result.get("post_refresh")),
         },

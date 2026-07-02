@@ -92,9 +92,9 @@ def _file_age_seconds(path: Path) -> float | None:
 def _mlb_live_refresh_interval_seconds() -> int:
     raw_value = str(os.environ.get("MLB_LIVE_ODDSAPI_REFRESH_INTERVAL_SECONDS") or "").strip()
     try:
-        value = int(raw_value or 30)
+        value = int(raw_value or 60)
     except ValueError:
-        value = 30
+        value = 60
     return max(1, value)
 
 

@@ -243,7 +243,7 @@ class MlbRefreshRunnerTests(unittest.TestCase):
             with patch.dict(os.environ, {}, clear=True):
                 spec.loader.exec_module(module)
 
-            self.assertEqual(module._live_lens_report_refresh_interval_seconds(), 30)
+            self.assertEqual(module._live_lens_report_refresh_interval_seconds(), 60)
         finally:
             sys.modules.pop(spec.name, None)
 

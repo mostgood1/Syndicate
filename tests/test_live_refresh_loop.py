@@ -178,6 +178,29 @@ class LiveRefreshLoopTests(unittest.TestCase):
         mocked_tick.assert_called_once()
         mocked_release.assert_called_once()
 
+    def test_run_live_odds_refresh_worker_starts_live_lens_loop(self) -> None:
+        with patch.object(run_live_odds_refresh_worker, "_acquire_process_lock", return_value=True), patch.object(
+            run_live_odds_refresh_worker,
+            "_start_live_lens_reports",
+            return_value=None,
+        ) as mocked_start_reports, patch.object(run_live_odds_refresh_worker, "_run_tick", return_value=None), patch.object(
+            run_live_odds_refresh_worker,
+            "_live_refresh_loop_interval_seconds",
+            return_value=5,
+        ), patch.object(run_live_odds_refresh_worker.time, "sleep", return_value=None), patch.object(
+            run_live_odds_refresh_worker.signal,
+            "signal",
+            side_effect=ValueError("skip signals"),
+        ), patch.object(run_live_odds_refresh_worker.sys, "argv", ["run_live_odds_refresh_worker.py"]), patch.object(
+            run_live_odds_refresh_worker._LIVE_REFRESH_LOOP_STOP,
+            "is_set",
+            side_effect=[False, True],
+        ):
+            exit_code = run_live_odds_refresh_worker.main()
+
+        self.assertEqual(exit_code, 0)
+        mocked_start_reports.assert_called_once()
+
 
 if __name__ == "__main__":
     unittest.main()

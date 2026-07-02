@@ -143,7 +143,7 @@ class RefreshWorkerTests(unittest.TestCase):
                     "SYNDICATE_REPORTS_ROOT": str(reports_root),
                     "SYNDICATE_DATA_ROOT": str(data_root),
                     "MLB_ENABLE_REFRESH_WORKER_AUTORUN": "1",
-                    "MLB_LIVE_ODDSAPI_REFRESH_INTERVAL_SECONDS": "30",
+                    "MLB_LIVE_ODDSAPI_REFRESH_INTERVAL_SECONDS": "60",
                 },
                 clear=True,
             ), patch.object(

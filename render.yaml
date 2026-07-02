@@ -94,7 +94,7 @@ services:
       - key: SYNDICATE_BOOTSTRAP_WNBA_TODAY
         value: "1"
       - key: SYNDICATE_LIVE_ODDS_REFRESH_INTERVAL_SECONDS
-        value: "30"
+        value: "60"
       # Execute refresh jobs directly so MLB odds updates can publish on Render.
       - key: SYNDICATE_LIVE_ODDS_REFRESH_LAUNCH_MODE
         value: detached_subprocess
@@ -137,9 +137,9 @@ services:
       - key: MLB_LIVE_LENS_LOOP_INTERVAL_SECONDS
         value: "30"
       - key: MLB_LIVE_LENS_REPORT_REFRESH_INTERVAL_SECONDS
-        value: "30"
+        value: "60"
       - key: MLB_LIVE_ODDSAPI_REFRESH_INTERVAL_SECONDS
-        value: "30"
+        value: "60"
 
   - type: worker
     name: refresh-worker
@@ -221,7 +221,7 @@ services:
       - key: SYNDICATE_BOOTSTRAP_WNBA_TODAY
         value: "1"
       - key: SYNDICATE_LIVE_ODDS_REFRESH_INTERVAL_SECONDS
-        value: "30"
+        value: "60"
       - key: SYNDICATE_INTELLIGENCE_REFRESH_INTERVAL_SECONDS
         value: "60"
       - key: SYNDICATE_LIVE_ODDS_REFRESH_LAUNCH_MODE
@@ -261,7 +261,7 @@ services:
       - key: MLB_LIVE_LENS_REPORT_REFRESH_INTERVAL_SECONDS
         value: "30"
       - key: MLB_LIVE_ODDSAPI_REFRESH_INTERVAL_SECONDS
-        value: "30"
+        value: "60"
 
   - type: worker
     name: live-odds-worker
@@ -373,13 +373,13 @@ services:
       - key: SYNDICATE_WNBA_SOURCE_APP_FALLBACK
         value: "false"
       - key: MLB_ENABLE_LIVE_LENS_LOOP
-        value: "false"
+        value: "true"
       - key: MLB_ENABLE_LIVE_LENS_BACKGROUND_REPORTS
-        value: "false"
+        value: "true"
       - key: MLB_LIVE_LENS_LOOP_INTERVAL_SECONDS
         value: "30"
       - key: MLB_LIVE_LENS_REPORT_REFRESH_INTERVAL_SECONDS
-        value: "30"
+        value: "60"
       - key: MLB_LIVE_ODDSAPI_REFRESH_INTERVAL_SECONDS
-        value: "30"
+        value: "60"
 
