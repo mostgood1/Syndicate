@@ -1,12 +1,12 @@
 ﻿{
     "date":  "2026-07-02",
-    "generatedAt":  "2026-07-02T20:14:34.4124890+00:00",
-    "lastUpdatedAt":  "2026-07-02T20:14:34.6573929+00:00",
+    "generatedAt":  "2026-07-02T20:48:07.0901206+00:00",
+    "lastUpdatedAt":  "2026-07-02T20:48:07.3420473+00:00",
     "completedAt":  null,
     "runMode":  "standard",
     "overallStatus":  "started",
     "error":  null,
-    "runDir":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-02\\20260702_201434",
+    "runDir":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-02\\20260702_204806",
     "latestDir":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest",
     "runtimePolicy":  {
                           "MLB":  {
@@ -894,13 +894,12 @@
     "replayContext":  {
                           "latestCheckpointLoaded":  true,
                           "latestCheckpointPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest_checkpoint.json",
-                          "latestCheckpointStage":  "completed",
+                          "latestCheckpointStage":  "queued",
                           "latestCheckpointFailedStage":  "",
-                          "latestCheckpointCompletedStageCount":  2,
-                          "latestCheckpointCompletedStages":  [
-                                                                  "source_update",
-                                                                  "refresh_gate"
-                                                              ],
+                          "latestCheckpointCompletedStageCount":  0,
+                          "latestCheckpointCompletedStages":  {
+
+                                                              },
                           "resumeEligible":  false,
                           "resumedFromCheckpoint":  false,
                           "forceRebuildToday":  false
@@ -911,7 +910,7 @@
 
                                          ],
                      "failedStage":  null,
-                     "lastUpdatedAt":  "2026-07-02T20:14:34.6573929+00:00",
+                     "lastUpdatedAt":  "2026-07-02T20:48:07.3420473+00:00",
                      "simulationContractPath":  null,
                      "simulationContractRunPath":  null,
                      "simulationContractSportCount":  0,
@@ -1857,9 +1856,9 @@
     "statusArtifact":  {
                            "format":  "json",
                            "scope":  "daily_update",
-                           "runManifestPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-02\\20260702_201434\\unified_daily_update_run.json",
+                           "runManifestPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-02\\20260702_204806\\unified_daily_update_run.json",
                            "latestManifestPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest.json",
-                           "runCheckpointPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-02\\20260702_201434\\unified_daily_update_checkpoint.json",
+                           "runCheckpointPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-02\\20260702_204806\\unified_daily_update_checkpoint.json",
                            "latestCheckpointPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest_checkpoint.json",
                            "state":  {
                                          "runMode":  "standard",
@@ -1946,13 +1945,12 @@
                                          "replayContext":  {
                                                                "latestCheckpointLoaded":  true,
                                                                "latestCheckpointPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest_checkpoint.json",
-                                                               "latestCheckpointStage":  "completed",
+                                                               "latestCheckpointStage":  "queued",
                                                                "latestCheckpointFailedStage":  "",
-                                                               "latestCheckpointCompletedStageCount":  2,
-                                                               "latestCheckpointCompletedStages":  [
-                                                                                                       "source_update",
-                                                                                                       "refresh_gate"
-                                                                                                   ],
+                                                               "latestCheckpointCompletedStageCount":  0,
+                                                               "latestCheckpointCompletedStages":  {
+
+                                                                                                   },
                                                                "resumeEligible":  false,
                                                                "resumedFromCheckpoint":  false,
                                                                "forceRebuildToday":  false
@@ -1970,7 +1968,7 @@
                                                                                                            ],
                                                                "status":  "skipped"
                                                            },
-                                         "lastUpdatedAt":  "2026-07-02T20:14:34.6573929+00:00"
+                                         "lastUpdatedAt":  "2026-07-02T20:48:07.3420473+00:00"
                                      }
                        },
     "sportRuns":  [
@@ -1997,8 +1995,8 @@
                         "oddsPhase":  null,
                         "oddsSports":  null,
                         "oddsRegions":  null,
-                        "manifestPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-02\\20260702_201434\\migration\\refresh_status_manifest.json",
-                        "runSummaryPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-02\\20260702_201434\\migration\\refresh_and_gate_run.json"
+                        "manifestPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-02\\20260702_204806\\migration\\refresh_status_manifest.json",
+                        "runSummaryPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-02\\20260702_204806\\migration\\refresh_and_gate_run.json"
                     },
     "pushResults":  [
 
