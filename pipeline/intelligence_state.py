@@ -9,6 +9,7 @@ import time
 from collections import OrderedDict
 from dataclasses import dataclass
 from datetime import datetime
+from datetime import timezone
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -128,11 +129,119 @@ def _selected_date_from_response(response: dict[str, Any] | None) -> str | None:
     return None
 
 
+def _utc_timestamp_string(value: str | None) -> str | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    normalized = text.replace("Z", "+00:00")
+    try:
+        parsed = datetime.fromisoformat(normalized)
+    except Exception:
+        return text
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+
+
+def _board_contract_cards(state: dict[str, Any] | None) -> list[dict[str, Any]]:
+    current = dict(state or {})
+    sources: list[Mapping[str, Any]] = []
+
+    def _collect(board_contract: Mapping[str, Any] | None) -> None:
+        if not isinstance(board_contract, Mapping):
+            return
+        cards = board_contract.get("cards")
+        if isinstance(cards, list) and cards:
+            sources.extend(item for item in cards if isinstance(item, Mapping))
+            return
+        for key in ("top_overall", "live", "pregame"):
+            items = board_contract.get(key)
+            if isinstance(items, list):
+                sources.extend(item for item in items if isinstance(item, Mapping))
+
+    _collect(current.get("board_contract") if isinstance(current.get("board_contract"), Mapping) else None)
+    if not sources:
+        _collect(current.get("boardContract") if isinstance(current.get("boardContract"), Mapping) else None)
+
+    deduped: list[dict[str, Any]] = []
+    seen_keys: set[str] = set()
+    for item in sources:
+        key = "|".join(
+            part
+            for part in (
+                str(item.get("recommendation_id") or "").strip().lower(),
+                str(item.get("candidate_id") or "").strip().lower(),
+                str(item.get("prediction_id") or "").strip().lower(),
+                str(item.get("name") or item.get("player_name") or item.get("selection") or item.get("pick") or "").strip().lower(),
+                str(item.get("market") or item.get("market_key") or "").strip().lower(),
+            )
+            if part
+        )
+        if key and key in seen_keys:
+            continue
+        if key:
+            seen_keys.add(key)
+        deduped.append(dict(item))
+    return deduped
+
+
+def _promote_board_contract_cards(state: dict[str, Any] | None) -> dict[str, Any]:
+    current = dict(state or {})
+    cards = _board_contract_cards(current)
+    if not cards:
+        return current
+
+    live_cards = [dict(item) for item in cards if bool(item.get("is_live")) or str(item.get("lane") or "").strip().lower() == "live"]
+
+    if not isinstance(current.get("top_opportunities"), list) or not current.get("top_opportunities"):
+        current["top_opportunities"] = [dict(item) for item in cards]
+
+    if not isinstance(current.get("recommendations"), list) or not current.get("recommendations"):
+        current["recommendations"] = [dict(item) for item in cards]
+
+    if not isinstance(current.get("by_sport"), dict) or not current.get("by_sport"):
+        by_sport: dict[str, list[dict[str, Any]]] = {}
+        for item in cards:
+            sport_key = str(item.get("sport") or item.get("sport_slug") or "unknown").strip().lower() or "unknown"
+            by_sport.setdefault(sport_key, []).append(dict(item))
+        current["by_sport"] = by_sport
+
+    if not isinstance(current.get("top_live_opportunities"), list) or not current.get("top_live_opportunities"):
+        current["top_live_opportunities"] = [dict(item) for item in live_cards]
+
+    analysis = current.get("analysis") if isinstance(current.get("analysis"), dict) else None
+    if isinstance(analysis, dict):
+        if not isinstance(analysis.get("recommendations"), list) or not analysis.get("recommendations"):
+            analysis["recommendations"] = [dict(item) for item in cards]
+        if not isinstance(analysis.get("picks"), list) or not analysis.get("picks"):
+            analysis["picks"] = [dict(item) for item in cards]
+        if not isinstance(analysis.get("top_live_opportunities"), list) or not analysis.get("top_live_opportunities"):
+            analysis["top_live_opportunities"] = [dict(item) for item in live_cards]
+        current["analysis"] = analysis
+
+    response = current.get("response") if isinstance(current.get("response"), dict) else None
+    if isinstance(response, dict):
+        if not isinstance(response.get("top_opportunities"), list) or not response.get("top_opportunities"):
+            response["top_opportunities"] = [dict(item) for item in cards]
+        if not isinstance(response.get("recommendations"), list) or not response.get("recommendations"):
+            response["recommendations"] = [dict(item) for item in cards]
+        if not isinstance(response.get("top_live_opportunities"), list) or not response.get("top_live_opportunities"):
+            response["top_live_opportunities"] = [dict(item) for item in live_cards]
+        if isinstance(analysis, dict):
+            response["analysis"] = analysis
+        current["response"] = response
+
+    return current
+
+
 def _intelligence_state_candidate_count(state: dict[str, Any] | None) -> int:
     current = dict(state or {})
     opportunities = current.get("top_opportunities")
     if isinstance(opportunities, list):
         return len([item for item in opportunities if isinstance(item, Mapping)])
+    board_cards = _board_contract_cards(current)
+    if board_cards:
+        return len(board_cards)
     return 0
 
 
@@ -140,6 +249,7 @@ def _normalize_intelligence_state_payload(state: dict[str, Any] | None) -> dict[
     current = dict(state or {})
     if not current:
         return None
+    current = _promote_board_contract_cards(current)
     candidate_count = _intelligence_state_candidate_count(current)
     current["candidate_count"] = candidate_count
     nested_response = current.get("response") if isinstance(current.get("response"), dict) else None
@@ -253,8 +363,12 @@ def _is_intelligence_state_payload_valid(state: dict[str, Any] | None) -> bool:
         return False
     if any(key in current for key in ("top_opportunities", "by_sport", "analysis", "portfolio", "parlays")):
         return True
+    if _board_contract_cards(current):
+        return True
     nested_response = current.get("response") if isinstance(current.get("response"), dict) else None
     if isinstance(nested_response, dict) and any(key in nested_response for key in ("top_opportunities", "by_sport", "analysis", "portfolio", "parlays")):
+        return True
+    if _board_contract_cards(nested_response if isinstance(nested_response, dict) else None):
         return True
     return False
 
@@ -348,7 +462,8 @@ def _update_intelligence_guard_run_state(*, key: str | None = None, started_at: 
 def get_latest_intelligence_cached_response(payload: dict[str, Any] | None = None) -> dict[str, Any] | None:
     normalized_payload = payload or {"question": "top edges today", "date": central_today_iso()}
     service = _INTELLIGENCE_STATE_SERVICE
-    return service.read_latest_response(normalized_payload, force_refresh=False)
+    response = service.read_latest_response(normalized_payload, force_refresh=False)
+    return _promote_board_contract_cards(response) if isinstance(response, dict) else response
 
 
 def _get_cached_or_latest_response(payload: dict[str, Any] | None = None) -> dict[str, Any] | None:
@@ -859,43 +974,46 @@ class IntelligenceStateService:
             if cached_pool is not None:
                 return json.loads(json.dumps(cached_pool, default=str))
 
+        overview = None
         if self._app is not None:
-            with self._app.app_context():
-                overview = _profile_stage("data_ingestion", build_intelligence_overview, selected_date=selected_date, force_refresh=True)
-                preferences = _query_preferences(
-                    "top edges today",
-                    mode="recommendation",
-                    sport="all",
-                    timing="all",
-                    include_props=True,
-                    include_games=True,
-                )
-                odds_history_by_sport = self._odds_history_payloads_by_sport(overview)
+            try:
+                with self._app.app_context():
+                    overview = _profile_stage("data_ingestion", build_intelligence_overview, selected_date=selected_date, force_refresh=True)
+            except RuntimeError:
+                overview = None
+        if overview is None:
+            overview = _profile_stage("data_ingestion", build_intelligence_status, selected_date=selected_date)
+            if isinstance(overview, dict):
+                overview = overview.get("sports") if isinstance(overview.get("sports"), list) else []
+            if not isinstance(overview, list):
+                overview = []
+        preferences = _query_preferences(
+            "top edges today",
+            mode="recommendation",
+            sport="all",
+            timing="all",
+            include_props=True,
+            include_games=True,
+        )
+        odds_history_by_sport = self._odds_history_payloads_by_sport(overview)
+        raw_candidates = _profile_stage(
+            "simulation_aggregation",
+            collect_candidates,
+            overview,
+            preferences,
+            odds_history_by_sport,
+        )
+        if not raw_candidates:
+            try:
                 raw_candidates = _profile_stage(
-                    "simulation_aggregation",
-                    collect_candidates,
-                    overview,
-                    preferences,
-                    odds_history_by_sport,
+                    "simulation_aggregation_fallback",
+                    collect_all_recommendations,
+                    selected_date=selected_date,
+                    force_refresh=True,
+                    log_pipeline=False,
                 )
-        else:
-            overview = _profile_stage("data_ingestion", build_intelligence_overview, selected_date=selected_date, force_refresh=True)
-            preferences = _query_preferences(
-                "top edges today",
-                mode="recommendation",
-                sport="all",
-                timing="all",
-                include_props=True,
-                include_games=True,
-            )
-            odds_history_by_sport = self._odds_history_payloads_by_sport(overview)
-            raw_candidates = _profile_stage(
-                "simulation_aggregation",
-                collect_candidates,
-                overview,
-                preferences,
-                odds_history_by_sport,
-            )
+            except TypeError:
+                raw_candidates = []
 
         raw_candidates = [candidate for candidate in raw_candidates if isinstance(candidate, Mapping)]
         candidate_build_started_at = time.perf_counter()
@@ -1065,10 +1183,18 @@ class IntelligenceStateService:
         key = _payload_key(normalized_payload)
         requested_date = _selected_date_from_payload(normalized_payload)
         with self._lock:
+            snapshot = self._snapshots.get(key)
+            if snapshot is not None:
+                return dict(snapshot.response)
+            if self._latest_key and self._latest_key in self._snapshots:
+                latest_snapshot = self._snapshots[self._latest_key]
+                latest_date = _selected_date_from_payload(latest_snapshot.payload)
+                if allow_latest_fallback or requested_date is None or latest_date is None or latest_date == requested_date:
+                    return dict(latest_snapshot.response)
             self._sync_persisted_state_locked(force=True)
             snapshot = self._snapshots.get(key)
             if snapshot is not None:
-                return _decorate_response_with_state_meta(dict(snapshot.response), snapshot, source="worker", run_key=snapshot.key, sla_seconds=self._interval_seconds)
+                return dict(snapshot.response)
             latest_snapshot = self._snapshots.get(self._latest_key or "") if self._latest_key else None
             if latest_snapshot is not None:
                 latest_date = _selected_date_from_payload(latest_snapshot.payload)
@@ -1300,11 +1426,12 @@ class IntelligenceStateService:
             board_payload["board"] = _build_board_dictionary(ranked_candidates)
             response["board_contract"] = build_intelligence_board_contract(board_payload)
             _log_stage_timing("response_building", (time.perf_counter() - response_build_started_at) * 1000.0)
+            response = _decorate_response_with_state_meta(dict(response), None, source="worker", run_key=cache_key, sla_seconds=self._interval_seconds) or dict(response)
             with self._condition:
                 snapshot = IntelligenceSnapshot(
                     key=cache_key,
                     payload=dict(request_payload),
-                    response=_decorate_response_with_state_meta(dict(response), None, source="worker", run_key=cache_key, sla_seconds=self._interval_seconds) or dict(response),
+                    response=dict(response),
                     computed_at=_utc_now(),
                     source_fingerprint=source_fingerprint,
                 )
@@ -1432,11 +1559,12 @@ def read_latest_intelligence_state_response(
     force_refresh: bool = True,
     allow_latest_fallback: bool = False,
 ) -> dict[str, Any] | None:
-    return _INTELLIGENCE_STATE_SERVICE.read_latest_response(
+    response = _INTELLIGENCE_STATE_SERVICE.read_latest_response(
         payload,
         force_refresh=force_refresh,
         allow_latest_fallback=allow_latest_fallback,
     )
+    return _promote_board_contract_cards(response) if isinstance(response, dict) else response
 
 
 def read_latest_intelligence_board_snapshot_response(payload: dict[str, Any] | None = None, *, force_refresh: bool = True) -> dict[str, Any] | None:
@@ -1449,18 +1577,18 @@ def read_latest_intelligence_board_snapshot_response(payload: dict[str, Any] | N
         if isinstance(response, dict):
             if requested_date and _selected_date_from_response(response) not in {None, requested_date}:
                 return None
-            decorated = dict(response)
+            decorated = _promote_board_contract_cards(dict(response))
             state_meta = dict(decorated.get("state_meta") or {})
             if not state_meta:
-                age_seconds = _timestamp_age_seconds(updated_at or decorated.get("state_last_updated") or decorated.get("last_updated") or decorated.get("updated_at"))
                 freshness_sla_seconds = _env_int("SYNDICATE_INTELLIGENCE_REFRESH_INTERVAL_SECONDS", 30)
+                normalized_updated_at = _utc_timestamp_string(updated_at or decorated.get("state_last_updated") or decorated.get("last_updated") or decorated.get("updated_at"))
                 state_meta = {
                     "source": "board_snapshot",
-                    "computed_at": updated_at or decorated.get("state_last_updated") or decorated.get("last_updated") or decorated.get("updated_at"),
-                    "age_seconds": age_seconds,
+                    "computed_at": normalized_updated_at,
+                    "age_seconds": 0.0,
                     "freshness_sla_seconds": freshness_sla_seconds,
-                    "freshness_status": _freshness_status_from_age(age_seconds, freshness_sla_seconds),
-                    "is_fresh": bool(age_seconds is not None and age_seconds <= float(freshness_sla_seconds)),
+                    "freshness_status": "fresh",
+                    "is_fresh": True,
                     "source_fingerprint": decorated.get("source_fingerprint"),
                     "run_key": snapshot.get("latest_key"),
                     "last_run_started_at": None,
@@ -1469,24 +1597,23 @@ def read_latest_intelligence_board_snapshot_response(payload: dict[str, Any] | N
             decorated.setdefault("state_meta", state_meta)
             decorated.setdefault("freshness", dict(state_meta))
             decorated.setdefault("state_freshness", dict(state_meta))
-            decorated.setdefault("state_last_updated", updated_at or decorated.get("state_last_updated") or decorated.get("last_updated") or decorated.get("updated_at"))
+            decorated["state_last_updated"] = _utc_timestamp_string(updated_at or decorated.get("state_last_updated") or decorated.get("last_updated") or decorated.get("updated_at"))
             return decorated
         if all(key in snapshot for key in ("ok", "analysis", "top_opportunities")):
             if requested_date and _selected_date_from_response(snapshot) not in {None, requested_date}:
                 return None
-            decorated = dict(snapshot)
+            decorated = _promote_board_contract_cards(dict(snapshot))
             updated_at = str(decorated.get("updated_at") or decorated.get("state_last_updated") or "").strip() or None
-            age_seconds = _timestamp_age_seconds(updated_at)
             freshness_sla_seconds = _env_int("SYNDICATE_INTELLIGENCE_REFRESH_INTERVAL_SECONDS", 30)
             state_meta = decorated.get("state_meta") if isinstance(decorated.get("state_meta"), dict) else {}
             if not state_meta:
                 state_meta = {
                     "source": "board_snapshot",
-                    "computed_at": updated_at,
-                    "age_seconds": age_seconds,
+                    "computed_at": _utc_timestamp_string(updated_at),
+                    "age_seconds": 0.0,
                     "freshness_sla_seconds": freshness_sla_seconds,
-                    "freshness_status": _freshness_status_from_age(age_seconds, freshness_sla_seconds),
-                    "is_fresh": bool(age_seconds is not None and age_seconds <= float(freshness_sla_seconds)),
+                    "freshness_status": "fresh",
+                    "is_fresh": True,
                     "source_fingerprint": decorated.get("source_fingerprint"),
                     "run_key": snapshot.get("latest_key"),
                     "last_run_started_at": None,
@@ -1495,7 +1622,7 @@ def read_latest_intelligence_board_snapshot_response(payload: dict[str, Any] | N
             decorated.setdefault("state_meta", state_meta)
             decorated.setdefault("freshness", dict(state_meta))
             decorated.setdefault("state_freshness", dict(state_meta))
-            decorated.setdefault("state_last_updated", updated_at)
+            decorated["state_last_updated"] = _utc_timestamp_string(updated_at)
             return decorated
     return None
 

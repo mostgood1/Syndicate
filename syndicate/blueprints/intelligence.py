@@ -992,7 +992,7 @@ def intelligence_status_api():
         _ = str(request.args.get("refresh") or request.args.get("force_refresh") or "").strip().lower() in {"1", "true", "yes", "on"}
         status = read_latest_intelligence_state({"date": selected_date})
         board_response = isinstance(status, dict) and _is_board_response(status)
-        if board_response and _response_needs_refresh({"date": selected_date}, status):
+        if board_response and not (isinstance(status, dict) and isinstance(status.get("board_contract"), dict)) and _response_needs_refresh({"date": selected_date}, status):
             fresh_status, _ = _cached_intelligence_response_with_source({"date": selected_date, "force_refresh": True}, force_refresh=True)
             if isinstance(fresh_status, dict) and _response_has_content(fresh_status):
                 status = fresh_status
@@ -1003,7 +1003,7 @@ def intelligence_status_api():
         _log_api_state_read(status if isinstance(status, dict) else {})
     except Exception as exc:
         return _api_error_response(exc)
-    state_snapshot = normalize_timestamped_payload(dict(status)) if board_response else dict(status)
+    state_snapshot = dict(status)
     response_payload = {"ok": True, "status": state_snapshot}
     if isinstance(status, dict) and _response_has_content(status):
         for key, value in status.items():

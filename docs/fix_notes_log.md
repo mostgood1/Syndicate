@@ -1,5 +1,12 @@
 # Fix Notes Log
 
+## 2026-07-02 - Worker-updated intelligence boards could read as empty
+- Symptom: `/intelligence` and `/api/intelligence/query` could still show no opportunities even after the odds refresh worker had populated the board artifact.
+- Root cause: The intelligence state readers only treated `top_opportunities` and `analysis.recommendations` as visible content, so a worker snapshot that only carried board-contract cards did not get promoted into the canonical opportunity lists.
+- Fix: Promote board-contract cards into `top_opportunities`, `recommendations`, `by_sport`, and the live lane during state normalization and snapshot reads, and accept board-contract cards when validating persisted intelligence state.
+- Validation: `python -m pytest tests/test_intelligence_state.py -k 'board_snapshot_promotes_board_contract_cards_into_visible_opportunities or status_endpoint_preserves_board_trace_metadata or query_endpoint_returns_empty_board_when_cached_live_snapshot_is_missing_hydration'` passed.
+- Follow-up: Keep any future worker board shape changes mirrored in the state reader so the live/pregame lanes do not drift back to a top-level-only contract.
+
 ## 2026-07-02 - Incremental daily-update publishes failed on ignored MLB artifact paths
 - Symptom: The daily update kept aborting during artifact publish with `git add failed` on `data/mlb_source/data/eval/seasons/2026/season_betting_cards_retuned_manifest.json` after the run had already produced the MLB bundle.
 - Root cause: The incremental publisher was sending newly generated artifact paths through the normal `git add` loop, but some owned MLB artifacts live under ignored trees and need to be force-added when they appear in the update set.

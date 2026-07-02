@@ -1158,6 +1158,56 @@ class IntelligenceStateTests(unittest.TestCase):
         self.assertEqual((board_contract.get("cards") or [])[0].get("trace_path"), "reports/intelligence/query_state_cache.json")
         self.assertEqual((board_contract.get("cards") or [])[0].get("trace", {}).get("source_id"), "cand_123")
 
+    def test_board_snapshot_promotes_board_contract_cards_into_visible_opportunities(self) -> None:
+        snapshot = {
+            "updated_at": "2026-06-11T16:05:00Z",
+            "response": {
+                "board_contract": {
+                    "schema": "intelligence_board_v1",
+                    "cards": [
+                        {
+                            "name": "Live Play",
+                            "sport": "nba",
+                            "sport_slug": "nba",
+                            "market": "points",
+                            "line": 28.5,
+                            "odds": "-110",
+                            "projected": 30.1,
+                            "live_projection": 31.2,
+                            "is_live": True,
+                            "status_display": "Live",
+                            "status_context": "In Progress",
+                        },
+                        {
+                            "name": "Pregame Play",
+                            "sport": "wnba",
+                            "sport_slug": "wnba",
+                            "market": "assists",
+                            "line": 5.5,
+                            "odds": "+104",
+                            "projected": 6.1,
+                            "is_live": False,
+                            "status_display": "7:10 PM CT",
+                            "status_context": "Scheduled",
+                        },
+                    ],
+                    "lane_counts": {"live": 1, "pregame": 1, "archived": 0},
+                    "active_lanes": ["live", "pregame"],
+                }
+            },
+        }
+
+        with patch("pipeline.intelligence_state.read_json_file", return_value=dict(snapshot)):
+            promoted = intelligence_state_module.read_latest_intelligence_board_snapshot_response({"date": "2026-06-11"})
+
+        self.assertIsNotNone(promoted)
+        self.assertEqual(len(promoted.get("top_opportunities") or []), 2)
+        self.assertEqual((promoted.get("top_opportunities") or [])[0].get("name"), "Live Play")
+        self.assertEqual(len(promoted.get("recommendations") or []), 2)
+        self.assertEqual(len(promoted.get("top_live_opportunities") or []), 1)
+        self.assertEqual((promoted.get("top_live_opportunities") or [])[0].get("name"), "Live Play")
+        self.assertEqual(sorted(promoted.get("by_sport") or {}), ["nba", "wnba"])
+
     def test_status_exposes_freshness_sla_fields(self) -> None:
         service = IntelligenceStateService()
         service._interval_seconds = 30
