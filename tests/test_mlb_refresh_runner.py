@@ -833,6 +833,103 @@ class MlbRefreshRunnerTests(unittest.TestCase):
         finally:
             sys.modules.pop(spec.name, None)
 
+    def test_build_live_lens_snapshot_internal_refreshes_stale_current_day_report(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        module_path = repo_root / "syndicate" / "features" / "mlb" / "live_lens.py"
+        spec = importlib.util.spec_from_file_location("test_mlb_live_lens_feature_stale_refresh", module_path)
+        assert spec is not None and spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = module
+
+        try:
+            with tempfile.TemporaryDirectory() as tmp_dir:
+                spec.loader.exec_module(module)
+                runtime_root = Path(tmp_dir) / "source" / "data"
+                runtime_live_lens_dir = runtime_root / "live_lens"
+                runtime_live_lens_dir.mkdir(parents=True, exist_ok=True)
+                today = datetime.now().astimezone().date().isoformat()
+                report_path = runtime_live_lens_dir / f"live_lens_report_{today.replace('-', '_')}.json"
+                report_path.write_text(
+                    json.dumps(
+                        {
+                            "generatedAt": "1999-01-01T00:00:00-05:00",
+                            "counts": {"games": 1, "live": 1, "final": 0, "pregame": 0, "props": 0, "archivedLiveProps": 0},
+                            "games": [
+                                {
+                                    "gamePk": 123,
+                                    "status": {"abstract": "Live", "detailed": "In Progress"},
+                                    "startTime": "7:10 PM",
+                                    "matchup": {
+                                        "away": {"abbr": "AAA", "name": "Away A"},
+                                        "home": {"abbr": "BBB", "name": "Home B"},
+                                        "score": {"away": 0, "home": 0},
+                                        "liveText": "Stale live lens row",
+                                    },
+                                    "gameMarkets": {},
+                                    "gameLens": [],
+                                    "props": [],
+                                    "liveProps": [],
+                                    "trackedProps": [],
+                                    "archivedLiveProps": [],
+                                    "simContextAvailable": False,
+                                    "snapshotAvailable": False,
+                                }
+                            ],
+                            "source_title": "MLB live-lens report artifact",
+                        }
+                    ),
+                    encoding="utf-8",
+                )
+
+                refresh_calls = {"count": 0}
+
+                def fake_persist(selected_date: str):
+                    refresh_calls["count"] += 1
+                    payload = {
+                        "generatedAt": "2026-07-02T12:00:01-05:00",
+                        "counts": {"games": 1, "live": 1, "final": 0, "pregame": 0, "props": 0, "archivedLiveProps": 0},
+                        "games": [
+                            {
+                                "gamePk": 123,
+                                "matchup": {
+                                    "away": {"abbr": "AAA", "name": "Away A"},
+                                    "home": {"abbr": "BBB", "name": "Home B"},
+                                    "score": {"away": 2, "home": 1},
+                                    "liveText": "Fresh live lens row",
+                                },
+                                "status": {"abstract": "Live", "detailed": "In Progress"},
+                                "startTime": "7:10 PM",
+                                "gameMarkets": {},
+                                "gameLens": [],
+                                "props": [],
+                                "liveProps": [],
+                                "trackedProps": [],
+                                "archivedLiveProps": [],
+                                "simContextAvailable": False,
+                                "snapshotAvailable": False,
+                            }
+                        ],
+                        "dataRoot": module.live_lens_report_path(selected_date).parent.parent.as_posix(),
+                        "liveLensDir": module.live_lens_report_path(selected_date).parent.as_posix(),
+                        "optimizationRegime": None,
+                    }
+                    report_path.write_text(json.dumps(payload), encoding="utf-8")
+                    return payload
+
+                module.live_lens_report_path = lambda d: report_path
+                module._path_age_seconds = lambda path: 999.0
+                module._persist_live_lens_report = fake_persist
+
+                snapshot = module.build_live_lens_snapshot_internal(today, persist=False)
+                persisted_report = json.loads(report_path.read_text(encoding="utf-8"))
+
+            self.assertEqual(refresh_calls["count"], 1)
+            self.assertEqual(snapshot["generatedAt"], "2026-07-02T12:00:01-05:00")
+            self.assertEqual(snapshot["games"][0]["matchup"]["score"], {"away": 2, "home": 1})
+            self.assertEqual(persisted_report["generatedAt"], "2026-07-02T12:00:01-05:00")
+        finally:
+            sys.modules.pop(spec.name, None)
+
     def test_build_live_lens_snapshot_internal_falls_back_to_cards_when_vendor_report_is_empty(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]
         module_path = repo_root / "syndicate" / "features" / "mlb" / "live_lens.py"

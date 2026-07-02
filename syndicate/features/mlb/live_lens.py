@@ -3,7 +3,9 @@ from __future__ import annotations
 from copy import deepcopy
 import math
 import json
+import os
 import re
+import time
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -21,6 +23,38 @@ from syndicate.features.shared.live_lens_contract import attach_live_lens_contra
 
 
 LIVE_LENS_SNAPSHOT_PATH = Path("data/live/mlb_live_lens.json")
+_LIVE_LENS_REPORT_MAX_AGE_DEFAULT_SECONDS = 180
+
+
+def _path_age_seconds(path: Path | None) -> float | None:
+    if not isinstance(path, Path) or not path.exists() or not path.is_file():
+        return None
+    try:
+        return max(0.0, float(time.time()) - float(path.stat().st_mtime))
+    except Exception:
+        return None
+
+
+def _live_lens_report_max_age_seconds() -> int:
+    raw = str(os.environ.get("MLB_LIVE_LENS_REPORT_MAX_AGE_SECONDS") or "").strip()
+    try:
+        value = int(raw or _LIVE_LENS_REPORT_MAX_AGE_DEFAULT_SECONDS)
+    except Exception:
+        value = _LIVE_LENS_REPORT_MAX_AGE_DEFAULT_SECONDS
+    return max(1, value)
+
+
+def _live_lens_report_needs_refresh(selected_date: str) -> bool:
+    if str(selected_date).strip() != datetime.now().astimezone().date().isoformat():
+        return False
+    report_path = live_lens_report_path(selected_date)
+    report = load_json_file(report_path)
+    if not isinstance(report, dict) or not isinstance(report.get("games"), list) or not report.get("games"):
+        return True
+    report_age_seconds = _path_age_seconds(report_path)
+    if report_age_seconds is None:
+        return True
+    return report_age_seconds > float(_live_lens_report_max_age_seconds())
 
 
 def _load_vendor_live_frontend() -> tuple[Any | None, Any | None]:
@@ -1149,7 +1183,9 @@ def read_latest_live_lens_snapshot() -> dict[str, Any] | None:
 def _live_lens_snapshot_needs_refresh(selected_date: str, snapshot: dict[str, Any] | None) -> bool:
     if str(selected_date).strip() != datetime.now().astimezone().date().isoformat():
         return False
-    return not bool(_snapshot_games(snapshot or {}))
+    if not bool(_snapshot_games(snapshot or {})):
+        return True
+    return _live_lens_report_needs_refresh(selected_date)
 
 
 def read_latest_live_lens_page_context(selected_date: str, *, season: int | None = None) -> dict[str, Any]:
@@ -1191,7 +1227,8 @@ def build_live_lens_snapshot_internal(selected_date: str, *, season: int | None 
     next_date = parsed_date.fromordinal(parsed_date.toordinal() + 1).isoformat()
 
     report_path = live_lens_report_path(selected_date)
-    report = _persist_live_lens_report(selected_date) if persist else load_json_file(report_path)
+    should_refresh_report = bool(persist or _live_lens_report_needs_refresh(selected_date))
+    report = _persist_live_lens_report(selected_date) if should_refresh_report else load_json_file(report_path)
     if not isinstance(report, dict) or not isinstance(report.get("games"), list) or not report.get("games"):
         fallback_report = _cards_backed_live_lens_report(selected_date)
         if fallback_report is not None:
