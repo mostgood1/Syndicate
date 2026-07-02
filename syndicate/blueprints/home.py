@@ -9,6 +9,7 @@ from datetime import timedelta
 from datetime import timezone
 import logging
 import os
+import socket
 from pathlib import Path
 import re
 import subprocess
@@ -135,6 +136,9 @@ def _public_detailed_version_payload() -> dict[str, Any]:
     ).strip() or None
     git_commit = _git_value(repo_root, "rev-parse", "HEAD")
     git_branch = _git_value(repo_root, "rev-parse", "--abbrev-ref", "HEAD")
+    hostname = socket.gethostname()
+    pid = os.getpid()
+    served_at = time.time()
     commit = env_commit or git_commit
     branch = env_branch or git_branch
     return {
@@ -152,6 +156,9 @@ def _public_detailed_version_payload() -> dict[str, Any]:
         "render_service_name": str(os.environ.get("RENDER_SERVICE_NAME") or "").strip() or None,
         "render_instance_id": str(os.environ.get("RENDER_INSTANCE_ID") or "").strip() or None,
         "render_external_url": str(os.environ.get("RENDER_EXTERNAL_URL") or "").strip() or None,
+        "hostname": hostname,
+        "pid": pid,
+        "served_at": served_at,
         "syndicate_data_root": str(current_app.config.get("SYNDICATE_DATA_ROOT") or os.environ.get("SYNDICATE_DATA_ROOT") or "").strip() or None,
         "syndicate_reports_root": str(current_app.config.get("SYNDICATE_REPORTS_ROOT") or os.environ.get("SYNDICATE_REPORTS_ROOT") or "").strip() or None,
     }

@@ -34,7 +34,13 @@ class HomeHealthRouteTests(unittest.TestCase):
                 "RENDER_SERVICE_NAME": "syndicate-web",
             },
             clear=False,
-        ), patch("syndicate.blueprints.home._git_value", side_effect=["ebb2136d", "main"]):
+        ), patch("syndicate.blueprints.home._git_value", side_effect=["ebb2136d", "main"]), patch(
+            "syndicate.blueprints.home.socket.gethostname",
+            return_value="host-123",
+        ), patch("syndicate.blueprints.home.os.getpid", return_value=4321), patch(
+            "syndicate.blueprints.home.time.time",
+            return_value=1234.5,
+        ):
             response = self.client.get("/versionz")
 
         self.assertEqual(response.status_code, 200)
@@ -47,6 +53,9 @@ class HomeHealthRouteTests(unittest.TestCase):
         self.assertFalse(version["commit_matches_checkout"])
         self.assertEqual(version["branch"], "main")
         self.assertEqual(version["render_service_name"], "syndicate-web")
+        self.assertEqual(version["hostname"], "host-123")
+        self.assertEqual(version["pid"], 4321)
+        self.assertEqual(version["served_at"], 1234.5)
 
 
 if __name__ == "__main__":
