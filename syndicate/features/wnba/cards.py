@@ -269,8 +269,6 @@ def _resolved_source_cards_date(selected_date: str, *, allow_stored_date_fallbac
     bundle = _artifact_bundle(resolved_date)
     if bundle["rows"]:
         return resolved_date
-    if resolved_date == central_today_iso():
-        return resolved_date
     if not allow_stored_date_fallback:
         return requested_date
     fallback_date = None
@@ -1946,28 +1944,27 @@ def build_cards_page_context(selected_date: str, *, allow_stored_date_fallback: 
             source_kind="artifact_backed",
             live_lens_integrated=True,
         )
+    resolved_date = _resolved_source_cards_date(requested_date, allow_stored_date_fallback=allow_stored_date_fallback)
     cache_key = (
         requested_date,
+        resolved_date,
         bool(allow_stored_date_fallback),
         tuple(available_dates()),
-        _path_cache_signature(_artifact_root_paths(requested_date)["cards"]),
-        _path_cache_signature(_artifact_root_paths(requested_date)["recommendations"]),
-        _path_cache_signature(_artifact_root_paths(requested_date)["sim"]),
-        _path_cache_signature(_artifact_root_paths(requested_date)["props"]),
-        _path_cache_signature(processed_root() / "live_snapshots" / f"live_state_{requested_date}.jsonl"),
+        _path_cache_signature(_artifact_root_paths(resolved_date)["cards"]),
+        _path_cache_signature(_artifact_root_paths(resolved_date)["recommendations"]),
+        _path_cache_signature(_artifact_root_paths(resolved_date)["sim"]),
+        _path_cache_signature(_artifact_root_paths(resolved_date)["props"]),
+        _path_cache_signature(processed_root() / "live_snapshots" / f"live_state_{resolved_date}.jsonl"),
     )
     cached_context = _WNBA_CARDS_CONTEXT_CACHE.get(cache_key)
     if cached_context is not None:
         return deepcopy(cached_context)
 
-    resolved_date = requested_date
     parsed_date = parse_iso_date(resolved_date)
     prev_date = (parsed_date - timedelta(days=1)).isoformat()
     next_date = (parsed_date + timedelta(days=1)).isoformat()
 
     games, cards_path, recs_path = _games_from_artifacts(resolved_date)
-    if not allow_stored_date_fallback and resolved_date == central_today_iso() and resolved_date not in str(cards_path):
-        games = []
     source_title = "WNBA processed game cards"
     had_artifact_games = bool(games)
     used_public_scoreboard_fallback = False

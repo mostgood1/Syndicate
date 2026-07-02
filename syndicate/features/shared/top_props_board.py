@@ -88,11 +88,12 @@ def build_top_props_page_context(
     extra_controls: list[dict[str, Any]] | None = None,
     empty_state: dict[str, Any] | None = None,
     limit: int = 12,
+    allow_previous_date_fallback: bool = True,
 ) -> dict[str, Any]:
     resolved_source_path = _resolve_top_props_source_path(
         source_path=source_path,
         selected_date=selected_date,
-        available_dates=available_dates,
+        available_dates=available_dates if allow_previous_date_fallback else None,
     )
     summary = load_summary(resolved_source_path) or {}
     cards = build_cards(summary, limit)

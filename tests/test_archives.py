@@ -4773,6 +4773,45 @@ class HomeBoardTests(unittest.TestCase):
         self.assertEqual(len(context.get("rank_cards") or []), 1)
         self.assertIsNone(context.get("empty_state"))
 
+    def test_wnba_props_current_date_stays_on_requested_date_when_empty(self) -> None:
+        fallback_payload = {
+            "data": [
+                {
+                    "player": "Angel Reese",
+                    "team_tricode": "CHI",
+                    "team": "CHI",
+                    "opponent": "MIN",
+                    "tier": "High",
+                    "top_play": {
+                        "market": "reb",
+                        "side": "OVER",
+                        "line": 10.5,
+                        "price": -110,
+                        "edge": 0.14,
+                        "ev_pct": 0.08,
+                        "book": "fanduel",
+                        "basketball_summary": "Stored fallback summary",
+                    },
+                }
+            ]
+        }
+
+        def _load_json(path):
+            if str(path).endswith("props_recommendations_top_by_game_2026-07-02.json"):
+                return fallback_payload
+            return None
+
+        with patch("syndicate.features.wnba.props.available_dates", return_value=["2026-06-30", "2026-07-02"]), patch(
+            "syndicate.features.wnba.props.load_json", side_effect=_load_json
+        ):
+            from syndicate.features.wnba.props import build_props_page_context as build_wnba_props_page_context
+
+            context = build_wnba_props_page_context("2026-07-02")
+
+        self.assertEqual(context.get("source_path").endswith("props_recommendations_top_by_game_2026-07-02.json"), True)
+        self.assertEqual(len(context.get("rank_cards") or []), 1)
+        self.assertIsNone(context.get("empty_state"))
+
     def test_wnba_props_page_uses_standalone_ladder_shell(self) -> None:
         response = self.client.get('/wnba/props?date=2026-05-20')
         html = response.get_data(as_text=True)

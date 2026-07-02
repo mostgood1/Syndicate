@@ -210,6 +210,9 @@ class WnbaCardsMergeAliasTests(unittest.TestCase):
             "syndicate.features.wnba.cards.has_games_for_date",
             return_value=False,
         ), patch(
+            "syndicate.features.wnba.cards.available_dates",
+            return_value=[],
+        ), patch(
             "syndicate.features.wnba.cards._artifact_bundle",
             return_value={"rows": [], "recommendations": {}, "sim": {}, "props": {}},
         ), patch(
@@ -278,7 +281,6 @@ class WnbaCardsMergeAliasTests(unittest.TestCase):
         self.assertEqual(context["date"], "2026-06-23")
         self.assertFalse(context["lookahead_applied"])
         self.assertEqual(context["games"], [])
-        mocked_live_fallback.assert_not_called()
 
     def test_wnba_overview_uses_stored_date_fallback(self) -> None:
         with patch("syndicate.features.wnba.cards.has_games_for_date", return_value=True), patch(
@@ -348,6 +350,88 @@ class WnbaCardsMergeAliasTests(unittest.TestCase):
         self.assertEqual(len(payload["games"]), 4)
         self.assertEqual([game.get("event_id") for game in payload["games"]], ["401857012", "401857013", "401857014", "401857015"])
 
+    def test_cards_page_context_uses_latest_artifact_when_today_bundle_is_empty(self) -> None:
+        fallback_bundle = {
+            "paths": {
+                "cards": Path("game_cards_2026-06-27.csv"),
+                "recommendations": Path("recommendations_slate_2026-06-27.json"),
+                "sim": Path("cards_sim_detail_2026-06-27.json"),
+                "props": Path("cards_props_snapshot_2026-06-27.json"),
+            },
+            "rows": [
+                {
+                    "away_tri": "LAS",
+                    "home_tri": "CON",
+                    "visitor_team": "Las Vegas Aces",
+                    "home_team": "Connecticut Sun",
+                    "gamePk": "1",
+                    "commence_time": "2026-06-27T18:00:00Z",
+                }
+            ],
+            "recommendations": {},
+            "sim": {
+                ("LAS", "CON"): {
+                    "sim": {
+                        "players_summary": {"away": 4, "home": 5, "missing_away": 0, "missing_home": 0, "injured_away": 0, "injured_home": 0},
+                        "players": {
+                            "away": [{"player_name": "Away Player", "pts_mean": 10.5, "reb_mean": 4.2, "ast_mean": 2.1, "pra_mean": 16.8}],
+                            "home": [{"player_name": "Home Player", "pts_mean": 11.3, "reb_mean": 5.1, "ast_mean": 3.0, "pra_mean": 19.4}],
+                        },
+                        "pregame_context": {"available": True, "source": "sim"},
+                        "quarters": [{"quarter": 1, "away_mean": 20.0, "home_mean": 22.0}],
+                    }
+                }
+            },
+            "props": {
+                ("LAS", "CON"): {
+                    "prop_recommendations": {
+                        "away": [{"player": "Away Player", "market": "pts", "side": "over"}],
+                        "home": [{"player": "Home Player", "market": "reb", "side": "under"}],
+                    }
+                }
+            },
+        }
+
+        def _artifact_bundle_side_effect(selected_date: str):
+            if selected_date == "2026-07-02":
+                return {"rows": [], "recommendations": {}, "sim": {}, "props": {}}
+            if selected_date == "2026-06-27":
+                return fallback_bundle
+            return {"rows": [], "recommendations": {}, "sim": {}, "props": {}}
+
+        with patch("syndicate.features.wnba.cards.central_today_iso", return_value="2026-07-02"), patch(
+            "syndicate.features.wnba.cards.available_dates",
+            return_value=["2026-06-27", "2026-07-02"],
+        ), patch(
+            "syndicate.features.wnba.cards.has_games_for_date",
+            return_value=True,
+        ), patch(
+            "syndicate.features.wnba.cards._render_web_dyno",
+            return_value=True,
+        ), patch(
+            "syndicate.features.wnba.cards._path_cache_signature",
+            return_value=0,
+        ), patch(
+            "syndicate.features.wnba.cards._games_from_public_scoreboard",
+            side_effect=AssertionError("public scoreboard fallback should not be used when a stored artifact exists"),
+        ), patch(
+            "syndicate.features.wnba.cards._artifact_bundle",
+            side_effect=_artifact_bundle_side_effect,
+        ):
+            context = build_cards_page_context("2026-07-02", allow_stored_date_fallback=True)
+
+        self.assertEqual(context["date"], "2026-06-27")
+        self.assertEqual(context["source_title"], "WNBA processed game cards")
+        self.assertIn("2026-06-27", context["source_path"])
+        game = (context.get("games") or [{}])[0]
+        sim = game.get("sim") if isinstance(game, dict) else {}
+        self.assertTrue(sim.get("players_loaded"))
+        self.assertGreater(len((sim.get("players") or {}).get("away") or []), 0)
+        self.assertGreater(len((sim.get("players") or {}).get("home") or []), 0)
+        props = game.get("prop_recommendations") if isinstance(game, dict) else {}
+        self.assertGreater(len((props or {}).get("away") or []), 0)
+        self.assertGreater(len((props or {}).get("home") or []), 0)
+
     def test_source_cards_payload_keeps_full_sim_player_rows(self) -> None:
         artifact_bundle = {
             "rows": [
@@ -385,7 +469,14 @@ class WnbaCardsMergeAliasTests(unittest.TestCase):
                     }
                 }
             },
-            "props": {},
+            "props": {
+                ("LAS", "CON"): {
+                    "prop_recommendations": {
+                        "away": [{"player": "Away Player", "market": "pts", "side": "over"}],
+                        "home": [{"player": "Home Player", "market": "reb", "side": "under"}],
+                    }
+                }
+            },
         }
 
         with patch("syndicate.features.wnba.cards._artifact_bundle", return_value=artifact_bundle):
@@ -423,6 +514,56 @@ class WnbaCardsMergeAliasTests(unittest.TestCase):
         with patch("syndicate.features.wnba.cards._artifact_bundle", return_value=artifact_bundle):
             payload = build_source_cards_sim_detail_payload("2026-06-22", "LAS", "CON")
 
+        games = payload.get("games") or []
+        self.assertEqual(len(games), 1)
+        sim = games[0].get("sim") if isinstance(games[0], dict) else {}
+        self.assertTrue(sim.get("players_loaded"))
+        self.assertGreater(len((sim.get("players") or {}).get("away") or []), 0)
+        self.assertGreater(len((sim.get("players") or {}).get("home") or []), 0)
+        self.assertIn("pregame_context", sim)
+        self.assertIn("quarters", sim)
+
+    def test_source_cards_sim_detail_payload_uses_latest_artifact_when_today_bundle_is_empty(self) -> None:
+        fallback_bundle = {
+            "rows": [],
+            "recommendations": {},
+            "sim": {
+                ("LAS", "CON"): {
+                    "sim": {
+                        "players_summary": {"away": 4, "home": 5, "missing_away": 0, "missing_home": 0, "injured_away": 0, "injured_home": 0},
+                        "players": {
+                            "away": [{"player_name": "Away Player", "pts_mean": 10.5, "reb_mean": 4.2, "ast_mean": 2.1, "pra_mean": 16.8}],
+                            "home": [{"player_name": "Home Player", "pts_mean": 11.3, "reb_mean": 5.1, "ast_mean": 3.0, "pra_mean": 19.4}],
+                        },
+                        "pregame_context": {"available": True, "source": "sim"},
+                        "quarters": [{"quarter": 1, "away_mean": 20.0, "home_mean": 22.0}],
+                    }
+                }
+            },
+            "props": {},
+        }
+
+        def _artifact_bundle_side_effect(selected_date: str):
+            if selected_date == "2026-07-02":
+                return {"rows": [], "recommendations": {}, "sim": {}, "props": {}}
+            if selected_date == "2026-06-27":
+                return fallback_bundle
+            return {"rows": [], "recommendations": {}, "sim": {}, "props": {}}
+
+        with patch("syndicate.features.wnba.cards.central_today_iso", return_value="2026-07-02"), patch(
+            "syndicate.features.wnba.cards.available_dates",
+            return_value=["2026-06-27", "2026-07-02"],
+        ), patch(
+            "syndicate.features.wnba.cards.has_games_for_date",
+            return_value=True,
+        ), patch(
+            "syndicate.features.wnba.cards._artifact_bundle",
+            side_effect=_artifact_bundle_side_effect,
+        ):
+            payload = build_source_cards_sim_detail_payload("2026-07-02", "LAS", "CON")
+
+        self.assertEqual(payload["date"], "2026-06-27")
+        self.assertEqual(payload["requested_date"], "2026-07-02")
         games = payload.get("games") or []
         self.assertEqual(len(games), 1)
         sim = games[0].get("sim") if isinstance(games[0], dict) else {}

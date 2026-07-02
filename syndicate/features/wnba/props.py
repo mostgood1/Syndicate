@@ -7,12 +7,12 @@ from typing import Any
 from syndicate.features.shared.top_props_board import build_top_props_page_context
 from syndicate.features.wnba.sources import build_module_links
 from syndicate.features.wnba.sources import available_dates
+from syndicate.features.wnba.sources import central_today_iso
 from syndicate.features.wnba.sources import format_moneyline
 from syndicate.features.wnba.sources import format_num
 from syndicate.features.wnba.sources import format_pct
 from syndicate.features.wnba.sources import market_label
 from syndicate.features.wnba.sources import load_json
-from syndicate.features.wnba.sources import processed_path
 
 
 def _cards_from_summary(summary: dict[str, Any], limit: int = 12) -> list[dict[str, Any]]:
@@ -116,8 +116,7 @@ def _load_props_recommendations_summary(path):
 
 
 def build_props_page_context(selected_date: str) -> dict[str, Any]:
-    summary_path = processed_path(f"props_recommendations_top_by_game_{selected_date}.json")
-    source_path = summary_path if summary_path.exists() else processed_path(f"props_recommendations_{selected_date}.csv")
+    source_path = f"props_recommendations_top_by_game_{selected_date}.json"
     return build_top_props_page_context(
         selected_date=selected_date,
         route_path="/wnba/props",
@@ -131,6 +130,7 @@ def build_props_page_context(selected_date: str) -> dict[str, Any]:
         build_cards=_cards_from_summary,
         build_module_links=build_module_links,
         available_dates=available_dates(),
+        allow_previous_date_fallback=selected_date != central_today_iso(),
         empty_state={
             "eyebrow": "WNBA props",
             "title": "No stored WNBA props were available for this date",
