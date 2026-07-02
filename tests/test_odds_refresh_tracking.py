@@ -120,6 +120,39 @@ class OddsRefreshTrackingTests(unittest.TestCase):
             self.assertEqual(market_state["history"][0]["current_line"], market_state["history"][1]["current_line"])
             self.assertNotEqual(market_state["history"][0]["last_odds"], market_state["history"][1]["last_odds"])
 
+    def test_sync_nhl_tracking_appends_when_refresh_timestamp_changes_without_market_change(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            props_root = root / "data" / "props" / "player_props_lines" / "date=2026-06-07"
+            props_root.mkdir(parents=True)
+            csv_path = props_root / "oddsapi.csv"
+            csv_path.write_text(
+                "player_name,market,book,line,over_price,last_seen_at\n"
+                "Player One,POINTS,draftkings,2.5,-110,2026-06-07T12:00:00Z\n",
+                encoding="utf-8",
+            )
+
+            first_result = sync_post_refresh_tracking_for_source_root(sport="nhl", source_root=root, date_str="2026-06-07")
+            self.assertTrue(first_result["ok"])
+
+            csv_path.write_text(
+                "player_name,market,book,line,over_price,last_seen_at\n"
+                "Player One,POINTS,draftkings,2.5,-110,2026-06-07T12:05:00Z\n",
+                encoding="utf-8",
+            )
+
+            second_result = sync_post_refresh_tracking_for_source_root(sport="nhl", source_root=root, date_str="2026-06-07")
+
+            self.assertTrue(second_result["ok"])
+            self.assertEqual(second_result["artifacts"]["odds_history"]["entries_appended"], 1)
+            history_payload = json.loads((root / "tracking" / "odds_history.json").read_text(encoding="utf-8"))
+            market_key = next(key for key in history_payload["markets"] if "selection=" in key)
+            market_state = history_payload["markets"][market_key]
+            self.assertEqual(len(market_state["history"]), 2)
+            self.assertEqual(market_state["history"][0]["current_line"], market_state["history"][1]["current_line"])
+            self.assertEqual(market_state["history"][0]["last_odds"], market_state["history"][1]["last_odds"])
+            self.assertNotEqual(market_state["history"][0]["snapshot_ts"], market_state["history"][1]["snapshot_ts"])
+
     def test_sync_nfl_tracking_reads_source_artifacts(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)

@@ -1,5 +1,12 @@
 # Fix Notes Log
 
+## 2026-07-02 - Odds histories stalled on same-price refreshes
+- Symptom: The long-lived odds artifact could stay stuck on the first capture even when the scheduled refresh worker kept running.
+- Root cause: The odds-history sync only keyed refresh dedupe on market, line, and odds, so a fresh source snapshot with the same price could be collapsed instead of recorded as a new refresh.
+- Fix: Persist source snapshot timestamps onto odds-history rows and treat a newer snapshot as a distinct refresh entry, even when the line and odds are unchanged.
+- Validation: A direct Python smoke check showed a second refresh appending a new history row with the same line and odds but a newer `snapshot_ts`.
+- Follow-up: Keep source snapshot timestamps flowing through any future odds refresh readers so hosted freshness labels stay aligned with the worker cadence.
+
 ## 2026-07-01 - MLB odds history skipped odds-only refreshes
 - Symptom: The MLB cards surface kept showing the same odds update time even though the daily update and live refresh paths were still running.
 - Root cause: The odds-history sync only treated line changes as refreshes, so a market price move with the same line was ignored and the long-lived odds artifact never advanced.

@@ -472,7 +472,42 @@ def _odds_history_rows_from_csv(path: Path) -> list[dict[str, Any]]:
         return []
     if frame.empty:
         return []
-    return [dict(row) for row in frame.to_dict(orient="records") if isinstance(row, Mapping)]
+    fallback_ts = datetime.fromtimestamp(path.stat().st_mtime, tz=timezone.utc).isoformat(timespec="seconds")
+    snapshot_ts = _to_snapshot_ts(frame, fallback_ts=fallback_ts)
+    rows: list[dict[str, Any]] = []
+    for index, row in enumerate(frame.to_dict(orient="records")):
+        if isinstance(row, Mapping):
+            item = dict(row)
+            item.setdefault("snapshot_ts", str(snapshot_ts.iloc[index]) if index < len(snapshot_ts) else fallback_ts)
+            rows.append(item)
+    return rows
+
+
+def _odds_history_candidate_snapshot_ts(path: Path) -> str:
+    try:
+        if path.suffix.lower() == ".json":
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            if isinstance(payload, Mapping):
+                timestamp = str(payload.get("retrieved_at") or payload.get("retrievedAt") or payload.get("fetched_at") or payload.get("snapshot_ts") or "").strip()
+                if timestamp:
+                    return timestamp
+        elif path.suffix.lower() == ".jsonl":
+            lines = path.read_text(encoding="utf-8").splitlines()
+            for line in lines:
+                text = line.strip()
+                if not text:
+                    continue
+                try:
+                    payload = json.loads(text)
+                except Exception:
+                    continue
+                if isinstance(payload, Mapping):
+                    timestamp = str(payload.get("retrieved_at") or payload.get("retrievedAt") or payload.get("fetched_at") or payload.get("snapshot_ts") or "").strip()
+                    if timestamp:
+                        return timestamp
+    except Exception:
+        pass
+    return datetime.fromtimestamp(path.stat().st_mtime, tz=timezone.utc).isoformat(timespec="seconds")
 
 
 def _odds_history_snapshot_paths(*, sport: str, source_root: Path, date_str: str) -> list[Path]:
@@ -593,6 +628,7 @@ def _sync_odds_history_for_refresh(*, sport: str, source_root: Path, date_str: s
     for candidate in candidates:
         files_scanned += 1
         suffix = candidate.suffix.lower()
+        candidate_snapshot_ts = _odds_history_candidate_snapshot_ts(candidate)
         if suffix == ".csv":
             rows = _odds_history_rows_from_csv(candidate)
         elif suffix == ".jsonl":
@@ -611,7 +647,8 @@ def _sync_odds_history_for_refresh(*, sport: str, source_root: Path, date_str: s
             if not market_key or not line_snapshot or current_line is None:
                 continue
             current_odds = _primary_odds_value(row)
-            dedupe_key = (market_key, current_line, current_odds)
+            row_snapshot_ts = str(row.get("snapshot_ts") or row.get("retrieved_at") or row.get("retrievedAt") or row.get("fetched_at") or candidate_snapshot_ts).strip() or candidate_snapshot_ts
+            dedupe_key = (market_key, current_line, current_odds, row_snapshot_ts)
             if dedupe_key in seen_current_snapshots:
                 continue
             seen_current_snapshots.add(dedupe_key)
@@ -630,8 +667,11 @@ def _sync_odds_history_for_refresh(*, sport: str, source_root: Path, date_str: s
             previous_odds = _line_number(market_state.get("last_odds"))
             if previous_odds is None and history:
                 previous_odds = _line_number((history[-1] or {}).get("last_odds"))
+            previous_snapshot_ts = str(market_state.get("last_snapshot_ts") or "").strip() or None
+            if previous_snapshot_ts is None and history:
+                previous_snapshot_ts = str((history[-1] or {}).get("captured_at") or (history[-1] or {}).get("snapshot_ts") or "").strip() or None
 
-            if previous_line is not None and current_line == previous_line and previous_odds is not None and current_odds == previous_odds and history:
+            if previous_line is not None and current_line == previous_line and previous_odds is not None and current_odds == previous_odds and previous_snapshot_ts == row_snapshot_ts and history:
                 markets[market_key] = market_state
                 continue
 
@@ -719,6 +759,7 @@ def _sync_odds_history_for_refresh(*, sport: str, source_root: Path, date_str: s
                     "previous_line": previous_line,
                     "current_line": current_line,
                     "last_odds": current_odds,
+                    "snapshot_ts": row_snapshot_ts,
                     "delta": delta,
                     "delta_line": delta,
                     "percent_change": percent_change,
@@ -734,6 +775,7 @@ def _sync_odds_history_for_refresh(*, sport: str, source_root: Path, date_str: s
             market_state["last_line"] = current_line
             market_state["previous_line"] = previous_line
             market_state["last_odds"] = current_odds
+            market_state["last_snapshot_ts"] = row_snapshot_ts
             market_state["delta"] = delta
             market_state["delta_line"] = delta
             market_state["percent_change"] = percent_change
