@@ -1,5 +1,12 @@
 # Fix Notes Log
 
+## 2026-07-01 - MLB odds history skipped odds-only refreshes
+- Symptom: The MLB cards surface kept showing the same odds update time even though the daily update and live refresh paths were still running.
+- Root cause: The odds-history sync only treated line changes as refreshes, so a market price move with the same line was ignored and the long-lived odds artifact never advanced.
+- Fix: Update the odds-history sync to treat a line-or-odds change as a new refresh entry, so the shared odds artifact advances whenever the scheduled updater captures a new price.
+- Validation: A focused regression now proves a same-line odds change appends a second history entry, and the live MLB cards API returns 200 with tracked game line metadata present.
+- Follow-up: Keep the odds-history sync and MLB card freshness labels aligned whenever the refresh contract changes.
+
 ## 2026-07-01 - MLB odds cadence was still configured for 30 seconds
 - Symptom: The live MLB page showed odds timestamps stuck at the morning refresh time instead of moving on the expected one-minute cadence.
 - Root cause: Render and MLB refresh defaults still used 30-second odds/report intervals in several service blocks and worker fallbacks, so the deployed contract did not match the 60-second expectation.

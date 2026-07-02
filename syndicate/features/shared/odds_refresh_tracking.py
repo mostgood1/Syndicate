@@ -585,7 +585,7 @@ def _sync_odds_history_for_refresh(*, sport: str, source_root: Path, date_str: s
     count_live = 0
     count_pregame = 0
     files_scanned = 0
-    seen_current_lines: set[tuple[str, float]] = set()
+    seen_current_snapshots: set[tuple[str, float, float | None]] = set()
     lifecycle_events: list[dict[str, Any]] = []
     seen_market_keys: set[str] = set()
     seen_live_market_keys: set[str] = set()
@@ -610,10 +610,11 @@ def _sync_odds_history_for_refresh(*, sport: str, source_root: Path, date_str: s
             current_line = _primary_line_value(row)
             if not market_key or not line_snapshot or current_line is None:
                 continue
-            dedupe_key = (market_key, current_line)
-            if dedupe_key in seen_current_lines:
+            current_odds = _primary_odds_value(row)
+            dedupe_key = (market_key, current_line, current_odds)
+            if dedupe_key in seen_current_snapshots:
                 continue
-            seen_current_lines.add(dedupe_key)
+            seen_current_snapshots.add(dedupe_key)
             seen_market_keys.add(market_key)
 
             market_state = markets.get(market_key)
@@ -626,8 +627,11 @@ def _sync_odds_history_for_refresh(*, sport: str, source_root: Path, date_str: s
             previous_line = _line_number(market_state.get("last_line"))
             if previous_line is None and history:
                 previous_line = _line_number((history[-1] or {}).get("current_line"))
+            previous_odds = _line_number(market_state.get("last_odds"))
+            if previous_odds is None and history:
+                previous_odds = _line_number((history[-1] or {}).get("last_odds"))
 
-            if previous_line is not None and current_line == previous_line and history:
+            if previous_line is not None and current_line == previous_line and previous_odds is not None and current_odds == previous_odds and history:
                 markets[market_key] = market_state
                 continue
 
@@ -665,7 +669,7 @@ def _sync_odds_history_for_refresh(*, sport: str, source_root: Path, date_str: s
                 market_type=canonical_record.get("market_type"),
                 entity=canonical_record.get("entity"),
                 line=current_line,
-                odds=_primary_odds_value(row),
+                odds=current_odds,
                 selection=str(row.get("selection") or "").strip() or None,
             )
             is_live_row = _is_live_odds_row(row, normalized_entry)
@@ -714,7 +718,7 @@ def _sync_odds_history_for_refresh(*, sport: str, source_root: Path, date_str: s
                     **canonical_record,
                     "previous_line": previous_line,
                     "current_line": current_line,
-                    "last_odds": _primary_odds_value(row),
+                    "last_odds": current_odds,
                     "delta": delta,
                     "delta_line": delta,
                     "percent_change": percent_change,
@@ -729,7 +733,7 @@ def _sync_odds_history_for_refresh(*, sport: str, source_root: Path, date_str: s
             market_state["history"] = history
             market_state["last_line"] = current_line
             market_state["previous_line"] = previous_line
-            market_state["last_odds"] = _primary_odds_value(row)
+            market_state["last_odds"] = current_odds
             market_state["delta"] = delta
             market_state["delta_line"] = delta
             market_state["percent_change"] = percent_change
@@ -770,7 +774,7 @@ def _sync_odds_history_for_refresh(*, sport: str, source_root: Path, date_str: s
         return {
             "ok": True,
             "skipped": True,
-            "reason": "no_line_changes",
+            "reason": "no_line_or_odds_changes",
             "sport": slug,
             "date": date_str,
             "history_path": str(history_path),
