@@ -1862,11 +1862,19 @@ def source_cards_api_payload(context: dict[str, Any]) -> dict[str, Any]:
     lineups_doc = load_json_file(lineups_path) if lineups_path else None
     game_lines_doc = load_json_file(game_lines_path) if game_lines_path else None
     shared_game_lines_doc = load_odds_history_payload_for_sport("mlb") if selected_date == today_iso else None
+    shared_game_lines_refreshed_at = None
     if isinstance(shared_game_lines_doc, dict):
         shared_game_lines_games = shared_game_lines_doc.get("games") if isinstance(shared_game_lines_doc.get("games"), list) else []
         shared_game_lines_date = str(shared_game_lines_doc.get("date") or shared_game_lines_doc.get("selected_date") or "").strip()
         shared_game_lines_mode = str(shared_game_lines_doc.get("mode") or shared_game_lines_doc.get("generation_mode") or "").strip().lower()
         shared_game_lines_retrieved_at = str(shared_game_lines_doc.get("retrieved_at") or shared_game_lines_doc.get("retrievedAt") or "").strip()
+        shared_game_lines_refreshed_at = _centralize_iso_timestamp(
+            shared_game_lines_doc.get("updated_at")
+            or shared_game_lines_doc.get("updatedAt")
+            or shared_game_lines_doc.get("last_updated")
+            or shared_game_lines_doc.get("lastUpdated")
+            or shared_game_lines_retrieved_at
+        )
         if shared_game_lines_games and (
             shared_game_lines_date in {"", selected_date}
             or shared_game_lines_mode in {"live", "refresh", "latest"}
@@ -1930,6 +1938,10 @@ def source_cards_api_payload(context: dict[str, Any]) -> dict[str, Any]:
                 else game
                 for game in games
             ]
+    if selected_date == today_iso and shared_game_lines_refreshed_at and (
+        latest_live_odds_refreshed_at is None or shared_game_lines_refreshed_at > latest_live_odds_refreshed_at
+    ):
+        latest_live_odds_refreshed_at = shared_game_lines_refreshed_at
     if selected_date == today_iso and latest_live_odds_refreshed_at and not str(latest_live_odds_refreshed_at).startswith(selected_date):
         latest_live_odds_refreshed_at = central_now().isoformat(timespec="seconds")
     for game in games:
