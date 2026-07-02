@@ -1,5 +1,40 @@
 # Fix Notes Log
 
+## 2026-07-02 - MLB freshness needed to live on the web service disk
+- Symptom: The 7/2 MLB UI stayed on the 7:18 AM odds state even after the 60-second freshness window had passed.
+- Root cause: The web service and refresh-worker service do not share a disk on Render, so the worker could refresh artifacts on its own mount without changing the files the UI actually reads. The web process also skipped the live refresh loop entirely.
+- Fix: Enable the MLB live refresh loop on the web service and let the web process own the 60-second refresh cadence so the refreshed artifacts land on the same disk the UI serves.
+- Validation: `syndicate/app.py` now starts the live refresh loop without the Render-web early return, `render.yaml` enables `SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP=true` for the web service, and the app file passed error checking.
+- Follow-up: Redeploy Render and verify that a fresh `/mlb/cards?date=2026-07-02` request advances the odds timestamp beyond 7:18 AM and that the page badge matches the API payload.
+
+## 2026-07-02 - MLB odds were stale at 10:42 AM on Render
+- Symptom: The 7/2 MLB page was still showing the 7:18 AM odds timestamp at 10:42 AM, so pregame and live odds were not advancing on the deployed UI.
+- Root cause: The live 60-second refresh loop is intentionally skipped on the Render web dyno in `app.py`, so the browser-facing service is serving the last persisted snapshot rather than running the refresh cadence itself.
+- Fix: None yet; the current behavior confirms the deployed UI depends on the external refresh job / worker artifacts instead of the web process self-refreshing.
+- Validation: The deployed `/mlb/api/cards?date=2026-07-02` payload still reported `marketAvailability.gameLines.retrievedAt=2026-07-02T07:18:51.166874`, `pitcherProps.retrievedAt=2026-07-02T07:18:52.272778`, and `hitterProps.retrievedAt=2026-07-02T07:18:53.509467`, and the rendered page still showed `Odds updated 7/2, 7:18 AM`.
+- Follow-up: Move or mirror the refresh ownership to the worker path that is expected to run every 60 seconds, or explicitly enable the live loop on the service that should own freshness.
+
+## 2026-07-02 - MLB 7/2 freshness trace matched the rendered UI
+- Symptom: There was concern that the 7/2 MLB odds state might still be stale on Render even though the daily update GitHub Action had already run.
+- Root cause: The apparent mismatch was a timestamp interpretation issue, not a broken read path; the deployed MLB payload was serving a later 7/2 snapshot, while the raw times were being compared against the worker run clock.
+- Fix: Treat the MLB cards API as the source of truth for the lane stamps and verify each lane independently against the rendered page: game lines, pitcher props, and hitter props.
+- Validation: The deployed `/mlb/api/cards?date=2026-07-02` payload reported `marketAvailability.gameLines.retrievedAt=2026-07-02T07:18:51.166874`, `pitcherProps.retrievedAt=2026-07-02T07:18:52.272778`, and `hitterProps.retrievedAt=2026-07-02T07:18:53.509467`; the rendered `/mlb/cards?date=2026-07-02` page showed `Odds updated 7/2, 7:18 AM` and the same 9-game slate.
+- Follow-up: Keep the UI badge and the lane summaries tied to the same snapshot contract, and treat any future offset confusion as a timezone-labeling issue until the write/read chain is proven broken.
+
+## 2026-07-02 - MLB is the contract model for the shared live-lens shape
+- Symptom: The cross-sport live-lens and odds surfaces were being compared for contract consistency, but the reference model was not explicit.
+- Root cause: Each sport uses its own artifact source shape, so the shared contract had drifted into sport-specific implementations rather than one clearly documented canonical pattern.
+- Fix: Treat MLB as the canonical contract model for persisted snapshot backing, freshness timestamps, stable empty-state behavior, and card-to-lens consistency; keep WNBA and NBA aligned to that pattern before considering broader refactors.
+- Validation: Live MLB cards rendered with the expected slate summary, odds timestamp, and playable rows, and the WNBA/NBA surfaces were confirmed to be the closest match to the same artifact-backed model.
+- Follow-up: Do not standardize the shared contract until MLB remains healthy through the same validation path and the remaining sports are mapped against the canonical fields.
+
+## 2026-07-02 - WNBA source cards dropped worker-built odds
+- Symptom: The WNBA `/api/source/cards` payload showed games, but the betting fields were blank and the card surface rendered `-` for moneyline, spread, and total.
+- Root cause: The source-card builder was only hydrating matchup rows from artifacts; it was not merging the worker-built live-lines artifact back into the game rows before returning the endpoint.
+- Fix: Merge the WNBA live-lines artifact into each matching source-card game by event id, then recompute the betting block so the endpoint carries the worker-built odds values through to the UI.
+- Validation: `python -m pytest tests/test_wnba_cards_merge_aliases.py -q` passed with coverage for artifact-backed game rows and live-lines odds hydration.
+- Follow-up: Keep WNBA source-card hydration aligned with the worker-built live-lines artifact contract if that payload shape changes.
+
 ## 2026-07-02 - WNBA slate fell back to the prior board instead of today's games
 - Symptom: The WNBA cards route showed the last stored slate or a stale "no slate" state for 2026-07-02 even though the current day had games available.
 - Root cause: WNBA source selection was still letting the ESPN schedule probe and stored-slate fallback decide the active board before the public-scoreboard path could hydrate today's slate, and artifact loading could be short-circuited by the same live gate.

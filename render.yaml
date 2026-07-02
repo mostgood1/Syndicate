@@ -90,7 +90,7 @@ services:
       - key: SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP
         value: "false"
       - key: SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP
-        value: "false"
+        value: "true"
       - key: SYNDICATE_BOOTSTRAP_WNBA_TODAY
         value: "1"
       - key: SYNDICATE_LIVE_ODDS_REFRESH_INTERVAL_SECONDS

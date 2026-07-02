@@ -109,6 +109,90 @@ class WnbaCardsMergeAliasTests(unittest.TestCase):
         self.assertEqual(len(bundle.get("rows") or []), 1)
         self.assertEqual((bundle.get("rows") or [{}])[0].get("away_tri"), "LAS")
 
+    def test_source_cards_payload_hydrates_betting_from_live_lines_artifact(self) -> None:
+        artifact_bundle = {
+            "rows": [
+                {
+                    "away_tri": "LAS",
+                    "home_tri": "IND",
+                    "visitor_team": "Las Vegas Aces",
+                    "home_team": "Indiana Fever",
+                    "gamePk": "401857500",
+                    "event_id": "401857500",
+                    "commence_time": "2026-07-02T23:00:00Z",
+                }
+            ],
+            "recommendations": {},
+            "sim": {},
+            "props": {},
+        }
+        live_lines_payload = {
+            "ok": True,
+            "date": "2026-07-02",
+            "odds_refreshed_at": "2026-07-02T09:09:00-05:00",
+            "games": [
+                {
+                    "event_id": "401857500",
+                    "found": True,
+                    "total": 167.5,
+                    "home_spread": -6.5,
+                    "away_spread": 6.5,
+                    "home_ml": -240,
+                    "away_ml": 196,
+                    "lines": {
+                        "total": 167.5,
+                        "home_spread": -6.5,
+                        "away_spread": 6.5,
+                        "home_ml": -240,
+                        "away_ml": 196,
+                    },
+                }
+            ],
+        }
+
+        with patch("syndicate.features.wnba.cards.central_today_iso", return_value="2026-07-02"), patch(
+            "syndicate.features.wnba.cards._artifact_bundle",
+            return_value=artifact_bundle,
+        ), patch(
+            "syndicate.features.wnba.cards._artifact_live_lines_payload",
+            return_value=live_lines_payload,
+        ), patch(
+            "syndicate.features.wnba.cards._games_from_public_scoreboard",
+            return_value=([], "espn_scoreboard_fallback"),
+        ), patch(
+            "syndicate.features.wnba.cards._supplement_games_with_live_state",
+            return_value=([
+                {
+                    "gamePk": "401857500",
+                    "event_id": "401857500",
+                    "away_tri": "LAS",
+                    "home_tri": "IND",
+                    "away_name": "Las Vegas Aces",
+                    "home_name": "Indiana Fever",
+                    "away": {"abbr": "LAS", "name": "Las Vegas Aces"},
+                    "home": {"abbr": "IND", "name": "Indiana Fever"},
+                    "status": "Scheduled",
+                    "detail": "Scheduled",
+                    "odds": {"commence_time": "2026-07-02T23:00:00Z"},
+                    "betting": {
+                        "total": 167.5,
+                        "home_spread": -6.5,
+                        "away_spread": 6.5,
+                        "home_ml": -240,
+                        "away_ml": 196,
+                    },
+                }
+            ], None, 0, 0),
+        ):
+            payload = build_source_cards_payload("2026-07-02", allow_stored_date_fallback=True)
+
+        game = (payload.get("games") or [{}])[0]
+        betting = game.get("betting") if isinstance(game, dict) else {}
+        self.assertEqual(betting.get("total"), 167.5)
+        self.assertEqual(betting.get("home_spread"), -6.5)
+        self.assertEqual(betting.get("home_ml"), -240)
+        self.assertEqual(betting.get("away_ml"), 196)
+
     def test_source_cards_payload_uses_public_scoreboard_for_today_when_artifacts_are_missing(self) -> None:
         public_games = [
             {

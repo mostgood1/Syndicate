@@ -1249,6 +1249,41 @@ def _source_game_from_row(
     }
 
 
+def _hydrate_source_game_with_live_lines(
+    game: dict[str, Any],
+    live_lines_game: dict[str, Any],
+    *,
+    odds_refreshed_at: str | None = None,
+) -> dict[str, Any]:
+    if not isinstance(game, dict) or not isinstance(live_lines_game, dict):
+        return dict(game) if isinstance(game, dict) else {}
+
+    merged = dict(game)
+    for key in ("total", "home_spread", "away_spread", "home_ml", "away_ml", "found"):
+        value = live_lines_game.get(key)
+        if value is not None:
+            merged[key] = value
+
+    live_lines = live_lines_game.get("lines") if isinstance(live_lines_game.get("lines"), dict) else {}
+    if live_lines:
+        merged_lines = dict(merged.get("lines") if isinstance(merged.get("lines"), dict) else {})
+        for key, value in live_lines.items():
+            if key not in merged_lines or merged_lines.get(key) is None:
+                merged_lines[key] = value
+        merged["lines"] = merged_lines
+
+    merged_odds = dict(merged.get("odds") if isinstance(merged.get("odds"), dict) else {})
+    for key in ("total", "home_spread", "away_spread", "home_ml", "away_ml"):
+        if merged_odds.get(key) is None and merged.get(key) is not None:
+            merged_odds[key] = merged.get(key)
+    if odds_refreshed_at:
+        merged_odds["odds_refreshed_at"] = odds_refreshed_at
+        merged["odds_refreshed_at"] = odds_refreshed_at
+    merged["odds"] = merged_odds
+    merged["betting"] = _source_betting(merged)
+    return merged
+
+
 def build_source_cards_payload(selected_date: str, *, allow_stored_date_fallback: bool = False) -> dict[str, Any]:
     requested_date = str(selected_date or "").strip() or parse_iso_date(selected_date).isoformat()
     resolved_date = _resolved_source_cards_date(selected_date, allow_stored_date_fallback=allow_stored_date_fallback)
@@ -1260,6 +1295,8 @@ def build_source_cards_payload(selected_date: str, *, allow_stored_date_fallback
     rec_index = bundle["recommendations"]
     sim_index = bundle["sim"]
     props_index = bundle["props"]
+    odds_refreshed_at: str | None = None
+    live_lines_by_event: dict[str, dict[str, Any]] = {}
     used_public_scoreboard_fallback = False
     games = [
         _source_game_from_row(
@@ -1272,6 +1309,25 @@ def build_source_cards_payload(selected_date: str, *, allow_stored_date_fallback
         )
         for idx, row in enumerate(rows, start=1)
     ]
+    event_ids = [str(game.get("event_id") or "").strip() for game in games if str(game.get("event_id") or "").strip()]
+    if event_ids:
+        live_lines_payload = _artifact_live_lines_payload(
+            resolved_date,
+            event_ids,
+            include_period_totals=True,
+            allow_stored_date_fallback=allow_stored_date_fallback,
+        )
+        live_lines_by_event = _payload_games_by_event_id(live_lines_payload)
+        odds_refreshed_at = str((live_lines_payload or {}).get("odds_refreshed_at") or "").strip() or None
+        if live_lines_by_event:
+            games = [
+                _hydrate_source_game_with_live_lines(
+                    game,
+                    live_lines_by_event.get(str(game.get("event_id") or "").strip()) or {},
+                    odds_refreshed_at=odds_refreshed_at,
+                )
+                for game in games
+            ]
     if not games and resolved_date == central_today_iso():
         public_games, _ = _games_from_public_scoreboard(resolved_date)
         if public_games:
@@ -1279,6 +1335,13 @@ def build_source_cards_payload(selected_date: str, *, allow_stored_date_fallback
             used_public_scoreboard_fallback = True
     if resolved_date == central_today_iso() and not used_public_scoreboard_fallback:
         games, _, _, _ = _supplement_games_with_live_state(games, resolved_date)
+    if odds_refreshed_at:
+        for game in games:
+            if not isinstance(game, dict):
+                continue
+            event_id = str(game.get("event_id") or "").strip()
+            if event_id and (not live_lines_by_event or event_id in live_lines_by_event):
+                game["odds_refreshed_at"] = odds_refreshed_at
     return {
         "date": resolved_date,
         "requested_date": requested_date,
