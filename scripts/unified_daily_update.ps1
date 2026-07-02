@@ -3521,7 +3521,16 @@ function Invoke-GitPublish {
             throw "git ls-files failed for $RepoPath with exit code $LASTEXITCODE"
         }
         foreach ($relativePath in @($appendOnlyChangePaths | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Sort-Object -Unique)) {
-            & git add -- $relativePath
+            & git check-ignore -q -- $relativePath
+            if ($LASTEXITCODE -eq 0) {
+                & git add -f -- $relativePath
+            }
+            elseif ($LASTEXITCODE -eq 1) {
+                & git add -- $relativePath
+            }
+            else {
+                throw "git check-ignore failed for $RepoPath path $relativePath with exit code $LASTEXITCODE"
+            }
             if ($LASTEXITCODE -ne 0) {
                 throw "git add failed for $RepoPath path $relativePath with exit code $LASTEXITCODE"
             }

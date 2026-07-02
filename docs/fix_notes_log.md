@@ -1,5 +1,19 @@
 # Fix Notes Log
 
+## 2026-07-02 - Incremental daily-update publishes failed on ignored MLB artifact paths
+- Symptom: The daily update kept aborting during artifact publish with `git add failed` on `data/mlb_source/data/eval/seasons/2026/season_betting_cards_retuned_manifest.json` after the run had already produced the MLB bundle.
+- Root cause: The incremental publisher was sending newly generated artifact paths through the normal `git add` loop, but some owned MLB artifacts live under ignored trees and need to be force-added when they appear in the update set.
+- Fix: Teach `scripts/unified_daily_update.ps1` to run `git check-ignore` for each incremental path and switch ignored paths to `git add -f` while keeping the explicit force-include lane intact.
+- Validation: Added a regression in `tests/test_unified_daily_update_incremental_artifact_generation.py` to cover the ignored-path force-add contract.
+- Follow-up: Keep documenting any repeated artifact-publish failures here so the next edit does not rediscover the same ignored-path staging rule.
+
+## 2026-07-02 - MLB live-lens kept serving stale current-day reports
+- Symptom: The MLB live-lens page and API could keep showing an older non-empty report for today instead of refreshing live projections and interval recommendations.
+- Root cause: The Syndicate live-lens wrapper only refreshed empty current-day snapshots, so a stale but populated report could keep winning the read path.
+- Fix: Add a current-day report freshness check based on report age, and rebuild stale reports through the persisted live-lens path before serving page or API context.
+- Validation: `py -3 -m pytest tests/test_mlb_refresh_runner.py -k refreshes_stale_current_day_report -q` passed.
+- Follow-up: Keep the wrapper aligned with the vendor report-age contract if the live-lens refresh interval or max-age setting changes.
+
 ## 2026-07-02 - WNBA artifacts were skipped when git push was disabled
 - Symptom: The 2026-07-02 daily update completed, but the WNBA date-stamped artifact bundle never appeared where Render expects it.
 - Root cause: `scripts/unified_daily_update.ps1` tied `artifactGeneration` to `SkipGitPush`, so no-push runs could mark the artifact stage skipped instead of materializing and publishing the WNBA bundle.

@@ -16,6 +16,15 @@ class UnifiedDailyUpdateIncrementalArtifactGenerationTests(unittest.TestCase):
         self.assertIn("Artifact stage incremental: publishing {0} updated event artifact(s).", content)
         self.assertIn("-ForceIncludePaths $artifactUpdatePaths", content)
 
+    def test_incremental_publish_force_adds_ignored_artifact_paths(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        script_path = repo_root / "scripts" / "unified_daily_update.ps1"
+        content = script_path.read_text(encoding="utf-8")
+
+        self.assertIn("git check-ignore -q -- $relativePath", content)
+        self.assertIn("git add -f -- $relativePath", content)
+        self.assertIn("git add -- $relativePath", content)
+
     def test_no_events_changed_skips_artifact_stage(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]
         script_path = repo_root / "scripts" / "unified_daily_update.ps1"
