@@ -242,6 +242,52 @@ class DateArchiveHelperTests(unittest.TestCase):
         self.assertEqual(((tracked.get("totals") or {}).get("line")), 9.5)
         self.assertEqual((((tracked.get("segments") or {}).get("first5") or {}).get("totals") or {}).get("line"), 5.5)
 
+    def test_mlb_cards_api_payload_prefers_shared_odds_history_for_today(self) -> None:
+        today_date = date.today().isoformat()
+        context = {
+            "date": today_date,
+            "prev_date": today_date,
+            "next_date": today_date,
+            "games": [
+                {
+                    "gamePk": 824834,
+                    "away": {"abbr": "TOR", "name": "Toronto Blue Jays"},
+                    "home": {"abbr": "BAL", "name": "Baltimore Orioles"},
+                    "markets": {},
+                }
+            ],
+            "scoreboard_items": [],
+            "source_path": "artifact.json",
+            "using_sample_data": False,
+            "board_contract": {},
+        }
+
+        shared_payload = {
+            "date": today_date,
+            "mode": "live",
+            "retrieved_at": "2026-07-01T08:15:00Z",
+            "games": [
+                {
+                    "away_team": "Toronto Blue Jays",
+                    "home_team": "Baltimore Orioles",
+                    "markets": {
+                        "h2h": {"home_odds": "-110", "away_odds": "-105"},
+                        "totals": {"line": 8.5, "over_odds": "-108", "under_odds": "-112"},
+                    },
+                }
+            ],
+        }
+
+        with patch("syndicate.features.mlb.cards.load_json_file", return_value=None), patch(
+            "syndicate.features.mlb.cards.load_odds_history_payload_for_sport",
+            return_value=shared_payload,
+        ):
+            payload = source_cards_api_payload(context)
+
+        tracked = ((payload.get("games") or [{}])[0].get("trackedGameLines") or {})
+        self.assertEqual(((tracked.get("totals") or {}).get("line")), 8.5)
+        self.assertEqual(tracked.get("retrievedAt"), "2026-07-01T08:15:00Z")
+
     def test_mlb_cards_source_js_computed_lens_rows_preserve_live_actual_segment(self) -> None:
         content = (REPO_ROOT / "syndicate" / "static" / "mlb" / "cards_source.js").read_text(encoding="utf-8")
 

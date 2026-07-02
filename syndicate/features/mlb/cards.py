@@ -37,6 +37,7 @@ from syndicate.features.mlb.sources import market_refresh_history_oddsapi_path
 from syndicate.features.mlb.sources import raw_feed_live_path
 from syndicate.features.mlb.sources import load_json_or_gz_file
 from syndicate.features.mlb.sources import load_json_file
+from syndicate.features.shared.odds_control_plane import load_odds_history_payload_for_sport
 from syndicate.features.shared.timezone import CENTRAL_TIMEZONE
 from syndicate.features.shared.timezone import central_now
 from syndicate.features.shared.timezone import central_today
@@ -1860,6 +1861,18 @@ def source_cards_api_payload(context: dict[str, Any]) -> dict[str, Any]:
     ops_report_path = daily_ops_report_path(selected_date) if selected_date else None
     lineups_doc = load_json_file(lineups_path) if lineups_path else None
     game_lines_doc = load_json_file(game_lines_path) if game_lines_path else None
+    shared_game_lines_doc = load_odds_history_payload_for_sport("mlb") if selected_date == today_iso else None
+    if isinstance(shared_game_lines_doc, dict):
+        shared_game_lines_games = shared_game_lines_doc.get("games") if isinstance(shared_game_lines_doc.get("games"), list) else []
+        shared_game_lines_date = str(shared_game_lines_doc.get("date") or shared_game_lines_doc.get("selected_date") or "").strip()
+        shared_game_lines_mode = str(shared_game_lines_doc.get("mode") or shared_game_lines_doc.get("generation_mode") or "").strip().lower()
+        shared_game_lines_retrieved_at = str(shared_game_lines_doc.get("retrieved_at") or shared_game_lines_doc.get("retrievedAt") or "").strip()
+        if shared_game_lines_games and (
+            shared_game_lines_date in {"", selected_date}
+            or shared_game_lines_mode in {"live", "refresh", "latest"}
+            or shared_game_lines_retrieved_at
+        ):
+            game_lines_doc = shared_game_lines_doc
     pitcher_props_doc = load_json_file(pitcher_props_path) if pitcher_props_path else None
     hitter_props_doc = load_json_file(hitter_props_path) if hitter_props_path else None
     ops_report_doc = load_json_file(ops_report_path) if ops_report_path else None
