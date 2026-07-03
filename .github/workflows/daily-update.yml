@@ -139,31 +139,31 @@ jobs:
             )
           }
 
-          if ([string]::IsNullOrWhiteSpace($env:BASE_URL)) {
-            & ./scripts/daily_update_in_season.ps1 `
-              -Date $env:DATE `
-              -RefreshOdds `
-              -OddsPhase all `
-              -OddsSports all `
-              -OddsRegions us `
-              -SkipGitPush `
-              $(if ($activeSports.Count -gt 0) { @('-ActiveSports') + $activeSports }) `
-              $(if ($forceRebuildToday) { '-ForceRebuildToday' }) `
-              -EventSimForceWindowMinutes $forceWindowMinutes 2>&1 | Tee-Object -FilePath daily-update.log
+          $dailyArgs = @(
+            '-Date', $env:DATE
+            '-RefreshOdds'
+            '-OddsPhase', 'all'
+            '-OddsSports', 'all'
+            '-OddsRegions', 'us'
+            '-SkipGitPush'
+            '-EventSimForceWindowMinutes', $forceWindowMinutes
+          )
+
+          if (-not [string]::IsNullOrWhiteSpace($env:BASE_URL)) {
+            $dailyArgs += @('-BaseUrl', $env:BASE_URL)
           }
-          else {
-            & ./scripts/daily_update_in_season.ps1 `
-              -Date $env:DATE `
-              -BaseUrl $env:BASE_URL `
-              -RefreshOdds `
-              -OddsPhase all `
-              -OddsSports all `
-              -OddsRegions us `
-              -SkipGitPush `
-              $(if ($activeSports.Count -gt 0) { @('-ActiveSports') + $activeSports }) `
-              $(if ($forceRebuildToday) { '-ForceRebuildToday' }) `
-              -EventSimForceWindowMinutes $forceWindowMinutes 2>&1 | Tee-Object -FilePath daily-update.log
+
+          if ($activeSports.Count -gt 0) {
+            $dailyArgs += '-ActiveSports'
+            $dailyArgs += $activeSports
           }
+
+          if ($forceRebuildToday) {
+            $dailyArgs += '-ForceRebuildToday'
+          }
+
+          Write-Host "Invoking: ./scripts/daily_update_in_season.ps1 $($dailyArgs -join ' ')"
+          & ./scripts/daily_update_in_season.ps1 @dailyArgs 2>&1 | Tee-Object -FilePath daily-update.log
 
           $exitCode = $LASTEXITCODE
           Write-Host "scripts/daily_update.ps1 exited with code $exitCode"
@@ -175,7 +175,6 @@ jobs:
         shell: pwsh
         run: |
           $repoRoot = (Get-Location).Path
-
           function Convert-ToRelativeGitPath {
             param([string]$FullPath)
 
