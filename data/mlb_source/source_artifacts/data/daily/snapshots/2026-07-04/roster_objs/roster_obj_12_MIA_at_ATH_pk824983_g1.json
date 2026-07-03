@@ -4315,6 +4315,105 @@
         },
         {
           "player": {
+            "mlbam_id": 660761,
+            "full_name": "Jos\u00e9 Suarez",
+            "primary_position": "P",
+            "bat_side": "L",
+            "throw_side": "L"
+          },
+          "k_rate": 0.2406731946144431,
+          "bb_rate": 0.09993880048959607,
+          "hbp_rate": 0.015789473684210527,
+          "hr_rate": 0.02039779681762546,
+          "inplay_hit_rate": 0.4032644628099173,
+          "batters_faced": 190.0,
+          "balls_in_play": 121.0,
+          "arsenal": {
+            "FF": 0.37783711508811757,
+            "OTHER": 0.009345793878504679,
+            "CH": 0.24699599678905204,
+            "SI": 0.09345794378504674,
+            "SL": 0.26301735658077435,
+            "FC": 0.009345793878504679
+          },
+          "pitch_type_whiff_mult": {},
+          "pitch_type_inplay_mult": {},
+          "pitch_type_hr_mult": {},
+          "statcast_splits_source": "",
+          "statcast_splits_n_pitches": 0,
+          "statcast_splits_start_date": "",
+          "statcast_splits_end_date": "",
+          "arsenal_source": "statsapi_pitchArsenal",
+          "arsenal_sample_size": 749,
+          "stamina_pitches": 28,
+          "role": "MR",
+          "availability_mult": 1.0,
+          "platoon_mult_vs_lhb": {
+            "k": 1.0424739264005907,
+            "bb": 0.9255997066672715,
+            "hr": 1.1157702807317769,
+            "inplay": 0.9483368409436654
+          },
+          "platoon_mult_vs_rhb": {
+            "k": 0.9741414158851883,
+            "bb": 1.1063649949156449,
+            "hr": 0.78,
+            "inplay": 1.0825190719529059
+          },
+          "venue_mult_home": {
+            "k": 0.9855971191499849,
+            "bb": 0.9493284867136674,
+            "hr": 1.0899670736304399,
+            "inplay": 1.072831258982504
+          },
+          "venue_mult_away": {
+            "k": 1.0285045133792068,
+            "bb": 1.1225,
+            "hr": 0.86,
+            "inplay": 0.9123934495766579
+          },
+          "vs_venue_hr_mult": {
+            "144": 0.86,
+            "133": 1.175
+          },
+          "vs_venue_k_mult": {
+            "144": 1.0522405186974997,
+            "133": 0.9408508365966536
+          },
+          "vs_venue_bb_mult": {
+            "144": 1.1225,
+            "133": 0.8775000000000001
+          },
+          "vs_venue_inplay_mult": {
+            "144": 1.1225,
+            "133": 0.9903595273543376
+          },
+          "vs_venue_history": {
+            "144": {
+              "bf": 47.0,
+              "k_mult": 1.1492586248499992,
+              "bb_mult": 1.35,
+              "hr_mult": 0.6,
+              "inplay_mult": 1.35
+            },
+            "133": {
+              "bf": 70.0,
+              "k_mult": 0.8310023902761532,
+              "bb_mult": 0.65,
+              "hr_mult": 1.5,
+              "inplay_mult": 0.9724557924409647
+            }
+          },
+          "statcast_quality_mult": {},
+          "bb_gb_rate": 0.44,
+          "bb_fb_rate": 0.25,
+          "bb_ld_rate": 0.2,
+          "bb_pu_rate": 0.11,
+          "bb_inplay_n": 0,
+          "leverage_skill": 0.5
+        },
+        {
+          "player": {
             "mlbam_id": 686993,
             "full_name": "Justin Sterner",
             "primary_position": "P",
@@ -4647,74 +4746,6 @@
               "inplay_mult": 0.8898435102792268
             }
           },
-          "statcast_quality_mult": {},
-          "bb_gb_rate": 0.44,
-          "bb_fb_rate": 0.25,
-          "bb_ld_rate": 0.2,
-          "bb_pu_rate": 0.11,
-          "bb_inplay_n": 0,
-          "leverage_skill": 0.5
-        },
-        {
-          "player": {
-            "mlbam_id": 640454,
-            "full_name": "Matt Krook",
-            "primary_position": "P",
-            "bat_side": "L",
-            "throw_side": "L"
-          },
-          "k_rate": 0.2222222222222222,
-          "bb_rate": 0.2222222222222222,
-          "hbp_rate": 0.0,
-          "hr_rate": 0.0,
-          "inplay_hit_rate": 0.2,
-          "batters_faced": 9.0,
-          "balls_in_play": 5.0,
-          "arsenal": {
-            "OTHER": 0.5581395432558136,
-            "SI": 0.4418604567441863
-          },
-          "pitch_type_whiff_mult": {},
-          "pitch_type_inplay_mult": {},
-          "pitch_type_hr_mult": {},
-          "statcast_splits_source": "",
-          "statcast_splits_n_pitches": 0,
-          "statcast_splits_start_date": "",
-          "statcast_splits_end_date": "",
-          "arsenal_source": "statsapi_pitchArsenal",
-          "arsenal_sample_size": 43,
-          "stamina_pitches": 25,
-          "role": "MR",
-          "availability_mult": 1.0,
-          "platoon_mult_vs_lhb": {
-            "k": 1.06875,
-            "bb": 1.06875,
-            "hr": 1.0,
-            "inplay": 0.8075
-          },
-          "platoon_mult_vs_rhb": {
-            "k": 0.9450000000000001,
-            "bb": 0.9450000000000001,
-            "hr": 1.0,
-            "inplay": 1.1925000000000001
-          },
-          "venue_mult_home": {
-            "k": 0.8775000000000001,
-            "bb": 1.1225,
-            "hr": 1.0,
-            "inplay": 0.8775000000000001
-          },
-          "venue_mult_away": {
-            "k": 1.1225,
-            "bb": 0.9125,
-            "hr": 1.0,
-            "inplay": 1.1225
-          },
-          "vs_venue_hr_mult": {},
-          "vs_venue_k_mult": {},
-          "vs_venue_bb_mult": {},
-          "vs_venue_inplay_mult": {},
-          "vs_venue_history": {},
           "statcast_quality_mult": {},
           "bb_gb_rate": 0.44,
           "bb_fb_rate": 0.25,

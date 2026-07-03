@@ -1,30 +1,35 @@
 {
   "date": "2026-07-03",
-  "generatedAt": "2026-07-03T02:13:56-05:00",
+  "generatedAt": "2026-07-03T12:14:41-05:00",
   "summary": {
     "cards": 13,
-    "badges": 59,
+    "badges": 94,
     "sources": {
-      "none": 59
+      "none": 94
     },
     "tones": {
-      "solid": 23,
-      "strong": 26,
-      "soft": 10
+      "solid": 44,
+      "strong": 30,
+      "soft": 20
     },
     "stats": {
       "hits_allowed": {
-        "badges": 13,
-        "rungWins": 0,
-        "rungLosses": 0
-      },
-      "outs": {
         "badges": 24,
         "rungWins": 0,
         "rungLosses": 0
       },
+      "outs": {
+        "badges": 23,
+        "rungWins": 0,
+        "rungLosses": 0
+      },
       "strikeouts": {
-        "badges": 22,
+        "badges": 23,
+        "rungWins": 0,
+        "rungLosses": 0
+      },
+      "walks_allowed": {
+        "badges": 24,
         "rungWins": 0,
         "rungLosses": 0
       }
@@ -70,7 +75,7 @@
       "status": "",
       "side": "away",
       "starter": "Andre Pallante",
-      "label": "O 17/18",
+      "label": "O 19/20",
       "stat": "outs",
       "tone": "strong",
       "source": "none",
@@ -79,10 +84,10 @@
       "losses": 0,
       "targetCount": 2,
       "targets": [
-        17,
-        18
+        19,
+        20
       ],
-      "detail": "Supported ladders: 17/18 Last supported rung: 18"
+      "detail": "Supported ladders: 19/20 Last supported rung: 20"
     },
     {
       "gamePk": 824659,
@@ -105,6 +110,25 @@
         9
       ],
       "detail": "Supported ladders: 6/7/8/9 Last supported rung: 9"
+    },
+    {
+      "gamePk": 824659,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "away",
+      "starter": "Andre Pallante",
+      "label": "BB up to 3",
+      "stat": "walks_allowed",
+      "tone": "solid",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 1,
+      "targets": [
+        3
+      ],
+      "detail": "Supported ladders: 3 Last supported rung: 3"
     },
     {
       "gamePk": 822714,
@@ -147,6 +171,48 @@
         19
       ],
       "detail": "Supported ladders: 18/19 Last supported rung: 19"
+    },
+    {
+      "gamePk": 822714,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "away",
+      "starter": "Mitch Keller",
+      "label": "H up to 9",
+      "stat": "hits_allowed",
+      "tone": "soft",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 4,
+      "targets": [
+        6,
+        7,
+        8,
+        9
+      ],
+      "detail": "Supported ladders: 6/7/8/9 Last supported rung: 9"
+    },
+    {
+      "gamePk": 822714,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "away",
+      "starter": "Mitch Keller",
+      "label": "BB up to 3",
+      "stat": "walks_allowed",
+      "tone": "solid",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 2,
+      "targets": [
+        2,
+        3
+      ],
+      "detail": "Supported ladders: 2/3 Last supported rung: 3"
     },
     {
       "gamePk": 822714,
@@ -210,6 +276,26 @@
       "detail": "Supported ladders: 6/7/8/9 Last supported rung: 9"
     },
     {
+      "gamePk": 822714,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "home",
+      "starter": "Foster Griffin",
+      "label": "BB up to 3",
+      "stat": "walks_allowed",
+      "tone": "solid",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 2,
+      "targets": [
+        2,
+        3
+      ],
+      "detail": "Supported ladders: 2/3 Last supported rung: 3"
+    },
+    {
       "gamePk": 823527,
       "matchup": "? @ ?",
       "status": "",
@@ -249,6 +335,47 @@
         17
       ],
       "detail": "Supported ladders: 16/17 Last supported rung: 17"
+    },
+    {
+      "gamePk": 823527,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "away",
+      "starter": "Mike Paredes",
+      "label": "H up to 8",
+      "stat": "hits_allowed",
+      "tone": "solid",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 3,
+      "targets": [
+        6,
+        7,
+        8
+      ],
+      "detail": "Supported ladders: 6/7/8 Last supported rung: 8"
+    },
+    {
+      "gamePk": 823527,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "away",
+      "starter": "Mike Paredes",
+      "label": "BB up to 3",
+      "stat": "walks_allowed",
+      "tone": "solid",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 2,
+      "targets": [
+        2,
+        3
+      ],
+      "detail": "Supported ladders: 2/3 Last supported rung: 3"
     },
     {
       "gamePk": 823527,
@@ -310,6 +437,26 @@
         8
       ],
       "detail": "Supported ladders: 6/7/8 Last supported rung: 8"
+    },
+    {
+      "gamePk": 823527,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "home",
+      "starter": "Gerrit Cole",
+      "label": "BB up to 3",
+      "stat": "walks_allowed",
+      "tone": "solid",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 2,
+      "targets": [
+        2,
+        3
+      ],
+      "detail": "Supported ladders: 2/3 Last supported rung: 3"
     },
     {
       "gamePk": 824417,
@@ -378,6 +525,25 @@
       "gamePk": 824417,
       "matchup": "? @ ?",
       "status": "",
+      "side": "away",
+      "starter": "Anthony Kay",
+      "label": "BB up to 3",
+      "stat": "walks_allowed",
+      "tone": "solid",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 1,
+      "targets": [
+        3
+      ],
+      "detail": "Supported ladders: 3 Last supported rung: 3"
+    },
+    {
+      "gamePk": 824417,
+      "matchup": "? @ ?",
+      "status": "",
       "side": "home",
       "starter": "Gavin Williams",
       "label": "K up to 7",
@@ -414,6 +580,49 @@
       "detail": "Supported ladders: 19/20 Last supported rung: 20"
     },
     {
+      "gamePk": 824417,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "home",
+      "starter": "Gavin Williams",
+      "label": "H up to 9",
+      "stat": "hits_allowed",
+      "tone": "soft",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 5,
+      "targets": [
+        5,
+        6,
+        7,
+        8,
+        9
+      ],
+      "detail": "Supported ladders: 5/6/7/8/9 Last supported rung: 9"
+    },
+    {
+      "gamePk": 824417,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "home",
+      "starter": "Gavin Williams",
+      "label": "BB up to 3",
+      "stat": "walks_allowed",
+      "tone": "solid",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 2,
+      "targets": [
+        2,
+        3
+      ],
+      "detail": "Supported ladders: 2/3 Last supported rung: 3"
+    },
+    {
       "gamePk": 824498,
       "matchup": "? @ ?",
       "status": "",
@@ -439,26 +648,6 @@
       "status": "",
       "side": "away",
       "starter": "Trevor Rogers",
-      "label": "O 18/19",
-      "stat": "outs",
-      "tone": "strong",
-      "source": "none",
-      "actual": null,
-      "wins": 0,
-      "losses": 0,
-      "targetCount": 2,
-      "targets": [
-        18,
-        19
-      ],
-      "detail": "Supported ladders: 18/19 Last supported rung: 19"
-    },
-    {
-      "gamePk": 824498,
-      "matchup": "? @ ?",
-      "status": "",
-      "side": "away",
-      "starter": "Trevor Rogers",
       "label": "H up to 9",
       "stat": "hits_allowed",
       "tone": "soft",
@@ -474,6 +663,26 @@
         9
       ],
       "detail": "Supported ladders: 6/7/8/9 Last supported rung: 9"
+    },
+    {
+      "gamePk": 824498,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "away",
+      "starter": "Trevor Rogers",
+      "label": "BB up to 3",
+      "stat": "walks_allowed",
+      "tone": "solid",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 2,
+      "targets": [
+        2,
+        3
+      ],
+      "detail": "Supported ladders: 2/3 Last supported rung: 3"
     },
     {
       "gamePk": 824498,
@@ -517,6 +726,49 @@
       "detail": "Supported ladders: 17/18 Last supported rung: 18"
     },
     {
+      "gamePk": 824498,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "home",
+      "starter": "Brady Singer",
+      "label": "H up to 10",
+      "stat": "hits_allowed",
+      "tone": "soft",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 5,
+      "targets": [
+        6,
+        7,
+        8,
+        9,
+        10
+      ],
+      "detail": "Supported ladders: 6/7/8/9/10 Last supported rung: 10"
+    },
+    {
+      "gamePk": 824498,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "home",
+      "starter": "Brady Singer",
+      "label": "BB up to 3",
+      "stat": "walks_allowed",
+      "tone": "solid",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 2,
+      "targets": [
+        2,
+        3
+      ],
+      "detail": "Supported ladders: 2/3 Last supported rung: 3"
+    },
+    {
       "gamePk": 824904,
       "matchup": "? @ ?",
       "status": "",
@@ -556,6 +808,49 @@
         17
       ],
       "detail": "Supported ladders: 16/17 Last supported rung: 17"
+    },
+    {
+      "gamePk": 824904,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "away",
+      "starter": "Christian Scott",
+      "label": "H up to 9",
+      "stat": "hits_allowed",
+      "tone": "solid",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 5,
+      "targets": [
+        5,
+        6,
+        7,
+        8,
+        9
+      ],
+      "detail": "Supported ladders: 5/6/7/8/9 Last supported rung: 9"
+    },
+    {
+      "gamePk": 824904,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "away",
+      "starter": "Christian Scott",
+      "label": "BB up to 3",
+      "stat": "walks_allowed",
+      "tone": "solid",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 2,
+      "targets": [
+        2,
+        3
+      ],
+      "detail": "Supported ladders: 2/3 Last supported rung: 3"
     },
     {
       "gamePk": 824904,
@@ -622,6 +917,47 @@
       "detail": "Supported ladders: 5/6/7/8/9 Last supported rung: 9"
     },
     {
+      "gamePk": 824904,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "home",
+      "starter": "Grant Holmes",
+      "label": "BB up to 3",
+      "stat": "walks_allowed",
+      "tone": "strong",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 1,
+      "targets": [
+        3
+      ],
+      "detail": "Supported ladders: 3 Last supported rung: 3"
+    },
+    {
+      "gamePk": 824336,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "home",
+      "starter": "Ryan Feltner",
+      "label": "K up to 7",
+      "stat": "strikeouts",
+      "tone": "solid",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 4,
+      "targets": [
+        4,
+        5,
+        6,
+        7
+      ],
+      "detail": "Supported ladders: 4/5/6/7 Last supported rung: 7"
+    },
+    {
       "gamePk": 824336,
       "matchup": "? @ ?",
       "status": "",
@@ -663,6 +999,26 @@
       "detail": "Supported ladders: 7/8/9 Last supported rung: 9"
     },
     {
+      "gamePk": 824336,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "home",
+      "starter": "Ryan Feltner",
+      "label": "BB up to 3",
+      "stat": "walks_allowed",
+      "tone": "solid",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 2,
+      "targets": [
+        2,
+        3
+      ],
+      "detail": "Supported ladders: 2/3 Last supported rung: 3"
+    },
+    {
       "gamePk": 824173,
       "matchup": "? @ ?",
       "status": "",
@@ -675,13 +1031,14 @@
       "actual": null,
       "wins": 0,
       "losses": 0,
-      "targetCount": 3,
+      "targetCount": 4,
       "targets": [
+        4,
         5,
         6,
         7
       ],
-      "detail": "Supported ladders: 5/6/7 Last supported rung: 7"
+      "detail": "Supported ladders: 4/5/6/7 Last supported rung: 7"
     },
     {
       "gamePk": 824173,
@@ -702,6 +1059,48 @@
         20
       ],
       "detail": "Supported ladders: 19/20 Last supported rung: 20"
+    },
+    {
+      "gamePk": 824173,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "away",
+      "starter": "Nick Martinez",
+      "label": "H up to 9",
+      "stat": "hits_allowed",
+      "tone": "soft",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 4,
+      "targets": [
+        6,
+        7,
+        8,
+        9
+      ],
+      "detail": "Supported ladders: 6/7/8/9 Last supported rung: 9"
+    },
+    {
+      "gamePk": 824173,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "away",
+      "starter": "Nick Martinez",
+      "label": "BB up to 3",
+      "stat": "walks_allowed",
+      "tone": "soft",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 2,
+      "targets": [
+        2,
+        3
+      ],
+      "detail": "Supported ladders: 2/3 Last supported rung: 3"
     },
     {
       "gamePk": 824173,
@@ -729,7 +1128,7 @@
       "status": "",
       "side": "home",
       "starter": "Spencer Arrighetti",
-      "label": "O 18/19",
+      "label": "O 17/18",
       "stat": "outs",
       "tone": "strong",
       "source": "none",
@@ -738,10 +1137,10 @@
       "losses": 0,
       "targetCount": 2,
       "targets": [
-        18,
-        19
+        17,
+        18
       ],
-      "detail": "Supported ladders: 18/19 Last supported rung: 19"
+      "detail": "Supported ladders: 17/18 Last supported rung: 18"
     },
     {
       "gamePk": 824173,
@@ -764,6 +1163,25 @@
         8
       ],
       "detail": "Supported ladders: 5/6/7/8 Last supported rung: 8"
+    },
+    {
+      "gamePk": 824173,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "home",
+      "starter": "Spencer Arrighetti",
+      "label": "BB up to 3",
+      "stat": "walks_allowed",
+      "tone": "solid",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 1,
+      "targets": [
+        3
+      ],
+      "detail": "Supported ladders: 3 Last supported rung: 3"
     },
     {
       "gamePk": 824013,
@@ -834,6 +1252,26 @@
       "gamePk": 824013,
       "matchup": "? @ ?",
       "status": "",
+      "side": "away",
+      "starter": "Jake Bennett",
+      "label": "BB up to 3",
+      "stat": "walks_allowed",
+      "tone": "soft",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 2,
+      "targets": [
+        2,
+        3
+      ],
+      "detail": "Supported ladders: 2/3 Last supported rung: 3"
+    },
+    {
+      "gamePk": 824013,
+      "matchup": "? @ ?",
+      "status": "",
       "side": "home",
       "starter": "Reid Detmers",
       "label": "K up to 7",
@@ -868,6 +1306,49 @@
         20
       ],
       "detail": "Supported ladders: 19/20 Last supported rung: 20"
+    },
+    {
+      "gamePk": 824013,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "home",
+      "starter": "Reid Detmers",
+      "label": "H up to 9",
+      "stat": "hits_allowed",
+      "tone": "soft",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 5,
+      "targets": [
+        5,
+        6,
+        7,
+        8,
+        9
+      ],
+      "detail": "Supported ladders: 5/6/7/8/9 Last supported rung: 9"
+    },
+    {
+      "gamePk": 824013,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "home",
+      "starter": "Reid Detmers",
+      "label": "BB up to 3",
+      "stat": "walks_allowed",
+      "tone": "solid",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 2,
+      "targets": [
+        2,
+        3
+      ],
+      "detail": "Supported ladders: 2/3 Last supported rung: 3"
     },
     {
       "gamePk": 824982,
@@ -936,6 +1417,26 @@
       "gamePk": 824982,
       "matchup": "? @ ?",
       "status": "",
+      "side": "away",
+      "starter": "Tyler Phillips",
+      "label": "BB up to 3",
+      "stat": "walks_allowed",
+      "tone": "strong",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 2,
+      "targets": [
+        2,
+        3
+      ],
+      "detail": "Supported ladders: 2/3 Last supported rung: 3"
+    },
+    {
+      "gamePk": 824982,
+      "matchup": "? @ ?",
+      "status": "",
       "side": "home",
       "starter": "Jack Perkins",
       "label": "K up to 7",
@@ -958,7 +1459,7 @@
       "status": "",
       "side": "home",
       "starter": "Jack Perkins",
-      "label": "O 17/18",
+      "label": "O 16/17",
       "stat": "outs",
       "tone": "strong",
       "source": "none",
@@ -967,10 +1468,54 @@
       "losses": 0,
       "targetCount": 2,
       "targets": [
-        17,
-        18
+        16,
+        17
       ],
-      "detail": "Supported ladders: 17/18 Last supported rung: 18"
+      "detail": "Supported ladders: 16/17 Last supported rung: 17"
+    },
+    {
+      "gamePk": 824982,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "home",
+      "starter": "Jack Perkins",
+      "label": "H up to 10",
+      "stat": "hits_allowed",
+      "tone": "solid",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 6,
+      "targets": [
+        5,
+        6,
+        7,
+        8,
+        9,
+        10
+      ],
+      "detail": "Supported ladders: 5/6/7/8/9/10 Last supported rung: 10"
+    },
+    {
+      "gamePk": 824982,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "home",
+      "starter": "Jack Perkins",
+      "label": "BB up to 3",
+      "stat": "walks_allowed",
+      "tone": "solid",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 2,
+      "targets": [
+        2,
+        3
+      ],
+      "detail": "Supported ladders: 2/3 Last supported rung: 3"
     },
     {
       "gamePk": 825062,
@@ -985,12 +1530,13 @@
       "actual": null,
       "wins": 0,
       "losses": 0,
-      "targetCount": 2,
+      "targetCount": 3,
       "targets": [
+        5,
         6,
         7
       ],
-      "detail": "Supported ladders: 6/7 Last supported rung: 7"
+      "detail": "Supported ladders: 5/6/7 Last supported rung: 7"
     },
     {
       "gamePk": 825062,
@@ -1011,6 +1557,48 @@
         19
       ],
       "detail": "Supported ladders: 18/19 Last supported rung: 19"
+    },
+    {
+      "gamePk": 825062,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "away",
+      "starter": "Kyle Harrison",
+      "label": "H up to 9",
+      "stat": "hits_allowed",
+      "tone": "solid",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 4,
+      "targets": [
+        6,
+        7,
+        8,
+        9
+      ],
+      "detail": "Supported ladders: 6/7/8/9 Last supported rung: 9"
+    },
+    {
+      "gamePk": 825062,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "away",
+      "starter": "Kyle Harrison",
+      "label": "BB up to 3",
+      "stat": "walks_allowed",
+      "tone": "soft",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 2,
+      "targets": [
+        2,
+        3
+      ],
+      "detail": "Supported ladders: 2/3 Last supported rung: 3"
     },
     {
       "gamePk": 825062,
@@ -1077,6 +1665,25 @@
       "detail": "Supported ladders: 5/6/7/8 Last supported rung: 8"
     },
     {
+      "gamePk": 825062,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "home",
+      "starter": "Jose Cabrera",
+      "label": "BB up to 2",
+      "stat": "walks_allowed",
+      "tone": "strong",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 1,
+      "targets": [
+        2
+      ],
+      "detail": "Supported ladders: 2 Last supported rung: 2"
+    },
+    {
       "gamePk": 823120,
       "matchup": "? @ ?",
       "status": "",
@@ -1124,6 +1731,25 @@
       "gamePk": 823120,
       "matchup": "? @ ?",
       "status": "",
+      "side": "away",
+      "starter": "Dylan Cease",
+      "label": "BB up to 3",
+      "stat": "walks_allowed",
+      "tone": "strong",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 1,
+      "targets": [
+        3
+      ],
+      "detail": "Supported ladders: 3 Last supported rung: 3"
+    },
+    {
+      "gamePk": 823120,
+      "matchup": "? @ ?",
+      "status": "",
       "side": "home",
       "starter": "Luis Castillo",
       "label": "K up to 7",
@@ -1160,6 +1786,49 @@
         20
       ],
       "detail": "Supported ladders: 19/20 Last supported rung: 20"
+    },
+    {
+      "gamePk": 823120,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "home",
+      "starter": "Luis Castillo",
+      "label": "H up to 10",
+      "stat": "hits_allowed",
+      "tone": "soft",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 5,
+      "targets": [
+        6,
+        7,
+        8,
+        9,
+        10
+      ],
+      "detail": "Supported ladders: 6/7/8/9/10 Last supported rung: 10"
+    },
+    {
+      "gamePk": 823120,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "home",
+      "starter": "Luis Castillo",
+      "label": "BB up to 3",
+      "stat": "walks_allowed",
+      "tone": "solid",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 2,
+      "targets": [
+        2,
+        3
+      ],
+      "detail": "Supported ladders: 2/3 Last supported rung: 3"
     },
     {
       "gamePk": 823933,
@@ -1215,15 +1884,33 @@
       "actual": null,
       "wins": 0,
       "losses": 0,
-      "targetCount": 5,
+      "targetCount": 4,
       "targets": [
-        5,
         6,
         7,
         8,
         9
       ],
-      "detail": "Supported ladders: 5/6/7/8/9 Last supported rung: 9"
+      "detail": "Supported ladders: 6/7/8/9 Last supported rung: 9"
+    },
+    {
+      "gamePk": 823933,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "away",
+      "starter": "Michael King",
+      "label": "BB up to 3",
+      "stat": "walks_allowed",
+      "tone": "solid",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 1,
+      "targets": [
+        3
+      ],
+      "detail": "Supported ladders: 3 Last supported rung: 3"
     },
     {
       "gamePk": 823933,
@@ -1263,6 +1950,48 @@
         20
       ],
       "detail": "Supported ladders: 19/20 Last supported rung: 20"
+    },
+    {
+      "gamePk": 823933,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "home",
+      "starter": "Shohei Ohtani",
+      "label": "H up to 8",
+      "stat": "hits_allowed",
+      "tone": "soft",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 4,
+      "targets": [
+        5,
+        6,
+        7,
+        8
+      ],
+      "detail": "Supported ladders: 5/6/7/8 Last supported rung: 8"
+    },
+    {
+      "gamePk": 823933,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "home",
+      "starter": "Shohei Ohtani",
+      "label": "BB up to 3",
+      "stat": "walks_allowed",
+      "tone": "strong",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 2,
+      "targets": [
+        2,
+        3
+      ],
+      "detail": "Supported ladders: 2/3 Last supported rung: 3"
     }
   ]
 }

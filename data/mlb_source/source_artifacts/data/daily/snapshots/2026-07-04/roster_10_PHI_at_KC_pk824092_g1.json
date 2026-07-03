@@ -69,12 +69,6 @@
     },
     "bullpen": [
       {
-        "id": 660604,
-        "name": "Alan Rangel",
-        "role": "SU",
-        "lev": 0.7
-      },
-      {
         "id": 661395,
         "name": "Jhoan Duran",
         "role": "CL",
@@ -89,8 +83,8 @@
       {
         "id": 621237,
         "name": "Jos\u00e9 Alvarado",
-        "role": "MR",
-        "lev": 0.5
+        "role": "SU",
+        "lev": 0.7
       },
       {
         "id": 679775,
@@ -100,7 +94,7 @@
       },
       {
         "id": 642152,
-        "name": "Lou Trivino",
+        "name": "Lou Trivino III",
         "role": "MR",
         "lev": 0.5
       },
@@ -549,49 +543,6 @@
     },
     "bullpen_profiles": [
       {
-        "id": 660604,
-        "name": "Alan Rangel",
-        "throw": "R",
-        "role": "SU",
-        "leverage_skill": 0.7,
-        "stamina_pitches": 29,
-        "availability_mult": 0.55,
-        "platoon_mult_vs_lhb": {
-          "k": 1.1558333333333335,
-          "bb": 1.0,
-          "hr": 1.275,
-          "inplay": 1.1129979035639415
-        },
-        "platoon_mult_vs_rhb": {
-          "k": 0.8075,
-          "bb": 1.0,
-          "hr": 0.78,
-          "inplay": 0.8839622641509435
-        },
-        "statcast_quality_mult": {},
-        "arsenal_source": "statsapi_pitchArsenal",
-        "arsenal_sample_size": 116,
-        "statcast_splits_found": false,
-        "statcast_splits_source": "",
-        "statcast_splits_n_pitches": 0,
-        "statcast_splits_start_date": "",
-        "statcast_splits_end_date": "",
-        "k_rate": 0.2727272727272727,
-        "bb_rate": 0.0,
-        "hbp_rate": 0.030303030303030304,
-        "hr_rate": 0.030303030303030304,
-        "inplay_hit_rate": 0.3456521739130434,
-        "arsenal": {
-          "FF": 0.3620689536206896,
-          "CU": 0.1465517314655173,
-          "CH": 0.37068966370689665,
-          "SL": 0.12068965120689651
-        },
-        "pitch_type_whiff_mult": {},
-        "pitch_type_inplay_mult": {},
-        "pitch_type_hr_mult": {}
-      },
-      {
         "id": 661395,
         "name": "Jhoan Duran",
         "throw": "R",
@@ -684,8 +635,8 @@
         "id": 621237,
         "name": "Jos\u00e9 Alvarado",
         "throw": "L",
-        "role": "MR",
-        "leverage_skill": 0.5,
+        "role": "SU",
+        "leverage_skill": 0.7,
         "stamina_pitches": 25,
         "availability_mult": 0.865,
         "platoon_mult_vs_lhb": {
@@ -767,7 +718,7 @@
       },
       {
         "id": 642152,
-        "name": "Lou Trivino",
+        "name": "Lou Trivino III",
         "throw": "R",
         "role": "MR",
         "leverage_skill": 0.5,
@@ -1008,12 +959,6 @@
         "name": "John Schreiber",
         "role": "SU",
         "lev": 0.7
-      },
-      {
-        "id": 621016,
-        "name": "Jose Cuas",
-        "role": "MR",
-        "lev": 0.5
       },
       {
         "id": 668674,
@@ -1329,35 +1274,6 @@
         "vs_pitcher_history": {}
       },
       {
-        "id": 670231,
-        "name": "John Rave",
-        "pos": "RF",
-        "bat": "L",
-        "throw": "L",
-        "k_rate": 0.3125,
-        "bb_rate": 0.1875,
-        "hbp_rate": 0.0,
-        "hr_rate": 0.0625,
-        "inplay_hit_rate": 0.375,
-        "xb_hit_share": 0.45,
-        "vs_pitch_type": {},
-        "vs_pitch_type_hr": {},
-        "platoon_mult_vs_lhp": {
-          "k": 0.8075,
-          "bb": 0.8075,
-          "hr": 0.78,
-          "inplay": 0.9388888888888889
-        },
-        "platoon_mult_vs_rhp": {
-          "k": 1.126923076923077,
-          "bb": 1.126923076923077,
-          "hr": 1.126923076923077,
-          "inplay": 1.0366666666666666
-        },
-        "statcast_quality_mult": {},
-        "vs_pitcher_history": {}
-      },
-      {
         "id": 670224,
         "name": "Kameron Misner",
         "pos": "CF",
@@ -1383,6 +1299,25 @@
           "hr": 1.0,
           "inplay": 0.989423076923077
         },
+        "statcast_quality_mult": {},
+        "vs_pitcher_history": {}
+      },
+      {
+        "id": 571912,
+        "name": "Luke Maile",
+        "pos": "C",
+        "bat": "R",
+        "throw": "R",
+        "k_rate": 0.22,
+        "bb_rate": 0.08,
+        "hbp_rate": 0.008,
+        "hr_rate": 0.03,
+        "inplay_hit_rate": 0.0,
+        "xb_hit_share": 0.22,
+        "vs_pitch_type": {},
+        "vs_pitch_type_hr": {},
+        "platoon_mult_vs_lhp": {},
+        "platoon_mult_vs_rhp": {},
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
       },
@@ -1633,49 +1568,6 @@
           "CH": 0.09108911,
           "SI": 0.23366337,
           "FC": 0.13663366
-        },
-        "pitch_type_whiff_mult": {},
-        "pitch_type_inplay_mult": {},
-        "pitch_type_hr_mult": {}
-      },
-      {
-        "id": 621016,
-        "name": "Jose Cuas",
-        "throw": "R",
-        "role": "MR",
-        "leverage_skill": 0.5,
-        "stamina_pitches": 25,
-        "availability_mult": 1.0,
-        "platoon_mult_vs_lhb": {
-          "k": 1.0366666666666666,
-          "bb": 1.0,
-          "hr": 1.0,
-          "inplay": 1.1925000000000001
-        },
-        "platoon_mult_vs_rhb": {
-          "k": 0.9388888888888889,
-          "bb": 1.0,
-          "hr": 1.0,
-          "inplay": 0.8075
-        },
-        "statcast_quality_mult": {},
-        "arsenal_source": "statsapi_pitchArsenal",
-        "arsenal_sample_size": 42,
-        "statcast_splits_found": false,
-        "statcast_splits_source": "",
-        "statcast_splits_n_pitches": 0,
-        "statcast_splits_start_date": "",
-        "statcast_splits_end_date": "",
-        "k_rate": 0.375,
-        "bb_rate": 0.0,
-        "hbp_rate": 0.0,
-        "hr_rate": 0.0,
-        "inplay_hit_rate": 0.4,
-        "arsenal": {
-          "FF": 0.3571428578571428,
-          "OTHER": 0.2380952319047621,
-          "CH": 0.023809523190476207,
-          "SI": 0.3809523870476188
         },
         "pitch_type_whiff_mult": {},
         "pitch_type_inplay_mult": {},

@@ -4571,88 +4571,6 @@
         },
         {
           "player": {
-            "mlbam_id": 656212,
-            "full_name": "Charlie Barnes",
-            "primary_position": "P",
-            "bat_side": "L",
-            "throw_side": "L"
-          },
-          "k_rate": 0.06779661016949153,
-          "bb_rate": 0.10169491525423728,
-          "hbp_rate": 0.01694915254237288,
-          "hr_rate": 0.05084745762711864,
-          "inplay_hit_rate": 0.3530824829931973,
-          "batters_faced": 59.0,
-          "balls_in_play": 48.0,
-          "arsenal": {
-            "FF": 0.3480663069613262,
-            "OTHER": 0.07182320143646403,
-            "CH": 0.17127071342541428,
-            "SI": 0.21546961430939232,
-            "SL": 0.1933701638674033
-          },
-          "pitch_type_whiff_mult": {},
-          "pitch_type_inplay_mult": {},
-          "pitch_type_hr_mult": {},
-          "statcast_splits_source": "",
-          "statcast_splits_n_pitches": 0,
-          "statcast_splits_start_date": "",
-          "statcast_splits_end_date": "",
-          "arsenal_source": "statsapi_pitchArsenal",
-          "arsenal_sample_size": 181,
-          "stamina_pitches": 28,
-          "role": "MR",
-          "availability_mult": 1.0,
-          "platoon_mult_vs_lhb": {
-            "k": 0.8363095238095237,
-            "bb": 0.9650793650793651,
-            "hr": 0.78,
-            "inplay": 0.8165199236416826
-          },
-          "platoon_mult_vs_rhb": {
-            "k": 1.0904605263157894,
-            "bb": 1.0192982456140351,
-            "hr": 1.275,
-            "inplay": 1.1032330897162246
-          },
-          "venue_mult_home": {},
-          "venue_mult_away": {
-            "k": 1.0,
-            "bb": 1.0,
-            "hr": 1.0,
-            "inplay": 1.0010747185261004
-          },
-          "vs_venue_hr_mult": {
-            "133": 1.175
-          },
-          "vs_venue_k_mult": {
-            "133": 0.9536764705882353
-          },
-          "vs_venue_bb_mult": {
-            "133": 0.8775000000000001
-          },
-          "vs_venue_inplay_mult": {
-            "133": 1.0465079173941838
-          },
-          "vs_venue_history": {
-            "133": {
-              "bf": 34.0,
-              "k_mult": 0.8676470588235294,
-              "bb_mult": 0.65,
-              "hr_mult": 1.5,
-              "inplay_mult": 1.1328797639833825
-            }
-          },
-          "statcast_quality_mult": {},
-          "bb_gb_rate": 0.44,
-          "bb_fb_rate": 0.25,
-          "bb_ld_rate": 0.2,
-          "bb_pu_rate": 0.11,
-          "bb_inplay_n": 0,
-          "leverage_skill": 0.5
-        },
-        {
-          "player": {
             "mlbam_id": 683618,
             "full_name": "Edgardo Henriquez",
             "primary_position": "P",
@@ -4907,6 +4825,76 @@
           "bb_pu_rate": 0.11,
           "bb_inplay_n": 0,
           "leverage_skill": 0.7
+        },
+        {
+          "player": {
+            "mlbam_id": 801434,
+            "full_name": "Paul Gervase",
+            "primary_position": "P",
+            "bat_side": "R",
+            "throw_side": "R"
+          },
+          "k_rate": 0.23809523809523808,
+          "bb_rate": 0.09523809523809523,
+          "hbp_rate": 0.0,
+          "hr_rate": 0.0,
+          "inplay_hit_rate": 0.3571428571428571,
+          "batters_faced": 21.0,
+          "balls_in_play": 14.0,
+          "arsenal": {
+            "FF": 0.5070422268732381,
+            "CH": 0.014084507746478911,
+            "SL": 0.35211269866197303,
+            "FC": 0.12676056671831004
+          },
+          "pitch_type_whiff_mult": {},
+          "pitch_type_inplay_mult": {},
+          "pitch_type_hr_mult": {},
+          "statcast_splits_source": "",
+          "statcast_splits_n_pitches": 0,
+          "statcast_splits_start_date": "",
+          "statcast_splits_end_date": "",
+          "arsenal_source": "statsapi_pitchArsenal",
+          "arsenal_sample_size": 71,
+          "stamina_pitches": 25,
+          "role": "MR",
+          "availability_mult": 0.895,
+          "platoon_mult_vs_lhb": {
+            "k": 1.0275,
+            "bb": 0.8075,
+            "hr": 1.0,
+            "inplay": 0.8075
+          },
+          "platoon_mult_vs_rhb": {
+            "k": 0.9633333333333334,
+            "bb": 1.1925000000000001,
+            "hr": 1.0,
+            "inplay": 1.1925000000000001
+          },
+          "venue_mult_home": {
+            "k": 1.1225,
+            "bb": 0.9125,
+            "hr": 1.0,
+            "inplay": 1.1225
+          },
+          "venue_mult_away": {
+            "k": 0.8775000000000001,
+            "bb": 1.1225,
+            "hr": 1.0,
+            "inplay": 0.8775000000000001
+          },
+          "vs_venue_hr_mult": {},
+          "vs_venue_k_mult": {},
+          "vs_venue_bb_mult": {},
+          "vs_venue_inplay_mult": {},
+          "vs_venue_history": {},
+          "statcast_quality_mult": {},
+          "bb_gb_rate": 0.44,
+          "bb_fb_rate": 0.25,
+          "bb_ld_rate": 0.2,
+          "bb_pu_rate": 0.11,
+          "bb_inplay_n": 0,
+          "leverage_skill": 0.5
         },
         {
           "player": {

@@ -1,7 +1,7 @@
 {
   "date": "2026-07-04",
   "season": 2026,
-  "generated_at": "2026-07-03T07:19:32.582803",
+  "generated_at": "2026-07-03T17:20:50.537642",
   "tool": "tools/daily_update_multi_profile.py",
   "selection_source": "_tmp_best_set_selection_holdout13.json",
   "best_selection": null,
@@ -104,7 +104,7 @@
         "data/tuning/pitch_model_overrides/_tmp_hr_bbhbp1p04_starterbbhbp1p04.json"
       ],
       "exit_code": 0,
-      "duration_s": 174.944,
+      "duration_s": 199.66,
       "skipped": false
     },
     "pitcher_props_recos": {
@@ -153,14 +153,14 @@
     "No support-qualified hitter strikeout shadow candidates were published; current hitter sim artifacts may not include strikeout distributions yet."
   ],
   "timings": {
-    "collect_game_candidates_s": 0.033,
+    "collect_game_candidates_s": 0.032,
     "collect_pitcher_candidates_s": 0.0,
     "collect_shadow_pitcher_candidates_s": 0.0,
     "collect_hitter_candidates_s": 0.0,
     "collect_shadow_hitter_candidates_s": 0.0,
     "selection_and_support_s": 0.0,
     "explanation_diagnostics_s": 0.0,
-    "total_build_s": 0.036
+    "total_build_s": 0.035
   },
   "explanation_diagnostics": {
     "selected_rows_n": 0,

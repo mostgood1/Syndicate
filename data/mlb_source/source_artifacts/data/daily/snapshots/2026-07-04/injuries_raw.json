@@ -2602,10 +2602,10 @@
         "abbreviation": "SD"
       },
       "injured_ids": [
+        592094,
         601713,
         605397,
         608337,
-        608566,
         657656,
         663362,
         663773,
@@ -2645,8 +2645,8 @@
           "roster_type_source": "40Man"
         },
         {
-          "player_id": 608566,
-          "full_name": "Germ\u00e1n M\u00e1rquez",
+          "player_id": 592094,
+          "full_name": "Jason Adam",
           "status": {
             "code": "D15",
             "description": "Injured 15-Day"
@@ -3825,7 +3825,6 @@
         641729,
         660670,
         663158,
-        664849,
         666214,
         669221,
         675911,
@@ -3836,21 +3835,6 @@
         {
           "player_id": 700363,
           "full_name": "AJ Smith-Shawver",
-          "status": {
-            "code": "D60",
-            "description": "Injured 60-Day"
-          },
-          "position": {
-            "code": "1",
-            "name": "Pitcher",
-            "type": "Pitcher",
-            "abbreviation": "P"
-          },
-          "roster_type_source": "40Man"
-        },
-        {
-          "player_id": 664849,
-          "full_name": "Danny Young",
           "status": {
             "code": "D60",
             "description": "Injured 60-Day"
@@ -7009,8 +6993,8 @@
     },
     {
       "team_id": 135,
-      "player_id": 608566,
-      "full_name": "Germ\u00e1n M\u00e1rquez",
+      "player_id": 592094,
+      "full_name": "Jason Adam",
       "status": {
         "code": "D15",
         "description": "Injured 15-Day"
@@ -8099,22 +8083,6 @@
       "team_id": 144,
       "player_id": 700363,
       "full_name": "AJ Smith-Shawver",
-      "status": {
-        "code": "D60",
-        "description": "Injured 60-Day"
-      },
-      "position": {
-        "code": "1",
-        "name": "Pitcher",
-        "type": "Pitcher",
-        "abbreviation": "P"
-      },
-      "roster_type_source": "40Man"
-    },
-    {
-      "team_id": 144,
-      "player_id": 664849,
-      "full_name": "Danny Young",
       "status": {
         "code": "D60",
         "description": "Injured 60-Day"

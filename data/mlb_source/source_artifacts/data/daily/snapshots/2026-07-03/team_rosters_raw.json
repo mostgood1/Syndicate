@@ -33151,7 +33151,7 @@
           {
             "person": {
               "id": 642152,
-              "fullName": "Lou Trivino",
+              "fullName": "Lou Trivino III",
               "link": "/api/v1/people/642152"
             },
             "jerseyNumber": "22",
@@ -33840,7 +33840,7 @@
           {
             "person": {
               "id": 642152,
-              "fullName": "Lou Trivino",
+              "fullName": "Lou Trivino III",
               "link": "/api/v1/people/642152"
             },
             "jerseyNumber": "22",
@@ -34097,6 +34097,25 @@
         "active": [
           {
             "person": {
+              "id": 683627,
+              "fullName": "Anthony Molina",
+              "link": "/api/v1/people/683627"
+            },
+            "jerseyNumber": "61",
+            "position": {
+              "code": "1",
+              "name": "Pitcher",
+              "type": "Pitcher",
+              "abbreviation": "P"
+            },
+            "status": {
+              "code": "A",
+              "description": "Active"
+            },
+            "parentTeamId": 144
+          },
+          {
+            "person": {
               "id": 663586,
               "fullName": "Austin Riley",
               "link": "/api/v1/people/663586"
@@ -34140,6 +34159,25 @@
               "link": "/api/v1/people/519242"
             },
             "jerseyNumber": "51",
+            "position": {
+              "code": "1",
+              "name": "Pitcher",
+              "type": "Pitcher",
+              "abbreviation": "P"
+            },
+            "status": {
+              "code": "A",
+              "description": "Active"
+            },
+            "parentTeamId": 144
+          },
+          {
+            "person": {
+              "id": 664849,
+              "fullName": "Danny Young",
+              "link": "/api/v1/people/664849"
+            },
+            "jerseyNumber": "63",
             "position": {
               "code": "1",
               "name": "Pitcher",
@@ -34311,44 +34349,6 @@
               "link": "/api/v1/people/694462"
             },
             "jerseyNumber": "64",
-            "position": {
-              "code": "1",
-              "name": "Pitcher",
-              "type": "Pitcher",
-              "abbreviation": "P"
-            },
-            "status": {
-              "code": "A",
-              "description": "Active"
-            },
-            "parentTeamId": 144
-          },
-          {
-            "person": {
-              "id": 641656,
-              "fullName": "Ian Hamilton",
-              "link": "/api/v1/people/641656"
-            },
-            "jerseyNumber": "71",
-            "position": {
-              "code": "1",
-              "name": "Pitcher",
-              "type": "Pitcher",
-              "abbreviation": "P"
-            },
-            "status": {
-              "code": "A",
-              "description": "Active"
-            },
-            "parentTeamId": 144
-          },
-          {
-            "person": {
-              "id": 675916,
-              "fullName": "James Karinchak",
-              "link": "/api/v1/people/675916"
-            },
-            "jerseyNumber": "00",
             "position": {
               "code": "1",
               "name": "Pitcher",
@@ -34625,8 +34625,8 @@
               "abbreviation": "P"
             },
             "status": {
-              "code": "RM",
-              "description": "Reassigned to Minors"
+              "code": "A",
+              "description": "Active"
             },
             "parentTeamId": 144
           },
@@ -34738,10 +34738,9 @@
               "type": "Pitcher",
               "abbreviation": "P"
             },
-            "note": "Left elbow reconstruction",
             "status": {
-              "code": "D60",
-              "description": "Injured 60-Day"
+              "code": "A",
+              "description": "Active"
             },
             "parentTeamId": 144
           },
@@ -34956,25 +34955,6 @@
           },
           {
             "person": {
-              "id": 641656,
-              "fullName": "Ian Hamilton",
-              "link": "/api/v1/people/641656"
-            },
-            "jerseyNumber": "71",
-            "position": {
-              "code": "1",
-              "name": "Pitcher",
-              "type": "Pitcher",
-              "abbreviation": "P"
-            },
-            "status": {
-              "code": "A",
-              "description": "Active"
-            },
-            "parentTeamId": 144
-          },
-          {
-            "person": {
               "id": 702275,
               "fullName": "JR Ritchie",
               "link": "/api/v1/people/702275"
@@ -35025,8 +35005,8 @@
               "abbreviation": "P"
             },
             "status": {
-              "code": "A",
-              "description": "Active"
+              "code": "RM",
+              "description": "Reassigned to Minors"
             },
             "parentTeamId": 144
           },

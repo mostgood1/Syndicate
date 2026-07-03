@@ -876,12 +876,6 @@
         "lev": 0.5
       },
       {
-        "id": 656212,
-        "name": "Charlie Barnes",
-        "role": "MR",
-        "lev": 0.5
-      },
-      {
         "id": 683618,
         "name": "Edgardo Henriquez",
         "role": "MR",
@@ -898,6 +892,12 @@
         "name": "Kyle Hurt",
         "role": "SU",
         "lev": 0.7
+      },
+      {
+        "id": 801434,
+        "name": "Paul Gervase",
+        "role": "MR",
+        "lev": 0.5
       },
       {
         "id": 656945,
@@ -1454,50 +1454,6 @@
         "pitch_type_hr_mult": {}
       },
       {
-        "id": 656212,
-        "name": "Charlie Barnes",
-        "throw": "L",
-        "role": "MR",
-        "leverage_skill": 0.5,
-        "stamina_pitches": 28,
-        "availability_mult": 1.0,
-        "platoon_mult_vs_lhb": {
-          "k": 0.8363095238095237,
-          "bb": 0.9650793650793651,
-          "hr": 0.78,
-          "inplay": 0.8165199236416826
-        },
-        "platoon_mult_vs_rhb": {
-          "k": 1.0904605263157894,
-          "bb": 1.0192982456140351,
-          "hr": 1.275,
-          "inplay": 1.1032330897162246
-        },
-        "statcast_quality_mult": {},
-        "arsenal_source": "statsapi_pitchArsenal",
-        "arsenal_sample_size": 181,
-        "statcast_splits_found": false,
-        "statcast_splits_source": "",
-        "statcast_splits_n_pitches": 0,
-        "statcast_splits_start_date": "",
-        "statcast_splits_end_date": "",
-        "k_rate": 0.06779661016949153,
-        "bb_rate": 0.10169491525423728,
-        "hbp_rate": 0.01694915254237288,
-        "hr_rate": 0.05084745762711864,
-        "inplay_hit_rate": 0.3530824829931973,
-        "arsenal": {
-          "FF": 0.3480663069613262,
-          "OTHER": 0.07182320143646403,
-          "CH": 0.17127071342541428,
-          "SI": 0.21546961430939232,
-          "SL": 0.1933701638674033
-        },
-        "pitch_type_whiff_mult": {},
-        "pitch_type_inplay_mult": {},
-        "pitch_type_hr_mult": {}
-      },
-      {
         "id": 683618,
         "name": "Edgardo Henriquez",
         "throw": "R",
@@ -1620,6 +1576,49 @@
           "FF": 0.5573333310506667,
           "CH": 0.34933333812266654,
           "SL": 0.09333333082666677
+        },
+        "pitch_type_whiff_mult": {},
+        "pitch_type_inplay_mult": {},
+        "pitch_type_hr_mult": {}
+      },
+      {
+        "id": 801434,
+        "name": "Paul Gervase",
+        "throw": "R",
+        "role": "MR",
+        "leverage_skill": 0.5,
+        "stamina_pitches": 25,
+        "availability_mult": 0.895,
+        "platoon_mult_vs_lhb": {
+          "k": 1.0275,
+          "bb": 0.8075,
+          "hr": 1.0,
+          "inplay": 0.8075
+        },
+        "platoon_mult_vs_rhb": {
+          "k": 0.9633333333333334,
+          "bb": 1.1925000000000001,
+          "hr": 1.0,
+          "inplay": 1.1925000000000001
+        },
+        "statcast_quality_mult": {},
+        "arsenal_source": "statsapi_pitchArsenal",
+        "arsenal_sample_size": 71,
+        "statcast_splits_found": false,
+        "statcast_splits_source": "",
+        "statcast_splits_n_pitches": 0,
+        "statcast_splits_start_date": "",
+        "statcast_splits_end_date": "",
+        "k_rate": 0.23809523809523808,
+        "bb_rate": 0.09523809523809523,
+        "hbp_rate": 0.0,
+        "hr_rate": 0.0,
+        "inplay_hit_rate": 0.3571428571428571,
+        "arsenal": {
+          "FF": 0.5070422268732381,
+          "CH": 0.014084507746478911,
+          "SL": 0.35211269866197303,
+          "FC": 0.12676056671831004
         },
         "pitch_type_whiff_mult": {},
         "pitch_type_inplay_mult": {},

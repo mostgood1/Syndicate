@@ -2,7 +2,7 @@
   "meta": {
     "season": 2026,
     "title": "MLB 2026 Rolling Season Eval",
-    "generated_at": "2026-07-03T07:04:53.503410",
+    "generated_at": "2026-07-03T17:05:28.600559",
     "batch_dir": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/eval/batches/season_2026_ui_daily_live",
     "game_types": [
       "R"
@@ -2238,27 +2238,27 @@
               "totals": 0,
               "ml": 1,
               "pitcher_props": 1,
-              "hitter_props": 10,
+              "hitter_props": 11,
               "hitter_home_runs": 0,
               "hitter_hits": 4,
               "hitter_strikeouts": 0,
               "hitter_total_bases": 6,
-              "hitter_runs": 0,
+              "hitter_runs": 1,
               "hitter_rbis": 0,
-              "combined": 12
+              "combined": 13
             },
             "playable_counts": {
               "totals": 0,
               "ml": 0,
-              "pitcher_props": 19,
-              "hitter_props": 21,
+              "pitcher_props": 17,
+              "hitter_props": 24,
               "hitter_home_runs": 0,
-              "hitter_hits": 8,
+              "hitter_hits": 10,
               "hitter_strikeouts": 0,
-              "hitter_total_bases": 13,
-              "hitter_runs": 0,
-              "hitter_rbis": 0,
-              "combined": 40
+              "hitter_total_bases": 6,
+              "hitter_runs": 6,
+              "hitter_rbis": 2,
+              "combined": 41
             },
             "results": {
               "combined": {
@@ -2297,14 +2297,14 @@
         "totals": 0,
         "ml": 1,
         "pitcher_props": 1,
-        "hitter_props": 10,
+        "hitter_props": 11,
         "hitter_home_runs": 0,
         "hitter_hits": 4,
         "hitter_strikeouts": 0,
         "hitter_total_bases": 6,
-        "hitter_runs": 0,
+        "hitter_runs": 1,
         "hitter_rbis": 0,
-        "combined": 12
+        "combined": 13
       },
       "results": {
         "combined": {
@@ -2319,7 +2319,7 @@
       "profit_u": 0.0,
       "roi": null,
       "settled_n": 0,
-      "unresolved_n": 12,
+      "unresolved_n": 13,
       "source_kind": "canonical_daily_fallback",
       "_betting_payload_found": true,
       "report_path": null

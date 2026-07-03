@@ -946,6 +946,12 @@
         "lev": 0.85
       },
       {
+        "id": 660761,
+        "name": "Jos\u00e9 Suarez",
+        "role": "MR",
+        "lev": 0.5
+      },
+      {
         "id": 686993,
         "name": "Justin Sterner",
         "role": "MR",
@@ -966,12 +972,6 @@
       {
         "id": 686930,
         "name": "Mason Barnett",
-        "role": "MR",
-        "lev": 0.5
-      },
-      {
-        "id": 640454,
-        "name": "Matt Krook",
         "role": "MR",
         "lev": 0.5
       },
@@ -1540,6 +1540,51 @@
         "pitch_type_hr_mult": {}
       },
       {
+        "id": 660761,
+        "name": "Jos\u00e9 Suarez",
+        "throw": "L",
+        "role": "MR",
+        "leverage_skill": 0.5,
+        "stamina_pitches": 28,
+        "availability_mult": 1.0,
+        "platoon_mult_vs_lhb": {
+          "k": 1.0424739264005907,
+          "bb": 0.9255997066672715,
+          "hr": 1.1157702807317769,
+          "inplay": 0.9483368409436654
+        },
+        "platoon_mult_vs_rhb": {
+          "k": 0.9741414158851883,
+          "bb": 1.1063649949156449,
+          "hr": 0.78,
+          "inplay": 1.0825190719529059
+        },
+        "statcast_quality_mult": {},
+        "arsenal_source": "statsapi_pitchArsenal",
+        "arsenal_sample_size": 749,
+        "statcast_splits_found": false,
+        "statcast_splits_source": "",
+        "statcast_splits_n_pitches": 0,
+        "statcast_splits_start_date": "",
+        "statcast_splits_end_date": "",
+        "k_rate": 0.2406731946144431,
+        "bb_rate": 0.09993880048959607,
+        "hbp_rate": 0.015789473684210527,
+        "hr_rate": 0.02039779681762546,
+        "inplay_hit_rate": 0.4032644628099173,
+        "arsenal": {
+          "FF": 0.37783711508811757,
+          "OTHER": 0.009345793878504679,
+          "CH": 0.24699599678905204,
+          "SI": 0.09345794378504674,
+          "SL": 0.26301735658077435,
+          "FC": 0.009345793878504679
+        },
+        "pitch_type_whiff_mult": {},
+        "pitch_type_inplay_mult": {},
+        "pitch_type_hr_mult": {}
+      },
+      {
         "id": 686993,
         "name": "Justin Sterner",
         "throw": "R",
@@ -1709,47 +1754,6 @@
           "CU": 0.14767932616033752,
           "CH": 0.025316455341772164,
           "SL": 0.28691982254008463
-        },
-        "pitch_type_whiff_mult": {},
-        "pitch_type_inplay_mult": {},
-        "pitch_type_hr_mult": {}
-      },
-      {
-        "id": 640454,
-        "name": "Matt Krook",
-        "throw": "L",
-        "role": "MR",
-        "leverage_skill": 0.5,
-        "stamina_pitches": 25,
-        "availability_mult": 1.0,
-        "platoon_mult_vs_lhb": {
-          "k": 1.06875,
-          "bb": 1.06875,
-          "hr": 1.0,
-          "inplay": 0.8075
-        },
-        "platoon_mult_vs_rhb": {
-          "k": 0.9450000000000001,
-          "bb": 0.9450000000000001,
-          "hr": 1.0,
-          "inplay": 1.1925000000000001
-        },
-        "statcast_quality_mult": {},
-        "arsenal_source": "statsapi_pitchArsenal",
-        "arsenal_sample_size": 43,
-        "statcast_splits_found": false,
-        "statcast_splits_source": "",
-        "statcast_splits_n_pitches": 0,
-        "statcast_splits_start_date": "",
-        "statcast_splits_end_date": "",
-        "k_rate": 0.2222222222222222,
-        "bb_rate": 0.2222222222222222,
-        "hbp_rate": 0.0,
-        "hr_rate": 0.0,
-        "inplay_hit_rate": 0.2,
-        "arsenal": {
-          "OTHER": 0.5581395432558136,
-          "SI": 0.4418604567441863
         },
         "pitch_type_whiff_mult": {},
         "pitch_type_inplay_mult": {},

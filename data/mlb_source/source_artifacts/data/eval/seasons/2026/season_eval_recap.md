@@ -1,6 +1,6 @@
 # MLB Season Eval 2026
 
-- Generated: 2026-07-03T07:04:53.503410
+- Generated: 2026-07-03T17:05:28.600559
 - Batch: D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/eval/batches/season_2026_ui_daily_live
 - Status: partial (7 of ? reports published)
 - Days: 7 | Games: 77 | Season card days: 0 | Legacy cards-page days: 0

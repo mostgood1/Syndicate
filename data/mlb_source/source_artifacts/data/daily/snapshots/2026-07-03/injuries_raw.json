@@ -3825,7 +3825,6 @@
         641729,
         660670,
         663158,
-        664849,
         666214,
         669221,
         675911,
@@ -3836,21 +3835,6 @@
         {
           "player_id": 700363,
           "full_name": "AJ Smith-Shawver",
-          "status": {
-            "code": "D60",
-            "description": "Injured 60-Day"
-          },
-          "position": {
-            "code": "1",
-            "name": "Pitcher",
-            "type": "Pitcher",
-            "abbreviation": "P"
-          },
-          "roster_type_source": "40Man"
-        },
-        {
-          "player_id": 664849,
-          "full_name": "Danny Young",
           "status": {
             "code": "D60",
             "description": "Injured 60-Day"
@@ -8099,22 +8083,6 @@
       "team_id": 144,
       "player_id": 700363,
       "full_name": "AJ Smith-Shawver",
-      "status": {
-        "code": "D60",
-        "description": "Injured 60-Day"
-      },
-      "position": {
-        "code": "1",
-        "name": "Pitcher",
-        "type": "Pitcher",
-        "abbreviation": "P"
-      },
-      "roster_type_source": "40Man"
-    },
-    {
-      "team_id": 144,
-      "player_id": 664849,
-      "full_name": "Danny Young",
       "status": {
         "code": "D60",
         "description": "Injured 60-Day"

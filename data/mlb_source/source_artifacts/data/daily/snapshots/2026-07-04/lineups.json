@@ -2,7 +2,7 @@
   "date": "2026-07-04",
   "season": 2026,
   "spring_mode": false,
-  "generated_at": "2026-07-03T07:19:32.420611",
+  "generated_at": "2026-07-03T17:20:50.365322",
   "summary": {
     "games": 15,
     "projected_teams": 30,
@@ -1782,7 +1782,7 @@
         "missing_ids": [],
         "backfilled_ids": [],
         "pool_source": "active+40Man",
-        "pool_size": 14,
+        "pool_size": 15,
         "raw_names": [
           "Carter Jensen",
           "Nick Loftin",

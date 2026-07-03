@@ -1,14 +1,14 @@
 {
   "tool": "tools/daily_update.py",
   "workflow": "ui-daily",
-  "generated_at": "2026-07-03T07:16:16.741227",
+  "generated_at": "2026-07-03T17:17:09.560959",
   "date": "2026-07-04",
   "season": 2026,
   "run_lock": {
     "status": "acquired",
     "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/runtime/locks/daily_update_ui-daily_2026_2026-07-04_1166be09fd3e.lock",
-    "pid": 10116,
-    "created_at": "2026-07-03T07:16:16.741227"
+    "pid": 2204,
+    "created_at": "2026-07-03T17:17:09.559935"
   },
   "seed": {
     "value": 1337,
@@ -94,7 +94,7 @@
         "headline": "No prior-day live-lens activity found for 2026-07-03.",
         "learnings": [],
         "performance": [
-          "Local live-lens report processed 13 games in 12348.8 ms with 0 ms spent refreshing markets."
+          "Local live-lens report processed 13 games in 2480.4 ms with 0 ms spent refreshing markets."
         ]
       }
     },
@@ -128,14 +128,14 @@
       "group_summaries": {
         "pitcher": {
           "found": true,
-          "candidateCount": 79,
-          "displayedCount": 79,
+          "candidateCount": 119,
+          "displayedCount": 119,
           "sectionCount": 5
         },
         "hitter": {
           "found": true,
-          "candidateCount": 672,
-          "displayedCount": 672,
+          "candidateCount": 1445,
+          "displayedCount": 1445,
           "sectionCount": 7
         }
       }
