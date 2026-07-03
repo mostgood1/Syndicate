@@ -1,12 +1,12 @@
 {
   "date": "2026-07-03",
-  "generatedAt": "2026-07-03T19:59:21.6917894+00:00",
-  "lastUpdatedAt": "2026-07-03T20:08:32.4824826+00:00",
-  "completedAt": "2026-07-03T20:08:32.4728903+00:00",
+  "generatedAt": "2026-07-03T21:59:42.9123463+00:00",
+  "lastUpdatedAt": "2026-07-03T21:59:43.0407341+00:00",
+  "completedAt": null,
   "runMode": "standard",
-  "overallStatus": "ok",
+  "overallStatus": "started",
   "error": null,
-  "runDir": "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-03\\20260703_195920",
+  "runDir": "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-03\\20260703_215942",
   "latestDir": "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest",
   "runtimePolicy": {
     "MLB": {
@@ -808,7 +808,7 @@
         "roi": null
       },
       {
-        "policyId": "",
+        "policyId": "sport:wnba:default",
         "policySource": "sport",
         "keyParameters": {
           "forceWithinMinutes": 40
@@ -836,6 +836,8 @@
     "oddsSports": "all",
     "oddsRegions": "us",
     "oddsHistoryTriggerPlan": [
+      null,
+      null,
       {
         "sport": "wnba",
         "workflow": "vendored_daily_update",
@@ -876,8 +878,18 @@
     "status": "skipped"
   },
   "runProvenance": {
-    "sourceStepCount": 2,
+    "sourceStepCount": 4,
     "sourceSteps": [
+      {
+        "sport": "mlb",
+        "workflow": "vendored_daily_update",
+        "name": "MLB vendored daily update"
+      },
+      {
+        "sport": "mlb",
+        "workflow": "syndicate_refresh",
+        "name": "MLB current-day live-lens refresh"
+      },
       {
         "sport": "wnba",
         "workflow": "vendored_daily_update",
@@ -892,28 +904,28 @@
     "latestManifestLoaded": true,
     "latestEventSimExecutionPlanCount": 21,
     "latestArtifactUpdateCount": 21,
-    "oddsHistoryTriggerPlanCount": 2,
+    "oddsHistoryTriggerPlanCount": 4,
     "simExecutionDecision": true
   },
   "replayContext": {
     "latestCheckpointLoaded": true,
     "latestCheckpointPath": "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest_checkpoint.json",
-    "latestCheckpointStage": "failed",
+    "latestCheckpointStage": "completed",
     "latestCheckpointFailedStage": "",
-    "latestCheckpointCompletedStageCount": 0,
-    "latestCheckpointCompletedStages": null,
-    "resumeEligible": true,
+    "latestCheckpointCompletedStageCount": 2,
+    "latestCheckpointCompletedStages": [
+      "source_update",
+      "refresh_gate"
+    ],
+    "resumeEligible": false,
     "resumedFromCheckpoint": false,
     "forceRebuildToday": false
   },
   "runState": {
-    "currentStage": "completed",
-    "completedStages": [
-      "source_update",
-      "refresh_gate"
-    ],
-    "failedStage": "",
-    "lastUpdatedAt": "2026-07-03T20:08:32.4824826+00:00",
+    "currentStage": "queued",
+    "completedStages": [],
+    "failedStage": null,
+    "lastUpdatedAt": "2026-07-03T21:59:43.0407341+00:00",
     "simulationContractPath": null,
     "simulationContractRunPath": null,
     "simulationContractSportCount": 0,
@@ -1696,7 +1708,7 @@
       "roi": null
     },
     {
-      "policyId": "",
+      "policyId": "sport:wnba:default",
       "policySource": "sport",
       "keyParameters": {
         "forceWithinMinutes": 40
@@ -1716,18 +1728,80 @@
   ],
   "sourceSteps": [
     {
+      "sport": "mlb",
+      "workflow": "vendored_daily_update",
+      "name": "MLB vendored daily update",
+      "workingDirectory": "D:\\a\\Syndicate\\Syndicate\\vendor\\mlb_bettingv2",
+      "environmentOverrides": {
+        "MLB_BETTING_DATA_ROOT": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data",
+        "ODDS_API_KEY": "77ae1c35140c82da1675af85dde36a44",
+        "MLB_LIVE_LENS_DIR": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\live_lens"
+      },
+      "runtimePolicy": {
+        "simsPerGame": 1000,
+        "workers": 3
+      },
+      "command": [
+        "C:\\hostedtoolcache\\windows\\Python\\3.11.9\\x64\\python.exe",
+        "tools\\daily_update.py",
+        "--workflow",
+        "ui-daily",
+        "--date",
+        "2026-07-03",
+        "--season",
+        "2026",
+        "--sims",
+        "1000",
+        "--workers",
+        "3",
+        "--git-push",
+        "off",
+        "--validate-render-frontend",
+        "off",
+        "--build-next-day",
+        "on"
+      ]
+    },
+    {
+      "sport": "mlb",
+      "workflow": "syndicate_refresh",
+      "name": "MLB current-day live-lens refresh",
+      "workingDirectory": "D:\\a\\Syndicate\\Syndicate",
+      "environmentOverrides": {
+        "MLB_BETTING_DATA_ROOT": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data",
+        "ODDS_API_KEY": "77ae1c35140c82da1675af85dde36a44",
+        "MLB_LIVE_LENS_DIR": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\live_lens"
+      },
+      "runtimePolicy": {
+        "simsPerGame": 1000,
+        "workers": 3
+      },
+      "command": [
+        "C:\\hostedtoolcache\\windows\\Python\\3.11.9\\x64\\python.exe",
+        "scripts\\refresh_mlb_oddsapi.py",
+        "--date",
+        "2026-07-03",
+        "--source-root",
+        "data\\mlb_source\\source_artifacts",
+        "--artifact-root",
+        "data\\mlb_source",
+        "--overwrite",
+        "on"
+      ]
+    },
+    {
       "sport": "wnba",
       "workflow": "vendored_daily_update",
       "name": "WNBA vendored daily update",
       "workingDirectory": "D:\\a\\Syndicate\\Syndicate",
       "environmentOverrides": {
-        "APP_TZ": "America/Chicago",
-        "SYNDICATE_WNBA_SOURCE_APP_FALLBACK": "1",
-        "REFRESH_PREDICT_PROPS_SMART_SIM_N_SIMS": "1000",
-        "APP_TZ_OFFSET_HOURS": "-6",
         "ODDS_API_KEY": "77ae1c35140c82da1675af85dde36a44",
+        "SYNDICATE_WNBA_SOURCE_APP_FALLBACK": "1",
+        "APP_TZ_OFFSET_HOURS": "-6",
         "REFRESH_PLAYER_LOGS_FETCH_ON_MISS": "1",
-        "REFRESH_PREDICT_PROPS_SMART_SIM_WORKERS": "3"
+        "REFRESH_PREDICT_PROPS_SMART_SIM_N_SIMS": "1000",
+        "REFRESH_PREDICT_PROPS_SMART_SIM_WORKERS": "3",
+        "APP_TZ": "America/Chicago"
       },
       "runtimePolicy": {
         "smartsimNSims": 1000,
@@ -1743,7 +1817,7 @@
         "--artifact-root",
         "data\\wnba_source\\source_artifacts",
         "--log-file",
-        "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-03\\20260703_195920\\wnba_props_refresh.log",
+        "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-03\\20260703_215942\\wnba_props_refresh.log",
         "--force-refresh",
         "--days-ahead",
         "0",
@@ -1774,6 +1848,22 @@
     }
   ],
   "stageDecisions": [
+    {
+      "stage": "source_update",
+      "sport": "mlb",
+      "workflow": "vendored_daily_update",
+      "name": "MLB vendored daily update",
+      "decision": "planned",
+      "status": "pending"
+    },
+    {
+      "stage": "source_update",
+      "sport": "mlb",
+      "workflow": "syndicate_refresh",
+      "name": "MLB current-day live-lens refresh",
+      "decision": "planned",
+      "status": "pending"
+    },
     {
       "stage": "source_update",
       "sport": "wnba",
@@ -1823,6 +1913,16 @@
   ],
   "simTriggerPlan": [
     {
+      "trigger": "planned",
+      "status": "pending",
+      "reason": "simulation compute is foundational and deferred until source-stage completion"
+    },
+    {
+      "trigger": "planned",
+      "status": "pending",
+      "reason": "simulation compute is foundational and deferred until source-stage completion"
+    },
+    {
       "sport": "wnba",
       "workflow": "vendored_daily_update",
       "trigger": "simulation",
@@ -1852,19 +1952,16 @@
   "statusArtifact": {
     "format": "json",
     "scope": "daily_update",
-    "runManifestPath": "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-03\\20260703_195920\\unified_daily_update_run.json",
+    "runManifestPath": "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-03\\20260703_215942\\unified_daily_update_run.json",
     "latestManifestPath": "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest.json",
-    "runCheckpointPath": "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-03\\20260703_195920\\unified_daily_update_checkpoint.json",
+    "runCheckpointPath": "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-03\\20260703_215942\\unified_daily_update_checkpoint.json",
     "latestCheckpointPath": "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest_checkpoint.json",
     "state": {
       "runMode": "standard",
-      "overallStatus": "ok",
-      "currentStage": "completed",
-      "completedStages": [
-        "source_update",
-        "refresh_gate"
-      ],
-      "failedStage": "",
+      "overallStatus": "started",
+      "currentStage": "queued",
+      "completedStages": [],
+      "failedStage": null,
       "policyPerformance": [
         {
           "policyId": "sport:mlb:default",
@@ -1903,7 +2000,7 @@
           "roi": null
         },
         {
-          "policyId": "",
+          "policyId": "sport:wnba:default",
           "policySource": "sport",
           "keyParameters": {
             "forceWithinMinutes": 40
@@ -1924,11 +2021,14 @@
       "replayContext": {
         "latestCheckpointLoaded": true,
         "latestCheckpointPath": "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest_checkpoint.json",
-        "latestCheckpointStage": "failed",
+        "latestCheckpointStage": "completed",
         "latestCheckpointFailedStage": "",
-        "latestCheckpointCompletedStageCount": 0,
-        "latestCheckpointCompletedStages": null,
-        "resumeEligible": true,
+        "latestCheckpointCompletedStageCount": 2,
+        "latestCheckpointCompletedStages": [
+          "source_update",
+          "refresh_gate"
+        ],
+        "resumeEligible": false,
         "resumedFromCheckpoint": false,
         "forceRebuildToday": false
       },
@@ -1941,87 +2041,17 @@
         "missingIntelligencePublishArtifactPaths": [],
         "status": "skipped"
       },
-      "lastUpdatedAt": "2026-07-03T20:08:32.4824826+00:00"
+      "lastUpdatedAt": "2026-07-03T21:59:43.0407341+00:00"
     }
   },
-  "sportRuns": [
-    {
-      "sport": "wnba",
-      "workflow": "vendored_daily_update",
-      "name": "WNBA vendored daily update",
-      "startedAt": "2026-07-03T19:59:24.6992970+00:00",
-      "completedAt": "2026-07-03T20:08:03.4840049+00:00",
-      "status": "ok",
-      "error": null,
-      "workingDirectory": "D:\\a\\Syndicate\\Syndicate",
-      "environmentOverrides": {
-        "APP_TZ": "America/Chicago",
-        "SYNDICATE_WNBA_SOURCE_APP_FALLBACK": "1",
-        "REFRESH_PREDICT_PROPS_SMART_SIM_N_SIMS": "1000",
-        "APP_TZ_OFFSET_HOURS": "-6",
-        "ODDS_API_KEY": "77ae1c35140c82da1675af85dde36a44",
-        "REFRESH_PLAYER_LOGS_FETCH_ON_MISS": "1",
-        "REFRESH_PREDICT_PROPS_SMART_SIM_WORKERS": "3"
-      },
-      "runtimePolicy": {
-        "smartsimNSims": 1000,
-        "smartsimWorkers": 3
-      },
-      "command": [
-        "C:\\hostedtoolcache\\windows\\Python\\3.11.9\\x64\\python.exe",
-        "scripts\\refresh_wnba_oddsapi_props.py",
-        "--date",
-        "2026-07-03",
-        "--source-root",
-        "vendor\\wnba_betting_repo",
-        "--artifact-root",
-        "data\\wnba_source\\source_artifacts",
-        "--log-file",
-        "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-03\\20260703_195920\\wnba_props_refresh.log",
-        "--force-refresh",
-        "--days-ahead",
-        "0",
-        "--do-edges",
-        "--do-export"
-      ],
-      "mirrorManifestPath": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\manifests\\mirror_refresh_2026-07-03.json",
-      "mirrorManifestExists": true
-    },
-    {
-      "sport": "wnba",
-      "workflow": "syndicate_mirror",
-      "name": "WNBA source mirror refresh",
-      "startedAt": "2026-07-03T20:08:03.5058134+00:00",
-      "completedAt": "2026-07-03T20:08:04.1481507+00:00",
-      "status": "ok",
-      "error": null,
-      "workingDirectory": "D:\\a\\Syndicate\\Syndicate",
-      "environmentOverrides": {},
-      "runtimePolicy": {
-        "smartsimNSims": 1000,
-        "smartsimWorkers": 3
-      },
-      "command": [
-        "powershell.exe",
-        "-NoProfile",
-        "-ExecutionPolicy",
-        "Bypass",
-        "-File",
-        "scripts\\refresh_wnba_source_mirror.ps1",
-        "-Date",
-        "2026-07-03"
-      ],
-      "mirrorManifestPath": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\manifests\\mirror_refresh_2026-07-03.json",
-      "mirrorManifestExists": true
-    }
-  ],
+  "sportRuns": [],
   "skipGitPush": true,
   "gitRemote": null,
   "commitMessagePrefix": null,
   "skipped": {
     "sourceUpdates": false,
     "refreshGate": false,
-    "mlb": true,
+    "mlb": false,
     "nba": true,
     "nhl": true,
     "wnba": false,
@@ -2036,30 +2066,10 @@
     "oddsPhase": "all",
     "oddsSports": "all",
     "oddsRegions": "us",
-    "manifestPath": "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-03\\20260703_195920\\migration\\refresh_status_manifest.json",
-    "runSummaryPath": "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-03\\20260703_195920\\migration\\refresh_and_gate_run.json",
-    "status": "ok"
+    "manifestPath": "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-03\\20260703_215942\\migration\\refresh_status_manifest.json",
+    "runSummaryPath": "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-03\\20260703_215942\\migration\\refresh_and_gate_run.json"
   },
-  "pushResults": [
-    {
-      "name": "Syndicate",
-      "repoPath": "D:\\a\\Syndicate\\Syndicate",
-      "remote": "",
-      "branch": "wnba-only-daily-update",
-      "commitMessage": " 2026-07-03 (pre-source publish)",
-      "status": "pushed",
-      "commit": "28682b37099938d100b1301737c007486e5aca4c"
-    },
-    {
-      "name": "Syndicate",
-      "repoPath": "D:\\a\\Syndicate\\Syndicate",
-      "remote": "",
-      "branch": "wnba-only-daily-update",
-      "commitMessage": " 2026-07-03 (Syndicate mirror + gate)",
-      "status": "pushed",
-      "commit": "936f12ee6ad354fa053f8ffd59fdd8f2b8dcb4fc"
-    }
-  ],
+  "pushResults": [],
   "runTrace": {
     "eventSimExecutionCount": 21,
     "artifactUpdateCount": 21,
@@ -2094,274 +2104,5 @@
       "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_bundle.json"
     ],
     "simExecutionDecision": true
-  },
-  "simulationContractPath": "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest_simulation_contract.json",
-  "simulationContractRunPath": "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-03\\20260703_195920\\unified_daily_update_simulation_contract.json",
-  "simulationContractSportCount": 1,
-  "simulationContractAdvancedBySport": {
-    "wnba": {
-      "page": {
-        "scoreboard_items": [
-          {
-            "target_id": "game-401857037",
-            "label": "MIN @ NYL",
-            "status": "Final"
-          },
-          {
-            "target_id": "game-401857038",
-            "label": "CHI @ LVA",
-            "status": "Final"
-          }
-        ],
-        "module_links": [
-          {
-            "label": "Cards",
-            "href": "/wnba/cards?date=2026-07-03",
-            "active": true
-          },
-          {
-            "label": "Betting Card",
-            "href": "/wnba/season/2026/betting-card?date=2026-07-03",
-            "active": false
-          },
-          {
-            "label": "Picks",
-            "href": "/wnba/picks?date=2026-07-03",
-            "active": false
-          },
-          {
-            "label": "Props",
-            "href": "/wnba/props?date=2026-07-03",
-            "active": false
-          },
-          {
-            "label": "Live Lens",
-            "href": "/wnba/live-lens?date=2026-07-03",
-            "active": false
-          },
-          {
-            "label": "Daily Archive",
-            "href": "/wnba/archive?date=2026-07-03",
-            "active": false
-          },
-          {
-            "label": "Hub",
-            "href": "/wnba/hub",
-            "active": false
-          }
-        ],
-        "cards_control_links": [
-          {
-            "label": "Betting Card",
-            "href": "/wnba/season/2026/betting-card?date=2026-07-03"
-          },
-          {
-            "label": "Props",
-            "href": "/wnba/props?date=2026-07-03"
-          },
-          {
-            "label": "Live Lens",
-            "href": "/wnba/live-lens?date=2026-07-03"
-          }
-        ],
-        "source_path": "espn_scoreboard_fallback",
-        "source_title": "WNBA live scoreboard fallback",
-        "wnba_advanced_contract": {
-          "available": true,
-          "sport": "wnba",
-          "selection": {
-            "kind": "date",
-            "requested": "2026-07-03",
-            "resolved": "2026-07-03"
-          },
-          "source": {
-            "title": "WNBA live scoreboard fallback",
-            "path": "espn_scoreboard_fallback",
-            "mode": "live"
-          },
-          "freshness": {
-            "requested": "2026-07-03",
-            "resolved": "2026-07-03",
-            "selection_kind": "date",
-            "is_current_day": true,
-            "is_stale": false,
-            "lookahead_applied": false
-          },
-          "coverage": {
-            "games_with_sim": 2,
-            "games_with_periods": 0,
-            "games_with_intervals": 2,
-            "games_with_players": 2,
-            "games_with_injuries": 2,
-            "games_with_props": 0
-          },
-          "game_count": 2,
-          "games": [
-            {
-              "game_id": "401857037",
-              "event_id": "401857037",
-              "matchup": {
-                "away": {
-                  "tri": "MIN",
-                  "name": "MIN"
-                },
-                "home": {
-                  "tri": "NYL",
-                  "name": "NYL"
-                }
-              },
-              "status": {
-                "status": "Final",
-                "detail": "Final",
-                "live": false,
-                "final": true
-              },
-              "market": {
-                "home_ml": null,
-                "away_ml": null,
-                "home_spread": null,
-                "total": null,
-                "p_home_win": null,
-                "p_away_win": null,
-                "p_home_cover": null,
-                "p_total_over": null
-              },
-              "simulation": {
-                "score": {
-                  "away_mean": null,
-                  "home_mean": null,
-                  "total_mean": null,
-                  "margin_mean": null
-                },
-                "periods": {},
-                "intervals": {
-                  "quarters": "",
-                  "halves": ""
-                },
-                "quarters": [],
-                "players_summary": {
-                  "away": 0,
-                  "home": 0,
-                  "missing_away": 0,
-                  "missing_home": 0,
-                  "injured_away": 0,
-                  "injured_home": 0
-                },
-                "players": {
-                  "away": "",
-                  "home": ""
-                },
-                "missing_prop_players": {
-                  "away": "",
-                  "home": ""
-                },
-                "injuries": {
-                  "away": "",
-                  "home": ""
-                },
-                "pregame_context": {}
-              },
-              "props": {
-                "prop_recommendations": {
-                  "away": "",
-                  "home": ""
-                },
-                "game_market_recommendations": []
-              },
-              "coverage": {
-                "has_simulation": true,
-                "has_periods": false,
-                "has_intervals": true,
-                "has_players": true,
-                "has_injuries": true,
-                "has_pregame_context": false
-              }
-            },
-            {
-              "game_id": "401857038",
-              "event_id": "401857038",
-              "matchup": {
-                "away": {
-                  "tri": "CHI",
-                  "name": "CHI"
-                },
-                "home": {
-                  "tri": "LVA",
-                  "name": "LVA"
-                }
-              },
-              "status": {
-                "status": "Final",
-                "detail": "Final",
-                "live": false,
-                "final": true
-              },
-              "market": {
-                "home_ml": null,
-                "away_ml": null,
-                "home_spread": null,
-                "total": null,
-                "p_home_win": null,
-                "p_away_win": null,
-                "p_home_cover": null,
-                "p_total_over": null
-              },
-              "simulation": {
-                "score": {
-                  "away_mean": null,
-                  "home_mean": null,
-                  "total_mean": null,
-                  "margin_mean": null
-                },
-                "periods": {},
-                "intervals": {
-                  "quarters": "",
-                  "halves": ""
-                },
-                "quarters": [],
-                "players_summary": {
-                  "away": 0,
-                  "home": 0,
-                  "missing_away": 0,
-                  "missing_home": 0,
-                  "injured_away": 0,
-                  "injured_home": 0
-                },
-                "players": {
-                  "away": "",
-                  "home": ""
-                },
-                "missing_prop_players": {
-                  "away": "",
-                  "home": ""
-                },
-                "injuries": {
-                  "away": "",
-                  "home": ""
-                },
-                "pregame_context": {}
-              },
-              "props": {
-                "prop_recommendations": {
-                  "away": "",
-                  "home": ""
-                },
-                "game_market_recommendations": []
-              },
-              "coverage": {
-                "has_simulation": true,
-                "has_periods": false,
-                "has_intervals": true,
-                "has_players": true,
-                "has_injuries": true,
-                "has_pregame_context": false
-              }
-            }
-          ]
-        }
-      },
-      "game": {},
-      "available": true
-    }
   }
 }
