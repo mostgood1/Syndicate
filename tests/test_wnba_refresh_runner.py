@@ -1272,6 +1272,62 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
             self.assertEqual(payload["games"][0]["home_tri"], "LVA")
             self.assertEqual(payload["games"][0]["away_tri"], "CHI")
 
+    def test_cards_sim_detail_export_rebuilds_sparse_existing_artifact(self) -> None:
+        module = self._load_module()
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_root = Path(tmp_dir)
+            source_root = tmp_root / "source"
+            processed_root = tmp_root / "bundle" / "data" / "processed"
+            source_processed = source_root / "data" / "processed"
+            source_processed.mkdir(parents=True, exist_ok=True)
+            processed_root.mkdir(parents=True, exist_ok=True)
+            (source_processed / "cards_sim_detail_2026-05-29.json").write_text(
+                json.dumps(
+                    {
+                        "date": "2026-05-29",
+                        "games": [
+                            {
+                                "home_tri": "POR",
+                                "away_tri": "ATL",
+                                "sim": {
+                                    "quarters": [],
+                                    "players_summary": {"home": 1, "away": 1},
+                                    "players": {"home": [{"player_name": "Home Player"}], "away": [{"player_name": "Away Player"}]},
+                                    "missing_prop_players": {"home": [], "away": []},
+                                    "injuries": {"home": [], "away": []},
+                                },
+                            }
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (processed_root / "smart_sim_2026-05-29_POR_ATL.json").write_text(
+                json.dumps(
+                    {
+                        "home": "POR",
+                        "away": "ATL",
+                        "periods": {
+                            "q1": {"away_mean": 21.4, "home_mean": 19.8, "total_mean": 41.2, "margin_mean": -1.6, "p_home_win": 0.41}
+                        },
+                        "players_summary": {"home": 1, "away": 1},
+                        "players": {"home": [{"player_name": "Home Player"}], "away": [{"player_name": "Away Player"}]},
+                        "missing_prop_players": {"home": [], "away": []},
+                        "injuries": {"home": [], "away": []},
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            with patch.object(module, "_load_source_app", side_effect=AssertionError("source app should not load")):
+                out = module._export_cards_sim_detail_snapshot(source_root=source_root, date_str="2026-05-29", processed_root=processed_root)
+
+            self.assertEqual(out, str(processed_root / "cards_sim_detail_2026-05-29.json"))
+            payload = json.loads((processed_root / "cards_sim_detail_2026-05-29.json").read_text(encoding="utf-8"))
+            self.assertGreater(len(payload["games"][0]["sim"]["quarters"]), 0)
+            self.assertEqual(payload["games"][0]["sim"]["quarters"][0]["away_pts_mu"], 21.4)
+
     def test_optional_tool_exports_prefer_existing_processed_files(self) -> None:
         module = self._load_module()
 

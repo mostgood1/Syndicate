@@ -1171,6 +1171,33 @@ def _load_local_props_recommendations(*, processed_root: Path, date_str: str) ->
     return rows_out
 
 
+def _cards_sim_detail_has_quarter_content(path: Path | None) -> bool:
+    try:
+        if path is None or not path.exists() or not path.is_file() or path.stat().st_size <= 0:
+            return False
+        payload = json.loads(path.read_text(encoding="utf-8", errors="ignore"))
+        games = payload.get("games") if isinstance(payload, dict) else None
+        if not isinstance(games, list):
+            return False
+        for row in games:
+            if not isinstance(row, dict):
+                continue
+            sim = row.get("sim") if isinstance(row.get("sim"), dict) else {}
+            quarters = sim.get("quarters") if isinstance(sim.get("quarters"), list) else []
+            if any(
+                isinstance(quarter, dict)
+                and any(
+                    quarter.get(field) is not None
+                    for field in ("away_pts_mu", "home_pts_mu", "total_mean", "margin_mean", "p_home_win")
+                )
+                for quarter in quarters
+            ):
+                return True
+        return False
+    except Exception:
+        return False
+
+
 def _basketball_recent_form_fields(row: dict[str, object], *, line_value: float | None = None) -> dict[str, float]:
     sources: list[dict[str, object]] = [row]
     for key in ("top_play", "model"):
@@ -3604,7 +3631,7 @@ def _export_cards_sim_detail_snapshot(*, source_root: Path, date_str: str, proce
         processed_root=processed_root,
         file_name=f"cards_sim_detail_{date_str}.json",
     )
-    if existing:
+    if existing and _cards_sim_detail_has_quarter_content(Path(existing)):
         return existing
     out_path = processed_root / f"cards_sim_detail_{date_str}.json"
     games_out = _build_cards_sim_detail_from_local_smart_sim(processed_root=processed_root, date_str=date_str)

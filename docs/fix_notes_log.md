@@ -1,5 +1,19 @@
 # Fix Notes Log
 
+## 2026-07-03 - WNBA sim-detail export now rebuilds sparse artifacts
+- Symptom: Daily update could keep reusing a processed `cards_sim_detail` file that existed but had empty quarter arrays, so interval and period lanes stayed empty after refresh.
+- Root cause: The WNBA export path treated any existing processed `cards_sim_detail` file as good enough and never checked whether it actually contained quarter content.
+- Fix: Make the exporter validate quarter content before accepting an existing file; if the artifact is sparse, rebuild it from smart-sim or source-app fallback and overwrite the bad file.
+- Validation: `python -m pytest tests/test_wnba_refresh_runner.py -k "cards_sim_detail_export"` passed, including a new regression that rebuilds a sparse existing artifact.
+- Follow-up: If future WNBA refreshes introduce another sparse-but-present artifact shape, add a content check before the copy short-circuit.
+
+## 2026-07-03 - WNBA live-player lanes now match event-id aliases
+- Symptom: WNBA player-prop lanes could stay empty or partially unhydrated even when the processed odds, live-lens, and live-state artifacts existed for the slate.
+- Root cause: The WNBA live-player join path depended on exact event-id equality, but the source artifacts can surface the same game under raw, stripped-leading-zero, or canonicalized IDs.
+- Fix: Add event-id alias matching in the WNBA game index, live-player odds index, and live-player row matcher so the same game hydrates across all supported ID variants.
+- Validation: `python -m pytest tests/test_wnba_live_snapshots_local.py -k "hydrates_prices"` passed, including a new regression that hydrates across event-id aliases.
+- Follow-up: If a future slate introduces a new event-id shape, add it to the alias helper instead of patching a single sport path.
+
 ## 2026-07-03 - WNBA artifact bundle now prefers the fuller mirror root
 - Symptom: The WNBA page could render game cards but still show zeroed sim metrics and empty props/hydration lanes on Render even when the day’s processed artifacts existed locally.
 - Root cause: The WNBA artifact bundle loader stopped at the first root with a cards CSV, so a partial mounted mirror could win over a richer repo bundle that also contained `cards_sim_detail`, `cards_props_snapshot`, and recommendations artifacts.

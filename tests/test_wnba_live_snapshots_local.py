@@ -1070,6 +1070,75 @@ class WnbaLiveSnapshotLocalTests(unittest.TestCase):
         self.assertEqual(row.get("book"), "FanDuel")
         self.assertEqual(row.get("line_source"), "oddsapi_player_props_fallback")
 
+    def test_live_player_lens_payload_hydrates_prices_across_event_id_aliases(self) -> None:
+        with patch(
+            "syndicate.features.wnba.cards.build_cards_page_context",
+            return_value={"date": "2026-05-21"},
+        ), patch(
+            "syndicate.features.wnba.cards._filtered_local_live_snapshot_payload",
+            return_value={
+                "ok": True,
+                "date": "2026-05-21",
+                "games": [
+                    {
+                        "event_id": "0ABC123",
+                        "rows": [
+                            {
+                                "player": "Breanna Stewart",
+                                "team_tri": "NYL",
+                                "stat": "pts",
+                                "line_live": 17.5,
+                                "sim_mu": 21.0,
+                                "sim_mu_adjusted": 21.0,
+                                "live_projection": 15.0,
+                                "live_edge": -2.5,
+                                "price": None,
+                                "line_source": "live_lens_projection_artifact",
+                            }
+                        ],
+                    }
+                ],
+            },
+        ), patch(
+            "syndicate.features.wnba.cards._resolve_games_for_event_ids",
+            return_value={
+                "0ABC123": {
+                    "event_id": "0ABC123",
+                    "gamePk": "0401",
+                    "away_tri": "NYL",
+                    "home_tri": "LAS",
+                    "prop_recommendations": {"away": [], "home": []},
+                }
+            },
+        ), patch(
+            "syndicate.features.wnba.cards._processed_live_player_odds_index",
+            return_value={
+                ("ABC123", "BREANNA STEWART", "pts"): [
+                    {
+                        "line": 17.5,
+                        "price_over": -112,
+                        "price_under": -108,
+                        "book": "FanDuel",
+                    }
+                ]
+            },
+        ), patch(
+            "syndicate.features.wnba.cards.build_live_player_boxscore_payload",
+            return_value={"games": []},
+        ), patch(
+            "syndicate.features.wnba.cards.build_live_state_payload",
+            return_value={"games": [{"event_id": "0ABC123", "status": {"in_progress": True, "period": 2, "clock": "8:00", "status": "8:00 - 2nd"}}]},
+        ):
+            payload = build_live_player_lens_payload("2026-05-21", ["0ABC123"], ttl=20)
+
+        row = ((payload.get("games") or [{}])[0].get("rows") or [{}])[0]
+        self.assertEqual(row.get("price_over"), -112)
+        self.assertEqual(row.get("price_under"), -108)
+        self.assertEqual(row.get("price"), -108)
+        self.assertEqual(row.get("ev_side"), "UNDER")
+        self.assertEqual(row.get("book"), "FanDuel")
+        self.assertEqual(row.get("line_source"), "oddsapi_player_props_fallback")
+
     def test_live_player_lens_payload_keeps_surpassed_live_line(self) -> None:
         with patch(
             "syndicate.features.wnba.cards.build_cards_page_context",

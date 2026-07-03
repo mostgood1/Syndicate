@@ -20,6 +20,7 @@ from urllib import request as urllib_request
 from syndicate.features.shared.game_board_contract import apply_game_board_contract
 from syndicate.features.shared.basketball_live_artifacts import build_live_lines_payload_from_artifacts
 from syndicate.features.shared.basketball_live_artifacts import build_live_player_lens_payload_from_artifacts
+from syndicate.features.shared.basketball_live_artifacts import _canonical_game_id
 from syndicate.features.shared.basketball_live_artifacts import resolve_event_ids_from_games
 from syndicate.features.shared.game_board_contract import _sim_payload
 from syndicate.features.wnba.sources import available_dates
@@ -2793,7 +2794,8 @@ def _game_index_by_event_id(selected_date: str) -> dict[str, dict[str, Any]]:
     for game in _cards_games_for_live_fallback(selected_date):
         event_id = str(game.get("event_id") or "").strip()
         if event_id:
-            out[event_id] = game
+            for alias in _event_id_aliases(event_id):
+                out[alias] = game
     return out
 
 
@@ -2829,7 +2831,7 @@ def _resolve_games_for_event_ids(selected_date: str, event_ids: list[str]) -> di
     by_event = _game_index_by_event_id(selected_date)
     matchup_index = _games_by_matchup(selected_date)
 
-    unresolved = [event_id for event_id in normalized_event_ids if event_id not in by_event]
+    unresolved = [event_id for event_id in normalized_event_ids if event_id not in by_event and not any(alias in by_event for alias in _event_id_aliases(event_id))]
     if unresolved:
         live_payload = build_live_state_payload(selected_date, ttl=12, allow_stored_date_fallback=False)
         live_rows = live_payload.get("games") if isinstance(live_payload, dict) else []
@@ -2839,18 +2841,19 @@ def _resolve_games_for_event_ids(selected_date: str, event_ids: list[str]) -> di
                 if not isinstance(row, dict):
                     continue
                 event_id = str(row.get("event_id") or "").strip()
-                if not event_id or event_id not in wanted or event_id in by_event:
+                if not event_id or event_id not in wanted or event_id in by_event or any(alias in by_event for alias in _event_id_aliases(event_id)):
                     continue
                 away_tri = _canonical_wnba_tri(str(row.get("away_tri") or row.get("away") or "").strip().upper())
                 home_tri = _canonical_wnba_tri(str(row.get("home_tri") or row.get("home") or "").strip().upper())
                 game = matchup_index.get((away_tri, home_tri)) if away_tri and home_tri else None
                 if isinstance(game, dict):
-                    by_event[event_id] = game
+                    for alias in _event_id_aliases(event_id):
+                        by_event[alias] = game
 
     return {
         event_id: game
         for event_id in normalized_event_ids
-        for game in [by_event.get(event_id)]
+        for game in [next((by_event.get(alias) for alias in _event_id_aliases(event_id) if by_event.get(alias) is not None), None)]
         if isinstance(game, dict)
     }
 
@@ -2926,7 +2929,8 @@ def _normalize_player_key(value: Any) -> str:
 
 
 def _live_player_row_key(row: dict[str, Any], event_id: str | None = None) -> tuple[str, str, str, str, str, str]:
-    normalized_event_id = str(event_id or row.get("event_id") or "").strip()
+    aliases = _event_id_aliases(event_id or row.get("event_id"))
+    normalized_event_id = aliases[0] if aliases else ""
     team_tri = str(row.get("team_tri") or "").strip().upper()
     player_key = _normalize_player_key(row.get("player"))
     stat_key = str(row.get("stat") or row.get("market") or "").strip().lower()
@@ -2998,13 +3002,14 @@ def _processed_live_player_odds_index(
         away_tri = _canonical_wnba_tri(str(game.get("away_tri") or game.get("away") or "").strip().upper())
         home_tri = _canonical_wnba_tri(str(game.get("home_tri") or game.get("home") or "").strip().upper())
         if away_tri and home_tri:
-            matchup_to_event[(away_tri, home_tri)] = str(event_id or "").strip()
+            event_aliases = _event_id_aliases(event_id or game.get("event_id") or game.get("game_id") or game.get("gamePk"))
+            matchup_to_event[(away_tri, home_tri)] = event_aliases[0] if event_aliases else str(event_id or "").strip()
 
     grouped: dict[tuple[str, str, str, str], dict[str, Any]] = {}
     for row in _load_csv_rows(odds_path):
         away_tri = _canonical_wnba_tri(str(row.get("away_team") or "").strip().upper())
         home_tri = _canonical_wnba_tri(str(row.get("home_team") or "").strip().upper())
-        event_id = matchup_to_event.get((away_tri, home_tri))
+        event_id = _canonical_game_id(matchup_to_event.get((away_tri, home_tri)))
         if not event_id:
             continue
         stat_key = _oddsapi_market_to_stat(row.get("market"))
@@ -3037,11 +3042,24 @@ def _processed_live_player_odds_index(
     index: dict[tuple[str, str, str], list[dict[str, Any]]] = {}
     for grouped_key, payload in grouped.items():
         event_id, player_key, stat_key, _line_key = grouped_key
-        index.setdefault((event_id, player_key, stat_key), []).append(payload)
+        for event_alias in _event_id_aliases(event_id):
+            index.setdefault((event_alias, player_key, stat_key), []).append(payload)
 
     for values in index.values():
         values.sort(key=lambda item: abs(float(item.get("line") or 0.0)))
     return index
+
+
+def _event_id_aliases(value: Any) -> list[str]:
+    text = str(value or "").strip()
+    if not text:
+        return []
+    aliases: list[str] = []
+    for candidate in (text, text.lstrip("0"), _canonical_game_id(text)):
+        candidate_text = str(candidate or "").strip()
+        if candidate_text and candidate_text not in aliases:
+            aliases.append(candidate_text)
+    return aliases
 
 
 def _best_live_player_odds_match(
@@ -3053,7 +3071,11 @@ def _best_live_player_odds_match(
     stat_key = str(row.get("stat") or row.get("market") or "").strip().lower()
     if not player_key or not stat_key:
         return None
-    candidates = odds_index.get((event_id, player_key, stat_key)) or []
+    candidates: list[dict[str, Any]] = []
+    for event_key in _event_id_aliases(event_id or row.get("event_id")):
+        candidates = odds_index.get((event_key, player_key, stat_key)) or []
+        if candidates:
+            break
     if not candidates:
         return None
     row_line = _safe_float(row.get("line_live") if row.get("line_live") is not None else row.get("line"))
