@@ -13,6 +13,7 @@ Constraints:
 from __future__ import annotations
 
 import os
+import threading
 from typing import Callable
 
 from flask import Flask
@@ -228,9 +229,25 @@ def create_app() -> Flask:
     def _start_background_loops() -> None:
         if app.extensions.get("syndicate_background_loops_started"):
             return
-        app.extensions["syndicate_background_loops_started"] = True
-        start_intelligence_state_background_loop(app)
-        start_live_refresh_background_loop()
+        if app.extensions.get("syndicate_background_loops_bootstrap_started"):
+            return
+        app.extensions["syndicate_background_loops_bootstrap_started"] = True
+
+        def _bootstrap_background_loops() -> None:
+            try:
+                if app.extensions.get("syndicate_background_loops_started"):
+                    return
+                start_intelligence_state_background_loop(app)
+                start_live_refresh_background_loop()
+                app.extensions["syndicate_background_loops_started"] = True
+            finally:
+                app.extensions.pop("syndicate_background_loops_bootstrap_started", None)
+
+        threading.Thread(
+            target=_bootstrap_background_loops,
+            name="syndicate-background-loop-bootstrap",
+            daemon=True,
+        ).start()
 
     try:
         app.before_serving(_start_background_loops)

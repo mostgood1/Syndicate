@@ -4644,7 +4644,10 @@ def _build_light_home_sports(selected_date: str | None = None) -> list[dict[str,
 @home_bp.get("/")
 def home():
     selected_date = _home_selected_date(request.args.get("date"))
-    sports = _build_light_home_sports(selected_date)
+    if _render_web_dyno():
+        sports = []
+    else:
+        sports = _build_light_home_sports(selected_date)
     return render_template(
         "home.html",
         selected_home_date=selected_date,
