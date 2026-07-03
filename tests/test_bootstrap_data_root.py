@@ -120,9 +120,16 @@ class BootstrapDataRootTests(unittest.TestCase):
                     "data/wnba_source/source_artifacts",
                     "data/wnba_source/manifests",
                     "reports/odds_control_plane",
-                    "reports/intelligence",
                     "reports/daily_update/latest",
                     "reports/refresh_status/latest",
+                    "reports/intelligence/board_snapshot.json",
+                    "reports/intelligence/intelligence_state.json",
+                    "reports/intelligence/intelligence_state_history.jsonl",
+                    "reports/intelligence/status_response_cache.json",
+                    "reports/intelligence/query_state_cache.json",
+                    "reports/intelligence/query_response_cache.json",
+                    "reports/intelligence/query_response_version.json",
+                    "reports/intelligence/performance_summary.json",
                 ],
             )
 

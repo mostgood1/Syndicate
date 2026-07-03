@@ -34,9 +34,19 @@ BOOTSTRAP_ROOTS = (
     Path("data/wnba_source/source_artifacts"),
     Path("data/wnba_source/manifests"),
     Path("reports/odds_control_plane"),
-    Path("reports/intelligence"),
     Path("reports/daily_update/latest"),
     Path("reports/refresh_status/latest"),
+)
+
+BOOTSTRAP_FILES = (
+    Path("reports/intelligence/board_snapshot.json"),
+    Path("reports/intelligence/intelligence_state.json"),
+    Path("reports/intelligence/intelligence_state_history.jsonl"),
+    Path("reports/intelligence/status_response_cache.json"),
+    Path("reports/intelligence/query_state_cache.json"),
+    Path("reports/intelligence/query_response_cache.json"),
+    Path("reports/intelligence/query_response_version.json"),
+    Path("reports/intelligence/performance_summary.json"),
 )
 
 
@@ -81,6 +91,10 @@ def _bootstrap_root_pairs(repo_root: Path, data_root: Path) -> list[tuple[Path, 
             dest_relative = relative_root
         dst = data_root / dest_relative
         pairs.append((src, dst, str(relative_root)))
+    for relative_file in BOOTSTRAP_FILES:
+        src = repo_root / relative_file
+        dst = data_root / relative_file
+        pairs.append((src, dst, str(relative_file)))
     return pairs
 
 

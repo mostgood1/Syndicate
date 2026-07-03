@@ -1,5 +1,12 @@
 # Fix Notes Log
 
+## 2026-07-03 - Render bootstrapping intelligence pulled a 3.2 GB ledger into startup
+- Symptom: Render instances repeatedly failed during deploy/startup with out-of-memory errors after intelligence updates.
+- Root cause: `scripts/bootstrap_data_root.py` was syncing the entire `reports/intelligence` tree on startup, including the 3.2 GB `evaluation_ledger.jsonl` file that the web dyno does not need at boot.
+- Fix: Replace the broad directory bootstrap with a small file allowlist for the intelligence state/cache artifacts the app actually reads at runtime.
+- Validation: `python -m unittest tests.test_bootstrap_data_root -q` passed.
+- Follow-up: Keep large evaluation ledgers out of the web bootstrap path unless a route explicitly requires them.
+
 ## 2026-07-02 - Daily update publish failed on staged MLB artifact paths
 - Symptom: The in-season daily update aborted while publishing MLB artifacts with `git add failed` on `data/mlb_source/data/eval/seasons/2026/season_betting_cards_retuned_manifest.json`.
 - Root cause: The incremental publish loop was branching on `git check-ignore` before staging each path, which made the artifact publish path too dependent on ignore-state handling for owned MLB outputs.
