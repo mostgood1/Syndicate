@@ -795,24 +795,31 @@ def _artifact_bundle(selected_date: str) -> dict[str, Any]:
     repo_data_root = _repo_root_from(__file__) / "data" / "wnba_source"
     candidate_roots = list(_wnba_source_roots()) + [repo_data_root]
 
-    paths = _artifact_root_paths(selected_date)
-    rows = []
+    best_paths = _artifact_root_paths(selected_date)
+    best_rows: list[dict[str, str]] = []
+    best_score = -1
     for root in candidate_roots:
         alt_path = root / "data" / "processed" / csv_name
         if not alt_path.exists():
             continue
         alt_rows = _load_csv_rows(alt_path)
         if alt_rows:
-            rows = alt_rows
-            paths = {
+            candidate_paths = {
                 "cards": alt_path,
                 "recommendations": root / "data" / "processed" / f"recommendations_slate_{selected_date}.json",
                 "sim": root / "data" / "processed" / f"cards_sim_detail_{selected_date}.json",
                 "props": root / "data" / "processed" / f"cards_props_snapshot_{selected_date}.json",
             }
-            break
+            score = sum(1 for key in ("recommendations", "sim", "props") if candidate_paths[key].exists())
+            score += 1
+            if score > best_score:
+                best_score = score
+                best_rows = alt_rows
+                best_paths = candidate_paths
 
     # ✅ Existing
+    rows = best_rows
+    paths = best_paths
     rec_summary = load_json(paths["recommendations"]) if paths["recommendations"].exists() else None
 
     # Runtime WNBA fallback is disabled on Render so the deployed app only

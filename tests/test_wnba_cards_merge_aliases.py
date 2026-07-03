@@ -109,6 +109,44 @@ class WnbaCardsMergeAliasTests(unittest.TestCase):
         self.assertEqual(len(bundle.get("rows") or []), 1)
         self.assertEqual((bundle.get("rows") or [{}])[0].get("away_tri"), "LAS")
 
+    def test_artifact_bundle_prefers_root_with_complete_sim_and_props_bundle(self) -> None:
+        from syndicate.features.wnba.cards import _artifact_bundle
+
+        with TemporaryDirectory() as temp_dir_a, TemporaryDirectory() as temp_dir_b:
+            root_a = Path(temp_dir_a)
+            root_b = Path(temp_dir_b)
+            processed_a = root_a / "data" / "processed"
+            processed_b = root_b / "data" / "processed"
+            processed_a.mkdir(parents=True, exist_ok=True)
+            processed_b.mkdir(parents=True, exist_ok=True)
+
+            (processed_a / "game_cards_2026-07-03.csv").write_text(
+                "away_tri,home_tri,visitor_team,home_team,commence_time\n"
+                "MIN,NYL,MIN,NYL,2026-07-03T23:00:00Z\n",
+                encoding="utf-8",
+            )
+            (processed_b / "game_cards_2026-07-03.csv").write_text(
+                "away_tri,home_tri,visitor_team,home_team,commence_time\n"
+                "MIN,NYL,MIN,NYL,2026-07-03T23:00:00Z\n",
+                encoding="utf-8",
+            )
+            (processed_b / "recommendations_slate_2026-07-03.json").write_text("{\"per_game\": []}", encoding="utf-8")
+            (processed_b / "cards_sim_detail_2026-07-03.json").write_text(
+                "{\"MIN\":{\"NYL\":{\"sim\":{\"players\":{\"away\":[],\"home\":[]}}}}}",
+                encoding="utf-8",
+            )
+            (processed_b / "cards_props_snapshot_2026-07-03.json").write_text(
+                "{\"MIN\":{\"NYL\":{\"prop_recommendations\":{\"away\":[],\"home\":[]}}}}",
+                encoding="utf-8",
+            )
+
+            with patch("syndicate.features.wnba.cards._wnba_source_roots", return_value=[root_a, root_b]):
+                bundle = _artifact_bundle("2026-07-03")
+
+        self.assertEqual(bundle["paths"]["cards"], processed_b / "game_cards_2026-07-03.csv")
+        self.assertEqual(bundle["paths"]["sim"], processed_b / "cards_sim_detail_2026-07-03.json")
+        self.assertEqual(bundle["paths"]["props"], processed_b / "cards_props_snapshot_2026-07-03.json")
+
     def test_source_cards_payload_hydrates_betting_from_live_lines_artifact(self) -> None:
         artifact_bundle = {
             "rows": [

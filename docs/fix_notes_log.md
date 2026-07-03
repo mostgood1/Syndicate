@@ -1,5 +1,12 @@
 # Fix Notes Log
 
+## 2026-07-03 - WNBA artifact bundle now prefers the fuller mirror root
+- Symptom: The WNBA page could render game cards but still show zeroed sim metrics and empty props/hydration lanes on Render even when the day’s processed artifacts existed locally.
+- Root cause: The WNBA artifact bundle loader stopped at the first root with a cards CSV, so a partial mounted mirror could win over a richer repo bundle that also contained `cards_sim_detail`, `cards_props_snapshot`, and recommendations artifacts.
+- Fix: Rank candidate roots by bundle completeness and select the root with the most complete cards/sim/props/recommendations set instead of blindly accepting the first CSV hit.
+- Validation: Focused regression coverage in `tests/test_wnba_cards_merge_aliases.py` now proves the fuller root is selected, and `python -m unittest tests.test_wnba_cards_merge_aliases` passes.
+- Follow-up: If Render still shows empty WNBA sim or props after redeploy, the remaining blocker is data parity on the mounted disk rather than the bundle-selection logic.
+
 ## 2026-07-03 - Render web startup no longer hard-fails on refresh-state readiness
 - Symptom: The Render site was still returning 502 on both `/wnba` and `/healthz`, which meant the web dyno was failing before the lightweight health check could respond.
 - Root cause: `syndicate.app.create_app()` still called `assert_refresh_state_backend_ready(process_name="web")` during app construction, so a hosted-storage or refresh-state mismatch could kill the web process at startup. The Render env file also carried conflicting live-refresh/bootstrap values, which made the deployment contract ambiguous.
