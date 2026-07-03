@@ -261,6 +261,7 @@ if ($activeList.Count -eq 0) {
     Write-Host '    no-slate day detected for scheduled-game sports; skipping run.' -ForegroundColor Yellow
     if ($noSlateSkips.Count -gt 0) {
         Write-Host ("    no-slate skips: {0}" -f ($noSlateSkips -join ', ')) -ForegroundColor DarkGray
+}
     }
     return
 }
