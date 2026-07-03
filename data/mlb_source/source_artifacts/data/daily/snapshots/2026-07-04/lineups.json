@@ -2,7 +2,7 @@
   "date": "2026-07-04",
   "season": 2026,
   "spring_mode": false,
-  "generated_at": "2026-07-03T03:30:00.391835",
+  "generated_at": "2026-07-03T07:19:32.420611",
   "summary": {
     "games": 15,
     "projected_teams": 30,
@@ -1452,7 +1452,7 @@
         "missing_ids": [],
         "backfilled_ids": [],
         "pool_source": "active+40Man",
-        "pool_size": 18,
+        "pool_size": 17,
         "raw_names": [
           "Mauricio Dubon",
           "Drake Baldwin",

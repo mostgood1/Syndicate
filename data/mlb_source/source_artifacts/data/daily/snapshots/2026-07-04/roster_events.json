@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "date": "2026-07-04",
-  "generated_at": "2026-07-03T03:26:53.891860",
+  "generated_at": "2026-07-03T07:16:46.196340",
   "include_baseline": false,
   "teams": {
     "108": {
@@ -88,25 +88,9 @@
         },
         "active": {
           "prev_date": "2026-07-03",
-          "n_players": 26,
-          "n_added": 1,
-          "n_removed": 0,
-          "added": [
-            {
-              "full_name": "Jordan Wicks",
-              "player_id": 696136,
-              "position": "P",
-              "status": {
-                "code": "A",
-                "description": "Active"
-              }
-            }
-          ],
-          "removed": [],
-          "added_ids": [
-            696136
-          ],
-          "removed_ids": []
+          "n_players": 25,
+          "n_added": 0,
+          "n_removed": 0
         }
       }
     },
@@ -194,25 +178,9 @@
         },
         "active": {
           "prev_date": "2026-07-03",
-          "n_players": 26,
-          "n_added": 1,
-          "n_removed": 0,
-          "added": [
-            {
-              "full_name": "Miguel Ullola",
-              "player_id": 699044,
-              "position": "P",
-              "status": {
-                "code": "A",
-                "description": "Active"
-              }
-            }
-          ],
-          "removed": [],
-          "added_ids": [
-            699044
-          ],
-          "removed_ids": []
+          "n_players": 25,
+          "n_added": 0,
+          "n_removed": 0
         }
       }
     },
@@ -647,36 +615,8 @@
         "active": {
           "prev_date": "2026-07-03",
           "n_players": 26,
-          "n_added": 1,
-          "n_removed": 1,
-          "added": [
-            {
-              "full_name": "Rowdy Tellez",
-              "player_id": 642133,
-              "position": "1B",
-              "status": {
-                "code": "A",
-                "description": "Active"
-              }
-            }
-          ],
-          "removed": [
-            {
-              "full_name": "Jim Jarvis",
-              "player_id": 805347,
-              "position": "SS",
-              "status": {
-                "code": "A",
-                "description": "Active"
-              }
-            }
-          ],
-          "added_ids": [
-            642133
-          ],
-          "removed_ids": [
-            805347
-          ]
+          "n_added": 0,
+          "n_removed": 0
         }
       }
     },

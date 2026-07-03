@@ -5843,25 +5843,6 @@
           },
           {
             "person": {
-              "id": 696136,
-              "fullName": "Jordan Wicks",
-              "link": "/api/v1/people/696136"
-            },
-            "jerseyNumber": "36",
-            "position": {
-              "code": "1",
-              "name": "Pitcher",
-              "type": "Pitcher",
-              "abbreviation": "P"
-            },
-            "status": {
-              "code": "A",
-              "description": "Active"
-            },
-            "parentTeamId": 112
-          },
-          {
-            "person": {
               "id": 681909,
               "fullName": "Justin Dean",
               "link": "/api/v1/people/681909"
@@ -12721,25 +12702,6 @@
               "link": "/api/v1/people/623352"
             },
             "jerseyNumber": "71",
-            "position": {
-              "code": "1",
-              "name": "Pitcher",
-              "type": "Pitcher",
-              "abbreviation": "P"
-            },
-            "status": {
-              "code": "A",
-              "description": "Active"
-            },
-            "parentTeamId": 117
-          },
-          {
-            "person": {
-              "id": 699044,
-              "fullName": "Miguel Ullola",
-              "link": "/api/v1/people/699044"
-            },
-            "jerseyNumber": "66",
             "position": {
               "code": "1",
               "name": "Pitcher",
@@ -34420,6 +34382,25 @@
           },
           {
             "person": {
+              "id": 805347,
+              "fullName": "Jim Jarvis",
+              "link": "/api/v1/people/805347"
+            },
+            "jerseyNumber": "74",
+            "position": {
+              "code": "6",
+              "name": "Shortstop",
+              "type": "Infielder",
+              "abbreviation": "SS"
+            },
+            "status": {
+              "code": "A",
+              "description": "Active"
+            },
+            "parentTeamId": 144
+          },
+          {
+            "person": {
               "id": 663698,
               "fullName": "Joey Bart",
               "link": "/api/v1/people/663698"
@@ -34601,25 +34582,6 @@
               "name": "Pitcher",
               "type": "Pitcher",
               "abbreviation": "P"
-            },
-            "status": {
-              "code": "A",
-              "description": "Active"
-            },
-            "parentTeamId": 144
-          },
-          {
-            "person": {
-              "id": 642133,
-              "fullName": "Rowdy Tellez",
-              "link": "/api/v1/people/642133"
-            },
-            "jerseyNumber": "11",
-            "position": {
-              "code": "3",
-              "name": "First Base",
-              "type": "Infielder",
-              "abbreviation": "1B"
             },
             "status": {
               "code": "A",

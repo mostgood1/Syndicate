@@ -1,30 +1,30 @@
 {
   "date": "2026-07-03",
-  "generatedAt": "2026-07-02T22:24:12-05:00",
+  "generatedAt": "2026-07-03T02:13:56-05:00",
   "summary": {
     "cards": 13,
-    "badges": 47,
+    "badges": 59,
     "sources": {
-      "none": 47
+      "none": 59
     },
     "tones": {
-      "solid": 19,
-      "strong": 19,
-      "soft": 9
+      "solid": 23,
+      "strong": 26,
+      "soft": 10
     },
     "stats": {
       "hits_allowed": {
-        "badges": 11,
+        "badges": 13,
         "rungWins": 0,
         "rungLosses": 0
       },
       "outs": {
-        "badges": 18,
+        "badges": 24,
         "rungWins": 0,
         "rungLosses": 0
       },
       "strikeouts": {
-        "badges": 18,
+        "badges": 22,
         "rungWins": 0,
         "rungLosses": 0
       }
@@ -161,12 +161,11 @@
       "actual": null,
       "wins": 0,
       "losses": 0,
-      "targetCount": 2,
+      "targetCount": 1,
       "targets": [
-        6,
         7
       ],
-      "detail": "Supported ladders: 6/7 Last supported rung: 7"
+      "detail": "Supported ladders: 7 Last supported rung: 7"
     },
     {
       "gamePk": 822714,
@@ -339,6 +338,26 @@
       "status": "",
       "side": "away",
       "starter": "Anthony Kay",
+      "label": "O 17/18",
+      "stat": "outs",
+      "tone": "strong",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 2,
+      "targets": [
+        17,
+        18
+      ],
+      "detail": "Supported ladders: 17/18 Last supported rung: 18"
+    },
+    {
+      "gamePk": 824417,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "away",
+      "starter": "Anthony Kay",
       "label": "H up to 8",
       "stat": "hits_allowed",
       "tone": "solid",
@@ -368,12 +387,11 @@
       "actual": null,
       "wins": 0,
       "losses": 0,
-      "targetCount": 2,
+      "targetCount": 1,
       "targets": [
-        6,
         7
       ],
-      "detail": "Supported ladders: 6/7 Last supported rung: 7"
+      "detail": "Supported ladders: 7 Last supported rung: 7"
     },
     {
       "gamePk": 824417,
@@ -525,7 +543,7 @@
       "status": "",
       "side": "away",
       "starter": "Christian Scott",
-      "label": "O 17/18",
+      "label": "O 16/17",
       "stat": "outs",
       "tone": "strong",
       "source": "none",
@@ -534,10 +552,10 @@
       "losses": 0,
       "targetCount": 2,
       "targets": [
-        17,
-        18
+        16,
+        17
       ],
-      "detail": "Supported ladders: 17/18 Last supported rung: 18"
+      "detail": "Supported ladders: 16/17 Last supported rung: 17"
     },
     {
       "gamePk": 824904,
@@ -650,6 +668,27 @@
       "status": "",
       "side": "away",
       "starter": "Nick Martinez",
+      "label": "K up to 7",
+      "stat": "strikeouts",
+      "tone": "solid",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 3,
+      "targets": [
+        5,
+        6,
+        7
+      ],
+      "detail": "Supported ladders: 5/6/7 Last supported rung: 7"
+    },
+    {
+      "gamePk": 824173,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "away",
+      "starter": "Nick Martinez",
       "label": "O 19/20",
       "stat": "outs",
       "tone": "strong",
@@ -668,23 +707,84 @@
       "gamePk": 824173,
       "matchup": "? @ ?",
       "status": "",
-      "side": "away",
-      "starter": "Nick Martinez",
-      "label": "H up to 9",
+      "side": "home",
+      "starter": "Spencer Arrighetti",
+      "label": "K up to 7",
+      "stat": "strikeouts",
+      "tone": "solid",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 2,
+      "targets": [
+        6,
+        7
+      ],
+      "detail": "Supported ladders: 6/7 Last supported rung: 7"
+    },
+    {
+      "gamePk": 824173,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "home",
+      "starter": "Spencer Arrighetti",
+      "label": "O 18/19",
+      "stat": "outs",
+      "tone": "strong",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 2,
+      "targets": [
+        18,
+        19
+      ],
+      "detail": "Supported ladders: 18/19 Last supported rung: 19"
+    },
+    {
+      "gamePk": 824173,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "home",
+      "starter": "Spencer Arrighetti",
+      "label": "H up to 8",
       "stat": "hits_allowed",
-      "tone": "soft",
+      "tone": "solid",
       "source": "none",
       "actual": null,
       "wins": 0,
       "losses": 0,
       "targetCount": 4,
       "targets": [
+        5,
         6,
         7,
-        8,
-        9
+        8
       ],
-      "detail": "Supported ladders: 6/7/8/9 Last supported rung: 9"
+      "detail": "Supported ladders: 5/6/7/8 Last supported rung: 8"
+    },
+    {
+      "gamePk": 824013,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "away",
+      "starter": "Jake Bennett",
+      "label": "K up to 7",
+      "stat": "strikeouts",
+      "tone": "solid",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 3,
+      "targets": [
+        5,
+        6,
+        7
+      ],
+      "detail": "Supported ladders: 5/6/7 Last supported rung: 7"
     },
     {
       "gamePk": 824013,
@@ -729,6 +829,25 @@
         10
       ],
       "detail": "Supported ladders: 5/6/7/8/9/10 Last supported rung: 10"
+    },
+    {
+      "gamePk": 824013,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "home",
+      "starter": "Reid Detmers",
+      "label": "K up to 7",
+      "stat": "strikeouts",
+      "tone": "strong",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 1,
+      "targets": [
+        7
+      ],
+      "detail": "Supported ladders: 7 Last supported rung: 7"
     },
     {
       "gamePk": 824013,
@@ -961,6 +1080,50 @@
       "gamePk": 823120,
       "matchup": "? @ ?",
       "status": "",
+      "side": "away",
+      "starter": "Dylan Cease",
+      "label": "O 19/20",
+      "stat": "outs",
+      "tone": "strong",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 2,
+      "targets": [
+        19,
+        20
+      ],
+      "detail": "Supported ladders: 19/20 Last supported rung: 20"
+    },
+    {
+      "gamePk": 823120,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "away",
+      "starter": "Dylan Cease",
+      "label": "H up to 9",
+      "stat": "hits_allowed",
+      "tone": "soft",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 6,
+      "targets": [
+        4,
+        5,
+        6,
+        7,
+        8,
+        9
+      ],
+      "detail": "Supported ladders: 4/5/6/7/8/9 Last supported rung: 9"
+    },
+    {
+      "gamePk": 823120,
+      "matchup": "? @ ?",
+      "status": "",
       "side": "home",
       "starter": "Luis Castillo",
       "label": "K up to 7",
@@ -977,6 +1140,26 @@
         7
       ],
       "detail": "Supported ladders: 5/6/7 Last supported rung: 7"
+    },
+    {
+      "gamePk": 823120,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "home",
+      "starter": "Luis Castillo",
+      "label": "O 19/20",
+      "stat": "outs",
+      "tone": "strong",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 2,
+      "targets": [
+        19,
+        20
+      ],
+      "detail": "Supported ladders: 19/20 Last supported rung: 20"
     },
     {
       "gamePk": 823933,
@@ -1003,6 +1186,49 @@
       "gamePk": 823933,
       "matchup": "? @ ?",
       "status": "",
+      "side": "away",
+      "starter": "Michael King",
+      "label": "O 17/18",
+      "stat": "outs",
+      "tone": "strong",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 2,
+      "targets": [
+        17,
+        18
+      ],
+      "detail": "Supported ladders: 17/18 Last supported rung: 18"
+    },
+    {
+      "gamePk": 823933,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "away",
+      "starter": "Michael King",
+      "label": "H up to 9",
+      "stat": "hits_allowed",
+      "tone": "soft",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 5,
+      "targets": [
+        5,
+        6,
+        7,
+        8,
+        9
+      ],
+      "detail": "Supported ladders: 5/6/7/8/9 Last supported rung: 9"
+    },
+    {
+      "gamePk": 823933,
+      "matchup": "? @ ?",
+      "status": "",
       "side": "home",
       "starter": "Shohei Ohtani",
       "label": "K up to 7",
@@ -1017,6 +1243,26 @@
         7
       ],
       "detail": "Supported ladders: 7 Last supported rung: 7"
+    },
+    {
+      "gamePk": 823933,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "home",
+      "starter": "Shohei Ohtani",
+      "label": "O 19/20",
+      "stat": "outs",
+      "tone": "strong",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 2,
+      "targets": [
+        19,
+        20
+      ],
+      "detail": "Supported ladders: 19/20 Last supported rung: 20"
     }
   ]
 }

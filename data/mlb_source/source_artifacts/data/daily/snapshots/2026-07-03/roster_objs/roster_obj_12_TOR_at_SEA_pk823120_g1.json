@@ -4224,7 +4224,7 @@
           "arsenal_sample_size": 510,
           "stamina_pitches": 25,
           "role": "CL",
-          "availability_mult": 1.0,
+          "availability_mult": 0.875,
           "platoon_mult_vs_lhb": {
             "k": 0.901618254311494,
             "bb": 1.1535013566141865,
@@ -4397,7 +4397,7 @@
           "arsenal_sample_size": 568,
           "stamina_pitches": 25,
           "role": "MR",
-          "availability_mult": 1.0,
+          "availability_mult": 0.9083333333333333,
           "platoon_mult_vs_lhb": {
             "k": 0.9986836576230931,
             "bb": 1.1526000497141438,

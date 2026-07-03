@@ -8676,9 +8676,9 @@
         "3b_mean": 0.0,
         "sb_mean": 0.0
       },
-      "573262": {
-        "batter_id": 573262,
-        "name": "Mike Yastrzemski",
+      "805347": {
+        "batter_id": 805347,
+        "name": "Jim Jarvis",
         "team": "ATL",
         "lineup_order": null,
         "is_lineup_batter": false,
@@ -8725,9 +8725,9 @@
         "3b_mean": 0.0,
         "sb_mean": 0.0
       },
-      "642133": {
-        "batter_id": 642133,
-        "name": "Rowdy Tellez",
+      "573262": {
+        "batter_id": 573262,
+        "name": "Mike Yastrzemski",
         "team": "ATL",
         "lineup_order": null,
         "is_lineup_batter": false,

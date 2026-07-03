@@ -1250,6 +1250,35 @@
         "vs_pitcher_history": {}
       },
       {
+        "id": 805347,
+        "name": "Jim Jarvis",
+        "pos": "SS",
+        "bat": "L",
+        "throw": "R",
+        "k_rate": 0.3333333333333333,
+        "bb_rate": 0.0,
+        "hbp_rate": 0.0,
+        "hr_rate": 0.0,
+        "inplay_hit_rate": 0.3333333333333333,
+        "xb_hit_share": 0.05,
+        "vs_pitch_type": {},
+        "vs_pitch_type_hr": {},
+        "platoon_mult_vs_lhp": {
+          "k": 0.8075,
+          "bb": 1.0,
+          "hr": 1.0,
+          "inplay": 0.8075
+        },
+        "platoon_mult_vs_rhp": {
+          "k": 1.06875,
+          "bb": 1.0,
+          "hr": 1.0,
+          "inplay": 1.11
+        },
+        "statcast_quality_mult": {},
+        "vs_pitcher_history": {}
+      },
+      {
         "id": 573262,
         "name": "Mike Yastrzemski",
         "pos": "LF",
@@ -1274,35 +1303,6 @@
           "bb": 0.9946566806007121,
           "hr": 1.0674358974358975,
           "inplay": 1.0381478431910711
-        },
-        "statcast_quality_mult": {},
-        "vs_pitcher_history": {}
-      },
-      {
-        "id": 642133,
-        "name": "Rowdy Tellez",
-        "pos": "1B",
-        "bat": "L",
-        "throw": "L",
-        "k_rate": 0.3,
-        "bb_rate": 0.0,
-        "hbp_rate": 0.0,
-        "hr_rate": 0.1,
-        "inplay_hit_rate": 0.14285714285714285,
-        "xb_hit_share": 0.05,
-        "vs_pitch_type": {},
-        "vs_pitch_type_hr": {},
-        "platoon_mult_vs_lhp": {
-          "k": 0.8075,
-          "bb": 1.0,
-          "hr": 0.78,
-          "inplay": 0.8075
-        },
-        "platoon_mult_vs_rhp": {
-          "k": 1.1375,
-          "bb": 1.0,
-          "hr": 1.1375,
-          "inplay": 1.1925000000000001
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}

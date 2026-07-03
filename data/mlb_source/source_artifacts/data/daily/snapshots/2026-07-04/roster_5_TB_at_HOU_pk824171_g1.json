@@ -970,12 +970,6 @@
         "lev": 0.7
       },
       {
-        "id": 699044,
-        "name": "Miguel Ullola",
-        "role": "MR",
-        "lev": 0.5
-      },
-      {
         "id": 663878,
         "name": "Nate Pearson",
         "role": "MR",
@@ -1621,49 +1615,6 @@
         "arsenal": {
           "SI": 0.6644736867105263,
           "SL": 0.33552631328947374
-        },
-        "pitch_type_whiff_mult": {},
-        "pitch_type_inplay_mult": {},
-        "pitch_type_hr_mult": {}
-      },
-      {
-        "id": 699044,
-        "name": "Miguel Ullola",
-        "throw": "R",
-        "role": "MR",
-        "leverage_skill": 0.5,
-        "stamina_pitches": 25,
-        "availability_mult": 1.0,
-        "platoon_mult_vs_lhb": {
-          "k": 0.9388888888888889,
-          "bb": 1.0,
-          "hr": 1.0,
-          "inplay": 0.835
-        },
-        "platoon_mult_vs_rhb": {
-          "k": 1.1099999999999999,
-          "bb": 1.0,
-          "hr": 1.0,
-          "inplay": 1.1925000000000001
-        },
-        "statcast_quality_mult": {},
-        "arsenal_source": "statsapi_pitchArsenal",
-        "arsenal_sample_size": 53,
-        "statcast_splits_found": false,
-        "statcast_splits_source": "",
-        "statcast_splits_n_pitches": 0,
-        "statcast_splits_start_date": "",
-        "statcast_splits_end_date": "",
-        "k_rate": 0.5,
-        "bb_rate": 0.0,
-        "hbp_rate": 0.0,
-        "hr_rate": 0.0,
-        "inplay_hit_rate": 0.2857142857142857,
-        "arsenal": {
-          "FF": 0.7358490639433959,
-          "CU": 0.05660377122641521,
-          "CH": 0.01886792407547172,
-          "SL": 0.18867924075471718
         },
         "pitch_type_whiff_mult": {},
         "pitch_type_inplay_mult": {},
