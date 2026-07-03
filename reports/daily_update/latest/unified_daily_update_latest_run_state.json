@@ -1,20 +1,20 @@
 ﻿{
     "scope":  "daily_update",
-    "date":  "2026-07-02",
+    "date":  "2026-07-03",
     "runMode":  "standard",
     "overallStatus":  "started",
-    "generatedAt":  "2026-07-02T20:48:07.0901206+00:00",
-    "updatedAt":  "2026-07-02T20:48:07.3707448+00:00",
-    "runManifestPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-02\\20260702_204806\\unified_daily_update_run.json",
+    "generatedAt":  "2026-07-03T03:14:04.1072950+00:00",
+    "updatedAt":  "2026-07-03T03:14:04.3709414+00:00",
+    "runManifestPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-03\\20260703_031403\\unified_daily_update_run.json",
     "latestManifestPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest.json",
-    "runCheckpointPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-02\\20260702_204806\\unified_daily_update_checkpoint.json",
+    "runCheckpointPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-03\\20260703_031403\\unified_daily_update_checkpoint.json",
     "latestCheckpointPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest_checkpoint.json",
     "currentStage":  "queued",
     "completedStages":  [
 
                         ],
     "failedStage":  null,
-    "lastUpdatedAt":  "2026-07-02T20:48:07.3420473+00:00",
+    "lastUpdatedAt":  "2026-07-03T03:14:04.3404996+00:00",
     "replayContext":  {
                           "latestCheckpointLoaded":  true,
                           "latestCheckpointPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest_checkpoint.json",
