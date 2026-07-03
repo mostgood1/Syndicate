@@ -1,5 +1,12 @@
 # Fix Notes Log
 
+## 2026-07-03 - Intelligence evaluation ledger moved to dated chunks
+- Symptom: The evaluation ledger was growing into a multi-gigabyte monolith and was no longer a good fit for default reads and writes.
+- Root cause: The default evaluation contract still treated `reports/intelligence/evaluation_ledger.jsonl` as a single append-only file, so long-lived history kept accumulating in one place.
+- Fix: Split the default evaluation ledger into dated JSONL chunk files under `reports/intelligence/evaluation_ledger_chunks/`, with an index and manifest for compatibility, and route default readers/writers through the chunk-aware helpers.
+- Validation: `python -m unittest tests.test_intelligence_evaluation -q` and `python -m unittest tests.test_recommendation_engine -q` passed.
+- Follow-up: The legacy monolithic ledger has been moved to `reports/intelligence/archive/evaluation_ledger.jsonl` and kept out of the active read path.
+
 ## 2026-07-03 - Render bootstrapping intelligence pulled a 3.2 GB ledger into startup
 - Symptom: Render instances repeatedly failed during deploy/startup with out-of-memory errors after intelligence updates.
 - Root cause: `scripts/bootstrap_data_root.py` was syncing the entire `reports/intelligence` tree on startup, including the 3.2 GB `evaluation_ledger.jsonl` file that the web dyno does not need at boot.

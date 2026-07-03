@@ -19,6 +19,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
+from syndicate.features.shared.intelligence_evaluation import _iter_record_payloads
 from syndicate.features.shared.intelligence_evaluation import build_reliability_profile
 from syndicate.features.shared.odds_lifecycle import build_market_features
 from syndicate.features.shared.source_roots import repo_root_from
@@ -323,20 +324,7 @@ def _market_dynamics_score(candidate: Mapping[str, Any], market_features: Mappin
 
 def _load_records_from_ledger(ledger_path: Path | str | None = None) -> list[dict[str, Any]]:
     path = Path(ledger_path) if ledger_path is not None else DEFAULT_EVALUATION_LEDGER
-    if not path.exists():
-        return []
-    records: list[dict[str, Any]] = []
-    for line in path.read_text(encoding="utf-8").splitlines():
-        line = line.strip()
-        if not line:
-            continue
-        try:
-            payload = json.loads(line)
-        except Exception:
-            continue
-        if isinstance(payload, dict):
-            records.append(payload)
-    return records
+    return _iter_record_payloads(ledger_path=path)
 
 
 def _load_performance_summary(ledger_path: Path | str | None = None) -> dict[str, Any] | None:

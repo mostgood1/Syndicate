@@ -18,7 +18,7 @@
   "schema_version": 1,
   "source": {
     "evaluation_ledger_count": 2,
-    "evaluation_ledger_path": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\intelligence\\evaluation_ledger.jsonl",
+    "evaluation_ledger_path": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\intelligence\\evaluation_ledger_chunks",
     "prediction_ledger_count": 0,
     "prediction_ledger_path": null,
     "used_prediction_ledger_fallback": false

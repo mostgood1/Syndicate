@@ -29,6 +29,9 @@ from syndicate.features.shared.source_roots import repo_root_from
 
 SCHEMA_VERSION = 1
 DEFAULT_LEDGER_PATH = repo_root_from(__file__) / "reports" / "intelligence" / "evaluation_ledger.jsonl"
+DEFAULT_LEDGER_CHUNK_ROOT = DEFAULT_LEDGER_PATH.parent / "evaluation_ledger_chunks"
+DEFAULT_LEDGER_INDEX_PATH = DEFAULT_LEDGER_CHUNK_ROOT / "index.json"
+DEFAULT_LEDGER_MANIFEST_PATH = DEFAULT_LEDGER_CHUNK_ROOT / "manifest.json"
 
 
 def _intel_trace(event: str, **fields: Any) -> None:
@@ -74,7 +77,170 @@ def _append_jsonl(path: Path, payload: Mapping[str, Any]) -> None:
         handle.write("\n")
 
 
+def _is_chunked_ledger_path(path: Path | str | None) -> bool:
+    if path is None:
+        return True
+    candidate = Path(path)
+    try:
+        return candidate.expanduser().resolve() == DEFAULT_LEDGER_PATH.resolve()
+    except Exception:
+        return str(candidate).replace("\\", "/").endswith("reports/intelligence/evaluation_ledger.jsonl")
+
+
+def _ledger_chunk_root(path: Path | str | None = None) -> Path:
+    candidate = Path(path) if path is not None else DEFAULT_LEDGER_PATH
+    if _is_chunked_ledger_path(candidate):
+        return candidate.parent / "evaluation_ledger_chunks"
+    return candidate.parent / f"{candidate.stem}_chunks"
+
+
+def _ledger_chunk_path(path: Path | str | None, chunk_name: str) -> Path:
+    return _ledger_chunk_root(path) / f"{chunk_name}.jsonl"
+
+
+def _ledger_index_path(path: Path | str | None = None) -> Path:
+    return _ledger_chunk_root(path) / "index.json"
+
+
+def _ledger_manifest_path(path: Path | str | None = None) -> Path:
+    return _ledger_chunk_root(path) / "manifest.json"
+
+
+def _ledger_record_chunk_name(record: Mapping[str, Any]) -> str:
+    query = _copy_mapping(record.get("query"))
+    response = _copy_mapping(record.get("response"))
+    artifact_metadata = _copy_mapping(record.get("artifact_metadata"))
+    for value in (
+        query.get("selected_date"),
+        query.get("date"),
+        response.get("selected_date"),
+        response.get("date"),
+        artifact_metadata.get("selected_date"),
+        artifact_metadata.get("date"),
+        record.get("settled_at"),
+        record.get("created_at"),
+        record.get("updated_at"),
+    ):
+        text = str(value or "").strip()
+        if not text:
+            continue
+        normalized = text.replace("Z", "")[:10]
+        if len(normalized) == 10 and normalized[4] == "-" and normalized[7] == "-":
+            return normalized
+    return "unknown"
+
+
+def _ledger_record_identity(record: Mapping[str, Any]) -> str | None:
+    for key in ("portfolio_event_id", "recommendation_id", "prediction_id"):
+        value = str(record.get(key) or "").strip()
+        if value:
+            return value
+    return None
+
+
+def _load_chunk_index(path: Path | str | None = None) -> dict[str, dict[str, Any]]:
+    index_path = _ledger_index_path(path)
+    if not index_path.exists():
+        return {}
+    try:
+        payload = json.loads(index_path.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+    if isinstance(payload, dict):
+        index = payload.get("records")
+        if isinstance(index, dict):
+            return {str(key): value for key, value in index.items() if isinstance(value, dict)}
+    return {}
+
+
+def _write_chunk_index(path: Path | str | None, index: dict[str, dict[str, Any]]) -> None:
+    index_path = _ledger_index_path(path)
+    _ensure_parent(index_path)
+    index_path.write_text(json.dumps({"records": index, "updated_at": _utc_now()}, indent=2, sort_keys=True), encoding="utf-8")
+
+
+def _write_chunk_manifest(path: Path | str | None, *, chunk_name: str, record_count: int) -> None:
+    manifest_path = _ledger_manifest_path(path)
+    _ensure_parent(manifest_path)
+    manifest: dict[str, Any] = {"chunks": []}
+    if manifest_path.exists():
+        try:
+            existing = json.loads(manifest_path.read_text(encoding="utf-8"))
+        except Exception:
+            existing = {}
+        if isinstance(existing, dict) and isinstance(existing.get("chunks"), list):
+            manifest = {"chunks": [item for item in existing.get("chunks") if isinstance(item, dict)]}
+    chunks = {str(item.get("chunk") or ""): dict(item) for item in manifest.get("chunks", []) if isinstance(item, dict)}
+    chunks[chunk_name] = {"chunk": chunk_name, "path": str(_ledger_chunk_path(path, chunk_name)), "record_count": int(record_count), "updated_at": _utc_now()}
+    manifest = {"chunks": list(chunks.values()), "updated_at": _utc_now()}
+    manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True), encoding="utf-8")
+
+
+def _append_evaluation_ledger_record(path: Path, payload: Mapping[str, Any]) -> None:
+    target = Path(path)
+    if not _is_chunked_ledger_path(target):
+        _append_jsonl(target, payload)
+        return
+    record = dict(payload)
+    chunk_name = _ledger_record_chunk_name(record)
+    chunk_path = _ledger_chunk_path(target, chunk_name)
+    identity = _ledger_record_identity(record)
+    index = _load_chunk_index(target)
+    if identity and identity in index:
+        return
+    _append_jsonl(chunk_path, record)
+    if identity:
+        index[identity] = {"chunk": chunk_name, "path": str(chunk_path), "updated_at": _utc_now()}
+        _write_chunk_index(target, index)
+    try:
+        record_count = sum(1 for _ in chunk_path.read_text(encoding="utf-8").splitlines() if _.strip())
+    except Exception:
+        record_count = 1
+    _write_chunk_manifest(target, chunk_name=chunk_name, record_count=record_count)
+
+
+def _load_chunked_ledger_records(path: Path) -> list[dict[str, Any]]:
+    chunk_root = _ledger_chunk_root(path)
+    if not chunk_root.exists():
+        return []
+    manifest_path = _ledger_manifest_path(path)
+    chunk_paths: list[Path] = []
+    if manifest_path.exists():
+        try:
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        except Exception:
+            manifest = {}
+        if isinstance(manifest, dict):
+            for chunk in manifest.get("chunks") or []:
+                if not isinstance(chunk, dict):
+                    continue
+                chunk_path = Path(str(chunk.get("path") or "").strip())
+                if chunk_path.exists() and chunk_path.is_file():
+                    chunk_paths.append(chunk_path)
+    if not chunk_paths:
+        chunk_paths = sorted(item for item in chunk_root.glob("*.jsonl") if item.is_file())
+    rows: list[dict[str, Any]] = []
+    for chunk_path in chunk_paths:
+        try:
+            content = chunk_path.read_text(encoding="utf-8")
+        except Exception:
+            continue
+        for line in content.splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                payload = json.loads(line)
+            except Exception:
+                continue
+            if isinstance(payload, dict):
+                rows.append(payload)
+    return rows
+
+
 def _ledger_index(path: Path) -> dict[str, dict[str, Any]]:
+    if _is_chunked_ledger_path(path):
+        return _load_chunk_index(path)
     if not path.exists():
         return {}
     index: dict[str, dict[str, Any]] = {}
@@ -509,7 +675,7 @@ def record_prediction(*, query: Any, response: Any, artifact_metadata: Any = Non
     if persist:
         target_path = Path(ledger_path) if ledger_path is not None else DEFAULT_LEDGER_PATH
         if _ledger_index(target_path).get(record.prediction_id) is None:
-            _append_jsonl(target_path, payload)
+            _append_evaluation_ledger_record(target_path, payload)
     return payload
 
 
@@ -547,7 +713,7 @@ def record_recommendation(*, prediction_record: Mapping[str, Any], recommendatio
     if persist:
         target_path = Path(ledger_path) if ledger_path is not None else DEFAULT_LEDGER_PATH
         if _ledger_index(target_path).get(str(payload.get("recommendation_id") or "")) is None:
-            _append_jsonl(target_path, payload)
+            _append_evaluation_ledger_record(target_path, payload)
     return payload
 
 
@@ -583,7 +749,7 @@ def record_portfolio_event(*, prediction_record: Mapping[str, Any], portfolio_ev
     if persist:
         target_path = Path(ledger_path) if ledger_path is not None else DEFAULT_LEDGER_PATH
         if _ledger_index(target_path).get(str(payload.get("portfolio_event_id") or "")) is None:
-            _append_jsonl(target_path, payload)
+            _append_evaluation_ledger_record(target_path, payload)
     return payload
 
 
@@ -598,7 +764,7 @@ def settle_result(*, record: Mapping[str, Any], result: Any, pnl: Any, closing_l
         "settled_at": settled_at or _utc_now(),
     }
     if persist:
-        _append_jsonl(Path(ledger_path) if ledger_path is not None else DEFAULT_LEDGER_PATH, settled_record)
+        _append_evaluation_ledger_record(Path(ledger_path) if ledger_path is not None else DEFAULT_LEDGER_PATH, settled_record)
     return settled_record
 
 
@@ -606,6 +772,8 @@ def _iter_record_payloads(records: Iterable[Mapping[str, Any]] | None = None, *,
     if records is not None:
         return [dict(item) for item in records if isinstance(item, Mapping)]
     path = Path(ledger_path) if ledger_path is not None else DEFAULT_LEDGER_PATH
+    if _is_chunked_ledger_path(path):
+        return _load_chunked_ledger_records(path)
     if not path.exists():
         return []
     rows: list[dict[str, Any]] = []
@@ -889,6 +1057,7 @@ def build_intelligence_evaluation_bundle(*, query: Any, response: Any, persist: 
 __all__ = [
     "SCHEMA_VERSION",
     "DEFAULT_LEDGER_PATH",
+    "DEFAULT_LEDGER_CHUNK_ROOT",
     "build_artifact_metadata",
     "build_reliability_profile",
     "build_intelligence_evaluation_bundle",

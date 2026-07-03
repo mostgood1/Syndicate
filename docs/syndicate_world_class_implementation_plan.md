@@ -368,7 +368,7 @@ Concrete file targets:
 - [syndicate/features/intelligence_reasoning.py](c:/Users/tempadmin/OneDrive/Coding/Syndicate/syndicate/features/intelligence_reasoning.py)
 - [syndicate/features/intelligence_evaluation.py](c:/Users/tempadmin/OneDrive/Coding/Syndicate/syndicate/features/intelligence_evaluation.py)
 - [syndicate/features/intelligence_analysis_views.py](c:/Users/tempadmin/OneDrive/Coding/Syndicate/syndicate/features/intelligence_analysis_views.py)
-- [reports/intelligence/evaluation_ledger.jsonl](c:/Users/tempadmin/OneDrive/Coding/Syndicate/reports/intelligence/evaluation_ledger.jsonl)
+- [reports/intelligence/evaluation_ledger_chunks/](c:/Users/tempadmin/OneDrive/Coding/Syndicate/reports/intelligence/evaluation_ledger_chunks/)
 - [tests/test_intelligence.py](c:/Users/tempadmin/OneDrive/Coding/Syndicate/tests/test_intelligence.py)
 - [tests/test_intelligence_state.py](c:/Users/tempadmin/OneDrive/Coding/Syndicate/tests/test_intelligence_state.py)
 - [tests/test_ask_the_syndicate.py](c:/Users/tempadmin/OneDrive/Coding/Syndicate/tests/test_ask_the_syndicate.py)

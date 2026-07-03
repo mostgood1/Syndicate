@@ -63,3 +63,5 @@ data/*_source/manifests/mirror_refresh*.json
 
 # Keep the evaluation ledger local; it is generated data and too large for GitHub history.
 reports/intelligence/evaluation_ledger.jsonl
+reports/intelligence/evaluation_ledger_chunks/
+reports/intelligence/archive/

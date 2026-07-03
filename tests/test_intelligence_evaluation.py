@@ -3,7 +3,9 @@ from __future__ import annotations
 import tempfile
 from pathlib import Path
 import unittest
+from unittest.mock import patch
 
+import syndicate.features.shared.intelligence_evaluation as intelligence_evaluation
 from syndicate.features.shared.intelligence_evaluation import build_intelligence_evaluation_bundle
 from syndicate.features.shared.intelligence_evaluation import adjust_confidence
 from syndicate.features.shared.intelligence_evaluation import compute_metrics
@@ -102,6 +104,30 @@ class IntelligenceEvaluationTests(unittest.TestCase):
         self.assertEqual(bundle["history"]["sport"], "nba")
         self.assertEqual(bundle["history"]["market_family"], "props")
         self.assertIn("history_status", bundle["history"])
+
+    def test_default_ledger_path_writes_chunked_records(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            ledger_path = Path(tmp_dir) / "evaluation_ledger.jsonl"
+            with patch.object(intelligence_evaluation, "DEFAULT_LEDGER_PATH", ledger_path):
+                first_record = record_prediction(
+                    query={"question": "chunked default ledger", "selected_date": "2026-06-14", "sport": "nba"},
+                    response={"selected_date": "2026-06-14", "recommendations": []},
+                    persist=True,
+                )
+                second_record = record_prediction(
+                    query={"question": "chunked default ledger", "selected_date": "2026-06-14", "sport": "nba"},
+                    response={"selected_date": "2026-06-14", "recommendations": []},
+                    persist=True,
+                )
+
+            chunk_file = ledger_path.parent / "evaluation_ledger_chunks" / "2026-06-14.jsonl"
+            manifest_file = ledger_path.parent / "evaluation_ledger_chunks" / "manifest.json"
+
+            self.assertEqual(first_record["prediction_id"], second_record["prediction_id"])
+            self.assertFalse(ledger_path.exists())
+            self.assertTrue(chunk_file.exists())
+            self.assertTrue(manifest_file.exists())
+            self.assertEqual(len(chunk_file.read_text(encoding="utf-8").strip().splitlines()), 1)
 
     def test_build_intelligence_evaluation_bundle_includes_portfolio_tracking_summary(self) -> None:
         bundle = build_intelligence_evaluation_bundle(
