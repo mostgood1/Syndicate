@@ -265,31 +265,29 @@ if ($activeList.Count -eq 0) {
     return
 }
 
-$dailyArgs = @(
-    'powershell.exe', '-ExecutionPolicy', 'Bypass', '-File', $dailyUpdateScript,
-    '-Date', $Date
-)
+$dailyArgs = [ordered]@{
+    Date = $Date
+}
 
 $effectiveSkipTests = [bool]$SkipTests
 $effectiveSkipSmoke = [bool]$SkipSmoke
 
-if ($BaseUrl) { $dailyArgs += @('-BaseUrl', $BaseUrl) }
-if ($Json) { $dailyArgs += '-Json' }
-if ($RefreshOdds) { $dailyArgs += '-RefreshOdds' }
-if ($OddsPhase) { $dailyArgs += @('-OddsPhase', $OddsPhase) }
-if ($OddsSports) { $dailyArgs += @('-OddsSports', $OddsSports) }
-if ($OddsRegions) { $dailyArgs += @('-OddsRegions', $OddsRegions) }
-if ($PSBoundParameters.ContainsKey('EventSimForceWindowMinutes')) { $dailyArgs += @('-EventSimForceWindowMinutes', $EventSimForceWindowMinutes) }
+if ($BaseUrl) { $dailyArgs.BaseUrl = $BaseUrl }
+if ($Json) { $dailyArgs.Json = $true }
+if ($RefreshOdds) { $dailyArgs.RefreshOdds = $true }
+if ($OddsPhase) { $dailyArgs.OddsPhase = $OddsPhase }
+if ($OddsSports) { $dailyArgs.OddsSports = $OddsSports }
+if ($OddsRegions) { $dailyArgs.OddsRegions = $OddsRegions }
+if ($PSBoundParameters.ContainsKey('EventSimForceWindowMinutes')) { $dailyArgs.EventSimForceWindowMinutes = $EventSimForceWindowMinutes }
 if ($effectiveSkipTests) { $dailyArgs += '-SkipTests' }
 if ($effectiveSkipSmoke) { $dailyArgs += '-SkipSmoke' }
-if ($SkipSourceUpdates) { $dailyArgs += '-SkipSourceUpdates' }
-if ($SkipRefreshGate) { $dailyArgs += '-SkipRefreshGate' }
-if ($SkipGitPush) { $dailyArgs += '-SkipGitPush' }
-if ($DryRun) { $dailyArgs += '-WhatIf' }
-if ($ForceRebuildToday) { $dailyArgs += '-ForceRebuildToday' }
+if ($SkipSourceUpdates) { $dailyArgs.SkipSourceUpdates = $true }
+if ($SkipRefreshGate) { $dailyArgs.SkipRefreshGate = $true }
+if ($SkipGitPush) { $dailyArgs.SkipGitPush = $true }
+if ($DryRun) { $dailyArgs.WhatIf = $true }
+if ($ForceRebuildToday) { $dailyArgs.ForceRebuildToday = $true }
 if ($activeList.Count -gt 0) {
-    $dailyArgs += '-ActiveSports'
-    $dailyArgs += @($activeList)
+    $dailyArgs.ActiveSports = @($activeList)
 }
 
 Write-Host '==> In-season daily update' -ForegroundColor Cyan
@@ -319,7 +317,7 @@ Write-Host ("    gate smoke: {0}" -f $gateSmokeStatus) -ForegroundColor DarkGray
 if ($RefreshOdds) {
     Write-Host ("    central odds refresh: enabled phase={0} sports={1} regions={2}" -f $OddsPhase, $OddsSports, $OddsRegions) -ForegroundColor DarkGray
 }
-Write-Host ("    " + ($dailyArgs -join ' ')) -ForegroundColor DarkGray
+Write-Host ("    {0} {1}" -f $dailyUpdateScript, (($dailyArgs.GetEnumerator() | ForEach-Object { if ($_.Value -is [System.Collections.IEnumerable] -and -not ($_.Value -is [string])) { "-{0} {1}" -f $_.Key, (@($_.Value) -join ' ') } elseif ($_.Value -is [bool]) { if ($_.Value) { "-{0}" -f $_.Key } else { $null } } else { "-{0} {1}" -f $_.Key, $_.Value } } | Where-Object { $_ }) -join ' ')) -ForegroundColor DarkGray
 
 if ($DryRun) {
     return
@@ -372,8 +370,7 @@ function Sync-SportSourceArtifacts {
 
 Push-Location $repoRoot
 try {
-    $dailyInvocationArgs = @($dailyArgs[1..($dailyArgs.Length - 1)])
-    & $dailyArgs[0] @dailyInvocationArgs
+    & $dailyUpdateScript @dailyArgs
     if ($LASTEXITCODE -ne 0) {
         throw "In-season daily update failed with exit code $LASTEXITCODE"
     }
