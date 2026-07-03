@@ -784,7 +784,7 @@ def _apply_user_profile_to_response(response_payload: dict[str, object], user_pr
     return response_payload
 
 
-def _intelligence_page_payload(selected_date: str) -> dict[str, object]:
+def _intelligence_page_payload(selected_date: str, *, force_refresh: bool = False) -> dict[str, object]:
     return {
         "question": DEFAULT_QUESTION,
         "date": selected_date,
@@ -795,7 +795,7 @@ def _intelligence_page_payload(selected_date: str) -> dict[str, object]:
         "limit": 5,
         "include_props": True,
         "include_games": True,
-        "force_refresh": True,
+        "force_refresh": force_refresh,
     }
 
 
@@ -855,17 +855,13 @@ def intelligence_home():
     payload = _intelligence_page_payload(selected_date)
     initial_response: dict[str, Any] = {}
     try:
-        cached_response, _ = _cached_intelligence_response_with_source(payload)
+        cached_response, _ = _cached_intelligence_response_with_source(payload, force_refresh=False)
         if cached_response is not None and _response_has_content(cached_response):
             initial_response = dict(cached_response)
-            by_sport = initial_response.get("by_sport") if isinstance(initial_response.get("by_sport"), dict) else {}
-            has_wnba = any(str(key).strip().lower() == "wnba" for key in by_sport.keys())
-            if _response_needs_refresh(payload, cached_response) or not has_wnba:
-                queue_intelligence_state_refresh(dict(payload))
         else:
-            queue_intelligence_state_refresh(dict(payload))
+            initial_response = _empty_default_intelligence_response()
     except Exception:
-        initial_response = {}
+        initial_response = _empty_default_intelligence_response()
     return render_template(
         "intelligence.html",
         initial_intelligence_response=initial_response,
@@ -981,7 +977,7 @@ def run_intelligence():
         launched = True
     except Exception:
         launch_result = load_latest_refresh_status()
-    queue_intelligence_state_refresh(_intelligence_page_payload(selected_date))
+    queue_intelligence_state_refresh(_intelligence_page_payload(selected_date, force_refresh=True))
     return jsonify({"ok": True, "selected_date": selected_date, "launched": launched, "refresh": normalize_timestamped_payload(launch_result), "queued": True})
 
 
@@ -989,17 +985,12 @@ def run_intelligence():
 def intelligence_status_api():
     try:
         selected_date = str(request.args.get("date") or "").strip() or _latest_available_intelligence_date()
-        _ = str(request.args.get("refresh") or request.args.get("force_refresh") or "").strip().lower() in {"1", "true", "yes", "on"}
+        refresh_requested = str(request.args.get("refresh") or request.args.get("force_refresh") or "").strip().lower() in {"1", "true", "yes", "on"}
+        if refresh_requested:
+            queue_intelligence_state_refresh(_intelligence_page_payload(selected_date, force_refresh=True))
         status = read_latest_intelligence_state({"date": selected_date})
-        board_response = isinstance(status, dict) and _is_board_response(status)
-        if board_response and not (isinstance(status, dict) and isinstance(status.get("board_contract"), dict)) and _response_needs_refresh({"date": selected_date}, status):
-            fresh_status, _ = _cached_intelligence_response_with_source({"date": selected_date, "force_refresh": True}, force_refresh=True)
-            if isinstance(fresh_status, dict) and _response_has_content(fresh_status):
-                status = fresh_status
-                board_response = _is_board_response(status)
         if not (isinstance(status, dict) and _response_has_content(status)):
             status = _empty_default_intelligence_response()
-            board_response = True
         _log_api_state_read(status if isinstance(status, dict) else {})
     except Exception as exc:
         return _api_error_response(exc)

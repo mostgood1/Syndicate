@@ -1,225 +1,451 @@
 {
-  "latest_key": "59188cdcee7bcf192140772d6f66cc8c9b95d8d644c1fd3a7f306b088650d10a",
-  "updated_at": "2026-07-02T12:06:53-05:00",
+  "latest_key": "928315208c68c7117c06911c88c130237572a6ae6d0a2ab034f65d17f0a112ce",
+  "updated_at": "2026-07-02T16:09:34-05:00",
   "response": {
-    "recommendations": [],
-    "portfolio": {},
-    "parlays": [],
-    "evidence": [],
-    "supporting_evidence": [],
-    "evaluation_record": {},
-    "query_type": "explanation",
-    "preferences": {},
-    "parsed_request": {},
-    "analysis_views": {},
-    "structured_response": {
-      "intent": "explanation",
-      "summary": "No summary was returned, so the board should be read through the returned recommendations and evidence.",
-      "clear_summary": "No summary was returned, so the board should be read through the returned recommendations and evidence.",
-      "deep_analysis": [
-        "Supporting detail is carried by Odds control plane, which keeps the response tied to the returned evidence instead of a shallow headline-only answer."
-      ],
-      "context_awareness": {
-        "is_vague": true,
-        "confidence": "low",
-        "detected_signals": [
-          "sport=all",
-          "mode=live",
-          "intent=explanation"
-        ],
-        "detected_sports": [],
-        "multi_sport": false,
-        "assumptions": [
-          "I assumed you want the strongest board-wide read because no specific sport or market was named.",
-          "I treated the request as a explanation prompt so the engine could answer instead of waiting for more input."
-        ],
-        "clarifying_questions": [
-          "Do you want props, game plays, or both?"
-        ],
-        "reasoning": "The request was handled as a general explanation because the prompt did not pin down a narrower market frame. Because the prompt was vague, the pipeline also made best-effort assumptions and preserved clarifying questions for follow-up.",
-        "recommendation_count": 0,
-        "reasoning_step_count": 0
-      },
-      "routing_context": {
-        "question": "top edges today",
-        "query_type": "explanation",
-        "mode": "live",
-        "selected_date": "2026-07-02",
-        "preview_subject": null,
-        "player_subject": null,
-        "sport": "all",
-        "game_state": null,
-        "limit": 10,
-        "include_props": true,
-        "include_games": true
-      },
-      "odds_control_plane": {
-        "generated_at": "2026-06-27T15:39:11-05:00",
-        "date": "2026-06-27",
-        "phase": "all",
-        "execution_mode": "source",
-        "dry_run": false,
-        "publish_parity": {
-          "generatedAt": "2026-06-27T15:39:11-05:00",
-          "date": "2026-06-27",
-          "totalForcedPublishPaths": 2,
-          "totalIntelligencePublishPaths": 0,
-          "totalPublishPaths": 2,
-          "sports": [
-            {
-              "sport": "mlb",
-              "rootPrefix": "data/mlb_source/",
-              "forcedPublishPathCount": 0,
-              "intelligencePublishPathCount": 0,
-              "totalPublishPathCount": 0
-            },
-            {
-              "sport": "nba",
-              "rootPrefix": "data/nba_source/",
-              "forcedPublishPathCount": 0,
-              "intelligencePublishPathCount": 0,
-              "totalPublishPathCount": 0
-            },
-            {
-              "sport": "wnba",
-              "rootPrefix": "data/wnba_source/",
-              "forcedPublishPathCount": 0,
-              "intelligencePublishPathCount": 0,
-              "totalPublishPathCount": 0
-            },
-            {
-              "sport": "nhl",
-              "rootPrefix": "data/nhl_source/",
-              "forcedPublishPathCount": 0,
-              "intelligencePublishPathCount": 0,
-              "totalPublishPathCount": 0
-            },
-            {
-              "sport": "nfl",
-              "rootPrefix": "data/nfl_source/",
-              "forcedPublishPathCount": 0,
-              "intelligencePublishPathCount": 0,
-              "totalPublishPathCount": 0
-            },
-            {
-              "sport": "ncaaf",
-              "rootPrefix": "data/ncaaf_source/",
-              "forcedPublishPathCount": 0,
-              "intelligencePublishPathCount": 0,
-              "totalPublishPathCount": 0
-            },
-            {
-              "sport": "ncaab",
-              "rootPrefix": "data/ncaab_source/",
-              "forcedPublishPathCount": 0,
-              "intelligencePublishPathCount": 0,
-              "totalPublishPathCount": 0
-            }
-          ]
-        },
-        "sports": [
-          {
-            "sport": "wnba",
-            "ok": false,
-            "generation_mode": "local_artifact_bundle",
-            "ingestion_mode": null,
-            "source_repo": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\vendor\\wnba_betting_repo",
-            "source_root_env_var": "SYNDICATE_SOURCE_ROOT_WNBA",
-            "artifact_paths": [],
-            "post_refresh_ok": null,
-            "mirror_ok": null,
-            "odds_history": {
-              "sport": "wnba",
-              "candidate_paths": [
-                "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\odds_control_plane\\odds_history\\wnba\\odds_history.json",
-                "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\wnba_source\\artifacts\\wnba\\odds_history.json",
-                "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\wnba_source\\tracking\\odds_history.json"
-              ],
-              "active_path": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\wnba_source\\artifacts\\wnba\\odds_history.json",
-              "has_payload": true,
-              "source_precedence": [
-                "shared_history",
-                "artifact_history",
-                "tracking_history"
-              ]
-            }
-          }
-        ],
-        "source_precedence": [
-          "artifact_history",
-          "tracking_history"
-        ],
-        "summary_ok": false
-      },
-      "key_insights": [],
-      "supporting_evidence": [
+    "ok": true,
+    "top_opportunities": [
+      {
+        "name": "Play 1",
+        "sport_slug": "mlb",
+        "market": "Hits",
+        "score": 91.0
+      }
+    ],
+    "by_sport": {
+      "mlb": [
         {
-          "kind": "bundle",
-          "title": "Odds control plane",
-          "sections": [
-            {
-              "kind": "metrics",
-              "title": "Control plane summary",
-              "items": [
-                {
-                  "label": "generated_at",
-                  "value": "2026-06-27T15:39:11-05:00"
-                },
-                {
-                  "label": "date",
-                  "value": "2026-06-27"
-                },
-                {
-                  "label": "phase",
-                  "value": "all"
-                },
-                {
-                  "label": "execution_mode",
-                  "value": "source"
-                },
-                {
-                  "label": "summary_ok",
-                  "value": false
-                }
-              ]
-            },
-            {
-              "kind": "list",
-              "title": "Source precedence",
-              "items": [
-                {
-                  "label": "1",
-                  "detail": "artifact_history"
-                },
-                {
-                  "label": "2",
-                  "detail": "tracking_history"
-                }
-              ]
-            },
-            {
-              "kind": "list",
-              "title": "Sport coverage",
-              "items": [
-                {
-                  "label": "wnba",
-                  "detail": "needs attention"
-                }
-              ]
-            }
-          ]
+          "name": "Play 1",
+          "sport_slug": "mlb",
+          "market": "Hits",
+          "score": 91.0
+        }
+      ]
+    },
+    "analysis": {
+      "ok": true,
+      "headline": "The Syndicate brief",
+      "recommendations": [
+        {
+          "name": "Play 1",
+          "sport_slug": "mlb",
+          "market": "Hits",
+          "score": 91.0,
+          "sport": "mlb",
+          "market_type": "Hits",
+          "entity": "Play 1",
+          "player_name": "Play 1",
+          "subject_key": "play 1",
+          "market_key": "hits"
         }
       ],
-      "risks_uncertainty": [],
-      "recommended_interpretation": "Best takeaway: use the returned evidence and risks to interpret the board directionally, since no single standout candidate was returned.",
-      "final_takeaway": "Best takeaway: use the returned evidence and risks to interpret the board directionally, since no single standout candidate was returned.",
-      "reasoning_steps": []
+      "picks": [
+        {
+          "name": "Play 1",
+          "sport_slug": "mlb",
+          "market": "Hits",
+          "score": 91.0,
+          "sport": "mlb",
+          "market_type": "Hits",
+          "entity": "Play 1",
+          "player_name": "Play 1",
+          "subject_key": "play 1",
+          "market_key": "hits"
+        }
+      ],
+      "top_live_opportunities": [
+        {
+          "name": "Play 1",
+          "sport_slug": "mlb",
+          "market": "Hits",
+          "score": 91.0,
+          "sport": "mlb",
+          "market_type": "Hits",
+          "entity": "Play 1",
+          "player_name": "Play 1",
+          "subject_key": "play 1",
+          "market_key": "hits"
+        }
+      ],
+      "portfolio": {},
+      "parlays": [],
+      "state_last_updated": "2026-07-02T21:09:34Z",
+      "last_updated": "2026-07-02T16:09:34-05:00",
+      "candidate_count": 1
     },
-    "reasoning_steps": [],
-    "board_notes": [],
-    "readiness_gate": {},
-    "candidate_count": 0
+    "candidate_pool": {
+      "selected_date": "2026-06-15",
+      "source_fingerprint": "fingerprint-1",
+      "candidate_count": 1,
+      "candidate_pools": {},
+      "global_pool": [
+        {
+          "name": "Play 1",
+          "sport_slug": "mlb",
+          "market": "Hits"
+        }
+      ],
+      "candidates": [
+        {
+          "name": "Play 1",
+          "sport_slug": "mlb",
+          "market": "Hits"
+        }
+      ]
+    },
+    "state_last_updated": "2026-07-02T21:09:34Z",
+    "last_updated": "2026-07-02T16:09:34-05:00",
+    "candidate_count": 1,
+    "response": {
+      "ok": true,
+      "headline": "The Syndicate brief",
+      "recommendations": [
+        {
+          "name": "Play 1",
+          "sport_slug": "mlb",
+          "market": "Hits",
+          "score": 91.0,
+          "sport": "mlb",
+          "market_type": "Hits",
+          "entity": "Play 1",
+          "player_name": "Play 1",
+          "subject_key": "play 1",
+          "market_key": "hits"
+        }
+      ],
+      "picks": [
+        {
+          "name": "Play 1",
+          "sport_slug": "mlb",
+          "market": "Hits",
+          "score": 91.0,
+          "sport": "mlb",
+          "market_type": "Hits",
+          "entity": "Play 1",
+          "player_name": "Play 1",
+          "subject_key": "play 1",
+          "market_key": "hits"
+        }
+      ],
+      "top_live_opportunities": [
+        {
+          "name": "Play 1",
+          "sport_slug": "mlb",
+          "market": "Hits",
+          "score": 91.0,
+          "sport": "mlb",
+          "market_type": "Hits",
+          "entity": "Play 1",
+          "player_name": "Play 1",
+          "subject_key": "play 1",
+          "market_key": "hits"
+        }
+      ],
+      "portfolio": {},
+      "parlays": [],
+      "state_last_updated": "2026-07-02T21:09:34Z",
+      "last_updated": "2026-07-02T16:09:34-05:00",
+      "candidate_count": 1
+    },
+    "board_contract": {
+      "schema": "intelligence_board_v1",
+      "card_fields": [
+        "sport",
+        "team",
+        "player",
+        "market",
+        "line",
+        "projected",
+        "live_projection",
+        "actual",
+        "status_display",
+        "movement",
+        "simulated_edge",
+        "trace_path",
+        "game_pk"
+      ],
+      "recommendation_count": 3,
+      "lane_counts": {
+        "live": 0,
+        "pregame": 3,
+        "archived": 0
+      },
+      "active_lanes": [
+        "pregame"
+      ],
+      "board_summary": {
+        "headline": "The Syndicate board",
+        "recommendation_count": 3,
+        "live_count": 0,
+        "pregame_count": 3,
+        "archived_count": 0,
+        "active_lanes": [
+          "pregame"
+        ]
+      },
+      "cards": [
+        {
+          "name": "Play 1",
+          "sport_slug": "mlb",
+          "market": "Hits",
+          "score": 91.0,
+          "lane": "pregame",
+          "sport": "mlb",
+          "team": "\u2014",
+          "player": "Play 1",
+          "line": null,
+          "movement": "flat",
+          "simulated_edge": null,
+          "trace": {
+            "path": "mlb/board/hits/Play 1",
+            "sport_slug": "mlb",
+            "selection": "Play 1",
+            "market": "Hits"
+          },
+          "trace_path": "mlb/board/hits/Play 1"
+        },
+        {
+          "name": "Play 2",
+          "sport_slug": "nba",
+          "market": "Points",
+          "score": 89.0,
+          "lane": "pregame",
+          "sport": "nba",
+          "team": "\u2014",
+          "player": "Play 2",
+          "line": null,
+          "movement": "flat",
+          "simulated_edge": null,
+          "trace": {
+            "path": "nba/board/points/Play 2",
+            "sport_slug": "nba",
+            "selection": "Play 2",
+            "market": "Points"
+          },
+          "trace_path": "nba/board/points/Play 2"
+        },
+        {
+          "name": "Play 3",
+          "sport_slug": "wnba",
+          "market": "Assists",
+          "score": 87.0,
+          "lane": "pregame",
+          "sport": "wnba",
+          "team": "\u2014",
+          "player": "Play 3",
+          "line": null,
+          "movement": "flat",
+          "simulated_edge": null,
+          "trace": {
+            "path": "wnba/board/assists/Play 3",
+            "sport_slug": "wnba",
+            "selection": "Play 3",
+            "market": "Assists"
+          },
+          "trace_path": "wnba/board/assists/Play 3"
+        }
+      ],
+      "waterfall": [
+        {
+          "step": "source_response",
+          "count": 3,
+          "label": "Raw response recommendations"
+        },
+        {
+          "step": "normalized_cards",
+          "count": 3,
+          "label": "Deduped board cards"
+        },
+        {
+          "step": "live_lane",
+          "count": 0,
+          "label": "Live recommendations"
+        },
+        {
+          "step": "pregame_lane",
+          "count": 3,
+          "label": "Pregame recommendations"
+        },
+        {
+          "step": "archived_lane",
+          "count": 0,
+          "label": "Archived recommendations"
+        }
+      ]
+    },
+    "state_meta": {
+      "source": "worker",
+      "computed_at": "2026-07-02T21:09:34Z",
+      "age_seconds": 0.4017157554626465,
+      "freshness_sla_seconds": 30,
+      "freshness_status": "fresh",
+      "is_fresh": true,
+      "source_fingerprint": null,
+      "run_key": "928315208c68c7117c06911c88c130237572a6ae6d0a2ab034f65d17f0a112ce",
+      "last_run_started_at": null,
+      "last_run_finished_at": null
+    },
+    "freshness": {
+      "source": "worker",
+      "computed_at": "2026-07-02T21:09:34Z",
+      "age_seconds": 0.4017157554626465,
+      "freshness_sla_seconds": 30,
+      "freshness_status": "fresh",
+      "is_fresh": true,
+      "source_fingerprint": null,
+      "run_key": "928315208c68c7117c06911c88c130237572a6ae6d0a2ab034f65d17f0a112ce",
+      "last_run_started_at": null,
+      "last_run_finished_at": null
+    },
+    "state_freshness": {
+      "source": "worker",
+      "computed_at": "2026-07-02T21:09:34Z",
+      "age_seconds": 0.4017157554626465,
+      "freshness_sla_seconds": 30,
+      "freshness_status": "fresh",
+      "is_fresh": true,
+      "source_fingerprint": null,
+      "run_key": "928315208c68c7117c06911c88c130237572a6ae6d0a2ab034f65d17f0a112ce",
+      "last_run_started_at": null,
+      "last_run_finished_at": null
+    },
+    "source_fingerprint": null
   },
-  "state_meta": null,
-  "board_contract": null
+  "state_meta": {
+    "source": "worker",
+    "computed_at": "2026-07-02T21:09:34Z",
+    "age_seconds": 0.4017157554626465,
+    "freshness_sla_seconds": 30,
+    "freshness_status": "fresh",
+    "is_fresh": true,
+    "source_fingerprint": null,
+    "run_key": "928315208c68c7117c06911c88c130237572a6ae6d0a2ab034f65d17f0a112ce",
+    "last_run_started_at": null,
+    "last_run_finished_at": null
+  },
+  "board_contract": {
+    "schema": "intelligence_board_v1",
+    "card_fields": [
+      "sport",
+      "team",
+      "player",
+      "market",
+      "line",
+      "projected",
+      "live_projection",
+      "actual",
+      "status_display",
+      "movement",
+      "simulated_edge",
+      "trace_path",
+      "game_pk"
+    ],
+    "recommendation_count": 3,
+    "lane_counts": {
+      "live": 0,
+      "pregame": 3,
+      "archived": 0
+    },
+    "active_lanes": [
+      "pregame"
+    ],
+    "board_summary": {
+      "headline": "The Syndicate board",
+      "recommendation_count": 3,
+      "live_count": 0,
+      "pregame_count": 3,
+      "archived_count": 0,
+      "active_lanes": [
+        "pregame"
+      ]
+    },
+    "cards": [
+      {
+        "name": "Play 1",
+        "sport_slug": "mlb",
+        "market": "Hits",
+        "score": 91.0,
+        "lane": "pregame",
+        "sport": "mlb",
+        "team": "\u2014",
+        "player": "Play 1",
+        "line": null,
+        "movement": "flat",
+        "simulated_edge": null,
+        "trace": {
+          "path": "mlb/board/hits/Play 1",
+          "sport_slug": "mlb",
+          "selection": "Play 1",
+          "market": "Hits"
+        },
+        "trace_path": "mlb/board/hits/Play 1"
+      },
+      {
+        "name": "Play 2",
+        "sport_slug": "nba",
+        "market": "Points",
+        "score": 89.0,
+        "lane": "pregame",
+        "sport": "nba",
+        "team": "\u2014",
+        "player": "Play 2",
+        "line": null,
+        "movement": "flat",
+        "simulated_edge": null,
+        "trace": {
+          "path": "nba/board/points/Play 2",
+          "sport_slug": "nba",
+          "selection": "Play 2",
+          "market": "Points"
+        },
+        "trace_path": "nba/board/points/Play 2"
+      },
+      {
+        "name": "Play 3",
+        "sport_slug": "wnba",
+        "market": "Assists",
+        "score": 87.0,
+        "lane": "pregame",
+        "sport": "wnba",
+        "team": "\u2014",
+        "player": "Play 3",
+        "line": null,
+        "movement": "flat",
+        "simulated_edge": null,
+        "trace": {
+          "path": "wnba/board/assists/Play 3",
+          "sport_slug": "wnba",
+          "selection": "Play 3",
+          "market": "Assists"
+        },
+        "trace_path": "wnba/board/assists/Play 3"
+      }
+    ],
+    "waterfall": [
+      {
+        "step": "source_response",
+        "count": 3,
+        "label": "Raw response recommendations"
+      },
+      {
+        "step": "normalized_cards",
+        "count": 3,
+        "label": "Deduped board cards"
+      },
+      {
+        "step": "live_lane",
+        "count": 0,
+        "label": "Live recommendations"
+      },
+      {
+        "step": "pregame_lane",
+        "count": 3,
+        "label": "Pregame recommendations"
+      },
+      {
+        "step": "archived_lane",
+        "count": 0,
+        "label": "Archived recommendations"
+      }
+    ]
+  }
 }

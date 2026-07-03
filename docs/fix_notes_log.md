@@ -1,5 +1,26 @@
 # Fix Notes Log
 
+## 2026-07-03 - MLB HR targets stopped backfilling from the daily summary
+- Symptom: `/mlb/hr-targets` could silently fill sparse HR-target artifacts from the daily summary, so the page could look healthy even when the dedicated HR-target artifact was incomplete.
+- Root cause: The HR-targets context builder merged dedicated HR-target rows with daily-summary rows when the dedicated artifact was sparse.
+- Fix: Make the HR-targets page artifact-only and show the empty state when the dedicated HR-target artifact has no rows.
+- Validation: `syndicate/features/mlb/hr_targets.py` syntax check passed after removing the daily-summary merge path.
+- Follow-up: Keep the dedicated HR-target artifact complete upstream so the page never needs a fallback source.
+
+## 2026-07-03 - Intelligence page stopped self-triggering refresh on load
+- Symptom: `/intelligence` and the intelligence status/read paths could still request refresh work even when a cached board artifact was already present.
+- Root cause: The page payload and client bootstrap were forcing refresh on first render, and the status route also auto-promoted stale board reads into refresh work.
+- Fix: Make the intelligence page cache-first, keep refresh explicit only, and preserve status refresh as an opt-in request instead of an automatic backfill.
+- Validation: Blueprint and template syntax checks passed after removing the load-time refresh trigger and preserving explicit refresh on the status endpoint.
+- Follow-up: Keep intelligence rendering artifact-backed by default; any new refresh trigger should be tied to explicit user action or a separate worker/cron path.
+
+## 2026-07-03 - MLB cards 502ed on Render web dynos
+- Symptom: `/mlb` and `/mlb/api/cards` returned 502 on the Render web service even though health checks and some artifact-backed endpoints were still responding.
+- Root cause: The MLB cards builder still tried to build the shared simulation contract on the web dyno, which pulled hosted-storage reads that require `SYNDICATE_DATA_ROOT` and failed when Render only had the web runtime.
+- Fix: Skip the hosted-storage simulation enrichment on the Render web path and keep the MLB page/API on the artifact-backed payload branch.
+- Validation: Simulated Render imports and Flask test-client requests returned `/mlb` 200 and `/mlb/api/cards?date=2026-07-03` 200 under the same hosted-storage env shape.
+- Follow-up: Keep the web dyno read-only and only reintroduce shared simulation enrichment where the required hosted data root is actually mounted.
+
 ## 2026-07-03 - Intelligence evaluation ledger moved to dated chunks
 - Symptom: The evaluation ledger was growing into a multi-gigabyte monolith and was no longer a good fit for default reads and writes.
 - Root cause: The default evaluation contract still treated `reports/intelligence/evaluation_ledger.jsonl` as a single append-only file, so long-lived history kept accumulating in one place.

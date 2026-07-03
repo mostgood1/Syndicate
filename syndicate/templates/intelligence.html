@@ -2101,7 +2101,7 @@ function renderTopStrip(recs) {
             <div style="opacity:.72; text-transform:uppercase; letter-spacing:.04em; font-size:11px;">Decision lanes</div>
             <div style="margin-top:4px; font-size:14px; font-weight:700; letter-spacing:-.02em;">${escapeHtml(String(boardContract.board_summary && boardContract.board_summary.headline || "Live and pregame lanes"))}</div>
           </div>
-          <div style="opacity:.72; font-size:11px; white-space:nowrap;">Odds/opps refresh every 30s</div>
+          <div style="opacity:.72; font-size:11px; white-space:nowrap;">Odds/opps refresh every 60s</div>
         </div>
         ${waterfallMarkup}
         <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
@@ -2244,7 +2244,6 @@ function scheduleIntelligencePolling() {
   }
   loadIntelligenceScheduled = true;
   window.loadIntelligence = loadIntelligence;
-  const hasInitialResponse = Boolean(initialIntelligenceResponse && Object.keys(initialIntelligenceResponse).length > 0);
   const hasVersionedInitialResponse = Boolean(
     initialIntelligenceResponse &&
     typeof initialIntelligenceResponse === "object" &&
@@ -2259,23 +2258,15 @@ function scheduleIntelligencePolling() {
     lastWorkerStateUpdated = String(initialIntelligenceResponse.state_last_updated || initialIntelligenceResponse.response?.state_last_updated || initialIntelligenceResponse.response?.updated_at || "").trim() || lastWorkerStateUpdated;
     renderIntelligence(mergeVersionedIntelligenceResponse(initialIntelligenceResponse));
     if (!hasVersionedInitialResponse) {
-      void loadIntelligence({ forceRefresh: true });
+      void loadIntelligence({});
     }
   } else {
     renderEmptyState();
-    void loadIntelligence({ forceRefresh: true });
+    void loadIntelligence({});
   }
   window.setInterval(() => {
     void loadIntelligence({ background: true });
-  }, 30000);
-  window.addEventListener("focus", () => {
-    void loadIntelligence({ background: true });
-  });
-  document.addEventListener("visibilitychange", () => {
-    if (!document.hidden) {
-      void loadIntelligence({ background: true });
-    }
-  });
+  }, 60000);
 }
 
 scheduleIntelligencePolling();

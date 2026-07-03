@@ -501,125 +501,6 @@ def _summary_target_matchup(team: str, away_abbr: str, home_abbr: str) -> str:
     return normalized_team or "-"
 
 
-def _targets_from_daily_summary(summary: dict[str, Any], *, selected_date: str = "", limit: int = 24) -> list[dict[str, Any]]:
-    outputs = summary.get("outputs") if isinstance(summary.get("outputs"), list) else []
-    candidates: list[dict[str, Any]] = []
-    for output in outputs:
-        if not isinstance(output, dict):
-            continue
-        hr_block = output.get("hitter_hr_likelihood_all") if isinstance(output.get("hitter_hr_likelihood_all"), dict) else {}
-        rows = hr_block.get("overall") if isinstance(hr_block.get("overall"), list) else []
-        away_abbr = str(output.get("away") or "").strip().upper()
-        home_abbr = str(output.get("home") or "").strip().upper()
-        for row in rows:
-            if not isinstance(row, dict):
-                continue
-            source_row = _apply_pitch_mix_context(selected_date, dict(row))
-            player_name = str(row.get("name") or "").strip()
-            team = str(row.get("team") or "").strip().upper()
-            if not player_name or not team:
-                continue
-            probability_raw = row.get("p_hr_1plus_cal") if row.get("p_hr_1plus_cal") is not None else row.get("p_hr_1plus")
-            try:
-                probability_value = float(probability_raw)
-            except Exception:
-                continue
-            lineup_order = row.get("lineup_order")
-            pa_mean = row.get("pa_mean")
-            hr_mean = row.get("hr_mean")
-            reasons: list[str] = []
-            if lineup_order is not None:
-                reasons.append(f"Projected lineup spot: {lineup_order}.")
-            if pa_mean is not None:
-                reasons.append(f"Expected plate appearances: {_format_num(pa_mean)}.")
-            if hr_mean is not None:
-                reasons.append(f"Mean HR outcome: {_format_num(hr_mean)}.")
-            support_score = _safe_float(hr_mean)
-            summary_text = reasons[0] if reasons else "Derived from the daily HR-likelihood board."
-            opponent = home_abbr if team == away_abbr else away_abbr if team == home_abbr else ""
-            target = dict(source_row)
-            target.update(
-                {
-                    "player_name": player_name,
-                    "team": team,
-                    "opponent": opponent,
-                    "matchup": _summary_target_matchup(team, away_abbr, home_abbr),
-                    "probability": _format_pct(probability_value),
-                    "support": _format_num(hr_mean),
-                    "summary": summary_text,
-                    "reasons": reasons[:3],
-                    "p_hr_1plus": probability_value,
-                    "support_score": support_score,
-                    "support_score_raw": support_score,
-                    "support_label": "",
-                    "support_score_display": _support_score_display(support_score),
-                    "pa_mean": _safe_float(pa_mean),
-                    "lineup_order": _safe_int(lineup_order),
-                    "opponent_pitcher_name": "",
-                    "game_pk": None,
-                    "batter_id": None,
-                    "team_id": None,
-                    "opponent_team_id": None,
-                    "headshot_url": None,
-                    "team_logo_url": None,
-                    "opponent_logo_url": None,
-                    "drivers": [],
-                    "writeup": summary_text,
-                    "sim_inputs": _sim_input_payload(source_row),
-                    "source_row": source_row,
-                    "gamePk": None,
-                    "batterId": None,
-                    "playerName": player_name,
-                    "teamId": None,
-                    "opponentTeamId": None,
-                    "opponentPitcherName": "",
-                    "headshotUrl": None,
-                    "teamLogoUrl": None,
-                    "opponentLogoUrl": None,
-                    "lineupOrder": _safe_int(lineup_order),
-                    "paMean": _safe_float(pa_mean),
-                    "pHr1Plus": probability_value,
-                    "supportScore": support_score,
-                    "supportScoreRaw": support_score,
-                    "supportScoreDisplay": _support_score_display(support_score),
-                    "supportLabel": "",
-                    "_probability_sort": probability_value,
-                }
-            )
-            candidates.append(target)
-    candidates.sort(key=lambda item: float(item.get("_probability_sort") or 0.0), reverse=True)
-    merged: list[dict[str, Any]] = []
-    seen: set[str] = set()
-    for candidate in candidates:
-        key = _target_key(candidate)
-        if not key or key in seen:
-            continue
-        cleaned = dict(candidate)
-        cleaned.pop("_probability_sort", None)
-        merged.append(cleaned)
-        seen.add(key)
-        if len(merged) >= limit:
-            break
-    return merged
-
-
-def _merge_targets(primary: list[dict[str, Any]], fallback: list[dict[str, Any]], *, limit: int = 24) -> list[dict[str, Any]]:
-    merged: list[dict[str, Any]] = []
-    seen: set[str] = set()
-    for bucket in (primary, fallback):
-        for target in bucket:
-            if not isinstance(target, dict):
-                continue
-            key = _target_key(target)
-            if not key or key in seen:
-                continue
-            merged.append(dict(target))
-            seen.add(key)
-            if len(merged) >= limit:
-                return merged
-    return merged
-
-
 def _cards_from_targets(targets: list[dict[str, Any]], *, selected_date: str) -> list[dict[str, Any]]:
     cards: list[dict[str, Any]] = []
     for target in targets:
@@ -663,20 +544,13 @@ def build_hr_targets_page_context(selected_date: str) -> dict[str, Any]:
 
     summary_path = daily_artifact_path(selected_date, suffix="_hr_targets")
     summary = load_json_file(summary_path)
-    daily_summary_path = daily_artifact_path(selected_date)
-    daily_summary = load_json_file(daily_summary_path)
     summary_targets = _targets_from_summary(summary, selected_date=selected_date, limit=24) if summary else []
-    daily_targets = _targets_from_daily_summary(daily_summary, selected_date=selected_date, limit=24) if daily_summary else []
-    if summary_targets:
-        # Keep dedicated HR-target rows first, but backfill from daily summary when sparse.
-        targets = _merge_targets(summary_targets, daily_targets, limit=24)
-    else:
-        targets = daily_targets
+    targets = summary_targets
     using_sample_data = False
 
     header_stats = [
         {"label": "Rows", "value": str(len(targets))},
-        {"label": "Policy", "value": str(((summary or {}).get("policy") or {}).get("label") or "Fallback")},
+        {"label": "Policy", "value": str(((summary or {}).get("policy") or {}).get("label") or "Saved artifact")},
     ]
 
     return {

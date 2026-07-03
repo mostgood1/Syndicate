@@ -227,6 +227,8 @@ def create_app() -> Flask:
         return "OK", 200
 
     def _start_background_loops() -> None:
+        if _is_render_web_dyno():
+            return
         if app.extensions.get("syndicate_background_loops_started"):
             return
         if app.extensions.get("syndicate_background_loops_bootstrap_started"):

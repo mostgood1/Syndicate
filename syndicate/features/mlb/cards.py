@@ -49,6 +49,42 @@ _MLB_TODAY_CACHE: dict[tuple[str, str, int, int], dict[str, Any]] = {}
 _MLB_CARDS_CONTEXT_CACHE: dict[tuple[Any, ...], dict[str, Any]] = {}
 
 
+def _render_web_dyno() -> bool:
+    return bool(
+        str(os.environ.get("RENDER") or "").strip().lower() in {"1", "true", "yes", "on"}
+        or str(os.environ.get("RENDER_EXTERNAL_URL") or "").strip()
+        or str(os.environ.get("RENDER_SERVICE_ID") or "").strip()
+    )
+
+
+def _attach_cards_board_contract(context: dict[str, Any]) -> dict[str, Any]:
+    out = dict(context)
+    out.setdefault("show_app_header", False)
+    out.setdefault("show_standalone_cards_header", True)
+    out.setdefault("active_sport_slug", "mlb")
+    out.setdefault("active_sport_name", "MLB")
+    out.setdefault("show_intro", False)
+    out.setdefault("show_source_summary", False)
+    out.setdefault("control_action", out.get("route_path"))
+    out.setdefault("control_value", out.get("date"))
+    out.setdefault("control_label", "Date")
+    out.setdefault("control_type", "date")
+    out.setdefault("control_name", "date")
+    out.setdefault("page_body_class", "cards-body syndicate-mlb-cards-page")
+    out.setdefault("page_shell_class", "syndicate-mlb-cards-shell")
+    out.setdefault("cards_grid_class", "cards-grid")
+    out.setdefault("cards_stylesheet", "mlb/cards_exact.css")
+    out["board_contract"] = {
+        "schema": "game_board_v1",
+        "surface": "mlb_dense_board_v1",
+        "sport": "mlb",
+        "module": "cards",
+        "source_kind": "artifact_backed",
+        "live_lens_integrated": True,
+    }
+    return out
+
+
 def _today_cache_bucket() -> int:
     return int(time.time() // _MLB_TODAY_CACHE_TTL_SECONDS)
 
@@ -1841,7 +1877,7 @@ def source_cards_api_payload(context: dict[str, Any]) -> dict[str, Any]:
     hr_rows = hr_targets.get("rows") if hr_targets and isinstance(hr_targets.get("rows"), list) else []
     selected_date = str(context.get("date") or "").strip()
     today_iso = central_today_iso()
-    render_web_dyno = str(os.environ.get("RENDER") or "").strip().lower() in {"1", "true", "yes", "on"}
+    render_web_dyno = _render_web_dyno()
     cache_key = None
     if selected_date == today_iso:
         cache_key = (
@@ -1861,7 +1897,7 @@ def source_cards_api_payload(context: dict[str, Any]) -> dict[str, Any]:
     ops_report_path = daily_ops_report_path(selected_date) if selected_date else None
     lineups_doc = load_json_file(lineups_path) if lineups_path else None
     game_lines_doc = load_json_file(game_lines_path) if game_lines_path else None
-    shared_game_lines_doc = load_odds_history_payload_for_sport("mlb") if selected_date == today_iso else None
+    shared_game_lines_doc = load_odds_history_payload_for_sport("mlb") if selected_date == today_iso and not render_web_dyno else None
     shared_game_lines_refreshed_at = None
     if isinstance(shared_game_lines_doc, dict):
         shared_game_lines_games = shared_game_lines_doc.get("games") if isinstance(shared_game_lines_doc.get("games"), list) else []
@@ -4537,7 +4573,7 @@ def build_cards_page_context(selected_date: str) -> dict[str, Any]:
         if str(link.get("label") or "").strip().lower() not in module_link_labels
     ]
 
-    result = apply_game_board_contract({
+    result = {
         "requested_date": selected_date,
         "date": resolved_date,
         "prev_date": prev_date,
@@ -4579,7 +4615,11 @@ def build_cards_page_context(selected_date: str) -> dict[str, Any]:
         "cards_grid_class": "cards-grid",
         "cards_stylesheet": "mlb/cards_exact.css",
         "cards_script": "mlb/cards_source.js",
-    }, sport="mlb", module="cards")
+    }
+    if not _render_web_dyno():
+        result = apply_game_board_contract(result, sport="mlb", module="cards")
+    else:
+        result = _attach_cards_board_contract(result)
     result["refresh_policy"] = {
         "enabled": True,
         "intervalMs": 30000,
