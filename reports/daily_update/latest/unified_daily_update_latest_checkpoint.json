@@ -2,16 +2,15 @@
     "scope":  "daily_update",
     "date":  "2026-07-03",
     "runMode":  "standard",
-    "overallStatus":  "ok",
-    "generatedAt":  "2026-07-03T07:04:43.6514858+00:00",
-    "updatedAt":  "2026-07-03T07:22:22.3749618+00:00",
-    "runDir":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-03\\20260703_070443",
+    "overallStatus":  "started",
+    "generatedAt":  "2026-07-03T17:05:17.7846243+00:00",
+    "updatedAt":  "2026-07-03T17:05:18.0702353+00:00",
+    "runDir":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-03\\20260703_170517",
     "latestDir":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest",
-    "lastUpdatedAt":  "2026-07-03T07:22:22.3628513+00:00",
-    "currentStage":  "completed",
+    "lastUpdatedAt":  "2026-07-03T17:05:17.9986152+00:00",
+    "currentStage":  "queued",
     "completedStages":  [
-                            "source_update",
-                            "refresh_gate"
+
                         ],
     "failedStage":  null,
     "stageDecisions":  [
