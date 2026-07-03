@@ -388,6 +388,7 @@
         621107,
         642585,
         663624,
+        664854,
         669211,
         676059,
         681882,
@@ -457,6 +458,21 @@
         {
           "player_id": 669211,
           "full_name": "Keegan Akin",
+          "status": {
+            "code": "D15",
+            "description": "Injured 15-Day"
+          },
+          "position": {
+            "code": "1",
+            "name": "Pitcher",
+            "type": "Pitcher",
+            "abbreviation": "P"
+          },
+          "roster_type_source": "40Man"
+        },
+        {
+          "player_id": 664854,
+          "full_name": "Ryan Helsley",
           "status": {
             "code": "D15",
             "description": "Injured 15-Day"
@@ -1504,7 +1520,6 @@
         621043,
         621121,
         656986,
-        664299,
         664774,
         665161,
         669699,
@@ -1518,8 +1533,8 @@
           "player_id": 656986,
           "full_name": "Bennett Sousa",
           "status": {
-            "code": "D15",
-            "description": "Injured 15-Day"
+            "code": "D60",
+            "description": "Injured 60-Day"
           },
           "position": {
             "code": "1",
@@ -1571,21 +1586,6 @@
             "name": "Shortstop",
             "type": "Infielder",
             "abbreviation": "SS"
-          },
-          "roster_type_source": "40Man"
-        },
-        {
-          "player_id": 664299,
-          "full_name": "Cristian Javier",
-          "status": {
-            "code": "D60",
-            "description": "Injured 60-Day"
-          },
-          "position": {
-            "code": "1",
-            "name": "Pitcher",
-            "type": "Pitcher",
-            "abbreviation": "P"
           },
           "roster_type_source": "40Man"
         },
@@ -2183,8 +2183,8 @@
           "player_id": 680730,
           "full_name": "Mitchell Parker",
           "status": {
-            "code": "D15",
-            "description": "Injured 15-Day"
+            "code": "D60",
+            "description": "Injured 60-Day"
           },
           "position": {
             "code": "1",
@@ -2374,7 +2374,6 @@
       "injured_ids": [
         621139,
         622663,
-        643410,
         667670,
         672016,
         680684,
@@ -2464,21 +2463,6 @@
           "status": {
             "code": "D60",
             "description": "Injured 60-Day"
-          },
-          "position": {
-            "code": "1",
-            "name": "Pitcher",
-            "type": "Pitcher",
-            "abbreviation": "P"
-          },
-          "roster_type_source": "40Man"
-        },
-        {
-          "player_id": 643410,
-          "full_name": "Mark Leiter Jr.",
-          "status": {
-            "code": "D15",
-            "description": "Injured 15-Day"
           },
           "position": {
             "code": "1",
@@ -4288,10 +4272,9 @@
       "injured_ids": [
         519317,
         592450,
+        607074,
         608331,
-        641857,
-        657376,
-        663757
+        657376
       ],
       "injured": [
         {
@@ -4306,6 +4289,21 @@
             "name": "Outfielder",
             "type": "Outfielder",
             "abbreviation": "RF"
+          },
+          "roster_type_source": "40Man"
+        },
+        {
+          "player_id": 607074,
+          "full_name": "Carlos Rod\u00f3n",
+          "status": {
+            "code": "D15",
+            "description": "Injured 15-Day"
+          },
+          "position": {
+            "code": "1",
+            "name": "Pitcher",
+            "type": "Pitcher",
+            "abbreviation": "P"
           },
           "roster_type_source": "40Man"
         },
@@ -4351,36 +4349,6 @@
             "name": "Pitcher",
             "type": "Pitcher",
             "abbreviation": "P"
-          },
-          "roster_type_source": "40Man"
-        },
-        {
-          "player_id": 641857,
-          "full_name": "Ryan McMahon",
-          "status": {
-            "code": "D10",
-            "description": "Injured 10-Day"
-          },
-          "position": {
-            "code": "5",
-            "name": "Third Base",
-            "type": "Infielder",
-            "abbreviation": "3B"
-          },
-          "roster_type_source": "40Man"
-        },
-        {
-          "player_id": 663757,
-          "full_name": "Trent Grisham",
-          "status": {
-            "code": "D10",
-            "description": "Injured 10-Day"
-          },
-          "position": {
-            "code": "8",
-            "name": "Outfielder",
-            "type": "Outfielder",
-            "abbreviation": "CF"
           },
           "roster_type_source": "40Man"
         }
@@ -4963,6 +4931,22 @@
       "team_id": 110,
       "player_id": 669211,
       "full_name": "Keegan Akin",
+      "status": {
+        "code": "D15",
+        "description": "Injured 15-Day"
+      },
+      "position": {
+        "code": "1",
+        "name": "Pitcher",
+        "type": "Pitcher",
+        "abbreviation": "P"
+      },
+      "roster_type_source": "40Man"
+    },
+    {
+      "team_id": 110,
+      "player_id": 664854,
+      "full_name": "Ryan Helsley",
       "status": {
         "code": "D15",
         "description": "Injured 15-Day"
@@ -5940,8 +5924,8 @@
       "player_id": 656986,
       "full_name": "Bennett Sousa",
       "status": {
-        "code": "D15",
-        "description": "Injured 15-Day"
+        "code": "D60",
+        "description": "Injured 60-Day"
       },
       "position": {
         "code": "1",
@@ -5996,22 +5980,6 @@
         "name": "Shortstop",
         "type": "Infielder",
         "abbreviation": "SS"
-      },
-      "roster_type_source": "40Man"
-    },
-    {
-      "team_id": 117,
-      "player_id": 664299,
-      "full_name": "Cristian Javier",
-      "status": {
-        "code": "D60",
-        "description": "Injured 60-Day"
-      },
-      "position": {
-        "code": "1",
-        "name": "Pitcher",
-        "type": "Pitcher",
-        "abbreviation": "P"
       },
       "roster_type_source": "40Man"
     },
@@ -6580,8 +6548,8 @@
       "player_id": 680730,
       "full_name": "Mitchell Parker",
       "status": {
-        "code": "D15",
-        "description": "Injured 15-Day"
+        "code": "D60",
+        "description": "Injured 60-Day"
       },
       "position": {
         "code": "1",
@@ -6838,22 +6806,6 @@
       "status": {
         "code": "D60",
         "description": "Injured 60-Day"
-      },
-      "position": {
-        "code": "1",
-        "name": "Pitcher",
-        "type": "Pitcher",
-        "abbreviation": "P"
-      },
-      "roster_type_source": "40Man"
-    },
-    {
-      "team_id": 133,
-      "player_id": 643410,
-      "full_name": "Mark Leiter Jr.",
-      "status": {
-        "code": "D15",
-        "description": "Injured 15-Day"
       },
       "position": {
         "code": "1",
@@ -8529,6 +8481,22 @@
     },
     {
       "team_id": 147,
+      "player_id": 607074,
+      "full_name": "Carlos Rod\u00f3n",
+      "status": {
+        "code": "D15",
+        "description": "Injured 15-Day"
+      },
+      "position": {
+        "code": "1",
+        "name": "Pitcher",
+        "type": "Pitcher",
+        "abbreviation": "P"
+      },
+      "roster_type_source": "40Man"
+    },
+    {
+      "team_id": 147,
       "player_id": 657376,
       "full_name": "Clarke Schmidt",
       "status": {
@@ -8572,38 +8540,6 @@
         "name": "Pitcher",
         "type": "Pitcher",
         "abbreviation": "P"
-      },
-      "roster_type_source": "40Man"
-    },
-    {
-      "team_id": 147,
-      "player_id": 641857,
-      "full_name": "Ryan McMahon",
-      "status": {
-        "code": "D10",
-        "description": "Injured 10-Day"
-      },
-      "position": {
-        "code": "5",
-        "name": "Third Base",
-        "type": "Infielder",
-        "abbreviation": "3B"
-      },
-      "roster_type_source": "40Man"
-    },
-    {
-      "team_id": 147,
-      "player_id": 663757,
-      "full_name": "Trent Grisham",
-      "status": {
-        "code": "D10",
-        "description": "Injured 10-Day"
-      },
-      "position": {
-        "code": "8",
-        "name": "Outfielder",
-        "type": "Outfielder",
-        "abbreviation": "CF"
       },
       "roster_type_source": "40Man"
     },

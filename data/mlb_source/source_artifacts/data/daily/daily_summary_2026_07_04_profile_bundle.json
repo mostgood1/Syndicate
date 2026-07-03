@@ -1,7 +1,7 @@
 {
   "date": "2026-07-04",
   "season": 2026,
-  "generated_at": "2026-07-03T18:26:44.002445",
+  "generated_at": "2026-07-03T22:21:06.609478",
   "tool": "tools/daily_update_multi_profile.py",
   "daily_update_tool": "tools\\daily_update.py",
   "python_exe": "C:\\hostedtoolcache\\windows\\Python\\3.11.9\\x64\\python.exe",
@@ -37,7 +37,7 @@
         "data/tuning/pitch_model_overrides/_tmp_hr_bbhbp1p04_starterbbhbp1p04.json"
       ],
       "exit_code": 0,
-      "duration_s": 158.856,
+      "duration_s": 167.35,
       "skipped": false
     },
     "pitcher_props_recos": {
@@ -48,7 +48,7 @@
       "snapshot_dir": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily_pitcher_props\\snapshots\\2026-07-04",
       "extra_args": [],
       "exit_code": 0,
-      "duration_s": 198.509,
+      "duration_s": 201.504,
       "skipped": false
     },
     "hitter_props_recos": {
@@ -68,7 +68,7 @@
         "24"
       ],
       "exit_code": 0,
-      "duration_s": 201.306,
+      "duration_s": 195.724,
       "skipped": false
     }
   },
@@ -111,8 +111,8 @@
     },
     "shadow_counts": {
       "pitcher_props": {
-        "raw_candidates_n": 0,
-        "selected_n": 0,
+        "raw_candidates_n": 2,
+        "selected_n": 2,
         "cap": 8,
         "stake_u": 0.0,
         "shadow_only": true,
@@ -121,7 +121,122 @@
           "walks_allowed"
         ],
         "playable_support_removed_n": 0,
-        "recommendations": []
+        "recommendations": [
+          {
+            "date": "2026-07-04",
+            "game_pk": 822882,
+            "away": "Detroit Tigers",
+            "home": "Texas Rangers",
+            "away_abbr": "DET",
+            "home_abbr": "TEX",
+            "double_header": "N",
+            "game_number": 1,
+            "event_id": null,
+            "commence_time": null,
+            "market": "pitcher_props",
+            "pitcher_id": 677958,
+            "pitcher_name": "Kumar Rocker",
+            "team": "TEX",
+            "team_side": "home",
+            "prop": "hits_allowed",
+            "selection": "over",
+            "edge": 0.2365384615384616,
+            "market_line": 4.5,
+            "model_prob_over": 0.775,
+            "market_prob_over": 0.5384615384615384,
+            "market_prob_under": 0.46153846153846145,
+            "market_prob_mode": "no_vig_two_way",
+            "market_no_vig_prob_over": 0.5384615384615384,
+            "selected_side_market_prob": 0.5384615384615384,
+            "selected_side_model_prob": 0.775,
+            "mean_support": 2.123,
+            "hits_mean": 6.623,
+            "market_alternates": [],
+            "odds": "-140",
+            "stake_u": 0.0,
+            "sim_sample_size": 1000,
+            "baseball_reasons": [
+              "Across his last 5 starts, he has averaged 5.2 hits allowed.",
+              "He mixes slider, sinker, and cutter often enough that hitters have to cover multiple looks."
+            ],
+            "explanation_diagnostic": {
+              "status": "supported",
+              "flag_sparse_support": false,
+              "support_min_reasons": 2,
+              "baseball_reasons_n": 2,
+              "reason_sentences_n": 5,
+              "market": "pitcher_props:hits allowed",
+              "subject": "Kumar Rocker",
+              "supporting_reasons": [
+                "Across his last 5 starts, he has averaged 5.2 hits allowed.",
+                "He mixes slider, sinker, and cutter often enough that hitters have to cover multiple looks."
+              ]
+            },
+            "reasons": [
+              "The model lands on the over side in 77.5% of sims, while the market is pricing it closer to 53.8%. Across his last 5 starts, he has averaged 5.2 hits allowed. He mixes slider, sinker, and cutter often enough that hitters have to cover multiple looks. The model baseline sits around 6.6 hits allowed against a line of 4.5. If he stays on his normal starter path, the matchup against DET gives him a fair shot to reach full workload volume."
+            ],
+            "reason_summary": "The model lands on the over side in 77.5% of sims, while the market is pricing it closer to 53.8%. Across his last 5 starts, he has averaged 5.2 hits allowed. He mixes slider, sinker, and cutter often enough that hitters have to cover multiple looks. The model baseline sits around 6.6 hits allowed against a line of 4.5. If he stays on his normal starter path, the matchup against DET gives him a fair shot to reach full workload volume.",
+            "rank": 1,
+            "shadow_only": true
+          },
+          {
+            "date": "2026-07-04",
+            "game_pk": 824092,
+            "away": "Philadelphia Phillies",
+            "home": "Kansas City Royals",
+            "away_abbr": "PHI",
+            "home_abbr": "KC",
+            "double_header": "N",
+            "game_number": 1,
+            "event_id": null,
+            "commence_time": null,
+            "market": "pitcher_props",
+            "pitcher_id": 666200,
+            "pitcher_name": "Jes\u00fas Luzardo",
+            "team": "PHI",
+            "team_side": "away",
+            "prop": "hits_allowed",
+            "selection": "over",
+            "edge": 0.2746532951289398,
+            "market_line": 5.5,
+            "model_prob_over": 0.746,
+            "market_prob_over": 0.4713467048710602,
+            "market_prob_under": 0.5286532951289399,
+            "market_prob_mode": "no_vig_two_way",
+            "market_no_vig_prob_over": 0.4713467048710602,
+            "selected_side_market_prob": 0.4713467048710602,
+            "selected_side_model_prob": 0.746,
+            "mean_support": 2.17,
+            "hits_mean": 7.67,
+            "market_alternates": [],
+            "odds": "-105",
+            "stake_u": 0.0,
+            "sim_sample_size": 1000,
+            "baseball_reasons": [
+              "Across his last 5 starts, he has averaged 5.8 hits allowed.",
+              "He mixes secondary mix, four-seam fastball, and changeup often enough that hitters have to cover multiple looks."
+            ],
+            "explanation_diagnostic": {
+              "status": "supported",
+              "flag_sparse_support": false,
+              "support_min_reasons": 2,
+              "baseball_reasons_n": 2,
+              "reason_sentences_n": 5,
+              "market": "pitcher_props:hits allowed",
+              "subject": "Jes\u00fas Luzardo",
+              "supporting_reasons": [
+                "Across his last 5 starts, he has averaged 5.8 hits allowed.",
+                "He mixes secondary mix, four-seam fastball, and changeup often enough that hitters have to cover multiple looks."
+              ]
+            },
+            "reasons": [
+              "The model lands on the over side in 74.6% of sims, while the market is pricing it closer to 47.1%. Across his last 5 starts, he has averaged 5.8 hits allowed. He mixes secondary mix, four-seam fastball, and changeup often enough that hitters have to cover multiple looks. The model baseline sits around 7.7 hits allowed against a line of 5.5. If he stays on his normal starter path, the matchup against KC gives him a fair shot to reach full workload volume."
+            ],
+            "reason_summary": "The model lands on the over side in 74.6% of sims, while the market is pricing it closer to 47.1%. Across his last 5 starts, he has averaged 5.8 hits allowed. He mixes secondary mix, four-seam fastball, and changeup often enough that hitters have to cover multiple looks. The model baseline sits around 7.7 hits allowed against a line of 5.5. If he stays on his normal starter path, the matchup against KC gives him a fair shot to reach full workload volume.",
+            "rank": 2,
+            "shadow_only": true
+          }
+        ]
       },
       "hitter_props": {
         "raw_candidates_n": 0,
@@ -534,8 +649,8 @@
       "shadow_support_policy": {
         "pitcher_props": {
           "market": "shadow_pitcher_props",
-          "evaluated_n": 0,
-          "kept_n": 0,
+          "evaluated_n": 2,
+          "kept_n": 2,
           "removed_sparse_support_n": 0,
           "removed_examples": []
         },
@@ -566,12 +681,12 @@
   },
   "timings": {
     "profiles": {
-      "game_recos": 158.856,
-      "pitcher_props_recos": 198.509,
-      "hitter_props_recos": 201.306
+      "game_recos": 167.35,
+      "pitcher_props_recos": 201.504,
+      "hitter_props_recos": 195.724
     },
-    "locked_policy_s": 0.989,
-    "total_s": 559.731
+    "locked_policy_s": 1.019,
+    "total_s": 565.669
   },
   "failures": [],
   "failures_n": 0

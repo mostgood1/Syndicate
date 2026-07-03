@@ -1,7 +1,7 @@
 {
   "date": "2026-07-04",
   "mode": "live",
-  "retrieved_at": "2026-07-03T18:17:22.884222",
+  "retrieved_at": "2026-07-03T22:11:38.789269",
   "pitcher_props": {
     "kumar rocker": {
       "earned_runs": {
@@ -21,14 +21,14 @@
       },
       "hits_allowed": {
         "line": 4.5,
-        "over_odds": "-155",
-        "under_odds": "+110",
+        "over_odds": "-140",
+        "under_odds": "+100",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 4.5,
-            "over_odds": "-155",
-            "under_odds": "+110",
+            "over_odds": "-140",
+            "under_odds": "+100",
             "_src": "oddsapi"
           }
         ],
@@ -36,14 +36,14 @@
       },
       "outs": {
         "line": 15.5,
-        "over_odds": "-120",
-        "under_odds": "-120",
+        "over_odds": "-130",
+        "under_odds": "-110",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 15.5,
-            "over_odds": "-120",
-            "under_odds": "-120",
+            "over_odds": "-130",
+            "under_odds": "-110",
             "_src": "oddsapi"
           }
         ],
@@ -53,14 +53,78 @@
     "jack flaherty": {
       "outs": {
         "line": 15.5,
-        "over_odds": "-120",
-        "under_odds": "-120",
+        "over_odds": "-115",
+        "under_odds": "-125",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 15.5,
-            "over_odds": "-120",
-            "under_odds": "-120",
+            "over_odds": "-115",
+            "under_odds": "-125",
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": []
+      }
+    },
+    "jesus luzardo": {
+      "earned_runs": {
+        "line": 2.5,
+        "over_odds": "+115",
+        "under_odds": "-165",
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 2.5,
+            "over_odds": "+115",
+            "under_odds": "-165",
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": []
+      },
+      "hits_allowed": {
+        "line": 5.5,
+        "over_odds": "-105",
+        "under_odds": "-135",
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 5.5,
+            "over_odds": "-105",
+            "under_odds": "-135",
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": []
+      },
+      "outs": {
+        "line": 17.5,
+        "over_odds": "-210",
+        "under_odds": "+145",
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 17.5,
+            "over_odds": "-210",
+            "under_odds": "+145",
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": []
+      }
+    },
+    "michael wacha": {
+      "outs": {
+        "line": 18.5,
+        "over_odds": "+140",
+        "under_odds": "-200",
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 18.5,
+            "over_odds": "+140",
+            "under_odds": "-200",
             "_src": "oddsapi"
           }
         ],
@@ -79,13 +143,13 @@
     "regions": "us",
     "bookmakers": null,
     "counts": {
-      "players": 2,
+      "players": 4,
       "markets": {
-        "earned_runs": 1,
-        "hits_allowed": 1,
-        "outs": 2
+        "earned_runs": 2,
+        "hits_allowed": 2,
+        "outs": 4
       },
-      "events_matched": 14
+      "events_matched": 13
     },
     "warnings": []
   }

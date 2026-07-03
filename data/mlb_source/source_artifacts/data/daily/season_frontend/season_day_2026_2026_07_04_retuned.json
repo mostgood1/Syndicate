@@ -7,7 +7,7 @@
   "meta": {
     "sims_per_game": null,
     "season": 2026,
-    "generated_at": "2026-07-03T13:27:30-05:00",
+    "generated_at": "2026-07-03T17:21:52-05:00",
     "use_raw": null,
     "jobs": null,
     "skipped_games": 0
@@ -251,7 +251,7 @@
       },
       "starter_names": {
         "away": "Zebby Matthews",
-        "home": "Carlos Rod\u00f3n"
+        "home": ""
       },
       "segments": {},
       "pitcher_props": {},
@@ -358,12 +358,12 @@
             "commence_time": "2026-07-04T20:06:00Z",
             "market": "ml",
             "selection": "home",
-            "edge": 0.1417391304347826,
+            "edge": 0.13083423618634887,
             "model_prob": 0.62,
             "selected_side_model_prob": 0.62,
-            "selected_side_market_prob": 0.4782608695652174,
-            "market_no_vig_prob": 0.4782608695652174,
-            "odds": "+100",
+            "selected_side_market_prob": 0.4891657638136511,
+            "market_no_vig_prob": 0.4891657638136511,
+            "odds": "-105",
             "stake_u": 1.0,
             "sim_sample_size": 1000,
             "baseball_reasons": [
@@ -384,9 +384,9 @@
               ]
             },
             "reasons": [
-              "The model lands on the home side in 62.0% of sims, while the market is pricing it closer to 47.8%. Across his last 5 starts, Kumar Rocker has allowed about 2.4 earned runs per outing. The projected lineup is mostly 6 left-handed and 3 right-handed, and the power risk also comes in lighter than baseline. TEX wins this matchup in about 62.0% of model runs."
+              "The model lands on the home side in 62.0% of sims, while the market is pricing it closer to 48.9%. Across his last 5 starts, Kumar Rocker has allowed about 2.4 earned runs per outing. The projected lineup is mostly 6 left-handed and 3 right-handed, and the power risk also comes in lighter than baseline. TEX wins this matchup in about 62.0% of model runs."
             ],
-            "reason_summary": "The model lands on the home side in 62.0% of sims, while the market is pricing it closer to 47.8%. Across his last 5 starts, Kumar Rocker has allowed about 2.4 earned runs per outing. The projected lineup is mostly 6 left-handed and 3 right-handed, and the power risk also comes in lighter than baseline. TEX wins this matchup in about 62.0% of model runs.",
+            "reason_summary": "The model lands on the home side in 62.0% of sims, while the market is pricing it closer to 48.9%. Across his last 5 starts, Kumar Rocker has allowed about 2.4 earned runs per outing. The projected lineup is mostly 6 left-handed and 3 right-handed, and the power risk also comes in lighter than baseline. TEX wins this matchup in about 62.0% of model runs.",
             "rank": 1,
             "recommendation_tier": "official"
           },
@@ -409,19 +409,19 @@
               "team_side": "home",
               "prop": "outs",
               "selection": "over",
-              "edge": 0.41400000000000003,
+              "edge": 0.39498859315589363,
               "market_line": 15.5,
               "model_prob_over": 0.914,
-              "market_prob_over": 0.5,
-              "market_prob_under": 0.5,
+              "market_prob_over": 0.5190114068441064,
+              "market_prob_under": 0.4809885931558936,
               "market_prob_mode": "no_vig_two_way",
-              "market_no_vig_prob_over": 0.5,
-              "selected_side_market_prob": 0.5,
+              "market_no_vig_prob_over": 0.5190114068441064,
+              "selected_side_market_prob": 0.5190114068441064,
               "selected_side_model_prob": 0.914,
               "mean_support": 5.524000000000001,
               "outs_mean": 21.024,
               "market_alternates": [],
-              "odds": "-120",
+              "odds": "-130",
               "stake_u": 1.0,
               "sim_sample_size": 1000,
               "baseball_reasons": [
@@ -442,9 +442,9 @@
                 ]
               },
               "reasons": [
-                "The model lands on the over side in 91.4% of sims, while the market is pricing it closer to 50.0%. The projected lineup is mostly 6 left-handed and 3 right-handed, and the damage profile is lighter than average. His modeled workload cap still reaches roughly 97 pitches, so the deeper-start path is still available if the outing stays efficient. The model baseline sits around 21.0 outs against a line of 15.5. If he stays on his normal starter path, the matchup against DET gives him a fair shot to reach full workload volume."
+                "The model lands on the over side in 91.4% of sims, while the market is pricing it closer to 51.9%. The projected lineup is mostly 6 left-handed and 3 right-handed, and the damage profile is lighter than average. His modeled workload cap still reaches roughly 97 pitches, so the deeper-start path is still available if the outing stays efficient. The model baseline sits around 21.0 outs against a line of 15.5. If he stays on his normal starter path, the matchup against DET gives him a fair shot to reach full workload volume."
               ],
-              "reason_summary": "The model lands on the over side in 91.4% of sims, while the market is pricing it closer to 50.0%. The projected lineup is mostly 6 left-handed and 3 right-handed, and the damage profile is lighter than average. His modeled workload cap still reaches roughly 97 pitches, so the deeper-start path is still available if the outing stays efficient. The model baseline sits around 21.0 outs against a line of 15.5. If he stays on his normal starter path, the matchup against DET gives him a fair shot to reach full workload volume.",
+              "reason_summary": "The model lands on the over side in 91.4% of sims, while the market is pricing it closer to 51.9%. The projected lineup is mostly 6 left-handed and 3 right-handed, and the damage profile is lighter than average. His modeled workload cap still reaches roughly 97 pitches, so the deeper-start path is still available if the outing stays efficient. The model baseline sits around 21.0 outs against a line of 15.5. If he stays on his normal starter path, the matchup against DET gives him a fair shot to reach full workload volume.",
               "rank": 1,
               "recommendation_tier": "official"
             }

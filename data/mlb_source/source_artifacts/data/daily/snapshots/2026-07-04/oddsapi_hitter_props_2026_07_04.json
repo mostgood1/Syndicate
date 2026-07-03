@@ -1,9 +1,26 @@
 {
   "date": "2026-07-04",
   "mode": "live",
-  "retrieved_at": "2026-07-03T18:17:23.799695",
+  "retrieved_at": "2026-07-03T22:11:40.189301",
   "hitter_props": {
     "colt keith": {
+      "batter_hits_runs_rbis": {
+        "line": 1.5,
+        "over_odds": "+120",
+        "under_odds": "-170",
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 1.5,
+            "over_odds": "+120",
+            "under_odds": "-170",
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": []
+      }
+    },
+    "nick loftin": {
       "batter_hits_runs_rbis": {
         "line": 1.5,
         "over_odds": "+115",
@@ -34,11 +51,11 @@
     "regions": "us",
     "bookmakers": null,
     "counts": {
-      "players": 1,
+      "players": 2,
       "markets": {
-        "batter_hits_runs_rbis": 1
+        "batter_hits_runs_rbis": 2
       },
-      "events_matched": 14
+      "events_matched": 13
     }
   }
 }

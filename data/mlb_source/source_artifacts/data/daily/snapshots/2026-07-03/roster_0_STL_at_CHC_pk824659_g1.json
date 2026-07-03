@@ -39,20 +39,20 @@
       "use_closer_in_9th_only": true,
       "pinch_hit_aggressiveness": 0.15
     },
-    "confirmed_lineup_ids": [],
-    "projected_lineup_ids": [
+    "confirmed_lineup_ids": [
       802139,
       671056,
       691023,
       676369,
       676475,
       691026,
-      663457,
+      665877,
       691458,
-      686780
+      701675
     ],
-    "lineup_source": "projected_rotowire_default_vs_lhp",
-    "lineup_confidence": 0.66,
+    "projected_lineup_ids": [],
+    "lineup_source": "confirmed_feed_live",
+    "lineup_confidence": 1.0,
     "probable_pitcher": {
       "id": 669467,
       "source": "feed_gameData_probablePitchers",
@@ -75,12 +75,6 @@
         "lev": 0.7
       },
       {
-        "id": 700669,
-        "name": "Gordon Graceffo",
-        "role": "SU",
-        "lev": 0.7
-      },
-      {
         "id": 668941,
         "name": "JoJo Romero",
         "role": "MR",
@@ -95,8 +89,8 @@
       {
         "id": 694335,
         "name": "Matt Svanson",
-        "role": "MR",
-        "lev": 0.5
+        "role": "SU",
+        "lev": 0.7
       },
       {
         "id": 691008,
@@ -113,6 +107,12 @@
       {
         "id": 681676,
         "name": "Ryan Fernandez",
+        "role": "MR",
+        "lev": 0.5
+      },
+      {
+        "id": 592773,
+        "name": "Ryne Stanek",
         "role": "MR",
         "lev": 0.5
       }
@@ -293,30 +293,30 @@
         "vs_pitcher_history": {}
       },
       {
-        "id": 663457,
-        "name": "Lars Nootbaar",
+        "id": 665877,
+        "name": "Jos\u00e9 Ferm\u00edn",
         "pos": "LF",
-        "bat": "L",
+        "bat": "R",
         "throw": "R",
-        "k_rate": 0.21372180451127817,
-        "bb_rate": 0.13984962406015036,
+        "k_rate": 0.1410569105691057,
+        "bb_rate": 0.06886178861788617,
         "hbp_rate": 0.0,
-        "hr_rate": 0.026917293233082708,
-        "inplay_hit_rate": 0.33464912280701753,
-        "xb_hit_share": 0.29411764705882354,
+        "hr_rate": 0.024065040650406506,
+        "inplay_hit_rate": 0.30712719298245617,
+        "xb_hit_share": 0.16129032258064516,
         "vs_pitch_type": {},
         "vs_pitch_type_hr": {},
         "platoon_mult_vs_lhp": {
-          "k": 0.9646877748460863,
-          "bb": 0.9743727598566309,
-          "hr": 1.275,
-          "inplay": 0.8075
+          "k": 0.958582884350332,
+          "bb": 1.1925000000000001,
+          "hr": 0.7812279670975323,
+          "inplay": 0.9665737511328371
         },
         "platoon_mult_vs_rhp": {
-          "k": 1.0114775725593668,
-          "bb": 1.022043010752688,
-          "hr": 0.8215083798882681,
-          "inplay": 1.0604474817449916
+          "k": 1.09985590778098,
+          "bb": 0.8075,
+          "hr": 1.275,
+          "inplay": 0.9790967511602999
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -351,30 +351,30 @@
         "vs_pitcher_history": {}
       },
       {
-        "id": 686780,
-        "name": "Pedro Pag\u00e9s",
-        "pos": "C",
-        "bat": "R",
-        "throw": "R",
-        "k_rate": 0.24232767232767233,
-        "bb_rate": 0.04423576423576424,
-        "hbp_rate": 0.013986013986013986,
-        "hr_rate": 0.023776223776223775,
-        "inplay_hit_rate": 0.252,
-        "xb_hit_share": 0.21428571428571427,
+        "id": 701675,
+        "name": "Nathan Church",
+        "pos": "LF",
+        "bat": "L",
+        "throw": "L",
+        "k_rate": 0.22212988017008117,
+        "bb_rate": 0.0662156938538848,
+        "hbp_rate": 0.010050251256281407,
+        "hr_rate": 0.02135678391959799,
+        "inplay_hit_rate": 0.32403846153846155,
+        "xb_hit_share": 0.20408163265306123,
         "vs_pitch_type": {},
         "vs_pitch_type_hr": {},
         "platoon_mult_vs_lhp": {
-          "k": 1.148355113987715,
-          "bb": 0.9282068654019874,
+          "k": 0.853074470000951,
+          "bb": 0.8075,
           "hr": 0.78,
-          "inplay": 1.027731092436975
+          "inplay": 0.9834463755828741
         },
         "platoon_mult_vs_rhp": {
-          "k": 0.9238838273488066,
-          "bb": 0.9965221318879856,
+          "k": 1.0213912816497,
+          "bb": 0.9824479470714147,
           "hr": 1.275,
-          "inplay": 0.946031746031746
+          "inplay": 0.968628420705572
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -440,59 +440,59 @@
         "vs_pitcher_history": {}
       },
       {
-        "id": 665877,
-        "name": "Jos\u00e9 Ferm\u00edn",
+        "id": 663457,
+        "name": "Lars Nootbaar",
         "pos": "LF",
-        "bat": "R",
+        "bat": "L",
         "throw": "R",
-        "k_rate": 0.1410569105691057,
-        "bb_rate": 0.06886178861788617,
+        "k_rate": 0.21372180451127817,
+        "bb_rate": 0.13984962406015036,
         "hbp_rate": 0.0,
-        "hr_rate": 0.024065040650406506,
-        "inplay_hit_rate": 0.30712719298245617,
-        "xb_hit_share": 0.16129032258064516,
+        "hr_rate": 0.026917293233082708,
+        "inplay_hit_rate": 0.33464912280701753,
+        "xb_hit_share": 0.29411764705882354,
         "vs_pitch_type": {},
         "vs_pitch_type_hr": {},
         "platoon_mult_vs_lhp": {
-          "k": 0.958582884350332,
-          "bb": 1.1925000000000001,
-          "hr": 0.7812279670975323,
-          "inplay": 0.9665737511328371
+          "k": 0.9646877748460863,
+          "bb": 0.9743727598566309,
+          "hr": 1.275,
+          "inplay": 0.8075
         },
         "platoon_mult_vs_rhp": {
-          "k": 1.09985590778098,
-          "bb": 0.8075,
-          "hr": 1.275,
-          "inplay": 0.9790967511602999
+          "k": 1.0114775725593668,
+          "bb": 1.022043010752688,
+          "hr": 0.8215083798882681,
+          "inplay": 1.0604474817449916
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
       },
       {
-        "id": 701675,
-        "name": "Nathan Church",
-        "pos": "LF",
-        "bat": "L",
-        "throw": "L",
-        "k_rate": 0.22212988017008117,
-        "bb_rate": 0.0662156938538848,
-        "hbp_rate": 0.010050251256281407,
-        "hr_rate": 0.02135678391959799,
-        "inplay_hit_rate": 0.32403846153846155,
-        "xb_hit_share": 0.20408163265306123,
+        "id": 686780,
+        "name": "Pedro Pag\u00e9s",
+        "pos": "C",
+        "bat": "R",
+        "throw": "R",
+        "k_rate": 0.24232767232767233,
+        "bb_rate": 0.04423576423576424,
+        "hbp_rate": 0.013986013986013986,
+        "hr_rate": 0.023776223776223775,
+        "inplay_hit_rate": 0.252,
+        "xb_hit_share": 0.21428571428571427,
         "vs_pitch_type": {},
         "vs_pitch_type_hr": {},
         "platoon_mult_vs_lhp": {
-          "k": 0.853074470000951,
-          "bb": 0.8075,
+          "k": 1.148355113987715,
+          "bb": 0.9282068654019874,
           "hr": 0.78,
-          "inplay": 0.9834463755828741
+          "inplay": 1.027731092436975
         },
         "platoon_mult_vs_rhp": {
-          "k": 1.0213912816497,
-          "bb": 0.9824479470714147,
+          "k": 0.9238838273488066,
+          "bb": 0.9965221318879856,
           "hr": 1.275,
-          "inplay": 0.968628420705572
+          "inplay": 0.946031746031746
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -582,50 +582,6 @@
           "CH": 0.25940593481188134,
           "SI": 0.12277227754455446,
           "SL": 0.23366336532673274
-        },
-        "pitch_type_whiff_mult": {},
-        "pitch_type_inplay_mult": {},
-        "pitch_type_hr_mult": {}
-      },
-      {
-        "id": 700669,
-        "name": "Gordon Graceffo",
-        "throw": "R",
-        "role": "SU",
-        "leverage_skill": 0.7,
-        "stamina_pitches": 25,
-        "availability_mult": 0.925,
-        "platoon_mult_vs_lhb": {
-          "k": 0.8075,
-          "bb": 1.0491158267020337,
-          "hr": 1.275,
-          "inplay": 0.8075
-        },
-        "platoon_mult_vs_rhb": {
-          "k": 1.1925000000000001,
-          "bb": 0.8438008523827975,
-          "hr": 0.78,
-          "inplay": 1.1241880341880341
-        },
-        "statcast_quality_mult": {},
-        "arsenal_source": "statsapi_pitchArsenal",
-        "arsenal_sample_size": 553,
-        "statcast_splits_found": false,
-        "statcast_splits_source": "",
-        "statcast_splits_n_pitches": 0,
-        "statcast_splits_start_date": "",
-        "statcast_splits_end_date": "",
-        "k_rate": 0.09837662337662337,
-        "bb_rate": 0.1412337662337662,
-        "hbp_rate": 0.012987012987012988,
-        "hr_rate": 0.026623376623376625,
-        "inplay_hit_rate": 0.21336206896551724,
-        "arsenal": {
-          "FF": 0.419529832517179,
-          "CU": 0.17540687105244124,
-          "CH": 0.08860759453164557,
-          "SI": 0.05967450035804701,
-          "SL": 0.25678120154068723
         },
         "pitch_type_whiff_mult": {},
         "pitch_type_inplay_mult": {},
@@ -722,8 +678,8 @@
         "id": 694335,
         "name": "Matt Svanson",
         "throw": "R",
-        "role": "MR",
-        "leverage_skill": 0.5,
+        "role": "SU",
+        "leverage_skill": 0.7,
         "stamina_pitches": 25,
         "availability_mult": 0.8666666666666667,
         "platoon_mult_vs_lhb": {
@@ -886,6 +842,50 @@
           "CH": 0.1017964011197604,
           "SL": 0.4431137748742515,
           "FC": 0.029940119329341312
+        },
+        "pitch_type_whiff_mult": {},
+        "pitch_type_inplay_mult": {},
+        "pitch_type_hr_mult": {}
+      },
+      {
+        "id": 592773,
+        "name": "Ryne Stanek",
+        "throw": "R",
+        "role": "MR",
+        "leverage_skill": 0.5,
+        "stamina_pitches": 25,
+        "availability_mult": 1.0,
+        "platoon_mult_vs_lhb": {
+          "k": 1.031100108376029,
+          "bb": 1.0275206257366336,
+          "hr": 0.8826793872614889,
+          "inplay": 0.9792631153340746
+        },
+        "platoon_mult_vs_rhb": {
+          "k": 0.977879472984926,
+          "bb": 1.1507528749896583,
+          "hr": 0.784094210417099,
+          "inplay": 1.0123420600424544
+        },
+        "statcast_quality_mult": {},
+        "arsenal_source": "statsapi_pitchArsenal",
+        "arsenal_sample_size": 585,
+        "statcast_splits_found": false,
+        "statcast_splits_source": "",
+        "statcast_splits_n_pitches": 0,
+        "statcast_splits_start_date": "",
+        "statcast_splits_end_date": "",
+        "k_rate": 0.26377329192546584,
+        "bb_rate": 0.10928571428571428,
+        "hbp_rate": 0.007142857142857143,
+        "hr_rate": 0.06251552795031055,
+        "inplay_hit_rate": 0.3463935574229692,
+        "arsenal": {
+          "FF": 0.5128205197948715,
+          "OTHER": 0.0034188032652991513,
+          "SI": 0.10427350189162403,
+          "SL": 0.23931623057094054,
+          "FS": 0.14017094447726478
         },
         "pitch_type_whiff_mult": {},
         "pitch_type_inplay_mult": {},
@@ -1760,16 +1760,16 @@
   },
   "weather": {
     "source": "statsapi_live_feed",
-    "condition": "Overcast",
-    "temperature_f": 88.0,
-    "wind_speed_mph": 10.0,
+    "condition": "Cloudy",
+    "temperature_f": 77.0,
+    "wind_speed_mph": 7.0,
     "wind_direction": "out",
-    "wind_raw": "10 mph, Out To CF",
+    "wind_raw": "7 mph, Out To LF",
     "is_dome": null,
     "multipliers": {
-      "hr_mult": 1.054,
-      "inplay_hit_mult": 1.027,
-      "xb_share_mult": 1.0144
+      "hr_mult": 1.021,
+      "inplay_hit_mult": 1.0105,
+      "xb_share_mult": 1.0056
     }
   },
   "park": {

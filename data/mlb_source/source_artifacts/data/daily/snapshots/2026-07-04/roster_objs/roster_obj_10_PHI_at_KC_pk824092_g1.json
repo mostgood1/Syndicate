@@ -1882,87 +1882,6 @@
       "bullpen": [
         {
           "player": {
-            "mlbam_id": 660604,
-            "full_name": "Alan Rangel",
-            "primary_position": "P",
-            "bat_side": "R",
-            "throw_side": "R"
-          },
-          "k_rate": 0.2727272727272727,
-          "bb_rate": 0.0,
-          "hbp_rate": 0.030303030303030304,
-          "hr_rate": 0.030303030303030304,
-          "inplay_hit_rate": 0.3456521739130434,
-          "batters_faced": 33.0,
-          "balls_in_play": 23.0,
-          "arsenal": {
-            "FF": 0.3620689536206896,
-            "CU": 0.1465517314655173,
-            "CH": 0.37068966370689665,
-            "SL": 0.12068965120689651
-          },
-          "pitch_type_whiff_mult": {},
-          "pitch_type_inplay_mult": {},
-          "pitch_type_hr_mult": {},
-          "statcast_splits_source": "",
-          "statcast_splits_n_pitches": 0,
-          "statcast_splits_start_date": "",
-          "statcast_splits_end_date": "",
-          "arsenal_source": "statsapi_pitchArsenal",
-          "arsenal_sample_size": 116,
-          "stamina_pitches": 29,
-          "role": "SU",
-          "availability_mult": 0.55,
-          "platoon_mult_vs_lhb": {
-            "k": 1.1558333333333335,
-            "bb": 1.0,
-            "hr": 1.275,
-            "inplay": 1.1129979035639415
-          },
-          "platoon_mult_vs_rhb": {
-            "k": 0.8075,
-            "bb": 1.0,
-            "hr": 0.78,
-            "inplay": 0.8839622641509435
-          },
-          "venue_mult_home": {},
-          "venue_mult_away": {
-            "k": 1.0,
-            "bb": 1.0,
-            "hr": 1.0,
-            "inplay": 1.0022012578616353
-          },
-          "vs_venue_hr_mult": {
-            "120": 1.175
-          },
-          "vs_venue_k_mult": {
-            "120": 0.8944444444444444
-          },
-          "vs_venue_bb_mult": {
-            "120": 1.0
-          },
-          "vs_venue_inplay_mult": {
-            "120": 0.966430817610063
-          },
-          "vs_venue_history": {
-            "120": {
-              "bf": 21.0,
-              "k_mult": 0.6984126984126984,
-              "bb_mult": 1.0,
-              "hr_mult": 1.5,
-              "inplay_mult": 0.9040880503144656
-            }
-          },
-          "statcast_quality_mult": {},
-          "bb_gb_rate": 0.44,
-          "bb_fb_rate": 0.25,
-          "bb_ld_rate": 0.2,
-          "bb_pu_rate": 0.11,
-          "bb_inplay_n": 0,
-          "leverage_skill": 0.7
-        },
-        {
-          "player": {
             "mlbam_id": 661395,
             "full_name": "Jhoan Duran",
             "primary_position": "P",
@@ -2167,7 +2086,7 @@
           "arsenal_source": "statsapi_pitchArsenal",
           "arsenal_sample_size": 577,
           "stamina_pitches": 25,
-          "role": "MR",
+          "role": "SU",
           "availability_mult": 0.865,
           "platoon_mult_vs_lhb": {
             "k": 0.8822418136020151,
@@ -2220,7 +2139,7 @@
           "bb_ld_rate": 0.2,
           "bb_pu_rate": 0.11,
           "bb_inplay_n": 0,
-          "leverage_skill": 0.5
+          "leverage_skill": 0.7
         },
         {
           "player": {

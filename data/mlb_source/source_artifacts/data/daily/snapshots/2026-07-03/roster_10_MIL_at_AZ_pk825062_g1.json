@@ -906,20 +906,20 @@
       "use_closer_in_9th_only": true,
       "pinch_hit_aggressiveness": 0.15
     },
-    "confirmed_lineup_ids": [],
-    "projected_lineup_ids": [
+    "confirmed_lineup_ids": [
       606466,
       672695,
       682998,
       672515,
-      571448,
-      694371,
       666971,
+      571448,
       545121,
-      694410
+      694410,
+      694371
     ],
-    "lineup_source": "projected_rotowire_default_vs_lhp",
-    "lineup_confidence": 0.66,
+    "projected_lineup_ids": [],
+    "lineup_source": "confirmed_feed_live",
+    "lineup_confidence": 1.0,
     "probable_pitcher": {
       "id": 703615,
       "source": "feed_gameData_probablePitchers",
@@ -1108,64 +1108,6 @@
         "vs_pitcher_history": {}
       },
       {
-        "id": 571448,
-        "name": "Nolan Arenado",
-        "pos": "3B",
-        "bat": "R",
-        "throw": "R",
-        "k_rate": 0.20539108187134503,
-        "bb_rate": 0.0757766812865497,
-        "hbp_rate": 0.020833333333333332,
-        "hr_rate": 0.02361111111111111,
-        "inplay_hit_rate": 0.25705618250212353,
-        "xb_hit_share": 0.22950819672131148,
-        "vs_pitch_type": {},
-        "vs_pitch_type_hr": {},
-        "platoon_mult_vs_lhp": {
-          "k": 0.8567572118335678,
-          "bb": 1.1850045104381155,
-          "hr": 1.0397244973938944,
-          "inplay": 0.9577040875108812
-        },
-        "platoon_mult_vs_rhp": {
-          "k": 1.0393762790283834,
-          "bb": 0.9709212588930424,
-          "hr": 1.1187306501547987,
-          "inplay": 1.037639389015361
-        },
-        "statcast_quality_mult": {},
-        "vs_pitcher_history": {}
-      },
-      {
-        "id": 694371,
-        "name": "Tommy Troy",
-        "pos": "LF",
-        "bat": "R",
-        "throw": "R",
-        "k_rate": 0.20965591397849465,
-        "bb_rate": 0.10639784946236559,
-        "hbp_rate": 0.0,
-        "hr_rate": 0.033419354838709676,
-        "inplay_hit_rate": 0.2575994318181818,
-        "xb_hit_share": 0.2,
-        "vs_pitch_type": {},
-        "vs_pitch_type_hr": {},
-        "platoon_mult_vs_lhp": {
-          "k": 0.9496849493720967,
-          "bb": 0.8075,
-          "hr": 1.2336918551204266,
-          "inplay": 1.1925000000000001
-        },
-        "platoon_mult_vs_rhp": {
-          "k": 0.9965304133757308,
-          "bb": 1.0961596766043455,
-          "hr": 0.9071535821535821,
-          "inplay": 0.8503308519437552
-        },
-        "statcast_quality_mult": {},
-        "vs_pitcher_history": {}
-      },
-      {
         "id": 666971,
         "name": "Lourdes Gurriel Jr.",
         "pos": "LF",
@@ -1190,6 +1132,35 @@
           "bb": 0.9740259449342168,
           "hr": 1.0782244468646962,
           "inplay": 1.0251663704377298
+        },
+        "statcast_quality_mult": {},
+        "vs_pitcher_history": {}
+      },
+      {
+        "id": 571448,
+        "name": "Nolan Arenado",
+        "pos": "3B",
+        "bat": "R",
+        "throw": "R",
+        "k_rate": 0.20539108187134503,
+        "bb_rate": 0.0757766812865497,
+        "hbp_rate": 0.020833333333333332,
+        "hr_rate": 0.02361111111111111,
+        "inplay_hit_rate": 0.25705618250212353,
+        "xb_hit_share": 0.22950819672131148,
+        "vs_pitch_type": {},
+        "vs_pitch_type_hr": {},
+        "platoon_mult_vs_lhp": {
+          "k": 0.8567572118335678,
+          "bb": 1.1850045104381155,
+          "hr": 1.0397244973938944,
+          "inplay": 0.9577040875108812
+        },
+        "platoon_mult_vs_rhp": {
+          "k": 1.0393762790283834,
+          "bb": 0.9709212588930424,
+          "hr": 1.1187306501547987,
+          "inplay": 1.037639389015361
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -1248,6 +1219,35 @@
           "bb": 1.1925000000000001,
           "hr": 0.78,
           "inplay": 1.107501494321578
+        },
+        "statcast_quality_mult": {},
+        "vs_pitcher_history": {}
+      },
+      {
+        "id": 694371,
+        "name": "Tommy Troy",
+        "pos": "LF",
+        "bat": "R",
+        "throw": "R",
+        "k_rate": 0.20965591397849465,
+        "bb_rate": 0.10639784946236559,
+        "hbp_rate": 0.0,
+        "hr_rate": 0.033419354838709676,
+        "inplay_hit_rate": 0.2575994318181818,
+        "xb_hit_share": 0.2,
+        "vs_pitch_type": {},
+        "vs_pitch_type_hr": {},
+        "platoon_mult_vs_lhp": {
+          "k": 0.9496849493720967,
+          "bb": 0.8075,
+          "hr": 1.2336918551204266,
+          "inplay": 1.1925000000000001
+        },
+        "platoon_mult_vs_rhp": {
+          "k": 0.9965304133757308,
+          "bb": 1.0961596766043455,
+          "hr": 0.9071535821535821,
+          "inplay": 0.8503308519437552
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -1798,16 +1798,16 @@
   },
   "weather": {
     "source": "statsapi_live_feed",
-    "condition": "",
-    "temperature_f": null,
-    "wind_speed_mph": null,
+    "condition": "Roof Closed",
+    "temperature_f": 72.0,
+    "wind_speed_mph": 0.0,
     "wind_direction": "unknown",
-    "wind_raw": "",
+    "wind_raw": "0 mph, None",
     "is_dome": null,
     "multipliers": {
-      "hr_mult": 1.0,
-      "inplay_hit_mult": 1.0,
-      "xb_share_mult": 1.0
+      "hr_mult": 1.006,
+      "inplay_hit_mult": 1.003,
+      "xb_share_mult": 1.0016
     }
   },
   "park": {
@@ -1827,8 +1827,8 @@
   },
   "umpire": {
     "source": "statsapi_live_feed",
-    "home_plate_umpire_id": null,
-    "home_plate_umpire_name": "",
+    "home_plate_umpire_id": 482663,
+    "home_plate_umpire_name": "David Rackley",
     "called_strike_mult": 1.0,
     "multipliers": {
       "called_strike_mult": 1.0

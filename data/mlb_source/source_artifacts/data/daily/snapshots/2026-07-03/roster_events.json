@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "date": "2026-07-03",
-  "generated_at": "2026-07-03T18:06:34.041559",
+  "generated_at": "2026-07-03T22:00:37.410317",
   "include_baseline": false,
   "teams": {
     "108": {
@@ -46,8 +46,8 @@
       "roster_types": {
         "40Man": {
           "prev_date": null,
-          "n_players": 46,
-          "n_added": 46,
+          "n_players": 45,
+          "n_added": 45,
           "n_removed": 0
         },
         "active": {
@@ -178,8 +178,8 @@
         },
         "active": {
           "prev_date": null,
-          "n_players": 25,
-          "n_added": 25,
+          "n_players": 26,
+          "n_added": 26,
           "n_removed": 0
         }
       }
@@ -262,8 +262,8 @@
       "roster_types": {
         "40Man": {
           "prev_date": null,
-          "n_players": 43,
-          "n_added": 43,
+          "n_players": 42,
+          "n_added": 42,
           "n_removed": 0
         },
         "active": {

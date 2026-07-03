@@ -1,6 +1,6 @@
 {
   "date": "2026-07-04",
-  "generatedAt": "2026-07-03T13:26:44-05:00",
+  "generatedAt": "2026-07-03T17:21:06-05:00",
   "groups": {
     "pitcher": {
       "found": true,
@@ -17,6 +17,12 @@
           "gamePk": 822882,
           "label": "DET @ TEX",
           "matchup": "DET @ TEX"
+        },
+        {
+          "value": "824092",
+          "gamePk": 824092,
+          "label": "PHI @ KC",
+          "matchup": "PHI @ KC"
         }
       ],
       "nav": {
@@ -72,12 +78,42 @@
               "selectionLabel": "Over",
               "targetLabel": "16+",
               "simProb": 0.914,
-              "marketProb": 0.5,
-              "rawEdge": 0.41400000000000003,
-              "odds": -120,
+              "marketProb": 0.5190114068441064,
+              "rawEdge": 0.39498859315589363,
+              "odds": -130,
               "marketLine": 15.5,
               "sourceFile": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/sims/2026-07-04/sim_2_DET_at_TEX_pk822882_g1.json",
               "rank": 1
+            },
+            {
+              "stat": "outs",
+              "statLabel": "Outs Recorded",
+              "group": "pitcher",
+              "side": "home",
+              "ownerId": 608379,
+              "ownerName": "Michael Wacha",
+              "playerName": "Michael Wacha",
+              "headshotUrl": "https://img.mlbstatic.com/mlb-photos/image/upload/w_180,q_auto:best/v1/people/608379/headshot/67/current",
+              "team": "KC",
+              "teamId": 118,
+              "teamLogoUrl": "https://www.mlbstatic.com/team-logos/118.svg",
+              "opponent": "PHI",
+              "opponentTeamId": 143,
+              "opponentLogoUrl": "https://www.mlbstatic.com/team-logos/143.svg",
+              "matchup": "PHI @ KC",
+              "gamePk": 824092,
+              "mean": 21.524,
+              "line": 18.5,
+              "selection": "over",
+              "selectionLabel": "Over",
+              "targetLabel": "19+",
+              "simProb": 0.75,
+              "marketProb": 0.38461538461538464,
+              "rawEdge": 0.36538461538461536,
+              "odds": 140,
+              "marketLine": 18.5,
+              "sourceFile": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/sims/2026-07-04/sim_10_PHI_at_KC_pk824092_g1.json",
+              "rank": 2
             },
             {
               "stat": "outs",
@@ -102,16 +138,46 @@
               "selectionLabel": "Over",
               "targetLabel": "16+",
               "simProb": 0.824,
-              "marketProb": 0.5,
-              "rawEdge": 0.32399999999999995,
-              "odds": -120,
+              "marketProb": 0.490521327014218,
+              "rawEdge": 0.33347867298578193,
+              "odds": -115,
               "marketLine": 15.5,
               "sourceFile": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/sims/2026-07-04/sim_2_DET_at_TEX_pk822882_g1.json",
-              "rank": 2
+              "rank": 3
+            },
+            {
+              "stat": "outs",
+              "statLabel": "Outs Recorded",
+              "group": "pitcher",
+              "side": "away",
+              "ownerId": 666200,
+              "ownerName": "Jes\u00fas Luzardo",
+              "playerName": "Jes\u00fas Luzardo",
+              "headshotUrl": "https://img.mlbstatic.com/mlb-photos/image/upload/w_180,q_auto:best/v1/people/666200/headshot/67/current",
+              "team": "PHI",
+              "teamId": 143,
+              "teamLogoUrl": "https://www.mlbstatic.com/team-logos/143.svg",
+              "opponent": "KC",
+              "opponentTeamId": 118,
+              "opponentLogoUrl": "https://www.mlbstatic.com/team-logos/118.svg",
+              "matchup": "PHI @ KC",
+              "gamePk": 824092,
+              "mean": 20.34,
+              "line": 17.5,
+              "selection": "over",
+              "selectionLabel": "Over",
+              "targetLabel": "18+",
+              "simProb": 0.787,
+              "marketProb": 0.6240145542753184,
+              "rawEdge": 0.16298544572468165,
+              "odds": -210,
+              "marketLine": 17.5,
+              "sourceFile": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/sims/2026-07-04/sim_10_PHI_at_KC_pk824092_g1.json",
+              "rank": 4
             }
           ],
-          "candidateCount": 2,
-          "positiveEdgeCount": 2,
+          "candidateCount": 4,
+          "positiveEdgeCount": 4,
           "found": true,
           "error": null
         },
@@ -121,6 +187,36 @@
           "unit": "Hits",
           "marketKey": "hits_allowed",
           "rows": [
+            {
+              "stat": "hits_allowed",
+              "statLabel": "Hits Allowed",
+              "group": "pitcher",
+              "side": "away",
+              "ownerId": 666200,
+              "ownerName": "Jes\u00fas Luzardo",
+              "playerName": "Jes\u00fas Luzardo",
+              "headshotUrl": "https://img.mlbstatic.com/mlb-photos/image/upload/w_180,q_auto:best/v1/people/666200/headshot/67/current",
+              "team": "PHI",
+              "teamId": 143,
+              "teamLogoUrl": "https://www.mlbstatic.com/team-logos/143.svg",
+              "opponent": "KC",
+              "opponentTeamId": 118,
+              "opponentLogoUrl": "https://www.mlbstatic.com/team-logos/118.svg",
+              "matchup": "PHI @ KC",
+              "gamePk": 824092,
+              "mean": 7.67,
+              "line": 5.5,
+              "selection": "over",
+              "selectionLabel": "Over",
+              "targetLabel": "6+",
+              "simProb": 0.746,
+              "marketProb": 0.4713467048710602,
+              "rawEdge": 0.2746532951289398,
+              "odds": -105,
+              "marketLine": 5.5,
+              "sourceFile": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/sims/2026-07-04/sim_10_PHI_at_KC_pk824092_g1.json",
+              "rank": 1
+            },
             {
               "stat": "hits_allowed",
               "statLabel": "Hits Allowed",
@@ -144,16 +240,16 @@
               "selectionLabel": "Over",
               "targetLabel": "5+",
               "simProb": 0.775,
-              "marketProb": 0.5607235142118863,
-              "rawEdge": 0.21427648578811376,
-              "odds": -155,
+              "marketProb": 0.5384615384615384,
+              "rawEdge": 0.2365384615384616,
+              "odds": -140,
               "marketLine": 4.5,
               "sourceFile": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/sims/2026-07-04/sim_2_DET_at_TEX_pk822882_g1.json",
-              "rank": 1
+              "rank": 2
             }
           ],
-          "candidateCount": 1,
-          "positiveEdgeCount": 1,
+          "candidateCount": 2,
+          "positiveEdgeCount": 2,
           "found": true,
           "error": null
         },
@@ -163,6 +259,36 @@
           "unit": "ER",
           "marketKey": "earned_runs",
           "rows": [
+            {
+              "stat": "earned_runs",
+              "statLabel": "Earned Runs",
+              "group": "pitcher",
+              "side": "away",
+              "ownerId": 666200,
+              "ownerName": "Jes\u00fas Luzardo",
+              "playerName": "Jes\u00fas Luzardo",
+              "headshotUrl": "https://img.mlbstatic.com/mlb-photos/image/upload/w_180,q_auto:best/v1/people/666200/headshot/67/current",
+              "team": "PHI",
+              "teamId": 143,
+              "teamLogoUrl": "https://www.mlbstatic.com/team-logos/143.svg",
+              "opponent": "KC",
+              "opponentTeamId": 118,
+              "opponentLogoUrl": "https://www.mlbstatic.com/team-logos/118.svg",
+              "matchup": "PHI @ KC",
+              "gamePk": 824092,
+              "mean": 3.298,
+              "line": 2.5,
+              "selection": "over",
+              "selectionLabel": "Over",
+              "targetLabel": "3+",
+              "simProb": 0.548,
+              "marketProb": 0.42759177087535294,
+              "rawEdge": 0.1204082291246471,
+              "odds": 115,
+              "marketLine": 2.5,
+              "sourceFile": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/sims/2026-07-04/sim_10_PHI_at_KC_pk824092_g1.json",
+              "rank": 1
+            },
             {
               "stat": "earned_runs",
               "statLabel": "Earned Runs",
@@ -191,11 +317,11 @@
               "odds": -135,
               "marketLine": 2.5,
               "sourceFile": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/sims/2026-07-04/sim_2_DET_at_TEX_pk822882_g1.json",
-              "rank": 1
+              "rank": 2
             }
           ],
-          "candidateCount": 1,
-          "positiveEdgeCount": 1,
+          "candidateCount": 2,
+          "positiveEdgeCount": 2,
           "found": true,
           "error": null
         },
@@ -213,9 +339,9 @@
       ],
       "summary": {
         "sectionCount": 5,
-        "candidateCount": 4,
-        "positiveEdgeCount": 4,
-        "displayedCount": 4
+        "candidateCount": 8,
+        "positiveEdgeCount": 8,
+        "displayedCount": 8
       }
     },
     "hitter": {
@@ -233,6 +359,12 @@
           "gamePk": 822882,
           "label": "DET @ TEX",
           "matchup": "DET @ TEX"
+        },
+        {
+          "value": "824092",
+          "gamePk": 824092,
+          "label": "PHI @ KC",
+          "matchup": "PHI @ KC"
         }
       ],
       "nav": {
@@ -269,6 +401,36 @@
               "stat": "hits_runs_rbis",
               "statLabel": "Hits + Runs + RBIs",
               "group": "hitter",
+              "side": "home",
+              "ownerId": 679845,
+              "ownerName": "Nick Loftin",
+              "playerName": "Nick Loftin",
+              "headshotUrl": "https://img.mlbstatic.com/mlb-photos/image/upload/w_180,q_auto:best/v1/people/679845/headshot/67/current",
+              "team": "KC",
+              "teamId": 118,
+              "teamLogoUrl": "https://www.mlbstatic.com/team-logos/118.svg",
+              "opponent": "PHI",
+              "opponentTeamId": 143,
+              "opponentLogoUrl": "https://www.mlbstatic.com/team-logos/143.svg",
+              "matchup": "PHI @ KC",
+              "gamePk": 824092,
+              "mean": 0.0,
+              "line": 1.5,
+              "selection": "under",
+              "selectionLabel": "Under",
+              "targetLabel": "1 or fewer",
+              "simProb": 1.0,
+              "marketProb": 0.572408229124647,
+              "rawEdge": 0.42759177087535305,
+              "odds": -165,
+              "marketLine": 1.5,
+              "sourceFile": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/sims/2026-07-04/sim_10_PHI_at_KC_pk824092_g1.json",
+              "rank": 1
+            },
+            {
+              "stat": "hits_runs_rbis",
+              "statLabel": "Hits + Runs + RBIs",
+              "group": "hitter",
               "side": "away",
               "ownerId": 690993,
               "ownerName": "Colt Keith",
@@ -288,16 +450,16 @@
               "selectionLabel": "Under",
               "targetLabel": "1 or fewer",
               "simProb": 1.0,
-              "marketProb": 0.572408229124647,
-              "rawEdge": 0.42759177087535305,
-              "odds": -165,
+              "marketProb": 0.5807453416149069,
+              "rawEdge": 0.4192546583850931,
+              "odds": -170,
               "marketLine": 1.5,
               "sourceFile": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/sims/2026-07-04/sim_2_DET_at_TEX_pk822882_g1.json",
-              "rank": 1
+              "rank": 2
             }
           ],
-          "candidateCount": 1,
-          "positiveEdgeCount": 1,
+          "candidateCount": 2,
+          "positiveEdgeCount": 2,
           "found": true,
           "error": null
         },
@@ -359,9 +521,9 @@
       ],
       "summary": {
         "sectionCount": 7,
-        "candidateCount": 1,
-        "positiveEdgeCount": 1,
-        "displayedCount": 1
+        "candidateCount": 2,
+        "positiveEdgeCount": 2,
+        "displayedCount": 2
       }
     }
   }

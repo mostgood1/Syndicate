@@ -4099,70 +4099,6 @@
         },
         {
           "player": {
-            "mlbam_id": 682982,
-            "full_name": "Daniel Espino",
-            "primary_position": "P",
-            "bat_side": "R",
-            "throw_side": "R"
-          },
-          "k_rate": 0.4444444444444444,
-          "bb_rate": 0.0,
-          "hbp_rate": 0.0,
-          "hr_rate": 0.1111111111111111,
-          "inplay_hit_rate": 0.6,
-          "batters_faced": 9.0,
-          "balls_in_play": 5.0,
-          "arsenal": {
-            "FF": 0.625,
-            "CU": 0.09375,
-            "SL": 0.28125
-          },
-          "pitch_type_whiff_mult": {},
-          "pitch_type_inplay_mult": {},
-          "pitch_type_hr_mult": {},
-          "statcast_splits_source": "",
-          "statcast_splits_n_pitches": 0,
-          "statcast_splits_start_date": "",
-          "statcast_splits_end_date": "",
-          "arsenal_source": "statsapi_pitchArsenal",
-          "arsenal_sample_size": 32,
-          "stamina_pitches": 25,
-          "role": "MR",
-          "availability_mult": 0.825,
-          "platoon_mult_vs_lhb": {
-            "k": 0.8625,
-            "bb": 1.0,
-            "hr": 0.78,
-            "inplay": 0.9083333333333333
-          },
-          "platoon_mult_vs_rhb": {
-            "k": 1.06875,
-            "bb": 1.0,
-            "hr": 1.275,
-            "inplay": 1.0611111111111111
-          },
-          "venue_mult_home": {},
-          "venue_mult_away": {
-            "k": 1.0,
-            "bb": 1.0,
-            "hr": 1.0,
-            "inplay": 1.0
-          },
-          "vs_venue_hr_mult": {},
-          "vs_venue_k_mult": {},
-          "vs_venue_bb_mult": {},
-          "vs_venue_inplay_mult": {},
-          "vs_venue_history": {},
-          "statcast_quality_mult": {},
-          "bb_gb_rate": 0.44,
-          "bb_fb_rate": 0.25,
-          "bb_ld_rate": 0.2,
-          "bb_pu_rate": 0.11,
-          "bb_inplay_n": 0,
-          "leverage_skill": 0.5
-        },
-        {
-          "player": {
             "mlbam_id": 681870,
             "full_name": "Erik Sabrowski",
             "primary_position": "P",
@@ -4238,6 +4174,69 @@
               "inplay_mult": 0.9487237406821775
             }
           },
+          "statcast_quality_mult": {},
+          "bb_gb_rate": 0.44,
+          "bb_fb_rate": 0.25,
+          "bb_ld_rate": 0.2,
+          "bb_pu_rate": 0.11,
+          "bb_inplay_n": 0,
+          "leverage_skill": 0.5
+        },
+        {
+          "player": {
+            "mlbam_id": 680916,
+            "full_name": "Franco Aleman",
+            "primary_position": "P",
+            "bat_side": "R",
+            "throw_side": "R"
+          },
+          "k_rate": 0.1,
+          "bb_rate": 0.1,
+          "hbp_rate": 0.0,
+          "hr_rate": 0.1,
+          "inplay_hit_rate": 0.375,
+          "batters_faced": 10.0,
+          "balls_in_play": 8.0,
+          "arsenal": {
+            "FF": 0.7692307769230766,
+            "SL": 0.2307692230769233
+          },
+          "pitch_type_whiff_mult": {},
+          "pitch_type_inplay_mult": {},
+          "pitch_type_hr_mult": {},
+          "statcast_splits_source": "",
+          "statcast_splits_n_pitches": 0,
+          "statcast_splits_start_date": "",
+          "statcast_splits_end_date": "",
+          "arsenal_source": "statsapi_pitchArsenal",
+          "arsenal_sample_size": 52,
+          "stamina_pitches": 25,
+          "role": "MR",
+          "availability_mult": 1.0,
+          "platoon_mult_vs_lhb": {
+            "k": 0.8075,
+            "bb": 1.1925000000000001,
+            "hr": 0.78,
+            "inplay": 1.1925000000000001
+          },
+          "platoon_mult_vs_rhb": {
+            "k": 1.1925000000000001,
+            "bb": 0.8075,
+            "hr": 1.2357142857142855,
+            "inplay": 0.8075
+          },
+          "venue_mult_home": {
+            "k": 1.0,
+            "bb": 1.0,
+            "hr": 1.0,
+            "inplay": 1.0
+          },
+          "venue_mult_away": {},
+          "vs_venue_hr_mult": {},
+          "vs_venue_k_mult": {},
+          "vs_venue_bb_mult": {},
+          "vs_venue_inplay_mult": {},
+          "vs_venue_history": {},
           "statcast_quality_mult": {},
           "bb_gb_rate": 0.44,
           "bb_fb_rate": 0.25,

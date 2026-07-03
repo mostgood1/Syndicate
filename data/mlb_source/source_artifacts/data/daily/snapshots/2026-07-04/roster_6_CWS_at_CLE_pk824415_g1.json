@@ -853,14 +853,14 @@
         "lev": 0.7
       },
       {
-        "id": 682982,
-        "name": "Daniel Espino",
+        "id": 681870,
+        "name": "Erik Sabrowski",
         "role": "MR",
         "lev": 0.5
       },
       {
-        "id": 681870,
-        "name": "Erik Sabrowski",
+        "id": 680916,
+        "name": "Franco Aleman",
         "role": "MR",
         "lev": 0.5
       },
@@ -1422,48 +1422,6 @@
         "pitch_type_hr_mult": {}
       },
       {
-        "id": 682982,
-        "name": "Daniel Espino",
-        "throw": "R",
-        "role": "MR",
-        "leverage_skill": 0.5,
-        "stamina_pitches": 25,
-        "availability_mult": 0.825,
-        "platoon_mult_vs_lhb": {
-          "k": 0.8625,
-          "bb": 1.0,
-          "hr": 0.78,
-          "inplay": 0.9083333333333333
-        },
-        "platoon_mult_vs_rhb": {
-          "k": 1.06875,
-          "bb": 1.0,
-          "hr": 1.275,
-          "inplay": 1.0611111111111111
-        },
-        "statcast_quality_mult": {},
-        "arsenal_source": "statsapi_pitchArsenal",
-        "arsenal_sample_size": 32,
-        "statcast_splits_found": false,
-        "statcast_splits_source": "",
-        "statcast_splits_n_pitches": 0,
-        "statcast_splits_start_date": "",
-        "statcast_splits_end_date": "",
-        "k_rate": 0.4444444444444444,
-        "bb_rate": 0.0,
-        "hbp_rate": 0.0,
-        "hr_rate": 0.1111111111111111,
-        "inplay_hit_rate": 0.6,
-        "arsenal": {
-          "FF": 0.625,
-          "CU": 0.09375,
-          "SL": 0.28125
-        },
-        "pitch_type_whiff_mult": {},
-        "pitch_type_inplay_mult": {},
-        "pitch_type_hr_mult": {}
-      },
-      {
         "id": 681870,
         "name": "Erik Sabrowski",
         "throw": "L",
@@ -1500,6 +1458,47 @@
           "FF": 0.64572865,
           "CU": 0.2160804,
           "SL": 0.13819095
+        },
+        "pitch_type_whiff_mult": {},
+        "pitch_type_inplay_mult": {},
+        "pitch_type_hr_mult": {}
+      },
+      {
+        "id": 680916,
+        "name": "Franco Aleman",
+        "throw": "R",
+        "role": "MR",
+        "leverage_skill": 0.5,
+        "stamina_pitches": 25,
+        "availability_mult": 1.0,
+        "platoon_mult_vs_lhb": {
+          "k": 0.8075,
+          "bb": 1.1925000000000001,
+          "hr": 0.78,
+          "inplay": 1.1925000000000001
+        },
+        "platoon_mult_vs_rhb": {
+          "k": 1.1925000000000001,
+          "bb": 0.8075,
+          "hr": 1.2357142857142855,
+          "inplay": 0.8075
+        },
+        "statcast_quality_mult": {},
+        "arsenal_source": "statsapi_pitchArsenal",
+        "arsenal_sample_size": 52,
+        "statcast_splits_found": false,
+        "statcast_splits_source": "",
+        "statcast_splits_n_pitches": 0,
+        "statcast_splits_start_date": "",
+        "statcast_splits_end_date": "",
+        "k_rate": 0.1,
+        "bb_rate": 0.1,
+        "hbp_rate": 0.0,
+        "hr_rate": 0.1,
+        "inplay_hit_rate": 0.375,
+        "arsenal": {
+          "FF": 0.7692307769230766,
+          "SL": 0.2307692230769233
         },
         "pitch_type_whiff_mult": {},
         "pitch_type_inplay_mult": {},

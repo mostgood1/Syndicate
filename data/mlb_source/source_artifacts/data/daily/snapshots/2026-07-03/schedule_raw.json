@@ -8,12 +8,12 @@
     "gameDate": "2026-07-03T20:05:00Z",
     "officialDate": "2026-07-03",
     "status": {
-      "abstractGameState": "Preview",
-      "codedGameState": "P",
-      "detailedState": "Pre-Game",
-      "statusCode": "P",
+      "abstractGameState": "Live",
+      "codedGameState": "I",
+      "detailedState": "In Progress",
+      "statusCode": "I",
       "startTimeTBD": false,
-      "abstractGameCode": "P"
+      "abstractGameCode": "L"
     },
     "teams": {
       "away": {
@@ -70,6 +70,7 @@
           "ties": 0,
           "pct": ".536"
         },
+        "score": 14,
         "probablePitcher": {
           "id": 669467,
           "fullName": "Andre Pallante",
@@ -138,6 +139,7 @@
           "ties": 0,
           "pct": ".563"
         },
+        "score": 0,
         "probablePitcher": {
           "id": 656849,
           "fullName": "David Peterson",
@@ -189,9 +191,9 @@
     "officialDate": "2026-07-03",
     "status": {
       "abstractGameState": "Preview",
-      "codedGameState": "S",
-      "detailedState": "Scheduled",
-      "statusCode": "S",
+      "codedGameState": "P",
+      "detailedState": "Pre-Game",
+      "statusCode": "P",
       "startTimeTBD": false,
       "abstractGameCode": "P"
     },
@@ -250,6 +252,7 @@
           "ties": 0,
           "pct": ".500"
         },
+        "score": 0,
         "probablePitcher": {
           "id": 656605,
           "fullName": "Mitch Keller",
@@ -318,6 +321,7 @@
           "ties": 0,
           "pct": ".511"
         },
+        "score": 0,
         "probablePitcher": {
           "id": 656492,
           "fullName": "Foster Griffin",
@@ -369,9 +373,9 @@
     "officialDate": "2026-07-03",
     "status": {
       "abstractGameState": "Preview",
-      "codedGameState": "S",
-      "detailedState": "Scheduled",
-      "statusCode": "S",
+      "codedGameState": "P",
+      "detailedState": "Pre-Game",
+      "statusCode": "P",
       "startTimeTBD": false,
       "abstractGameCode": "P"
     },
@@ -430,6 +434,7 @@
           "ties": 0,
           "pct": ".477"
         },
+        "score": 0,
         "probablePitcher": {
           "id": 702474,
           "fullName": "Mike Paredes",
@@ -498,6 +503,7 @@
           "ties": 0,
           "pct": ".558"
         },
+        "score": 0,
         "probablePitcher": {
           "id": 543037,
           "fullName": "Gerrit Cole",
@@ -549,9 +555,9 @@
     "officialDate": "2026-07-03",
     "status": {
       "abstractGameState": "Preview",
-      "codedGameState": "S",
-      "detailedState": "Scheduled",
-      "statusCode": "S",
+      "codedGameState": "P",
+      "detailedState": "Pre-Game",
+      "statusCode": "P",
       "startTimeTBD": false,
       "abstractGameCode": "P"
     },
@@ -610,6 +616,7 @@
           "ties": 0,
           "pct": ".455"
         },
+        "score": 0,
         "probablePitcher": {
           "id": 669432,
           "fullName": "Trevor Rogers",
@@ -678,6 +685,7 @@
           "ties": 0,
           "pct": ".465"
         },
+        "score": 0,
         "probablePitcher": {
           "id": 663903,
           "fullName": "Brady Singer",
@@ -729,9 +737,9 @@
     "officialDate": "2026-07-03",
     "status": {
       "abstractGameState": "Preview",
-      "codedGameState": "S",
-      "detailedState": "Scheduled",
-      "statusCode": "S",
+      "codedGameState": "P",
+      "detailedState": "Pre-Game",
+      "statusCode": "P",
       "startTimeTBD": false,
       "abstractGameCode": "P"
     },
@@ -790,6 +798,7 @@
           "ties": 0,
           "pct": ".523"
         },
+        "score": 0,
         "probablePitcher": {
           "id": 641743,
           "fullName": "Anthony Kay",
@@ -858,6 +867,7 @@
           "ties": 0,
           "pct": ".523"
         },
+        "score": 0,
         "probablePitcher": {
           "id": 668909,
           "fullName": "Gavin Williams",
@@ -909,9 +919,9 @@
     "officialDate": "2026-07-03",
     "status": {
       "abstractGameState": "Preview",
-      "codedGameState": "S",
-      "detailedState": "Scheduled",
-      "statusCode": "S",
+      "codedGameState": "P",
+      "detailedState": "Pre-Game",
+      "statusCode": "P",
       "startTimeTBD": false,
       "abstractGameCode": "P"
     },
@@ -970,6 +980,7 @@
           "ties": 0,
           "pct": ".414"
         },
+        "score": 0,
         "probablePitcher": {
           "id": 681035,
           "fullName": "Christian Scott",
@@ -1038,6 +1049,7 @@
           "ties": 0,
           "pct": ".588"
         },
+        "score": 0,
         "probablePitcher": {
           "id": 656550,
           "fullName": "Grant Holmes",
@@ -1089,9 +1101,9 @@
     "officialDate": "2026-07-03",
     "status": {
       "abstractGameState": "Preview",
-      "codedGameState": "S",
-      "detailedState": "Scheduled",
-      "statusCode": "S",
+      "codedGameState": "P",
+      "detailedState": "Pre-Game",
+      "statusCode": "P",
       "startTimeTBD": false,
       "abstractGameCode": "P"
     },
@@ -1149,6 +1161,12 @@
           "losses": 50,
           "ties": 0,
           "pct": ".419"
+        },
+        "score": 0,
+        "probablePitcher": {
+          "id": 657277,
+          "fullName": "Logan Webb",
+          "link": "/api/v1/people/657277"
         },
         "splitSquad": false,
         "seriesNumber": 29,
@@ -1213,6 +1231,7 @@
           "ties": 0,
           "pct": ".398"
         },
+        "score": 0,
         "probablePitcher": {
           "id": 663372,
           "fullName": "Ryan Feltner",
@@ -1264,9 +1283,9 @@
     "officialDate": "2026-07-03",
     "status": {
       "abstractGameState": "Preview",
-      "codedGameState": "S",
-      "detailedState": "Scheduled",
-      "statusCode": "S",
+      "codedGameState": "P",
+      "detailedState": "Pre-Game",
+      "statusCode": "P",
       "startTimeTBD": false,
       "abstractGameCode": "P"
     },
@@ -1325,6 +1344,7 @@
           "ties": 0,
           "pct": ".607"
         },
+        "score": 0,
         "probablePitcher": {
           "id": 607259,
           "fullName": "Nick Martinez",
@@ -1393,6 +1413,7 @@
           "ties": 0,
           "pct": ".483"
         },
+        "score": 0,
         "probablePitcher": {
           "id": 681293,
           "fullName": "Spencer Arrighetti",
@@ -1624,9 +1645,9 @@
     "officialDate": "2026-07-03",
     "status": {
       "abstractGameState": "Preview",
-      "codedGameState": "S",
-      "detailedState": "Scheduled",
-      "statusCode": "S",
+      "codedGameState": "P",
+      "detailedState": "Pre-Game",
+      "statusCode": "P",
       "startTimeTBD": false,
       "abstractGameCode": "P"
     },
@@ -1804,9 +1825,9 @@
     "officialDate": "2026-07-03",
     "status": {
       "abstractGameState": "Preview",
-      "codedGameState": "S",
-      "detailedState": "Scheduled",
-      "statusCode": "S",
+      "codedGameState": "P",
+      "detailedState": "Pre-Game",
+      "statusCode": "P",
       "startTimeTBD": false,
       "abstractGameCode": "P"
     },

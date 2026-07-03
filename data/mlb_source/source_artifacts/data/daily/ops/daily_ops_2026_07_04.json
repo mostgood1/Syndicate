@@ -1,14 +1,14 @@
 {
   "tool": "tools/daily_update.py",
   "workflow": "ui-daily",
-  "generated_at": "2026-07-03T18:17:01.898009",
+  "generated_at": "2026-07-03T22:11:16.254792",
   "date": "2026-07-04",
   "season": 2026,
   "run_lock": {
     "status": "acquired",
     "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/runtime/locks/daily_update_ui-daily_2026_2026-07-04_1166be09fd3e.lock",
-    "pid": 5496,
-    "created_at": "2026-07-03T18:17:01.898009"
+    "pid": 732,
+    "created_at": "2026-07-03T22:11:16.254792"
   },
   "seed": {
     "value": 1337,
@@ -94,7 +94,7 @@
         "headline": "No prior-day live-lens activity found for 2026-07-03.",
         "learnings": [],
         "performance": [
-          "Local live-lens report processed 13 games in 2480.4 ms with 0 ms spent refreshing markets."
+          "Local live-lens report processed 13 games in 793.5 ms with 0 ms spent refreshing markets."
         ]
       }
     },
@@ -134,8 +134,8 @@
         },
         "hitter": {
           "found": true,
-          "candidateCount": 1443,
-          "displayedCount": 1443,
+          "candidateCount": 1356,
+          "displayedCount": 1356,
           "sectionCount": 7
         }
       }
@@ -150,27 +150,27 @@
       "hitter_props_path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\market\\oddsapi\\oddsapi_hitter_props_2026_07_04.json",
       "counts": {
         "game_lines": {
-          "events_matched": 14,
-          "games": 14,
-          "h2h_games": 14,
-          "totals_games": 14,
-          "spreads_games": 14
+          "events_matched": 13,
+          "games": 13,
+          "h2h_games": 13,
+          "totals_games": 13,
+          "spreads_games": 13
         },
         "pitcher_props": {
-          "players": 2,
+          "players": 4,
           "markets": {
-            "earned_runs": 1,
-            "hits_allowed": 1,
-            "outs": 2
+            "earned_runs": 2,
+            "hits_allowed": 2,
+            "outs": 4
           },
-          "events_matched": 14
+          "events_matched": 13
         },
         "hitter_props": {
-          "players": 1,
+          "players": 2,
           "markets": {
-            "batter_hits_runs_rbis": 1
+            "batter_hits_runs_rbis": 2
           },
-          "events_matched": 14
+          "events_matched": 13
         }
       }
     },
@@ -521,8 +521,8 @@
         "shadow_support_policy": {
           "pitcher_props": {
             "market": "shadow_pitcher_props",
-            "evaluated_n": 0,
-            "kept_n": 0,
+            "evaluated_n": 2,
+            "kept_n": 2,
             "removed_sparse_support_n": 0,
             "removed_examples": []
           },
@@ -668,14 +668,14 @@
       "group_summaries": {
         "pitcher": {
           "found": true,
-          "candidateCount": 4,
-          "displayedCount": 4,
+          "candidateCount": 8,
+          "displayedCount": 8,
           "sectionCount": 5
         },
         "hitter": {
           "found": true,
-          "candidateCount": 1,
-          "displayedCount": 1,
+          "candidateCount": 2,
+          "displayedCount": 2,
           "sectionCount": 7
         }
       }
@@ -725,52 +725,52 @@
         "hitter": {
           "hits": {
             "found": true,
-            "rowCount": 395,
+            "rowCount": 396,
             "error": null
           },
           "hits_runs_rbis": {
             "found": true,
-            "rowCount": 395,
+            "rowCount": 396,
             "error": null
           },
           "home_runs": {
             "found": true,
-            "rowCount": 395,
+            "rowCount": 396,
             "error": null
           },
           "total_bases": {
             "found": true,
-            "rowCount": 395,
+            "rowCount": 396,
             "error": null
           },
           "runs": {
             "found": true,
-            "rowCount": 395,
+            "rowCount": 396,
             "error": null
           },
           "rbi": {
             "found": true,
-            "rowCount": 395,
+            "rowCount": 396,
             "error": null
           },
           "hitter_strikeouts": {
             "found": true,
-            "rowCount": 395,
+            "rowCount": 396,
             "error": null
           },
           "doubles": {
             "found": true,
-            "rowCount": 395,
+            "rowCount": 396,
             "error": null
           },
           "triples": {
             "found": true,
-            "rowCount": 395,
+            "rowCount": 396,
             "error": null
           },
           "stolen_bases": {
             "found": true,
-            "rowCount": 395,
+            "rowCount": 396,
             "error": null
           }
         }
@@ -782,22 +782,23 @@
       "artifact_path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/ladders/daily_ladder_audit_2026_07_04.json",
       "summary": {
         "cards": 15,
-        "badges": 3,
+        "badges": 6,
         "sources": {
-          "none": 3
+          "none": 6
         },
         "tones": {
-          "strong": 2,
-          "soft": 1
+          "strong": 4,
+          "soft": 1,
+          "solid": 1
         },
         "stats": {
           "hits_allowed": {
-            "badges": 1,
+            "badges": 2,
             "rungWins": 0,
             "rungLosses": 0
           },
           "outs": {
-            "badges": 2,
+            "badges": 4,
             "rungWins": 0,
             "rungLosses": 0
           }

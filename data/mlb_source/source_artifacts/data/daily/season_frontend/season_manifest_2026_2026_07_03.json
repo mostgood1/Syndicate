@@ -2,7 +2,7 @@
   "meta": {
     "season": 2026,
     "title": "MLB 2026 Rolling Season Eval",
-    "generated_at": "2026-07-03T18:05:49.286618",
+    "generated_at": "2026-07-03T21:59:51.688195",
     "batch_dir": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/eval/batches/season_2026_ui_daily_live",
     "game_types": [
       "R"
@@ -2250,15 +2250,15 @@
             "playable_counts": {
               "totals": 0,
               "ml": 0,
-              "pitcher_props": 19,
-              "hitter_props": 22,
+              "pitcher_props": 22,
+              "hitter_props": 24,
               "hitter_home_runs": 0,
-              "hitter_hits": 10,
+              "hitter_hits": 13,
               "hitter_strikeouts": 0,
-              "hitter_total_bases": 5,
-              "hitter_runs": 5,
-              "hitter_rbis": 2,
-              "combined": 41
+              "hitter_total_bases": 7,
+              "hitter_runs": 1,
+              "hitter_rbis": 3,
+              "combined": 46
             },
             "results": {
               "combined": {
@@ -2344,8 +2344,8 @@
             "card_path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_07_04_locked_policy.json",
             "selected_counts": {
               "totals": 0,
-              "ml": 0,
-              "pitcher_props": 0,
+              "ml": 1,
+              "pitcher_props": 1,
               "hitter_props": 0,
               "hitter_home_runs": 0,
               "hitter_hits": 0,
@@ -2353,7 +2353,7 @@
               "hitter_total_bases": 0,
               "hitter_runs": 0,
               "hitter_rbis": 0,
-              "combined": 0
+              "combined": 2
             },
             "playable_counts": {
               "totals": 0,
@@ -2403,8 +2403,8 @@
       "card_path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_07_04_locked_policy.json",
       "selected_counts": {
         "totals": 0,
-        "ml": 0,
-        "pitcher_props": 0,
+        "ml": 1,
+        "pitcher_props": 1,
         "hitter_props": 0,
         "hitter_home_runs": 0,
         "hitter_hits": 0,
@@ -2412,7 +2412,7 @@
         "hitter_total_bases": 0,
         "hitter_runs": 0,
         "hitter_rbis": 0,
-        "combined": 0
+        "combined": 2
       },
       "results": {
         "combined": {
@@ -2427,7 +2427,7 @@
       "profit_u": 0.0,
       "roi": null,
       "settled_n": 0,
-      "unresolved_n": 0,
+      "unresolved_n": 2,
       "source_kind": "canonical_daily_fallback",
       "_betting_payload_found": true,
       "report_path": null

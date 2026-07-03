@@ -18,11 +18,11 @@
   "registryLogPath": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/live_lens/prop_registry/live_prop_registry_2026_07_03.jsonl",
   "reportPath": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/live_lens/live_lens_report_2026_07_03.json",
   "dailyRecapPath": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/live_lens/recaps/live_lens_daily_recap_2026_07_03.json",
-  "entries": 4,
+  "entries": 6,
   "latestEntry": {
-    "recordedAt": "2026-07-03T10:29:43-05:00",
+    "recordedAt": "2026-07-03T20:08:14+00:00",
     "date": "2026-07-03",
-    "generatedAt": "2026-07-03T10:29:43-05:00",
+    "generatedAt": "2026-07-03T15:08:14-05:00",
     "oddsRefreshedAt": null,
     "counts": {
       "games": 13,
@@ -35,11 +35,11 @@
     "performance": {
       "marketsRefreshed": false,
       "marketRefreshMs": 0.0,
-      "totalMs": 2480.4,
-      "snapshotLoadMs": 1.4,
-      "simContextLoadMs": 1.2,
+      "totalMs": 793.5,
+      "snapshotLoadMs": 2.3,
+      "simContextLoadMs": 1.1,
       "propEvalMs": 0.1,
-      "gameLensMs": 1.3,
+      "gameLensMs": 1.5,
       "gameCount": 13,
       "liveGameCount": 0,
       "feedFetchCount": 13,
@@ -48,7 +48,7 @@
     "games": [
       {
         "gamePk": 824659,
-        "status": "Preview",
+        "status": "Live",
         "score": {
           "away": 0,
           "home": 0
@@ -193,7 +193,7 @@
   },
   "latestReport": {
     "date": "2026-07-03",
-    "generatedAt": "2026-07-03T13:27:36-05:00",
+    "generatedAt": "2026-07-03T17:21:58-05:00",
     "dataRoot": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data",
     "liveLensDir": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/live_lens",
     "optimizationRegime": {
@@ -218,11 +218,11 @@
     "performance": {
       "marketsRefreshed": false,
       "marketRefreshMs": 0.0,
-      "totalMs": 2480.4,
-      "snapshotLoadMs": 1.4,
-      "simContextLoadMs": 1.2,
+      "totalMs": 793.5,
+      "snapshotLoadMs": 2.3,
+      "simContextLoadMs": 1.1,
       "propEvalMs": 0.1,
-      "gameLensMs": 1.3,
+      "gameLensMs": 1.5,
       "gameCount": 13,
       "liveGameCount": 0,
       "feedFetchCount": 13,
@@ -232,8 +232,8 @@
       {
         "gamePk": 824659,
         "status": {
-          "abstract": "Preview",
-          "detailed": "Scheduled"
+          "abstract": "Live",
+          "detailed": "Warmup"
         },
         "startTime": "3:05 PM",
         "matchup": {
@@ -280,12 +280,12 @@
             },
             "progress": {
               "fraction": 0.0,
-              "inning": null,
-              "half": null,
+              "inning": 1,
+              "half": "top",
               "outs": 0,
               "outsRecorded": 0,
               "remainingOuts": 54,
-              "label": "Scheduled"
+              "label": "Top 1"
             },
             "baselineHomeWinProb": null,
             "modelHomeWinProb": null,
@@ -337,12 +337,12 @@
             },
             "progress": {
               "fraction": 0.0,
-              "inning": null,
-              "half": null,
+              "inning": 1,
+              "half": "top",
               "outs": 0,
               "outsRecorded": 0,
               "remainingOuts": 54,
-              "label": "Scheduled"
+              "label": "Top 1"
             },
             "baselineHomeWinProb": null,
             "modelHomeWinProb": null,
@@ -394,12 +394,12 @@
             },
             "progress": {
               "fraction": 0.0,
-              "inning": null,
-              "half": null,
+              "inning": 1,
+              "half": "top",
               "outs": 0,
               "outsRecorded": 0,
               "remainingOuts": 54,
-              "label": "Scheduled"
+              "label": "Top 1"
             },
             "baselineHomeWinProb": null,
             "modelHomeWinProb": null,
@@ -451,12 +451,12 @@
             },
             "progress": {
               "fraction": 0.0,
-              "inning": null,
-              "half": null,
+              "inning": 1,
+              "half": "top",
               "outs": 0,
               "outsRecorded": 0,
               "remainingOuts": 54,
-              "label": "Scheduled"
+              "label": "Top 1"
             },
             "baselineHomeWinProb": null,
             "modelHomeWinProb": null,
@@ -501,7 +501,7 @@
         "gamePk": 822714,
         "status": {
           "abstract": "Preview",
-          "detailed": "Scheduled"
+          "detailed": "Pre-Game"
         },
         "startTime": "5:45 PM",
         "matchup": {
@@ -553,7 +553,7 @@
               "outs": 0,
               "outsRecorded": 0,
               "remainingOuts": 54,
-              "label": "Scheduled"
+              "label": "Pre-Game"
             },
             "baselineHomeWinProb": null,
             "modelHomeWinProb": null,
@@ -610,7 +610,7 @@
               "outs": 0,
               "outsRecorded": 0,
               "remainingOuts": 54,
-              "label": "Scheduled"
+              "label": "Pre-Game"
             },
             "baselineHomeWinProb": null,
             "modelHomeWinProb": null,
@@ -667,7 +667,7 @@
               "outs": 0,
               "outsRecorded": 0,
               "remainingOuts": 54,
-              "label": "Scheduled"
+              "label": "Pre-Game"
             },
             "baselineHomeWinProb": null,
             "modelHomeWinProb": null,
@@ -724,7 +724,7 @@
               "outs": 0,
               "outsRecorded": 0,
               "remainingOuts": 54,
-              "label": "Scheduled"
+              "label": "Pre-Game"
             },
             "baselineHomeWinProb": null,
             "modelHomeWinProb": null,
@@ -769,7 +769,7 @@
         "gamePk": 823527,
         "status": {
           "abstract": "Preview",
-          "detailed": "Scheduled"
+          "detailed": "Pre-Game"
         },
         "startTime": "6:05 PM",
         "matchup": {
@@ -821,7 +821,7 @@
               "outs": 0,
               "outsRecorded": 0,
               "remainingOuts": 54,
-              "label": "Scheduled"
+              "label": "Pre-Game"
             },
             "baselineHomeWinProb": null,
             "modelHomeWinProb": null,
@@ -878,7 +878,7 @@
               "outs": 0,
               "outsRecorded": 0,
               "remainingOuts": 54,
-              "label": "Scheduled"
+              "label": "Pre-Game"
             },
             "baselineHomeWinProb": null,
             "modelHomeWinProb": null,
@@ -935,7 +935,7 @@
               "outs": 0,
               "outsRecorded": 0,
               "remainingOuts": 54,
-              "label": "Scheduled"
+              "label": "Pre-Game"
             },
             "baselineHomeWinProb": null,
             "modelHomeWinProb": null,
@@ -992,7 +992,7 @@
               "outs": 0,
               "outsRecorded": 0,
               "remainingOuts": 54,
-              "label": "Scheduled"
+              "label": "Pre-Game"
             },
             "baselineHomeWinProb": null,
             "modelHomeWinProb": null,
@@ -1037,7 +1037,7 @@
         "gamePk": 824417,
         "status": {
           "abstract": "Preview",
-          "detailed": "Scheduled"
+          "detailed": "Pre-Game"
         },
         "startTime": "6:10 PM",
         "matchup": {
@@ -1089,7 +1089,7 @@
               "outs": 0,
               "outsRecorded": 0,
               "remainingOuts": 54,
-              "label": "Scheduled"
+              "label": "Pre-Game"
             },
             "baselineHomeWinProb": null,
             "modelHomeWinProb": null,
@@ -1146,7 +1146,7 @@
               "outs": 0,
               "outsRecorded": 0,
               "remainingOuts": 54,
-              "label": "Scheduled"
+              "label": "Pre-Game"
             },
             "baselineHomeWinProb": null,
             "modelHomeWinProb": null,
@@ -1203,7 +1203,7 @@
               "outs": 0,
               "outsRecorded": 0,
               "remainingOuts": 54,
-              "label": "Scheduled"
+              "label": "Pre-Game"
             },
             "baselineHomeWinProb": null,
             "modelHomeWinProb": null,
@@ -1260,7 +1260,7 @@
               "outs": 0,
               "outsRecorded": 0,
               "remainingOuts": 54,
-              "label": "Scheduled"
+              "label": "Pre-Game"
             },
             "baselineHomeWinProb": null,
             "modelHomeWinProb": null,
@@ -1305,7 +1305,7 @@
         "gamePk": 824498,
         "status": {
           "abstract": "Preview",
-          "detailed": "Scheduled"
+          "detailed": "Pre-Game"
         },
         "startTime": "6:10 PM",
         "matchup": {
@@ -1357,7 +1357,7 @@
               "outs": 0,
               "outsRecorded": 0,
               "remainingOuts": 54,
-              "label": "Scheduled"
+              "label": "Pre-Game"
             },
             "baselineHomeWinProb": null,
             "modelHomeWinProb": null,
@@ -1414,7 +1414,7 @@
               "outs": 0,
               "outsRecorded": 0,
               "remainingOuts": 54,
-              "label": "Scheduled"
+              "label": "Pre-Game"
             },
             "baselineHomeWinProb": null,
             "modelHomeWinProb": null,
@@ -1471,7 +1471,7 @@
               "outs": 0,
               "outsRecorded": 0,
               "remainingOuts": 54,
-              "label": "Scheduled"
+              "label": "Pre-Game"
             },
             "baselineHomeWinProb": null,
             "modelHomeWinProb": null,
@@ -1528,7 +1528,7 @@
               "outs": 0,
               "outsRecorded": 0,
               "remainingOuts": 54,
-              "label": "Scheduled"
+              "label": "Pre-Game"
             },
             "baselineHomeWinProb": null,
             "modelHomeWinProb": null,
@@ -1573,7 +1573,7 @@
         "gamePk": 824904,
         "status": {
           "abstract": "Preview",
-          "detailed": "Scheduled"
+          "detailed": "Pre-Game"
         },
         "startTime": "6:15 PM",
         "matchup": {
@@ -1625,7 +1625,7 @@
               "outs": 0,
               "outsRecorded": 0,
               "remainingOuts": 54,
-              "label": "Scheduled"
+              "label": "Pre-Game"
             },
             "baselineHomeWinProb": null,
             "modelHomeWinProb": null,
@@ -1682,7 +1682,7 @@
               "outs": 0,
               "outsRecorded": 0,
               "remainingOuts": 54,
-              "label": "Scheduled"
+              "label": "Pre-Game"
             },
             "baselineHomeWinProb": null,
             "modelHomeWinProb": null,
@@ -1739,7 +1739,7 @@
               "outs": 0,
               "outsRecorded": 0,
               "remainingOuts": 54,
-              "label": "Scheduled"
+              "label": "Pre-Game"
             },
             "baselineHomeWinProb": null,
             "modelHomeWinProb": null,
@@ -1796,7 +1796,7 @@
               "outs": 0,
               "outsRecorded": 0,
               "remainingOuts": 54,
-              "label": "Scheduled"
+              "label": "Pre-Game"
             },
             "baselineHomeWinProb": null,
             "modelHomeWinProb": null,
@@ -1841,7 +1841,7 @@
         "gamePk": 824336,
         "status": {
           "abstract": "Preview",
-          "detailed": "Scheduled"
+          "detailed": "Pre-Game"
         },
         "startTime": "7:10 PM",
         "matchup": {
@@ -1893,7 +1893,7 @@
               "outs": 0,
               "outsRecorded": 0,
               "remainingOuts": 54,
-              "label": "Scheduled"
+              "label": "Pre-Game"
             },
             "baselineHomeWinProb": null,
             "modelHomeWinProb": null,
@@ -1950,7 +1950,7 @@
               "outs": 0,
               "outsRecorded": 0,
               "remainingOuts": 54,
-              "label": "Scheduled"
+              "label": "Pre-Game"
             },
             "baselineHomeWinProb": null,
             "modelHomeWinProb": null,
@@ -2007,7 +2007,7 @@
               "outs": 0,
               "outsRecorded": 0,
               "remainingOuts": 54,
-              "label": "Scheduled"
+              "label": "Pre-Game"
             },
             "baselineHomeWinProb": null,
             "modelHomeWinProb": null,
@@ -2064,7 +2064,7 @@
               "outs": 0,
               "outsRecorded": 0,
               "remainingOuts": 54,
-              "label": "Scheduled"
+              "label": "Pre-Game"
             },
             "baselineHomeWinProb": null,
             "modelHomeWinProb": null,
@@ -2109,7 +2109,7 @@
         "gamePk": 824173,
         "status": {
           "abstract": "Preview",
-          "detailed": "Scheduled"
+          "detailed": "Pre-Game"
         },
         "startTime": "7:15 PM",
         "matchup": {
@@ -2161,7 +2161,7 @@
               "outs": 0,
               "outsRecorded": 0,
               "remainingOuts": 54,
-              "label": "Scheduled"
+              "label": "Pre-Game"
             },
             "baselineHomeWinProb": null,
             "modelHomeWinProb": null,
@@ -2218,7 +2218,7 @@
               "outs": 0,
               "outsRecorded": 0,
               "remainingOuts": 54,
-              "label": "Scheduled"
+              "label": "Pre-Game"
             },
             "baselineHomeWinProb": null,
             "modelHomeWinProb": null,
@@ -2275,7 +2275,7 @@
               "outs": 0,
               "outsRecorded": 0,
               "remainingOuts": 54,
-              "label": "Scheduled"
+              "label": "Pre-Game"
             },
             "baselineHomeWinProb": null,
             "modelHomeWinProb": null,
@@ -2332,7 +2332,7 @@
               "outs": 0,
               "outsRecorded": 0,
               "remainingOuts": 54,
-              "label": "Scheduled"
+              "label": "Pre-Game"
             },
             "baselineHomeWinProb": null,
             "modelHomeWinProb": null,
@@ -3745,11 +3745,11 @@
     "performance": {
       "marketsRefreshed": false,
       "marketRefreshMs": 0.0,
-      "totalMs": 2480.4,
-      "snapshotLoadMs": 1.4,
-      "simContextLoadMs": 1.2,
+      "totalMs": 793.5,
+      "snapshotLoadMs": 2.3,
+      "simContextLoadMs": 1.1,
       "propEvalMs": 0.1,
-      "gameLensMs": 1.3,
+      "gameLensMs": 1.5,
       "gameCount": 13,
       "liveGameCount": 0,
       "feedFetchCount": 13,
@@ -3760,43 +3760,43 @@
   },
   "firstObservationArchive": [],
   "rawArtifacts": {
-    "total_bytes": 333734,
-    "total_bytes_text": "325.91 KB",
+    "total_bytes": 337712,
+    "total_bytes_text": "329.80 KB",
     "files": {
       "log": {
         "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/live_lens/live_lens_2026_07_03.jsonl",
         "exists": true,
-        "bytes": 226486,
-        "bytes_text": "221.18 KB",
-        "modified_at": "2026-07-03T13:04:08-05:00"
+        "bytes": 230646,
+        "bytes_text": "225.24 KB",
+        "modified_at": "2026-07-03T16:58:26-05:00"
       },
       "observation_log": {
         "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/live_lens/prop_registry/live_prop_observations_2026_07_03.jsonl",
         "exists": true,
         "bytes": 0,
         "bytes_text": "0 B",
-        "modified_at": "2026-07-03T13:04:08-05:00"
+        "modified_at": "2026-07-03T16:58:26-05:00"
       },
       "registry": {
         "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/live_lens/prop_registry/live_prop_registry_2026_07_03.json",
         "exists": true,
         "bytes": 91,
         "bytes_text": "91 B",
-        "modified_at": "2026-07-03T13:04:08-05:00"
+        "modified_at": "2026-07-03T16:58:26-05:00"
       },
       "registry_log": {
         "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/live_lens/prop_registry/live_prop_registry_2026_07_03.jsonl",
         "exists": true,
         "bytes": 0,
         "bytes_text": "0 B",
-        "modified_at": "2026-07-03T13:04:08-05:00"
+        "modified_at": "2026-07-03T16:58:26-05:00"
       },
       "report": {
         "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/live_lens/live_lens_report_2026_07_03.json",
         "exists": true,
-        "bytes": 107157,
-        "bytes_text": "104.65 KB",
-        "modified_at": "2026-07-03T13:04:08-05:00"
+        "bytes": 106975,
+        "bytes_text": "104.47 KB",
+        "modified_at": "2026-07-03T16:58:26-05:00"
       }
     }
   }

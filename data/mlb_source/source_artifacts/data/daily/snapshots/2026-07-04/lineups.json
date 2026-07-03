@@ -2,7 +2,7 @@
   "date": "2026-07-04",
   "season": 2026,
   "spring_mode": false,
-  "generated_at": "2026-07-03T18:20:03.063021",
+  "generated_at": "2026-07-03T22:14:28.227542",
   "summary": {
     "games": 15,
     "projected_teams": 30,
@@ -195,15 +195,15 @@
       "away_confirmed_ids": [],
       "home_confirmed_ids": [],
       "away_projected_ids": [
-        668885,
+        663616,
         621439,
-        686797,
-        668904,
+        665019,
         605137,
-        693459,
+        668904,
+        686797,
+        605170,
         807712,
-        668952,
-        656577
+        668952
       ],
       "home_projected_ids": [
         700250,
@@ -219,55 +219,55 @@
       "away_projected_validation": {
         "status": "ok",
         "raw_ids": [
-          668885,
+          663616,
           621439,
-          686797,
-          668904,
+          665019,
           605137,
-          693459,
+          668904,
+          686797,
+          605170,
           807712,
-          668952,
-          656577
+          668952
         ],
         "ids": [
-          668885,
+          663616,
           621439,
-          686797,
-          668904,
+          665019,
           605137,
-          693459,
+          668904,
+          686797,
+          605170,
           807712,
-          668952,
-          656577
+          668952
         ],
         "missing_ids": [],
         "backfilled_ids": [],
         "pool_source": "active+40Man",
         "pool_size": 18,
         "raw_names": [
-          "Austin Martin",
+          "Trevor Larnach",
           "Byron Buxton",
-          "Brooks Lee",
-          "Royce Lewis",
+          "Kody Clemens",
           "Josh Bell",
-          "Kyler Fedko",
+          "Royce Lewis",
+          "Brooks Lee",
+          "Victor Caratini",
           "Luke Keaschall",
-          "Ryan Kreidler",
-          "Alex Jackson"
+          "Ryan Kreidler"
         ],
         "matched_names": [
-          "Austin Martin",
+          "Trevor Larnach",
           "Byron Buxton",
-          "Brooks Lee",
-          "Royce Lewis",
+          "Kody Clemens",
           "Josh Bell",
-          "Kyler Fedko",
+          "Royce Lewis",
+          "Brooks Lee",
+          "Victor Caratini",
           "Luke Keaschall",
-          "Ryan Kreidler",
-          "Alex Jackson"
+          "Ryan Kreidler"
         ],
         "missing_name_labels": [],
-        "mapping_source": "projected_rotowire_default_vs_lhp"
+        "mapping_source": "projected_rotowire_default_vs_rhp"
       },
       "home_projected_validation": {
         "status": "ok",
@@ -296,7 +296,7 @@
         "missing_ids": [],
         "backfilled_ids": [],
         "pool_source": "active+40Man",
-        "pool_size": 14,
+        "pool_size": 16,
         "raw_names": [
           "Ben Rice",
           "Jasson Dominguez",
@@ -322,9 +322,9 @@
         "missing_name_labels": [],
         "mapping_source": "projected_rotowire_default_vs_rhp"
       },
-      "away_source": "projected_rotowire_default_vs_lhp",
+      "away_source": "projected_rotowire_default_vs_rhp",
       "home_source": "projected_rotowire_default_vs_rhp",
-      "away_confidence": 0.66,
+      "away_confidence": 0.58,
       "home_confidence": 0.66,
       "away_comparison": {
         "status": "projected_only",
@@ -737,7 +737,7 @@
         "missing_ids": [],
         "backfilled_ids": [],
         "pool_source": "active+40Man",
-        "pool_size": 18,
+        "pool_size": 17,
         "raw_names": [
           "Taylor Ward",
           "Gunnar Henderson",
