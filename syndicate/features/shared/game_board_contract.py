@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from typing import Any
 
 from syndicate.features.shared.simulation_adapter import build_simulation_contract_from_context
@@ -43,6 +44,14 @@ def _metric_lookup(metrics: list[dict[str, Any]], label: str) -> str | None:
         if current == wanted:
             return str(metric.get("value") or "").strip() or None
     return None
+
+
+def _render_web_dyno() -> bool:
+    return bool(
+        str(os.environ.get("RENDER") or "").strip().lower() in {"1", "true", "yes", "on"}
+        or str(os.environ.get("RENDER_EXTERNAL_URL") or "").strip()
+        or str(os.environ.get("RENDER_SERVICE_ID") or "").strip()
+    )
 
 
 def _infer_live_state(game: dict[str, Any]) -> bool:
@@ -402,6 +411,7 @@ def apply_game_board_contract(
     schema: str = "game_board_v1",
     source_kind: str = "artifact_backed",
     live_lens_integrated: bool = True,
+    include_simulation_contract: bool | None = None,
 ) -> dict[str, Any]:
     out = dict(context)
     games = out.get("games") if isinstance(out.get("games"), list) else []
@@ -427,11 +437,17 @@ def apply_game_board_contract(
     out.setdefault("page_shell_class", f"syndicate-{normalized_sport}-cards-shell")
     out.setdefault("cards_grid_class", "mlb-cards-grid")
     out.setdefault("cards_stylesheet", f"{normalized_sport}/cards.css")
-    out["simulation_contract"] = build_simulation_contract_from_context(
-        out,
-        sport=normalized_sport,
-        selection=out.get("control_value") or out.get("date") or out.get("requested_date"),
-    )
+    should_include_simulation_contract = include_simulation_contract
+    if should_include_simulation_contract is None:
+        should_include_simulation_contract = not _render_web_dyno()
+    if should_include_simulation_contract:
+        out["simulation_contract"] = build_simulation_contract_from_context(
+            out,
+            sport=normalized_sport,
+            selection=out.get("control_value") or out.get("date") or out.get("requested_date"),
+        )
+    else:
+        out.pop("simulation_contract", None)
     resolved_surface = str(surface or f"{normalized_sport}_dense_board_v1").strip() or f"{normalized_sport}_dense_board_v1"
     out["board_contract"] = {
         "schema": schema,
