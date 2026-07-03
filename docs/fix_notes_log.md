@@ -1,5 +1,12 @@
 # Fix Notes Log
 
+## 2026-07-03 - WNBA scheduled games no longer flip to Final from stale time alone
+- Symptom: The WNBA cards page could show upcoming games as Final and hide tipoff times even when the live-state row still looked like a 0-0 pregame row.
+- Root cause: The shared WNBA status normalizer promoted stale past-start rows to Final purely from elapsed time, which was too aggressive for rows with no scoring or period evidence.
+- Fix: Only infer Final from stale start times when the row also has real game evidence, such as non-zero scoring or a parsed in-progress period.
+- Validation: `python -m pytest tests/test_wnba_cards_merge_aliases.py -k "scheduled"` passed, and the WNBA live-player hydration regression still passed.
+- Follow-up: If another feed starts emitting different pregame placeholders, keep the guard evidence-based instead of time-only.
+
 ## 2026-07-03 - WNBA sim-detail export now rebuilds sparse artifacts
 - Symptom: Daily update could keep reusing a processed `cards_sim_detail` file that existed but had empty quarter arrays, so interval and period lanes stayed empty after refresh.
 - Root cause: The WNBA export path treated any existing processed `cards_sim_detail` file as good enough and never checked whether it actually contained quarter content.

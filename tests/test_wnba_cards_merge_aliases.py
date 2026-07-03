@@ -6,6 +6,7 @@ from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
 from syndicate.features.wnba.cards import build_cards_page_context
+from syndicate.features.wnba.cards import _games_from_live_state_fallback
 from syndicate.features.wnba.cards import _supplement_games_with_live_state
 from syndicate.features.wnba.cards import _source_sim_score
 from syndicate.features.wnba.cards import get_wnba_overview
@@ -87,6 +88,37 @@ class WnbaCardsMergeAliasTests(unittest.TestCase):
 
         self.assertEqual(len(merged_games), 1)
         self.assertEqual(supplemented_count, 0)
+
+    def test_live_state_fallback_keeps_old_zero_zero_rows_scheduled(self) -> None:
+        live_games = [
+            {
+                "gamePk": "MIN@NYL",
+                "event_id": "401857037",
+                "away_tri": "MIN",
+                "home_tri": "NYL",
+                "away": "MIN",
+                "home": "NYL",
+                "status": "7/3 - 7:30 PM EDT",
+                "in_progress": False,
+                "final": False,
+                "away_pts": 0,
+                "home_pts": 0,
+                "status_id": 1,
+                "periods": [],
+            }
+        ]
+
+        with patch("syndicate.features.wnba.cards._local_live_state_payload", return_value={"games": live_games}), patch(
+            "syndicate.features.wnba.cards._artifact_bundle",
+            return_value={"sim": {}},
+        ):
+            games, source_path = _games_from_live_state_fallback("2026-07-03")
+
+        self.assertTrue(str(source_path).endswith("live_state_2026-07-03.jsonl"))
+        self.assertEqual(len(games), 1)
+        self.assertEqual(games[0]["status"], "Scheduled")
+        self.assertFalse(games[0]["live_state"]["final"])
+        self.assertEqual(games[0]["detail"], "7/3 - 7:30 PM EDT")
 
     def test_artifact_bundle_loads_rows_even_when_schedule_probe_says_no_games(self) -> None:
         from syndicate.features.wnba.cards import _artifact_bundle

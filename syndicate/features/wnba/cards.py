@@ -414,6 +414,12 @@ def _normalized_game_status(
     detail_raw = str(detail_text or "").strip()
     live = bool(in_progress)
     is_final = bool(final)
+    away_val = _safe_float(away_pts)
+    home_val = _safe_float(home_pts)
+    has_score_evidence = bool(
+        (away_val is not None and abs(away_val) > 0.0)
+        or (home_val is not None and abs(home_val) > 0.0)
+    )
 
     if _looks_live_status_text(status_raw, detail_raw):
         live = True
@@ -422,17 +428,14 @@ def _normalized_game_status(
 
     if not live and not is_final:
         start_dt = _parse_utc_datetime(start_time_utc)
-        if start_dt is not None and start_dt <= datetime.now(timezone.utc) - timedelta(hours=3):
-            # Upstream feeds can lag terminal flags; settle stale past-start rows as final.
+        if start_dt is not None and start_dt <= datetime.now(timezone.utc) - timedelta(hours=3) and (has_score_evidence or _infer_period_clock_from_status_text(detail_raw or status_raw)[0] is not None):
+            # Upstream feeds can lag terminal flags; settle stale past-start rows as final only when the row looks like real game state.
             is_final = True
 
     if live:
         is_final = False
 
     period, clock = _infer_period_clock_from_status_text(detail_raw or status_raw)
-
-    away_val = _safe_float(away_pts)
-    home_val = _safe_float(home_pts)
 
     if is_final:
         status_label = "Final"
