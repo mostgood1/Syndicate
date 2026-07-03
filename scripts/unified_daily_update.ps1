@@ -3803,15 +3803,18 @@ function Assert-IntelligenceSportReady {
     $script = @'
 import json
 import sys
-
-from syndicate.app import create_app
-from syndicate.features.intelligence import build_intelligence_status
+from contextlib import redirect_stderr, redirect_stdout
+from io import StringIO
 
 sport_slug = str(sys.argv[1] or "").strip().lower()
 selected_date = str(sys.argv[2] or "").strip()
-app = create_app()
-with app.app_context():
-    payload = build_intelligence_status(selected_date=selected_date, force_refresh=True)
+with redirect_stdout(StringIO()), redirect_stderr(StringIO()):
+    from syndicate.app import create_app
+    from syndicate.features.intelligence import build_intelligence_status
+
+    app = create_app()
+    with app.app_context():
+        payload = build_intelligence_status(selected_date=selected_date, force_refresh=True)
 
 row = {}
 for sport in payload.get("sports") or []:

@@ -90,9 +90,7 @@ services:
       - key: SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP
         value: "false"
       - key: SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP
-        value: "true"
-      - key: SYNDICATE_BOOTSTRAP_WNBA_TODAY
-        value: "1"
+        value: "false"
       - key: SYNDICATE_LIVE_ODDS_REFRESH_INTERVAL_SECONDS
         value: "60"
       # Execute refresh jobs directly so MLB odds updates can publish on Render.
@@ -195,9 +193,9 @@ services:
       - key: SYNDICATE_REPORTS_ROOT
         value: /opt/render/project/data/reports
       - key: SYNDICATE_BOOTSTRAP_ON_START
-        value: "0"
+        value: "1"
       - key: SYNDICATE_BOOTSTRAP_WNBA_TODAY
-        value: "0"
+        value: "1"
       - key: SYNDICATE_NBA_SOURCE_APP_FALLBACK
         value: "false"
       - key: SYNDICATE_WNBA_SOURCE_APP_FALLBACK
@@ -218,8 +216,6 @@ services:
         value: "false"
       - key: SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP
         value: "false"
-      - key: SYNDICATE_BOOTSTRAP_WNBA_TODAY
-        value: "1"
       - key: SYNDICATE_LIVE_ODDS_REFRESH_INTERVAL_SECONDS
         value: "60"
       - key: SYNDICATE_INTELLIGENCE_REFRESH_INTERVAL_SECONDS

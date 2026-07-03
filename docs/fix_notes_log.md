@@ -1,5 +1,12 @@
 # Fix Notes Log
 
+## 2026-07-03 - Render web startup no longer hard-fails on refresh-state readiness
+- Symptom: The Render site was still returning 502 on both `/wnba` and `/healthz`, which meant the web dyno was failing before the lightweight health check could respond.
+- Root cause: `syndicate.app.create_app()` still called `assert_refresh_state_backend_ready(process_name="web")` during app construction, so a hosted-storage or refresh-state mismatch could kill the web process at startup. The Render env file also carried conflicting live-refresh/bootstrap values, which made the deployment contract ambiguous.
+- Fix: Remove the hard refresh-state assertion from web app startup and clean up `render.yaml` so the web service stays non-refreshing while the worker owns bootstrap-on-start and WNBA-today bootstrap behavior.
+- Validation: Focused tests for app bootstrap, health routes, and Render env contract passed with `python -m unittest tests.test_app_bootstrap tests.test_home_health tests.test_render_yaml_envs`.
+- Follow-up: Keep `/healthz` lightweight and treat any future Render 502 as a deployment/runtime issue before reintroducing startup-time state checks.
+
 ## 2026-07-03 - WNBA-only daily update dispatch needed hashtable splatting
 - Symptom: Manual GitHub Actions runs for WNBA-only daily updates kept failing before the daily pipeline step with `Cannot process argument transformation on parameter 'EventSimForceWindowMinutes'` and `-OddsSports` / `-RefreshOdds` being misread as typed values.
 - Root cause: The workflow and wrapper scripts were splatting plain arrays into PowerShell scripts, which is positional binding rather than named parameter binding. That let later flags slide into the `EventSimForceWindowMinutes` slot when WNBA-only dispatch arguments were forwarded.
