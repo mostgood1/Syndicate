@@ -21,9 +21,9 @@ class UnifiedDailyUpdateIncrementalArtifactGenerationTests(unittest.TestCase):
         script_path = repo_root / "scripts" / "unified_daily_update.ps1"
         content = script_path.read_text(encoding="utf-8")
 
-        self.assertIn("git check-ignore -q -- $relativePath", content)
-        self.assertIn("git add -f -- $relativePath", content)
-        self.assertIn("git add -- $relativePath", content)
+        self.assertIn("$normalizedRelativePath = ([string]$relativePath).Trim().Replace('\\\\', '/')", content)
+        self.assertIn("git add -A -f -- $normalizedRelativePath", content)
+        self.assertNotIn("git check-ignore -q -- $relativePath", content)
 
     def test_no_events_changed_skips_artifact_stage(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]

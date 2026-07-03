@@ -1,5 +1,12 @@
 # Fix Notes Log
 
+## 2026-07-02 - Daily update publish failed on staged MLB artifact paths
+- Symptom: The in-season daily update aborted while publishing MLB artifacts with `git add failed` on `data/mlb_source/data/eval/seasons/2026/season_betting_cards_retuned_manifest.json`.
+- Root cause: The incremental publish loop was branching on `git check-ignore` before staging each path, which made the artifact publish path too dependent on ignore-state handling for owned MLB outputs.
+- Fix: Normalize each publish path and force-add it directly in `scripts/unified_daily_update.ps1` instead of switching between ignored and non-ignored staging branches.
+- Validation: `powershell -NoProfile -Command "$text = Get-Content 'scripts\\unified_daily_update.ps1' -Raw; [void][scriptblock]::Create($text); Write-Host 'parse=ok'"` passed.
+- Follow-up: Re-run the daily update once the fix is deployed and confirm the MLB artifact publish stage completes without a git staging error.
+
 ## 2026-07-02 - Worker-updated intelligence boards could read as empty
 - Symptom: `/intelligence` and `/api/intelligence/query` could still show no opportunities even after the odds refresh worker had populated the board artifact.
 - Root cause: The intelligence state readers only treated `top_opportunities` and `analysis.recommendations` as visible content, so a worker snapshot that only carried board-contract cards did not get promoted into the canonical opportunity lists.
