@@ -810,7 +810,10 @@ function Get-OddsHistoryTriggerDecision {
     )
 
     $scheduleCheck = $null
-    if ($Sport -eq 'nhl') {
+    if ($Sport -eq 'nba' -or $Sport -eq 'wnba') {
+        $scheduleCheck = Get-BasketballScheduledGamesCheck -Sport $Sport -DateValue $DateValue
+    }
+    elseif ($Sport -eq 'nhl') {
         $scheduleCheck = Get-NhlScheduledGamesCheck -DateValue $DateValue
     }
 
@@ -914,7 +917,7 @@ function Get-OddsHistoryTriggerDecision {
     }
 
     $skipHeavyComputation = -not $hasLineMovement
-    if ($Sport -eq 'nhl' -and $null -ne $scheduleCheck -and $scheduleCheck.known -and [int]$scheduleCheck.count -gt 0) {
+    if (($Sport -eq 'nhl' -or $Sport -eq 'nba' -or $Sport -eq 'wnba') -and $null -ne $scheduleCheck -and $scheduleCheck.known -and [int]$scheduleCheck.count -gt 0) {
         $skipHeavyComputation = $false
         if (-not $runSimulation -and -not $priorityScoring) {
             $trigger = 'scheduled_slate'
@@ -980,6 +983,18 @@ function Get-SimExecutionDecision {
 
     if ($null -eq $latestManifest -or $null -eq $latestManifest.runState) {
         return $true
+    }
+
+    foreach ($step in @($SourceSteps)) {
+        $sport = [string]$step.Sport
+        if ($sport -ne 'nba' -and $sport -ne 'wnba') {
+            continue
+        }
+
+        $scheduledCheck = Get-BasketballScheduledGamesCheck -Sport $sport -DateValue $DateValue
+        if ($null -ne $scheduledCheck -and $scheduledCheck.known -and [int]$scheduledCheck.count -gt 0) {
+            return $true
+        }
     }
 
     $oddsHistoryDecisions = @()
@@ -4434,7 +4449,7 @@ try {
             $stageDecision.status = if ($DryRun) { 'dry_run' } else { 'skipped' }
         }
     }
-    $shouldRunSourceUpdate = [bool]($shouldRunSimExecution -and -not $sourceUpdateAlreadyCompleted)
+    $shouldRunSourceUpdate = [bool]((Get-RunPlanDecisionValue -Plan $runManifest.runPlan -Key 'sourceUpdates' -Fallback ([bool](-not $SkipSourceUpdates))) -and -not $sourceUpdateAlreadyCompleted)
     if ($shouldRunSourceUpdate) {
         Update-RunStateStage -Manifest $runManifest -Stage 'source_update' -Status 'started'
         for ($stepIndex = 0; $stepIndex -lt $sourceSteps.Count; $stepIndex++) {

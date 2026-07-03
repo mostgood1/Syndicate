@@ -130,6 +130,34 @@ class WnbaLiveSnapshotLocalTests(unittest.TestCase):
         self.assertEqual([game.get("event_id") for game in payload.get("games") or []], ["evt-2"])
         self.assertEqual(((payload.get("games") or [{}])[0]).get("total"), 159.5)
 
+    def test_live_lines_payload_materializes_current_day_snapshot(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            processed_root = Path(temp_dir) / "data" / "processed"
+            processed_root.mkdir(parents=True, exist_ok=True)
+
+            with patch("syndicate.features.wnba.cards.processed_root", return_value=processed_root), patch(
+                "syndicate.features.wnba.cards.central_today_iso",
+                return_value="2026-05-21",
+            ), patch(
+                "syndicate.features.wnba.cards.build_cards_page_context",
+                return_value={"date": "2026-05-21"},
+            ), patch(
+                "syndicate.features.wnba.cards._filtered_local_live_snapshot_payload",
+                return_value=None,
+            ), patch(
+                "syndicate.features.wnba.cards._artifact_live_lines_payload",
+                return_value={"ok": True, "date": "2026-05-21", "games": [{"event_id": "evt-2", "found": True, "total": 159.5}]},
+            ):
+                _local_live_snapshot_payload.cache_clear()
+                payload = build_live_lines_payload("2026-05-21", ["evt-2"], ttl=20, include_period_totals=True)
+                _local_live_snapshot_payload.cache_clear()
+
+            snapshot_path = processed_root / "live_snapshots" / "live_lines_2026-05-21.jsonl"
+            stored_payload = json.loads(snapshot_path.read_text(encoding="utf-8").splitlines()[-1])
+            self.assertTrue(snapshot_path.exists())
+            self.assertEqual([game.get("event_id") for game in payload.get("games") or []], ["evt-2"])
+            self.assertEqual(((stored_payload.get("payload") or {}).get("games") or [{}])[0].get("total"), 159.5)
+
     def test_live_pbp_stats_payload_uses_local_snapshot(self) -> None:
         with TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
@@ -153,6 +181,34 @@ class WnbaLiveSnapshotLocalTests(unittest.TestCase):
 
         self.assertEqual([game.get("event_id") for game in payload.get("games") or []], ["evt-2"])
         self.assertEqual((((payload.get("games") or [{}])[0]).get("pbp_recent") or {}).get("points_total"), 14)
+
+    def test_live_player_boxscore_payload_materializes_current_day_snapshot(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            processed_root = Path(temp_dir) / "data" / "processed"
+            processed_root.mkdir(parents=True, exist_ok=True)
+
+            with patch("syndicate.features.wnba.cards.processed_root", return_value=processed_root), patch(
+                "syndicate.features.wnba.cards.central_today_iso",
+                return_value="2026-05-21",
+            ), patch(
+                "syndicate.features.wnba.cards.build_cards_page_context",
+                return_value={"date": "2026-05-21"},
+            ), patch(
+                "syndicate.features.wnba.cards._filtered_local_live_snapshot_payload",
+                return_value=None,
+            ), patch(
+                "syndicate.features.wnba.cards._public_live_player_boxscore_payload",
+                return_value={"games": [{"event_id": "evt-2", "players": [{"player": "Two"}]}]},
+            ):
+                _local_live_snapshot_payload.cache_clear()
+                payload = build_live_player_boxscore_payload("2026-05-21", ["evt-2"], ttl=20)
+                _local_live_snapshot_payload.cache_clear()
+
+            snapshot_path = processed_root / "live_snapshots" / "live_player_boxscore_2026-05-21.jsonl"
+            stored_payload = json.loads(snapshot_path.read_text(encoding="utf-8").splitlines()[-1])
+            self.assertTrue(snapshot_path.exists())
+            self.assertEqual([game.get("event_id") for game in payload.get("games") or []], ["evt-2"])
+            self.assertEqual((((stored_payload.get("payload") or {}).get("games") or [{}])[0]).get("players"), [{"player": "Two"}])
 
     def test_date_scoped_paths_prefer_current_day_over_larger_previous_snapshot(self) -> None:
         with TemporaryDirectory() as temp_dir:

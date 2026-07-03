@@ -24,6 +24,8 @@ class UnifiedDailyUpdateDynamicSimExecutionDecisionTests(unittest.TestCase):
         self.assertIn("Get-OddsHistoryTriggerDecision -RepoRoot $RepoRoot -DateValue $DateValue -Sport $sport -Workflow $workflow", content)
         self.assertIn("$oddsHistoryDecisions = @()", content)
         self.assertIn("return $null", content)
+        self.assertIn("Get-BasketballScheduledGamesCheck -Sport $sport -DateValue $DateValue", content)
         self.assertIn("trigger = 'skip_heavy_computation'", content)
+        self.assertIn("trigger = 'scheduled_slate'", content)
         self.assertIn("return $true", content)
         self.assertIn("return $false", content)

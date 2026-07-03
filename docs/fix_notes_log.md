@@ -1,5 +1,19 @@
 # Fix Notes Log
 
+## 2026-07-03 - Daily update source refresh was chained to sim execution
+- Symptom: Render could boot with no current WNBA artifact data even though the daily update pipeline was available.
+- Root cause: `scripts/unified_daily_update.ps1` only entered `source_update` when `simExecution` was planned, so a sim no-op could suppress the WNBA refresh and mirror steps entirely.
+- Fix: Drive `source_update` from the explicit `sourceUpdates` run-plan decision instead of the sim decision, while still honoring `SkipSourceUpdates` and the replay checkpoint.
+- Validation: Pending a focused PowerShell parse check and a follow-up daily-update run.
+- Follow-up: Confirm WNBA artifacts still materialize when sim execution is skipped but source refresh is requested.
+
+## 2026-07-03 - WNBA live snapshots now materialize current-day artifacts
+- Symptom: Render logged missing WNBA `live_snapshots` files for current-day `live_lines` and `live_player_boxscore` reads instead of keeping the board fully artifact-backed.
+- Root cause: The WNBA live snapshot readers only looked for already-existing JSONL files, while the builders returned synthesized payloads without writing them back to the canonical processed snapshot path.
+- Fix: Persist current-day WNBA live payloads into `data/wnba_source/source_artifacts/data/processed/live_snapshots/` after synthesis and switch the local snapshot lookup to a quiet path read so missing files do not spam strict-path errors before the artifact is written.
+- Validation: Focused pytest regressions for current-day live-lines and live-player-boxscore artifact materialization passed.
+- Follow-up: Keep the WNBA live-snapshot writer aligned with the refresh runner so today’s files continue to exist in the Render artifact root before the UI reads them.
+
 ## 2026-07-03 - MLB HR targets stopped backfilling from the daily summary
 - Symptom: `/mlb/hr-targets` could silently fill sparse HR-target artifacts from the daily summary, so the page could look healthy even when the dedicated HR-target artifact was incomplete.
 - Root cause: The HR-targets context builder merged dedicated HR-target rows with daily-summary rows when the dedicated artifact was sparse.

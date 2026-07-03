@@ -250,6 +250,9 @@ foreach ($sport in @('MLB', 'NBA', 'NHL', 'WNBA')) {
 }
 
 $activeList = @($activeSports.GetEnumerator() | Where-Object { $_.Value } | ForEach-Object { $_.Key })
+if ($activeSports['WNBA'] -and -not ($activeList -contains 'WNBA')) {
+    $activeList += 'WNBA'
+}
 $skippedList = @($activeSports.GetEnumerator() | Where-Object { -not $_.Value } | ForEach-Object { $_.Key })
 
 if ($activeList.Count -eq 0) {

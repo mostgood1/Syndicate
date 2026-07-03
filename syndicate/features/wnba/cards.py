@@ -63,6 +63,65 @@ def _path_cache_signature(path: Path | None) -> int:
         return 0
 
 
+def _live_snapshot_artifact_path(kind: str, selected_date: str) -> Path:
+    return processed_root() / "live_snapshots" / f"{str(kind or '').strip().lower()}_{str(selected_date or '').strip()}.jsonl"
+
+
+def _read_jsonl_snapshot_payload(path: Path) -> dict[str, Any] | None:
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except Exception:
+        return None
+    for line in reversed(lines):
+        raw = str(line or "").strip()
+        if not raw:
+            continue
+        try:
+            record = json.loads(raw)
+        except Exception:
+            continue
+        payload = record.get("payload") if isinstance(record, dict) and isinstance(record.get("payload"), dict) else None
+        if isinstance(payload, dict):
+            return payload
+        if isinstance(record, dict) and isinstance(record.get("games"), list):
+            return record
+    return None
+
+
+def _write_jsonl_snapshot_payload(path: Path, payload: dict[str, Any]) -> bool:
+    if not isinstance(payload, dict):
+        return False
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps({"payload": payload}, ensure_ascii=False) + "\n", encoding="utf-8")
+        return True
+    except Exception:
+        return False
+
+
+def _maybe_persist_current_day_live_snapshot_artifact(kind: str, selected_date: str, payload: dict[str, Any] | None) -> dict[str, Any] | None:
+    if not isinstance(payload, dict):
+        return payload
+    if str(selected_date or "").strip() != central_today_iso():
+        return payload
+    path = _live_snapshot_artifact_path(kind, selected_date)
+    try:
+        if path.exists() and path.is_file() and path.stat().st_size > 0:
+            return payload
+    except OSError:
+        pass
+    if _write_jsonl_snapshot_payload(path, payload):
+        try:
+            _local_live_snapshot_payload.cache_clear()
+        except Exception:
+            pass
+        try:
+            _local_live_state_payload.cache_clear()
+        except Exception:
+            pass
+    return payload
+
+
 def _canonical_wnba_tri(team_tri: str) -> str:
     value = str(team_tri or "").strip().upper()
     compact = "".join(ch for ch in value if ch.isalnum())
@@ -2361,38 +2420,15 @@ def _public_scoreboard_live_state_payload(selected_date: str) -> dict[str, Any] 
 def _local_live_snapshot_payload_cached(kind: str, resolved_date: str, snapshot_mtime_ns: int | None, snapshot_size: int | None) -> dict[str, Any] | None:
     if not resolved_date:
         return None
-    try:
-        path = live_snapshot_path(f"{kind}_{resolved_date}.jsonl")
-    except FileNotFoundError:
-        return None
-    try:
-        lines = path.read_text(encoding="utf-8").splitlines()
-    except Exception:
-        return None
-    for line in reversed(lines):
-        raw = str(line or "").strip()
-        if not raw:
-            continue
-        try:
-            record = json.loads(raw)
-        except Exception:
-            continue
-        payload = record.get("payload") if isinstance(record, dict) and isinstance(record.get("payload"), dict) else None
-        if isinstance(payload, dict):
-            return payload
-        if isinstance(record, dict) and isinstance(record.get("games"), list):
-            return record
-    return None
+    path = _live_snapshot_artifact_path(kind, resolved_date)
+    return _read_jsonl_snapshot_payload(path)
 
 
 def _local_live_snapshot_payload(kind: str, selected_date: str) -> dict[str, Any] | None:
     resolved_date = str(selected_date or "").strip()
     if not resolved_date:
         return None
-    try:
-        path = live_snapshot_path(f"{kind}_{resolved_date}.jsonl")
-    except FileNotFoundError:
-        return _local_live_snapshot_payload_cached(kind, resolved_date, None, None)
+    path = _live_snapshot_artifact_path(kind, resolved_date)
     try:
         stat = path.stat()
     except Exception:
@@ -3737,13 +3773,13 @@ def build_live_state_payload(selected_date: str, ttl: int = 12, *, allow_stored_
                     "periods": [],
                 }
             )
-        return _attach_odds_refresh_timestamp({
+        return _maybe_persist_current_day_live_snapshot_artifact("live_state", selected_date, _attach_odds_refresh_timestamp({
             "date": selected_date,
             "ttl": int(ttl),
             "source": "wnba_artifacts",
             "games": out_games,
             "generated_at": _wnba_generated_at(),
-        })
+        }))
 
     context = build_cards_page_context(selected_date, allow_stored_date_fallback=allow_stored_date_fallback)
     games = context.get("games") if isinstance(context.get("games"), list) else []
@@ -3851,13 +3887,13 @@ def build_live_state_payload(selected_date: str, ttl: int = 12, *, allow_stored_
             }
         )
 
-    return _attach_odds_refresh_timestamp({
+    return _maybe_persist_current_day_live_snapshot_artifact("live_state", selected_date, _attach_odds_refresh_timestamp({
         "date": selected_date,
         "ttl": int(ttl),
         "source": "syndicate_cards_fallback",
         "games": out_games,
         "generated_at": _wnba_generated_at(),
-    })
+    }))
 
 
 def build_live_player_boxscore_payload(
@@ -3881,7 +3917,7 @@ def build_live_player_boxscore_payload(
 
     public_payload = _public_live_player_boxscore_payload(resolved_date, normalized_event_ids)
     if _payload_has_live_boxscore_players(public_payload):
-        return _attach_odds_refresh_timestamp(public_payload)
+        return _maybe_persist_current_day_live_snapshot_artifact("live_player_boxscore", resolved_date, _attach_odds_refresh_timestamp(public_payload))
 
     game_index = _resolve_games_for_event_ids(resolved_date, normalized_event_ids)
     resolved_event_ids = resolve_event_ids_from_games(game_index, normalized_event_ids)
@@ -3892,9 +3928,9 @@ def build_live_player_boxscore_payload(
 
         public_payload = _public_live_player_boxscore_payload(resolved_date, resolved_event_ids)
         if _payload_has_live_boxscore_players(public_payload):
-            return _attach_odds_refresh_timestamp(public_payload)
+            return _maybe_persist_current_day_live_snapshot_artifact("live_player_boxscore", resolved_date, _attach_odds_refresh_timestamp(public_payload))
 
-    return _attach_odds_refresh_timestamp({
+    return _maybe_persist_current_day_live_snapshot_artifact("live_player_boxscore", resolved_date, _attach_odds_refresh_timestamp({
         "ok": True,
         "ttl": int(ttl),
         "date": resolved_date or None,
@@ -3902,7 +3938,7 @@ def build_live_player_boxscore_payload(
         "lookahead_applied": bool(resolved_date != selected_date),
         "games": [{"event_id": event_id, "game_id": event_id, "players": []} for event_id in normalized_event_ids],
         "generated_at": _wnba_generated_at(),
-    })
+    }))
 
 
 def build_live_player_lens_payload(
@@ -3926,12 +3962,12 @@ def build_live_player_lens_payload(
     if is_today and local_timestamp and (datetime.now(timezone.utc) - local_timestamp) > timedelta(minutes=20):
         local_payload = None
     if _payload_has_live_lens_rows(local_payload):
-        return _hydrate_live_player_lens_payload(
+        return _maybe_persist_current_day_live_snapshot_artifact("live_player_lens", resolved_date, _hydrate_live_player_lens_payload(
             _attach_odds_refresh_timestamp(local_payload),
             resolved_date,
             normalized_event_ids,
             allow_stored_date_fallback=allow_stored_date_fallback,
-        )
+        ))
 
     artifact_payload = _artifact_live_player_lens_payload(
         resolved_date,
@@ -3939,12 +3975,12 @@ def build_live_player_lens_payload(
         allow_stored_date_fallback=allow_stored_date_fallback,
     )
     if _payload_has_live_lens_rows(artifact_payload):
-        return _hydrate_live_player_lens_payload(
+        return _maybe_persist_current_day_live_snapshot_artifact("live_player_lens", resolved_date, _hydrate_live_player_lens_payload(
             _attach_odds_refresh_timestamp(artifact_payload),
             resolved_date,
             normalized_event_ids,
             allow_stored_date_fallback=allow_stored_date_fallback,
-        )
+        ))
 
     game_index = _resolve_games_for_event_ids(resolved_date, normalized_event_ids)
     fallback_games = [
@@ -3954,7 +3990,7 @@ def build_live_player_lens_payload(
         if isinstance(game, dict)
     ]
     if fallback_games:
-        return _hydrate_live_player_lens_payload(_attach_odds_refresh_timestamp({
+        return _maybe_persist_current_day_live_snapshot_artifact("live_player_lens", resolved_date, _hydrate_live_player_lens_payload(_attach_odds_refresh_timestamp({
             "ok": True,
             "ttl": int(ttl),
             "date": resolved_date or None,
@@ -3962,8 +3998,8 @@ def build_live_player_lens_payload(
             "lookahead_applied": bool(resolved_date != selected_date),
             "games": fallback_games,
             "generated_at": _wnba_generated_at(),
-        }), resolved_date, normalized_event_ids, allow_stored_date_fallback=allow_stored_date_fallback)
-    return _attach_odds_refresh_timestamp({
+        }), resolved_date, normalized_event_ids, allow_stored_date_fallback=allow_stored_date_fallback))
+    return _maybe_persist_current_day_live_snapshot_artifact("live_player_lens", resolved_date, _attach_odds_refresh_timestamp({
         "ok": True,
         "ttl": int(ttl),
         "date": resolved_date or None,
@@ -3981,7 +4017,7 @@ def build_live_player_lens_payload(
             for event_id in normalized_event_ids
         ],
         "generated_at": _wnba_generated_at(),
-    })
+    }))
 
 
 def build_live_lines_payload(
@@ -4011,7 +4047,7 @@ def build_live_lines_payload(
         normalized_event_ids,
         include_period_totals=bool(include_period_totals),
     ):
-        return _attach_odds_refresh_timestamp(_finalize_live_lines_payload(merged_payload, include_period_totals=bool(include_period_totals)))
+        return _maybe_persist_current_day_live_snapshot_artifact("live_lines", resolved_date, _attach_odds_refresh_timestamp(_finalize_live_lines_payload(merged_payload, include_period_totals=bool(include_period_totals))))
 
     artifact_payload = _artifact_live_lines_payload(
         resolved_date,
@@ -4026,7 +4062,7 @@ def build_live_lines_payload(
             normalized_event_ids,
             include_period_totals=bool(include_period_totals),
         ):
-            return _attach_odds_refresh_timestamp(_finalize_live_lines_payload(merged_payload, include_period_totals=bool(include_period_totals)))
+            return _maybe_persist_current_day_live_snapshot_artifact("live_lines", resolved_date, _attach_odds_refresh_timestamp(_finalize_live_lines_payload(merged_payload, include_period_totals=bool(include_period_totals))))
 
     game_index = _resolve_games_for_event_ids(resolved_date, normalized_event_ids)
     fallback_games = [
@@ -4047,10 +4083,10 @@ def build_live_lines_payload(
             "generated_at": _wnba_generated_at(),
         }
         merged_payload = _merge_live_lines_payloads(merged_payload, fallback_payload)
-        return _attach_odds_refresh_timestamp(_finalize_live_lines_payload(merged_payload or fallback_payload, include_period_totals=bool(include_period_totals)))
+        return _maybe_persist_current_day_live_snapshot_artifact("live_lines", resolved_date, _attach_odds_refresh_timestamp(_finalize_live_lines_payload(merged_payload or fallback_payload, include_period_totals=bool(include_period_totals))))
     if merged_payload:
-        return _attach_odds_refresh_timestamp(_finalize_live_lines_payload(merged_payload, include_period_totals=bool(include_period_totals)))
-    return _attach_odds_refresh_timestamp({
+        return _maybe_persist_current_day_live_snapshot_artifact("live_lines", resolved_date, _attach_odds_refresh_timestamp(_finalize_live_lines_payload(merged_payload, include_period_totals=bool(include_period_totals))))
+    return _maybe_persist_current_day_live_snapshot_artifact("live_lines", resolved_date, _attach_odds_refresh_timestamp({
         "ok": True,
         "ttl": int(ttl),
         "date": resolved_date,
@@ -4059,7 +4095,7 @@ def build_live_lines_payload(
         "include_period_totals": bool(include_period_totals),
         "games": [{"event_id": event_id, "game_id": event_id, "found": False} for event_id in normalized_event_ids],
         "generated_at": _wnba_generated_at(),
-    })
+    }))
 
 
 def build_live_pbp_stats_payload(
@@ -4075,7 +4111,7 @@ def build_live_pbp_stats_payload(
     local_payload = _filtered_local_live_snapshot_payload("live_pbp_stats", resolved_date, normalized_event_ids)
     if isinstance(local_payload, dict) and isinstance(local_payload.get("games"), list) and bool(local_payload.get("games")):
         return _attach_odds_refresh_timestamp(local_payload)
-    return _attach_odds_refresh_timestamp({
+    return _maybe_persist_current_day_live_snapshot_artifact("live_pbp_stats", resolved_date, _attach_odds_refresh_timestamp({
         "ok": True,
         "ttl": int(ttl),
         "date": resolved_date or None,
@@ -4097,7 +4133,7 @@ def build_live_pbp_stats_payload(
             for event_id in normalized_event_ids
         ],
         "generated_at": _wnba_generated_at(),
-    })
+    }))
 
 
 def build_live_lens_tuning_payload(ttl: int = 300) -> dict[str, Any]:

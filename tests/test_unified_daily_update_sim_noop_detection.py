@@ -16,7 +16,7 @@ class UnifiedDailyUpdateSimNoOpDetectionTests(unittest.TestCase):
         self.assertIn("Get-OddsHistoryTriggerDecision -RepoRoot $RepoRoot -DateValue $DateValue -Sport $sport -Workflow $workflow", content)
         self.assertIn("skip_heavy_computation", content)
         self.assertIn("$shouldRunSimExecution = $false", content)
-        self.assertIn("if ($simExecutionNoOpDecision -eq $false) {", content)
+        self.assertIn("if (-not $ForceRebuildToday -and $simExecutionNoOpDecision -eq $false) {", content)
 
     def test_at_least_one_event_needs_simulation_runs_stage_normally(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]
@@ -25,7 +25,7 @@ class UnifiedDailyUpdateSimNoOpDetectionTests(unittest.TestCase):
 
         self.assertIn("if (@($oddsHistoryDecisions | Where-Object { [bool]$_.runSimulation -or [bool]$_.priorityScoring }).Count -gt 0) {", content)
         self.assertIn("return $true", content)
-        self.assertIn("if ($shouldRunSimExecution) {", content)
+        self.assertIn("if ($shouldRunSourceUpdate) {", content)
 
     def test_force_rebuild_today_disables_sim_noop_short_circuit(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]
