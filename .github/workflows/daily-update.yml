@@ -167,7 +167,7 @@ jobs:
             $scriptPath = './scripts/daily_update_in_season.ps1'
           }
 
-          Write-Host "Invoking: $scriptPath $((($dailyArgs.GetEnumerator() | ForEach-Object {
+          $invocationArgs = @($dailyArgs.GetEnumerator() | ForEach-Object {
             if ($_.Value -is [System.Collections.IEnumerable] -and -not ($_.Value -is [string])) {
               "-{0} {1}" -f $_.Key, (@($_.Value) -join ' ')
             }
@@ -177,7 +177,8 @@ jobs:
             else {
               "-{0} {1}" -f $_.Key, $_.Value
             }
-          } | Where-Object { $_ }) -join ' ')"
+          } | Where-Object { $_ })
+          Write-Host ("Invoking: {0} {1}" -f $scriptPath, ($invocationArgs -join ' '))
           & $scriptPath @dailyArgs 2>&1 | Tee-Object -FilePath daily-update.log
 
           $exitCode = $LASTEXITCODE
