@@ -1,7 +1,7 @@
 ﻿{
     "sport":  "wnba",
     "date":  "2026-07-03",
-    "refreshedAtUtc":  "2026-07-03T20:08:24.8638706Z",
+    "refreshedAtUtc":  "2026-07-03T22:30:09.7156222Z",
     "sourceRepo":  "D:\\a\\Syndicate\\Syndicate\\",
     "sourceArtifactRoot":  "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts",
     "sourceRootEnvVar":  "SYNDICATE_SOURCE_ROOT_WNBA",
