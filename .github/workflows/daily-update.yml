@@ -162,8 +162,13 @@ jobs:
             $dailyArgs += '-ForceRebuildToday'
           }
 
-          Write-Host "Invoking: ./scripts/daily_update_in_season.ps1 $($dailyArgs -join ' ')"
-          & ./scripts/daily_update_in_season.ps1 @dailyArgs 2>&1 | Tee-Object -FilePath daily-update.log
+          $scriptPath = './scripts/daily_update.ps1'
+          if ($activeSports.Count -eq 0) {
+            $scriptPath = './scripts/daily_update_in_season.ps1'
+          }
+
+          Write-Host "Invoking: $scriptPath $($dailyArgs -join ' ')"
+          & $scriptPath @dailyArgs 2>&1 | Tee-Object -FilePath daily-update.log
 
           $exitCode = $LASTEXITCODE
           Write-Host "scripts/daily_update.ps1 exited with code $exitCode"
