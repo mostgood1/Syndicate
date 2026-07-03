@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "date": "2026-07-04",
-  "generated_at": "2026-07-03T17:17:37.400990",
+  "generated_at": "2026-07-03T18:17:28.098740",
   "include_baseline": false,
   "teams": {
     "108": {
@@ -82,13 +82,13 @@
       "roster_types": {
         "40Man": {
           "prev_date": "2026-07-03",
-          "n_players": 46,
+          "n_players": 47,
           "n_added": 0,
           "n_removed": 0
         },
         "active": {
           "prev_date": "2026-07-03",
-          "n_players": 25,
+          "n_players": 26,
           "n_added": 0,
           "n_removed": 0
         }
@@ -262,15 +262,59 @@
       "roster_types": {
         "40Man": {
           "prev_date": "2026-07-03",
-          "n_players": 43,
-          "n_added": 0,
-          "n_removed": 0
+          "n_players": 44,
+          "n_added": 1,
+          "n_removed": 0,
+          "added": [
+            {
+              "full_name": "Matt Krook",
+              "player_id": 640454,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            }
+          ],
+          "removed": [],
+          "added_ids": [
+            640454
+          ],
+          "removed_ids": []
         },
         "active": {
           "prev_date": "2026-07-03",
           "n_players": 26,
-          "n_added": 0,
-          "n_removed": 0
+          "n_added": 1,
+          "n_removed": 1,
+          "added": [
+            {
+              "full_name": "Matt Krook",
+              "player_id": 640454,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            }
+          ],
+          "removed": [
+            {
+              "full_name": "Jos\u00e9 Suarez",
+              "player_id": 660761,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            }
+          ],
+          "added_ids": [
+            640454
+          ],
+          "removed_ids": [
+            660761
+          ]
         }
       }
     },
@@ -448,9 +492,25 @@
         },
         "active": {
           "prev_date": "2026-07-03",
-          "n_players": 25,
-          "n_added": 0,
-          "n_removed": 0
+          "n_players": 26,
+          "n_added": 1,
+          "n_removed": 0,
+          "added": [
+            {
+              "full_name": "Alan Rangel",
+              "player_id": 660604,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            }
+          ],
+          "removed": [],
+          "added_ids": [
+            660604
+          ],
+          "removed_ids": []
         }
       }
     },

@@ -2,16 +2,16 @@
   "date": "2026-07-03",
   "season": 2026,
   "spring_mode": false,
-  "generated_at": "2026-07-03T17:08:47.559501",
+  "generated_at": "2026-07-03T18:08:48.073122",
   "summary": {
     "games": 13,
-    "projected_teams": 26,
-    "adjusted_teams": 6,
+    "projected_teams": 25,
+    "adjusted_teams": 5,
     "partial_teams": 0,
     "fallback_pool_teams": 0,
-    "confirmed_teams": 0,
-    "projected_only_teams": 26,
-    "confirmed_only_teams": 0,
+    "confirmed_teams": 1,
+    "projected_only_teams": 25,
+    "confirmed_only_teams": 1,
     "comparable_teams": 0,
     "exact_match_teams": 0,
     "true_mismatch_teams": 0
@@ -29,7 +29,17 @@
         "abbr": "CHC"
       },
       "away_confirmed_ids": [],
-      "home_confirmed_ids": [],
+      "home_confirmed_ids": [
+        691718,
+        608324,
+        683737,
+        673548,
+        664023,
+        663538,
+        624424,
+        608348,
+        621020
+      ],
       "away_projected_ids": [
         802139,
         671056,
@@ -41,17 +51,7 @@
         691458,
         686780
       ],
-      "home_projected_ids": [
-        691718,
-        608324,
-        683737,
-        673548,
-        664023,
-        663538,
-        608348,
-        621020,
-        681909
-      ],
+      "home_projected_ids": [],
       "away_projected_validation": {
         "status": "ok",
         "raw_ids": [
@@ -106,64 +106,14 @@
         "mapping_source": "projected_rotowire_default_vs_lhp"
       },
       "home_projected_validation": {
-        "status": "adjusted",
-        "raw_ids": [
-          691718,
-          608324,
-          683737,
-          673548,
-          664023,
-          663538,
-          608348,
-          621020
-        ],
-        "ids": [
-          691718,
-          608324,
-          683737,
-          673548,
-          664023,
-          663538,
-          608348,
-          621020,
-          681909
-        ],
-        "missing_ids": [],
-        "backfilled_ids": [
-          681909
-        ],
-        "pool_source": "active+40Man",
-        "pool_size": 15,
-        "raw_names": [
-          "Pete Crow-Armstrong",
-          "Alex Bregman",
-          "Michael Busch",
-          "Seiya Suzuki",
-          "Ian Happ",
-          "Matt Shaw",
-          "Nico Hoerner",
-          "Carson Kelly",
-          "Dansby Swanson"
-        ],
-        "matched_names": [
-          "Pete Crow-Armstrong",
-          "Alex Bregman",
-          "Michael Busch",
-          "Seiya Suzuki",
-          "Ian Happ",
-          "Nico Hoerner",
-          "Carson Kelly",
-          "Dansby Swanson"
-        ],
-        "missing_name_labels": [
-          "Matt Shaw"
-        ],
-        "mapping_source": "projected_rotowire_default_vs_rhp"
+        "status": "none",
+        "raw_ids": [],
+        "ids": []
       },
       "away_source": "projected_rotowire_default_vs_lhp",
-      "home_source": "projected_rotowire_default_vs_rhp",
+      "home_source": "confirmed_feed_live",
       "away_confidence": 0.66,
-      "home_confidence": 0.48000000000000004,
+      "home_confidence": 1.0,
       "away_comparison": {
         "status": "projected_only",
         "is_true_mismatch": false,
@@ -174,10 +124,10 @@
         "extra_in_projection": []
       },
       "home_comparison": {
-        "status": "projected_only",
+        "status": "confirmed_only",
         "is_true_mismatch": false,
-        "confirmed_count": 0,
-        "projected_count": 9,
+        "confirmed_count": 9,
+        "projected_count": 0,
         "overlap_count": 0,
         "missing_from_projection": [],
         "extra_in_projection": []

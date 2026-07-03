@@ -1,7 +1,7 @@
 {
   "date": "2026-06-25",
   "season": 2026,
-  "generated_at": "2026-07-03T17:05:29.318382",
+  "generated_at": "2026-07-03T18:05:49.979850",
   "tool": "tools/eval/build_season_betting_cards_manifest.py",
   "selection_source": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/eval/batches/season_2026_ui_daily_live/sim_vs_actual_2026-06-25.json",
   "source_batch": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/eval/batches/season_2026_ui_daily_live",

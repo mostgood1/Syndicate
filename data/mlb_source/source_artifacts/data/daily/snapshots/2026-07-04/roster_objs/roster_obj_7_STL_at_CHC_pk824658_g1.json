@@ -4474,6 +4474,90 @@
         },
         {
           "player": {
+            "mlbam_id": 519141,
+            "full_name": "Drew Pomeranz",
+            "primary_position": "P",
+            "bat_side": "R",
+            "throw_side": "L"
+          },
+          "k_rate": 0.1642061855670103,
+          "bb_rate": 0.12915463917525774,
+          "hbp_rate": 0.020618556701030927,
+          "hr_rate": 0.03505154639175258,
+          "inplay_hit_rate": 0.33590869183494293,
+          "batters_faced": 97.0,
+          "balls_in_play": 67.0,
+          "arsenal": {
+            "FF": 0.7267441781976748,
+            "KC": 0.2732558218023254
+          },
+          "pitch_type_whiff_mult": {},
+          "pitch_type_inplay_mult": {},
+          "pitch_type_hr_mult": {},
+          "statcast_splits_source": "",
+          "statcast_splits_n_pitches": 0,
+          "statcast_splits_start_date": "",
+          "statcast_splits_end_date": "",
+          "arsenal_source": "statsapi_pitchArsenal",
+          "arsenal_sample_size": 344,
+          "stamina_pitches": 25,
+          "role": "MR",
+          "availability_mult": 1.0,
+          "platoon_mult_vs_lhb": {
+            "k": 1.1925000000000001,
+            "bb": 0.8075,
+            "hr": 1.1971988795518207,
+            "inplay": 0.9957832374978218
+          },
+          "platoon_mult_vs_rhb": {
+            "k": 0.8075,
+            "bb": 1.1468390804597701,
+            "hr": 1.0205882352941176,
+            "inplay": 1.023072399372713
+          },
+          "venue_mult_home": {
+            "k": 0.9657728295849843,
+            "bb": 0.8775000000000001,
+            "hr": 0.86,
+            "inplay": 1.0146824359644537
+          },
+          "venue_mult_away": {
+            "k": 1.0153942742340532,
+            "bb": 1.03713282247765,
+            "hr": 1.175,
+            "inplay": 1.0047063206949094
+          },
+          "vs_venue_hr_mult": {
+            "108": 0.86
+          },
+          "vs_venue_k_mult": {
+            "108": 0.9657728295849843
+          },
+          "vs_venue_bb_mult": {
+            "108": 0.8775000000000001
+          },
+          "vs_venue_inplay_mult": {
+            "108": 0.9973166056804321
+          },
+          "vs_venue_history": {
+            "108": {
+              "bf": 27.0,
+              "k_mult": 0.9022080845285265,
+              "bb_mult": 0.65,
+              "hr_mult": 0.6,
+              "inplay_mult": 0.9923331590869489
+            }
+          },
+          "statcast_quality_mult": {},
+          "bb_gb_rate": 0.44,
+          "bb_fb_rate": 0.25,
+          "bb_ld_rate": 0.2,
+          "bb_pu_rate": 0.11,
+          "bb_inplay_n": 0,
+          "leverage_skill": 0.5
+        },
+        {
+          "player": {
             "mlbam_id": 668970,
             "full_name": "Gavin Hollowell",
             "primary_position": "P",

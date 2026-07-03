@@ -1,12 +1,28 @@
 {
   "date": "2026-07-04",
-  "generatedAt": "2026-07-03T12:22:05-05:00",
+  "generatedAt": "2026-07-03T13:27:18-05:00",
   "summary": {
     "cards": 15,
-    "badges": 0,
-    "sources": {},
-    "tones": {},
-    "stats": {},
+    "badges": 3,
+    "sources": {
+      "none": 3
+    },
+    "tones": {
+      "strong": 2,
+      "soft": 1
+    },
+    "stats": {
+      "hits_allowed": {
+        "badges": 1,
+        "rungWins": 0,
+        "rungLosses": 0
+      },
+      "outs": {
+        "badges": 2,
+        "rungWins": 0,
+        "rungLosses": 0
+      }
+    },
     "final": {
       "badges": 0,
       "rungWins": 0,
@@ -19,5 +35,69 @@
   },
   "largestLosses": [],
   "mixedFinalBadges": [],
-  "rows": []
+  "rows": [
+    {
+      "gamePk": 822882,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "away",
+      "starter": "Jack Flaherty",
+      "label": "O 17/18",
+      "stat": "outs",
+      "tone": "strong",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 2,
+      "targets": [
+        17,
+        18
+      ],
+      "detail": "Supported ladders: 17/18 Last supported rung: 18"
+    },
+    {
+      "gamePk": 822882,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "home",
+      "starter": "Kumar Rocker",
+      "label": "O 17/18",
+      "stat": "outs",
+      "tone": "strong",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 2,
+      "targets": [
+        17,
+        18
+      ],
+      "detail": "Supported ladders: 17/18 Last supported rung: 18"
+    },
+    {
+      "gamePk": 822882,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "home",
+      "starter": "Kumar Rocker",
+      "label": "H up to 9",
+      "stat": "hits_allowed",
+      "tone": "soft",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 5,
+      "targets": [
+        5,
+        6,
+        7,
+        8,
+        9
+      ],
+      "detail": "Supported ladders: 5/6/7/8/9 Last supported rung: 9"
+    }
+  ]
 }

@@ -1,8 +1,26 @@
 {
   "date": "2026-07-04",
   "mode": "live",
-  "retrieved_at": "2026-07-03T17:17:30.259473",
-  "hitter_props": {},
+  "retrieved_at": "2026-07-03T18:17:23.799695",
+  "hitter_props": {
+    "colt keith": {
+      "batter_hits_runs_rbis": {
+        "line": 1.5,
+        "over_odds": "+115",
+        "under_odds": "-165",
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 1.5,
+            "over_odds": "+115",
+            "under_odds": "-165",
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": []
+      }
+    }
+  },
   "meta": {
     "markets": [
       "batter_hits",
@@ -16,9 +34,11 @@
     "regions": "us",
     "bookmakers": null,
     "counts": {
-      "players": 0,
-      "markets": {},
-      "events_matched": 0
+      "players": 1,
+      "markets": {
+        "batter_hits_runs_rbis": 1
+      },
+      "events_matched": 14
     }
   }
 }

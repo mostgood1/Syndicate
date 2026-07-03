@@ -908,20 +908,20 @@
       "use_closer_in_9th_only": true,
       "pinch_hit_aggressiveness": 0.15
     },
-    "confirmed_lineup_ids": [],
-    "projected_lineup_ids": [
+    "confirmed_lineup_ids": [
       691718,
       608324,
       683737,
       673548,
       664023,
       663538,
+      624424,
       608348,
-      621020,
-      681909
+      621020
     ],
-    "lineup_source": "projected_rotowire_default_vs_rhp",
-    "lineup_confidence": 0.48000000000000004,
+    "projected_lineup_ids": [],
+    "lineup_source": "confirmed_feed_live",
+    "lineup_confidence": 1.0,
     "probable_pitcher": {
       "id": 656849,
       "source": "feed_gameData_probablePitchers",
@@ -942,6 +942,12 @@
         "name": "Caleb Thielbar",
         "role": "SU",
         "lev": 0.7
+      },
+      {
+        "id": 519141,
+        "name": "Drew Pomeranz",
+        "role": "MR",
+        "lev": 0.5
       },
       {
         "id": 668970,
@@ -1156,6 +1162,35 @@
         "vs_pitcher_history": {}
       },
       {
+        "id": 624424,
+        "name": "Michael Conforto",
+        "pos": "DH",
+        "bat": "L",
+        "throw": "R",
+        "k_rate": 0.3302651515151515,
+        "bb_rate": 0.12242424242424242,
+        "hbp_rate": 0.0,
+        "hr_rate": 0.028333333333333332,
+        "inplay_hit_rate": 0.26916977611940296,
+        "xb_hit_share": 0.43478260869565216,
+        "vs_pitch_type": {},
+        "vs_pitch_type_hr": {},
+        "platoon_mult_vs_lhp": {
+          "k": 0.8075,
+          "bb": 1.1925000000000001,
+          "hr": 0.78,
+          "inplay": 1.131106682839485
+        },
+        "platoon_mult_vs_rhp": {
+          "k": 0.981182395956512,
+          "bb": 1.0309363263912599,
+          "hr": 1.1193711967545639,
+          "inplay": 1.0246837636458153
+        },
+        "statcast_quality_mult": {},
+        "vs_pitcher_history": {}
+      },
+      {
         "id": 608348,
         "name": "Carson Kelly",
         "pos": "C",
@@ -1212,7 +1247,9 @@
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
-      },
+      }
+    ],
+    "bench": [
       {
         "id": 681909,
         "name": "Justin Dean",
@@ -1236,9 +1273,7 @@
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
-      }
-    ],
-    "bench": [
+      },
       {
         "id": 682634,
         "name": "Kevin Alc\u00e1ntara",
@@ -1264,35 +1299,6 @@
           "bb": 0.8075,
           "hr": 1.0,
           "inplay": 0.8075
-        },
-        "statcast_quality_mult": {},
-        "vs_pitcher_history": {}
-      },
-      {
-        "id": 624424,
-        "name": "Michael Conforto",
-        "pos": "DH",
-        "bat": "L",
-        "throw": "R",
-        "k_rate": 0.3302651515151515,
-        "bb_rate": 0.12242424242424242,
-        "hbp_rate": 0.0,
-        "hr_rate": 0.028333333333333332,
-        "inplay_hit_rate": 0.26916977611940296,
-        "xb_hit_share": 0.43478260869565216,
-        "vs_pitch_type": {},
-        "vs_pitch_type_hr": {},
-        "platoon_mult_vs_lhp": {
-          "k": 0.8075,
-          "bb": 1.1925000000000001,
-          "hr": 0.78,
-          "inplay": 1.131106682839485
-        },
-        "platoon_mult_vs_rhp": {
-          "k": 0.981182395956512,
-          "bb": 1.0309363263912599,
-          "hr": 1.1193711967545639,
-          "inplay": 1.0246837636458153
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -1439,6 +1445,47 @@
           "OTHER": 0.11111111,
           "CU": 0.22739018,
           "SL": 0.23255815
+        },
+        "pitch_type_whiff_mult": {},
+        "pitch_type_inplay_mult": {},
+        "pitch_type_hr_mult": {}
+      },
+      {
+        "id": 519141,
+        "name": "Drew Pomeranz",
+        "throw": "L",
+        "role": "MR",
+        "leverage_skill": 0.5,
+        "stamina_pitches": 25,
+        "availability_mult": 1.0,
+        "platoon_mult_vs_lhb": {
+          "k": 1.1925000000000001,
+          "bb": 0.8075,
+          "hr": 1.1971988795518207,
+          "inplay": 0.9957832374978218
+        },
+        "platoon_mult_vs_rhb": {
+          "k": 0.8075,
+          "bb": 1.1468390804597701,
+          "hr": 1.0205882352941176,
+          "inplay": 1.023072399372713
+        },
+        "statcast_quality_mult": {},
+        "arsenal_source": "statsapi_pitchArsenal",
+        "arsenal_sample_size": 344,
+        "statcast_splits_found": false,
+        "statcast_splits_source": "",
+        "statcast_splits_n_pitches": 0,
+        "statcast_splits_start_date": "",
+        "statcast_splits_end_date": "",
+        "k_rate": 0.1642061855670103,
+        "bb_rate": 0.12915463917525774,
+        "hbp_rate": 0.020618556701030927,
+        "hr_rate": 0.03505154639175258,
+        "inplay_hit_rate": 0.33590869183494293,
+        "arsenal": {
+          "FF": 0.7267441781976748,
+          "KC": 0.2732558218023254
         },
         "pitch_type_whiff_mult": {},
         "pitch_type_inplay_mult": {},
@@ -1713,16 +1760,16 @@
   },
   "weather": {
     "source": "statsapi_live_feed",
-    "condition": "",
-    "temperature_f": null,
-    "wind_speed_mph": null,
-    "wind_direction": "unknown",
-    "wind_raw": "",
+    "condition": "Overcast",
+    "temperature_f": 88.0,
+    "wind_speed_mph": 10.0,
+    "wind_direction": "out",
+    "wind_raw": "10 mph, Out To CF",
     "is_dome": null,
     "multipliers": {
-      "hr_mult": 1.0,
-      "inplay_hit_mult": 1.0,
-      "xb_share_mult": 1.0
+      "hr_mult": 1.054,
+      "inplay_hit_mult": 1.027,
+      "xb_share_mult": 1.0144
     }
   },
   "park": {
@@ -1742,8 +1789,8 @@
   },
   "umpire": {
     "source": "statsapi_live_feed",
-    "home_plate_umpire_id": null,
-    "home_plate_umpire_name": "",
+    "home_plate_umpire_id": 483564,
+    "home_plate_umpire_name": "Dan Bellino",
     "called_strike_mult": 1.0,
     "multipliers": {
       "called_strike_mult": 1.0

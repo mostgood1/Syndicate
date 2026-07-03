@@ -7,7 +7,7 @@
   "meta": {
     "sims_per_game": null,
     "season": 2026,
-    "generated_at": "2026-07-03T12:22:17-05:00",
+    "generated_at": "2026-07-03T13:27:30-05:00",
     "use_raw": null,
     "jobs": null,
     "skipped_games": 0
@@ -43,8 +43,8 @@
       "card_path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_07_04_locked_policy.json",
       "selected_counts": {
         "totals": 0,
-        "ml": 0,
-        "pitcher_props": 0,
+        "ml": 1,
+        "pitcher_props": 1,
         "hitter_props": 0,
         "hitter_home_runs": 0,
         "hitter_hits": 0,
@@ -52,7 +52,7 @@
         "hitter_total_bases": 0,
         "hitter_runs": 0,
         "hitter_rbis": 0,
-        "combined": 0
+        "combined": 2
       },
       "results": {
         "combined": {
@@ -67,13 +67,13 @@
       "profit_u": 0.0,
       "roi": null,
       "settled_n": 0,
-      "unresolved_n": 0
+      "unresolved_n": 2
     },
     "cap_profile": "nototals_p1_tbheavy11_r1_nohr",
     "selected_counts": {
       "totals": 0,
-      "ml": 0,
-      "pitcher_props": 0,
+      "ml": 1,
+      "pitcher_props": 1,
       "hitter_props": 0,
       "hitter_home_runs": 0,
       "hitter_hits": 0,
@@ -81,7 +81,7 @@
       "hitter_total_bases": 0,
       "hitter_runs": 0,
       "hitter_rbis": 0,
-      "combined": 0
+      "combined": 2
     },
     "playable_selected_counts": {
       "totals": 0,
@@ -98,8 +98,8 @@
     },
     "all_selected_counts": {
       "totals": 0,
-      "ml": 0,
-      "pitcher_props": 0,
+      "ml": 1,
+      "pitcher_props": 1,
       "hitter_props": 0,
       "hitter_home_runs": 0,
       "hitter_hits": 0,
@@ -107,7 +107,7 @@
       "hitter_total_bases": 0,
       "hitter_runs": 0,
       "hitter_rbis": 0,
-      "combined": 0
+      "combined": 2
     },
     "results": {
       "combined": {
@@ -345,8 +345,110 @@
       "betting": {
         "markets": {
           "totals": null,
-          "ml": null,
-          "pitcherProps": [],
+          "ml": {
+            "date": "2026-07-04",
+            "game_pk": 822882,
+            "away": "Detroit Tigers",
+            "home": "Texas Rangers",
+            "away_abbr": "DET",
+            "home_abbr": "TEX",
+            "double_header": "N",
+            "game_number": 1,
+            "event_id": "ec4b853359310a5bcf7395eeb51dc121",
+            "commence_time": "2026-07-04T20:06:00Z",
+            "market": "ml",
+            "selection": "home",
+            "edge": 0.1417391304347826,
+            "model_prob": 0.62,
+            "selected_side_model_prob": 0.62,
+            "selected_side_market_prob": 0.4782608695652174,
+            "market_no_vig_prob": 0.4782608695652174,
+            "odds": "+100",
+            "stake_u": 1.0,
+            "sim_sample_size": 1000,
+            "baseball_reasons": [
+              "Across his last 5 starts, Kumar Rocker has allowed about 2.4 earned runs per outing.",
+              "The projected lineup is mostly 6 left-handed and 3 right-handed, and the power risk also comes in lighter than baseline."
+            ],
+            "explanation_diagnostic": {
+              "status": "supported",
+              "flag_sparse_support": false,
+              "support_min_reasons": 2,
+              "baseball_reasons_n": 2,
+              "reason_sentences_n": 4,
+              "market": "ml",
+              "subject": "DET @ TEX",
+              "supporting_reasons": [
+                "Across his last 5 starts, Kumar Rocker has allowed about 2.4 earned runs per outing.",
+                "The projected lineup is mostly 6 left-handed and 3 right-handed, and the power risk also comes in lighter than baseline."
+              ]
+            },
+            "reasons": [
+              "The model lands on the home side in 62.0% of sims, while the market is pricing it closer to 47.8%. Across his last 5 starts, Kumar Rocker has allowed about 2.4 earned runs per outing. The projected lineup is mostly 6 left-handed and 3 right-handed, and the power risk also comes in lighter than baseline. TEX wins this matchup in about 62.0% of model runs."
+            ],
+            "reason_summary": "The model lands on the home side in 62.0% of sims, while the market is pricing it closer to 47.8%. Across his last 5 starts, Kumar Rocker has allowed about 2.4 earned runs per outing. The projected lineup is mostly 6 left-handed and 3 right-handed, and the power risk also comes in lighter than baseline. TEX wins this matchup in about 62.0% of model runs.",
+            "rank": 1,
+            "recommendation_tier": "official"
+          },
+          "pitcherProps": [
+            {
+              "date": "2026-07-04",
+              "game_pk": 822882,
+              "away": "Detroit Tigers",
+              "home": "Texas Rangers",
+              "away_abbr": "DET",
+              "home_abbr": "TEX",
+              "double_header": "N",
+              "game_number": 1,
+              "event_id": null,
+              "commence_time": null,
+              "market": "pitcher_props",
+              "pitcher_id": 677958,
+              "pitcher_name": "Kumar Rocker",
+              "team": "TEX",
+              "team_side": "home",
+              "prop": "outs",
+              "selection": "over",
+              "edge": 0.41400000000000003,
+              "market_line": 15.5,
+              "model_prob_over": 0.914,
+              "market_prob_over": 0.5,
+              "market_prob_under": 0.5,
+              "market_prob_mode": "no_vig_two_way",
+              "market_no_vig_prob_over": 0.5,
+              "selected_side_market_prob": 0.5,
+              "selected_side_model_prob": 0.914,
+              "mean_support": 5.524000000000001,
+              "outs_mean": 21.024,
+              "market_alternates": [],
+              "odds": "-120",
+              "stake_u": 1.0,
+              "sim_sample_size": 1000,
+              "baseball_reasons": [
+                "The projected lineup is mostly 6 left-handed and 3 right-handed, and the damage profile is lighter than average.",
+                "His modeled workload cap still reaches roughly 97 pitches, so the deeper-start path is still available if the outing stays efficient."
+              ],
+              "explanation_diagnostic": {
+                "status": "supported",
+                "flag_sparse_support": false,
+                "support_min_reasons": 2,
+                "baseball_reasons_n": 2,
+                "reason_sentences_n": 5,
+                "market": "pitcher_props:outs",
+                "subject": "Kumar Rocker",
+                "supporting_reasons": [
+                  "The projected lineup is mostly 6 left-handed and 3 right-handed, and the damage profile is lighter than average.",
+                  "His modeled workload cap still reaches roughly 97 pitches, so the deeper-start path is still available if the outing stays efficient."
+                ]
+              },
+              "reasons": [
+                "The model lands on the over side in 91.4% of sims, while the market is pricing it closer to 50.0%. The projected lineup is mostly 6 left-handed and 3 right-handed, and the damage profile is lighter than average. His modeled workload cap still reaches roughly 97 pitches, so the deeper-start path is still available if the outing stays efficient. The model baseline sits around 21.0 outs against a line of 15.5. If he stays on his normal starter path, the matchup against DET gives him a fair shot to reach full workload volume."
+              ],
+              "reason_summary": "The model lands on the over side in 91.4% of sims, while the market is pricing it closer to 50.0%. The projected lineup is mostly 6 left-handed and 3 right-handed, and the damage profile is lighter than average. His modeled workload cap still reaches roughly 97 pitches, so the deeper-start path is still available if the outing stays efficient. The model baseline sits around 21.0 outs against a line of 15.5. If he stays on his normal starter path, the matchup against DET gives him a fair shot to reach full workload volume.",
+              "rank": 1,
+              "recommendation_tier": "official"
+            }
+          ],
           "hitterProps": [],
           "extraPitcherProps": [],
           "extraHitterProps": []
@@ -384,20 +486,66 @@
         "settled_rows": [],
         "playable_settled_rows": [],
         "all_settled_rows": [],
-        "unresolved_rows": [],
+        "unresolved_rows": [
+          {
+            "path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\daily_summary_2026_07_04_locked_policy.json",
+            "date": "2026-07-04",
+            "game_pk": 822882,
+            "market": "ml",
+            "player_name": null,
+            "selection": "home",
+            "market_line": null,
+            "reason": "game not final",
+            "recommendation_tier": "official"
+          },
+          {
+            "path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\daily_summary_2026_07_04_locked_policy.json",
+            "date": "2026-07-04",
+            "game_pk": 822882,
+            "market": "pitcher_props",
+            "player_name": "Kumar Rocker",
+            "selection": "over",
+            "market_line": 15.5,
+            "reason": "game not final",
+            "recommendation_tier": "official"
+          }
+        ],
         "playable_unresolved_rows": [],
-        "all_unresolved_rows": [],
+        "all_unresolved_rows": [
+          {
+            "path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\daily_summary_2026_07_04_locked_policy.json",
+            "date": "2026-07-04",
+            "game_pk": 822882,
+            "market": "ml",
+            "player_name": null,
+            "selection": "home",
+            "market_line": null,
+            "reason": "game not final",
+            "recommendation_tier": "official"
+          },
+          {
+            "path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\daily_summary_2026_07_04_locked_policy.json",
+            "date": "2026-07-04",
+            "game_pk": 822882,
+            "market": "pitcher_props",
+            "player_name": "Kumar Rocker",
+            "selection": "over",
+            "market_line": 15.5,
+            "reason": "game not final",
+            "recommendation_tier": "official"
+          }
+        ],
         "counts": {
-          "official": 0,
+          "official": 2,
           "playable": 0,
-          "pitcher": 0,
+          "pitcher": 1,
           "hitter": 0,
           "extra_pitcher": 0,
           "extra_hitter": 0
         },
         "flags": {
-          "hasAnyRecommendations": false,
-          "hasOfficialRecommendations": false,
+          "hasAnyRecommendations": true,
+          "hasOfficialRecommendations": true,
           "hasPlayableCandidates": false
         }
       }

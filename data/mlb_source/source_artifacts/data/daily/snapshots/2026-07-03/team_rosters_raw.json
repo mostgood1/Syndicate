@@ -5767,6 +5767,25 @@
           },
           {
             "person": {
+              "id": 519141,
+              "fullName": "Drew Pomeranz",
+              "link": "/api/v1/people/519141"
+            },
+            "jerseyNumber": "47",
+            "position": {
+              "code": "1",
+              "name": "Pitcher",
+              "type": "Pitcher",
+              "abbreviation": "P"
+            },
+            "status": {
+              "code": "A",
+              "description": "Active"
+            },
+            "parentTeamId": 112
+          },
+          {
+            "person": {
               "id": 668970,
               "fullName": "Gavin Hollowell",
               "link": "/api/v1/people/668970"
@@ -6309,6 +6328,25 @@
               "link": "/api/v1/people/656849"
             },
             "jerseyNumber": "19",
+            "position": {
+              "code": "1",
+              "name": "Pitcher",
+              "type": "Pitcher",
+              "abbreviation": "P"
+            },
+            "status": {
+              "code": "A",
+              "description": "Active"
+            },
+            "parentTeamId": 112
+          },
+          {
+            "person": {
+              "id": 519141,
+              "fullName": "Drew Pomeranz",
+              "link": "/api/v1/people/519141"
+            },
+            "jerseyNumber": "47",
             "position": {
               "code": "1",
               "name": "Pitcher",

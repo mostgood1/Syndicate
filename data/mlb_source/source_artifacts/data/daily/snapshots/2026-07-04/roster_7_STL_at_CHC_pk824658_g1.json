@@ -945,6 +945,12 @@
         "lev": 0.7
       },
       {
+        "id": 519141,
+        "name": "Drew Pomeranz",
+        "role": "MR",
+        "lev": 0.5
+      },
+      {
         "id": 668970,
         "name": "Gavin Hollowell",
         "role": "MR",
@@ -1440,6 +1446,47 @@
           "OTHER": 0.11111111,
           "CU": 0.22739018,
           "SL": 0.23255815
+        },
+        "pitch_type_whiff_mult": {},
+        "pitch_type_inplay_mult": {},
+        "pitch_type_hr_mult": {}
+      },
+      {
+        "id": 519141,
+        "name": "Drew Pomeranz",
+        "throw": "L",
+        "role": "MR",
+        "leverage_skill": 0.5,
+        "stamina_pitches": 25,
+        "availability_mult": 1.0,
+        "platoon_mult_vs_lhb": {
+          "k": 1.1925000000000001,
+          "bb": 0.8075,
+          "hr": 1.1971988795518207,
+          "inplay": 0.9957832374978218
+        },
+        "platoon_mult_vs_rhb": {
+          "k": 0.8075,
+          "bb": 1.1468390804597701,
+          "hr": 1.0205882352941176,
+          "inplay": 1.023072399372713
+        },
+        "statcast_quality_mult": {},
+        "arsenal_source": "statsapi_pitchArsenal",
+        "arsenal_sample_size": 344,
+        "statcast_splits_found": false,
+        "statcast_splits_source": "",
+        "statcast_splits_n_pitches": 0,
+        "statcast_splits_start_date": "",
+        "statcast_splits_end_date": "",
+        "k_rate": 0.1642061855670103,
+        "bb_rate": 0.12915463917525774,
+        "hbp_rate": 0.020618556701030927,
+        "hr_rate": 0.03505154639175258,
+        "inplay_hit_rate": 0.33590869183494293,
+        "arsenal": {
+          "FF": 0.7267441781976748,
+          "KC": 0.2732558218023254
         },
         "pitch_type_whiff_mult": {},
         "pitch_type_inplay_mult": {},

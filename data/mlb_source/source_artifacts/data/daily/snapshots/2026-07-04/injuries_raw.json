@@ -2183,8 +2183,8 @@
           "player_id": 680730,
           "full_name": "Mitchell Parker",
           "status": {
-            "code": "D60",
-            "description": "Injured 60-Day"
+            "code": "D15",
+            "description": "Injured 15-Day"
           },
           "position": {
             "code": "1",
@@ -6580,8 +6580,8 @@
       "player_id": 680730,
       "full_name": "Mitchell Parker",
       "status": {
-        "code": "D60",
-        "description": "Injured 60-Day"
+        "code": "D15",
+        "description": "Injured 15-Day"
       },
       "position": {
         "code": "1",

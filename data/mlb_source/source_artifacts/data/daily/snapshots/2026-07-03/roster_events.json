@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "date": "2026-07-03",
-  "generated_at": "2026-07-03T17:06:15.636670",
+  "generated_at": "2026-07-03T18:06:34.041559",
   "include_baseline": false,
   "teams": {
     "108": {
@@ -82,14 +82,14 @@
       "roster_types": {
         "40Man": {
           "prev_date": null,
-          "n_players": 46,
-          "n_added": 46,
+          "n_players": 47,
+          "n_added": 47,
           "n_removed": 0
         },
         "active": {
           "prev_date": null,
-          "n_players": 25,
-          "n_added": 25,
+          "n_players": 26,
+          "n_added": 26,
           "n_removed": 0
         }
       }

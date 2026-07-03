@@ -1,7 +1,7 @@
 {
   "date": "2026-07-04",
   "season": 2026,
-  "generated_at": "2026-07-03T17:20:50.537642",
+  "generated_at": "2026-07-03T18:26:43.538664",
   "tool": "tools/daily_update_multi_profile.py",
   "selection_source": "_tmp_best_set_selection_holdout13.json",
   "best_selection": null,
@@ -104,7 +104,7 @@
         "data/tuning/pitch_model_overrides/_tmp_hr_bbhbp1p04_starterbbhbp1p04.json"
       ],
       "exit_code": 0,
-      "duration_s": 199.66,
+      "duration_s": 158.856,
       "skipped": false
     },
     "pitcher_props_recos": {
@@ -115,8 +115,8 @@
       "snapshot_dir": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily_pitcher_props\\snapshots\\2026-07-04",
       "extra_args": [],
       "exit_code": 0,
-      "skipped": true,
-      "skip_reason": "no pitcher prop market entries in D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\market\\oddsapi\\oddsapi_pitcher_props_2026_07_04.json"
+      "duration_s": 198.509,
+      "skipped": false
     },
     "hitter_props_recos": {
       "profile": "hitter_props",
@@ -135,8 +135,8 @@
         "24"
       ],
       "exit_code": 0,
-      "skipped": true,
-      "skip_reason": "no hitter prop market entries in D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\market\\oddsapi\\oddsapi_hitter_props_2026_07_04.json"
+      "duration_s": 201.306,
+      "skipped": false
     }
   },
   "inputs": {
@@ -147,29 +147,26 @@
     "outs_prob_calibration": "data\\tuning\\outs_calibration\\default.json"
   },
   "warnings": [
-    "No game lines entries found in D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\market\\oddsapi\\oddsapi_game_lines_2026_07_04.json",
-    "No pitcher lines entries found in D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\market\\oddsapi\\oddsapi_pitcher_props_2026_07_04.json",
-    "No hitter lines entries found in D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\market\\oddsapi\\oddsapi_hitter_props_2026_07_04.json",
     "No support-qualified hitter strikeout shadow candidates were published; current hitter sim artifacts may not include strikeout distributions yet."
   ],
   "timings": {
-    "collect_game_candidates_s": 0.032,
-    "collect_pitcher_candidates_s": 0.0,
-    "collect_shadow_pitcher_candidates_s": 0.0,
-    "collect_hitter_candidates_s": 0.0,
-    "collect_shadow_hitter_candidates_s": 0.0,
+    "collect_game_candidates_s": 0.257,
+    "collect_pitcher_candidates_s": 0.06,
+    "collect_shadow_pitcher_candidates_s": 0.042,
+    "collect_hitter_candidates_s": 0.081,
+    "collect_shadow_hitter_candidates_s": 0.08,
     "selection_and_support_s": 0.0,
     "explanation_diagnostics_s": 0.0,
-    "total_build_s": 0.035
+    "total_build_s": 0.522
   },
   "explanation_diagnostics": {
-    "selected_rows_n": 0,
+    "selected_rows_n": 2,
     "sparse_support_n": 0,
     "sparse_support_rate": 0.0,
     "support_min_reasons": 2,
     "status_counts": {
       "strong": 0,
-      "supported": 0,
+      "supported": 2,
       "thin": 0,
       "none": 0
     },
@@ -186,22 +183,22 @@
         "examples": []
       },
       "ml": {
-        "selected_n": 0,
+        "selected_n": 1,
         "sparse_support_n": 0,
         "status_counts": {
           "strong": 0,
-          "supported": 0,
+          "supported": 1,
           "thin": 0,
           "none": 0
         },
         "examples": []
       },
       "pitcher_props": {
-        "selected_n": 0,
+        "selected_n": 1,
         "sparse_support_n": 0,
         "status_counts": {
           "strong": 0,
-          "supported": 0,
+          "supported": 1,
           "thin": 0,
           "none": 0
         },
@@ -278,13 +275,13 @@
   },
   "audit_track": {
     "official_card_explanation_support": {
-      "selected_rows_n": 0,
+      "selected_rows_n": 2,
       "sparse_support_n": 0,
       "sparse_support_rate": 0.0,
       "support_min_reasons": 2,
       "status_counts": {
         "strong": 0,
-        "supported": 0,
+        "supported": 2,
         "thin": 0,
         "none": 0
       },
@@ -301,22 +298,22 @@
           "examples": []
         },
         "ml": {
-          "selected_n": 0,
+          "selected_n": 1,
           "sparse_support_n": 0,
           "status_counts": {
             "strong": 0,
-            "supported": 0,
+            "supported": 1,
             "thin": 0,
             "none": 0
           },
           "examples": []
         },
         "pitcher_props": {
-          "selected_n": 0,
+          "selected_n": 1,
           "sparse_support_n": 0,
           "status_counts": {
             "strong": 0,
-            "supported": 0,
+            "supported": 1,
             "thin": 0,
             "none": 0
           },
@@ -410,8 +407,8 @@
         "ml": {
           "market": "ml",
           "support_min_reasons": 2,
-          "baseline_selected_n": 0,
-          "final_selected_n": 0,
+          "baseline_selected_n": 1,
+          "final_selected_n": 1,
           "removed_sparse_support_n": 0,
           "replacement_added_n": 0,
           "selection_shortfall_n": 0,
@@ -420,8 +417,8 @@
         "pitcher_props": {
           "market": "pitcher_props",
           "support_min_reasons": 2,
-          "baseline_selected_n": 0,
-          "final_selected_n": 0,
+          "baseline_selected_n": 1,
+          "final_selected_n": 1,
           "removed_sparse_support_n": 0,
           "replacement_added_n": 0,
           "selection_shortfall_n": 0,
@@ -608,27 +605,129 @@
   },
   "markets": {
     "totals": {
-      "raw_candidates_n": 0,
+      "raw_candidates_n": 11,
       "selected_n": 0,
       "cap": 0,
       "stake_u": 1.0,
       "recommendations": []
     },
     "ml": {
-      "raw_candidates_n": 0,
-      "selected_n": 0,
+      "raw_candidates_n": 13,
+      "selected_n": 1,
       "cap": 1,
       "stake_u": 1.0,
-      "recommendations": []
+      "recommendations": [
+        {
+          "date": "2026-07-04",
+          "game_pk": 822882,
+          "away": "Detroit Tigers",
+          "home": "Texas Rangers",
+          "away_abbr": "DET",
+          "home_abbr": "TEX",
+          "double_header": "N",
+          "game_number": 1,
+          "event_id": "ec4b853359310a5bcf7395eeb51dc121",
+          "commence_time": "2026-07-04T20:06:00Z",
+          "market": "ml",
+          "selection": "home",
+          "edge": 0.1417391304347826,
+          "model_prob": 0.62,
+          "selected_side_model_prob": 0.62,
+          "selected_side_market_prob": 0.4782608695652174,
+          "market_no_vig_prob": 0.4782608695652174,
+          "odds": "+100",
+          "stake_u": 1.0,
+          "sim_sample_size": 1000,
+          "baseball_reasons": [
+            "Across his last 5 starts, Kumar Rocker has allowed about 2.4 earned runs per outing.",
+            "The projected lineup is mostly 6 left-handed and 3 right-handed, and the power risk also comes in lighter than baseline."
+          ],
+          "explanation_diagnostic": {
+            "status": "supported",
+            "flag_sparse_support": false,
+            "support_min_reasons": 2,
+            "baseball_reasons_n": 2,
+            "reason_sentences_n": 4,
+            "market": "ml",
+            "subject": "DET @ TEX",
+            "supporting_reasons": [
+              "Across his last 5 starts, Kumar Rocker has allowed about 2.4 earned runs per outing.",
+              "The projected lineup is mostly 6 left-handed and 3 right-handed, and the power risk also comes in lighter than baseline."
+            ]
+          },
+          "reasons": [
+            "The model lands on the home side in 62.0% of sims, while the market is pricing it closer to 47.8%. Across his last 5 starts, Kumar Rocker has allowed about 2.4 earned runs per outing. The projected lineup is mostly 6 left-handed and 3 right-handed, and the power risk also comes in lighter than baseline. TEX wins this matchup in about 62.0% of model runs."
+          ],
+          "reason_summary": "The model lands on the home side in 62.0% of sims, while the market is pricing it closer to 47.8%. Across his last 5 starts, Kumar Rocker has allowed about 2.4 earned runs per outing. The projected lineup is mostly 6 left-handed and 3 right-handed, and the power risk also comes in lighter than baseline. TEX wins this matchup in about 62.0% of model runs.",
+          "rank": 1
+        }
+      ]
     },
     "pitcher_props": {
-      "raw_candidates_n": 0,
-      "selected_n": 0,
+      "raw_candidates_n": 2,
+      "selected_n": 1,
       "other_playable_candidates_n": 0,
       "cap": 1,
       "stake_u": 1.0,
       "one_prop_per_player": true,
-      "recommendations": [],
+      "recommendations": [
+        {
+          "date": "2026-07-04",
+          "game_pk": 822882,
+          "away": "Detroit Tigers",
+          "home": "Texas Rangers",
+          "away_abbr": "DET",
+          "home_abbr": "TEX",
+          "double_header": "N",
+          "game_number": 1,
+          "event_id": null,
+          "commence_time": null,
+          "market": "pitcher_props",
+          "pitcher_id": 677958,
+          "pitcher_name": "Kumar Rocker",
+          "team": "TEX",
+          "team_side": "home",
+          "prop": "outs",
+          "selection": "over",
+          "edge": 0.41400000000000003,
+          "market_line": 15.5,
+          "model_prob_over": 0.914,
+          "market_prob_over": 0.5,
+          "market_prob_under": 0.5,
+          "market_prob_mode": "no_vig_two_way",
+          "market_no_vig_prob_over": 0.5,
+          "selected_side_market_prob": 0.5,
+          "selected_side_model_prob": 0.914,
+          "mean_support": 5.524000000000001,
+          "outs_mean": 21.024,
+          "market_alternates": [],
+          "odds": "-120",
+          "stake_u": 1.0,
+          "sim_sample_size": 1000,
+          "baseball_reasons": [
+            "The projected lineup is mostly 6 left-handed and 3 right-handed, and the damage profile is lighter than average.",
+            "His modeled workload cap still reaches roughly 97 pitches, so the deeper-start path is still available if the outing stays efficient."
+          ],
+          "explanation_diagnostic": {
+            "status": "supported",
+            "flag_sparse_support": false,
+            "support_min_reasons": 2,
+            "baseball_reasons_n": 2,
+            "reason_sentences_n": 5,
+            "market": "pitcher_props:outs",
+            "subject": "Kumar Rocker",
+            "supporting_reasons": [
+              "The projected lineup is mostly 6 left-handed and 3 right-handed, and the damage profile is lighter than average.",
+              "His modeled workload cap still reaches roughly 97 pitches, so the deeper-start path is still available if the outing stays efficient."
+            ]
+          },
+          "reasons": [
+            "The model lands on the over side in 91.4% of sims, while the market is pricing it closer to 50.0%. The projected lineup is mostly 6 left-handed and 3 right-handed, and the damage profile is lighter than average. His modeled workload cap still reaches roughly 97 pitches, so the deeper-start path is still available if the outing stays efficient. The model baseline sits around 21.0 outs against a line of 15.5. If he stays on his normal starter path, the matchup against DET gives him a fair shot to reach full workload volume."
+          ],
+          "reason_summary": "The model lands on the over side in 91.4% of sims, while the market is pricing it closer to 50.0%. The projected lineup is mostly 6 left-handed and 3 right-handed, and the damage profile is lighter than average. His modeled workload cap still reaches roughly 97 pitches, so the deeper-start path is still available if the outing stays efficient. The model baseline sits around 21.0 outs against a line of 15.5. If he stays on his normal starter path, the matchup against DET gives him a fair shot to reach full workload volume.",
+          "rank": 1
+        }
+      ],
       "other_playable_candidates": [],
       "playable_support_removed_n": 0
     },
@@ -739,7 +838,7 @@
     }
   },
   "combined": {
-    "raw_candidates_n": 0,
-    "selected_n": 0
+    "raw_candidates_n": 26,
+    "selected_n": 2
   }
 }
