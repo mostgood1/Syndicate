@@ -648,6 +648,10 @@ class IntelligenceStateTests(unittest.TestCase):
         self.assertIn("Decision lanes", html)
         self.assertIn("intelligence-hero", html)
         self.assertIn("intelligence-lane__intro", html)
+        self.assertIn("/api/intelligence/query", html)
+        self.assertNotIn("/api/syndicate/query", html)
+        self.assertNotIn("/syndicate?question=", html)
+        self.assertNotIn("powers Ask", html)
         mocked_queue.assert_called_once()
 
     def test_intelligence_home_honors_explicit_date_query_param(self) -> None:
@@ -1243,6 +1247,27 @@ class IntelligenceStateTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 302)
         self.assertIn("/api/intelligence/status?date=2026-06-10", response.location)
+
+    def test_default_intelligence_query_uses_latest_board_snapshot_fallback(self) -> None:
+        response_payload = {
+            "ok": True,
+            "selected_date": "2026-07-02",
+            "top_opportunities": [{"name": "Fallback Play", "sport_slug": "mlb", "market": "Hits"}],
+            "by_sport": {"mlb": [{"name": "Fallback Play", "sport_slug": "mlb", "market": "Hits"}]},
+            "analysis": {"recommendations": [{"name": "Fallback Play"}], "picks": [], "top_live_opportunities": [], "portfolio": {}, "parlays": []},
+            "board_contract": {"schema": "intelligence_board_v1", "cards": [{"name": "Fallback Play"}]},
+        }
+
+        with patch("syndicate.blueprints.intelligence.read_latest_intelligence_board_snapshot_response", side_effect=[None, dict(response_payload)]):
+            with patch("syndicate.blueprints.intelligence.read_latest_intelligence_state_response", return_value=None):
+                cached_response, source = intelligence_module._cached_intelligence_response_with_source(
+                    {"question": "top edges today", "date": "2026-07-03"},
+                    force_refresh=False,
+                )
+
+        self.assertIsNotNone(cached_response)
+        self.assertEqual(source, "board_snapshot_latest")
+        self.assertEqual((cached_response or {}).get("top_opportunities", [])[0].get("name"), "Fallback Play")
 
     def test_compute_response_reuses_source_cache_until_state_changes(self) -> None:
         service = IntelligenceStateService()

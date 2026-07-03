@@ -65,6 +65,45 @@ class MlbRefreshRunnerTests(unittest.TestCase):
         self.assertEqual(odds_module.calls[0]["date"], "2026-05-22")
         self.assertEqual(odds_module.calls[0]["regions"], "us,eu")
 
+    def test_cards_page_context_defaults_to_auto_expand(self) -> None:
+        from syndicate.features.mlb.cards import build_cards_page_context
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            temp_root = Path(tmp_dir)
+            summary_path = temp_root / "daily_artifact_2026-06-03.json"
+            live_lens_path = temp_root / "live_lens_report_2026-06-03.json"
+            summary_path.write_text(json.dumps({"date": "2026-06-03", "outputs": []}), encoding="utf-8")
+            live_lens_path.write_text(json.dumps({"games": []}), encoding="utf-8")
+
+            with patch("syndicate.features.mlb.cards.available_daily_summary_dates", return_value=["2026-06-03"]), patch(
+                "syndicate.features.mlb.cards.daily_artifact_path",
+                return_value=summary_path,
+            ), patch(
+                "syndicate.features.mlb.cards.live_lens_report_path",
+                return_value=live_lens_path,
+            ), patch(
+                "syndicate.features.mlb.cards._cards_recommendation_payload_by_game",
+                return_value={},
+            ), patch(
+                "syndicate.features.mlb.cards._daily_sim_by_game",
+                return_value={},
+            ), patch(
+                "syndicate.features.mlb.cards._daily_actual_by_game",
+                return_value={},
+            ), patch(
+                "syndicate.features.mlb.cards._rfi_targets_signal_index",
+                return_value={},
+            ), patch(
+                "syndicate.features.mlb.cards._hr_targets_shelf",
+                return_value=None,
+            ), patch(
+                "syndicate.features.mlb.cards.build_module_links",
+                return_value=[],
+            ):
+                context = build_cards_page_context("2026-06-03")
+
+        self.assertTrue(context["auto_expand_cards"])
+
     def test_same_doc_considers_retrieved_at_freshness(self) -> None:
         module = self._load_module()
 

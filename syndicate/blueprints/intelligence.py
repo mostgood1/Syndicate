@@ -437,6 +437,11 @@ def _cached_intelligence_response_with_source(payload: dict[str, object], *, for
     cached_response = read_latest_intelligence_state_response(payload, force_refresh=force_refresh, allow_latest_fallback=True)
     if _is_board_response(cached_response) and not _response_needs_refresh(payload, cached_response):
         return _hydrate_board_response_payload(cached_response), "worker"
+    question_text = str(payload.get("question") or "").strip().lower()
+    if question_text == DEFAULT_QUESTION.lower():
+        latest_board_snapshot = read_latest_intelligence_board_snapshot_response(None, force_refresh=force_refresh)
+        if _is_board_response(latest_board_snapshot):
+            return _hydrate_board_response_payload(latest_board_snapshot), "board_snapshot_latest"
     return None, "fallback"
 
 

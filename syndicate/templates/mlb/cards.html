@@ -113,6 +113,7 @@
         basePath: {{ route_path|tojson }},
         client: {{ (cards_client or ('source' if source_client_shell else 'board'))|tojson }},
         preserveClientParam: {{ (cards_client is defined and cards_client is not none)|tojson }},
+        autoExpandCards: {{ (auto_expand_cards if auto_expand_cards is defined else false)|tojson }},
         refreshPolicy: {{ refresh_policy|default({})|tojson }},
       };
       window.freshnessText = window.freshnessText || function (row, fieldName, fallbackDetail) {

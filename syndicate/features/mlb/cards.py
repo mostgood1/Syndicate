@@ -4615,6 +4615,7 @@ def build_cards_page_context(selected_date: str) -> dict[str, Any]:
         "cards_grid_class": "cards-grid",
         "cards_stylesheet": "mlb/cards_exact.css",
         "cards_script": "mlb/cards_source.js",
+        "auto_expand_cards": True,
     }
     if not _render_web_dyno():
         result = apply_game_board_contract(result, sport="mlb", module="cards")

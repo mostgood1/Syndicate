@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import os
 import json
 import unittest
+from datetime import datetime, timezone
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
@@ -22,6 +24,7 @@ from syndicate.features.wnba.live_prop_accuracy import build_live_prop_accuracy_
 from syndicate.features.wnba.live_prop_audit import build_live_prop_audit_payload as build_wnba_prop_audit
 from syndicate.features.shared.live_lens_contract import attach_live_lens_contract
 from syndicate.features.shared.rank_board import build_rank_api_payload
+from syndicate.features.mlb.live_lens import _live_lens_report_needs_refresh
 
 
 def _write_daily_accuracy_artifacts(root: Path, date_str: str) -> None:
@@ -311,6 +314,41 @@ class LocalDailyAccuracyTests(unittest.TestCase):
         self.assertEqual(payload["summary"]["summary"]["wins"], 1)
         self.assertEqual(payload["summary"]["summary"]["losses"], 1)
         self.assertEqual(((payload["days"] or [])[0].get("signals") or {}).get("lines"), 3)
+
+    def test_mlb_live_lens_refreshes_after_sixty_seconds(self) -> None:
+        with TemporaryDirectory() as tmp_dir:
+            report_path = Path(tmp_dir) / "live_lens_report_2026_07_03.json"
+            report_path.write_text(
+                json.dumps({"games": [{"gamePk": 1}], "generatedAt": "2026-07-03T17:05:00-05:00"}),
+                encoding="utf-8",
+            )
+            old_mtime = 1_725_000_000.0
+            recent_mtime = old_mtime + 59.0
+            os.utime(report_path, (old_mtime, old_mtime))
+
+            fixed_now = datetime(2026, 7, 3, 18, 0, tzinfo=timezone.utc)
+            fixed_time = fixed_now.timestamp()
+            with patch("syndicate.features.mlb.live_lens.live_lens_report_path", return_value=report_path), patch(
+                "syndicate.features.mlb.live_lens.load_json_file",
+                return_value={"games": [{"gamePk": 1}]},
+            ), patch("syndicate.features.mlb.live_lens.datetime") as mock_datetime, patch(
+                "syndicate.features.mlb.live_lens.time.time",
+                return_value=fixed_time,
+            ):
+                mock_datetime.now.return_value = fixed_now
+                os.utime(report_path, (fixed_time - 61.0, fixed_time - 61.0))
+                self.assertTrue(_live_lens_report_needs_refresh("2026-07-03"))
+
+            with patch("syndicate.features.mlb.live_lens.live_lens_report_path", return_value=report_path), patch(
+                "syndicate.features.mlb.live_lens.load_json_file",
+                return_value={"games": [{"gamePk": 1}]},
+            ), patch("syndicate.features.mlb.live_lens.datetime") as mock_datetime, patch(
+                "syndicate.features.mlb.live_lens.time.time",
+                return_value=fixed_time,
+            ):
+                mock_datetime.now.return_value = fixed_now
+                os.utime(report_path, (fixed_time - 59.0, fixed_time - 59.0))
+                self.assertFalse(_live_lens_report_needs_refresh("2026-07-03"))
 
     def test_nba_daily_accuracy_uses_local_artifacts_before_source_proxy(self) -> None:
         build_nba_daily_accuracy.cache_clear()

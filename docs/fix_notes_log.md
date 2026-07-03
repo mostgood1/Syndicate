@@ -1,5 +1,26 @@
 # Fix Notes Log
 
+## 2026-07-03 - Betting board no longer drifts into Ask
+- Symptom: The /intelligence page still felt tied to the Ask surface, and board items could jump users into /syndicate instead of staying on the betting board.
+- Root cause: The template still carried Ask-oriented copy and a dead drill-down helper that pointed to /syndicate.
+- Fix: Removed the Ask drill-down wiring from the intelligence template and kept the board copy and interactions on the native intelligence surface.
+- Validation: `python -m pytest tests/test_intelligence_state.py -k "intelligence_home_renders_initial_board_shell or default_intelligence_query_uses_latest_board_snapshot_fallback or board_snapshot_reader_skips_mismatched_dates"` passed.
+- Follow-up: If a future drill-down is added, it should stay within the intelligence surface instead of opening Ask.
+
+## 2026-07-03 - Intelligence betting board now falls back to the latest artifact snapshot
+- Symptom: The /intelligence betting board could render with no opportunities even though the latest board snapshot artifact still contained live and pregame cards.
+- Root cause: The default board request was date-scoped too strictly, so a current-day request could reject an older but still valid artifact-backed snapshot instead of surfacing it.
+- Fix: Keep explicit date queries strict, but let the default "top edges today" board request fall back to the latest artifact-backed board snapshot when the date-scoped cache is empty.
+- Validation: `python -m pytest tests/test_intelligence_state.py -k "default_intelligence_query_uses_latest_board_snapshot_fallback or board_snapshot_reader_skips_mismatched_dates or board_snapshot_promotes_board_contract_cards_into_visible_opportunities"` passed.
+- Follow-up: If the worker stops producing fresh snapshots, this fallback keeps the board usable, but the refresh pipeline still needs to be monitored.
+
+## 2026-07-03 - MLB live lens now refreshes on a 60-second freshness window
+- Symptom: The MLB cards page could keep showing an odds timestamp around 5:05 PM even after the live-lens pipeline had produced newer data, which made interval-related cards look stale.
+- Root cause: The live-lens refresh gate allowed a 180-second stale window by default, so the page could reuse an old report longer than the odds refresh cadence.
+- Fix: Lower the MLB live-lens max-age default to 60 seconds in both the Syndicate wrapper and the vendor frontend, and pin the Render env var to 60 so deployed refreshes match the expected cadence.
+- Validation: `python -m pytest tests/test_live_lens_local.py -k "refreshes_after_sixty_seconds or shared_live_lens_contract_normalizes_refresh_metadata"` passed.
+- Follow-up: If the upstream odds worker slows down again, check the refresh worker first rather than widening the live-lens cache window.
+
 ## 2026-07-03 - WNBA scheduled games no longer flip to Final from stale time alone
 - Symptom: The WNBA cards page could show upcoming games as Final and hide tipoff times even when the live-state row still looked like a 0-0 pregame row.
 - Root cause: The shared WNBA status normalizer promoted stale past-start rows to Final purely from elapsed time, which was too aggressive for rows with no scoring or period evidence.

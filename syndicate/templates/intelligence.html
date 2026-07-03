@@ -401,7 +401,7 @@
         <div>
           <div class="intelligence-card__kicker">Top opportunities</div>
           <h3 class="intelligence-card__title">Shared board output</h3>
-          <p class="intelligence-card__lede">This lane reflects the active response payload that powers Ask, the home command center, and the live board.</p>
+          <p class="intelligence-card__lede">This lane reflects the active response payload that powers the home command center and the live board.</p>
         </div>
       </div>
       <div id="top-opportunities-evidence"></div>
@@ -562,53 +562,6 @@ function escapeHtml(value) {
     '"': "&quot;",
     "'": "&#39;",
   }[char] || char));
-}
-
-function syndicateQuestionForItem(item) {
-  const title = displayTitle(item);
-  const context = displayContext(item);
-  if (title && title !== "—") {
-    return context ? `What do you think about ${title} (${context})?` : `What do you think about ${title}?`;
-  }
-  if (context) {
-    return `What do you think about ${context}?`;
-  }
-  return "What do you think about this pick?";
-}
-
-function syndicateContextForItem(item) {
-  return {
-    sport: String(item && (item.sport_slug || item.sport) || "").trim(),
-    sport_slug: String(item && (item.sport_slug || item.sport) || "").trim(),
-    market: String(item && (item.market || item.market_key || item.market_label) || "").trim(),
-    candidate_type: String(item && item.candidate_type || "").trim(),
-    selection: String(item && (item.selection || item.pick) || "").trim(),
-    matchup: String(item && item.matchup || "").trim(),
-    player_name: String(item && (item.player_name || item.name) || "").trim(),
-    name: String(item && (item.display_name || item.name) || "").trim(),
-  };
-}
-
-function openSyndicateFromItem(item) {
-  const question = syndicateQuestionForItem(item);
-  const url = `/syndicate?question=${encodeURIComponent(question)}`;
-  window.location.assign(url);
-}
-
-function displayContext(item) {
-  const parts = [];
-  const matchup = String(item.matchup || "").trim();
-  const candidateType = String(item.candidate_type || "").trim();
-  const market = String(item.market || "").trim();
-  if (matchup) {
-    parts.push(matchup);
-  }
-  if (candidateType) {
-    parts.push(candidateType.toUpperCase());
-  } else if (market) {
-    parts.push(market);
-  }
-  return parts.join(" · ");
 }
 
 function formatTimestamp(value) {

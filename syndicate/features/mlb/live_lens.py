@@ -23,7 +23,7 @@ from syndicate.features.shared.live_lens_contract import attach_live_lens_contra
 
 
 LIVE_LENS_SNAPSHOT_PATH = Path("data/live/mlb_live_lens.json")
-_LIVE_LENS_REPORT_MAX_AGE_DEFAULT_SECONDS = 180
+_LIVE_LENS_REPORT_MAX_AGE_DEFAULT_SECONDS = 60
 
 
 def _path_age_seconds(path: Path | None) -> float | None:
