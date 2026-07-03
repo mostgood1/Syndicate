@@ -84,6 +84,10 @@ if ($ForceRebuildToday) { $unifiedArgs.ForceRebuildToday = $true }
 
 Push-Location $repoRoot
 try {
+    Write-Host '==> Daily update wrapper starting' -ForegroundColor Cyan
+    Write-Host ("    date: {0}" -f $Date) -ForegroundColor DarkGray
+    $activeSportsText = if ($ActiveSports -and @($ActiveSports).Count -gt 0) { @($ActiveSports) -join ', ' } else { '<none>' }
+    Write-Host ("    active sports: {0}" -f $activeSportsText) -ForegroundColor DarkGray
     Write-Host '==> Unified daily update' -ForegroundColor Cyan
     Write-Host ("    " + (($unifiedArgs.GetEnumerator() | ForEach-Object {
         if ($_.Value -is [System.Collections.IEnumerable] -and -not ($_.Value -is [string])) {

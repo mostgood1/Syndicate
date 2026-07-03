@@ -119,6 +119,7 @@ jobs:
           Write-Host "Using ActiveSports=$(if ($env:DAILY_UPDATE_ACTIVE_SPORTS) { $env:DAILY_UPDATE_ACTIVE_SPORTS } else { '<empty>' })"
           Write-Host "Using BaseUrl=$(if ($env:BASE_URL) { $env:BASE_URL } else { '<empty>' })"
           Write-Host "Using EventSimForceWindowMinutes=$env:EVENT_SIM_FORCE_WINDOW_MINUTES"
+          Write-Host '==> Daily update dispatch summary'
 
           # ✅ Get correct Python path
           $python = $env:PYTHON_PATH.Split("`n")[0].Trim()
@@ -166,6 +167,10 @@ jobs:
           if ($activeSports.Count -eq 0) {
             $scriptPath = './scripts/daily_update_in_season.ps1'
           }
+
+          Write-Host "    script path: $scriptPath"
+          Write-Host ("    active sports count: {0}" -f $activeSports.Count)
+          Write-Host ("    force rebuild today: {0}" -f $forceRebuildToday)
 
           $invocationArgs = @($dailyArgs.GetEnumerator() | ForEach-Object {
             if ($_.Value -is [System.Collections.IEnumerable] -and -not ($_.Value -is [string])) {
