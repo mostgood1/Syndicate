@@ -47,42 +47,51 @@ if ([string]::IsNullOrWhiteSpace($Date)) {
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $python = if ($env:PYTHON_PATH) { $env:PYTHON_PATH.Split("`n")[0].Trim() } else { "python" }
 $unifiedDailyUpdateScript = Join-Path $PSScriptRoot 'unified_daily_update.ps1'
-$unifiedArgs = @(
-    '-Date', $Date
-)
+$unifiedArgs = [ordered]@{
+    Date = $Date
+}
 
-if ($BaseUrl) { $unifiedArgs += @('-BaseUrl', $BaseUrl) }
-if ($Json) { $unifiedArgs += '-Json' }
-if ($RefreshOdds) { $unifiedArgs += '-RefreshOdds' }
-if ($OddsPhase) { $unifiedArgs += @('-OddsPhase', $OddsPhase) }
-if ($OddsSports) { $unifiedArgs += @('-OddsSports', $OddsSports) }
-if ($OddsRegions) { $unifiedArgs += @('-OddsRegions', $OddsRegions) }
-if ($PSBoundParameters.ContainsKey('EventSimForceWindowMinutes')) { $unifiedArgs += @('-EventSimForceWindowMinutes', $EventSimForceWindowMinutes) }
+if ($BaseUrl) { $unifiedArgs.BaseUrl = $BaseUrl }
+if ($Json) { $unifiedArgs.Json = $true }
+if ($RefreshOdds) { $unifiedArgs.RefreshOdds = $true }
+if ($OddsPhase) { $unifiedArgs.OddsPhase = $OddsPhase }
+if ($OddsSports) { $unifiedArgs.OddsSports = $OddsSports }
+if ($OddsRegions) { $unifiedArgs.OddsRegions = $OddsRegions }
+if ($PSBoundParameters.ContainsKey('EventSimForceWindowMinutes')) { $unifiedArgs.EventSimForceWindowMinutes = $EventSimForceWindowMinutes }
 if ($ActiveSports -and @($ActiveSports).Count -gt 0) {
-    $unifiedArgs += '-ActiveSports'
-    $unifiedArgs += @($ActiveSports | ForEach-Object { [string]$_ } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+    $unifiedArgs.ActiveSports = @($ActiveSports | ForEach-Object { [string]$_ } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
 }
-if ($SkipTests) { $unifiedArgs += '-SkipTests' }
-if ($SkipSmoke) { $unifiedArgs += '-SkipSmoke' }
-if ($SkipGitPush) { $unifiedArgs += '-SkipGitPush' }
-if ($WhatIf) { $unifiedArgs += '-DryRun' }
-if ($SkipSourceUpdates) { $unifiedArgs += '-SkipSourceUpdates' }
-if ($SkipRefreshGate) { $unifiedArgs += '-SkipRefreshGate' }
+if ($SkipTests) { $unifiedArgs.SkipTests = $true }
+if ($SkipSmoke) { $unifiedArgs.SkipSmoke = $true }
+if ($SkipGitPush) { $unifiedArgs.SkipGitPush = $true }
+if ($WhatIf) { $unifiedArgs.DryRun = $true }
+if ($SkipSourceUpdates) { $unifiedArgs.SkipSourceUpdates = $true }
+if ($SkipRefreshGate) { $unifiedArgs.SkipRefreshGate = $true }
 if (-not ($ActiveSports -and @($ActiveSports).Count -gt 0)) {
-    if ($SkipNFL) { $unifiedArgs += '-SkipNFL' }
-    if ($SkipNCAAF) { $unifiedArgs += '-SkipNCAAF' }
-    if ($SkipNCAAB) { $unifiedArgs += '-SkipNCAAB' }
-    if ($SkipMLB) { $unifiedArgs += '-SkipMLB' }
-    if ($SkipNBA) { $unifiedArgs += '-SkipNBA' }
-    if ($SkipNHL) { $unifiedArgs += '-SkipNHL' }
-    if ($SkipWNBA) { $unifiedArgs += '-SkipWNBA' }
+    if ($SkipNFL) { $unifiedArgs.SkipNFL = $true }
+    if ($SkipNCAAF) { $unifiedArgs.SkipNCAAF = $true }
+    if ($SkipNCAAB) { $unifiedArgs.SkipNCAAB = $true }
+    if ($SkipMLB) { $unifiedArgs.SkipMLB = $true }
+    if ($SkipNBA) { $unifiedArgs.SkipNBA = $true }
+    if ($SkipNHL) { $unifiedArgs.SkipNHL = $true }
+    if ($SkipWNBA) { $unifiedArgs.SkipWNBA = $true }
 }
-if ($ForceRebuildToday) { $unifiedArgs += '-ForceRebuildToday' }
+if ($ForceRebuildToday) { $unifiedArgs.ForceRebuildToday = $true }
 
 Push-Location $repoRoot
 try {
     Write-Host '==> Unified daily update' -ForegroundColor Cyan
-    Write-Host ("    " + ($unifiedArgs -join ' ')) -ForegroundColor DarkGray
+    Write-Host ("    " + (($unifiedArgs.GetEnumerator() | ForEach-Object {
+        if ($_.Value -is [System.Collections.IEnumerable] -and -not ($_.Value -is [string])) {
+            "-{0} {1}" -f $_.Key, (@($_.Value) -join ' ')
+        }
+        elseif ($_.Value -is [bool]) {
+            if ($_.Value) { "-{0}" -f $_.Key } else { $null }
+        }
+        else {
+            "-{0} {1}" -f $_.Key, $_.Value
+        }
+    } | Where-Object { $_ }) -join ' ')) -ForegroundColor DarkGray
     & $unifiedDailyUpdateScript @unifiedArgs
     if ($LASTEXITCODE -ne 0) {
         throw "Unified daily update failed with exit code $LASTEXITCODE"

@@ -139,31 +139,26 @@ jobs:
             )
           }
 
-          $dailyArgs = @()
-          $dailyArgs += '-Date'
-          $dailyArgs += $env:DATE
-          $dailyArgs += '-RefreshOdds'
-          $dailyArgs += '-OddsPhase'
-          $dailyArgs += 'all'
-          $dailyArgs += '-OddsSports'
-          $dailyArgs += 'all'
-          $dailyArgs += '-OddsRegions'
-          $dailyArgs += 'us'
-          $dailyArgs += '-SkipGitPush'
-          $dailyArgs += '-EventSimForceWindowMinutes'
-          $dailyArgs += $forceWindowMinutes
+          $dailyArgs = [ordered]@{
+            Date = $env:DATE
+            RefreshOdds = $true
+            OddsPhase = 'all'
+            OddsSports = 'all'
+            OddsRegions = 'us'
+            SkipGitPush = $true
+            EventSimForceWindowMinutes = $forceWindowMinutes
+          }
 
           if (-not [string]::IsNullOrWhiteSpace($env:BASE_URL)) {
-            $dailyArgs += @('-BaseUrl', $env:BASE_URL)
+            $dailyArgs.BaseUrl = $env:BASE_URL
           }
 
           if ($activeSports.Count -gt 0) {
-            $dailyArgs += '-ActiveSports'
-            $dailyArgs += $activeSports
+            $dailyArgs.ActiveSports = @($activeSports)
           }
 
           if ($forceRebuildToday) {
-            $dailyArgs += '-ForceRebuildToday'
+            $dailyArgs.ForceRebuildToday = $true
           }
 
           $scriptPath = './scripts/daily_update.ps1'
@@ -171,7 +166,17 @@ jobs:
             $scriptPath = './scripts/daily_update_in_season.ps1'
           }
 
-          Write-Host "Invoking: $scriptPath $($dailyArgs -join ' ')"
+          Write-Host "Invoking: $scriptPath $((($dailyArgs.GetEnumerator() | ForEach-Object {
+            if ($_.Value -is [System.Collections.IEnumerable] -and -not ($_.Value -is [string])) {
+              "-{0} {1}" -f $_.Key, (@($_.Value) -join ' ')
+            }
+            elseif ($_.Value -is [bool]) {
+              if ($_.Value) { "-{0}" -f $_.Key } else { $null }
+            }
+            else {
+              "-{0} {1}" -f $_.Key, $_.Value
+            }
+          } | Where-Object { $_ }) -join ' ')"
           & $scriptPath @dailyArgs 2>&1 | Tee-Object -FilePath daily-update.log
 
           $exitCode = $LASTEXITCODE

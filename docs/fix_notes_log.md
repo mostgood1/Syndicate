@@ -1,5 +1,12 @@
 # Fix Notes Log
 
+## 2026-07-03 - WNBA-only daily update dispatch needed hashtable splatting
+- Symptom: Manual GitHub Actions runs for WNBA-only daily updates kept failing before the daily pipeline step with `Cannot process argument transformation on parameter 'EventSimForceWindowMinutes'` and `-OddsSports` / `-RefreshOdds` being misread as typed values.
+- Root cause: The workflow and wrapper scripts were splatting plain arrays into PowerShell scripts, which is positional binding rather than named parameter binding. That let later flags slide into the `EventSimForceWindowMinutes` slot when WNBA-only dispatch arguments were forwarded.
+- Fix: Add a manual `active_sports` workflow_dispatch input, switch the workflow and both wrapper scripts to ordered hashtable splatting, and keep sport-specific manual runs routed through the direct daily-update path when needed.
+- Validation: A local `powershell.exe -File .\scripts\daily_update.ps1 -Date 2026-07-03 -RefreshOdds -OddsPhase all -OddsSports all -OddsRegions us -SkipGitPush -EventSimForceWindowMinutes 30 -ActiveSports WNBA -WhatIf` run now reaches the WNBA vendored refresh, WNBA source mirror, Syndicate refresh-and-gate, and prediction reconciliation steps without the binder error.
+- Follow-up: Confirm the current GitHub Actions run reaches the same WNBA pipeline stages and then verify the WNBA artifact publish path materializes the expected `recommendations_slate` output.
+
 ## 2026-07-03 - Daily update source refresh was chained to sim execution
 - Symptom: Render could boot with no current WNBA artifact data even though the daily update pipeline was available.
 - Root cause: `scripts/unified_daily_update.ps1` only entered `source_update` when `simExecution` was planned, so a sim no-op could suppress the WNBA refresh and mirror steps entirely.
