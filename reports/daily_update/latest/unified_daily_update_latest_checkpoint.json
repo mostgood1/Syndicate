@@ -2,16 +2,15 @@
     "scope":  "daily_update",
     "date":  "2026-07-03",
     "runMode":  "standard",
-    "overallStatus":  "ok",
-    "generatedAt":  "2026-07-03T03:14:04.1072950+00:00",
-    "updatedAt":  "2026-07-03T03:32:56.2140666+00:00",
-    "runDir":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-03\\20260703_031403",
+    "overallStatus":  "started",
+    "generatedAt":  "2026-07-03T07:04:43.6514858+00:00",
+    "updatedAt":  "2026-07-03T07:04:43.8713098+00:00",
+    "runDir":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-03\\20260703_070443",
     "latestDir":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest",
-    "lastUpdatedAt":  "2026-07-03T03:32:56.0991379+00:00",
-    "currentStage":  "completed",
+    "lastUpdatedAt":  "2026-07-03T07:04:43.8190137+00:00",
+    "currentStage":  "queued",
     "completedStages":  [
-                            "source_update",
-                            "refresh_gate"
+
                         ],
     "failedStage":  null,
     "stageDecisions":  [
@@ -120,12 +119,13 @@
     "replayContext":  {
                           "latestCheckpointLoaded":  true,
                           "latestCheckpointPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest_checkpoint.json",
-                          "latestCheckpointStage":  "queued",
+                          "latestCheckpointStage":  "completed",
                           "latestCheckpointFailedStage":  "",
-                          "latestCheckpointCompletedStageCount":  0,
-                          "latestCheckpointCompletedStages":  {
-
-                                                              },
+                          "latestCheckpointCompletedStageCount":  2,
+                          "latestCheckpointCompletedStages":  [
+                                                                  "source_update",
+                                                                  "refresh_gate"
+                                                              ],
                           "resumeEligible":  false,
                           "resumedFromCheckpoint":  false,
                           "forceRebuildToday":  false
