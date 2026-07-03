@@ -245,10 +245,11 @@ def create_app() -> Flask:
             daemon=True,
         ).start()
 
-    try:
-        app.before_serving(_start_background_loops)
-    except AttributeError:
-        app.before_request(_start_background_loops)
+    if not _is_render_web_dyno():
+        try:
+            app.before_serving(_start_background_loops)
+        except AttributeError:
+            app.before_request(_start_background_loops)
 
     return app
 
