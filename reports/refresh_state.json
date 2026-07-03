@@ -911,6 +911,16 @@
         "trigger": "syndicate_refresh",
         "source_root": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts"
       }
+    },
+    "wnba_artifact_bundle:D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts:2026-07-03:1:1": {
+      "inputHash": "2833f7c1e96deddd42fe1001bd387ff5b27cbbe53844fec54257eef58e21d7e4",
+      "updatedAt": "2026-07-03T20:08:03-05:00",
+      "outputs": [],
+      "metadata": {
+        "date": "2026-07-03",
+        "reused": false,
+        "artifact_root": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts"
+      }
     }
   }
 }

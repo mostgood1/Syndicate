@@ -1,3 +1,2 @@
-==> Unified daily update
-    powershell.exe -ExecutionPolicy Bypass -File D:\a\Syndicate\Syndicate\scripts\unified_daily_update.ps1 -Date 2026-07-03 -BaseUrl WNBA -RefreshOdds -OddsPhase all -OddsSports all -OddsRegions us -ActiveSports MLB -SkipGitPush
-Unified script using Python: C:\hostedtoolcache\windows\Python\3.11.9\x64\python.exe
+To https://github.com/mostgood1/Syndicate
+   35176456..28682b37  wnba-only-daily-update -> wnba-only-daily-update
