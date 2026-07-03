@@ -253,6 +253,58 @@ class HomePageCommandCenterTests(unittest.TestCase):
         self.assertEqual(overview.get("data_warnings"), [])
         self.assertFalse(overview.get("show_on_home"))
 
+    def test_build_sport_overview_treats_missing_wnba_schedule_probe_as_no_games_when_no_local_dates(self) -> None:
+        app = create_app()
+        app.testing = True
+
+        sport = {"slug": "wnba", "name": "WNBA", "primary_label": "Open WNBA cards"}
+
+        with app.app_context():
+            with patch("syndicate.blueprints.home.central_today_iso", return_value="2026-07-03"), patch(
+                "syndicate.blueprints.home.wnba_available_dates",
+                return_value=[],
+            ), patch(
+                "syndicate.blueprints.home.wnba_has_games_for_date",
+                return_value=None,
+            ), patch(
+                "syndicate.blueprints.home.build_wnba_module_links",
+                return_value=[],
+            ), patch(
+                "syndicate.blueprints.home._prefer_today_or_latest",
+                return_value="2026-07-03",
+            ), patch(
+                "syndicate.blueprints.home._load_home_game_items",
+                side_effect=AssertionError("WNBA home should not load game items directly"),
+            ), patch(
+                "syndicate.blueprints.home._load_home_games",
+                side_effect=AssertionError("WNBA home should not load games directly"),
+            ), patch(
+                "syndicate.blueprints.home._load_home_prop_items",
+                side_effect=AssertionError("WNBA home should not load prop items directly"),
+            ), patch(
+                "syndicate.blueprints.home._finalize_home_prop_rows",
+                side_effect=AssertionError("WNBA home should not finalize prop rows directly"),
+            ), patch(
+                "syndicate.blueprints.home._link_lookup_any",
+                return_value=(None, None),
+            ), patch(
+                "syndicate.blueprints.home._link_lookup",
+                return_value=None,
+            ), patch(
+                "syndicate.blueprints.home._secondary_links",
+                return_value=[],
+            ), patch(
+                "syndicate.blueprints.home._rail_links",
+                return_value=[],
+            ), patch(
+                "syndicate.blueprints.home._LOGGER.warning",
+            ) as mocked_warning:
+                overview = _build_sport_overview(sport, "2026-07-03", force_refresh=True)
+
+        mocked_warning.assert_not_called()
+        self.assertEqual(overview.get("data_warnings"), [])
+        self.assertFalse(overview.get("show_on_home"))
+
     def test_prefer_today_or_latest_uses_latest_available_date(self) -> None:
         self.assertEqual(
             _prefer_today_or_latest(["2026-06-26", "2026-06-24"], "2026-06-27"),

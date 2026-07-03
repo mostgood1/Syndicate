@@ -4220,6 +4220,7 @@ def _build_sport_overview(
     hub_href = f"/{slug}/hub"
     season: int | None = None
     selected_week: int | None = None
+    wnba_available_date_set: set[str] = set()
 
     if slug == "mlb":
         dates = available_daily_summary_dates()
@@ -4259,6 +4260,7 @@ def _build_sport_overview(
         ]
     elif slug == "wnba":
         dates = wnba_available_dates()
+        wnba_available_date_set = {str(date_value).strip() for date_value in dates if str(date_value).strip()}
         selected_date = _prefer_today_or_latest(dates, today_value, preserve_requested=preserve_requested_date)
         if selected_date != today_value and _wnba_has_live_games(today_value):
             selected_date = today_value
@@ -4341,29 +4343,41 @@ def _build_sport_overview(
             props_bar["summary"] = "Mirror the standalone MLB pregame props structure by keeping pitcher and hitter top-props lanes distinct on the main Syndicate page."
             props_bar["opportunity_tags"] = ["Pitcher top props", "Hitter top props", "Pregame props"]
     if slug == "wnba":
-        wnba_overview = get_wnba_overview(context_label)
-        if wnba_overview.get("status") == "no_games":
+        wnba_has_games_today = wnba_has_games_for_date(context_label)
+        wnba_no_games_today = wnba_has_games_today is False or (wnba_has_games_today is None and context_label not in wnba_available_date_set)
+        if wnba_no_games_today:
             active_today = False
             game_items = []
             game_count = 0
             home_games = []
             pregame_prop_items = []
             live_prop_items = []
-            source_title = str(wnba_overview.get("source_title") or "WNBA cards unavailable").strip()
-            source_path = str(wnba_overview.get("source_path") or "").strip()
+            source_title = "WNBA cards unavailable"
+            source_path = ""
         else:
-            home_games = list(wnba_overview.get("games") or [])
-            game_items = _compact_game_cards(home_games)
-            game_count = len(game_items)
-            pregame_prop_items = _finalize_home_prop_rows(
-                list(wnba_overview.get("prop_rows") or []),
-                slug=slug,
-                context_label=context_label,
-                home_games=home_games,
-            )
-            live_prop_items = list(pregame_prop_items)
-            source_title = str(wnba_overview.get("source_title") or "WNBA cards").strip()
-            source_path = str(wnba_overview.get("source_path") or "").strip()
+            wnba_overview = get_wnba_overview(context_label)
+            if wnba_overview.get("status") == "no_games":
+                active_today = False
+                game_items = []
+                game_count = 0
+                home_games = []
+                pregame_prop_items = []
+                live_prop_items = []
+                source_title = str(wnba_overview.get("source_title") or "WNBA cards unavailable").strip()
+                source_path = str(wnba_overview.get("source_path") or "").strip()
+            else:
+                home_games = list(wnba_overview.get("games") or [])
+                game_items = _compact_game_cards(home_games)
+                game_count = len(game_items)
+                pregame_prop_items = _finalize_home_prop_rows(
+                    list(wnba_overview.get("prop_rows") or []),
+                    slug=slug,
+                    context_label=context_label,
+                    home_games=home_games,
+                )
+                live_prop_items = list(pregame_prop_items)
+                source_title = str(wnba_overview.get("source_title") or "WNBA cards").strip()
+                source_path = str(wnba_overview.get("source_path") or "").strip()
     else:
         game_items, game_count = _load_home_game_items(
             slug,
@@ -4498,7 +4512,7 @@ def _build_sport_overview(
     overview["props_count"] = props_count
     overview["show_on_home"] = bool(active_game_count or hydrated_game_count or props_count)
     data_warnings: list[str] = []
-    wnba_no_games_today = slug == "wnba" and wnba_has_games_for_date(context_label) is False
+    wnba_no_games_today = slug == "wnba" and not bool(home_games)
     if active_today and active_game_count <= 0 and not wnba_no_games_today:
         data_warnings.append("No game rows surfaced")
     if active_today and hydrated_game_count <= 0 and not wnba_no_games_today:
