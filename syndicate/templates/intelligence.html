@@ -2030,6 +2030,7 @@ function renderTopStrip(recs) {
         ${escapeHtml(part)}
       </span>
     `).join("");
+    const boardWaterfall = Array.isArray(boardContract.waterfall) ? boardContract.waterfall : [];
     const waterfallMarkup = boardWaterfall.length ? `
       <details style="margin-top:12px; padding:12px; border-radius:12px; background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.08);">
         <summary style="cursor:pointer; list-style:none; display:flex; align-items:center; justify-content:space-between; gap:12px; font-size:11px; text-transform:uppercase; letter-spacing:.04em; opacity:.78;">
