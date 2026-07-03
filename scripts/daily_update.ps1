@@ -18,6 +18,7 @@ param(
     [string]$OddsPhase = 'all',
     [string]$OddsSports = 'all',
     [string]$OddsRegions = 'us',
+    [int]$EventSimForceWindowMinutes = 30,
     [string[]]$ActiveSports,
     [switch]$SkipTests,
     [switch]$SkipSmoke,
@@ -56,6 +57,7 @@ if ($RefreshOdds) { $unifiedArgs += '-RefreshOdds' }
 if ($OddsPhase) { $unifiedArgs += @('-OddsPhase', $OddsPhase) }
 if ($OddsSports) { $unifiedArgs += @('-OddsSports', $OddsSports) }
 if ($OddsRegions) { $unifiedArgs += @('-OddsRegions', $OddsRegions) }
+if ($PSBoundParameters.ContainsKey('EventSimForceWindowMinutes')) { $unifiedArgs += @('-EventSimForceWindowMinutes', $EventSimForceWindowMinutes) }
 if ($ActiveSports -and @($ActiveSports).Count -gt 0) {
     $unifiedArgs += '-ActiveSports'
     $unifiedArgs += @($ActiveSports | ForEach-Object { [string]$_ } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
@@ -81,7 +83,8 @@ Push-Location $repoRoot
 try {
     Write-Host '==> Unified daily update' -ForegroundColor Cyan
     Write-Host ("    " + ($unifiedArgs -join ' ')) -ForegroundColor DarkGray
-    & $unifiedArgs[0] $unifiedArgs[1..($unifiedArgs.Length - 1)]
+    $unifiedInvocationArgs = @($unifiedArgs[1..($unifiedArgs.Length - 1)])
+    & $unifiedArgs[0] @unifiedInvocationArgs
     if ($LASTEXITCODE -ne 0) {
         throw "Unified daily update failed with exit code $LASTEXITCODE"
     }
@@ -91,7 +94,8 @@ try {
     )
     Write-Host '==> Prediction reconciliation' -ForegroundColor Cyan
     Write-Host ("    " + ($reconciliationArgs -join ' ')) -ForegroundColor DarkGray
-    & $reconciliationArgs[0] $reconciliationArgs[1..($reconciliationArgs.Length - 1)]
+    $reconciliationInvocationArgs = @($reconciliationArgs[1..($reconciliationArgs.Length - 1)])
+    & $reconciliationArgs[0] @reconciliationInvocationArgs
     if ($LASTEXITCODE -ne 0) {
         throw "Prediction reconciliation failed with exit code $LASTEXITCODE"
     }

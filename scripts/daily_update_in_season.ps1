@@ -372,7 +372,8 @@ function Sync-SportSourceArtifacts {
 
 Push-Location $repoRoot
 try {
-    & $dailyArgs[0] $dailyArgs[1..($dailyArgs.Length - 1)]
+    $dailyInvocationArgs = @($dailyArgs[1..($dailyArgs.Length - 1)])
+    & $dailyArgs[0] @dailyInvocationArgs
     if ($LASTEXITCODE -ne 0) {
         throw "In-season daily update failed with exit code $LASTEXITCODE"
     }
