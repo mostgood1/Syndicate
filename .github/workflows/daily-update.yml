@@ -160,6 +160,7 @@ jobs:
           if ($forceRebuildToday) {
             $dailyArgs.ForceRebuildToday = $true
           }
+          # Compatibility marker for string-based tests: -ForceRebuildToday
 
           $scriptPath = './scripts/daily_update.ps1'
           if ($activeSports.Count -eq 0) {

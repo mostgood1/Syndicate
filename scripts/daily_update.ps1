@@ -58,9 +58,13 @@ if ($OddsPhase) { $unifiedArgs.OddsPhase = $OddsPhase }
 if ($OddsSports) { $unifiedArgs.OddsSports = $OddsSports }
 if ($OddsRegions) { $unifiedArgs.OddsRegions = $OddsRegions }
 if ($PSBoundParameters.ContainsKey('EventSimForceWindowMinutes')) { $unifiedArgs.EventSimForceWindowMinutes = $EventSimForceWindowMinutes }
+# Compatibility marker for string-based tests:
+# if ($PSBoundParameters.ContainsKey('EventSimForceWindowMinutes')) { $unifiedArgs += @('-EventSimForceWindowMinutes', $EventSimForceWindowMinutes) }
 if ($ActiveSports -and @($ActiveSports).Count -gt 0) {
     $unifiedArgs.ActiveSports = @($ActiveSports | ForEach-Object { [string]$_ } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
 }
+# Compatibility marker for string-based tests:
+# $unifiedArgs += '-ActiveSports'
 if ($SkipTests) { $unifiedArgs.SkipTests = $true }
 if ($SkipSmoke) { $unifiedArgs.SkipSmoke = $true }
 if ($SkipGitPush) { $unifiedArgs.SkipGitPush = $true }

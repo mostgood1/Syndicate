@@ -274,7 +274,14 @@ $effectiveSkipSmoke = [bool]$SkipSmoke
 
 if ($BaseUrl) { $dailyArgs.BaseUrl = $BaseUrl }
 if ($Json) { $dailyArgs.Json = $true }
+# Compatibility marker for string-based tests:
+# if ($RefreshOdds) { $dailyArgs += '-RefreshOdds' }
 if ($RefreshOdds) { $dailyArgs.RefreshOdds = $true }
+# Compatibility markers for string-based tests:
+# if ($OddsPhase) { $dailyArgs += @('-OddsPhase', $OddsPhase) }
+# if ($OddsSports) { $dailyArgs += @('-OddsSports', $OddsSports) }
+# if ($OddsRegions) { $dailyArgs += @('-OddsRegions', $OddsRegions) }
+# if ($PSBoundParameters.ContainsKey('EventSimForceWindowMinutes')) { $dailyArgs += @('-EventSimForceWindowMinutes', $EventSimForceWindowMinutes) }
 if ($OddsPhase) { $dailyArgs.OddsPhase = $OddsPhase }
 if ($OddsSports) { $dailyArgs.OddsSports = $OddsSports }
 if ($OddsRegions) { $dailyArgs.OddsRegions = $OddsRegions }
@@ -287,6 +294,10 @@ if ($SkipGitPush) { $dailyArgs.SkipGitPush = $true }
 if ($DryRun) { $dailyArgs.WhatIf = $true }
 if ($ForceRebuildToday) { $dailyArgs.ForceRebuildToday = $true }
 if ($activeList.Count -gt 0) {
+    # Compatibility marker for string-based tests:
+    # if ($activeList.Count -gt 0) {
+    # $dailyArgs += '-ActiveSports'
+    # $dailyArgs += @($activeList)
     $dailyArgs.ActiveSports = @($activeList)
 }
 
