@@ -71,12 +71,6 @@
       {
         "id": 670970,
         "name": "Adrian Morejon",
-        "role": "MR",
-        "lev": 0.5
-      },
-      {
-        "id": 592094,
-        "name": "Jason Adam",
         "role": "SU",
         "lev": 0.7
       },
@@ -376,25 +370,25 @@
         "pos": "2B",
         "bat": "L",
         "throw": "R",
-        "k_rate": 0.18918699186991872,
-        "bb_rate": 0.11008130081300813,
-        "hbp_rate": 0.024390243902439025,
-        "hr_rate": 0.0069105691056910576,
-        "inplay_hit_rate": 0.19673601147776185,
-        "xb_hit_share": 0.11764705882352941,
+        "k_rate": 0.18413023255813954,
+        "bb_rate": 0.10915348837209302,
+        "hbp_rate": 0.024,
+        "hr_rate": 0.017088372093023253,
+        "inplay_hit_rate": 0.18917748917748917,
+        "xb_hit_share": 0.1111111111111111,
         "vs_pitch_type": {},
         "vs_pitch_type_hr": {},
         "platoon_mult_vs_lhp": {
-          "k": 0.8075,
+          "k": 0.808441952106699,
           "bb": 0.8075,
           "hr": 0.78,
-          "inplay": 0.9824998914789251
+          "inplay": 1.0037757437070938
         },
         "platoon_mult_vs_rhp": {
-          "k": 1.0729664190558044,
-          "bb": 1.163758176830555,
-          "hr": 1.262124849939976,
-          "inplay": 0.9999589043142998
+          "k": 1.0900749144762483,
+          "bb": 1.169825172271056,
+          "hr": 0.78,
+          "inplay": 1.0219323254679822
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -565,8 +559,8 @@
         "id": 670970,
         "name": "Adrian Morejon",
         "throw": "L",
-        "role": "MR",
-        "leverage_skill": 0.5,
+        "role": "SU",
+        "leverage_skill": 0.7,
         "stamina_pitches": 25,
         "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
@@ -605,56 +599,13 @@
         "pitch_type_hr_mult": {}
       },
       {
-        "id": 592094,
-        "name": "Jason Adam",
-        "throw": "R",
-        "role": "SU",
-        "leverage_skill": 0.7,
-        "stamina_pitches": 25,
-        "availability_mult": 1.0,
-        "platoon_mult_vs_lhb": {
-          "k": 1.0538294617401514,
-          "bb": 0.8075,
-          "hr": 0.78,
-          "inplay": 0.9852949364513399
-        },
-        "platoon_mult_vs_rhb": {
-          "k": 0.9795119895259788,
-          "bb": 1.1925000000000001,
-          "hr": 1.1482557795778396,
-          "inplay": 1.0019407691724127
-        },
-        "statcast_quality_mult": {},
-        "arsenal_source": "statsapi_pitchArsenal",
-        "arsenal_sample_size": 495,
-        "statcast_splits_found": false,
-        "statcast_splits_source": "",
-        "statcast_splits_n_pitches": 0,
-        "statcast_splits_start_date": "",
-        "statcast_splits_end_date": "",
-        "k_rate": 0.1597988077496274,
-        "bb_rate": 0.05573770491803279,
-        "hbp_rate": 0.01639344262295082,
-        "hr_rate": 0.04847242921013412,
-        "inplay_hit_rate": 0.296824942791762,
-        "arsenal": {
-          "FF": 0.24040403759595966,
-          "OTHER": 0.06464646935353531,
-          "CH": 0.3232323167676769,
-          "SL": 0.37171717628282824
-        },
-        "pitch_type_whiff_mult": {},
-        "pitch_type_inplay_mult": {},
-        "pitch_type_hr_mult": {}
-      },
-      {
         "id": 606996,
         "name": "Kyle Hart",
         "throw": "L",
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.74,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 0.9200000000000002,
           "bb": 0.8130901287553649,
@@ -941,16 +892,16 @@
         "lev": 0.7
       },
       {
+        "id": 801434,
+        "name": "Paul Gervase",
+        "role": "MR",
+        "lev": 0.5
+      },
+      {
         "id": 656945,
         "name": "Tanner Scott",
         "role": "CL",
         "lev": 0.85
-      },
-      {
-        "id": 670090,
-        "name": "Wyatt Mills",
-        "role": "MR",
-        "lev": 0.5
       },
       {
         "id": 694361,
@@ -1552,7 +1503,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.9299999999999999,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 0.8075,
           "bb": 0.9245324979673825,
@@ -1630,6 +1581,49 @@
         "pitch_type_hr_mult": {}
       },
       {
+        "id": 801434,
+        "name": "Paul Gervase",
+        "throw": "R",
+        "role": "MR",
+        "leverage_skill": 0.5,
+        "stamina_pitches": 25,
+        "availability_mult": 1.0,
+        "platoon_mult_vs_lhb": {
+          "k": 1.0275,
+          "bb": 0.8075,
+          "hr": 1.0,
+          "inplay": 0.8075
+        },
+        "platoon_mult_vs_rhb": {
+          "k": 0.9633333333333334,
+          "bb": 1.1925000000000001,
+          "hr": 1.0,
+          "inplay": 1.1925000000000001
+        },
+        "statcast_quality_mult": {},
+        "arsenal_source": "statsapi_pitchArsenal",
+        "arsenal_sample_size": 71,
+        "statcast_splits_found": false,
+        "statcast_splits_source": "",
+        "statcast_splits_n_pitches": 0,
+        "statcast_splits_start_date": "",
+        "statcast_splits_end_date": "",
+        "k_rate": 0.23809523809523808,
+        "bb_rate": 0.09523809523809523,
+        "hbp_rate": 0.0,
+        "hr_rate": 0.0,
+        "inplay_hit_rate": 0.3571428571428571,
+        "arsenal": {
+          "FF": 0.5070422268732381,
+          "CH": 0.014084507746478911,
+          "SL": 0.35211269866197303,
+          "FC": 0.12676056671831004
+        },
+        "pitch_type_whiff_mult": {},
+        "pitch_type_inplay_mult": {},
+        "pitch_type_hr_mult": {}
+      },
+      {
         "id": 656945,
         "name": "Tanner Scott",
         "throw": "L",
@@ -1665,49 +1659,6 @@
         "arsenal": {
           "FF": 0.49148935,
           "SL": 0.50851065
-        },
-        "pitch_type_whiff_mult": {},
-        "pitch_type_inplay_mult": {},
-        "pitch_type_hr_mult": {}
-      },
-      {
-        "id": 670090,
-        "name": "Wyatt Mills",
-        "throw": "R",
-        "role": "MR",
-        "leverage_skill": 0.5,
-        "stamina_pitches": 24,
-        "availability_mult": 1.0,
-        "platoon_mult_vs_lhb": {
-          "k": 1.1925000000000001,
-          "bb": 0.8075,
-          "hr": 1.0,
-          "inplay": 1.006420233463035
-        },
-        "platoon_mult_vs_rhb": {
-          "k": 0.8625,
-          "bb": 1.157142857142857,
-          "hr": 1.0,
-          "inplay": 1.006420233463035
-        },
-        "statcast_quality_mult": {},
-        "arsenal_source": "statsapi_pitchArsenal",
-        "arsenal_sample_size": 96,
-        "statcast_splits_found": false,
-        "statcast_splits_source": "",
-        "statcast_splits_n_pitches": 0,
-        "statcast_splits_start_date": "",
-        "statcast_splits_end_date": "",
-        "k_rate": 0.16666666666666666,
-        "bb_rate": 0.2916666666666667,
-        "hbp_rate": 0.041666666666666664,
-        "hr_rate": 0.0,
-        "inplay_hit_rate": 0.24711538461538463,
-        "arsenal": {
-          "FF": 0.20833333,
-          "OTHER": 0.14583333,
-          "SI": 0.33333334,
-          "SL": 0.3125
         },
         "pitch_type_whiff_mult": {},
         "pitch_type_inplay_mult": {},

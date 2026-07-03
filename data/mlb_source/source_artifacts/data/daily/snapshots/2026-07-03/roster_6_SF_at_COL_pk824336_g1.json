@@ -41,7 +41,6 @@
     },
     "confirmed_lineup_ids": [],
     "projected_lineup_ids": [
-      656305,
       805811,
       669477,
       646240,
@@ -49,10 +48,11 @@
       808982,
       682674,
       813841,
-      683766
+      683766,
+      701852
     ],
     "lineup_source": "projected_rotowire_today_lineup",
-    "lineup_confidence": 0.48000000000000004,
+    "lineup_confidence": 0.44,
     "probable_pitcher": {
       "id": null,
       "source": "none",
@@ -112,35 +112,6 @@
       }
     ],
     "lineup": [
-      {
-        "id": 656305,
-        "name": "Matt Chapman",
-        "pos": "3B",
-        "bat": "R",
-        "throw": "R",
-        "k_rate": 0.2286854103343465,
-        "bb_rate": 0.10784194528875381,
-        "hbp_rate": 0.015197568389057751,
-        "hr_rate": 0.02558510638297872,
-        "inplay_hit_rate": 0.28046796796796797,
-        "xb_hit_share": 0.2608695652173913,
-        "vs_pitch_type": {},
-        "vs_pitch_type_hr": {},
-        "platoon_mult_vs_lhp": {
-          "k": 0.9813484044711128,
-          "bb": 1.1925000000000001,
-          "hr": 0.9499274766716628,
-          "inplay": 1.042002491592978
-        },
-        "platoon_mult_vs_rhp": {
-          "k": 0.9943530329539448,
-          "bb": 0.8697577259082958,
-          "hr": 0.8923226645448867,
-          "inplay": 1.0034133721256444
-        },
-        "statcast_quality_mult": {},
-        "vs_pitcher_history": {}
-      },
       {
         "id": 805811,
         "name": "Bryce Eldridge",
@@ -372,9 +343,7 @@
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
-      }
-    ],
-    "bench": [
+      },
       {
         "id": 701852,
         "name": "Drew Cavanaugh",
@@ -398,7 +367,9 @@
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
-      },
+      }
+    ],
+    "bench": [
       {
         "id": 687551,
         "name": "Drew Gilbert",
@@ -568,7 +539,7 @@
         "role": "CL",
         "leverage_skill": 0.85,
         "stamina_pitches": 25,
-        "availability_mult": 0.95,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 0.8936080903970812,
           "bb": 0.9137523606989256,
@@ -611,7 +582,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.935,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 1.1925000000000001,
           "bb": 0.8075,
@@ -655,7 +626,7 @@
         "role": "SU",
         "leverage_skill": 0.7,
         "stamina_pitches": 25,
-        "availability_mult": 0.9,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 1.0625249264077485,
           "bb": 0.8075,
@@ -785,7 +756,7 @@
         "role": "SU",
         "leverage_skill": 0.7,
         "stamina_pitches": 25,
-        "availability_mult": 0.9400000000000001,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 1.1033036377134373,
           "bb": 1.1925000000000001,
@@ -895,18 +866,18 @@
     "lineup_source": "projected_rotowire_default_vs_rhp",
     "lineup_confidence": 0.58,
     "probable_pitcher": {
-      "id": null,
-      "source": "none",
-      "confidence": 0.0,
-      "raw_schedule_id": null,
-      "raw_feed_id": null
+      "id": 663372,
+      "source": "feed_gameData_probablePitchers",
+      "confidence": 0.75,
+      "raw_schedule_id": 663372,
+      "raw_feed_id": 663372
     },
     "starter": {
-      "id": 547179,
-      "name": "Michael Lorenzen",
+      "id": 663372,
+      "name": "Ryan Feltner",
       "role": "SP",
-      "selection_source": "heuristic",
-      "requested_id": null
+      "selection_source": "probable",
+      "requested_id": 663372
     },
     "bullpen": [
       {
@@ -916,8 +887,8 @@
         "lev": 0.7
       },
       {
-        "id": 605154,
-        "name": "John Brebbia",
+        "id": 687312,
+        "name": "Gabriel Hughes",
         "role": "MR",
         "lev": 0.5
       },
@@ -1328,46 +1299,45 @@
       }
     ],
     "starter_profile": {
-      "id": 547179,
-      "name": "Michael Lorenzen",
+      "id": 663372,
+      "name": "Ryan Feltner",
       "throw": "R",
       "role": "SP",
       "leverage_skill": 0.5,
-      "stamina_pitches": 91,
+      "stamina_pitches": 94,
       "availability_mult": 1.0,
       "platoon_mult_vs_lhb": {
-        "k": 0.9679424772638366,
-        "bb": 1.12505556638721,
-        "hr": 1.275,
-        "inplay": 1.1063273442702606
+        "k": 1.1925000000000001,
+        "bb": 0.8075,
+        "hr": 1.1841704742130206,
+        "inplay": 0.9220075474280575
       },
       "platoon_mult_vs_rhb": {
-        "k": 0.9765271592074362,
-        "bb": 0.9217929787181329,
-        "hr": 0.78,
-        "inplay": 0.9172837684358244
+        "k": 0.8515758919977116,
+        "bb": 0.9705705249316771,
+        "hr": 1.267060689043523,
+        "inplay": 1.1801366749277764
       },
       "statcast_quality_mult": {},
       "arsenal_source": "statsapi_pitchArsenal",
-      "arsenal_sample_size": 1400,
+      "arsenal_sample_size": 742,
       "statcast_splits_found": false,
       "statcast_splits_source": "",
       "statcast_splits_n_pitches": 0,
       "statcast_splits_start_date": "",
       "statcast_splits_end_date": "",
-      "k_rate": 0.18467721438556362,
-      "bb_rate": 0.07084762994027195,
-      "hbp_rate": 0.01092896174863388,
-      "hr_rate": 0.03484241962129876,
-      "inplay_hit_rate": 0.4154170552694538,
+      "k_rate": 0.17672311348781936,
+      "bb_rate": 0.1022451404804346,
+      "hbp_rate": 0.005050505050505051,
+      "hr_rate": 0.03257151345386639,
+      "inplay_hit_rate": 0.28248135874067937,
       "arsenal": {
-        "FF": 0.20285713797142862,
-        "OTHER": 0.0771428592285714,
-        "CU": 0.13571428864285712,
-        "CH": 0.19071427809285724,
-        "SI": 0.15642857843571423,
-        "SL": 0.09499999905000002,
-        "FC": 0.14214285857857142
+        "FF": 0.2587601,
+        "OTHER": 0.11859838,
+        "CU": 0.08625337,
+        "CH": 0.15633424,
+        "SI": 0.13072777,
+        "SL": 0.24932614
       },
       "pitch_type_whiff_mult": {},
       "pitch_type_inplay_mult": {},
@@ -1420,43 +1390,34 @@
         "pitch_type_hr_mult": {}
       },
       {
-        "id": 605154,
-        "name": "John Brebbia",
+        "id": 687312,
+        "name": "Gabriel Hughes",
         "throw": "R",
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
         "availability_mult": 1.0,
-        "platoon_mult_vs_lhb": {
-          "k": 0.8075,
-          "bb": 1.0,
-          "hr": 1.0,
-          "inplay": 1.11
-        },
-        "platoon_mult_vs_rhb": {
-          "k": 1.1925000000000001,
-          "bb": 1.0,
-          "hr": 1.0,
-          "inplay": 0.8075
-        },
+        "platoon_mult_vs_lhb": {},
+        "platoon_mult_vs_rhb": {},
         "statcast_quality_mult": {},
-        "arsenal_source": "statsapi_pitchArsenal",
-        "arsenal_sample_size": 24,
+        "arsenal_source": "default",
+        "arsenal_sample_size": 0,
         "statcast_splits_found": false,
         "statcast_splits_source": "",
         "statcast_splits_n_pitches": 0,
         "statcast_splits_start_date": "",
         "statcast_splits_end_date": "",
-        "k_rate": 0.14285714285714285,
-        "bb_rate": 0.0,
-        "hbp_rate": 0.0,
-        "hr_rate": 0.0,
-        "inplay_hit_rate": 0.16666666666666666,
+        "k_rate": 0.24,
+        "bb_rate": 0.08,
+        "hbp_rate": 0.008,
+        "hr_rate": 0.03,
+        "inplay_hit_rate": 0.0,
         "arsenal": {
-          "FF": 0.37499999850000004,
-          "OTHER": 0.08333333566666666,
-          "CH": 0.04166666783333333,
-          "SL": 0.49999999800000006
+          "FF": 0.45,
+          "SL": 0.22,
+          "CH": 0.12,
+          "SI": 0.13,
+          "CU": 0.08
         },
         "pitch_type_whiff_mult": {},
         "pitch_type_inplay_mult": {},
@@ -1469,7 +1430,7 @@
         "role": "CL",
         "leverage_skill": 0.85,
         "stamina_pitches": 25,
-        "availability_mult": 0.875,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 1.0539697090474291,
           "bb": 0.962942371160193,
@@ -1555,7 +1516,7 @@
         "role": "SU",
         "leverage_skill": 0.7,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.9,
         "platoon_mult_vs_lhb": {
           "k": 1.1518177096857958,
           "bb": 0.8075,
@@ -1599,7 +1560,7 @@
         "role": "LR",
         "leverage_skill": 0.35,
         "stamina_pitches": 33,
-        "availability_mult": 1.0,
+        "availability_mult": 0.7833333333333333,
         "platoon_mult_vs_lhb": {
           "k": 1.1710728690263392,
           "bb": 1.0858994122747856,

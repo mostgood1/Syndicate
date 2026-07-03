@@ -54,18 +54,18 @@
     "lineup_source": "projected_rotowire_today_lineup",
     "lineup_confidence": 0.72,
     "probable_pitcher": {
-      "id": null,
-      "source": "none",
-      "confidence": 0.0,
-      "raw_schedule_id": null,
-      "raw_feed_id": null
+      "id": 607259,
+      "source": "feed_gameData_probablePitchers",
+      "confidence": 0.75,
+      "raw_schedule_id": 607259,
+      "raw_feed_id": 607259
     },
     "starter": {
-      "id": 656876,
-      "name": "Drew Rasmussen",
+      "id": 607259,
+      "name": "Nick Martinez",
       "role": "SP",
-      "selection_source": "heuristic",
-      "requested_id": null
+      "selection_source": "probable",
+      "requested_id": 607259
     },
     "bullpen": [
       {
@@ -499,45 +499,45 @@
       }
     ],
     "starter_profile": {
-      "id": 656876,
-      "name": "Drew Rasmussen",
+      "id": 607259,
+      "name": "Nick Martinez",
       "throw": "R",
       "role": "SP",
       "leverage_skill": 0.5,
-      "stamina_pitches": 91,
+      "stamina_pitches": 94,
       "availability_mult": 1.0,
       "platoon_mult_vs_lhb": {
-        "k": 0.9282563569641183,
+        "k": 1.0411027588207766,
         "bb": 1.1925000000000001,
-        "hr": 1.275,
-        "inplay": 1.1925000000000001
+        "hr": 0.9787438532474197,
+        "inplay": 0.9741008987577016
       },
       "platoon_mult_vs_rhb": {
-        "k": 0.8933360515349922,
-        "bb": 0.8580843414468251,
-        "hr": 0.9346995008511497,
-        "inplay": 0.8075
+        "k": 0.960153711061084,
+        "bb": 0.8075,
+        "hr": 0.9291513263221446,
+        "inplay": 1.0106453491812828
       },
       "statcast_quality_mult": {},
       "arsenal_source": "statsapi_pitchArsenal",
-      "arsenal_sample_size": 1307,
+      "arsenal_sample_size": 1242,
       "statcast_splits_found": false,
       "statcast_splits_source": "",
       "statcast_splits_n_pitches": 0,
       "statcast_splits_start_date": "",
       "statcast_splits_end_date": "",
-      "k_rate": 0.27568753273965424,
-      "bb_rate": 0.044925353588266104,
-      "hbp_rate": 0.006024096385542169,
-      "hr_rate": 0.025216081718177057,
-      "inplay_hit_rate": 0.2669247787610619,
+      "k_rate": 0.1487043362043362,
+      "bb_rate": 0.04577888327888328,
+      "hbp_rate": 0.005494505494505495,
+      "hr_rate": 0.02374888624888625,
+      "inplay_hit_rate": 0.3024788015828151,
       "arsenal": {
-        "FF": 0.26778883,
-        "OTHER": 0.030604437,
-        "CU": 0.044376433,
-        "CH": 0.11476664,
-        "SI": 0.21805662,
-        "FC": 0.32440704
+        "FF": 0.1175523278840581,
+        "CU": 0.07326891868115946,
+        "CH": 0.28180354492753623,
+        "SI": 0.30676329447826073,
+        "SL": 0.02898550747826087,
+        "FC": 0.1916264065507247
       },
       "pitch_type_whiff_mult": {},
       "pitch_type_inplay_mult": {},
@@ -551,7 +551,7 @@
         "role": "CL",
         "leverage_skill": 0.85,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.9333333333333333,
         "platoon_mult_vs_lhb": {
           "k": 0.8792609966687063,
           "bb": 1.0242296918767506,
@@ -593,7 +593,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.875,
         "platoon_mult_vs_lhb": {
           "k": 1.1925000000000001,
           "bb": 1.1925000000000001,
@@ -636,7 +636,7 @@
         "role": "SU",
         "leverage_skill": 0.7,
         "stamina_pitches": 25,
-        "availability_mult": 0.915,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 1.0059950457469335,
           "bb": 1.0258157100834329,
@@ -723,7 +723,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.91,
+        "availability_mult": 0.9166666666666666,
         "platoon_mult_vs_lhb": {
           "k": 0.9189746343881682,
           "bb": 1.1925000000000001,
@@ -766,7 +766,7 @@
         "role": "SU",
         "leverage_skill": 0.7,
         "stamina_pitches": 25,
-        "availability_mult": 0.965,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 0.8075,
           "bb": 1.1925000000000001,
@@ -854,7 +854,7 @@
         "role": "LR",
         "leverage_skill": 0.35,
         "stamina_pitches": 26,
-        "availability_mult": 1.0,
+        "availability_mult": 0.35,
         "platoon_mult_vs_lhb": {
           "k": 1.1169800235017626,
           "bb": 0.8075,
@@ -968,12 +968,6 @@
         "name": "Josh Hader",
         "role": "SU",
         "lev": 0.7
-      },
-      {
-        "id": 699044,
-        "name": "Miguel Ullola",
-        "role": "MR",
-        "lev": 0.5
       },
       {
         "id": 663878,
@@ -1422,7 +1416,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 27,
-        "availability_mult": 0.765,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 1.0298171644593983,
           "bb": 1.0839489587202331,
@@ -1466,7 +1460,7 @@
         "role": "CL",
         "leverage_skill": 0.85,
         "stamina_pitches": 25,
-        "availability_mult": 0.8300000000000001,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 0.9039429717086211,
           "bb": 1.1925000000000001,
@@ -1628,56 +1622,13 @@
         "pitch_type_hr_mult": {}
       },
       {
-        "id": 699044,
-        "name": "Miguel Ullola",
-        "throw": "R",
-        "role": "MR",
-        "leverage_skill": 0.5,
-        "stamina_pitches": 25,
-        "availability_mult": 0.885,
-        "platoon_mult_vs_lhb": {
-          "k": 0.9388888888888889,
-          "bb": 1.0,
-          "hr": 1.0,
-          "inplay": 0.835
-        },
-        "platoon_mult_vs_rhb": {
-          "k": 1.1099999999999999,
-          "bb": 1.0,
-          "hr": 1.0,
-          "inplay": 1.1925000000000001
-        },
-        "statcast_quality_mult": {},
-        "arsenal_source": "statsapi_pitchArsenal",
-        "arsenal_sample_size": 53,
-        "statcast_splits_found": false,
-        "statcast_splits_source": "",
-        "statcast_splits_n_pitches": 0,
-        "statcast_splits_start_date": "",
-        "statcast_splits_end_date": "",
-        "k_rate": 0.5,
-        "bb_rate": 0.0,
-        "hbp_rate": 0.0,
-        "hr_rate": 0.0,
-        "inplay_hit_rate": 0.2857142857142857,
-        "arsenal": {
-          "FF": 0.7358490639433959,
-          "CU": 0.05660377122641521,
-          "CH": 0.01886792407547172,
-          "SL": 0.18867924075471718
-        },
-        "pitch_type_whiff_mult": {},
-        "pitch_type_inplay_mult": {},
-        "pitch_type_hr_mult": {}
-      },
-      {
         "id": 663878,
         "name": "Nate Pearson",
         "throw": "R",
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.86,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 1.0019178612940722,
           "bb": 0.8472023422251138,

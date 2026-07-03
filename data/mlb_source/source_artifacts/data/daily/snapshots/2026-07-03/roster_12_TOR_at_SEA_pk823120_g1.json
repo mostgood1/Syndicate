@@ -52,7 +52,7 @@
       664702
     ],
     "lineup_source": "projected_rotowire_default_vs_lhp",
-    "lineup_confidence": 0.58,
+    "lineup_confidence": 0.56,
     "probable_pitcher": {
       "id": 656302,
       "source": "feed_gameData_probablePitchers",
@@ -800,7 +800,7 @@
         "role": "SU",
         "leverage_skill": 0.7,
         "stamina_pitches": 25,
-        "availability_mult": 0.9299999999999999,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 1.0246393318147304,
           "bb": 1.121288209606987,
@@ -868,18 +868,18 @@
     "lineup_source": "projected_rotowire_today_lineup",
     "lineup_confidence": 0.72,
     "probable_pitcher": {
-      "id": null,
-      "source": "none",
-      "confidence": 0.0,
-      "raw_schedule_id": null,
-      "raw_feed_id": null
+      "id": 622491,
+      "source": "feed_gameData_probablePitchers",
+      "confidence": 0.75,
+      "raw_schedule_id": 622491,
+      "raw_feed_id": 622491
     },
     "starter": {
-      "id": 669923,
-      "name": "George Kirby",
+      "id": 622491,
+      "name": "Luis Castillo",
       "role": "SP",
-      "selection_source": "heuristic",
-      "requested_id": null
+      "selection_source": "probable",
+      "requested_id": 622491
     },
     "bullpen": [
       {
@@ -1307,45 +1307,44 @@
       }
     ],
     "starter_profile": {
-      "id": 669923,
-      "name": "George Kirby",
+      "id": 622491,
+      "name": "Luis Castillo",
       "throw": "R",
       "role": "SP",
       "leverage_skill": 0.5,
-      "stamina_pitches": 94,
+      "stamina_pitches": 103,
       "availability_mult": 1.0,
       "platoon_mult_vs_lhb": {
-        "k": 0.8877586342537959,
-        "bb": 1.1925000000000001,
-        "hr": 1.0907348872825464,
-        "inplay": 0.8885938505296853
+        "k": 0.8831434654804085,
+        "bb": 1.092024288548695,
+        "hr": 1.275,
+        "inplay": 0.9867373703813804
       },
       "platoon_mult_vs_rhb": {
-        "k": 1.0519181220989693,
-        "bb": 0.8075,
-        "hr": 0.970597095917069,
-        "inplay": 1.000554544893534
+        "k": 1.135154209032646,
+        "bb": 0.8894274632286959,
+        "hr": 0.78,
+        "inplay": 1.0632080172367921
       },
       "statcast_quality_mult": {},
       "arsenal_source": "statsapi_pitchArsenal",
-      "arsenal_sample_size": 1482,
+      "arsenal_sample_size": 1293,
       "statcast_splits_found": false,
       "statcast_splits_source": "",
       "statcast_splits_n_pitches": 0,
       "statcast_splits_start_date": "",
       "statcast_splits_end_date": "",
-      "k_rate": 0.20940001976870615,
-      "bb_rate": 0.055585483180125864,
-      "hbp_rate": 0.004975124378109453,
-      "hr_rate": 0.022009983196599782,
-      "inplay_hit_rate": 0.36755393710385176,
+      "k_rate": 0.2189288163489233,
+      "bb_rate": 0.07877383075024003,
+      "hbp_rate": 0.015772870662460567,
+      "hr_rate": 0.026741187765738583,
+      "inplay_hit_rate": 0.3279071100917431,
       "arsenal": {
-        "FF": 0.303643726659919,
-        "OTHER": 0.29487179675641023,
-        "CH": 0.06680161926518219,
-        "SI": 0.20445343775101216,
-        "KC": 0.09784075492375169,
-        "FC": 0.03238866464372468
+        "FF": 0.46094355442505813,
+        "CH": 0.11987626115081211,
+        "SI": 0.16318639156658934,
+        "SL": 0.2544470024426912,
+        "FC": 0.0015467904148491881
       },
       "pitch_type_whiff_mult": {},
       "pitch_type_inplay_mult": {},

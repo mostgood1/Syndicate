@@ -54,18 +54,18 @@
     "lineup_source": "projected_rotowire_default_vs_rhp",
     "lineup_confidence": 0.66,
     "probable_pitcher": {
-      "id": null,
-      "source": "none",
-      "confidence": 0.0,
-      "raw_schedule_id": null,
-      "raw_feed_id": null
+      "id": 663969,
+      "source": "feed_gameData_probablePitchers",
+      "confidence": 0.75,
+      "raw_schedule_id": 663969,
+      "raw_feed_id": 663969
     },
     "starter": {
-      "id": 645261,
-      "name": "Sandy Alcantara",
+      "id": 663969,
+      "name": "Tyler Phillips",
       "role": "SP",
-      "selection_source": "heuristic",
-      "requested_id": null
+      "selection_source": "probable",
+      "requested_id": 663969
     },
     "bullpen": [
       {
@@ -111,8 +111,8 @@
         "lev": 0.5
       },
       {
-        "id": 663969,
-        "name": "Tyler Phillips",
+        "id": 669199,
+        "name": "Lake Bachar",
         "role": "SU",
         "lev": 0.7
       }
@@ -494,46 +494,44 @@
       }
     ],
     "starter_profile": {
-      "id": 645261,
-      "name": "Sandy Alcantara",
+      "id": 663969,
+      "name": "Tyler Phillips",
       "throw": "R",
       "role": "SP",
       "leverage_skill": 0.5,
-      "stamina_pitches": 97,
+      "stamina_pitches": 94,
       "availability_mult": 1.0,
       "platoon_mult_vs_lhb": {
-        "k": 0.9047029702970297,
-        "bb": 1.127217189804087,
-        "hr": 1.1402719790051294,
-        "inplay": 1.026847985029588
+        "k": 1.0657055023737256,
+        "bb": 1.036317006212975,
+        "hr": 0.9149622595568542,
+        "inplay": 1.0435819290068125
       },
       "platoon_mult_vs_rhb": {
-        "k": 1.0123469387755102,
-        "bb": 0.9152988855116515,
-        "hr": 0.8565158593557904,
-        "inplay": 0.9932629753154447
+        "k": 0.9399513281488533,
+        "bb": 0.9673385348938015,
+        "hr": 0.9864949148732932,
+        "inplay": 0.9385946490464239
       },
       "statcast_quality_mult": {},
       "arsenal_source": "statsapi_pitchArsenal",
-      "arsenal_sample_size": 1653,
+      "arsenal_sample_size": 948,
       "statcast_splits_found": false,
       "statcast_splits_source": "",
       "statcast_splits_n_pitches": 0,
       "statcast_splits_start_date": "",
       "statcast_splits_end_date": "",
-      "k_rate": 0.17964071856287425,
-      "bb_rate": 0.056287425149700594,
-      "hbp_rate": 0.013071895424836602,
-      "hr_rate": 0.02761144377910845,
-      "inplay_hit_rate": 0.31579481912587015,
+      "k_rate": 0.19189068100358422,
+      "bb_rate": 0.11812596006144392,
+      "hbp_rate": 0.003968253968253968,
+      "hr_rate": 0.02628648233486943,
+      "inplay_hit_rate": 0.2948202959830867,
       "arsenal": {
-        "FF": 0.19056261904718685,
-        "OTHER": 0.08106472959467634,
-        "CU": 0.04053236479733817,
-        "CH": 0.22565032887174832,
-        "SI": 0.24258923878705377,
-        "SL": 0.08166968959165154,
-        "FC": 0.13793102931034484
+        "FF": 0.09071729909282701,
+        "OTHER": 0.23839662761603372,
+        "CU": 0.16772151832278484,
+        "SI": 0.25949367740506324,
+        "FS": 0.24367087756329125
       },
       "pitch_type_whiff_mult": {},
       "pitch_type_inplay_mult": {},
@@ -547,7 +545,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 26,
-        "availability_mult": 1.0,
+        "availability_mult": 0.7166666666666667,
         "platoon_mult_vs_lhb": {
           "k": 1.1925000000000001,
           "bb": 0.91267087276551,
@@ -592,7 +590,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.8833333333333333,
         "platoon_mult_vs_lhb": {
           "k": 1.0624967393703473,
           "bb": 0.919499815430048,
@@ -637,7 +635,7 @@
         "role": "SU",
         "leverage_skill": 0.7,
         "stamina_pitches": 25,
-        "availability_mult": 0.975,
+        "availability_mult": 0.7666666666666666,
         "platoon_mult_vs_lhb": {
           "k": 0.9825884543761639,
           "bb": 0.8075,
@@ -767,7 +765,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.9299999999999999,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 0.8075,
           "bb": 1.1925000000000001,
@@ -838,44 +836,45 @@
         "pitch_type_hr_mult": {}
       },
       {
-        "id": 663969,
-        "name": "Tyler Phillips",
+        "id": 669199,
+        "name": "Lake Bachar",
         "throw": "R",
         "role": "SU",
         "leverage_skill": 0.7,
-        "stamina_pitches": 35,
+        "stamina_pitches": 26,
         "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
-          "k": 1.0657055023737256,
-          "bb": 1.036317006212975,
-          "hr": 0.9149622595568542,
-          "inplay": 1.0435819290068125
+          "k": 0.9373803307223673,
+          "bb": 1.025117370892019,
+          "hr": 1.1166666666666667,
+          "inplay": 1.0857321478188386
         },
         "platoon_mult_vs_rhb": {
-          "k": 0.9399513281488533,
-          "bb": 0.9673385348938015,
-          "hr": 0.9864949148732932,
-          "inplay": 0.9385946490464239
+          "k": 1.0866405570060922,
+          "bb": 0.8115023474178404,
+          "hr": 1.275,
+          "inplay": 0.8826510450433762
         },
         "statcast_quality_mult": {},
         "arsenal_source": "statsapi_pitchArsenal",
-        "arsenal_sample_size": 948,
+        "arsenal_sample_size": 695,
         "statcast_splits_found": false,
         "statcast_splits_source": "",
         "statcast_splits_n_pitches": 0,
         "statcast_splits_start_date": "",
         "statcast_splits_end_date": "",
-        "k_rate": 0.19189068100358422,
-        "bb_rate": 0.11812596006144392,
-        "hbp_rate": 0.003968253968253968,
-        "hr_rate": 0.02628648233486943,
-        "inplay_hit_rate": 0.2948202959830867,
+        "k_rate": 0.2735714285714286,
+        "bb_rate": 0.10142857142857142,
+        "hbp_rate": 0.01764705882352941,
+        "hr_rate": 0.024999999999999998,
+        "inplay_hit_rate": 0.24718406593406592,
         "arsenal": {
-          "FF": 0.09071729909282701,
-          "OTHER": 0.23839662761603372,
-          "CU": 0.16772151832278484,
-          "SI": 0.25949367740506324,
-          "FS": 0.24367087756329125
+          "FF": 0.3194244551107913,
+          "OTHER": 0.18129496290071942,
+          "CU": 0.12805755204892083,
+          "SI": 0.021582734345323748,
+          "SL": 0.2402877738446044,
+          "FS": 0.10935252174964034
         },
         "pitch_type_whiff_mult": {},
         "pitch_type_inplay_mult": {},
@@ -946,6 +945,12 @@
         "lev": 0.85
       },
       {
+        "id": 660761,
+        "name": "Jos\u00e9 Suarez",
+        "role": "SU",
+        "lev": 0.7
+      },
+      {
         "id": 686993,
         "name": "Justin Sterner",
         "role": "MR",
@@ -960,18 +965,12 @@
       {
         "id": 665622,
         "name": "Luis Medina",
-        "role": "SU",
-        "lev": 0.7
-      },
-      {
-        "id": 686930,
-        "name": "Mason Barnett",
         "role": "MR",
         "lev": 0.5
       },
       {
-        "id": 640454,
-        "name": "Matt Krook",
+        "id": 686930,
+        "name": "Mason Barnett",
         "role": "MR",
         "lev": 0.5
       }
@@ -1496,7 +1495,7 @@
         "role": "CL",
         "leverage_skill": 0.85,
         "stamina_pitches": 25,
-        "availability_mult": 0.915,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 1.0472005576798311,
           "bb": 1.0076142056739692,
@@ -1528,6 +1527,51 @@
           "CH": 0.05801105000000001,
           "SL": 0.10497238000000002,
           "FC": 0.015193370000000001
+        },
+        "pitch_type_whiff_mult": {},
+        "pitch_type_inplay_mult": {},
+        "pitch_type_hr_mult": {}
+      },
+      {
+        "id": 660761,
+        "name": "Jos\u00e9 Suarez",
+        "throw": "L",
+        "role": "SU",
+        "leverage_skill": 0.7,
+        "stamina_pitches": 28,
+        "availability_mult": 1.0,
+        "platoon_mult_vs_lhb": {
+          "k": 1.0424739264005907,
+          "bb": 0.9255997066672715,
+          "hr": 1.1157702807317769,
+          "inplay": 0.9483368409436654
+        },
+        "platoon_mult_vs_rhb": {
+          "k": 0.9741414158851883,
+          "bb": 1.1063649949156449,
+          "hr": 0.78,
+          "inplay": 1.0825190719529059
+        },
+        "statcast_quality_mult": {},
+        "arsenal_source": "statsapi_pitchArsenal",
+        "arsenal_sample_size": 749,
+        "statcast_splits_found": false,
+        "statcast_splits_source": "",
+        "statcast_splits_n_pitches": 0,
+        "statcast_splits_start_date": "",
+        "statcast_splits_end_date": "",
+        "k_rate": 0.2406731946144431,
+        "bb_rate": 0.09993880048959607,
+        "hbp_rate": 0.015789473684210527,
+        "hr_rate": 0.02039779681762546,
+        "inplay_hit_rate": 0.4032644628099173,
+        "arsenal": {
+          "FF": 0.37783711508811757,
+          "OTHER": 0.009345793878504679,
+          "CH": 0.24699599678905204,
+          "SI": 0.09345794378504674,
+          "SL": 0.26301735658077435,
+          "FC": 0.009345793878504679
         },
         "pitch_type_whiff_mult": {},
         "pitch_type_inplay_mult": {},
@@ -1624,10 +1668,10 @@
         "id": 665622,
         "name": "Luis Medina",
         "throw": "R",
-        "role": "SU",
-        "leverage_skill": 0.7,
+        "role": "MR",
+        "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.855,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 1.1133320239186417,
           "bb": 1.1857232624022833,
@@ -1703,47 +1747,6 @@
           "CU": 0.14767932616033752,
           "CH": 0.025316455341772164,
           "SL": 0.28691982254008463
-        },
-        "pitch_type_whiff_mult": {},
-        "pitch_type_inplay_mult": {},
-        "pitch_type_hr_mult": {}
-      },
-      {
-        "id": 640454,
-        "name": "Matt Krook",
-        "throw": "L",
-        "role": "MR",
-        "leverage_skill": 0.5,
-        "stamina_pitches": 25,
-        "availability_mult": 1.0,
-        "platoon_mult_vs_lhb": {
-          "k": 1.06875,
-          "bb": 1.06875,
-          "hr": 1.0,
-          "inplay": 0.8075
-        },
-        "platoon_mult_vs_rhb": {
-          "k": 0.9450000000000001,
-          "bb": 0.9450000000000001,
-          "hr": 1.0,
-          "inplay": 1.1925000000000001
-        },
-        "statcast_quality_mult": {},
-        "arsenal_source": "statsapi_pitchArsenal",
-        "arsenal_sample_size": 43,
-        "statcast_splits_found": false,
-        "statcast_splits_source": "",
-        "statcast_splits_n_pitches": 0,
-        "statcast_splits_start_date": "",
-        "statcast_splits_end_date": "",
-        "k_rate": 0.2222222222222222,
-        "bb_rate": 0.2222222222222222,
-        "hbp_rate": 0.0,
-        "hr_rate": 0.0,
-        "inplay_hit_rate": 0.2,
-        "arsenal": {
-          "OTHER": 0.5581395432558136,
-          "SI": 0.4418604567441863
         },
         "pitch_type_whiff_mult": {},
         "pitch_type_inplay_mult": {},
