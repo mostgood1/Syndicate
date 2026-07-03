@@ -1,0 +1,1160 @@
+{
+  "date": "2026-07-03",
+  "home": "NYL",
+  "away": "MIN",
+  "market_total": null,
+  "market_home_spread": null,
+  "quarters": [
+    {
+      "q": 1,
+      "home_pts_mu": 19.567931249999997,
+      "home_pts_sigma": 5.0,
+      "away_pts_mu": 19.567931249999997,
+      "away_pts_sigma": 5.0,
+      "corr": 0.25
+    },
+    {
+      "q": 2,
+      "home_pts_mu": 19.971393749999997,
+      "home_pts_sigma": 5.0,
+      "away_pts_mu": 19.971393749999997,
+      "away_pts_sigma": 5.0,
+      "corr": 0.25
+    },
+    {
+      "q": 3,
+      "home_pts_mu": 20.37485625,
+      "home_pts_sigma": 5.0,
+      "away_pts_mu": 20.37485625,
+      "away_pts_sigma": 5.0,
+      "corr": 0.25
+    },
+    {
+      "q": 4,
+      "home_pts_mu": 20.77831875,
+      "home_pts_sigma": 5.0,
+      "away_pts_mu": 20.77831875,
+      "away_pts_sigma": 5.0,
+      "corr": 0.25
+    }
+  ],
+  "players": {
+    "home": [
+      {
+        "team": "NYL",
+        "opponent": "MIN",
+        "player_name": "Breanna Stewart",
+        "player_id": 2998928,
+        "pts_mean": 17.61,
+        "reb_mean": 9.245,
+        "ast_mean": 2.48,
+        "threes_mean": 0.3399999999999999,
+        "pra_mean": 29.335,
+        "stl_mean": 0.6997099999999998,
+        "blk_mean": 0.5724899999999998,
+        "tov_mean": 1.9083,
+        "pts_sd": 4.4025,
+        "reb_sd": 2.31125,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 7.33375,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "position": "F",
+        "minutes": 31.805
+      },
+      {
+        "team": "NYL",
+        "opponent": "MIN",
+        "player_name": "Jonquel Jones",
+        "player_id": 2999101,
+        "pts_mean": 12.695,
+        "reb_mean": 7.555,
+        "ast_mean": 2.41,
+        "threes_mean": 0.6749999999999999,
+        "pra_mean": 22.66,
+        "stl_mean": 0.60544,
+        "blk_mean": 0.4953599999999999,
+        "tov_mean": 1.6512,
+        "pts_sd": 3.17375,
+        "reb_sd": 1.88875,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 5.665,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "position": "C",
+        "minutes": 27.52
+      },
+      {
+        "team": "NYL",
+        "opponent": "MIN",
+        "player_name": "Pauline Astier",
+        "player_id": 5345320,
+        "pts_mean": 12.095,
+        "reb_mean": 2.585,
+        "ast_mean": 2.275,
+        "threes_mean": 1.315,
+        "pra_mean": 16.955,
+        "stl_mean": 0.4971999999999999,
+        "blk_mean": 0.4067999999999999,
+        "tov_mean": 1.356,
+        "pts_sd": 3.02375,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 4.23875,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "position": "G",
+        "minutes": 22.6
+      },
+      {
+        "team": "NYL",
+        "opponent": "MIN",
+        "player_name": "Marine Johannes",
+        "player_id": 4038379,
+        "pts_mean": 5.662857142857142,
+        "reb_mean": 2.9871428571428567,
+        "ast_mean": 4.917142857142858,
+        "threes_mean": 1.342857142857143,
+        "pra_mean": 13.567142857142857,
+        "stl_mean": 0.5922399999999999,
+        "blk_mean": 0.4845599999999999,
+        "tov_mean": 1.6151999999999995,
+        "pts_sd": 1.4157142857142855,
+        "reb_sd": 1.0,
+        "ast_sd": 1.2292857142857145,
+        "threes_sd": 1.0,
+        "pra_sd": 3.391785714285714,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "position": "G",
+        "minutes": 26.92
+      },
+      {
+        "team": "NYL",
+        "opponent": "MIN",
+        "player_name": "Rebekah Gardner",
+        "player_id": 2327695,
+        "pts_mean": 8.715,
+        "reb_mean": 2.485,
+        "ast_mean": 1.62,
+        "threes_mean": 0.7999999999999999,
+        "pra_mean": 12.82,
+        "stl_mean": 0.4232799999999999,
+        "blk_mean": 0.3463199999999999,
+        "tov_mean": 1.1544,
+        "pts_sd": 2.17875,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 3.205,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "position": "G",
+        "minutes": 19.24
+      },
+      {
+        "team": "NYL",
+        "opponent": "MIN",
+        "player_name": "Julie Vanloo",
+        "player_id": 2566110,
+        "pts_mean": 4.558571428571429,
+        "reb_mean": 1.5714285714285714,
+        "ast_mean": 5.347142857142858,
+        "threes_mean": 1.09,
+        "pra_mean": 11.47714285714286,
+        "stl_mean": 0.3409685714285714,
+        "blk_mean": 0.2789742857142857,
+        "tov_mean": 0.9299142857142856,
+        "pts_sd": 1.1396428571428572,
+        "reb_sd": 1.0,
+        "ast_sd": 1.3367857142857145,
+        "threes_sd": 1.0,
+        "pra_sd": 2.869285714285715,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "minutes": 15.498571428571427
+      },
+      {
+        "team": "NYL",
+        "opponent": "MIN",
+        "player_name": "Satou Sabally",
+        "player_id": 4281929,
+        "pts_mean": 8.083333333333334,
+        "reb_mean": 1.5199999999999998,
+        "ast_mean": 1.1133333333333333,
+        "threes_mean": 1.2633333333333332,
+        "pra_mean": 10.716666666666669,
+        "stl_mean": 0.2659066666666666,
+        "blk_mean": 0.2175599999999999,
+        "tov_mean": 0.7252,
+        "pts_sd": 2.0208333333333335,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 2.679166666666667,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "position": "F",
+        "minutes": 12.086666666666666
+      },
+      {
+        "team": "NYL",
+        "opponent": "MIN",
+        "player_name": "Derin Erdogan",
+        "player_id": 4703579,
+        "pts_mean": 9.55,
+        "reb_mean": 0.0,
+        "ast_mean": 1.0,
+        "threes_mean": 1.0,
+        "pra_mean": 10.55,
+        "stl_mean": 0.3586,
+        "blk_mean": 0.2934,
+        "tov_mean": 0.978,
+        "pts_sd": 2.3875,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 2.6375,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "minutes": 16.3
+      },
+      {
+        "team": "NYL",
+        "opponent": "MIN",
+        "player_name": "Betnijah Laney-Hamilton",
+        "player_id": 2593770,
+        "pts_mean": 6.776666666666666,
+        "reb_mean": 1.93,
+        "ast_mean": 1.7633333333333336,
+        "threes_mean": 1.1133333333333333,
+        "pra_mean": 10.47,
+        "stl_mean": 0.4282666666666666,
+        "blk_mean": 0.3503999999999999,
+        "tov_mean": 1.168,
+        "pts_sd": 1.6941666666666666,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 2.6175,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "position": "G",
+        "minutes": 19.466666666666665
+      },
+      {
+        "team": "NYL",
+        "opponent": "MIN",
+        "player_name": "Sabrina Ionescu",
+        "player_id": 4066533,
+        "pts_mean": 4.73,
+        "reb_mean": 2.13,
+        "ast_mean": 3.18,
+        "threes_mean": 0.72,
+        "pra_mean": 10.04,
+        "stl_mean": 0.32054,
+        "blk_mean": 0.26226,
+        "tov_mean": 0.8742,
+        "pts_sd": 1.1825,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 2.51,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "position": "G",
+        "minutes": 14.57
+      },
+      {
+        "team": "NYL",
+        "opponent": "MIN",
+        "player_name": "Ny'Ceara Pryor",
+        "player_id": 5106084,
+        "pts_mean": 1.0,
+        "reb_mean": 3.0,
+        "ast_mean": 5.0,
+        "threes_mean": 0.0,
+        "pra_mean": 9.0,
+        "stl_mean": 0.5279999999999999,
+        "blk_mean": 0.4319999999999999,
+        "tov_mean": 1.4399999999999995,
+        "pts_sd": 1.0,
+        "reb_sd": 1.0,
+        "ast_sd": 1.25,
+        "threes_sd": 1.0,
+        "pra_sd": 2.25,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "minutes": 24.0
+      },
+      {
+        "team": "NYL",
+        "opponent": "MIN",
+        "player_name": "Han Xu",
+        "player_id": 4337216,
+        "pts_mean": 4.81,
+        "reb_mean": 1.6800000000000002,
+        "ast_mean": 0.4649999999999999,
+        "threes_mean": 0.96,
+        "pra_mean": 6.955,
+        "stl_mean": 0.2504699999999999,
+        "blk_mean": 0.2049299999999999,
+        "tov_mean": 0.6830999999999999,
+        "pts_sd": 1.2025,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 1.73875,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "position": "C",
+        "minutes": 11.385
+      },
+      {
+        "team": "NYL",
+        "opponent": "MIN",
+        "player_name": "Ashley Owusu",
+        "player_id": 4433632,
+        "pts_mean": 2.0,
+        "reb_mean": 3.0,
+        "ast_mean": 1.0,
+        "threes_mean": 0.0,
+        "pra_mean": 6.0,
+        "stl_mean": 0.2859999999999999,
+        "blk_mean": 0.2339999999999999,
+        "tov_mean": 0.7799999999999999,
+        "pts_sd": 1.0,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 1.5,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "minutes": 12.999999999999998
+      },
+      {
+        "team": "NYL",
+        "opponent": "MIN",
+        "player_name": "Alex Fowler",
+        "player_id": 4595823,
+        "pts_mean": 3.95,
+        "reb_mean": 1.1625,
+        "ast_mean": 0.375,
+        "threes_mean": 0.475,
+        "pra_mean": 5.4875,
+        "stl_mean": 0.36465,
+        "blk_mean": 0.2983499999999999,
+        "tov_mean": 0.9945,
+        "pts_sd": 1.0,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 1.371875,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "minutes": 16.575
+      }
+    ],
+    "away": [
+      {
+        "team": "MIN",
+        "opponent": "NYL",
+        "player_name": "Natasha Howard",
+        "player_id": 2529130,
+        "pts_mean": 18.77,
+        "reb_mean": 9.45,
+        "ast_mean": 4.345,
+        "threes_mean": 0.0,
+        "pra_mean": 32.565,
+        "stl_mean": 0.62117,
+        "blk_mean": 0.50823,
+        "tov_mean": 1.6941,
+        "pts_sd": 4.6925,
+        "reb_sd": 2.3625,
+        "ast_sd": 1.08625,
+        "threes_sd": 1.0,
+        "pra_sd": 8.14125,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "position": "F",
+        "minutes": 28.235
+      },
+      {
+        "team": "MIN",
+        "opponent": "NYL",
+        "player_name": "Courtney Williams",
+        "player_id": 2987891,
+        "pts_mean": 15.697777777777777,
+        "reb_mean": 6.285555555555556,
+        "ast_mean": 3.273333333333333,
+        "threes_mean": 1.5666666666666664,
+        "pra_mean": 25.256666666666664,
+        "stl_mean": 0.6574088888888888,
+        "blk_mean": 0.5378799999999999,
+        "tov_mean": 1.7929333333333333,
+        "pts_sd": 3.924444444444444,
+        "reb_sd": 1.571388888888889,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 6.314166666666666,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "position": "G",
+        "minutes": 29.88222222222222
+      },
+      {
+        "team": "MIN",
+        "opponent": "NYL",
+        "player_name": "Olivia Miles",
+        "player_id": 4433791,
+        "pts_mean": 13.74111111111111,
+        "reb_mean": 6.1177777777777775,
+        "ast_mean": 4.633333333333334,
+        "threes_mean": 0.2366666666666666,
+        "pra_mean": 24.49222222222222,
+        "stl_mean": 0.6593155555555555,
+        "blk_mean": 0.53944,
+        "tov_mean": 1.7981333333333334,
+        "pts_sd": 3.4352777777777774,
+        "reb_sd": 1.5294444444444444,
+        "ast_sd": 1.1583333333333334,
+        "threes_sd": 1.0,
+        "pra_sd": 6.123055555555555,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "position": "G",
+        "minutes": 29.96888888888889
+      },
+      {
+        "team": "MIN",
+        "opponent": "NYL",
+        "player_name": "Kayla McBride",
+        "player_id": 2529205,
+        "pts_mean": 13.831111111111111,
+        "reb_mean": 5.201111111111111,
+        "ast_mean": 2.381111111111111,
+        "threes_mean": 1.49,
+        "pra_mean": 21.41333333333333,
+        "stl_mean": 0.6922666666666666,
+        "blk_mean": 0.5663999999999999,
+        "tov_mean": 1.888,
+        "pts_sd": 3.457777777777778,
+        "reb_sd": 1.3002777777777776,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 5.353333333333333,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "position": "G",
+        "minutes": 31.466666666666665
+      },
+      {
+        "team": "MIN",
+        "opponent": "NYL",
+        "player_name": "Nia Coffey",
+        "player_id": 3054590,
+        "pts_mean": 7.657777777777778,
+        "reb_mean": 5.52,
+        "ast_mean": 0.9277777777777778,
+        "threes_mean": 0.9622222222222222,
+        "pra_mean": 14.105555555555554,
+        "stl_mean": 0.5442066666666666,
+        "blk_mean": 0.44526,
+        "tov_mean": 1.4842,
+        "pts_sd": 1.9144444444444444,
+        "reb_sd": 1.38,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 3.5263888888888886,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "position": "F",
+        "minutes": 24.736666666666668
+      },
+      {
+        "team": "MIN",
+        "opponent": "NYL",
+        "player_name": "Saylor Poffenbarger",
+        "player_id": 4433542,
+        "pts_mean": 4.816666666666667,
+        "reb_mean": 5.4,
+        "ast_mean": 0.5666666666666667,
+        "threes_mean": 0.8499999999999999,
+        "pra_mean": 10.783333333333331,
+        "stl_mean": 0.4795999999999999,
+        "blk_mean": 0.3923999999999999,
+        "tov_mean": 1.3079999999999998,
+        "pts_sd": 1.2041666666666668,
+        "reb_sd": 1.35,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 2.695833333333333,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "minutes": 21.8
+      },
+      {
+        "team": "MIN",
+        "opponent": "NYL",
+        "player_name": "Maya Caldwell",
+        "player_id": 4280850,
+        "pts_mean": 4.984999999999999,
+        "reb_mean": 2.375,
+        "ast_mean": 2.0,
+        "threes_mean": 1.0,
+        "pra_mean": 9.36,
+        "stl_mean": 0.3140499999999999,
+        "blk_mean": 0.2569499999999999,
+        "tov_mean": 0.8564999999999999,
+        "pts_sd": 1.2462499999999999,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 2.34,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "position": "G",
+        "minutes": 14.275
+      },
+      {
+        "team": "MIN",
+        "opponent": "NYL",
+        "player_name": "Liatu King",
+        "player_id": 4596309,
+        "pts_mean": 2.8566666666666665,
+        "reb_mean": 3.693333333333333,
+        "ast_mean": 0.4466666666666666,
+        "threes_mean": 0.2033333333333333,
+        "pra_mean": 6.996666666666666,
+        "stl_mean": 0.2350333333333333,
+        "blk_mean": 0.1923,
+        "tov_mean": 0.641,
+        "pts_sd": 1.0,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 1.7491666666666665,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "position": "F",
+        "minutes": 10.683333333333334
+      },
+      {
+        "team": "MIN",
+        "opponent": "NYL",
+        "player_name": "Antonia Delaere",
+        "player_id": 4873358,
+        "pts_mean": 2.6077777777777778,
+        "reb_mean": 0.7377777777777778,
+        "ast_mean": 1.3233333333333333,
+        "threes_mean": 0.6711111111111111,
+        "pra_mean": 4.668888888888889,
+        "stl_mean": 0.2839466666666666,
+        "blk_mean": 0.2323199999999999,
+        "tov_mean": 0.7744,
+        "pts_sd": 1.0,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 1.1672222222222222,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "position": "F",
+        "minutes": 12.906666666666666
+      }
+    ]
+  },
+  "home_team_total_pts_mean": 102.23642857142858,
+  "away_team_total_pts_mean": 84.96388888888889,
+  "excluded_player_keys_by_team": {
+    "NYL": [],
+    "MIN": []
+  },
+  "pregame_context": {
+    "home_injuries_out": 0,
+    "away_injuries_out": 0,
+    "home_pace": 79.5,
+    "away_pace": 79.5,
+    "home_b2b": false,
+    "away_b2b": false
+  },
+  "n_sims": 1000
+}

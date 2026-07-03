@@ -1,0 +1,71 @@
+{
+  "date": "2026-07-03",
+  "counts": {
+    "games": 1,
+    "picks": 3
+  },
+  "per_game": [
+    {
+      "home": "NYL",
+      "away": "MIN",
+      "matchup": "MIN @ NYL",
+      "picks": [
+        {
+          "market": "PROPS",
+          "team": "NYL",
+          "display_pick": "Sabrina Ionescu UNDER 14.5",
+          "selection": "UNDER 14.5",
+          "price": -103.0,
+          "score": 42.8883495145631,
+          "ev_pct": 42.8883495145631,
+          "win_prob": 0.5073891625615764,
+          "p_win": 0.5073891625615764,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 42.9%",
+            "Regular price range (-150 to +150)",
+            "Consensus: 4 books aligned",
+            "Best line available"
+          ],
+          "matchup": "MIN @ NYL"
+        },
+        {
+          "market": "PROPS",
+          "team": "NYL",
+          "display_pick": "Pauline Astier OVER 8.5",
+          "selection": "OVER 8.5",
+          "price": 104.0,
+          "score": 37.13779233680856,
+          "ev_pct": 37.13779233680856,
+          "win_prob": 0.49019607843137253,
+          "p_win": 0.49019607843137253,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 37.1%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "MIN @ NYL"
+        },
+        {
+          "market": "PROPS",
+          "team": "MIN",
+          "display_pick": "Natasha Howard OVER 10.5",
+          "selection": "OVER 10.5",
+          "price": -136.0,
+          "score": 12.261657281607896,
+          "ev_pct": 12.261657281607896,
+          "win_prob": 0.576271186440678,
+          "p_win": 0.576271186440678,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.3%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "MIN @ NYL"
+        }
+      ]
+    }
+  ]
+}

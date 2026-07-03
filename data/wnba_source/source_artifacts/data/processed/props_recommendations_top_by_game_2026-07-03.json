@@ -1,0 +1,134 @@
+{
+  "date": "2026-07-03",
+  "data": [
+    {
+      "game_key": "MIN@NYL",
+      "game_id": "0eb6f53f248f70b4841769705a8ef055d",
+      "player": "Leonie Fiebich",
+      "team": "NYL",
+      "team_tricode": "NYL",
+      "opponent": "MIN",
+      "score": 61.16161550707251,
+      "score_adj": 61.16161550707251,
+      "tier": "High",
+      "model": {
+        "pts": 0.0,
+        "reb": 0.0,
+        "ast": 0.0,
+        "threes": 0.0,
+        "stl": 0.176,
+        "blk": 0.144,
+        "tov": 0.48,
+        "pra": 0.0,
+        "pr": 0.0,
+        "pa": 0.0,
+        "ra": 0.0
+      },
+      "top_play": {
+        "market": "threes",
+        "side": "UNDER",
+        "line": 1.5,
+        "price": -119.0,
+        "edge": 0.3323393719334077,
+        "ev": 0.6116161550707251,
+        "ev_pct": 61.16161550707251,
+        "book": "betonlineag",
+        "p_win": 1.0,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 61.2%",
+        "Regular price range (-150 to +150)",
+        "Consensus: 4 books aligned",
+        "Best line available"
+      ],
+      "basketball_summary": "model 0.0 vs line 1.5 (-1.5)"
+    },
+    {
+      "game_key": "MIN@NYL",
+      "game_id": "0eb6f53f248f70b4841769705a8ef055d",
+      "player": "Jonquel Jones",
+      "team": "NYL",
+      "team_tricode": "NYL",
+      "opponent": "MIN",
+      "score": 57.50340196575748,
+      "score_adj": 57.50340196575748,
+      "tier": "High",
+      "model": {
+        "pts": 12.695,
+        "reb": 7.555,
+        "ast": 2.41,
+        "threes": 0.6749999999999999,
+        "stl": 0.60544,
+        "blk": 0.4953599999999999,
+        "tov": 1.6512,
+        "pra": 22.66,
+        "pr": 20.25,
+        "pa": 15.105,
+        "ra": 9.965
+      },
+      "top_play": {
+        "market": "threes",
+        "side": "UNDER",
+        "line": 1.5,
+        "price": -102.0,
+        "edge": 0.2903637128963992,
+        "ev": 0.5750340196575748,
+        "ev_pct": 57.50340196575748,
+        "book": "fanduel",
+        "p_win": 1.0,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 57.5%",
+        "Regular price range (-150 to +150)",
+        "Consensus: 4 books aligned",
+        "Best line available"
+      ],
+      "basketball_summary": "model 0.7 vs line 1.5 (-0.8)"
+    },
+    {
+      "game_key": "MIN@NYL",
+      "game_id": "0eb6f53f248f70b4841769705a8ef055d",
+      "player": "Sabrina Ionescu",
+      "team": "NYL",
+      "team_tricode": "NYL",
+      "opponent": "MIN",
+      "score": 42.8883495145631,
+      "score_adj": 42.8883495145631,
+      "tier": "High",
+      "model": {
+        "pts": 4.73,
+        "reb": 2.13,
+        "ast": 3.18,
+        "threes": 0.72,
+        "stl": 0.32054,
+        "blk": 0.26226,
+        "tov": 0.8742,
+        "pra": 10.04,
+        "pr": 6.86,
+        "pa": 7.91,
+        "ra": 5.3100000000000005
+      },
+      "top_play": {
+        "market": "pts",
+        "side": "UNDER",
+        "line": 14.5,
+        "price": -103.0,
+        "edge": 0.21761083743842358,
+        "ev": 0.42888349514563107,
+        "ev_pct": 42.8883495145631,
+        "book": "betonlineag",
+        "p_win": 0.9362726577072075,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 42.9%",
+        "Regular price range (-150 to +150)",
+        "Consensus: 4 books aligned",
+        "Best line available"
+      ],
+      "basketball_summary": "model 4.7 vs line 14.5 (-9.8)"
+    }
+  ]
+}
