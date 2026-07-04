@@ -35,6 +35,33 @@ class AppBootstrapTests(unittest.TestCase):
 
         self.assertEqual(calls, [])
 
+    def test_create_app_starts_intelligence_loop_on_render_web_when_enabled(self) -> None:
+        class _ImmediateThread:
+            def __init__(self, *, target=None, name=None, daemon=None):
+                self._target = target
+
+            def start(self):
+                if self._target is not None:
+                    self._target()
+
+        with patch("syndicate.app._bootstrap_render_data") as bootstrap_mock, patch(
+            "syndicate.app._is_render_web_dyno",
+            return_value=True,
+        ), patch(
+            "syndicate.app._env_bool",
+            side_effect=lambda name, default=False: name == "SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP",
+        ), patch(
+            "syndicate.app.threading.Thread",
+            side_effect=lambda **kwargs: _ImmediateThread(**kwargs),
+        ), patch(
+            "syndicate.app.start_intelligence_state_background_loop"
+        ) as mocked_start_intel, patch("syndicate.app.start_live_refresh_background_loop") as mocked_start_live:
+            syndicate_app.create_app()
+
+        bootstrap_mock.assert_called_once()
+        mocked_start_intel.assert_called_once()
+        mocked_start_live.assert_not_called()
+
 
 if __name__ == "__main__":
     unittest.main()

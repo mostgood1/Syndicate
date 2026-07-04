@@ -221,7 +221,8 @@ def create_app() -> Flask:
         return "OK", 200
 
     def _start_background_loops() -> None:
-        if _is_render_web_dyno():
+        render_web_dyno = _is_render_web_dyno()
+        if render_web_dyno and not _env_bool("SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP", default=False):
             return
         if app.extensions.get("syndicate_background_loops_started"):
             return
@@ -234,7 +235,8 @@ def create_app() -> Flask:
                 if app.extensions.get("syndicate_background_loops_started"):
                     return
                 start_intelligence_state_background_loop(app)
-                start_live_refresh_background_loop()
+                if not render_web_dyno:
+                    start_live_refresh_background_loop()
                 app.extensions["syndicate_background_loops_started"] = True
             finally:
                 app.extensions.pop("syndicate_background_loops_bootstrap_started", None)
@@ -245,7 +247,10 @@ def create_app() -> Flask:
             daemon=True,
         ).start()
 
-    if not _is_render_web_dyno():
+    if _is_render_web_dyno():
+        if _env_bool("SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP", default=False):
+            _start_background_loops()
+    else:
         try:
             app.before_serving(_start_background_loops)
         except AttributeError:

@@ -1,5 +1,12 @@
 # Fix Notes Log
 
+## 2026-07-04 - Intelligence queue can now hydrate on the Render web dyno
+- Symptom: The board stopped 502ing, but it stayed empty because the query route queued refresh work into a web process that never consumed the in-memory intelligence queue.
+- Root cause: Render web dynos were skipping the intelligence background loop entirely, so the queue-only fallback had no consumer on the same process.
+- Fix: Allow the intelligence background loop to start on Render web when the loop flag is enabled, keep the live odds loop off there, and enable that flag in `render.yaml`.
+- Validation: `pytest -q tests/test_app_bootstrap.py tests/test_intelligence_state.py -k 'bootstrap or query_endpoint'` passed.
+- Follow-up: Redeploy Render so the web process picks up the new bootstrap behavior and can actually consume queued intelligence refreshes.
+
 ## 2026-07-04 - Intelligence query now launches the refresh job when the board is empty
 - Symptom: The live `/intelligence` board stopped 502ing after the inline recompute removal, but it remained empty because the query route only queued a refresh and never actually kicked off a job that could repopulate the state.
 - Root cause: The request path depended on the worker loop to notice the queue entry, and that was not enough to rebuild the board on Render in time for the live surface.
