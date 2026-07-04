@@ -537,7 +537,7 @@ def _cached_intelligence_response_with_source(payload: dict[str, object], *, for
     if _is_board_response(board_snapshot_response) and not _response_needs_refresh(payload, board_snapshot_response):
         return _hydrate_board_response_payload(board_snapshot_response), "board_snapshot"
     question_text = str(payload.get("question") or "").strip().lower()
-    if question_text == DEFAULT_QUESTION.lower():
+    if question_text == DEFAULT_QUESTION.lower() and not str(payload.get("date") or payload.get("selected_date") or "").strip():
         latest_board_snapshot = read_latest_intelligence_board_snapshot_response(None, force_refresh=force_refresh)
         if _is_board_response(latest_board_snapshot):
             return _hydrate_board_response_payload(latest_board_snapshot), "board_snapshot_latest"
@@ -911,7 +911,7 @@ def _intelligence_page_payload(selected_date: str, *, force_refresh: bool = Fals
 def _normalize_default_query_payload(payload: dict[str, object]) -> dict[str, object]:
     normalized = dict(payload or {})
     if str(normalized.get("question") or "").strip() == DEFAULT_QUESTION:
-        normalized["date"] = str(normalized.get("date") or normalized.get("selected_date") or _latest_available_intelligence_date()).strip() or _latest_available_intelligence_date()
+        normalized["date"] = str(normalized.get("date") or normalized.get("selected_date") or central_today_iso()).strip() or central_today_iso()
         normalized.setdefault("mode", "recommendation")
         normalized.setdefault("timing", "all")
     return normalized
@@ -1070,7 +1070,7 @@ def intelligence_portfolio_event_api():
 
 @intelligence_bp.get("/intelligence/run")
 def run_intelligence():
-    selected_date = _latest_available_intelligence_date()
+    selected_date = central_today_iso()
     launch_result: dict[str, Any] | None = None
     launched = False
     try:
@@ -1092,7 +1092,7 @@ def run_intelligence():
 @intelligence_bp.get("/api/intelligence/status")
 def intelligence_status_api():
     try:
-        selected_date = str(request.args.get("date") or "").strip() or _latest_available_intelligence_date()
+        selected_date = str(request.args.get("date") or "").strip() or central_today_iso()
         refresh_requested = str(request.args.get("refresh") or request.args.get("force_refresh") or "").strip().lower() in {"1", "true", "yes", "on"}
         stale_snapshot = False
         if not refresh_requested:
@@ -1123,5 +1123,5 @@ def intelligence_status_api():
 
 @intelligence_bp.get("/intelligence/status")
 def intelligence_status_page():
-    selected_date = str(request.args.get("date") or "").strip() or _latest_available_intelligence_date()
+    selected_date = str(request.args.get("date") or "").strip() or central_today_iso()
     return redirect(f"/api/intelligence/status?date={selected_date}", code=302)

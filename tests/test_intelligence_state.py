@@ -1254,12 +1254,12 @@ class IntelligenceStateTests(unittest.TestCase):
         self.assertEqual((payload.get("status") or {}).get("top_opportunities"), [])
         mocked_read.assert_called_once_with({"date": "2026-06-10"})
 
-    def test_status_endpoint_defaults_to_latest_available_date_when_missing(self) -> None:
+    def test_status_endpoint_defaults_to_today_when_missing(self) -> None:
         app = Flask(__name__)
         app.register_blueprint(intelligence_bp)
 
         with app.test_request_context("/api/intelligence/status", method="GET"):
-            with patch("syndicate.blueprints.intelligence._latest_available_intelligence_date", return_value="2026-06-15"):
+            with patch("syndicate.blueprints.intelligence.central_today_iso", return_value="2026-07-04"):
                 with patch("syndicate.blueprints.intelligence.read_latest_intelligence_state", return_value={}) as mocked_read:
                     response = intelligence_status_api()
 
@@ -1267,7 +1267,8 @@ class IntelligenceStateTests(unittest.TestCase):
         self.assertIsNotNone(payload)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(payload["debug_source"], "snapshot_read")
-        mocked_read.assert_called_once_with({"date": "2026-06-15"})
+        self.assertEqual(mocked_read.call_count, 2)
+        mocked_read.assert_any_call({"date": "2026-07-04"})
 
     def test_status_endpoint_uses_latest_board_snapshot_when_state_is_date_mismatched(self) -> None:
         app = Flask(__name__)
@@ -1543,7 +1544,7 @@ class IntelligenceStateTests(unittest.TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertIn("/api/intelligence/status?date=2026-06-10", response.location)
 
-    def test_default_intelligence_query_uses_latest_board_snapshot_fallback(self) -> None:
+    def test_default_intelligence_query_does_not_use_stale_latest_board_snapshot_fallback(self) -> None:
         response_payload = {
             "ok": True,
             "selected_date": "2026-07-02",
@@ -1560,9 +1561,8 @@ class IntelligenceStateTests(unittest.TestCase):
                     force_refresh=False,
                 )
 
-        self.assertIsNotNone(cached_response)
-        self.assertEqual(source, "board_snapshot_latest")
-        self.assertEqual((cached_response or {}).get("top_opportunities", [])[0].get("name"), "Fallback Play")
+        self.assertIsNone(cached_response)
+        self.assertEqual(source, "fallback")
 
     def test_compute_response_reuses_source_cache_until_state_changes(self) -> None:
         service = IntelligenceStateService()
