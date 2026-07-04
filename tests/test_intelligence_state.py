@@ -427,10 +427,9 @@ class IntelligenceStateTests(unittest.TestCase):
         }
 
         with app.test_request_context("/api/intelligence/status?date=2026-07-04", method="GET"):
-            with patch("syndicate.blueprints.intelligence.read_latest_intelligence_state", side_effect=[dict(stale_response), dict(stale_response)]), patch(
-                "syndicate.blueprints.intelligence.compute_intelligence_state_response",
-                return_value=dict(fresh_response),
-            ) as mocked_compute:
+            with patch("syndicate.blueprints.intelligence.read_latest_intelligence_state", side_effect=[dict(stale_response), dict(fresh_response)]), patch(
+                "syndicate.blueprints.intelligence.queue_intelligence_state_refresh"
+            ) as mocked_queue:
                 response = intelligence_status_api()
 
         payload = response.get_json()
@@ -438,7 +437,7 @@ class IntelligenceStateTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(payload["status"]["selected_date"], "2026-07-04")
         self.assertEqual(payload["top_opportunities"][0]["name"], "Fresh Play")
-        mocked_compute.assert_called_once()
+        mocked_queue.assert_called_once()
 
     def test_response_selected_date_reads_nested_evaluation_metadata(self) -> None:
         payload = {

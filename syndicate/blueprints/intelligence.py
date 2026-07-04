@@ -1100,11 +1100,9 @@ def intelligence_status_api():
             stale_snapshot = bool(_response_selected_date(current_snapshot) and _response_selected_date(current_snapshot) != selected_date)
         if refresh_requested:
             queue_intelligence_state_refresh(_intelligence_page_payload(selected_date, force_refresh=True))
+        elif stale_snapshot:
+            queue_intelligence_state_refresh(_intelligence_page_payload(selected_date, force_refresh=True))
         status = read_latest_intelligence_state({"date": selected_date})
-        if stale_snapshot:
-            computed_status = compute_intelligence_state_response(_intelligence_page_payload(selected_date, force_refresh=True))
-            if isinstance(computed_status, dict) and _response_has_content(computed_status):
-                status = computed_status
         if not (isinstance(status, dict) and _response_has_content(status)):
             status = _empty_default_intelligence_response()
         _log_api_state_read(status if isinstance(status, dict) else {})
