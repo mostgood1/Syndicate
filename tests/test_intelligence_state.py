@@ -152,6 +152,74 @@ class IntelligenceStateTests(unittest.TestCase):
         self.assertEqual(int(response.get("candidate_count") or 0), 2)
         self.assertEqual(response.get("top_opportunities", [])[0]["name"], "Daily Play 1")
 
+    def test_source_state_fingerprint_changes_when_odds_history_updates(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            reports_root = Path(tmp_dir) / "reports"
+            manifest_path = reports_root / "manifests" / "mlb.json"
+            odds_history_path = reports_root / "odds_control_plane" / "odds_history" / "mlb" / "odds_history.json"
+            manifest_path.parent.mkdir(parents=True, exist_ok=True)
+            odds_history_path.parent.mkdir(parents=True, exist_ok=True)
+
+            refresh_state_store.write_json_file(
+                manifest_path,
+                {
+                    "sport": "mlb",
+                    "last_updated": "2026-07-03T18:00:00Z",
+                    "status": "ready",
+                    "artifact_paths": [],
+                },
+            )
+            refresh_state_store.write_json_file(
+                odds_history_path,
+                {
+                    "sport": "mlb",
+                    "date": "2026-07-03",
+                    "updated_at": "2026-07-03T18:00:00Z",
+                    "markets": {
+                        "market-1": {
+                            "last_line": 7.0,
+                            "last_odds": -110,
+                            "history": [{"current_line": 7.0, "last_odds": -110, "captured_at": "2026-07-03T18:00:00Z"}],
+                        }
+                    },
+                },
+            )
+
+            status_payload = {
+                "selected_date": "2026-07-03",
+                "sports": [{"slug": "mlb", "name": "MLB", "active_today": True}],
+            }
+
+            with patch.object(intelligence_state_module, "reports_root", return_value=reports_root):
+                with patch("syndicate.features.shared.odds_control_plane.reports_root", return_value=reports_root):
+                    with patch("pipeline.intelligence_state.build_intelligence_status", return_value=status_payload):
+                        first_service = IntelligenceStateService()
+                        first_fingerprint = first_service._source_state_fingerprint("2026-07-03")
+
+            refresh_state_store.write_json_file(
+                odds_history_path,
+                {
+                    "sport": "mlb",
+                    "date": "2026-07-03",
+                    "updated_at": "2026-07-03T19:00:00Z",
+                    "markets": {
+                        "market-1": {
+                            "last_line": 7.5,
+                            "last_odds": -108,
+                            "history": [{"current_line": 7.5, "last_odds": -108, "captured_at": "2026-07-03T19:00:00Z"}],
+                        }
+                    },
+                },
+            )
+
+            with patch.object(intelligence_state_module, "reports_root", return_value=reports_root):
+                with patch("syndicate.features.shared.odds_control_plane.reports_root", return_value=reports_root):
+                    with patch("pipeline.intelligence_state.build_intelligence_status", return_value=status_payload):
+                        second_service = IntelligenceStateService()
+                        second_fingerprint = second_service._source_state_fingerprint("2026-07-03")
+
+        self.assertNotEqual(first_fingerprint, second_fingerprint)
+
     def test_latest_available_intelligence_date_prefers_daily_snapshot(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir, patch.dict(
             os.environ,

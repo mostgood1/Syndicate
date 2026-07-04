@@ -15,6 +15,8 @@ class DailyUpdatePublishPathTests(unittest.TestCase):
         self.assertIn("SYNDICATE_WNBA_SOURCE_APP_FALLBACK = '1'", script_text)
         self.assertIn("${rootRelative}/tracking/odds_history.json", script_text)
         self.assertIn("${rootRelative}/artifacts/${sportSlug}/odds_history.json", script_text)
+        self.assertIn('odds_control_plane_root = repo_root / "reports" / "odds_control_plane"', script_text)
+        self.assertIn('"odds_history/**/*.json"', script_text)
         self.assertIn('Add-PathsUnderRoot -RelativeRoot "${rootRelative}/manifests"', script_text)
         self.assertIn('Add-PathsUnderRoot -RelativeRoot "${rootRelative}/source_artifacts/manifests"', script_text)
 

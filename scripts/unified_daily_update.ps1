@@ -3742,6 +3742,19 @@ def main() -> int:
             relative = _relative_repo_path(path, repo_root)
             if relative:
                 rows.append(relative)
+    odds_control_plane_root = repo_root / "reports" / "odds_control_plane"
+    for pattern in [
+        "latest.json",
+        "odds_history/**/*.json",
+    ]:
+        if not odds_control_plane_root.exists():
+            break
+        for path in sorted(odds_control_plane_root.glob(pattern)):
+            if not path.exists():
+                continue
+            relative = _relative_repo_path(path, repo_root)
+            if relative:
+                rows.append(relative)
     for relative_path in [
         Path("reports/intelligence/status_response_cache.json"),
         Path("reports/intelligence/query_state_cache.json"),

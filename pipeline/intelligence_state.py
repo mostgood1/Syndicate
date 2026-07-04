@@ -564,7 +564,39 @@ class IntelligenceStateService:
                     "artifact_path_count": len(manifest.get("artifact_paths") or []) if isinstance(manifest.get("artifact_paths"), list) else 0,
                 }
             )
+        signature["odds_history"] = self._odds_history_signature(sport_slug)
         return signature
+
+    def _odds_history_signature(self, sport_slug: str) -> dict[str, Any]:
+        candidate_paths = self._odds_history_paths_for_sport(sport_slug)
+        active_path: Path | None = None
+        active_payload: dict[str, Any] | None = None
+        for candidate_path in candidate_paths:
+            payload = read_json_file(candidate_path)
+            if isinstance(payload, dict):
+                active_path = candidate_path
+                active_payload = payload
+                break
+
+        if active_payload is None:
+            return {
+                "path": None,
+                "exists": False,
+                "payload_hash": None,
+                "updated_at": None,
+                "market_count": 0,
+            }
+
+        canonical_payload = json.dumps(active_payload, sort_keys=True, separators=(",", ":"), default=str)
+        markets = active_payload.get("markets") if isinstance(active_payload.get("markets"), dict) else {}
+        market_count = len(markets) if isinstance(markets, dict) else 0
+        return {
+            "path": str(active_path) if active_path is not None else None,
+            "exists": True,
+            "payload_hash": hashlib.sha256(canonical_payload.encode("utf-8")).hexdigest(),
+            "updated_at": str(active_payload.get("updated_at") or "").strip() or None,
+            "market_count": int(market_count),
+        }
 
     def _available_sport_manifests(self, selected_date: str | None) -> OrderedDict[str, dict[str, Any]]:
         status = _profile_stage("data_ingestion", build_intelligence_status, selected_date=selected_date, force_refresh=False)
@@ -746,6 +778,7 @@ class IntelligenceStateService:
                     "data_warnings": [str(item).strip() for item in (sport.get("data_warnings") or []) if str(item).strip()],
                     "artifacts": artifact_signatures,
                     "advanced_inputs": advanced_signatures,
+                    "odds_history": self._odds_history_signature(str(sport.get("slug") or "")),
                 }
             )
         payload = {
