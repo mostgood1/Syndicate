@@ -6,6 +6,8 @@ from typing import Any, Iterable, Mapping
 
 from syndicate.features.shared.source_roots import repo_root_from
 from syndicate.features.shared.source_roots import preferred_source_roots
+from syndicate.features.shared.refresh_state_store import read_json_file
+from syndicate.features.shared.refresh_state_store import reports_root
 
 
 ARTIFACT_CATEGORIES = ("predictions", "edges", "recommendations", "live_data")
@@ -276,6 +278,103 @@ def _guess_date_from_path(path: Path) -> str | None:
     return None
 
 
+def _published_manifest_path(sport_slug: str) -> Path:
+    return reports_root() / "manifests" / f"{_normalize_slug(sport_slug)}.json"
+
+
+def _manifest_artifact_paths(payload: Mapping[str, Any]) -> list[str]:
+    paths: list[str] = []
+    seen: set[str] = set()
+
+    def add_path(value: Any) -> None:
+        text = str(value or "").strip()
+        if not text or text in seen:
+            return
+        seen.add(text)
+        paths.append(text)
+
+    direct_paths = payload.get("artifact_paths")
+    if isinstance(direct_paths, list):
+        for item in direct_paths:
+            add_path(item)
+
+    metadata = payload.get("metadata") if isinstance(payload.get("metadata"), Mapping) else None
+    if isinstance(metadata, Mapping):
+        odds_control_plane = metadata.get("odds_control_plane") if isinstance(metadata.get("odds_control_plane"), Mapping) else None
+        if isinstance(odds_control_plane, Mapping):
+            nested_paths = odds_control_plane.get("artifact_paths")
+            if isinstance(nested_paths, list):
+                for item in nested_paths:
+                    add_path(item)
+
+    return paths
+
+
+def _published_manifest_references(manifest_path: Path, payload: Mapping[str, Any], sport_slug: str) -> list[ArtifactReference]:
+    artifact_paths = _manifest_artifact_paths(payload)
+    if not artifact_paths:
+        return []
+
+    metadata = payload.get("metadata") if isinstance(payload.get("metadata"), Mapping) else None
+    selected_date = _normalize_date(
+        payload.get("selected_date")
+        or payload.get("date")
+        or (metadata or {}).get("selected_date")
+        or (metadata or {}).get("date")
+    )
+    references: list[ArtifactReference] = []
+    for artifact_path_text in artifact_paths:
+        artifact_path = Path(artifact_path_text)
+        references.append(
+            ArtifactReference.from_path(
+                artifact_path,
+                category=_category_from_path(artifact_path) or "recommendations",
+                sport_slug=sport_slug,
+                date=selected_date or _guess_date_from_path(artifact_path),
+                source_kind="published_manifest",
+                source_name=manifest_path.name,
+                metadata={"matched_by": "published_manifest"},
+            )
+        )
+    return references
+
+
+def _published_manifest_for_sport(sport_slug: str, selected_date: str | None = None) -> ArtifactManifest | None:
+    manifest_path = _published_manifest_path(sport_slug)
+    payload = read_json_file(manifest_path)
+    if not isinstance(payload, dict):
+        return None
+
+    references = _published_manifest_references(manifest_path, payload, sport_slug)
+    if not references:
+        return None
+
+    grouped = _group_by_category(references)
+    metadata = payload.get("metadata") if isinstance(payload.get("metadata"), Mapping) else None
+    effective_date = _normalize_date(selected_date) or _normalize_date(
+        payload.get("selected_date")
+        or payload.get("date")
+        or (metadata or {}).get("selected_date")
+        or (metadata or {}).get("date")
+    )
+    return ArtifactManifest(
+        sport_slug=_normalize_slug(sport_slug),
+        selected_date=effective_date,
+        source_root=str(manifest_path.parent),
+        data_root=str(reports_root()),
+        predictions=tuple(grouped["predictions"]),
+        edges=tuple(grouped["edges"]),
+        recommendations=tuple(grouped["recommendations"]),
+        live_data=tuple(grouped["live_data"]),
+        raw={
+            "roots": [str(manifest_path.parent)],
+            "selected_date": effective_date,
+            "published_manifest_path": str(manifest_path),
+            "published_manifest": dict(payload),
+        },
+    )
+
+
 def _references_from_directory(root: Path, sport_slug: str) -> list[ArtifactReference]:
     if not root.exists() or not root.is_dir():
         return []
@@ -313,6 +412,10 @@ def _group_by_category(references: Iterable[ArtifactReference]) -> dict[str, lis
 
 def load_artifact_manifest(*, sport_slug: str, selected_date: str | None = None) -> ArtifactManifest:
     slug = _normalize_slug(sport_slug)
+    published_manifest = _published_manifest_for_sport(slug, selected_date=selected_date)
+    if published_manifest is not None:
+        return published_manifest
+
     roots = _sport_roots(slug)
     scanned: list[ArtifactReference] = []
     for root in roots:

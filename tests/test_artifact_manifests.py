@@ -54,6 +54,7 @@ class ArtifactManifestTest(unittest.TestCase):
     def test_loader_discovers_sport_artifacts_from_existing_folder_layout(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
             data_root = Path(tmp_dir)
+            reports_root = data_root / "reports"
             nba_root = data_root / "nba_source"
             (nba_root / "data" / "processed").mkdir(parents=True, exist_ok=True)
             (nba_root / "data" / "processed" / "recommendations_slate_2026-06-08.json").write_text("{}", encoding="utf-8")
@@ -62,13 +63,59 @@ class ArtifactManifestTest(unittest.TestCase):
             (nba_root / "data" / "processed" / "live_snapshots").mkdir(parents=True, exist_ok=True)
             (nba_root / "data" / "processed" / "live_snapshots" / "live_state_2026-06-08.json").write_text("{}", encoding="utf-8")
 
-            with patch.dict("os.environ", {"SYNDICATE_DATA_ROOT": str(data_root)}, clear=False):
+            with patch.dict("os.environ", {"SYNDICATE_DATA_ROOT": str(data_root), "SYNDICATE_REPORTS_ROOT": str(reports_root)}, clear=False):
                 manifest = load_artifact_manifest(sport_slug="nba", selected_date="2026-06-08")
 
         self.assertEqual(manifest.sport_slug, "nba")
         self.assertGreaterEqual(len(manifest.recommendations), 1)
         self.assertGreaterEqual(len(manifest.edges), 1)
         self.assertGreaterEqual(len(manifest.live_data), 1)
+
+    def test_loader_prefers_published_reports_manifest_over_source_scan(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            repo_root = Path(tmp_dir)
+            data_root = repo_root / "data"
+            reports_root = repo_root / "reports"
+            nba_root = data_root / "nba_source"
+            published_manifest_path = reports_root / "manifests" / "nba.json"
+
+            (nba_root / "source_artifacts" / "data" / "processed").mkdir(parents=True, exist_ok=True)
+            (nba_root / "source_artifacts" / "data" / "processed" / "recommendations_slate_2026-06-29.json").write_text("{}", encoding="utf-8")
+            (nba_root / "source_artifacts" / "data" / "processed" / "props_edges_2026-06-29.csv").write_text("player,edge\n", encoding="utf-8")
+            published_manifest_path.parent.mkdir(parents=True, exist_ok=True)
+            published_manifest_path.write_text(
+                "\n".join(
+                    [
+                        "{",
+                        '  "sport": "nba",',
+                        '  "date": "2026-07-03",',
+                        '  "status": "complete",',
+                        '  "artifact_paths": [',
+                        '    "data/nba_source/source_artifacts/data/processed/recommendations_slate_2026-07-03.json",',
+                        '    "data/nba_source/source_artifacts/data/processed/props_edges_2026-07-03.csv"',
+                        "  ],",
+                        '  "metadata": {"date": "2026-07-03", "execution_mode": "source"}',
+                        "}",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            with patch.dict(
+                "os.environ",
+                {
+                    "SYNDICATE_DATA_ROOT": str(data_root),
+                    "SYNDICATE_REPORTS_ROOT": str(reports_root),
+                },
+                clear=False,
+            ):
+                manifest = load_artifact_manifest(sport_slug="nba", selected_date="2026-07-03")
+
+        self.assertEqual(manifest.selected_date, "2026-07-03")
+        self.assertEqual(manifest.source_root, str(published_manifest_path.parent.resolve()))
+        self.assertEqual(len(manifest.recommendations), 1)
+        self.assertEqual(len(manifest.edges), 1)
+        self.assertEqual(manifest.recommendations[0].date, "2026-07-03")
 
 
 if __name__ == "__main__":

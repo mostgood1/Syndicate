@@ -1,5 +1,12 @@
 # Fix Notes Log
 
+## 2026-07-03 - Intelligence status now prefers published report manifests over source-tree scans
+- Symptom: The live /api/intelligence/status payload kept resolving an all-sports manifest rooted at `src/data/all_source`, so the betting board stayed anchored to stale 6/29 evidence instead of the worker-published 7/3 snapshot.
+- Root cause: `load_artifact_manifests()` only scanned source-tree data roots and ignored the shared published manifests under `reports/manifests`, which are the web-side copy Render can actually read.
+- Fix: Make the artifact-manifest loader prefer the published `reports/manifests/<sport>.json` file first, reconstruct the manifest from its `artifact_paths`, and fall back to source-tree scans only when the publish is missing.
+- Validation: `python -m pytest tests/test_artifact_manifests.py -vv` and the relevant `tests/test_intelligence_state.py` date-selection/status tests both passed.
+- Follow-up: Keep the published reports tree current on the worker side; source-tree scans should remain a fallback, not the primary Render status path.
+
 ## 2026-07-03 - Intelligence board default date was anchored to stale source manifests
 - Symptom: The /intelligence board kept resolving the 2026-06-29 board snapshot even after the Render deploy was live and daily refreshes were running.
 - Root cause: The default intelligence date chooser still preferred artifact-manifest dates, so it could keep selecting the stale `all_source` manifest path instead of the newest daily board snapshot written for the current day.
