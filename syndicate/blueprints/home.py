@@ -141,6 +141,9 @@ def _public_detailed_version_payload() -> dict[str, Any]:
     served_at = time.time()
     commit = env_commit or git_commit
     branch = env_branch or git_branch
+    branch_matches_checkout = None
+    if env_branch and git_branch and git_branch not in {"HEAD", "DETACHED"}:
+        branch_matches_checkout = env_branch == git_branch
     return {
         "service": "syndicate",
         "commit": commit,
@@ -152,7 +155,7 @@ def _public_detailed_version_payload() -> dict[str, Any]:
         "commit_source": "env" if env_commit else "git" if git_commit else "unknown",
         "branch_source": "env" if env_branch else "git" if git_branch else "unknown",
         "commit_matches_checkout": bool(env_commit and git_commit and env_commit == git_commit) if env_commit or git_commit else None,
-        "branch_matches_checkout": bool(env_branch and git_branch and env_branch == git_branch) if env_branch or git_branch else None,
+        "branch_matches_checkout": branch_matches_checkout,
         "render_service_name": str(os.environ.get("RENDER_SERVICE_NAME") or "").strip() or None,
         "render_instance_id": str(os.environ.get("RENDER_INSTANCE_ID") or "").strip() or None,
         "render_external_url": str(os.environ.get("RENDER_EXTERNAL_URL") or "").strip() or None,

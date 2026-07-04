@@ -57,6 +57,30 @@ class HomeHealthRouteTests(unittest.TestCase):
         self.assertEqual(version["pid"], 4321)
         self.assertEqual(version["served_at"], 1234.5)
 
+    def test_versionz_treats_detached_head_as_not_comparable(self) -> None:
+        with patch.dict(
+            os.environ,
+            {
+                "RENDER_GIT_COMMIT": "e6aa9a6",
+                "RENDER_GIT_BRANCH": "main",
+            },
+            clear=False,
+        ), patch("syndicate.blueprints.home._git_value", side_effect=["ebb2136d", "HEAD"]), patch(
+            "syndicate.blueprints.home.socket.gethostname",
+            return_value="host-123",
+        ), patch("syndicate.blueprints.home.os.getpid", return_value=4321), patch(
+            "syndicate.blueprints.home.time.time",
+            return_value=1234.5,
+        ):
+            response = self.client.get("/versionz")
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json()
+        self.assertTrue(payload["ok"])
+        version = payload["version"]
+        self.assertEqual(version["branch"], "main")
+        self.assertIsNone(version["branch_matches_checkout"])
+
 
 if __name__ == "__main__":
     unittest.main()
