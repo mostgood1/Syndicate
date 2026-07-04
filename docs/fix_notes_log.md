@@ -1,5 +1,12 @@
 # Fix Notes Log
 
+## 2026-07-04 - Intelligence query now computes when the board cache is empty or zero-candidate
+- Symptom: The deployed `/intelligence` board stayed on the initial shell or showed `candidate_count: 0` even after the deploy was current and the board route was being exercised.
+- Root cause: The query route accepted stale snapshot payloads that still carried metadata, so the refresh flow could short-circuit before it rebuilt a populated board contract.
+- Fix: Make `/api/intelligence/query` compute immediately when the cached board has no visible candidates, and only fall back to queueing if the compute path still cannot produce a usable response.
+- Validation: Focused query tests passed in `tests/test_intelligence_state.py`, and a local `POST /api/intelligence/query` returned `candidate_count: 39` with 5 top opportunities.
+- Follow-up: Keep the request-path compute guard limited to the query route so the status read path stays cache-oriented.
+
 ## 2026-07-04 - Intelligence board cards now promote into the visible response shape
 - Symptom: `/intelligence` could return a stale or empty board shell even when the worker had computed a populated board contract, and Render could still fall back to a 502 when the home route tried to bootstrap too aggressively.
 - Root cause: The persisted state kept the useful board cards nested under `board_contract`, while the home route bootstrap logic no longer matched the cached-response queue contract the tests and refresh path expected.

@@ -1011,14 +1011,20 @@ def intelligence_query_api():
     state_payload = read_latest_intelligence_state(dict(payload))
     if force_refresh:
         queue_intelligence_state_refresh(dict(payload))
-    if not isinstance(state_payload, dict) or not _response_has_content(state_payload):
-        queue_intelligence_state_refresh(dict(payload))
-        queued_state = read_latest_intelligence_state(dict(payload))
-        if isinstance(queued_state, dict) and _response_has_content(queued_state):
-            state_payload = queued_state
+    candidate_count = _response_candidate_count(state_payload) if isinstance(state_payload, dict) else 0
+    needs_compute = force_refresh or candidate_count <= 0 or not isinstance(state_payload, dict) or not _response_has_content(state_payload)
+    if needs_compute:
+        computed_state = compute_intelligence_state_response(dict(payload), force_refresh=True)
+        if isinstance(computed_state, dict) and _response_candidate_count(computed_state) > 0:
+            state_payload = computed_state
         else:
-            state_payload = _empty_default_intelligence_response()
-            state_payload["queued"] = True
+            queue_intelligence_state_refresh(dict(payload))
+            queued_state = read_latest_intelligence_state(dict(payload))
+            if isinstance(queued_state, dict) and _response_candidate_count(queued_state) > 0:
+                state_payload = queued_state
+            else:
+                state_payload = _empty_default_intelligence_response()
+                state_payload["queued"] = True
     response = dict(state_payload)
     response.setdefault("ok", True)
     response.setdefault("response", dict(response))

@@ -462,12 +462,14 @@ class IntelligenceStateTests(unittest.TestCase):
             json={"question": "top edges today", "force_refresh": False},
         ):
             with patch("syndicate.blueprints.intelligence.read_latest_intelligence_state", return_value=None):
-                with patch("syndicate.blueprints.intelligence.queue_intelligence_state_refresh") as mocked_queue:
-                    response = intelligence_query_api()
+                with patch("syndicate.blueprints.intelligence.compute_intelligence_state_response", return_value=None) as mocked_compute:
+                    with patch("syndicate.blueprints.intelligence.queue_intelligence_state_refresh") as mocked_queue:
+                        response = intelligence_query_api()
 
         payload = response.get_json()
         self.assertIsNotNone(payload)
         self.assertEqual(response.status_code, 200)
+        mocked_compute.assert_called_once()
         mocked_queue.assert_called_once()
         self.assertIn("version", payload)
         self.assertIn("timestamp", payload)
@@ -494,12 +496,14 @@ class IntelligenceStateTests(unittest.TestCase):
             json={"question": "top edges today", "force_refresh": False},
         ):
             with patch("syndicate.blueprints.intelligence.read_latest_intelligence_state", return_value=dict(empty_cached_response)):
-                with patch("syndicate.blueprints.intelligence.queue_intelligence_state_refresh") as mocked_queue:
-                    response = intelligence_query_api()
+                with patch("syndicate.blueprints.intelligence.compute_intelligence_state_response", return_value=None) as mocked_compute:
+                    with patch("syndicate.blueprints.intelligence.queue_intelligence_state_refresh") as mocked_queue:
+                        response = intelligence_query_api()
 
         payload = response.get_json()
         self.assertIsNotNone(payload)
         self.assertEqual(response.status_code, 200)
+        mocked_compute.assert_called_once()
         mocked_queue.assert_called_once()
         self.assertIn("version", payload)
         self.assertIn("timestamp", payload)
@@ -603,17 +607,21 @@ class IntelligenceStateTests(unittest.TestCase):
             json={"question": "top edges today", "force_refresh": False},
         ):
             with patch("syndicate.blueprints.intelligence.read_latest_intelligence_state", return_value=dict(cached_response)):
-                response = intelligence_query_api()
+                with patch("syndicate.blueprints.intelligence.compute_intelligence_state_response", return_value=dict(computed_response)) as mocked_compute:
+                    with patch("syndicate.blueprints.intelligence.queue_intelligence_state_refresh") as mocked_queue:
+                        response = intelligence_query_api()
 
         payload = response.get_json()
         self.assertIsNotNone(payload)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(payload["line_moves_tracked"], 1)
+        mocked_compute.assert_called_once()
+        mocked_queue.assert_not_called()
         self.assertEqual(payload["line_move_history_count"], 2)
         self.assertEqual(payload["line_move_source_count"], 1)
         self.assertEqual(payload["debug_source"], "snapshot_read")
-
-    def test_intelligence_state_roundtrip_persists_to_tmp_file(self) -> None:
+        self.assertEqual(payload["response"]["top_opportunities"][0]["name"], "Play 1")
+        self.assertEqual(payload["response"]["analysis"]["recommendations"][0]["name"], "Play 1")
         with tempfile.TemporaryDirectory() as tmp_dir:
             reports_root = Path(tmp_dir) / "reports"
             state_path = reports_root / "intelligence" / "intelligence_state.json"
