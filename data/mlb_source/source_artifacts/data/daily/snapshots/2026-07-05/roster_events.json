@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "date": "2026-07-05",
-  "generated_at": "2026-07-04T05:07:06.238857",
+  "generated_at": "2026-07-04T07:10:23.533328",
   "include_baseline": false,
   "teams": {
     "108": {
@@ -46,15 +46,9 @@
       "roster_types": {
         "40Man": {
           "prev_date": "2026-07-04",
-          "n_players": 45,
-          "n_added": 0,
-          "n_removed": 0
-        },
-        "active": {
-          "prev_date": "2026-07-04",
-          "n_players": 26,
-          "n_added": 2,
-          "n_removed": 2,
+          "n_players": 46,
+          "n_added": 1,
+          "n_removed": 0,
           "added": [
             {
               "full_name": "Chadwick Tromp",
@@ -64,45 +58,19 @@
                 "code": "A",
                 "description": "Active"
               }
-            },
-            {
-              "full_name": "Ryan Helsley",
-              "player_id": 664854,
-              "position": "P",
-              "status": {
-                "code": "A",
-                "description": "Active"
-              }
             }
           ],
-          "removed": [
-            {
-              "full_name": "Anthony Nunez",
-              "player_id": 689296,
-              "position": "P",
-              "status": {
-                "code": "A",
-                "description": "Active"
-              }
-            },
-            {
-              "full_name": "Jeremiah Jackson",
-              "player_id": 669236,
-              "position": "2B",
-              "status": {
-                "code": "A",
-                "description": "Active"
-              }
-            }
-          ],
+          "removed": [],
           "added_ids": [
-            644433,
-            664854
+            644433
           ],
-          "removed_ids": [
-            669236,
-            689296
-          ]
+          "removed_ids": []
+        },
+        "active": {
+          "prev_date": "2026-07-04",
+          "n_players": 26,
+          "n_added": 0,
+          "n_removed": 0
         }
       }
     },
@@ -130,9 +98,25 @@
       "roster_types": {
         "40Man": {
           "prev_date": "2026-07-04",
-          "n_players": 47,
+          "n_players": 46,
           "n_added": 0,
-          "n_removed": 0
+          "n_removed": 1,
+          "added": [],
+          "removed": [
+            {
+              "full_name": "Drew Pomeranz",
+              "player_id": 519141,
+              "position": "P",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            }
+          ],
+          "added_ids": [],
+          "removed_ids": [
+            519141
+          ]
         },
         "active": {
           "prev_date": "2026-07-04",
@@ -173,36 +157,8 @@
         "active": {
           "prev_date": "2026-07-04",
           "n_players": 26,
-          "n_added": 1,
-          "n_removed": 1,
-          "added": [
-            {
-              "full_name": "Daniel Espino",
-              "player_id": 682982,
-              "position": "P",
-              "status": {
-                "code": "A",
-                "description": "Active"
-              }
-            }
-          ],
-          "removed": [
-            {
-              "full_name": "Franco Aleman",
-              "player_id": 680916,
-              "position": "P",
-              "status": {
-                "code": "A",
-                "description": "Active"
-              }
-            }
-          ],
-          "added_ids": [
-            682982
-          ],
-          "removed_ids": [
-            680916
-          ]
+          "n_added": 0,
+          "n_removed": 0
         }
       }
     },
@@ -452,9 +408,25 @@
       "roster_types": {
         "40Man": {
           "prev_date": "2026-07-04",
-          "n_players": 44,
+          "n_players": 43,
           "n_added": 0,
-          "n_removed": 0
+          "n_removed": 1,
+          "added": [],
+          "removed": [
+            {
+              "full_name": "Miles Mastrobuoni",
+              "player_id": 670156,
+              "position": "3B",
+              "status": {
+                "code": "A",
+                "description": "Active"
+              }
+            }
+          ],
+          "added_ids": [],
+          "removed_ids": [
+            670156
+          ]
         },
         "active": {
           "prev_date": "2026-07-04",

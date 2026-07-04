@@ -388,7 +388,6 @@
         621107,
         642585,
         663624,
-        664854,
         669211,
         676059,
         681882,
@@ -458,21 +457,6 @@
         {
           "player_id": 669211,
           "full_name": "Keegan Akin",
-          "status": {
-            "code": "D15",
-            "description": "Injured 15-Day"
-          },
-          "position": {
-            "code": "1",
-            "name": "Pitcher",
-            "type": "Pitcher",
-            "abbreviation": "P"
-          },
-          "roster_type_source": "40Man"
-        },
-        {
-          "player_id": 664854,
-          "full_name": "Ryan Helsley",
           "status": {
             "code": "D15",
             "description": "Injured 15-Day"
@@ -1520,6 +1504,7 @@
         621043,
         621121,
         656986,
+        664299,
         664774,
         665161,
         669699,
@@ -1533,8 +1518,8 @@
           "player_id": 656986,
           "full_name": "Bennett Sousa",
           "status": {
-            "code": "D60",
-            "description": "Injured 60-Day"
+            "code": "D15",
+            "description": "Injured 15-Day"
           },
           "position": {
             "code": "1",
@@ -1586,6 +1571,21 @@
             "name": "Shortstop",
             "type": "Infielder",
             "abbreviation": "SS"
+          },
+          "roster_type_source": "40Man"
+        },
+        {
+          "player_id": 664299,
+          "full_name": "Cristian Javier",
+          "status": {
+            "code": "D60",
+            "description": "Injured 60-Day"
+          },
+          "position": {
+            "code": "1",
+            "name": "Pitcher",
+            "type": "Pitcher",
+            "abbreviation": "P"
           },
           "roster_type_source": "40Man"
         },
@@ -2793,7 +2793,6 @@
         666374,
         669717,
         672841,
-        677594,
         680977,
         681867,
         688138
@@ -2833,29 +2832,14 @@
           "player_id": 681867,
           "full_name": "Cooper Criswell",
           "status": {
-            "code": "D60",
-            "description": "Injured 60-Day"
+            "code": "D15",
+            "description": "Injured 15-Day"
           },
           "position": {
             "code": "1",
             "name": "Pitcher",
             "type": "Pitcher",
             "abbreviation": "P"
-          },
-          "roster_type_source": "40Man"
-        },
-        {
-          "player_id": 677594,
-          "full_name": "Julio Rodr\u00edguez",
-          "status": {
-            "code": "D7",
-            "description": "Injured 7-Day"
-          },
-          "position": {
-            "code": "8",
-            "name": "Outfielder",
-            "type": "Outfielder",
-            "abbreviation": "CF"
           },
           "roster_type_source": "40Man"
         },
@@ -4993,22 +4977,6 @@
     },
     {
       "team_id": 110,
-      "player_id": 664854,
-      "full_name": "Ryan Helsley",
-      "status": {
-        "code": "D15",
-        "description": "Injured 15-Day"
-      },
-      "position": {
-        "code": "1",
-        "name": "Pitcher",
-        "type": "Pitcher",
-        "abbreviation": "P"
-      },
-      "roster_type_source": "40Man"
-    },
-    {
-      "team_id": 110,
       "player_id": 663624,
       "full_name": "Ryan Mountcastle",
       "status": {
@@ -5972,8 +5940,8 @@
       "player_id": 656986,
       "full_name": "Bennett Sousa",
       "status": {
-        "code": "D60",
-        "description": "Injured 60-Day"
+        "code": "D15",
+        "description": "Injured 15-Day"
       },
       "position": {
         "code": "1",
@@ -6028,6 +5996,22 @@
         "name": "Shortstop",
         "type": "Infielder",
         "abbreviation": "SS"
+      },
+      "roster_type_source": "40Man"
+    },
+    {
+      "team_id": 117,
+      "player_id": 664299,
+      "full_name": "Cristian Javier",
+      "status": {
+        "code": "D60",
+        "description": "Injured 60-Day"
+      },
+      "position": {
+        "code": "1",
+        "name": "Pitcher",
+        "type": "Pitcher",
+        "abbreviation": "P"
       },
       "roster_type_source": "40Man"
     },
@@ -7188,30 +7172,14 @@
       "player_id": 681867,
       "full_name": "Cooper Criswell",
       "status": {
-        "code": "D60",
-        "description": "Injured 60-Day"
+        "code": "D15",
+        "description": "Injured 15-Day"
       },
       "position": {
         "code": "1",
         "name": "Pitcher",
         "type": "Pitcher",
         "abbreviation": "P"
-      },
-      "roster_type_source": "40Man"
-    },
-    {
-      "team_id": 136,
-      "player_id": 677594,
-      "full_name": "Julio Rodr\u00edguez",
-      "status": {
-        "code": "D7",
-        "description": "Injured 7-Day"
-      },
-      "position": {
-        "code": "8",
-        "name": "Outfielder",
-        "type": "Outfielder",
-        "abbreviation": "CF"
       },
       "roster_type_source": "40Man"
     },

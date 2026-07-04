@@ -1,7 +1,7 @@
 {
   "date": "2026-07-04",
   "season": 2026,
-  "generated_at": "2026-07-04T05:04:00.405310",
+  "generated_at": "2026-07-04T07:07:34.886540",
   "tool": "tools/daily_update_multi_profile.py",
   "source_sim_dir": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily_hitter_props\\sims\\2026-07-04",
   "source_snapshot_dir": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily_hitter_props\\snapshots\\2026-07-04",

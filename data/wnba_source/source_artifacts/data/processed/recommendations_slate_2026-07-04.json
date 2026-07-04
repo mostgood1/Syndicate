@@ -33,14 +33,14 @@
           "team": "ATL",
           "display_pick": "Allisha Gray UNDER 1.5",
           "selection": "UNDER 1.5",
-          "price": 122.0,
-          "score": 18.329878219883476,
-          "ev_pct": 18.329878219883476,
-          "win_prob": 0.45045045045045046,
-          "p_win": 0.45045045045045046,
+          "price": 124.0,
+          "score": 19.39591315880135,
+          "ev_pct": 19.39591315880135,
+          "win_prob": 0.44642857142857145,
+          "p_win": 0.44642857142857145,
           "basketball_summary": "Prop projection -",
           "top_play_reasons": [
-            "EV 18.3%",
+            "EV 19.4%",
             "Regular price range (-150 to +150)",
             "Consensus: 4 books aligned",
             "Best line available"
@@ -49,18 +49,19 @@
         },
         {
           "market": "PROPS",
-          "team": "GSV",
-          "display_pick": "Veronica Burton OVER 15.5",
-          "selection": "OVER 15.5",
+          "team": "ATL",
+          "display_pick": "Angel Reese UNDER 14.5",
+          "selection": "UNDER 14.5",
           "price": -108.0,
-          "score": 8.870771028229896,
-          "ev_pct": 8.870771028229896,
+          "score": 8.196978474568194,
+          "ev_pct": 8.196978474568194,
           "win_prob": 0.5192307692307693,
           "p_win": 0.5192307692307693,
           "basketball_summary": "Prop projection -",
           "top_play_reasons": [
-            "EV 8.9%",
-            "Regular price range (-150 to +150)"
+            "EV 8.2%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
           ],
           "matchup": "GSV @ ATL"
         }

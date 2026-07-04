@@ -854,16 +854,16 @@
     "projected_lineup_ids": [
       641487,
       663728,
+      677594,
       647304,
       668227,
       670042,
       702284,
       641598,
-      806068,
-      671083
+      806068
     ],
     "lineup_source": "projected_rotowire_today_lineup",
-    "lineup_confidence": 0.48000000000000004,
+    "lineup_confidence": 0.72,
     "probable_pitcher": {
       "id": 669923,
       "source": "feed_gameData_probablePitchers",
@@ -977,6 +977,35 @@
           "bb": 0.9879452054794521,
           "hr": 1.2013649564375606,
           "inplay": 0.9603401881299511
+        },
+        "statcast_quality_mult": {},
+        "vs_pitcher_history": {}
+      },
+      {
+        "id": 677594,
+        "name": "Julio Rodr\u00edguez",
+        "pos": "CF",
+        "bat": "R",
+        "throw": "R",
+        "k_rate": 0.21027212918660285,
+        "bb_rate": 0.0733104066985646,
+        "hbp_rate": 0.008522727272727272,
+        "hr_rate": 0.0364383971291866,
+        "inplay_hit_rate": 0.26188657067293564,
+        "xb_hit_share": 0.1875,
+        "vs_pitch_type": {},
+        "vs_pitch_type_hr": {},
+        "platoon_mult_vs_lhp": {
+          "k": 0.9000056963327088,
+          "bb": 1.1925000000000001,
+          "hr": 1.275,
+          "inplay": 0.8954854877318971
+        },
+        "platoon_mult_vs_rhp": {
+          "k": 1.0323926260399632,
+          "bb": 0.9188965939220884,
+          "hr": 0.862725687320476,
+          "inplay": 1.0417538088814386
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -1154,7 +1183,9 @@
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
-      },
+      }
+    ],
+    "bench": [
       {
         "id": 671083,
         "name": "Buddy Kennedy",
@@ -1183,9 +1214,7 @@
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
-      }
-    ],
-    "bench": [
+      },
       {
         "id": 686527,
         "name": "Dominic Canzone",

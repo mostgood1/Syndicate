@@ -103,12 +103,12 @@
   },
   "playable_results": {
     "hitter_hits": {
-      "n": 12,
+      "n": 13,
       "wins": 5,
-      "losses": 7,
-      "stake_u": 6.0,
-      "profit_u": -1.51,
-      "roi": -0.2517
+      "losses": 8,
+      "stake_u": 6.5,
+      "profit_u": -2.01,
+      "roi": -0.3092
     },
     "hitter_rbis": {
       "n": 3,
@@ -127,36 +127,36 @@
       "roi": 0.8
     },
     "hitter_total_bases": {
-      "n": 5,
+      "n": 7,
       "wins": 2,
-      "losses": 3,
-      "stake_u": 2.5,
-      "profit_u": -0.1902,
-      "roi": -0.0761
+      "losses": 5,
+      "stake_u": 3.5,
+      "profit_u": -1.1902,
+      "roi": -0.3401
     },
     "pitcher_props": {
-      "n": 21,
+      "n": 22,
       "wins": 9,
-      "losses": 12,
-      "stake_u": 21.0,
-      "profit_u": -3.5631,
-      "roi": -0.1697
+      "losses": 13,
+      "stake_u": 22.0,
+      "profit_u": -4.5631,
+      "roi": -0.2074
     },
     "hitter_props": {
-      "n": 21,
+      "n": 24,
       "wins": 9,
-      "losses": 12,
-      "stake_u": 10.5,
-      "profit_u": -1.4652,
-      "roi": -0.1395
+      "losses": 15,
+      "stake_u": 12.0,
+      "profit_u": -2.9652,
+      "roi": -0.2471
     },
     "combined": {
-      "n": 42,
+      "n": 46,
       "wins": 18,
-      "losses": 24,
-      "stake_u": 31.5,
-      "profit_u": -5.0283,
-      "roi": -0.1596
+      "losses": 28,
+      "stake_u": 34.0,
+      "profit_u": -7.5283,
+      "roi": -0.2214
     }
   },
   "shadow_results": {
@@ -179,12 +179,12 @@
   },
   "all_results": {
     "hitter_hits": {
-      "n": 16,
+      "n": 17,
       "wins": 8,
-      "losses": 8,
-      "stake_u": 8.0,
-      "profit_u": -0.8578,
-      "roi": -0.1072
+      "losses": 9,
+      "stake_u": 8.5,
+      "profit_u": -1.3578,
+      "roi": -0.1597
     },
     "hitter_rbis": {
       "n": 3,
@@ -203,12 +203,12 @@
       "roi": 0.7676
     },
     "hitter_total_bases": {
-      "n": 11,
+      "n": 13,
       "wins": 4,
-      "losses": 7,
-      "stake_u": 5.5,
-      "profit_u": -1.4608,
-      "roi": -0.2656
+      "losses": 9,
+      "stake_u": 6.5,
+      "profit_u": -2.4608,
+      "roi": -0.3786
     },
     "ml": {
       "n": 1,
@@ -219,156 +219,42 @@
       "roi": -1.0
     },
     "pitcher_props": {
-      "n": 22,
+      "n": 23,
       "wins": 9,
-      "losses": 13,
-      "stake_u": 22.0,
-      "profit_u": -4.5631,
-      "roi": -0.2074
+      "losses": 14,
+      "stake_u": 23.0,
+      "profit_u": -5.5631,
+      "roi": -0.2419
     },
     "hitter_props": {
-      "n": 32,
+      "n": 35,
       "wins": 15,
-      "losses": 17,
-      "stake_u": 16.0,
-      "profit_u": -1.716,
-      "roi": -0.1073
+      "losses": 20,
+      "stake_u": 17.5,
+      "profit_u": -3.216,
+      "roi": -0.1838
     },
     "combined": {
-      "n": 55,
+      "n": 59,
       "wins": 24,
-      "losses": 31,
-      "stake_u": 39.0,
-      "profit_u": -7.2791,
-      "roi": -0.1866
+      "losses": 35,
+      "stake_u": 41.5,
+      "profit_u": -9.7791,
+      "roi": -0.2356
     }
   },
   "settled_n": 13,
-  "playable_settled_n": 42,
+  "playable_settled_n": 46,
   "shadow_settled_n": 8,
-  "all_settled_n": 55,
+  "all_settled_n": 59,
   "unresolved_n": 0,
-  "playable_unresolved_n": 4,
+  "playable_unresolved_n": 0,
   "shadow_unresolved_n": 0,
-  "all_unresolved_n": 4,
+  "all_unresolved_n": 0,
   "unresolved_recommendations": [],
-  "playable_unresolved_recommendations": [
-    {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_07_03_locked_policy.json",
-      "date": "2026-07-03",
-      "game_pk": 825062,
-      "market": "pitcher_props",
-      "player_name": "Kyle Harrison",
-      "pitcher_name": "Kyle Harrison",
-      "team": "MIL",
-      "prop": "outs",
-      "selection": "over",
-      "market_line": 16.5,
-      "reason": "game not final",
-      "recommendation_tier": "candidate"
-    },
-    {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_07_03_locked_policy.json",
-      "date": "2026-07-03",
-      "game_pk": 825062,
-      "market": "hitter_hits",
-      "player_name": "LuJames Groover",
-      "pitcher_name": "LuJames Groover",
-      "team": "AZ",
-      "prop": "batter_hits",
-      "selection": "over",
-      "market_line": 0.5,
-      "reason": "game not final",
-      "recommendation_tier": "candidate"
-    },
-    {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_07_03_locked_policy.json",
-      "date": "2026-07-03",
-      "game_pk": 825062,
-      "market": "hitter_total_bases",
-      "player_name": "LuJames Groover",
-      "pitcher_name": "LuJames Groover",
-      "team": "AZ",
-      "prop": "batter_total_bases",
-      "selection": "over",
-      "market_line": 0.5,
-      "reason": "game not final",
-      "recommendation_tier": "candidate"
-    },
-    {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_07_03_locked_policy.json",
-      "date": "2026-07-03",
-      "game_pk": 825062,
-      "market": "hitter_total_bases",
-      "player_name": "Corbin Carroll",
-      "pitcher_name": "Corbin Carroll",
-      "team": "AZ",
-      "prop": "batter_total_bases",
-      "selection": "over",
-      "market_line": 1.5,
-      "reason": "game not final",
-      "recommendation_tier": "candidate"
-    }
-  ],
+  "playable_unresolved_recommendations": [],
   "shadow_unresolved_recommendations": [],
-  "all_unresolved_recommendations": [
-    {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_07_03_locked_policy.json",
-      "date": "2026-07-03",
-      "game_pk": 825062,
-      "market": "pitcher_props",
-      "player_name": "Kyle Harrison",
-      "pitcher_name": "Kyle Harrison",
-      "team": "MIL",
-      "prop": "outs",
-      "selection": "over",
-      "market_line": 16.5,
-      "reason": "game not final",
-      "recommendation_tier": "candidate"
-    },
-    {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_07_03_locked_policy.json",
-      "date": "2026-07-03",
-      "game_pk": 825062,
-      "market": "hitter_hits",
-      "player_name": "LuJames Groover",
-      "pitcher_name": "LuJames Groover",
-      "team": "AZ",
-      "prop": "batter_hits",
-      "selection": "over",
-      "market_line": 0.5,
-      "reason": "game not final",
-      "recommendation_tier": "candidate"
-    },
-    {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_07_03_locked_policy.json",
-      "date": "2026-07-03",
-      "game_pk": 825062,
-      "market": "hitter_total_bases",
-      "player_name": "LuJames Groover",
-      "pitcher_name": "LuJames Groover",
-      "team": "AZ",
-      "prop": "batter_total_bases",
-      "selection": "over",
-      "market_line": 0.5,
-      "reason": "game not final",
-      "recommendation_tier": "candidate"
-    },
-    {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_07_03_locked_policy.json",
-      "date": "2026-07-03",
-      "game_pk": 825062,
-      "market": "hitter_total_bases",
-      "player_name": "Corbin Carroll",
-      "pitcher_name": "Corbin Carroll",
-      "team": "AZ",
-      "prop": "batter_total_bases",
-      "selection": "over",
-      "market_line": 1.5,
-      "reason": "game not final",
-      "recommendation_tier": "candidate"
-    }
-  ],
+  "all_unresolved_recommendations": [],
   "_settled_rows": [
     {
       "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_07_03_locked_policy.json",
@@ -692,6 +578,24 @@
       "odds": "+130",
       "stake_u": 1.0,
       "actual": 12.0,
+      "result": "loss",
+      "profit_u": -1.0,
+      "recommendation_tier": "candidate"
+    },
+    {
+      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_07_03_locked_policy.json",
+      "date": "2026-07-03",
+      "game_pk": 825062,
+      "market": "pitcher_props",
+      "player_name": "Kyle Harrison",
+      "pitcher_name": "Kyle Harrison",
+      "team": "MIL",
+      "prop": "outs",
+      "selection": "over",
+      "market_line": 16.5,
+      "odds": "-132",
+      "stake_u": 1.0,
+      "actual": 8.0,
       "result": "loss",
       "profit_u": -1.0,
       "recommendation_tier": "candidate"
@@ -1185,6 +1089,24 @@
     {
       "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_07_03_locked_policy.json",
       "date": "2026-07-03",
+      "game_pk": 825062,
+      "market": "hitter_hits",
+      "player_name": "LuJames Groover",
+      "pitcher_name": "LuJames Groover",
+      "team": "AZ",
+      "prop": "batter_hits",
+      "selection": "over",
+      "market_line": 0.5,
+      "odds": "-118",
+      "stake_u": 0.5,
+      "actual": 0.0,
+      "result": "loss",
+      "profit_u": -0.5,
+      "recommendation_tier": "candidate"
+    },
+    {
+      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_07_03_locked_policy.json",
+      "date": "2026-07-03",
       "game_pk": 823933,
       "market": "hitter_hits",
       "player_name": "Gavin Sheets",
@@ -1221,6 +1143,24 @@
     {
       "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_07_03_locked_policy.json",
       "date": "2026-07-03",
+      "game_pk": 825062,
+      "market": "hitter_total_bases",
+      "player_name": "LuJames Groover",
+      "pitcher_name": "LuJames Groover",
+      "team": "AZ",
+      "prop": "batter_total_bases",
+      "selection": "over",
+      "market_line": 0.5,
+      "odds": "-115",
+      "stake_u": 0.5,
+      "actual": 0.0,
+      "result": "loss",
+      "profit_u": -0.5,
+      "recommendation_tier": "candidate"
+    },
+    {
+      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_07_03_locked_policy.json",
+      "date": "2026-07-03",
       "game_pk": 824659,
       "market": "hitter_total_bases",
       "player_name": "Dansby Swanson",
@@ -1248,6 +1188,24 @@
       "selection": "over",
       "market_line": 1.5,
       "odds": "+100",
+      "stake_u": 0.5,
+      "actual": 1.0,
+      "result": "loss",
+      "profit_u": -0.5,
+      "recommendation_tier": "candidate"
+    },
+    {
+      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_07_03_locked_policy.json",
+      "date": "2026-07-03",
+      "game_pk": 825062,
+      "market": "hitter_total_bases",
+      "player_name": "Corbin Carroll",
+      "pitcher_name": "Corbin Carroll",
+      "team": "AZ",
+      "prop": "batter_total_bases",
+      "selection": "over",
+      "market_line": 1.5,
+      "odds": "+122",
       "stake_u": 0.5,
       "actual": 1.0,
       "result": "loss",
@@ -1837,6 +1795,24 @@
     {
       "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_07_03_locked_policy.json",
       "date": "2026-07-03",
+      "game_pk": 825062,
+      "market": "pitcher_props",
+      "player_name": "Kyle Harrison",
+      "pitcher_name": "Kyle Harrison",
+      "team": "MIL",
+      "prop": "outs",
+      "selection": "over",
+      "market_line": 16.5,
+      "odds": "-132",
+      "stake_u": 1.0,
+      "actual": 8.0,
+      "result": "loss",
+      "profit_u": -1.0,
+      "recommendation_tier": "candidate"
+    },
+    {
+      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_07_03_locked_policy.json",
+      "date": "2026-07-03",
       "game_pk": 824498,
       "market": "pitcher_props",
       "player_name": "Trevor Rogers",
@@ -2323,6 +2299,24 @@
     {
       "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_07_03_locked_policy.json",
       "date": "2026-07-03",
+      "game_pk": 825062,
+      "market": "hitter_hits",
+      "player_name": "LuJames Groover",
+      "pitcher_name": "LuJames Groover",
+      "team": "AZ",
+      "prop": "batter_hits",
+      "selection": "over",
+      "market_line": 0.5,
+      "odds": "-118",
+      "stake_u": 0.5,
+      "actual": 0.0,
+      "result": "loss",
+      "profit_u": -0.5,
+      "recommendation_tier": "candidate"
+    },
+    {
+      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_07_03_locked_policy.json",
+      "date": "2026-07-03",
       "game_pk": 823933,
       "market": "hitter_hits",
       "player_name": "Gavin Sheets",
@@ -2359,6 +2353,24 @@
     {
       "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_07_03_locked_policy.json",
       "date": "2026-07-03",
+      "game_pk": 825062,
+      "market": "hitter_total_bases",
+      "player_name": "LuJames Groover",
+      "pitcher_name": "LuJames Groover",
+      "team": "AZ",
+      "prop": "batter_total_bases",
+      "selection": "over",
+      "market_line": 0.5,
+      "odds": "-115",
+      "stake_u": 0.5,
+      "actual": 0.0,
+      "result": "loss",
+      "profit_u": -0.5,
+      "recommendation_tier": "candidate"
+    },
+    {
+      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_07_03_locked_policy.json",
+      "date": "2026-07-03",
       "game_pk": 824659,
       "market": "hitter_total_bases",
       "player_name": "Dansby Swanson",
@@ -2386,6 +2398,24 @@
       "selection": "over",
       "market_line": 1.5,
       "odds": "+100",
+      "stake_u": 0.5,
+      "actual": 1.0,
+      "result": "loss",
+      "profit_u": -0.5,
+      "recommendation_tier": "candidate"
+    },
+    {
+      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_07_03_locked_policy.json",
+      "date": "2026-07-03",
+      "game_pk": 825062,
+      "market": "hitter_total_bases",
+      "player_name": "Corbin Carroll",
+      "pitcher_name": "Corbin Carroll",
+      "team": "AZ",
+      "prop": "batter_total_bases",
+      "selection": "over",
+      "market_line": 1.5,
+      "odds": "+122",
       "stake_u": 0.5,
       "actual": 1.0,
       "result": "loss",

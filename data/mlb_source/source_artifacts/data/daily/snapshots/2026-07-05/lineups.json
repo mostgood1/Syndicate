@@ -2,11 +2,11 @@
   "date": "2026-07-05",
   "season": 2026,
   "spring_mode": false,
-  "generated_at": "2026-07-04T05:09:34.111475",
+  "generated_at": "2026-07-04T07:12:11.449885",
   "summary": {
     "games": 15,
     "projected_teams": 30,
-    "adjusted_teams": 9,
+    "adjusted_teams": 8,
     "partial_teams": 0,
     "fallback_pool_teams": 0,
     "confirmed_teams": 0,
@@ -2024,13 +2024,13 @@
       "home_projected_ids": [
         641487,
         663728,
+        677594,
         647304,
         668227,
         670042,
         702284,
         641598,
-        806068,
-        671083
+        806068
       ],
       "away_projected_validation": {
         "status": "ok",
@@ -2086,10 +2086,11 @@
         "mapping_source": "projected_rotowire_default_vs_lhp"
       },
       "home_projected_validation": {
-        "status": "adjusted",
+        "status": "ok",
         "raw_ids": [
           641487,
           663728,
+          677594,
           647304,
           668227,
           670042,
@@ -2100,20 +2101,18 @@
         "ids": [
           641487,
           663728,
+          677594,
           647304,
           668227,
           670042,
           702284,
           641598,
-          806068,
-          671083
+          806068
         ],
         "missing_ids": [],
-        "backfilled_ids": [
-          671083
-        ],
+        "backfilled_ids": [],
         "pool_source": "active+40Man",
-        "pool_size": 19,
+        "pool_size": 20,
         "raw_names": [
           "J.P. Crawford",
           "Cal Raleigh",
@@ -2128,6 +2127,7 @@
         "matched_names": [
           "J.P. Crawford",
           "Cal Raleigh",
+          "Julio Rodr\u00edguez",
           "Josh Naylor",
           "Randy Arozarena",
           "Luke Raley",
@@ -2135,15 +2135,13 @@
           "Mitch Garver",
           "Colt Emerson"
         ],
-        "missing_name_labels": [
-          "Julio Rodriguez"
-        ],
+        "missing_name_labels": [],
         "mapping_source": "projected_rotowire_today_lineup"
       },
       "away_source": "projected_rotowire_default_vs_lhp",
       "home_source": "projected_rotowire_today_lineup",
       "away_confidence": 0.56,
-      "home_confidence": 0.48000000000000004,
+      "home_confidence": 0.72,
       "away_comparison": {
         "status": "projected_only",
         "is_true_mismatch": false,

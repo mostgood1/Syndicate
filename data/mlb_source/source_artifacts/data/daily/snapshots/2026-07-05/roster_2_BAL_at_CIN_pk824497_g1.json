@@ -77,6 +77,12 @@
       {
         "id": 552640,
         "name": "Andrew Kittredge",
+        "role": "MR",
+        "lev": 0.5
+      },
+      {
+        "id": 689296,
+        "name": "Anthony Nunez",
         "role": "SU",
         "lev": 0.7
       },
@@ -405,35 +411,6 @@
         "vs_pitcher_history": {}
       },
       {
-        "id": 644433,
-        "name": "Chadwick Tromp",
-        "pos": "C",
-        "bat": "R",
-        "throw": "R",
-        "k_rate": 0.25925925925925924,
-        "bb_rate": 0.0,
-        "hbp_rate": 0.0,
-        "hr_rate": 0.0,
-        "inplay_hit_rate": 0.25,
-        "xb_hit_share": 0.2,
-        "vs_pitch_type": {},
-        "vs_pitch_type_hr": {},
-        "platoon_mult_vs_lhp": {
-          "k": 1.1925000000000001,
-          "bb": 1.0,
-          "hr": 1.0,
-          "inplay": 1.0785714285714285
-        },
-        "platoon_mult_vs_rhp": {
-          "k": 0.8477678571428572,
-          "bb": 1.0,
-          "hr": 1.0,
-          "inplay": 0.9576923076923077
-        },
-        "statcast_quality_mult": {},
-        "vs_pitcher_history": {}
-      },
-      {
         "id": 691723,
         "name": "Coby Mayo",
         "pos": "3B",
@@ -487,6 +464,35 @@
           "bb": 1.0556382907358959,
           "hr": 1.2241596638655463,
           "inplay": 1.0005601629564964
+        },
+        "statcast_quality_mult": {},
+        "vs_pitcher_history": {}
+      },
+      {
+        "id": 669236,
+        "name": "Jeremiah Jackson",
+        "pos": "2B",
+        "bat": "R",
+        "throw": "R",
+        "k_rate": 0.19331683168316832,
+        "bb_rate": 0.021831683168316834,
+        "hbp_rate": 0.0049504950495049506,
+        "hr_rate": 0.03445544554455446,
+        "inplay_hit_rate": 0.2711385350318471,
+        "xb_hit_share": 0.16326530612244897,
+        "vs_pitch_type": {},
+        "vs_pitch_type_hr": {},
+        "platoon_mult_vs_lhp": {
+          "k": 1.134924360980699,
+          "bb": 1.1925000000000001,
+          "hr": 0.78,
+          "inplay": 1.0371925445679977
+        },
+        "platoon_mult_vs_rhp": {
+          "k": 0.9690331176246669,
+          "bb": 0.8075,
+          "hr": 1.097134203168686,
+          "inplay": 0.9784284320100086
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -584,8 +590,8 @@
         "id": 552640,
         "name": "Andrew Kittredge",
         "throw": "R",
-        "role": "SU",
-        "leverage_skill": 0.7,
+        "role": "MR",
+        "leverage_skill": 0.5,
         "stamina_pitches": 25,
         "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
@@ -617,6 +623,50 @@
           "FF": 0.11604094883959053,
           "SI": 0.38566553614334464,
           "SL": 0.49829351501706487
+        },
+        "pitch_type_whiff_mult": {},
+        "pitch_type_inplay_mult": {},
+        "pitch_type_hr_mult": {}
+      },
+      {
+        "id": 689296,
+        "name": "Anthony Nunez",
+        "throw": "R",
+        "role": "SU",
+        "leverage_skill": 0.7,
+        "stamina_pitches": 25,
+        "availability_mult": 1.0,
+        "platoon_mult_vs_lhb": {
+          "k": 0.8725212613873748,
+          "bb": 0.8885976969963554,
+          "hr": 1.275,
+          "inplay": 0.8222313371616079
+        },
+        "platoon_mult_vs_rhb": {
+          "k": 1.1925000000000001,
+          "bb": 1.112433763049668,
+          "hr": 0.8153651115618661,
+          "inplay": 1.1925000000000001
+        },
+        "statcast_quality_mult": {},
+        "arsenal_source": "statsapi_pitchArsenal",
+        "arsenal_sample_size": 494,
+        "statcast_splits_found": false,
+        "statcast_splits_source": "",
+        "statcast_splits_n_pitches": 0,
+        "statcast_splits_start_date": "",
+        "statcast_splits_end_date": "",
+        "k_rate": 0.24964294508741686,
+        "bb_rate": 0.08589017483378478,
+        "hbp_rate": 0.007633587786259542,
+        "hr_rate": 0.025954198473282442,
+        "inplay_hit_rate": 0.33454545454545453,
+        "arsenal": {
+          "FF": 0.277327927765182,
+          "OTHER": 0.28947368810526325,
+          "CH": 0.24089068674493921,
+          "SI": 0.1619433245344131,
+          "FC": 0.03036437285020244
         },
         "pitch_type_whiff_mult": {},
         "pitch_type_inplay_mult": {},
