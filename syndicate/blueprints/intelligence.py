@@ -992,6 +992,7 @@ def intelligence_query_api():
     if force_refresh:
         queue_intelligence_state_refresh(dict(payload))
     if not isinstance(state_payload, dict) or not _response_has_content(state_payload):
+        queue_intelligence_state_refresh(dict(payload))
         queued_state = read_latest_intelligence_state(dict(payload))
         if isinstance(queued_state, dict) and _response_has_content(queued_state):
             state_payload = queued_state

@@ -462,11 +462,13 @@ class IntelligenceStateTests(unittest.TestCase):
             json={"question": "top edges today", "force_refresh": False},
         ):
             with patch("syndicate.blueprints.intelligence.read_latest_intelligence_state", return_value=None):
-                response = intelligence_query_api()
+                with patch("syndicate.blueprints.intelligence.queue_intelligence_state_refresh") as mocked_queue:
+                    response = intelligence_query_api()
 
         payload = response.get_json()
         self.assertIsNotNone(payload)
         self.assertEqual(response.status_code, 200)
+        mocked_queue.assert_called_once()
         self.assertIn("version", payload)
         self.assertIn("timestamp", payload)
         self.assertIn("response", payload)
@@ -500,11 +502,13 @@ class IntelligenceStateTests(unittest.TestCase):
             json={"question": "top edges today", "force_refresh": False},
         ):
             with patch("syndicate.blueprints.intelligence.read_latest_intelligence_state", return_value=dict(empty_cached_response)):
-                response = intelligence_query_api()
+                with patch("syndicate.blueprints.intelligence.queue_intelligence_state_refresh") as mocked_queue:
+                    response = intelligence_query_api()
 
         payload = response.get_json()
         self.assertIsNotNone(payload)
         self.assertEqual(response.status_code, 200)
+        mocked_queue.assert_called_once()
         self.assertIn("version", payload)
         self.assertIn("timestamp", payload)
         self.assertIn("response", payload)
