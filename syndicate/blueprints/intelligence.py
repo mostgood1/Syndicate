@@ -697,12 +697,17 @@ def _line_move_tracking_fields(response_payload: dict[str, object] | None) -> di
 
 def _debug_state_fields(response_payload: dict[str, object] | None, *, source: str, state_last_updated: str | None = None) -> dict[str, object]:
     current = dict(response_payload or {})
+    state_meta = current.get("state_meta") if isinstance(current.get("state_meta"), dict) else {}
     derived_last_updated = str(
         state_last_updated
-        or current.get("last_updated")
-        or current.get("latestComputedAt")
+        or state_meta.get("computed_at")
+        or state_meta.get("latestComputedAt")
+        or current.get("timestamp")
+        or current.get("state_last_updated")
         or current.get("computed_at")
         or current.get("updated_at")
+        or current.get("last_updated")
+        or current.get("latestComputedAt")
         or ""
     ).strip() or None
     debug_fields = {

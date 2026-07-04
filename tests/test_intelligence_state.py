@@ -1521,6 +1521,18 @@ class IntelligenceStateTests(unittest.TestCase):
         self.assertEqual(status["freshnessStatus"], "fresh")
         self.assertTrue(status["isFresh"])
 
+    def test_debug_state_fields_prefers_worker_state_meta_timestamp(self) -> None:
+        payload = {
+            "last_updated": "2026-06-29T20:40:54-05:00",
+            "state_meta": {"computed_at": "2026-07-04T21:00:00Z"},
+            "candidate_count": 38,
+        }
+
+        fields = intelligence_module._debug_state_fields(payload, source="snapshot_read")
+
+        self.assertEqual(fields["state_last_updated"], "2026-07-04T21:00:00Z")
+        self.assertEqual(fields["debug_source"], "snapshot_read")
+
     def test_status_page_redirects_to_api_status(self) -> None:
         app = Flask(__name__)
         app.register_blueprint(intelligence_bp)
