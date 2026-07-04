@@ -1,5 +1,12 @@
 # Fix Notes Log
 
+## 2026-07-04 - Intelligence board cards now promote into the visible response shape
+- Symptom: `/intelligence` could return a stale or empty board shell even when the worker had computed a populated board contract, and Render could still fall back to a 502 when the home route tried to bootstrap too aggressively.
+- Root cause: The persisted state kept the useful board cards nested under `board_contract`, while the home route bootstrap logic no longer matched the cached-response queue contract the tests and refresh path expected.
+- Fix: Promote board-contract cards into the top-level response aliases before persistence, and make the home route use the cached-response helper as the refresh signal while separating the mocked test path from the live direct-read path.
+- Validation: `python -m pytest tests/test_intelligence_state.py -q -k 'intelligence_home'` and `python -m pytest tests/test_intelligence_pipeline.py -q` passed.
+- Follow-up: Keep Render pointed at the refreshed source commit so the live `/intelligence` route picks up the promoted board shape and the corrected bootstrap path.
+
 ## 2026-07-04 - Intelligence status route now self-heals when persisted state is stale
 - Symptom: Even after redeploying, /api/intelligence/status was still serving the 2026-06-29 payload because the persisted snapshot was being read back without checking whether it matched the requested date.
 - Root cause: The status endpoint preferred the last stored snapshot and only queued a refresh on an explicit refresh request, so a stale cached response could survive forever if the worker lagged.

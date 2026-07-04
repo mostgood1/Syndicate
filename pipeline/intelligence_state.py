@@ -211,6 +211,7 @@ def _promote_board_contract_cards(state: dict[str, Any] | None) -> dict[str, Any
 
     analysis = current.get("analysis") if isinstance(current.get("analysis"), dict) else None
     if isinstance(analysis, dict):
+        analysis = dict(analysis)
         if not isinstance(analysis.get("recommendations"), list) or not analysis.get("recommendations"):
             analysis["recommendations"] = [dict(item) for item in cards]
         if not isinstance(analysis.get("picks"), list) or not analysis.get("picks"):
@@ -221,6 +222,7 @@ def _promote_board_contract_cards(state: dict[str, Any] | None) -> dict[str, Any
 
     response = current.get("response") if isinstance(current.get("response"), dict) else None
     if isinstance(response, dict):
+        response = dict(response)
         if not isinstance(response.get("top_opportunities"), list) or not response.get("top_opportunities"):
             response["top_opportunities"] = [dict(item) for item in cards]
         if not isinstance(response.get("recommendations"), list) or not response.get("recommendations"):
@@ -1478,6 +1480,7 @@ class IntelligenceStateService:
             board_payload = dict(response)
             board_payload["board"] = _build_board_dictionary(ranked_candidates)
             response["board_contract"] = build_intelligence_board_contract(board_payload)
+            response = _promote_board_contract_cards(response)
             _log_stage_timing("response_building", (time.perf_counter() - response_build_started_at) * 1000.0)
             response = _decorate_response_with_state_meta(dict(response), None, source="worker", run_key=cache_key, sla_seconds=self._interval_seconds) or dict(response)
             with self._condition:

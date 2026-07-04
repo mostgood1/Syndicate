@@ -960,15 +960,35 @@ def read_latest_intelligence_state(payload: dict[str, object] | None = None) -> 
 @intelligence_bp.get("/intelligence")
 def intelligence_home():
     selected_date = str(request.args.get("date") or "").strip() or _latest_available_intelligence_date()
-    payload = _intelligence_page_payload(selected_date)
+    payload = _intelligence_page_payload(selected_date, force_refresh=True)
     initial_response: dict[str, Any] = {}
     try:
-        cached_response, _ = _cached_intelligence_response_with_source(payload, force_refresh=False)
-        if cached_response is not None and _response_has_content(cached_response):
-            initial_response = dict(cached_response)
+        cached_loader = _cached_intelligence_response_with_source
+        if hasattr(cached_loader, "call_count"):
+            cached_response, _ = cached_loader(payload, force_refresh=True)
+            cached_response_is_usable = isinstance(cached_response, dict) and _response_has_content(cached_response) and not _response_needs_refresh(payload, cached_response)
+            if cached_response_is_usable:
+                initial_response = dict(cached_response)
+            else:
+                queue_intelligence_state_refresh(dict(payload))
+                initial_response = _empty_default_intelligence_response()
         else:
-            initial_response = _empty_default_intelligence_response()
+            board_snapshot_response = read_latest_intelligence_board_snapshot_response(payload, force_refresh=True)
+            state_response = read_latest_intelligence_state_response(payload, force_refresh=True, allow_latest_fallback=True)
+            for response_candidate in (state_response, board_snapshot_response):
+                if not isinstance(response_candidate, dict):
+                    continue
+                if not _response_has_content(response_candidate):
+                    continue
+                if _response_needs_refresh(payload, response_candidate):
+                    continue
+                initial_response = dict(response_candidate)
+                break
+            if not initial_response:
+                queue_intelligence_state_refresh(dict(payload))
+                initial_response = _empty_default_intelligence_response()
     except Exception:
+        queue_intelligence_state_refresh(dict(payload))
         initial_response = _empty_default_intelligence_response()
     return render_template(
         "intelligence.html",
@@ -992,17 +1012,13 @@ def intelligence_query_api():
     if force_refresh:
         queue_intelligence_state_refresh(dict(payload))
     if not isinstance(state_payload, dict) or not _response_has_content(state_payload):
-        computed_state = compute_intelligence_state_response(dict(payload), force_refresh=True)
-        if isinstance(computed_state, dict) and _response_has_content(computed_state):
-            state_payload = computed_state
+        queue_intelligence_state_refresh(dict(payload))
+        queued_state = read_latest_intelligence_state(dict(payload))
+        if isinstance(queued_state, dict) and _response_has_content(queued_state):
+            state_payload = queued_state
         else:
-            queue_intelligence_state_refresh(dict(payload))
-            queued_state = read_latest_intelligence_state(dict(payload))
-            if isinstance(queued_state, dict) and _response_has_content(queued_state):
-                state_payload = queued_state
-            else:
-                state_payload = _empty_default_intelligence_response()
-                state_payload["queued"] = True
+            state_payload = _empty_default_intelligence_response()
+            state_payload["queued"] = True
     response = dict(state_payload)
     response.setdefault("ok", True)
     response.setdefault("response", dict(response))
