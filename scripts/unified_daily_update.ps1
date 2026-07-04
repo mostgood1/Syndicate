@@ -3728,6 +3728,22 @@ def main() -> int:
                 relative = _relative_repo_path(path, repo_root)
                 if relative:
                     rows.append(relative)
+    for relative_path in [
+        Path("reports/intelligence/board_snapshot.json"),
+        Path("reports/intelligence/intelligence_state.json"),
+        Path("reports/intelligence/intelligence_state_history.jsonl"),
+        Path("reports/intelligence/status_response_cache.json"),
+        Path("reports/intelligence/query_state_cache.json"),
+        Path("reports/intelligence/query_response_cache.json"),
+        Path("reports/intelligence/query_response_version.json"),
+        Path("reports/intelligence/performance_summary.json"),
+    ]:
+        path = repo_root / relative_path
+        if not path.exists():
+            continue
+        relative = _relative_repo_path(path, repo_root)
+        if relative:
+            rows.append(relative)
     print(json.dumps(sorted(set(rows))))
     return 0
 

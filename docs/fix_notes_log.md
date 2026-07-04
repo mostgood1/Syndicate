@@ -1,5 +1,12 @@
 # Fix Notes Log
 
+## 2026-07-03 - Intelligence snapshots were not included in daily-update publish paths
+- Symptom: The live Render betting board stayed on the old 6/29 snapshot even after the local intelligence refresh regenerated newer `reports/intelligence/*` artifacts.
+- Root cause: `scripts/unified_daily_update.ps1` only built publish paths from sport-specific artifacts, so the repo-local intelligence snapshot and cache files the web dyno reads were not part of the publish set.
+- Fix: Add the repo-local intelligence snapshot/cache files to `Get-IntelligencePublishArtifactPaths` so daily update now treats them as publishable artifacts alongside the sport outputs.
+- Validation: The edited PowerShell controller passed a syntax parse check with `powershell -NoProfile -Command "[void][scriptblock]::Create((Get-Content 'scripts\unified_daily_update.ps1' -Raw)); 'parse=ok'"`.
+- Follow-up: Run the publish path again and confirm `reports/intelligence/board_snapshot.json` and `reports/intelligence/query_state_cache.json` are staged and reach Render with the next deploy.
+
 ## 2026-07-03 - Betting board on Render was reading the mounted reports disk instead of the repo snapshot
 - Symptom: The live /intelligence board stayed empty on Render even though the pushed repo snapshot in `reports/intelligence/board_snapshot.json` still contained top opportunities and a populated board contract.
 - Root cause: `render.yaml` pointed the web service `SYNDICATE_REPORTS_ROOT` at `/opt/render/project/data/reports`, so the board read the mounted disk instead of the checked-in report snapshot that actually contained the latest board data.

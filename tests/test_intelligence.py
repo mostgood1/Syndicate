@@ -2572,6 +2572,40 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertEqual(recent_form_row.get("target"), "A'ja Wilson Over 24.5")
         self.assertGreater(recent_form_row.get("last10_delta_signal") or 0.0, 0.0)
 
+    def test_build_intelligence_status_handles_missing_wnba_artifacts(self) -> None:
+        from syndicate.features.intelligence import build_intelligence_status
+
+        def fake_path_status(path, tracked):
+            return {
+                "path": str(path),
+                "exists": False,
+                "tracked": False,
+                "inside_repo": True,
+            }
+
+        overview = [
+            {
+                "slug": "wnba",
+                "name": "WNBA",
+                "context_label": "2026-07-03",
+                "data_health": "ready",
+                "data_warnings": [],
+                "active_today": True,
+            }
+        ]
+
+        with patch("syndicate.features.intelligence.build_intelligence_overview", return_value=overview):
+            with patch("syndicate.features.intelligence._tracked_repo_files", return_value=set()):
+                with patch("syndicate.features.intelligence.load_latest_refresh_status", return_value={}):
+                    with patch("syndicate.features.intelligence._path_status", side_effect=fake_path_status):
+                        status = build_intelligence_status(selected_date="2026-07-03")
+
+        wnba_row = next((sport for sport in status.get("sports", []) if sport.get("slug") == "wnba"), None)
+        self.assertIsNotNone(wnba_row)
+        self.assertEqual(wnba_row.get("data_health"), "missing")
+        self.assertTrue(wnba_row.get("artifacts"))
+        self.assertTrue(any("No tracked artifacts" in warning for warning in (wnba_row.get("data_warnings") or [])))
+
     def test_intelligence_query_uses_basketball_source_summary_without_writeup(self) -> None:
         overview = _sample_overview_with_secondary_sport()
         wnba_item = ((((overview[1].get("home_rails") or {}).get("pregame") or {}).get("items") or [])[0])

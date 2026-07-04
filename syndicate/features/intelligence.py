@@ -92,7 +92,6 @@ from syndicate.features.intelligence.signals.normalization import _pct_hint
 from syndicate.features.intelligence.signals.normalization import _safe_text
 from syndicate.features.shared.artifact_manifests import load_artifact_manifests
 from syndicate.features.shared.timezone import central_today_iso
-from syndicate.features.wnba.sources import live_snapshot_path as wnba_live_snapshot_path
 from syndicate.features.wnba.sources import processed_path as wnba_processed_path
 from syndicate.features.shared.intelligence_evaluation import build_intelligence_evaluation_bundle
 from syndicate.features.intelligence_board import build_intelligence_board_contract
@@ -2437,10 +2436,10 @@ def _artifact_specs_for_sport(sport: dict[str, Any]) -> list[tuple[str, Path]]:
     if slug == "wnba" and re.fullmatch(r"\d{4}-\d{2}-\d{2}", context_label):
         season = int(context_label[:4])
         return [
-            ("Recommendations slate", wnba_processed_path(f"recommendations_slate_{context_label}.json")),
-            ("Props recommendations", wnba_processed_path(f"props_recommendations_{context_label}.csv")),
-            ("Live state snapshot", wnba_live_snapshot_path(f"live_state_{context_label}.jsonl")),
-            ("Season betting day", wnba_processed_path(f"season_betting_card_day_{season}_retuned_{context_label}.json")),
+            ("Recommendations slate", _wnba_repo_artifact_path(f"recommendations_slate_{context_label}.json")),
+            ("Props recommendations", _wnba_repo_artifact_path(f"props_recommendations_{context_label}.csv")),
+            ("Live state snapshot", _wnba_repo_artifact_path("live_snapshots", f"live_state_{context_label}.jsonl")),
+            ("Season betting day", _wnba_repo_artifact_path(f"season_betting_card_day_{season}_retuned_{context_label}.json")),
         ]
     if slug == "nhl" and re.fullmatch(r"\d{4}-\d{2}-\d{2}", context_label):
         return [
@@ -2478,6 +2477,10 @@ def _artifact_specs_for_sport(sport: dict[str, Any]) -> list[tuple[str, Path]]:
 
 def _mlb_repo_artifact_path(*parts: str) -> Path:
     return default_mlb_source_root().joinpath(*parts)
+
+
+def _wnba_repo_artifact_path(*parts: str) -> Path:
+    return default_wnba_source_root().joinpath("data", "processed", *parts)
 
 
 def _odds_history_tracking_root_for_sport(slug: str) -> Path | None:
@@ -2865,7 +2868,7 @@ def _nba_live_lens_path(filename: str) -> Path:
 
 
 def _wnba_live_lens_path(filename: str) -> Path:
-    processed_root = wnba_processed_path("recommendations_slate_2026-06-04.json").parents[1]
+    processed_root = _wnba_repo_artifact_path("recommendations_slate_2026-06-04.json").parents[1]
     return processed_root / "live_lens" / filename
 
 
@@ -2898,7 +2901,7 @@ def _resolve_wnba_live_context_path(context_label: str) -> Path:
 
 
 def _resolve_wnba_live_pbp_context_path(context_label: str) -> Path:
-    direct = wnba_live_snapshot_path(f"live_pbp_stats_{context_label}.jsonl")
+    direct = _wnba_repo_artifact_path("live_snapshots", f"live_pbp_stats_{context_label}.jsonl")
     if direct.exists():
         return direct
     return _latest_matching_path(direct.parent, "live_pbp_stats_*.jsonl", requested_date=context_label) or direct
@@ -3174,7 +3177,7 @@ def _advanced_input_specs_for_sport(sport: dict[str, Any]) -> list[dict[str, Any
             {
                 "label": "Team environment and pace layer",
                 "metrics": ["Pace", "Team environment", "Shot volume context", "Possession profile", "Matchup pressure"],
-                "path": wnba_processed_path(f"recommendations_slate_{context_label}.json"),
+                "path": _wnba_repo_artifact_path(f"recommendations_slate_{context_label}.json"),
             },
             {
                 "label": "Play-by-play live recap",
@@ -3184,7 +3187,7 @@ def _advanced_input_specs_for_sport(sport: dict[str, Any]) -> list[dict[str, Any
             {
                 "label": "Player prop model outputs",
                 "metrics": ["Usage context", "Minute expectation", "Prop mean", "Edge vs line", "Calibration"],
-                "path": wnba_processed_path(f"props_recommendations_{context_label}.csv"),
+                "path": _wnba_repo_artifact_path(f"props_recommendations_{context_label}.csv"),
             },
             {
                 "label": "Live state mirror",
