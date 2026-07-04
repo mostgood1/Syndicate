@@ -5,6 +5,7 @@ import json
 import os
 import time
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Mapping
 
 from flask import Blueprint, jsonify, render_template, request
@@ -21,6 +22,8 @@ from syndicate.features.intelligence import _attach_intelligence_response_aliase
 from syndicate.features.intelligence_board import build_intelligence_board_contract
 from syndicate.features.shared.artifact_manifests import load_artifact_manifests
 from syndicate.features.shared.intelligence_evaluation import build_intelligence_evaluation_bundle
+from syndicate.features.shared.refresh_state_store import read_json_file
+from syndicate.features.shared.refresh_state_store import reports_root
 from syndicate.features.shared.timezone import normalize_timestamped_payload
 from syndicate.features.shared.timezone import central_today_iso
 from syndicate.features.shared.ops_refresh import launch_refresh_run
@@ -68,6 +71,32 @@ def _api_error_response(error: Exception):
 
 def _latest_available_intelligence_date() -> str:
     latest_date = ""
+    intelligence_root = reports_root() / "intelligence"
+    for pattern in ("board_snapshot_*.json", "intelligence_state_*.json"):
+        if not intelligence_root.exists():
+            break
+        for path in sorted(intelligence_root.glob(pattern), reverse=True):
+            if not path.is_file():
+                continue
+            candidate = ""
+            try:
+                payload = read_json_file(path)
+            except Exception:
+                payload = None
+            if isinstance(payload, dict):
+                candidate = str(
+                    payload.get("selected_date")
+                    or payload.get("date")
+                    or (payload.get("response") or {}).get("selected_date")
+                    or (payload.get("response") or {}).get("date")
+                    or ""
+                ).strip()
+            if not candidate:
+                stem_parts = path.stem.rsplit("_", 3)
+                if len(stem_parts) >= 4:
+                    candidate = "-".join(stem_parts[-3:])
+            if candidate and candidate > latest_date:
+                latest_date = candidate
     try:
         manifests = load_artifact_manifests()
     except Exception:

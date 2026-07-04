@@ -1,5 +1,12 @@
 # Fix Notes Log
 
+## 2026-07-03 - Intelligence board default date was anchored to stale source manifests
+- Symptom: The /intelligence board kept resolving the 2026-06-29 board snapshot even after the Render deploy was live and daily refreshes were running.
+- Root cause: The default intelligence date chooser still preferred artifact-manifest dates, so it could keep selecting the stale `all_source` manifest path instead of the newest daily board snapshot written for the current day.
+- Fix: Make the intelligence board prefer the newest daily `board_snapshot_*.json` / `intelligence_state_*.json` file before falling back to manifest-derived dates.
+- Validation: Focused pytest coverage passed for the new daily-snapshot date preference regression in `tests/test_intelligence_state.py`.
+- Follow-up: Keep the manifest fallback only as a last resort; the daily board snapshot should remain the canonical source for the default board date.
+
 ## 2026-07-04 - Intelligence artifacts now prefer daily worker-written files
 - Symptom: The intelligence board still depended on large root snapshot files, which made the artifact set hard to manage and left the live reader tied to the legacy root path.
 - Root cause: The state service, bootstrap sync, and daily-update publish list were still centered on `reports/intelligence/board_snapshot.json` and `reports/intelligence/intelligence_state.json` instead of the daily worker-written artifacts.

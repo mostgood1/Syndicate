@@ -152,6 +152,31 @@ class IntelligenceStateTests(unittest.TestCase):
         self.assertEqual(int(response.get("candidate_count") or 0), 2)
         self.assertEqual(response.get("top_opportunities", [])[0]["name"], "Daily Play 1")
 
+    def test_latest_available_intelligence_date_prefers_daily_snapshot(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir, patch.dict(
+            os.environ,
+            {
+                "SYNDICATE_REPORTS_ROOT": str(Path(tmp_dir) / "reports"),
+            },
+            clear=False,
+        ):
+            reports_root = Path(tmp_dir) / "reports"
+            daily_snapshot_path = reports_root / "intelligence" / "board_snapshot_2026_07_03.json"
+            daily_snapshot_path.parent.mkdir(parents=True, exist_ok=True)
+            refresh_state_store.write_json_file(
+                daily_snapshot_path,
+                {
+                    "selected_date": "2026-07-03",
+                    "response": {"selected_date": "2026-07-03"},
+                },
+            )
+
+            with patch.object(intelligence_module, "reports_root", return_value=reports_root):
+                with patch.object(intelligence_module, "load_artifact_manifests", return_value=[]):
+                    latest_date = intelligence_module._latest_available_intelligence_date()
+
+        self.assertEqual(latest_date, "2026-07-03")
+
     def test_read_latest_response_syncs_shared_backend_state(self) -> None:
         service = IntelligenceStateService()
         cached_response = {"ok": True, "response": {"recommendations": [{"name": "Play 1"}]}}
