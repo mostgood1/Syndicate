@@ -868,6 +868,55 @@ class IntelligenceStateTests(unittest.TestCase):
         self.assertEqual(source, "fallback")
         self.assertIsNone(cached_response)
 
+    def test_cached_intelligence_response_prefers_worker_state_over_board_snapshot(self) -> None:
+        payload = {"question": "top edges today", "date": "2026-07-04"}
+        worker_response = {
+            "ok": True,
+            "selected_date": "2026-07-04",
+            "last_updated": "2026-07-04T18:40:54Z",
+            "top_opportunities": [{"name": "Fresh Play"}],
+            "analysis": {"recommendations": [{"name": "Fresh Play"}], "picks": [], "top_live_opportunities": [], "portfolio": {}, "parlays": []},
+        }
+        board_snapshot_response = {
+            "ok": True,
+            "selected_date": "2026-06-29",
+            "last_updated": "2026-06-29T20:40:54Z",
+            "top_opportunities": [{"name": "Stale Play"}],
+            "analysis": {"recommendations": [{"name": "Stale Play"}], "picks": [], "top_live_opportunities": [], "portfolio": {}, "parlays": []},
+        }
+
+        with patch("syndicate.blueprints.intelligence._response_needs_refresh", return_value=False):
+            with patch("syndicate.blueprints.intelligence.read_latest_intelligence_state_response", return_value=dict(worker_response)):
+                with patch("syndicate.blueprints.intelligence.read_latest_intelligence_board_snapshot_response", return_value=dict(board_snapshot_response)):
+                    cached_response, source = intelligence_module._cached_intelligence_response_with_source(payload)
+
+        self.assertEqual(source, "worker")
+        self.assertEqual(cached_response.get("selected_date"), "2026-07-04")
+        self.assertEqual(cached_response.get("top_opportunities", [])[0]["name"], "Fresh Play")
+
+    def test_read_latest_intelligence_state_prefers_worker_state_over_board_snapshot(self) -> None:
+        worker_response = {
+            "ok": True,
+            "selected_date": "2026-07-04",
+            "last_updated": "2026-07-04T18:40:54Z",
+            "top_opportunities": [{"name": "Fresh Play"}],
+            "analysis": {"recommendations": [{"name": "Fresh Play"}], "picks": [], "top_live_opportunities": [], "portfolio": {}, "parlays": []},
+        }
+        board_snapshot_response = {
+            "ok": True,
+            "selected_date": "2026-06-29",
+            "last_updated": "2026-06-29T20:40:54Z",
+            "top_opportunities": [{"name": "Stale Play"}],
+            "analysis": {"recommendations": [{"name": "Stale Play"}], "picks": [], "top_live_opportunities": [], "portfolio": {}, "parlays": []},
+        }
+
+        with patch("syndicate.blueprints.intelligence.read_latest_intelligence_state_response", return_value=dict(worker_response)):
+            with patch("syndicate.blueprints.intelligence.read_latest_intelligence_board_snapshot_response", return_value=dict(board_snapshot_response)):
+                response = intelligence_module.read_latest_intelligence_state({"date": "2026-07-04"})
+
+        self.assertEqual(response.get("selected_date"), "2026-07-04")
+        self.assertEqual(response.get("top_opportunities", [])[0]["name"], "Fresh Play")
+
     def test_intelligence_home_renders_initial_board_shell(self) -> None:
         app = create_app()
         app.testing = True
