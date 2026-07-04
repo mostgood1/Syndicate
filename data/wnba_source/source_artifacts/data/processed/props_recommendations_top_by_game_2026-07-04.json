@@ -1,0 +1,133 @@
+{
+  "date": "2026-07-04",
+  "data": [
+    {
+      "game_key": "GSV@ATL",
+      "game_id": "0c7e2d1320d0907e35977d472bd02d7d6",
+      "player": "Gabby Williams",
+      "team": "GSV",
+      "team_tricode": "GSV",
+      "opponent": "ATL",
+      "score": 35.76675154637454,
+      "score_adj": 35.76675154637454,
+      "tier": "High",
+      "model": {
+        "pts": 11.3684,
+        "reb": 2.4832,
+        "ast": 2.321533333333333,
+        "threes": 1.8818,
+        "stl": 0.5193444666666667,
+        "blk": 0.4249181999999999,
+        "tov": 1.416394,
+        "pra": 16.173133333333332,
+        "pr": 13.8516,
+        "pa": 13.689933333333332,
+        "ra": 4.804733333333333
+      },
+      "top_play": {
+        "market": "pts",
+        "side": "UNDER",
+        "line": 15.5,
+        "price": -104.0,
+        "edge": 0.18234030200112517,
+        "ev": 0.3576675154637454,
+        "ev_pct": 35.76675154637454,
+        "book": "fanduel",
+        "p_win": 0.8674714370323728,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 35.8%",
+        "Regular price range (-150 to +150)",
+        "Consensus: 4 books aligned",
+        "Best line available"
+      ],
+      "basketball_summary": "model 11.4 vs line 15.5 (-4.1)"
+    },
+    {
+      "game_key": "GSV@ATL",
+      "game_id": "0c7e2d1320d0907e35977d472bd02d7d6",
+      "player": "Rhyne Howard",
+      "team": "ATL",
+      "team_tricode": "ATL",
+      "opponent": "GSV",
+      "score": 29.869684313664823,
+      "score_adj": 29.869684313664823,
+      "tier": "High",
+      "model": {
+        "pts": 17.406666666666666,
+        "reb": 4.87,
+        "ast": 3.333333333333333,
+        "threes": 3.14,
+        "stl": 0.7111133333333333,
+        "blk": 0.5818199999999999,
+        "tov": 1.9394,
+        "pra": 25.61,
+        "pr": 22.276666666666667,
+        "pa": 20.74,
+        "ra": 8.203333333333333
+      },
+      "top_play": {
+        "market": "threes",
+        "side": "OVER",
+        "line": 2.5,
+        "price": -132.0,
+        "edge": 0.1699482038536102,
+        "ev": 0.29869684313664824,
+        "ev_pct": 29.869684313664823,
+        "book": "betonlineag",
+        "p_win": 0.8676623603780276,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 29.9%",
+        "Regular price range (-150 to +150)",
+        "Consensus: 4 books aligned",
+        "Best line available"
+      ],
+      "basketball_summary": "model 3.1 vs line 2.5 (+0.6)"
+    },
+    {
+      "game_key": "GSV@ATL",
+      "game_id": "0c7e2d1320d0907e35977d472bd02d7d6",
+      "player": "Jordin Canada",
+      "team": "ATL",
+      "team_tricode": "ATL",
+      "opponent": "GSV",
+      "score": 20.15020437927063,
+      "score_adj": 20.15020437927063,
+      "tier": "High",
+      "model": {
+        "pts": 11.004285714285714,
+        "reb": 4.944285714285714,
+        "ast": 8.29142857142857,
+        "threes": 0.6214285714285714,
+        "stl": 0.6512942857142856,
+        "blk": 0.5328771428571428,
+        "tov": 1.7762571428571428,
+        "pra": 24.24,
+        "pr": 15.948571428571428,
+        "pa": 19.295714285714283,
+        "ra": 13.235714285714284
+      },
+      "top_play": {
+        "market": "ra",
+        "side": "OVER",
+        "line": 9.5,
+        "price": 104.0,
+        "edge": 0.09877551166309134,
+        "ev": 0.2015020437927063,
+        "ev_pct": 20.15020437927063,
+        "book": "fanduel",
+        "p_win": 0.6916981222240788,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 20.2%",
+        "Regular price range (-150 to +150)",
+        "Best line available"
+      ],
+      "basketball_summary": "model 13.2 vs line 9.5 (+3.7)"
+    }
+  ]
+}
