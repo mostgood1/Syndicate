@@ -376,7 +376,10 @@ def _game_identity_set(items: list[dict[str, Any]] | None) -> set[str]:
 
 
 def _active_sport_slugs() -> set[str]:
-    configured = current_app.config.get("SYNDICATE_ACTIVE_SPORTS", ["mlb", "wnba"])
+    try:
+        configured = current_app.config.get("SYNDICATE_ACTIVE_SPORTS", ["mlb", "wnba"])
+    except RuntimeError:
+        configured = os.environ.get("SYNDICATE_ACTIVE_SPORTS", "mlb,wnba")
     if isinstance(configured, str):
         configured = [configured]
     return {str(slug).strip().lower() for slug in configured if str(slug).strip()}

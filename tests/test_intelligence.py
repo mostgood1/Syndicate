@@ -805,17 +805,26 @@ class IntelligenceBlueprintTests(unittest.TestCase):
 
         with app.app_context():
             with patch(
-                "syndicate.features.intelligence._build_sport_overview",
-                return_value={"slug": "mlb", "context_label": "2026-06-07"},
+                "syndicate.features.intelligence.build_home_overview",
+                return_value=[{"slug": "mlb", "context_label": "2026-06-07"}],
             ) as mocked_build:
                 build_intelligence_overview(selected_date="2026-06-17", force_refresh=True)
 
         mocked_build.assert_called_once_with(
-            {"slug": "mlb", "name": "MLB"},
-            "2026-06-17",
+            [{"slug": "mlb", "name": "MLB"}],
+            selected_date="2026-06-17",
             force_refresh=True,
-            preserve_requested_date=True,
         )
+
+    def test_build_intelligence_overview_falls_back_without_app_context(self) -> None:
+        with patch("syndicate.features.intelligence.build_home_overview", return_value=[{"slug": "mlb"}]) as mocked_build:
+            overview = build_intelligence_overview(selected_date="2026-07-04", force_refresh=True)
+
+        self.assertEqual(overview, [{"slug": "mlb"}])
+        mocked_build.assert_called_once()
+        sports_arg = mocked_build.call_args.args[0]
+        self.assertIsInstance(sports_arg, list)
+        self.assertTrue(any(isinstance(item, dict) and item.get("slug") == "mlb" for item in sports_arg))
 
     def tearDown(self) -> None:
         self._shared_recommendations_patcher.stop()

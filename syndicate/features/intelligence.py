@@ -78,6 +78,25 @@ from syndicate.features.intelligence_parlay_correlation import parlay_matches_pr
 from syndicate.features.intelligence_parlay_correlation import parlay_pair_penalty as _runtime_parlay_pair_penalty
 from syndicate.features.intelligence_reasoning import build_analysis_brief as _runtime_build_analysis_brief
 from syndicate.features.correlation_engine import compute_correlation as _compute_candidate_correlation
+def _default_syndicate_sports() -> list[dict[str, Any]]:
+    return [
+        {"slug": "mlb", "name": "MLB", "primary_href": "/mlb", "primary_label": "Open MLB cards"},
+        {"slug": "nba", "name": "NBA", "primary_href": "/nba", "primary_label": "Open NBA cards"},
+        {"slug": "wnba", "name": "WNBA", "primary_href": "/wnba", "primary_label": "Open WNBA cards"},
+        {"slug": "nfl", "name": "NFL", "primary_href": "/nfl", "primary_label": "Open NFL cards"},
+        {"slug": "ncaaf", "name": "NCAAF", "primary_href": "/ncaaf", "primary_label": "Open NCAAF cards"},
+        {"slug": "ncaab", "name": "NCAAB", "primary_href": "/ncaab", "primary_label": "Open NCAAB cards"},
+        {"slug": "nhl", "name": "NHL", "primary_href": "/nhl", "primary_label": "Open NHL cards"},
+    ]
+
+def _configured_syndicate_sports() -> list[dict[str, Any]]:
+    try:
+        configured = current_app.config.get("SYNDICATE_SPORTS", [])
+    except RuntimeError:
+        return _default_syndicate_sports()
+    if isinstance(configured, list) and configured:
+        return [dict(sport) for sport in configured if isinstance(sport, dict)]
+    return _default_syndicate_sports()
 from syndicate.features.intelligence_parlay_runtime import build_parlay_payload as _runtime_build_parlay_payload
 from syndicate.features.intelligence_parlay_runtime import build_parlays as _runtime_build_parlays
 from syndicate.features.intelligence_parlay_runtime import build_round_robin_parlays as _runtime_build_round_robin_parlays
@@ -2340,7 +2359,7 @@ def _query_preferences(
 
 def build_intelligence_overview(*, selected_date: str | None = None, force_refresh: bool = False) -> list[dict[str, Any]]:
     effective_date = _effective_date(selected_date)
-    sports = current_app.config.get("SYNDICATE_SPORTS", [])
+    sports = _configured_syndicate_sports()
     overview = build_home_overview(sports, selected_date=effective_date, force_refresh=force_refresh)
     for sport_overview in overview:
         if _safe_text(sport_overview.get("slug"), "").lower() == "wnba":
@@ -2384,7 +2403,7 @@ def _status_context_label_for_sport(slug: str, effective_date: str) -> str:
 
 def _status_overview_rows(*, selected_date: str | None = None) -> list[dict[str, Any]]:
     effective_date = _effective_date(selected_date)
-    sports = current_app.config.get("SYNDICATE_SPORTS", [])
+    sports = _configured_syndicate_sports()
     overview: list[dict[str, Any]] = []
     for sport in sports:
         if not isinstance(sport, dict):
