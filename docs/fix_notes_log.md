@@ -1,5 +1,12 @@
 # Fix Notes Log
 
+## 2026-07-03 - Betting board on Render was reading the mounted reports disk instead of the repo snapshot
+- Symptom: The live /intelligence board stayed empty on Render even though the pushed repo snapshot in `reports/intelligence/board_snapshot.json` still contained top opportunities and a populated board contract.
+- Root cause: `render.yaml` pointed the web service `SYNDICATE_REPORTS_ROOT` at `/opt/render/project/data/reports`, so the board read the mounted disk instead of the checked-in report snapshot that actually contained the latest board data.
+- Fix: Move the Render web service `SYNDICATE_REPORTS_ROOT` back to `./reports` so the board reads the repo-local snapshot while the worker continues to own the mounted disk.
+- Validation: `python -m pytest tests/test_render_yaml_envs.py -q` passed after updating the render contract test to require `./reports` in the web section.
+- Follow-up: If Render starts publishing the reports tree onto the mounted disk reliably, re-evaluate whether the web service still needs the repo-local reports fallback.
+
 ## 2026-07-03 - Betting board no longer drifts into Ask
 - Symptom: The /intelligence page still felt tied to the Ask surface, and board items could jump users into /syndicate instead of staying on the betting board.
 - Root cause: The template still carried Ask-oriented copy and a dead drill-down helper that pointed to /syndicate.
