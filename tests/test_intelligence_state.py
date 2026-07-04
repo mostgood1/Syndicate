@@ -393,6 +393,37 @@ class IntelligenceStateTests(unittest.TestCase):
         self.assertEqual(response.headers.get("Expires"), "0")
         self.assertEqual(payload["response"]["analysis"]["recommendations"], [{"name": "Play 1"}, {"name": "Play 2"}])
 
+    def test_status_endpoint_refreshes_stale_snapshot_for_requested_date(self) -> None:
+        app = Flask(__name__)
+        app.register_blueprint(intelligence_bp)
+
+        stale_response = {
+            "ok": True,
+            "selected_date": "2026-06-29",
+            "analysis": {"recommendations": [{"name": "Stale Play"}]},
+            "top_opportunities": [{"name": "Stale Play"}],
+        }
+        fresh_response = {
+            "ok": True,
+            "selected_date": "2026-07-04",
+            "analysis": {"recommendations": [{"name": "Fresh Play"}]},
+            "top_opportunities": [{"name": "Fresh Play"}],
+        }
+
+        with app.test_request_context("/api/intelligence/status?date=2026-07-04", method="GET"):
+            with patch("syndicate.blueprints.intelligence.read_latest_intelligence_state", side_effect=[dict(stale_response), dict(stale_response)]), patch(
+                "syndicate.blueprints.intelligence.compute_intelligence_state_response",
+                return_value=dict(fresh_response),
+            ) as mocked_compute:
+                response = intelligence_status_api()
+
+        payload = response.get_json()
+        self.assertIsNotNone(payload)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(payload["status"]["selected_date"], "2026-07-04")
+        self.assertEqual(payload["top_opportunities"][0]["name"], "Fresh Play")
+        mocked_compute.assert_called_once()
+
     def test_query_endpoint_queues_refresh_when_default_cache_is_empty(self) -> None:
         app = Flask(__name__)
         app.register_blueprint(intelligence_bp)

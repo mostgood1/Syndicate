@@ -12,6 +12,7 @@ from flask import Blueprint, jsonify, render_template, request
 from flask import redirect
 
 from pipeline.intelligence_state import read_latest_intelligence_board_snapshot_response
+from pipeline.intelligence_state import compute_intelligence_state_response
 from pipeline.intelligence_state import read_latest_intelligence_state_response
 from pipeline.intelligence_state import queue_intelligence_state_refresh
 from pipeline.intelligence_state import _INTELLIGENCE_STATE_SERVICE
@@ -1071,9 +1072,17 @@ def intelligence_status_api():
     try:
         selected_date = str(request.args.get("date") or "").strip() or _latest_available_intelligence_date()
         refresh_requested = str(request.args.get("refresh") or request.args.get("force_refresh") or "").strip().lower() in {"1", "true", "yes", "on"}
+        stale_snapshot = False
+        if not refresh_requested:
+            current_snapshot = read_latest_intelligence_state({"date": selected_date})
+            stale_snapshot = bool(_response_selected_date(current_snapshot) and _response_selected_date(current_snapshot) != selected_date)
         if refresh_requested:
             queue_intelligence_state_refresh(_intelligence_page_payload(selected_date, force_refresh=True))
         status = read_latest_intelligence_state({"date": selected_date})
+        if stale_snapshot:
+            computed_status = compute_intelligence_state_response(_intelligence_page_payload(selected_date, force_refresh=True))
+            if isinstance(computed_status, dict) and _response_has_content(computed_status):
+                status = computed_status
         if not (isinstance(status, dict) and _response_has_content(status)):
             status = _empty_default_intelligence_response()
         _log_api_state_read(status if isinstance(status, dict) else {})

@@ -1,5 +1,12 @@
 # Fix Notes Log
 
+## 2026-07-04 - Intelligence status route now self-heals when persisted state is stale
+- Symptom: Even after redeploying, /api/intelligence/status was still serving the 2026-06-29 payload because the persisted snapshot was being read back without checking whether it matched the requested date.
+- Root cause: The status endpoint preferred the last stored snapshot and only queued a refresh on an explicit refresh request, so a stale cached response could survive forever if the worker lagged.
+- Fix: If the stored snapshot date does not match the requested date, the status endpoint now computes a fresh intelligence response for that date before returning.
+- Validation: Focused pytest coverage passed for the stale-status refresh regression in `tests/test_intelligence_state.py`.
+- Follow-up: Keep the worker loop fix in place so the request-path fallback is only a safety net, not the primary refresh mechanism.
+
 ## 2026-07-04 - Render refresh worker now owns the intelligence state loop
 - Symptom: The live betting board could redeploy cleanly but still serve the 2026-06-29 intelligence snapshot, so the board never stayed on today's opps throughout the day.
 - Root cause: The Render refresh worker only polled refresh contracts and launched queued jobs; it never started the intelligence state background loop, so the worker-owned board snapshot never advanced on its own.
