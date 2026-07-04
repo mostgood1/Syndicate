@@ -1244,7 +1244,7 @@ class IntelligenceStateService:
                 latest_date = _selected_date_from_payload(latest_snapshot.payload)
                 if allow_latest_fallback or requested_date is None or latest_date is None or latest_date == requested_date:
                     return dict(latest_snapshot.response)
-            self._sync_persisted_state_locked(force=True)
+            self._sync_persisted_state_locked(force=force_refresh)
             snapshot = self._snapshots.get(key)
             if snapshot is not None:
                 return dict(snapshot.response)

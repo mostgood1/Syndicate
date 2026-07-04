@@ -358,6 +358,15 @@ class IntelligenceStateTests(unittest.TestCase):
 
         self.assertEqual(response, cached_response)
 
+    def test_read_latest_response_avoids_forced_sync_when_force_refresh_is_false(self) -> None:
+        service = IntelligenceStateService()
+
+        with patch.object(service, "_sync_persisted_state_locked") as mocked_sync:
+            response = service.read_latest_response({"question": "top edges today"}, force_refresh=False)
+
+        self.assertIsNone(response)
+        mocked_sync.assert_called_once_with(force=False)
+
     def test_query_endpoint_reads_cached_state_only(self) -> None:
         app = Flask(__name__)
         app.register_blueprint(intelligence_bp)
