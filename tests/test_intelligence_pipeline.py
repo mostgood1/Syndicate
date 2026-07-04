@@ -115,8 +115,8 @@ class IntelligencePipelineTests(unittest.TestCase):
         )
 
         control_plane_snapshot = {
-            "generated_at": "2026-06-12T22:16:54+00:00",
-            "date": "2026-06-12",
+            "generated_at": "2026-06-04T22:16:54+00:00",
+            "date": "2026-06-04",
             "phase": "all",
             "execution_mode": "source",
             "dry_run": False,
@@ -147,6 +147,46 @@ class IntelligencePipelineTests(unittest.TestCase):
         odds_evidence = next((section for section in structured.get("supporting_evidence", []) if isinstance(section, dict) and section.get("title") == "Odds control plane"), None)
         self.assertIsNotNone(odds_evidence)
         self.assertEqual((structured.get("odds_control_plane") or {}).get("source_precedence"), ["shared_history", "artifact_history", "tracking_history"])
+
+    def test_pipeline_ignores_stale_odds_control_plane_snapshot_for_request_date(self) -> None:
+        fake_request = SimpleNamespace(
+            get_json=lambda silent=True: {
+                "question": "What are the best live bets?",
+                "date": "2026-07-04",
+                "sport": "nba",
+            },
+            form={},
+        )
+
+        stale_control_plane_snapshot = {
+            "generated_at": "2026-06-27T15:39:11+00:00",
+            "date": "2026-06-27",
+            "phase": "all",
+            "execution_mode": "source",
+            "dry_run": False,
+            "summary_ok": False,
+            "source_precedence": ["shared_history", "artifact_history", "tracking_history"],
+            "sports": [{"sport": "wnba", "ok": False}],
+        }
+
+        with patch("pipeline.intelligence_pipeline.load_odds_control_plane_snapshot", return_value=stale_control_plane_snapshot), patch(
+            "pipeline.intelligence_pipeline.run_intelligence_query",
+            return_value={
+                "headline": "Test headline",
+                "selected_date": "2026-07-04",
+                "recommendations": [{"name": "Darius Garland Over 7.5 Assists", "score": 91.2}],
+                "supporting_evidence": {
+                    "kind": "bundle",
+                    "title": "Supporting evidence",
+                    "sections": [{"kind": "metrics", "title": "Top case evidence", "items": [{"label": "Projection", "value": 8.3}]}],
+                },
+            },
+        ):
+            result = run_intelligence_pipeline(fake_request)
+
+        structured = result.to_dict()["structured_response"]
+        self.assertEqual((structured.get("odds_control_plane") or {}), {})
+        self.assertFalse(any(isinstance(section, dict) and section.get("title") == "Odds control plane" for section in structured.get("supporting_evidence", [])))
 
     def test_intelligence_result_round_trips_top_level_fields(self) -> None:
         raw = {

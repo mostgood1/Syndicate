@@ -209,6 +209,10 @@ def _normalize_request(request_or_payload: Any) -> IntelligencePipelineRequest:
 
 def _enrich_context(normalized_request: IntelligencePipelineRequest) -> dict[str, Any]:
     odds_control_plane = load_odds_control_plane_snapshot() or {}
+    control_plane_date = str(odds_control_plane.get("date") or "").strip() if isinstance(odds_control_plane, dict) else ""
+    request_date = str(normalized_request.selected_date or "").strip()
+    if control_plane_date and request_date and control_plane_date != request_date:
+        odds_control_plane = {}
     return {
         "enriched": False,
         "notes": ["context enrichment placeholder"],
