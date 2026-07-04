@@ -399,8 +399,15 @@ class IntelligenceStateTests(unittest.TestCase):
 
         stale_response = {
             "ok": True,
-            "selected_date": "2026-06-29",
-            "analysis": {"recommendations": [{"name": "Stale Play"}]},
+            "analysis": {
+                "recommendations": [{"name": "Stale Play"}],
+                "evaluation_record": {
+                    "artifact_metadata": {
+                        "manifest_summary": {"selected_date": "2026-06-29", "sport": "all"},
+                        "selected_date": "2026-06-29",
+                    }
+                },
+            },
             "top_opportunities": [{"name": "Stale Play"}],
         }
         fresh_response = {
@@ -423,6 +430,19 @@ class IntelligenceStateTests(unittest.TestCase):
         self.assertEqual(payload["status"]["selected_date"], "2026-07-04")
         self.assertEqual(payload["top_opportunities"][0]["name"], "Fresh Play")
         mocked_compute.assert_called_once()
+
+    def test_response_selected_date_reads_nested_evaluation_metadata(self) -> None:
+        payload = {
+            "analysis": {
+                "evaluation_record": {
+                    "artifact_metadata": {
+                        "manifest_summary": {"selected_date": "2026-06-29"},
+                    }
+                }
+            }
+        }
+
+        self.assertEqual(intelligence_module._response_selected_date(payload), "2026-06-29")
 
     def test_query_endpoint_queues_refresh_when_default_cache_is_empty(self) -> None:
         app = Flask(__name__)
@@ -1285,22 +1305,9 @@ class IntelligenceStateTests(unittest.TestCase):
             "candidate_pool": {"candidates": [{"name": "Play 1"}]},
         }
 
-        expected_payload = {
-            "question": "top edges today",
-            "date": "2026-06-10",
-            "mode": "recommendation",
-            "sport": "all",
-            "game_state": "all",
-            "timing": "all",
-            "limit": 5,
-            "include_props": True,
-            "include_games": True,
-            "force_refresh": True,
-        }
-
         with app.test_request_context("/api/intelligence/status?date=2026-06-10", method="GET"):
             with patch("syndicate.blueprints.intelligence.read_latest_intelligence_state", return_value=dict(state_response)) as mocked_state_response:
-                    response = intelligence_status_api()
+                response = intelligence_status_api()
 
         payload = response.get_json()
         self.assertIsNotNone(payload)

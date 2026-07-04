@@ -373,12 +373,30 @@ def _response_selected_date(payload: dict[str, object] | None) -> str | None:
         value = str(current.get(key) or "").strip()
         if value:
             return value
-    nested = current.get("response") if isinstance(current.get("response"), dict) else None
-    if isinstance(nested, dict):
+    for container in (
+        current.get("response") if isinstance(current.get("response"), dict) else None,
+        current.get("analysis") if isinstance(current.get("analysis"), dict) else None,
+    ):
+        if not isinstance(container, dict):
+            continue
         for key in ("selected_date", "date"):
-            value = str(nested.get(key) or "").strip()
+            value = str(container.get(key) or "").strip()
             if value:
                 return value
+        evaluation_record = container.get("evaluation_record") if isinstance(container.get("evaluation_record"), dict) else None
+        if isinstance(evaluation_record, dict):
+            artifact_metadata = evaluation_record.get("artifact_metadata") if isinstance(evaluation_record.get("artifact_metadata"), dict) else None
+            if isinstance(artifact_metadata, dict):
+                for key in ("selected_date", "date"):
+                    value = str(artifact_metadata.get(key) or "").strip()
+                    if value:
+                        return value
+                manifest_summary = artifact_metadata.get("manifest_summary") if isinstance(artifact_metadata.get("manifest_summary"), dict) else None
+                if isinstance(manifest_summary, dict):
+                    for key in ("selected_date", "date"):
+                        value = str(manifest_summary.get(key) or "").strip()
+                        if value:
+                            return value
     return None
 
 
