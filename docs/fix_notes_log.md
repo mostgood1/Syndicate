@@ -1,5 +1,12 @@
 # Fix Notes Log
 
+## 2026-07-04 - Intelligence query stopped doing inline recompute on the web dyno
+- Symptom: The live `/api/intelligence/query` and `/intelligence` routes were returning Render 502s and the board stayed on the shell because the request path was trying to rebuild intelligence state synchronously.
+- Root cause: The query endpoint called `compute_intelligence_state_response(...)` in the web request path when the cache was empty or zero-candidate, and that recompute takes long enough to trip the Render request window.
+- Fix: Make the query route queue a refresh and return the best cached or empty queued response instead of recomputing inline.
+- Validation: `pytest -q tests/test_intelligence_state.py -k query_endpoint` passed after the route change.
+- Follow-up: Let the worker own full intelligence recompute so the web dyno stays responsive.
+
 ## 2026-07-04 - Intelligence query now computes when the board cache is empty or zero-candidate
 - Symptom: The deployed `/intelligence` board stayed on the initial shell or showed `candidate_count: 0` even after the deploy was current and the board route was being exercised.
 - Root cause: The query route accepted stale snapshot payloads that still carried metadata, so the refresh flow could short-circuit before it rebuilt a populated board contract.
