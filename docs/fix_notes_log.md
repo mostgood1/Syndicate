@@ -1,5 +1,12 @@
 # Fix Notes Log
 
+## 2026-07-04 - Intelligence evaluation metadata stopped collapsing sport=all into the stale all-source manifest
+- Symptom: The live /api/intelligence/status payload still showed a 2026-06-29 `all_source` manifest summary even after the board cards themselves were current.
+- Root cause: The evaluation metadata helper treated `sport=all` as a single aggregate manifest request, which let the old all-source bundle keep winning the manifest summary path.
+- Fix: Make the manifest summary helper use the per-sport manifest list when the sport is `all`, so the board metadata reflects current per-sport artifacts instead of the aggregate all-source bundle.
+- Validation: Focused pytest coverage passed for the manifest-summary regression in `tests/test_intelligence_evaluation.py` and the earlier intelligence date-selection regressions in `tests/test_intelligence_state.py`.
+- Follow-up: Keep the worker publishing current per-sport manifests so the board never needs to lean on aggregate all-source provenance again.
+
 ## 2026-07-04 - Intelligence board default date stopped falling back to 6/29 manifests
 - Symptom: The /intelligence board still surfaced a stale 2026-06-29 artifact summary in the response metadata even though the worker-written board snapshot was current.
 - Root cause: The default board date chooser only looked at snapshot files with explicit date fields, so it could skip the worker-written root snapshot and fall back to an older manifest-derived date.

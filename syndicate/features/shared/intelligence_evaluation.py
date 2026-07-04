@@ -357,7 +357,8 @@ def _timestamp_key(value: Any) -> tuple[int, str]:
 
 
 def _artifact_manifest_summary(*, selected_date: str | None = None, sport: str | None = None) -> dict[str, Any]:
-    sport_slugs = [sport] if sport else None
+    sport_slug = str(sport or "").strip().lower()
+    sport_slugs = None if not sport_slug or sport_slug == "all" else [sport_slug]
     manifests = load_artifact_manifests(selected_date=selected_date, sport_slugs=sport_slugs)
     manifest_rows = [manifest.to_dict() for manifest in manifests]
     return {

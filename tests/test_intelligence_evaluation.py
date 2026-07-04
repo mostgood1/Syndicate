@@ -162,6 +162,22 @@ class IntelligenceEvaluationTests(unittest.TestCase):
         self.assertEqual(tracking["risk_level"], "low")
         self.assertEqual(tracking["wager_count"], 1)
 
+    def test_artifact_manifest_summary_for_all_uses_per_sport_manifests(self) -> None:
+        fake_manifest = type(
+            "FakeManifest",
+            (),
+            {
+                "to_dict": lambda self: {"sport_slug": "nba", "selected_date": "2026-07-04"},
+            },
+        )()
+
+        with patch.object(intelligence_evaluation, "load_artifact_manifests", return_value=[fake_manifest]) as mocked_loader:
+            summary = intelligence_evaluation._artifact_manifest_summary(selected_date="2026-07-04", sport="all")
+
+        mocked_loader.assert_called_once_with(selected_date="2026-07-04", sport_slugs=None)
+        self.assertEqual(summary["manifest_count"], 1)
+        self.assertEqual(summary["sport_manifests"][0]["sport_slug"], "nba")
+
     def test_build_intelligence_evaluation_bundle_includes_portfolio_event_summary(self) -> None:
         bundle = build_intelligence_evaluation_bundle(
             query={
