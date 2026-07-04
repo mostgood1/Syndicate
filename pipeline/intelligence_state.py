@@ -1169,7 +1169,8 @@ class IntelligenceStateService:
             self._thread = threading.Thread(target=self._background_loop, name="syndicate-intelligence-state-loop", daemon=True)
             self._thread.start()
             self._running = True
-            if not self._snapshots:
+            latest_snapshot = self._snapshots.get(self._latest_key or "") if self._latest_key else None
+            if not self._snapshots or latest_snapshot is None or self._is_stale(latest_snapshot):
                 self._enqueue_locked(self._default_payload())
             return True
 

@@ -24,6 +24,34 @@ from syndicate.blueprints.intelligence import intelligence_query_api
 
 
 class IntelligenceStateTests(unittest.TestCase):
+    def test_start_queues_default_payload_when_persisted_snapshot_is_stale(self) -> None:
+        service = IntelligenceStateService()
+        stale_snapshot = IntelligenceSnapshot(
+            key=_payload_key({"question": "top edges today", "date": "2026-06-29"}),
+            payload={"question": "top edges today", "date": "2026-06-29"},
+            response={"ok": True, "response": {"selected_date": "2026-06-29"}},
+            computed_at="2026-06-29T12:00:00Z",
+            source_fingerprint="fingerprint-1",
+        )
+        service._snapshots[stale_snapshot.key] = stale_snapshot
+        service._latest_key = stale_snapshot.key
+
+        with patch.object(service, "_load_persisted_state_locked") as mocked_load, patch.object(
+            service,
+            "_background_loop",
+            return_value=None,
+        ), patch.object(service, "_enqueue_locked") as mocked_enqueue, patch.object(
+            intelligence_state_module,
+            "central_today_iso",
+            return_value="2026-07-04",
+        ):
+            started = service.start()
+
+        self.assertTrue(started)
+        mocked_load.assert_called_once()
+        mocked_enqueue.assert_called_once()
+        self.assertEqual(mocked_enqueue.call_args.args[0]["date"], "2026-07-04")
+
     def test_read_latest_response_does_not_enqueue_work(self) -> None:
         service = IntelligenceStateService()
         snapshot = IntelligenceSnapshot(
