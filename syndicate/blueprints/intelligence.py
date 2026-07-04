@@ -530,7 +530,7 @@ def _response_needs_refresh(request_payload: dict[str, object], response_payload
 
 
 def _cached_intelligence_response_with_source(payload: dict[str, object], *, force_refresh: bool = True) -> tuple[dict[str, object] | None, str]:
-    cached_response = read_latest_intelligence_state_response(payload, force_refresh=force_refresh, allow_latest_fallback=True)
+    cached_response = read_latest_intelligence_state_response(payload, force_refresh=force_refresh, allow_latest_fallback=False)
     if _is_board_response(cached_response) and not _response_needs_refresh(payload, cached_response):
         return _hydrate_board_response_payload(cached_response), "worker"
     board_snapshot_response = read_latest_intelligence_board_snapshot_response(payload, force_refresh=force_refresh)
@@ -948,7 +948,7 @@ def _empty_default_intelligence_response() -> dict[str, object]:
 
 
 def read_latest_intelligence_state(payload: dict[str, object] | None = None) -> dict[str, object]:
-    snapshot = read_latest_intelligence_state_response(payload, force_refresh=False, allow_latest_fallback=True)
+    snapshot = read_latest_intelligence_state_response(payload, force_refresh=False, allow_latest_fallback=False)
     if isinstance(snapshot, dict) and _response_has_content(snapshot):
         return _hydrate_board_response_payload(snapshot)
     board_snapshot = read_latest_intelligence_board_snapshot_response(payload, force_refresh=False)
