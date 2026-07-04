@@ -342,6 +342,24 @@ def _intelligence_state_daily_paths() -> dict[str, Path]:
     }
 
 
+def _intelligence_state_daily_candidates() -> dict[str, list[Path]]:
+    base_dir = reports_root() / "intelligence"
+    return {
+        "state": [path for path in sorted(base_dir.glob("intelligence_state_*.json"), reverse=True) if path.is_file()],
+        "history": [path for path in sorted(base_dir.glob("intelligence_state_history_*.jsonl"), reverse=True) if path.is_file()],
+        "board_snapshot": [path for path in sorted(base_dir.glob("board_snapshot_*.json"), reverse=True) if path.is_file()],
+    }
+
+
+def _intelligence_state_read_path(artifact_name: str, fallback_path: Path) -> Path:
+    daily_paths = _intelligence_state_daily_paths()
+    daily_candidates = _intelligence_state_daily_candidates().get(artifact_name, [])
+    for path in [daily_paths.get(artifact_name), *daily_candidates, fallback_path]:
+        if isinstance(path, Path) and path.exists() and path.is_file():
+            return path
+    return fallback_path
+
+
 def _intelligence_state_history_entry(state: dict[str, Any]) -> dict[str, Any]:
     response = state.get("response") if isinstance(state.get("response"), dict) else {}
     top_opportunities = response.get("top_opportunities") if isinstance(response, dict) and isinstance(response.get("top_opportunities"), list) else state.get("top_opportunities")
@@ -374,13 +392,14 @@ def _is_intelligence_state_payload_valid(state: dict[str, Any] | None) -> bool:
 
 
 def read_intelligence_state() -> dict[str, Any] | None:
-    print("[INTELLIGENCE STATE READ]", {"path": str(INTELLIGENCE_STATE_PATH)})
-    payload = read_json_file(INTELLIGENCE_STATE_PATH)
+    path = _intelligence_state_read_path("state", INTELLIGENCE_STATE_PATH)
+    print("[INTELLIGENCE STATE READ]", {"path": str(path)})
+    payload = read_json_file(path)
     normalized = _normalize_intelligence_state_payload(payload if isinstance(payload, dict) else None)
     if not _is_intelligence_state_payload_valid(normalized):
-        print("[INTELLIGENCE STATE READ]", {"path": str(INTELLIGENCE_STATE_PATH), "valid": False, "candidate_count": 0})
+        print("[INTELLIGENCE STATE READ]", {"path": str(path), "valid": False, "candidate_count": 0})
         return None
-    print("[INTELLIGENCE STATE READ]", {"path": str(INTELLIGENCE_STATE_PATH), "valid": True, "candidate_count": int(normalized.get("candidate_count") or 0)})
+    print("[INTELLIGENCE STATE READ]", {"path": str(path), "valid": True, "candidate_count": int(normalized.get("candidate_count") or 0)})
     return normalized
 
 
@@ -1570,7 +1589,8 @@ def read_latest_intelligence_state_response(
 def read_latest_intelligence_board_snapshot_response(payload: dict[str, Any] | None = None, *, force_refresh: bool = True) -> dict[str, Any] | None:
     requested_date = _selected_date_from_payload(payload)
     _ = force_refresh
-    snapshot = read_json_file(BOARD_SNAPSHOT_PATH)
+    snapshot_path = _intelligence_state_read_path("board_snapshot", BOARD_SNAPSHOT_PATH)
+    snapshot = read_json_file(snapshot_path)
     if isinstance(snapshot, dict):
         updated_at = str(snapshot.get("updated_at") or "").strip() or None
         response = snapshot.get("response")

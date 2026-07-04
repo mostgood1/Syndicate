@@ -124,6 +124,34 @@ class IntelligenceStateTests(unittest.TestCase):
 
         self.assertIsNone(response)
 
+    def test_read_intelligence_state_prefers_daily_artifact(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir, patch.dict(
+            os.environ,
+            {
+                "SYNDICATE_REPORTS_ROOT": str(Path(tmp_dir) / "reports"),
+            },
+            clear=False,
+        ):
+            reports_root = Path(tmp_dir) / "reports"
+            legacy_state_path = reports_root / "intelligence" / "intelligence_state.json"
+            daily_state_path = reports_root / "intelligence" / "intelligence_state_2026_06_18.json"
+            refresh_state_store.write_json_file(
+                legacy_state_path,
+                {"candidate_count": 1, "top_opportunities": [{"name": "Legacy Play"}]},
+            )
+            refresh_state_store.write_json_file(
+                daily_state_path,
+                {"candidate_count": 2, "top_opportunities": [{"name": "Daily Play 1"}, {"name": "Daily Play 2"}]},
+            )
+
+            with patch.object(intelligence_state_module, "INTELLIGENCE_STATE_PATH", legacy_state_path):
+                with patch.object(intelligence_state_module, "reports_root", return_value=reports_root):
+                    response = intelligence_state_module.read_intelligence_state()
+
+        self.assertIsNotNone(response)
+        self.assertEqual(int(response.get("candidate_count") or 0), 2)
+        self.assertEqual(response.get("top_opportunities", [])[0]["name"], "Daily Play 1")
+
     def test_read_latest_response_syncs_shared_backend_state(self) -> None:
         service = IntelligenceStateService()
         cached_response = {"ok": True, "response": {"recommendations": [{"name": "Play 1"}]}}

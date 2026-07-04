@@ -133,6 +133,20 @@ class BootstrapDataRootTests(unittest.TestCase):
                 ],
             )
 
+    def test_bootstrap_roots_include_daily_intelligence_artifacts(self) -> None:
+        module = _load_module()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir) / "repo"
+            data_root = Path(temp_dir) / "data-root"
+            daily_snapshot = repo_root / "reports" / "intelligence" / "board_snapshot_2026_06_18.json"
+            daily_snapshot.parent.mkdir(parents=True, exist_ok=True)
+            daily_snapshot.write_text("{}\n", encoding="utf-8")
+
+            pairs = module._bootstrap_root_pairs(repo_root, data_root)
+            relative_sources = [source.relative_to(repo_root).as_posix() for source, _, _ in pairs]
+
+            self.assertIn("reports/intelligence/board_snapshot_2026_06_18.json", relative_sources)
+
     def test_bootstrap_wnba_today_artifacts_runs_when_missing(self) -> None:
         module = _load_module()
         with tempfile.TemporaryDirectory() as temp_dir:

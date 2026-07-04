@@ -95,6 +95,14 @@ def _bootstrap_root_pairs(repo_root: Path, data_root: Path) -> list[tuple[Path, 
         src = repo_root / relative_file
         dst = data_root / relative_file
         pairs.append((src, dst, str(relative_file)))
+    intelligence_root = repo_root / "reports" / "intelligence"
+    if intelligence_root.exists() and intelligence_root.is_dir():
+        for pattern in ("board_snapshot_*.json", "intelligence_state_*.json", "intelligence_state_history_*.jsonl"):
+            for src in sorted(intelligence_root.glob(pattern)):
+                if not src.is_file():
+                    continue
+                dst = data_root / "reports" / "intelligence" / src.name
+                pairs.append((src, dst, f"reports/intelligence/{src.name}"))
     return pairs
 
 

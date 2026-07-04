@@ -1,5 +1,12 @@
 # Fix Notes Log
 
+## 2026-07-04 - Intelligence artifacts now prefer daily worker-written files
+- Symptom: The intelligence board still depended on large root snapshot files, which made the artifact set hard to manage and left the live reader tied to the legacy root path.
+- Root cause: The state service, bootstrap sync, and daily-update publish list were still centered on `reports/intelligence/board_snapshot.json` and `reports/intelligence/intelligence_state.json` instead of the daily worker-written artifacts.
+- Fix: Make the reader prefer daily intelligence files, publish daily `board_snapshot_*.json` / `intelligence_state_*.json` / `intelligence_state_history_*.jsonl` artifacts, and bootstrap the daily files on startup.
+- Validation: Focused pytest coverage passed for `tests/test_intelligence_state.py` and `tests/test_bootstrap_data_root.py` after the contract change.
+- Follow-up: Keep the remaining compatibility root files out of the publish path so the daily worker-written artifacts stay the canonical source.
+
 ## 2026-07-03 - Intelligence snapshots were not included in daily-update publish paths
 - Symptom: The live Render betting board stayed on the old 6/29 snapshot even after the local intelligence refresh regenerated newer `reports/intelligence/*` artifacts.
 - Root cause: `scripts/unified_daily_update.ps1` only built publish paths from sport-specific artifacts, so the repo-local intelligence snapshot and cache files the web dyno reads were not part of the publish set.
