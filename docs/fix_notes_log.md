@@ -1,5 +1,12 @@
 # Fix Notes Log
 
+## 2026-07-04 - Intelligence query now launches the refresh job when the board is empty
+- Symptom: The live `/intelligence` board stopped 502ing after the inline recompute removal, but it remained empty because the query route only queued a refresh and never actually kicked off a job that could repopulate the state.
+- Root cause: The request path depended on the worker loop to notice the queue entry, and that was not enough to rebuild the board on Render in time for the live surface.
+- Fix: When the query route sees an empty board or an explicit refresh request, it now launches the real refresh job and then falls back to queueing the intelligence state refresh.
+- Validation: `pytest -q tests/test_intelligence_state.py -k query_endpoint` passed after the launcher fallback was added.
+- Follow-up: Keep the request path non-blocking, but make sure empty-board refreshes always start a real refresh job.
+
 ## 2026-07-04 - Intelligence query stopped doing inline recompute on the web dyno
 - Symptom: The live `/api/intelligence/query` and `/intelligence` routes were returning Render 502s and the board stayed on the shell because the request path was trying to rebuild intelligence state synchronously.
 - Root cause: The query endpoint called `compute_intelligence_state_response(...)` in the web request path when the cache was empty or zero-candidate, and that recompute takes long enough to trip the Render request window.
