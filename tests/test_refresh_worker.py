@@ -84,6 +84,24 @@ class RefreshWorkerTests(unittest.TestCase):
             latest_payload = json.loads(latest_manifest_path.read_text(encoding="utf-8"))
             self.assertEqual(latest_payload["state"], "claimed")
 
+    def test_main_starts_intelligence_state_background_loop(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        module = self._load_module(repo_root)
+
+        with TemporaryDirectory() as tmp_dir:
+            latest_manifest_path = Path(tmp_dir) / "refresh_status_latest.json"
+            latest_manifest_path.write_text(json.dumps({"state": "idle"}), encoding="utf-8")
+
+            with patch.object(
+                sys,
+                "argv",
+                ["run_refresh_worker.py", "--latest-manifest", str(latest_manifest_path), "--run-once"],
+            ), patch.object(module, "start_intelligence_state_background_loop") as mocked_start_loop:
+                exit_code = module.main()
+
+            self.assertEqual(exit_code, 0)
+            mocked_start_loop.assert_called_once()
+
     def test_main_run_once_skips_runner_when_nothing_is_pending(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]
         module = self._load_module(repo_root)

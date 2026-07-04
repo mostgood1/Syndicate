@@ -1,5 +1,12 @@
 # Fix Notes Log
 
+## 2026-07-04 - Render refresh worker now owns the intelligence state loop
+- Symptom: The live betting board could redeploy cleanly but still serve the 2026-06-29 intelligence snapshot, so the board never stayed on today's opps throughout the day.
+- Root cause: The Render refresh worker only polled refresh contracts and launched queued jobs; it never started the intelligence state background loop, so the worker-owned board snapshot never advanced on its own.
+- Fix: Start the intelligence state background loop from `scripts/run_refresh_worker.py` so the Render worker continuously refreshes and persists today's board snapshot.
+- Validation: Focused pytest coverage passed for the worker bootstrap regression in `tests/test_refresh_worker.py`.
+- Follow-up: Keep the worker loop enabled on Render and monitor the status snapshot age to confirm today's state continues to advance during the slate.
+
 ## 2026-07-04 - Intelligence evaluation metadata stopped collapsing sport=all into the stale all-source manifest
 - Symptom: The live /api/intelligence/status payload still showed a 2026-06-29 `all_source` manifest summary even after the board cards themselves were current.
 - Root cause: The evaluation metadata helper treated `sport=all` as a single aggregate manifest request, which let the old all-source bundle keep winning the manifest summary path.
