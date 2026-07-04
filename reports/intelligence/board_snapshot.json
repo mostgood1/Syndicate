@@ -1,6 +1,6 @@
 {
   "latest_key": "928315208c68c7117c06911c88c130237572a6ae6d0a2ab034f65d17f0a112ce",
-  "updated_at": "2026-07-02T16:09:34-05:00",
+  "updated_at": "2026-07-03T21:30:22-05:00",
   "response": {
     "ok": true,
     "top_opportunities": [
@@ -68,8 +68,8 @@
       ],
       "portfolio": {},
       "parlays": [],
-      "state_last_updated": "2026-07-02T21:09:34Z",
-      "last_updated": "2026-07-02T16:09:34-05:00",
+      "state_last_updated": "2026-07-04T02:30:22Z",
+      "last_updated": "2026-07-03T21:30:22-05:00",
       "candidate_count": 1
     },
     "candidate_pool": {
@@ -92,8 +92,8 @@
         }
       ]
     },
-    "state_last_updated": "2026-07-02T21:09:34Z",
-    "last_updated": "2026-07-02T16:09:34-05:00",
+    "state_last_updated": "2026-07-04T02:30:22Z",
+    "last_updated": "2026-07-03T21:30:22-05:00",
     "candidate_count": 1,
     "response": {
       "ok": true,
@@ -142,8 +142,8 @@
       ],
       "portfolio": {},
       "parlays": [],
-      "state_last_updated": "2026-07-02T21:09:34Z",
-      "last_updated": "2026-07-02T16:09:34-05:00",
+      "state_last_updated": "2026-07-04T02:30:22Z",
+      "last_updated": "2026-07-03T21:30:22-05:00",
       "candidate_count": 1
     },
     "board_contract": {
@@ -274,8 +274,8 @@
     },
     "state_meta": {
       "source": "worker",
-      "computed_at": "2026-07-02T21:09:34Z",
-      "age_seconds": 0.4017157554626465,
+      "computed_at": "2026-07-04T02:30:22Z",
+      "age_seconds": 0.11768579483032227,
       "freshness_sla_seconds": 30,
       "freshness_status": "fresh",
       "is_fresh": true,
@@ -286,8 +286,8 @@
     },
     "freshness": {
       "source": "worker",
-      "computed_at": "2026-07-02T21:09:34Z",
-      "age_seconds": 0.4017157554626465,
+      "computed_at": "2026-07-04T02:30:22Z",
+      "age_seconds": 0.11768579483032227,
       "freshness_sla_seconds": 30,
       "freshness_status": "fresh",
       "is_fresh": true,
@@ -298,8 +298,8 @@
     },
     "state_freshness": {
       "source": "worker",
-      "computed_at": "2026-07-02T21:09:34Z",
-      "age_seconds": 0.4017157554626465,
+      "computed_at": "2026-07-04T02:30:22Z",
+      "age_seconds": 0.11768579483032227,
       "freshness_sla_seconds": 30,
       "freshness_status": "fresh",
       "is_fresh": true,
@@ -312,8 +312,8 @@
   },
   "state_meta": {
     "source": "worker",
-    "computed_at": "2026-07-02T21:09:34Z",
-    "age_seconds": 0.4017157554626465,
+    "computed_at": "2026-07-04T02:30:22Z",
+    "age_seconds": 0.11768579483032227,
     "freshness_sla_seconds": 30,
     "freshness_status": "fresh",
     "is_fresh": true,
