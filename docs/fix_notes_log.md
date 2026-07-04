@@ -1,5 +1,12 @@
 # Fix Notes Log
 
+## 2026-07-04 - Intelligence board default date stopped falling back to 6/29 manifests
+- Symptom: The /intelligence board still surfaced a stale 2026-06-29 artifact summary in the response metadata even though the worker-written board snapshot was current.
+- Root cause: The default board date chooser only looked at snapshot files with explicit date fields, so it could skip the worker-written root snapshot and fall back to an older manifest-derived date.
+- Fix: Teach the intelligence date chooser to inspect the worker-written root snapshot metadata and file mtime first, normalize timestamp-like values to ISO dates, and only then fall back to manifests.
+- Validation: Focused pytest coverage passed for the daily snapshot selector regression and the worker-snapshot-over-manifest regression in `tests/test_intelligence_state.py`.
+- Follow-up: Keep the worker publishing the root intelligence snapshot so the default board date continues to track the newest artifact instead of stale manifest provenance.
+
 ## 2026-07-03 - Intelligence status now prefers published report manifests over source-tree scans
 - Symptom: The live /api/intelligence/status payload kept resolving an all-sports manifest rooted at `src/data/all_source`, so the betting board stayed anchored to stale 6/29 evidence instead of the worker-published 7/3 snapshot.
 - Root cause: `load_artifact_manifests()` only scanned source-tree data roots and ignored the shared published manifests under `reports/manifests`, which are the web-side copy Render can actually read.

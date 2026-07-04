@@ -245,6 +245,44 @@ class IntelligenceStateTests(unittest.TestCase):
 
         self.assertEqual(latest_date, "2026-07-03")
 
+    def test_latest_available_intelligence_date_prefers_worker_snapshot_metadata_over_manifest_dates(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir, patch.dict(
+            os.environ,
+            {
+                "SYNDICATE_REPORTS_ROOT": str(Path(tmp_dir) / "reports"),
+            },
+            clear=False,
+        ):
+            reports_root = Path(tmp_dir) / "reports"
+            board_snapshot_path = reports_root / "intelligence" / "board_snapshot.json"
+            board_snapshot_path.parent.mkdir(parents=True, exist_ok=True)
+            refresh_state_store.write_json_file(
+                board_snapshot_path,
+                {
+                    "updated_at": "2026-07-03T21:30:22-05:00",
+                    "response": {
+                        "top_opportunities": [{"name": "Fresh Play"}],
+                    },
+                },
+            )
+
+            fake_manifest = type(
+                "FakeManifest",
+                (),
+                {
+                    "predictions": (),
+                    "edges": (),
+                    "recommendations": (),
+                    "live_data": (),
+                },
+            )()
+
+            with patch.object(intelligence_module, "reports_root", return_value=reports_root):
+                with patch.object(intelligence_module, "load_artifact_manifests", return_value=[fake_manifest]):
+                    latest_date = intelligence_module._latest_available_intelligence_date()
+
+        self.assertEqual(latest_date, "2026-07-03")
+
     def test_read_latest_response_syncs_shared_backend_state(self) -> None:
         service = IntelligenceStateService()
         cached_response = {"ok": True, "response": {"recommendations": [{"name": "Play 1"}]}}

@@ -69,9 +69,52 @@ def _api_error_response(error: Exception):
     return response
 
 
+def _date_string_from_value(value: Any) -> str:
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    normalized = text.replace("Z", "+00:00")
+    try:
+        return datetime.fromisoformat(normalized).date().isoformat()
+    except Exception:
+        if len(text) >= 10 and text[4] == "-" and text[7] == "-":
+            return text[:10]
+    return text
+
+
 def _latest_available_intelligence_date() -> str:
     latest_date = ""
     intelligence_root = reports_root() / "intelligence"
+    for path in (
+        intelligence_root / "board_snapshot.json",
+        intelligence_root / "intelligence_state.json",
+    ):
+        if not path.is_file():
+            continue
+        candidate = ""
+        try:
+            payload = read_json_file(path)
+        except Exception:
+            payload = None
+        if isinstance(payload, dict):
+            candidate = _date_string_from_value(
+                payload.get("selected_date")
+                or payload.get("date")
+                or (payload.get("response") or {}).get("selected_date")
+                or (payload.get("response") or {}).get("date")
+                or payload.get("updated_at")
+                or payload.get("last_updated")
+                or payload.get("state_last_updated")
+                or ""
+            ).strip()
+        if not candidate:
+            try:
+                candidate = datetime.fromtimestamp(path.stat().st_mtime, tz=timezone.utc).date().isoformat()
+            except Exception:
+                candidate = ""
+        if candidate and candidate > latest_date:
+            latest_date = candidate
+
     for pattern in ("board_snapshot_*.json", "intelligence_state_*.json"):
         if not intelligence_root.exists():
             break
@@ -84,17 +127,25 @@ def _latest_available_intelligence_date() -> str:
             except Exception:
                 payload = None
             if isinstance(payload, dict):
-                candidate = str(
+                candidate = _date_string_from_value(
                     payload.get("selected_date")
                     or payload.get("date")
                     or (payload.get("response") or {}).get("selected_date")
                     or (payload.get("response") or {}).get("date")
+                    or payload.get("updated_at")
+                    or payload.get("last_updated")
+                    or payload.get("state_last_updated")
                     or ""
                 ).strip()
             if not candidate:
                 stem_parts = path.stem.rsplit("_", 3)
                 if len(stem_parts) >= 4:
                     candidate = "-".join(stem_parts[-3:])
+            if not candidate:
+                try:
+                    candidate = datetime.fromtimestamp(path.stat().st_mtime, tz=timezone.utc).date().isoformat()
+                except Exception:
+                    candidate = ""
             if candidate and candidate > latest_date:
                 latest_date = candidate
     try:
