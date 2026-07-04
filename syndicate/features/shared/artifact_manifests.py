@@ -11,6 +11,7 @@ from syndicate.features.shared.refresh_state_store import reports_root
 
 
 ARTIFACT_CATEGORIES = ("predictions", "edges", "recommendations", "live_data")
+SUPPORTED_SPORT_SLUGS = ("mlb", "nba", "wnba", "nhl", "nfl", "ncaaf", "ncaab")
 
 
 def _copy_mapping(value: Any) -> dict[str, Any]:
@@ -375,6 +376,68 @@ def _published_manifest_for_sport(sport_slug: str, selected_date: str | None = N
     )
 
 
+def _load_scanned_manifest(sport_slug: str, selected_date: str | None = None) -> ArtifactManifest:
+    slug = _normalize_slug(sport_slug)
+    roots = _sport_roots(slug)
+    scanned: list[ArtifactReference] = []
+    for root in roots:
+        for candidate_root in _sport_directories(root):
+            scanned.extend(_references_from_directory(candidate_root, slug))
+    grouped = _group_by_category(scanned)
+    source_root = str(roots[0]) if roots else None
+    data_root = str(roots[0].parent) if roots else None
+    return ArtifactManifest(
+        sport_slug=slug,
+        selected_date=_normalize_date(selected_date),
+        source_root=source_root,
+        data_root=data_root,
+        predictions=tuple(grouped["predictions"]),
+        edges=tuple(grouped["edges"]),
+        recommendations=tuple(grouped["recommendations"]),
+        live_data=tuple(grouped["live_data"]),
+        raw={"roots": [str(root) for root in roots], "selected_date": selected_date},
+    )
+
+
+def _aggregate_all_manifests(*, selected_date: str | None = None) -> ArtifactManifest | None:
+    manifests: list[ArtifactManifest] = []
+    for sport_slug in SUPPORTED_SPORT_SLUGS:
+        manifest = _published_manifest_for_sport(sport_slug, selected_date=selected_date)
+        if manifest is None:
+            manifest = _load_scanned_manifest(sport_slug, selected_date=selected_date)
+        if manifest is not None:
+            manifests.append(manifest)
+
+    if not manifests:
+        return None
+
+    references: list[ArtifactReference] = []
+    raw_roots: list[str] = []
+    selected_dates = [str(manifest.selected_date or "").strip() for manifest in manifests if str(manifest.selected_date or "").strip()]
+    for manifest in manifests:
+        raw_roots.extend(str(root) for root in (manifest.raw.get("roots") or []) if str(root or "").strip())
+        for category in ARTIFACT_CATEGORIES:
+            references.extend(getattr(manifest, category, ()) or ())
+
+    grouped = _group_by_category(references)
+    effective_date = _normalize_date(selected_date) or (max(selected_dates) if selected_dates else None)
+    return ArtifactManifest(
+        sport_slug="all",
+        selected_date=effective_date,
+        source_root=str(reports_root() / "manifests"),
+        data_root=str(reports_root()),
+        predictions=tuple(grouped["predictions"]),
+        edges=tuple(grouped["edges"]),
+        recommendations=tuple(grouped["recommendations"]),
+        live_data=tuple(grouped["live_data"]),
+        raw={
+            "roots": raw_roots,
+            "selected_date": effective_date,
+            "published_manifest_paths": [str(reports_root() / "manifests" / f"{sport_slug}.json") for sport_slug in SUPPORTED_SPORT_SLUGS],
+        },
+    )
+
+
 def _references_from_directory(root: Path, sport_slug: str) -> list[ArtifactReference]:
     if not root.exists() or not root.is_dir():
         return []
@@ -412,29 +475,16 @@ def _group_by_category(references: Iterable[ArtifactReference]) -> dict[str, lis
 
 def load_artifact_manifest(*, sport_slug: str, selected_date: str | None = None) -> ArtifactManifest:
     slug = _normalize_slug(sport_slug)
+    if slug == "all":
+        aggregate_manifest = _aggregate_all_manifests(selected_date=selected_date)
+        if aggregate_manifest is not None:
+            return aggregate_manifest
+
     published_manifest = _published_manifest_for_sport(slug, selected_date=selected_date)
     if published_manifest is not None:
         return published_manifest
 
-    roots = _sport_roots(slug)
-    scanned: list[ArtifactReference] = []
-    for root in roots:
-        for candidate_root in _sport_directories(root):
-            scanned.extend(_references_from_directory(candidate_root, slug))
-    grouped = _group_by_category(scanned)
-    source_root = str(roots[0]) if roots else None
-    data_root = str(roots[0].parent) if roots else None
-    return ArtifactManifest(
-        sport_slug=slug,
-        selected_date=_normalize_date(selected_date),
-        source_root=source_root,
-        data_root=data_root,
-        predictions=tuple(grouped["predictions"]),
-        edges=tuple(grouped["edges"]),
-        recommendations=tuple(grouped["recommendations"]),
-        live_data=tuple(grouped["live_data"]),
-        raw={"roots": [str(root) for root in roots], "selected_date": selected_date},
-    )
+    return _load_scanned_manifest(slug, selected_date=selected_date)
 
 
 def load_artifact_manifests(*, selected_date: str | None = None, sport_slugs: Iterable[str] | None = None) -> list[ArtifactManifest]:
