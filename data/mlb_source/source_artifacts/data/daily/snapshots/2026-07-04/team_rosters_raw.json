@@ -22078,6 +22078,25 @@
           },
           {
             "person": {
+              "id": 689690,
+              "fullName": "Alek Jacob",
+              "link": "/api/v1/people/689690"
+            },
+            "jerseyNumber": "37",
+            "position": {
+              "code": "1",
+              "name": "Pitcher",
+              "type": "Pitcher",
+              "abbreviation": "P"
+            },
+            "status": {
+              "code": "A",
+              "description": "Active"
+            },
+            "parentTeamId": 135
+          },
+          {
+            "person": {
               "id": 699134,
               "fullName": "Bradgley Rodriguez",
               "link": "/api/v1/people/699134"
@@ -22107,25 +22126,6 @@
               "name": "Outfielder",
               "type": "Outfielder",
               "abbreviation": "RF"
-            },
-            "status": {
-              "code": "A",
-              "description": "Active"
-            },
-            "parentTeamId": 135
-          },
-          {
-            "person": {
-              "id": 666023,
-              "fullName": "Freddy Fermin",
-              "link": "/api/v1/people/666023"
-            },
-            "jerseyNumber": "54",
-            "position": {
-              "code": "2",
-              "name": "Catcher",
-              "type": "Catcher",
-              "abbreviation": "C"
             },
             "status": {
               "code": "A",
@@ -22287,6 +22287,25 @@
           },
           {
             "person": {
+              "id": 669134,
+              "fullName": "Luis Campusano",
+              "link": "/api/v1/people/669134"
+            },
+            "jerseyNumber": "12",
+            "position": {
+              "code": "2",
+              "name": "Catcher",
+              "type": "Catcher",
+              "abbreviation": "C"
+            },
+            "status": {
+              "code": "A",
+              "description": "Active"
+            },
+            "parentTeamId": 135
+          },
+          {
+            "person": {
               "id": 592518,
               "fullName": "Manny Machado",
               "link": "/api/v1/people/592518"
@@ -22354,25 +22373,6 @@
               "name": "Designated Hitter",
               "type": "Hitter",
               "abbreviation": "DH"
-            },
-            "status": {
-              "code": "A",
-              "description": "Active"
-            },
-            "parentTeamId": 135
-          },
-          {
-            "person": {
-              "id": 681190,
-              "fullName": "Randy V\u00e1squez",
-              "link": "/api/v1/people/681190"
-            },
-            "jerseyNumber": "98",
-            "position": {
-              "code": "1",
-              "name": "Pitcher",
-              "type": "Pitcher",
-              "abbreviation": "P"
             },
             "status": {
               "code": "A",
@@ -22586,8 +22586,8 @@
               "abbreviation": "P"
             },
             "status": {
-              "code": "RM",
-              "description": "Reassigned to Minors"
+              "code": "A",
+              "description": "Active"
             },
             "parentTeamId": 135
           },
@@ -22701,9 +22701,10 @@
               "type": "Catcher",
               "abbreviation": "C"
             },
+            "note": "Head contusion.",
             "status": {
-              "code": "A",
-              "description": "Active"
+              "code": "D10",
+              "description": "Injured 10-Day"
             },
             "parentTeamId": 135
           },
@@ -22989,10 +22990,9 @@
               "type": "Catcher",
               "abbreviation": "C"
             },
-            "note": "Left toe fracture",
             "status": {
-              "code": "D10",
-              "description": "Injured 10-Day"
+              "code": "A",
+              "description": "Active"
             },
             "parentTeamId": 135
           },
@@ -23182,9 +23182,10 @@
               "type": "Pitcher",
               "abbreviation": "P"
             },
+            "note": "Right ankle contusion.",
             "status": {
-              "code": "A",
-              "description": "Active"
+              "code": "D15",
+              "description": "Injured 15-Day"
             },
             "parentTeamId": 135
           },
@@ -23695,25 +23696,6 @@
           },
           {
             "person": {
-              "id": 677594,
-              "fullName": "Julio Rodr\u00edguez",
-              "link": "/api/v1/people/677594"
-            },
-            "jerseyNumber": "44",
-            "position": {
-              "code": "8",
-              "name": "Outfielder",
-              "type": "Outfielder",
-              "abbreviation": "CF"
-            },
-            "status": {
-              "code": "A",
-              "description": "Active"
-            },
-            "parentTeamId": 136
-          },
-          {
-            "person": {
               "id": 669302,
               "fullName": "Logan Gilbert",
               "link": "/api/v1/people/669302"
@@ -23781,6 +23763,25 @@
               "name": "Pitcher",
               "type": "Pitcher",
               "abbreviation": "P"
+            },
+            "status": {
+              "code": "A",
+              "description": "Active"
+            },
+            "parentTeamId": 136
+          },
+          {
+            "person": {
+              "id": 670156,
+              "fullName": "Miles Mastrobuoni",
+              "link": "/api/v1/people/670156"
+            },
+            "jerseyNumber": "21",
+            "position": {
+              "code": "5",
+              "name": "Third Base",
+              "type": "Infielder",
+              "abbreviation": "3B"
             },
             "status": {
               "code": "A",
@@ -24149,8 +24150,8 @@
             },
             "note": "Right shoulder strain.",
             "status": {
-              "code": "D15",
-              "description": "Injured 15-Day"
+              "code": "D60",
+              "description": "Injured 60-Day"
             },
             "parentTeamId": 136
           },
@@ -24357,9 +24358,10 @@
               "type": "Outfielder",
               "abbreviation": "CF"
             },
+            "note": "Concussion",
             "status": {
-              "code": "A",
-              "description": "Active"
+              "code": "D7",
+              "description": "Injured 7-Day"
             },
             "parentTeamId": 136
           },
@@ -24491,6 +24493,25 @@
               "name": "Pitcher",
               "type": "Pitcher",
               "abbreviation": "P"
+            },
+            "status": {
+              "code": "A",
+              "description": "Active"
+            },
+            "parentTeamId": 136
+          },
+          {
+            "person": {
+              "id": 670156,
+              "fullName": "Miles Mastrobuoni",
+              "link": "/api/v1/people/670156"
+            },
+            "jerseyNumber": "21",
+            "position": {
+              "code": "5",
+              "name": "Third Base",
+              "type": "Infielder",
+              "abbreviation": "3B"
             },
             "status": {
               "code": "A",
@@ -38699,25 +38720,6 @@
           },
           {
             "person": {
-              "id": 682987,
-              "fullName": "Spencer Jones",
-              "link": "/api/v1/people/682987"
-            },
-            "jerseyNumber": "78",
-            "position": {
-              "code": "8",
-              "name": "Outfielder",
-              "type": "Outfielder",
-              "abbreviation": "CF"
-            },
-            "status": {
-              "code": "A",
-              "description": "Active"
-            },
-            "parentTeamId": 147
-          },
-          {
-            "person": {
               "id": 657612,
               "fullName": "Tim Hill",
               "link": "/api/v1/people/657612"
@@ -39459,8 +39461,8 @@
               "abbreviation": "CF"
             },
             "status": {
-              "code": "A",
-              "description": "Active"
+              "code": "RM",
+              "description": "Reassigned to Minors"
             },
             "parentTeamId": 147
           },

@@ -2593,8 +2593,9 @@
         657656,
         663362,
         663773,
+        666023,
         669093,
-        669134,
+        681190,
         688158
       ],
       "injured": [
@@ -2625,6 +2626,21 @@
             "name": "Pitcher",
             "type": "Pitcher",
             "abbreviation": "P"
+          },
+          "roster_type_source": "40Man"
+        },
+        {
+          "player_id": 666023,
+          "full_name": "Freddy Fermin",
+          "status": {
+            "code": "D10",
+            "description": "Injured 10-Day"
+          },
+          "position": {
+            "code": "2",
+            "name": "Catcher",
+            "type": "Catcher",
+            "abbreviation": "C"
           },
           "roster_type_source": "40Man"
         },
@@ -2689,21 +2705,6 @@
           "roster_type_source": "40Man"
         },
         {
-          "player_id": 669134,
-          "full_name": "Luis Campusano",
-          "status": {
-            "code": "D10",
-            "description": "Injured 10-Day"
-          },
-          "position": {
-            "code": "2",
-            "name": "Catcher",
-            "type": "Catcher",
-            "abbreviation": "C"
-          },
-          "roster_type_source": "40Man"
-        },
-        {
           "player_id": 663362,
           "full_name": "Matt Waldron",
           "status": {
@@ -2747,6 +2748,21 @@
             "abbreviation": "LF"
           },
           "roster_type_source": "40Man"
+        },
+        {
+          "player_id": 681190,
+          "full_name": "Randy V\u00e1squez",
+          "status": {
+            "code": "D15",
+            "description": "Injured 15-Day"
+          },
+          "position": {
+            "code": "1",
+            "name": "Pitcher",
+            "type": "Pitcher",
+            "abbreviation": "P"
+          },
+          "roster_type_source": "40Man"
         }
       ]
     },
@@ -2761,6 +2777,7 @@
         666374,
         669717,
         672841,
+        677594,
         680977,
         681867,
         688138
@@ -2800,14 +2817,29 @@
           "player_id": 681867,
           "full_name": "Cooper Criswell",
           "status": {
-            "code": "D15",
-            "description": "Injured 15-Day"
+            "code": "D60",
+            "description": "Injured 60-Day"
           },
           "position": {
             "code": "1",
             "name": "Pitcher",
             "type": "Pitcher",
             "abbreviation": "P"
+          },
+          "roster_type_source": "40Man"
+        },
+        {
+          "player_id": 677594,
+          "full_name": "Julio Rodr\u00edguez",
+          "status": {
+            "code": "D7",
+            "description": "Injured 7-Day"
+          },
+          "position": {
+            "code": "8",
+            "name": "Outfielder",
+            "type": "Outfielder",
+            "abbreviation": "CF"
           },
           "roster_type_source": "40Man"
         },
@@ -6945,6 +6977,22 @@
     },
     {
       "team_id": 135,
+      "player_id": 666023,
+      "full_name": "Freddy Fermin",
+      "status": {
+        "code": "D10",
+        "description": "Injured 10-Day"
+      },
+      "position": {
+        "code": "2",
+        "name": "Catcher",
+        "type": "Catcher",
+        "abbreviation": "C"
+      },
+      "roster_type_source": "40Man"
+    },
+    {
+      "team_id": 135,
       "player_id": 592094,
       "full_name": "Jason Adam",
       "status": {
@@ -7009,22 +7057,6 @@
     },
     {
       "team_id": 135,
-      "player_id": 669134,
-      "full_name": "Luis Campusano",
-      "status": {
-        "code": "D10",
-        "description": "Injured 10-Day"
-      },
-      "position": {
-        "code": "2",
-        "name": "Catcher",
-        "type": "Catcher",
-        "abbreviation": "C"
-      },
-      "roster_type_source": "40Man"
-    },
-    {
-      "team_id": 135,
       "player_id": 663362,
       "full_name": "Matt Waldron",
       "status": {
@@ -7072,6 +7104,22 @@
       "roster_type_source": "40Man"
     },
     {
+      "team_id": 135,
+      "player_id": 681190,
+      "full_name": "Randy V\u00e1squez",
+      "status": {
+        "code": "D15",
+        "description": "Injured 15-Day"
+      },
+      "position": {
+        "code": "1",
+        "name": "Pitcher",
+        "type": "Pitcher",
+        "abbreviation": "P"
+      },
+      "roster_type_source": "40Man"
+    },
+    {
       "team_id": 136,
       "player_id": 680977,
       "full_name": "Brendan Donovan",
@@ -7108,14 +7156,30 @@
       "player_id": 681867,
       "full_name": "Cooper Criswell",
       "status": {
-        "code": "D15",
-        "description": "Injured 15-Day"
+        "code": "D60",
+        "description": "Injured 60-Day"
       },
       "position": {
         "code": "1",
         "name": "Pitcher",
         "type": "Pitcher",
         "abbreviation": "P"
+      },
+      "roster_type_source": "40Man"
+    },
+    {
+      "team_id": 136,
+      "player_id": 677594,
+      "full_name": "Julio Rodr\u00edguez",
+      "status": {
+        "code": "D7",
+        "description": "Injured 7-Day"
+      },
+      "position": {
+        "code": "8",
+        "name": "Outfielder",
+        "type": "Outfielder",
+        "abbreviation": "CF"
       },
       "roster_type_source": "40Man"
     },

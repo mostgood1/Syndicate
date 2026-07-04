@@ -675,7 +675,7 @@
         "role": "CL",
         "leverage_skill": 0.85,
         "stamina_pitches": 25,
-        "availability_mult": 0.96,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 0.9457634757526591,
           "bb": 0.886161776367962,
@@ -719,7 +719,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.6916666666666667,
         "platoon_mult_vs_lhb": {
           "k": 0.9792985457656116,
           "bb": 1.1925000000000001,
@@ -806,7 +806,7 @@
         "role": "LR",
         "leverage_skill": 0.35,
         "stamina_pitches": 25,
-        "availability_mult": 0.9299999999999999,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 0.9849425660106846,
           "bb": 1.1319965891194543,
@@ -1409,7 +1409,7 @@
         "role": "CL",
         "leverage_skill": 0.85,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.9583333333333334,
         "platoon_mult_vs_lhb": {
           "k": 0.9335748792270532,
           "bb": 1.1081196581196582,
@@ -1450,7 +1450,7 @@
         "role": "SU",
         "leverage_skill": 0.7,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.7833333333333333,
         "platoon_mult_vs_lhb": {
           "k": 0.925551580202743,
           "bb": 1.0336748272368481,
@@ -1492,7 +1492,7 @@
         "role": "SU",
         "leverage_skill": 0.7,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.825,
         "platoon_mult_vs_lhb": {
           "k": 1.008465874376712,
           "bb": 1.1925000000000001,
@@ -1576,7 +1576,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 26,
-        "availability_mult": 1.0,
+        "availability_mult": 0.6583333333333333,
         "platoon_mult_vs_lhb": {
           "k": 1.0512422360248448,
           "bb": 1.0813043478260869,

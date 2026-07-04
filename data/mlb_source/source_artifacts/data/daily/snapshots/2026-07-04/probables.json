@@ -2,7 +2,7 @@
   "date": "2026-07-04",
   "season": 2026,
   "spring_mode": false,
-  "generated_at": "2026-07-03T22:14:28.231347",
+  "generated_at": "2026-07-04T04:58:17.620680",
   "games": [
     {
       "idx": 0,
@@ -80,11 +80,11 @@
         "abbr": "NYY"
       },
       "away_probable_id": 805673,
-      "home_probable_id": null,
+      "home_probable_id": 694341,
       "away_source": "feed_gameData_probablePitchers",
-      "home_source": "none",
+      "home_source": "feed_gameData_probablePitchers",
       "away_confidence": 0.75,
-      "home_confidence": 0.0,
+      "home_confidence": 0.75,
       "away_validation": {
         "status": "ok",
         "selected_id": 805673,
@@ -104,28 +104,32 @@
         "rejected_candidates": []
       },
       "home_validation": {
-        "status": "none",
-        "selected_id": null,
-        "selected_name": "",
-        "selected_source": "none",
+        "status": "ok",
+        "selected_id": 694341,
+        "selected_name": "Brendan Beck",
+        "selected_source": "feed_gameData_probablePitchers",
         "override_reason": "",
-        "roster_team_ids": [],
-        "registry_team_ids": [],
-        "on_expected_team": false,
+        "roster_team_ids": [
+          147
+        ],
+        "registry_team_ids": [
+          147
+        ],
+        "on_expected_team": true,
         "on_opponent_team": false,
-        "on_expected_registry_team": false,
+        "on_expected_registry_team": true,
         "on_opponent_registry_team": false,
         "rejected_candidates": []
       },
       "raw": {
         "away_schedule_id": 805673,
-        "home_schedule_id": null,
+        "home_schedule_id": 694341,
         "away_schedule_name": "Zebby Matthews",
-        "home_schedule_name": "",
+        "home_schedule_name": "Brendan Beck",
         "away_feed_id": 805673,
-        "home_feed_id": null,
+        "home_feed_id": 694341,
         "away_feed_name": "Zebby Matthews",
-        "home_feed_name": ""
+        "home_feed_name": "Brendan Beck"
       }
     },
     {
@@ -587,23 +591,27 @@
         "team_id": 115,
         "abbr": "COL"
       },
-      "away_probable_id": null,
+      "away_probable_id": 592662,
       "home_probable_id": 608372,
-      "away_source": "none",
+      "away_source": "feed_gameData_probablePitchers",
       "home_source": "feed_gameData_probablePitchers",
-      "away_confidence": 0.0,
+      "away_confidence": 0.75,
       "home_confidence": 0.75,
       "away_validation": {
-        "status": "none",
-        "selected_id": null,
-        "selected_name": "",
-        "selected_source": "none",
+        "status": "ok",
+        "selected_id": 592662,
+        "selected_name": "Robbie Ray",
+        "selected_source": "feed_gameData_probablePitchers",
         "override_reason": "",
-        "roster_team_ids": [],
-        "registry_team_ids": [],
-        "on_expected_team": false,
+        "roster_team_ids": [
+          137
+        ],
+        "registry_team_ids": [
+          137
+        ],
+        "on_expected_team": true,
         "on_opponent_team": false,
-        "on_expected_registry_team": false,
+        "on_expected_registry_team": true,
         "on_opponent_registry_team": false,
         "rejected_candidates": []
       },
@@ -626,13 +634,13 @@
         "rejected_candidates": []
       },
       "raw": {
-        "away_schedule_id": null,
+        "away_schedule_id": 592662,
         "home_schedule_id": 608372,
-        "away_schedule_name": "",
+        "away_schedule_name": "Robbie Ray",
         "home_schedule_name": "Tomoyuki Sugano",
-        "away_feed_id": null,
+        "away_feed_id": 592662,
         "home_feed_id": 608372,
-        "away_feed_name": "",
+        "away_feed_name": "Robbie Ray",
         "home_feed_name": "Tomoyuki Sugano"
       }
     },

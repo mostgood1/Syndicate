@@ -2,11 +2,11 @@
   "date": "2026-07-04",
   "season": 2026,
   "spring_mode": false,
-  "generated_at": "2026-07-03T22:14:28.227542",
+  "generated_at": "2026-07-04T04:58:17.616594",
   "summary": {
     "games": 15,
     "projected_teams": 30,
-    "adjusted_teams": 7,
+    "adjusted_teams": 9,
     "partial_teams": 0,
     "fallback_pool_teams": 0,
     "confirmed_teams": 0,
@@ -324,7 +324,7 @@
       },
       "away_source": "projected_rotowire_default_vs_rhp",
       "home_source": "projected_rotowire_default_vs_rhp",
-      "away_confidence": 0.58,
+      "away_confidence": 0.66,
       "home_confidence": 0.66,
       "away_comparison": {
         "status": "projected_only",
@@ -538,13 +538,13 @@
       "home_projected_ids": [
         641487,
         663728,
-        677594,
         647304,
         668227,
         670042,
         702284,
         641598,
-        806068
+        806068,
+        671083
       ],
       "away_projected_validation": {
         "status": "ok",
@@ -600,11 +600,10 @@
         "mapping_source": "projected_rotowire_default_vs_lhp"
       },
       "home_projected_validation": {
-        "status": "ok",
+        "status": "adjusted",
         "raw_ids": [
           641487,
           663728,
-          677594,
           647304,
           668227,
           670042,
@@ -615,16 +614,18 @@
         "ids": [
           641487,
           663728,
-          677594,
           647304,
           668227,
           670042,
           702284,
           641598,
-          806068
+          806068,
+          671083
         ],
         "missing_ids": [],
-        "backfilled_ids": [],
+        "backfilled_ids": [
+          671083
+        ],
         "pool_source": "active+40Man",
         "pool_size": 19,
         "raw_names": [
@@ -641,7 +642,6 @@
         "matched_names": [
           "J.P. Crawford",
           "Cal Raleigh",
-          "Julio Rodr\u00edguez",
           "Josh Naylor",
           "Randy Arozarena",
           "Luke Raley",
@@ -649,13 +649,15 @@
           "Mitch Garver",
           "Colt Emerson"
         ],
-        "missing_name_labels": [],
+        "missing_name_labels": [
+          "Julio Rodriguez"
+        ],
         "mapping_source": "projected_rotowire_today_lineup"
       },
       "away_source": "projected_rotowire_default_vs_lhp",
       "home_source": "projected_rotowire_today_lineup",
       "away_confidence": 0.56,
-      "home_confidence": 0.72,
+      "home_confidence": 0.48000000000000004,
       "away_comparison": {
         "status": "projected_only",
         "is_true_mismatch": false,
@@ -1526,13 +1528,13 @@
         701852
       ],
       "home_projected_ids": [
-        664983,
-        666160,
-        681198,
-        696100,
         650489,
         671289,
+        681198,
+        696100,
         694249,
+        664983,
+        690924,
         678662,
         691720
       ],
@@ -1594,24 +1596,24 @@
       "home_projected_validation": {
         "status": "ok",
         "raw_ids": [
-          664983,
-          666160,
-          681198,
-          696100,
           650489,
           671289,
+          681198,
+          696100,
           694249,
+          664983,
+          690924,
           678662,
           691720
         ],
         "ids": [
-          664983,
-          666160,
-          681198,
-          696100,
           650489,
           671289,
+          681198,
+          696100,
           694249,
+          664983,
+          690924,
           678662,
           691720
         ],
@@ -1620,34 +1622,34 @@
         "pool_source": "active+40Man",
         "pool_size": 19,
         "raw_names": [
-          "Jake McCarthy",
-          "Mickey Moniak",
-          "TJ Rumfield",
-          "Hunter Goodman",
           "Willi Castro",
           "Tyler Freeman",
+          "TJ Rumfield",
+          "Hunter Goodman",
           "Cole Carrigg",
+          "Jake McCarthy",
+          "Braxton Fulford",
           "Ezequiel Tovar",
           "Kyle Karros"
         ],
         "matched_names": [
-          "Jake McCarthy",
-          "Mickey Moniak",
-          "TJ Rumfield",
-          "Hunter Goodman",
           "Willi Castro",
           "Tyler Freeman",
+          "TJ Rumfield",
+          "Hunter Goodman",
           "Cole Carrigg",
+          "Jake McCarthy",
+          "Braxton Fulford",
           "Ezequiel Tovar",
           "Kyle Karros"
         ],
         "missing_name_labels": [],
-        "mapping_source": "projected_rotowire_default_vs_rhp"
+        "mapping_source": "projected_rotowire_default_vs_lhp"
       },
       "away_source": "projected_rotowire_today_lineup",
-      "home_source": "projected_rotowire_default_vs_rhp",
+      "home_source": "projected_rotowire_default_vs_lhp",
       "away_confidence": 0.44,
-      "home_confidence": 0.58,
+      "home_confidence": 0.66,
       "away_comparison": {
         "status": "projected_only",
         "is_true_mismatch": false,
@@ -2349,7 +2351,7 @@
         593428,
         695238,
         664034,
-        666023
+        630105
       ],
       "home_projected_ids": [
         660271,
@@ -2363,7 +2365,7 @@
         669899
       ],
       "away_projected_validation": {
-        "status": "ok",
+        "status": "adjusted",
         "raw_ids": [
           665487,
           669392,
@@ -2372,8 +2374,7 @@
           657757,
           593428,
           695238,
-          664034,
-          666023
+          664034
         ],
         "ids": [
           665487,
@@ -2384,10 +2385,12 @@
           593428,
           695238,
           664034,
-          666023
+          630105
         ],
         "missing_ids": [],
-        "backfilled_ids": [],
+        "backfilled_ids": [
+          630105
+        ],
         "pool_source": "active+40Man",
         "pool_size": 16,
         "raw_names": [
@@ -2409,10 +2412,11 @@
           "Gavin Sheets",
           "Xander Bogaerts",
           "Will Wagner",
-          "Ty France",
+          "Ty France"
+        ],
+        "missing_name_labels": [
           "Freddy Fermin"
         ],
-        "missing_name_labels": [],
         "mapping_source": "projected_rotowire_default_vs_rhp"
       },
       "home_projected_validation": {
@@ -2470,7 +2474,7 @@
       },
       "away_source": "projected_rotowire_default_vs_rhp",
       "home_source": "projected_rotowire_default_vs_rhp",
-      "away_confidence": 0.66,
+      "away_confidence": 0.48000000000000004,
       "home_confidence": 0.66,
       "away_comparison": {
         "status": "projected_only",

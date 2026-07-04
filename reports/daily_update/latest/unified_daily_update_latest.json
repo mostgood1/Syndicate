@@ -1,7 +1,7 @@
 {
   "date": "2026-07-04",
   "generatedAt": "2026-07-04T04:54:56.4476661+00:00",
-  "lastUpdatedAt": "2026-07-04T04:54:56.5851865+00:00",
+  "lastUpdatedAt": "2026-07-04T05:19:07.9007093+00:00",
   "completedAt": null,
   "runMode": "standard",
   "overallStatus": "started",
@@ -37,18 +37,18 @@
         "workflow": "vendored_daily_update",
         "eventKey": "sim_0_NYM_at_CIN_pk824503_g1",
         "artifactPath": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_0_NYM_at_CIN_pk824503_g1.json",
-        "inputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
-        "previousInputFingerprint": "c1eaee72b125e037442e45022c82a58f8716bf7c28209e4e0a936f7ffca35ce1",
+        "inputFingerprint": "7049b6dd52a1b567b9362dbd44f2f400a507711fda52c573b89597a2265aa7a4",
+        "previousInputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
         "eventStartTimeUtc": null,
         "timeToStartMinutes": null,
-        "policyId": "sport:mlb:balanced",
+        "policyId": "sport:mlb:default",
         "policySource": "sport",
-        "policySelectionMode": "exploratory",
-        "isExploratory": true,
+        "policySelectionMode": "optimal",
+        "isExploratory": false,
         "policyKeyParameters": {
-          "forceWithinMinutes": 30
+          "forceWithinMinutes": 20
         },
-        "forceWithinMinutes": 30,
+        "forceWithinMinutes": 20,
         "decision": "planned",
         "status": "pending"
       },
@@ -57,8 +57,8 @@
         "workflow": "vendored_daily_update",
         "eventKey": "sim_10_CLE_at_MIL_pk823774_g1",
         "artifactPath": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_10_CLE_at_MIL_pk823774_g1.json",
-        "inputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
-        "previousInputFingerprint": "c1eaee72b125e037442e45022c82a58f8716bf7c28209e4e0a936f7ffca35ce1",
+        "inputFingerprint": "7049b6dd52a1b567b9362dbd44f2f400a507711fda52c573b89597a2265aa7a4",
+        "previousInputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
         "eventStartTimeUtc": null,
         "timeToStartMinutes": null,
         "policyId": "sport:mlb:default",
@@ -77,8 +77,8 @@
         "workflow": "vendored_daily_update",
         "eventKey": "sim_11_COL_at_CHC_pk824668_g1",
         "artifactPath": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_11_COL_at_CHC_pk824668_g1.json",
-        "inputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
-        "previousInputFingerprint": "c1eaee72b125e037442e45022c82a58f8716bf7c28209e4e0a936f7ffca35ce1",
+        "inputFingerprint": "7049b6dd52a1b567b9362dbd44f2f400a507711fda52c573b89597a2265aa7a4",
+        "previousInputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
         "eventStartTimeUtc": null,
         "timeToStartMinutes": null,
         "policyId": "sport:mlb:default",
@@ -97,18 +97,18 @@
         "workflow": "vendored_daily_update",
         "eventKey": "sim_12_PIT_at_ATH_pk824992_g1",
         "artifactPath": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_12_PIT_at_ATH_pk824992_g1.json",
-        "inputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
-        "previousInputFingerprint": "c1eaee72b125e037442e45022c82a58f8716bf7c28209e4e0a936f7ffca35ce1",
+        "inputFingerprint": "7049b6dd52a1b567b9362dbd44f2f400a507711fda52c573b89597a2265aa7a4",
+        "previousInputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
         "eventStartTimeUtc": null,
         "timeToStartMinutes": null,
-        "policyId": "sport:mlb:default",
+        "policyId": "sport:mlb:balanced",
         "policySource": "sport",
-        "policySelectionMode": "optimal",
-        "isExploratory": false,
+        "policySelectionMode": "exploratory",
+        "isExploratory": true,
         "policyKeyParameters": {
-          "forceWithinMinutes": 20
+          "forceWithinMinutes": 30
         },
-        "forceWithinMinutes": 20,
+        "forceWithinMinutes": 30,
         "decision": "planned",
         "status": "pending"
       },
@@ -117,8 +117,8 @@
         "workflow": "vendored_daily_update",
         "eventKey": "sim_13_BAL_at_SEA_pk823127_g1",
         "artifactPath": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_13_BAL_at_SEA_pk823127_g1.json",
-        "inputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
-        "previousInputFingerprint": "c1eaee72b125e037442e45022c82a58f8716bf7c28209e4e0a936f7ffca35ce1",
+        "inputFingerprint": "7049b6dd52a1b567b9362dbd44f2f400a507711fda52c573b89597a2265aa7a4",
+        "previousInputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
         "eventStartTimeUtc": null,
         "timeToStartMinutes": null,
         "policyId": "sport:mlb:default",
@@ -137,8 +137,8 @@
         "workflow": "vendored_daily_update",
         "eventKey": "sim_1_KC_at_WSH_pk822721_g1",
         "artifactPath": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_1_KC_at_WSH_pk822721_g1.json",
-        "inputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
-        "previousInputFingerprint": "c1eaee72b125e037442e45022c82a58f8716bf7c28209e4e0a936f7ffca35ce1",
+        "inputFingerprint": "7049b6dd52a1b567b9362dbd44f2f400a507711fda52c573b89597a2265aa7a4",
+        "previousInputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
         "eventStartTimeUtc": null,
         "timeToStartMinutes": null,
         "policyId": "sport:mlb:default",
@@ -157,18 +157,18 @@
         "workflow": "vendored_daily_update",
         "eventKey": "sim_2_MIA_at_PHI_pk823450_g1",
         "artifactPath": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_2_MIA_at_PHI_pk823450_g1.json",
-        "inputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
-        "previousInputFingerprint": "c1eaee72b125e037442e45022c82a58f8716bf7c28209e4e0a936f7ffca35ce1",
+        "inputFingerprint": "7049b6dd52a1b567b9362dbd44f2f400a507711fda52c573b89597a2265aa7a4",
+        "previousInputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
         "eventStartTimeUtc": null,
         "timeToStartMinutes": null,
-        "policyId": "sport:mlb:balanced",
+        "policyId": "sport:mlb:default",
         "policySource": "sport",
-        "policySelectionMode": "exploratory",
-        "isExploratory": true,
+        "policySelectionMode": "optimal",
+        "isExploratory": false,
         "policyKeyParameters": {
-          "forceWithinMinutes": 30
+          "forceWithinMinutes": 20
         },
-        "forceWithinMinutes": 30,
+        "forceWithinMinutes": 20,
         "decision": "planned",
         "status": "pending"
       },
@@ -177,8 +177,8 @@
         "workflow": "vendored_daily_update",
         "eventKey": "sim_3_DET_at_HOU_pk824178_g1",
         "artifactPath": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_3_DET_at_HOU_pk824178_g1.json",
-        "inputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
-        "previousInputFingerprint": "c1eaee72b125e037442e45022c82a58f8716bf7c28209e4e0a936f7ffca35ce1",
+        "inputFingerprint": "7049b6dd52a1b567b9362dbd44f2f400a507711fda52c573b89597a2265aa7a4",
+        "previousInputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
         "eventStartTimeUtc": null,
         "timeToStartMinutes": null,
         "policyId": "sport:mlb:default",
@@ -197,8 +197,8 @@
         "workflow": "vendored_daily_update",
         "eventKey": "sim_4_SD_at_STL_pk823044_g1",
         "artifactPath": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_4_SD_at_STL_pk823044_g1.json",
-        "inputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
-        "previousInputFingerprint": "c1eaee72b125e037442e45022c82a58f8716bf7c28209e4e0a936f7ffca35ce1",
+        "inputFingerprint": "7049b6dd52a1b567b9362dbd44f2f400a507711fda52c573b89597a2265aa7a4",
+        "previousInputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
         "eventStartTimeUtc": null,
         "timeToStartMinutes": null,
         "policyId": "sport:mlb:default",
@@ -217,8 +217,8 @@
         "workflow": "vendored_daily_update",
         "eventKey": "sim_5_TB_at_LAD_pk823940_g1",
         "artifactPath": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_5_TB_at_LAD_pk823940_g1.json",
-        "inputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
-        "previousInputFingerprint": "c1eaee72b125e037442e45022c82a58f8716bf7c28209e4e0a936f7ffca35ce1",
+        "inputFingerprint": "7049b6dd52a1b567b9362dbd44f2f400a507711fda52c573b89597a2265aa7a4",
+        "previousInputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
         "eventStartTimeUtc": null,
         "timeToStartMinutes": null,
         "policyId": "sport:mlb:default",
@@ -237,8 +237,8 @@
         "workflow": "vendored_daily_update",
         "eventKey": "sim_6_LAA_at_AZ_pk825072_g1",
         "artifactPath": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_6_LAA_at_AZ_pk825072_g1.json",
-        "inputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
-        "previousInputFingerprint": "c1eaee72b125e037442e45022c82a58f8716bf7c28209e4e0a936f7ffca35ce1",
+        "inputFingerprint": "7049b6dd52a1b567b9362dbd44f2f400a507711fda52c573b89597a2265aa7a4",
+        "previousInputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
         "eventStartTimeUtc": null,
         "timeToStartMinutes": null,
         "policyId": "sport:mlb:default",
@@ -257,8 +257,8 @@
         "workflow": "vendored_daily_update",
         "eventKey": "sim_7_TOR_at_BOS_pk824746_g1",
         "artifactPath": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_7_TOR_at_BOS_pk824746_g1.json",
-        "inputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
-        "previousInputFingerprint": "c1eaee72b125e037442e45022c82a58f8716bf7c28209e4e0a936f7ffca35ce1",
+        "inputFingerprint": "7049b6dd52a1b567b9362dbd44f2f400a507711fda52c573b89597a2265aa7a4",
+        "previousInputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
         "eventStartTimeUtc": null,
         "timeToStartMinutes": null,
         "policyId": "sport:mlb:default",
@@ -277,8 +277,8 @@
         "workflow": "vendored_daily_update",
         "eventKey": "sim_8_CWS_at_NYY_pk823536_g1",
         "artifactPath": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_8_CWS_at_NYY_pk823536_g1.json",
-        "inputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
-        "previousInputFingerprint": "c1eaee72b125e037442e45022c82a58f8716bf7c28209e4e0a936f7ffca35ce1",
+        "inputFingerprint": "7049b6dd52a1b567b9362dbd44f2f400a507711fda52c573b89597a2265aa7a4",
+        "previousInputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
         "eventStartTimeUtc": null,
         "timeToStartMinutes": null,
         "policyId": "sport:mlb:default",
@@ -297,8 +297,8 @@
         "workflow": "vendored_daily_update",
         "eventKey": "sim_9_SF_at_ATL_pk824913_g1",
         "artifactPath": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_9_SF_at_ATL_pk824913_g1.json",
-        "inputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
-        "previousInputFingerprint": "c1eaee72b125e037442e45022c82a58f8716bf7c28209e4e0a936f7ffca35ce1",
+        "inputFingerprint": "7049b6dd52a1b567b9362dbd44f2f400a507711fda52c573b89597a2265aa7a4",
+        "previousInputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
         "eventStartTimeUtc": null,
         "timeToStartMinutes": null,
         "policyId": "sport:mlb:default",
@@ -317,8 +317,8 @@
         "workflow": "vendored_daily_update",
         "eventKey": "smart_sim_2026-06-17_CHI_NYL",
         "artifactPath": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_CHI_NYL.json",
-        "inputFingerprint": "14c67c4d7cd065ed85718e4f6e37dcd27245f4b6d49cb842ce9723e0e397828c",
-        "previousInputFingerprint": "aaada7cb920f3e7bbf0d2a76d6acf7f63b9b56c962e2ea558fe2578985185ae7",
+        "inputFingerprint": "cd99add1ad102f9cc81fdbd68048128eb0c5b2dfb2edb477e8c9d128681d7e87",
+        "previousInputFingerprint": "14c67c4d7cd065ed85718e4f6e37dcd27245f4b6d49cb842ce9723e0e397828c",
         "eventStartTimeUtc": null,
         "timeToStartMinutes": null,
         "policyId": "sport:wnba:default",
@@ -330,15 +330,15 @@
         },
         "forceWithinMinutes": 40,
         "decision": "planned",
-        "status": "dry_run"
+        "status": "pending"
       },
       {
         "sport": "wnba",
         "workflow": "vendored_daily_update",
         "eventKey": "smart_sim_2026-06-17_CON_WSH",
         "artifactPath": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_CON_WSH.json",
-        "inputFingerprint": "14c67c4d7cd065ed85718e4f6e37dcd27245f4b6d49cb842ce9723e0e397828c",
-        "previousInputFingerprint": "aaada7cb920f3e7bbf0d2a76d6acf7f63b9b56c962e2ea558fe2578985185ae7",
+        "inputFingerprint": "cd99add1ad102f9cc81fdbd68048128eb0c5b2dfb2edb477e8c9d128681d7e87",
+        "previousInputFingerprint": "14c67c4d7cd065ed85718e4f6e37dcd27245f4b6d49cb842ce9723e0e397828c",
         "eventStartTimeUtc": null,
         "timeToStartMinutes": null,
         "policyId": "sport:wnba:default",
@@ -350,15 +350,15 @@
         },
         "forceWithinMinutes": 40,
         "decision": "planned",
-        "status": "dry_run"
+        "status": "pending"
       },
       {
         "sport": "wnba",
         "workflow": "vendored_daily_update",
         "eventKey": "smart_sim_2026-06-17_GSV_DAL",
         "artifactPath": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_GSV_DAL.json",
-        "inputFingerprint": "14c67c4d7cd065ed85718e4f6e37dcd27245f4b6d49cb842ce9723e0e397828c",
-        "previousInputFingerprint": "aaada7cb920f3e7bbf0d2a76d6acf7f63b9b56c962e2ea558fe2578985185ae7",
+        "inputFingerprint": "cd99add1ad102f9cc81fdbd68048128eb0c5b2dfb2edb477e8c9d128681d7e87",
+        "previousInputFingerprint": "14c67c4d7cd065ed85718e4f6e37dcd27245f4b6d49cb842ce9723e0e397828c",
         "eventStartTimeUtc": null,
         "timeToStartMinutes": null,
         "policyId": "sport:wnba:default",
@@ -370,15 +370,15 @@
         },
         "forceWithinMinutes": 40,
         "decision": "planned",
-        "status": "dry_run"
+        "status": "pending"
       },
       {
         "sport": "wnba",
         "workflow": "vendored_daily_update",
         "eventKey": "smart_sim_2026-06-17_LAS_MIN",
         "artifactPath": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_LAS_MIN.json",
-        "inputFingerprint": "14c67c4d7cd065ed85718e4f6e37dcd27245f4b6d49cb842ce9723e0e397828c",
-        "previousInputFingerprint": "aaada7cb920f3e7bbf0d2a76d6acf7f63b9b56c962e2ea558fe2578985185ae7",
+        "inputFingerprint": "cd99add1ad102f9cc81fdbd68048128eb0c5b2dfb2edb477e8c9d128681d7e87",
+        "previousInputFingerprint": "14c67c4d7cd065ed85718e4f6e37dcd27245f4b6d49cb842ce9723e0e397828c",
         "eventStartTimeUtc": null,
         "timeToStartMinutes": null,
         "policyId": "sport:wnba:default",
@@ -390,15 +390,15 @@
         },
         "forceWithinMinutes": 40,
         "decision": "planned",
-        "status": "dry_run"
+        "status": "pending"
       },
       {
         "sport": "wnba",
         "workflow": "vendored_daily_update",
         "eventKey": "smart_sim_2026-06-17_PHX_LVA",
         "artifactPath": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_PHX_LVA.json",
-        "inputFingerprint": "14c67c4d7cd065ed85718e4f6e37dcd27245f4b6d49cb842ce9723e0e397828c",
-        "previousInputFingerprint": "aaada7cb920f3e7bbf0d2a76d6acf7f63b9b56c962e2ea558fe2578985185ae7",
+        "inputFingerprint": "cd99add1ad102f9cc81fdbd68048128eb0c5b2dfb2edb477e8c9d128681d7e87",
+        "previousInputFingerprint": "14c67c4d7cd065ed85718e4f6e37dcd27245f4b6d49cb842ce9723e0e397828c",
         "eventStartTimeUtc": null,
         "timeToStartMinutes": null,
         "policyId": "sport:wnba:default",
@@ -410,15 +410,15 @@
         },
         "forceWithinMinutes": 40,
         "decision": "planned",
-        "status": "dry_run"
+        "status": "pending"
       },
       {
         "sport": "wnba",
         "workflow": "vendored_daily_update",
         "eventKey": "smart_sim_2026-06-17_POR_SEA",
         "artifactPath": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_POR_SEA.json",
-        "inputFingerprint": "14c67c4d7cd065ed85718e4f6e37dcd27245f4b6d49cb842ce9723e0e397828c",
-        "previousInputFingerprint": "aaada7cb920f3e7bbf0d2a76d6acf7f63b9b56c962e2ea558fe2578985185ae7",
+        "inputFingerprint": "cd99add1ad102f9cc81fdbd68048128eb0c5b2dfb2edb477e8c9d128681d7e87",
+        "previousInputFingerprint": "14c67c4d7cd065ed85718e4f6e37dcd27245f4b6d49cb842ce9723e0e397828c",
         "eventStartTimeUtc": null,
         "timeToStartMinutes": null,
         "policyId": "sport:wnba:default",
@@ -430,7 +430,7 @@
         },
         "forceWithinMinutes": 40,
         "decision": "planned",
-        "status": "dry_run"
+        "status": "pending"
       },
       {
         "sport": "nhl",
@@ -459,12 +459,12 @@
         "workflow": "vendored_daily_update",
         "eventKey": "sim_0_NYM_at_CIN_pk824503_g1",
         "artifactPath": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_0_NYM_at_CIN_pk824503_g1.json",
-        "inputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
-        "previousInputFingerprint": "c1eaee72b125e037442e45022c82a58f8716bf7c28209e4e0a936f7ffca35ce1",
-        "policyId": "sport:mlb:balanced",
+        "inputFingerprint": "7049b6dd52a1b567b9362dbd44f2f400a507711fda52c573b89597a2265aa7a4",
+        "previousInputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
+        "policyId": "sport:mlb:default",
         "policySource": "sport",
         "policyKeyParameters": {
-          "forceWithinMinutes": 30
+          "forceWithinMinutes": 20
         },
         "decision": "planned",
         "status": "pending"
@@ -474,8 +474,8 @@
         "workflow": "vendored_daily_update",
         "eventKey": "sim_10_CLE_at_MIL_pk823774_g1",
         "artifactPath": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_10_CLE_at_MIL_pk823774_g1.json",
-        "inputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
-        "previousInputFingerprint": "c1eaee72b125e037442e45022c82a58f8716bf7c28209e4e0a936f7ffca35ce1",
+        "inputFingerprint": "7049b6dd52a1b567b9362dbd44f2f400a507711fda52c573b89597a2265aa7a4",
+        "previousInputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
         "policyId": "sport:mlb:default",
         "policySource": "sport",
         "policyKeyParameters": {
@@ -489,8 +489,8 @@
         "workflow": "vendored_daily_update",
         "eventKey": "sim_11_COL_at_CHC_pk824668_g1",
         "artifactPath": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_11_COL_at_CHC_pk824668_g1.json",
-        "inputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
-        "previousInputFingerprint": "c1eaee72b125e037442e45022c82a58f8716bf7c28209e4e0a936f7ffca35ce1",
+        "inputFingerprint": "7049b6dd52a1b567b9362dbd44f2f400a507711fda52c573b89597a2265aa7a4",
+        "previousInputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
         "policyId": "sport:mlb:default",
         "policySource": "sport",
         "policyKeyParameters": {
@@ -504,12 +504,12 @@
         "workflow": "vendored_daily_update",
         "eventKey": "sim_12_PIT_at_ATH_pk824992_g1",
         "artifactPath": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_12_PIT_at_ATH_pk824992_g1.json",
-        "inputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
-        "previousInputFingerprint": "c1eaee72b125e037442e45022c82a58f8716bf7c28209e4e0a936f7ffca35ce1",
-        "policyId": "sport:mlb:default",
+        "inputFingerprint": "7049b6dd52a1b567b9362dbd44f2f400a507711fda52c573b89597a2265aa7a4",
+        "previousInputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
+        "policyId": "sport:mlb:balanced",
         "policySource": "sport",
         "policyKeyParameters": {
-          "forceWithinMinutes": 20
+          "forceWithinMinutes": 30
         },
         "decision": "planned",
         "status": "pending"
@@ -519,8 +519,8 @@
         "workflow": "vendored_daily_update",
         "eventKey": "sim_13_BAL_at_SEA_pk823127_g1",
         "artifactPath": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_13_BAL_at_SEA_pk823127_g1.json",
-        "inputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
-        "previousInputFingerprint": "c1eaee72b125e037442e45022c82a58f8716bf7c28209e4e0a936f7ffca35ce1",
+        "inputFingerprint": "7049b6dd52a1b567b9362dbd44f2f400a507711fda52c573b89597a2265aa7a4",
+        "previousInputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
         "policyId": "sport:mlb:default",
         "policySource": "sport",
         "policyKeyParameters": {
@@ -534,8 +534,8 @@
         "workflow": "vendored_daily_update",
         "eventKey": "sim_1_KC_at_WSH_pk822721_g1",
         "artifactPath": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_1_KC_at_WSH_pk822721_g1.json",
-        "inputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
-        "previousInputFingerprint": "c1eaee72b125e037442e45022c82a58f8716bf7c28209e4e0a936f7ffca35ce1",
+        "inputFingerprint": "7049b6dd52a1b567b9362dbd44f2f400a507711fda52c573b89597a2265aa7a4",
+        "previousInputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
         "policyId": "sport:mlb:default",
         "policySource": "sport",
         "policyKeyParameters": {
@@ -549,12 +549,12 @@
         "workflow": "vendored_daily_update",
         "eventKey": "sim_2_MIA_at_PHI_pk823450_g1",
         "artifactPath": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_2_MIA_at_PHI_pk823450_g1.json",
-        "inputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
-        "previousInputFingerprint": "c1eaee72b125e037442e45022c82a58f8716bf7c28209e4e0a936f7ffca35ce1",
-        "policyId": "sport:mlb:balanced",
+        "inputFingerprint": "7049b6dd52a1b567b9362dbd44f2f400a507711fda52c573b89597a2265aa7a4",
+        "previousInputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
+        "policyId": "sport:mlb:default",
         "policySource": "sport",
         "policyKeyParameters": {
-          "forceWithinMinutes": 30
+          "forceWithinMinutes": 20
         },
         "decision": "planned",
         "status": "pending"
@@ -564,8 +564,8 @@
         "workflow": "vendored_daily_update",
         "eventKey": "sim_3_DET_at_HOU_pk824178_g1",
         "artifactPath": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_3_DET_at_HOU_pk824178_g1.json",
-        "inputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
-        "previousInputFingerprint": "c1eaee72b125e037442e45022c82a58f8716bf7c28209e4e0a936f7ffca35ce1",
+        "inputFingerprint": "7049b6dd52a1b567b9362dbd44f2f400a507711fda52c573b89597a2265aa7a4",
+        "previousInputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
         "policyId": "sport:mlb:default",
         "policySource": "sport",
         "policyKeyParameters": {
@@ -579,8 +579,8 @@
         "workflow": "vendored_daily_update",
         "eventKey": "sim_4_SD_at_STL_pk823044_g1",
         "artifactPath": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_4_SD_at_STL_pk823044_g1.json",
-        "inputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
-        "previousInputFingerprint": "c1eaee72b125e037442e45022c82a58f8716bf7c28209e4e0a936f7ffca35ce1",
+        "inputFingerprint": "7049b6dd52a1b567b9362dbd44f2f400a507711fda52c573b89597a2265aa7a4",
+        "previousInputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
         "policyId": "sport:mlb:default",
         "policySource": "sport",
         "policyKeyParameters": {
@@ -594,8 +594,8 @@
         "workflow": "vendored_daily_update",
         "eventKey": "sim_5_TB_at_LAD_pk823940_g1",
         "artifactPath": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_5_TB_at_LAD_pk823940_g1.json",
-        "inputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
-        "previousInputFingerprint": "c1eaee72b125e037442e45022c82a58f8716bf7c28209e4e0a936f7ffca35ce1",
+        "inputFingerprint": "7049b6dd52a1b567b9362dbd44f2f400a507711fda52c573b89597a2265aa7a4",
+        "previousInputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
         "policyId": "sport:mlb:default",
         "policySource": "sport",
         "policyKeyParameters": {
@@ -609,8 +609,8 @@
         "workflow": "vendored_daily_update",
         "eventKey": "sim_6_LAA_at_AZ_pk825072_g1",
         "artifactPath": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_6_LAA_at_AZ_pk825072_g1.json",
-        "inputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
-        "previousInputFingerprint": "c1eaee72b125e037442e45022c82a58f8716bf7c28209e4e0a936f7ffca35ce1",
+        "inputFingerprint": "7049b6dd52a1b567b9362dbd44f2f400a507711fda52c573b89597a2265aa7a4",
+        "previousInputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
         "policyId": "sport:mlb:default",
         "policySource": "sport",
         "policyKeyParameters": {
@@ -624,8 +624,8 @@
         "workflow": "vendored_daily_update",
         "eventKey": "sim_7_TOR_at_BOS_pk824746_g1",
         "artifactPath": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_7_TOR_at_BOS_pk824746_g1.json",
-        "inputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
-        "previousInputFingerprint": "c1eaee72b125e037442e45022c82a58f8716bf7c28209e4e0a936f7ffca35ce1",
+        "inputFingerprint": "7049b6dd52a1b567b9362dbd44f2f400a507711fda52c573b89597a2265aa7a4",
+        "previousInputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
         "policyId": "sport:mlb:default",
         "policySource": "sport",
         "policyKeyParameters": {
@@ -639,8 +639,8 @@
         "workflow": "vendored_daily_update",
         "eventKey": "sim_8_CWS_at_NYY_pk823536_g1",
         "artifactPath": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_8_CWS_at_NYY_pk823536_g1.json",
-        "inputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
-        "previousInputFingerprint": "c1eaee72b125e037442e45022c82a58f8716bf7c28209e4e0a936f7ffca35ce1",
+        "inputFingerprint": "7049b6dd52a1b567b9362dbd44f2f400a507711fda52c573b89597a2265aa7a4",
+        "previousInputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
         "policyId": "sport:mlb:default",
         "policySource": "sport",
         "policyKeyParameters": {
@@ -654,8 +654,8 @@
         "workflow": "vendored_daily_update",
         "eventKey": "sim_9_SF_at_ATL_pk824913_g1",
         "artifactPath": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_9_SF_at_ATL_pk824913_g1.json",
-        "inputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
-        "previousInputFingerprint": "c1eaee72b125e037442e45022c82a58f8716bf7c28209e4e0a936f7ffca35ce1",
+        "inputFingerprint": "7049b6dd52a1b567b9362dbd44f2f400a507711fda52c573b89597a2265aa7a4",
+        "previousInputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
         "policyId": "sport:mlb:default",
         "policySource": "sport",
         "policyKeyParameters": {
@@ -669,90 +669,90 @@
         "workflow": "vendored_daily_update",
         "eventKey": "smart_sim_2026-06-17_CHI_NYL",
         "artifactPath": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_CHI_NYL.json",
-        "inputFingerprint": "14c67c4d7cd065ed85718e4f6e37dcd27245f4b6d49cb842ce9723e0e397828c",
-        "previousInputFingerprint": "aaada7cb920f3e7bbf0d2a76d6acf7f63b9b56c962e2ea558fe2578985185ae7",
+        "inputFingerprint": "cd99add1ad102f9cc81fdbd68048128eb0c5b2dfb2edb477e8c9d128681d7e87",
+        "previousInputFingerprint": "14c67c4d7cd065ed85718e4f6e37dcd27245f4b6d49cb842ce9723e0e397828c",
         "policyId": "sport:wnba:default",
         "policySource": "sport",
         "policyKeyParameters": {
           "forceWithinMinutes": 40
         },
         "decision": "planned",
-        "status": "dry_run"
+        "status": "pending"
       },
       {
         "sport": "wnba",
         "workflow": "vendored_daily_update",
         "eventKey": "smart_sim_2026-06-17_CON_WSH",
         "artifactPath": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_CON_WSH.json",
-        "inputFingerprint": "14c67c4d7cd065ed85718e4f6e37dcd27245f4b6d49cb842ce9723e0e397828c",
-        "previousInputFingerprint": "aaada7cb920f3e7bbf0d2a76d6acf7f63b9b56c962e2ea558fe2578985185ae7",
+        "inputFingerprint": "cd99add1ad102f9cc81fdbd68048128eb0c5b2dfb2edb477e8c9d128681d7e87",
+        "previousInputFingerprint": "14c67c4d7cd065ed85718e4f6e37dcd27245f4b6d49cb842ce9723e0e397828c",
         "policyId": "sport:wnba:default",
         "policySource": "sport",
         "policyKeyParameters": {
           "forceWithinMinutes": 40
         },
         "decision": "planned",
-        "status": "dry_run"
+        "status": "pending"
       },
       {
         "sport": "wnba",
         "workflow": "vendored_daily_update",
         "eventKey": "smart_sim_2026-06-17_GSV_DAL",
         "artifactPath": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_GSV_DAL.json",
-        "inputFingerprint": "14c67c4d7cd065ed85718e4f6e37dcd27245f4b6d49cb842ce9723e0e397828c",
-        "previousInputFingerprint": "aaada7cb920f3e7bbf0d2a76d6acf7f63b9b56c962e2ea558fe2578985185ae7",
+        "inputFingerprint": "cd99add1ad102f9cc81fdbd68048128eb0c5b2dfb2edb477e8c9d128681d7e87",
+        "previousInputFingerprint": "14c67c4d7cd065ed85718e4f6e37dcd27245f4b6d49cb842ce9723e0e397828c",
         "policyId": "sport:wnba:default",
         "policySource": "sport",
         "policyKeyParameters": {
           "forceWithinMinutes": 40
         },
         "decision": "planned",
-        "status": "dry_run"
+        "status": "pending"
       },
       {
         "sport": "wnba",
         "workflow": "vendored_daily_update",
         "eventKey": "smart_sim_2026-06-17_LAS_MIN",
         "artifactPath": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_LAS_MIN.json",
-        "inputFingerprint": "14c67c4d7cd065ed85718e4f6e37dcd27245f4b6d49cb842ce9723e0e397828c",
-        "previousInputFingerprint": "aaada7cb920f3e7bbf0d2a76d6acf7f63b9b56c962e2ea558fe2578985185ae7",
+        "inputFingerprint": "cd99add1ad102f9cc81fdbd68048128eb0c5b2dfb2edb477e8c9d128681d7e87",
+        "previousInputFingerprint": "14c67c4d7cd065ed85718e4f6e37dcd27245f4b6d49cb842ce9723e0e397828c",
         "policyId": "sport:wnba:default",
         "policySource": "sport",
         "policyKeyParameters": {
           "forceWithinMinutes": 40
         },
         "decision": "planned",
-        "status": "dry_run"
+        "status": "pending"
       },
       {
         "sport": "wnba",
         "workflow": "vendored_daily_update",
         "eventKey": "smart_sim_2026-06-17_PHX_LVA",
         "artifactPath": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_PHX_LVA.json",
-        "inputFingerprint": "14c67c4d7cd065ed85718e4f6e37dcd27245f4b6d49cb842ce9723e0e397828c",
-        "previousInputFingerprint": "aaada7cb920f3e7bbf0d2a76d6acf7f63b9b56c962e2ea558fe2578985185ae7",
+        "inputFingerprint": "cd99add1ad102f9cc81fdbd68048128eb0c5b2dfb2edb477e8c9d128681d7e87",
+        "previousInputFingerprint": "14c67c4d7cd065ed85718e4f6e37dcd27245f4b6d49cb842ce9723e0e397828c",
         "policyId": "sport:wnba:default",
         "policySource": "sport",
         "policyKeyParameters": {
           "forceWithinMinutes": 40
         },
         "decision": "planned",
-        "status": "dry_run"
+        "status": "pending"
       },
       {
         "sport": "wnba",
         "workflow": "vendored_daily_update",
         "eventKey": "smart_sim_2026-06-17_POR_SEA",
         "artifactPath": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_POR_SEA.json",
-        "inputFingerprint": "14c67c4d7cd065ed85718e4f6e37dcd27245f4b6d49cb842ce9723e0e397828c",
-        "previousInputFingerprint": "aaada7cb920f3e7bbf0d2a76d6acf7f63b9b56c962e2ea558fe2578985185ae7",
+        "inputFingerprint": "cd99add1ad102f9cc81fdbd68048128eb0c5b2dfb2edb477e8c9d128681d7e87",
+        "previousInputFingerprint": "14c67c4d7cd065ed85718e4f6e37dcd27245f4b6d49cb842ce9723e0e397828c",
         "policyId": "sport:wnba:default",
         "policySource": "sport",
         "policyKeyParameters": {
           "forceWithinMinutes": 40
         },
         "decision": "planned",
-        "status": "dry_run"
+        "status": "pending"
       },
       {
         "sport": "nhl",
@@ -772,42 +772,6 @@
     ],
     "policyPerformance": [
       {
-        "policyId": "sport:mlb:balanced",
-        "policySource": "sport",
-        "keyParameters": {
-          "forceWithinMinutes": 30
-        },
-        "recordCount": 2,
-        "sampleSize": 2,
-        "exploratoryCount": 2,
-        "exploratoryRate": 1.0,
-        "plannedCount": 2,
-        "skippedCount": 0,
-        "dryRunCount": 0,
-        "withinWindowCount": 0,
-        "averageTimeToStartMinutes": null,
-        "averageForceWithinMinutes": 30.0,
-        "roi": null
-      },
-      {
-        "policyId": "sport:mlb:default",
-        "policySource": "sport",
-        "keyParameters": {
-          "forceWithinMinutes": 20
-        },
-        "recordCount": 12,
-        "sampleSize": 12,
-        "exploratoryCount": 0,
-        "exploratoryRate": 0.0,
-        "plannedCount": 12,
-        "skippedCount": 0,
-        "dryRunCount": 0,
-        "withinWindowCount": 0,
-        "averageTimeToStartMinutes": null,
-        "averageForceWithinMinutes": 20.0,
-        "roi": null
-      },
-      {
         "policyId": "sport:nhl:default",
         "policySource": "sport",
         "keyParameters": {
@@ -826,21 +790,21 @@
         "roi": null
       },
       {
-        "policyId": "sport:wnba:default",
+        "policyId": "",
         "policySource": "sport",
         "keyParameters": {
-          "forceWithinMinutes": 40
+          "forceWithinMinutes": 20
         },
-        "recordCount": 6,
-        "sampleSize": 6,
-        "exploratoryCount": 0,
-        "exploratoryRate": 0.0,
-        "plannedCount": 6,
+        "recordCount": 20,
+        "sampleSize": 20,
+        "exploratoryCount": 1,
+        "exploratoryRate": 0.05,
+        "plannedCount": 20,
         "skippedCount": 0,
-        "dryRunCount": 6,
+        "dryRunCount": 0,
         "withinWindowCount": 0,
         "averageTimeToStartMinutes": null,
-        "averageForceWithinMinutes": 40.0,
+        "averageForceWithinMinutes": 26.5,
         "roi": null
       }
     ],
@@ -940,10 +904,12 @@
     "forceRebuildToday": false
   },
   "runState": {
-    "currentStage": "queued",
-    "completedStages": [],
+    "currentStage": "refresh_gate",
+    "completedStages": [
+      "source_update"
+    ],
     "failedStage": null,
-    "lastUpdatedAt": "2026-07-04T04:54:56.5851865+00:00",
+    "lastUpdatedAt": "2026-07-04T05:19:07.9007093+00:00",
     "simulationContractPath": null,
     "simulationContractRunPath": null,
     "simulationContractSportCount": 0,
@@ -955,18 +921,18 @@
       "workflow": "vendored_daily_update",
       "eventKey": "sim_0_NYM_at_CIN_pk824503_g1",
       "artifactPath": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_0_NYM_at_CIN_pk824503_g1.json",
-      "inputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
-      "previousInputFingerprint": "c1eaee72b125e037442e45022c82a58f8716bf7c28209e4e0a936f7ffca35ce1",
+      "inputFingerprint": "7049b6dd52a1b567b9362dbd44f2f400a507711fda52c573b89597a2265aa7a4",
+      "previousInputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
       "eventStartTimeUtc": null,
       "timeToStartMinutes": null,
-      "policyId": "sport:mlb:balanced",
+      "policyId": "sport:mlb:default",
       "policySource": "sport",
-      "policySelectionMode": "exploratory",
-      "isExploratory": true,
+      "policySelectionMode": "optimal",
+      "isExploratory": false,
       "policyKeyParameters": {
-        "forceWithinMinutes": 30
+        "forceWithinMinutes": 20
       },
-      "forceWithinMinutes": 30,
+      "forceWithinMinutes": 20,
       "decision": "planned",
       "status": "pending"
     },
@@ -975,8 +941,8 @@
       "workflow": "vendored_daily_update",
       "eventKey": "sim_10_CLE_at_MIL_pk823774_g1",
       "artifactPath": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_10_CLE_at_MIL_pk823774_g1.json",
-      "inputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
-      "previousInputFingerprint": "c1eaee72b125e037442e45022c82a58f8716bf7c28209e4e0a936f7ffca35ce1",
+      "inputFingerprint": "7049b6dd52a1b567b9362dbd44f2f400a507711fda52c573b89597a2265aa7a4",
+      "previousInputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
       "eventStartTimeUtc": null,
       "timeToStartMinutes": null,
       "policyId": "sport:mlb:default",
@@ -995,8 +961,8 @@
       "workflow": "vendored_daily_update",
       "eventKey": "sim_11_COL_at_CHC_pk824668_g1",
       "artifactPath": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_11_COL_at_CHC_pk824668_g1.json",
-      "inputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
-      "previousInputFingerprint": "c1eaee72b125e037442e45022c82a58f8716bf7c28209e4e0a936f7ffca35ce1",
+      "inputFingerprint": "7049b6dd52a1b567b9362dbd44f2f400a507711fda52c573b89597a2265aa7a4",
+      "previousInputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
       "eventStartTimeUtc": null,
       "timeToStartMinutes": null,
       "policyId": "sport:mlb:default",
@@ -1015,18 +981,18 @@
       "workflow": "vendored_daily_update",
       "eventKey": "sim_12_PIT_at_ATH_pk824992_g1",
       "artifactPath": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_12_PIT_at_ATH_pk824992_g1.json",
-      "inputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
-      "previousInputFingerprint": "c1eaee72b125e037442e45022c82a58f8716bf7c28209e4e0a936f7ffca35ce1",
+      "inputFingerprint": "7049b6dd52a1b567b9362dbd44f2f400a507711fda52c573b89597a2265aa7a4",
+      "previousInputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
       "eventStartTimeUtc": null,
       "timeToStartMinutes": null,
-      "policyId": "sport:mlb:default",
+      "policyId": "sport:mlb:balanced",
       "policySource": "sport",
-      "policySelectionMode": "optimal",
-      "isExploratory": false,
+      "policySelectionMode": "exploratory",
+      "isExploratory": true,
       "policyKeyParameters": {
-        "forceWithinMinutes": 20
+        "forceWithinMinutes": 30
       },
-      "forceWithinMinutes": 20,
+      "forceWithinMinutes": 30,
       "decision": "planned",
       "status": "pending"
     },
@@ -1035,8 +1001,8 @@
       "workflow": "vendored_daily_update",
       "eventKey": "sim_13_BAL_at_SEA_pk823127_g1",
       "artifactPath": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_13_BAL_at_SEA_pk823127_g1.json",
-      "inputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
-      "previousInputFingerprint": "c1eaee72b125e037442e45022c82a58f8716bf7c28209e4e0a936f7ffca35ce1",
+      "inputFingerprint": "7049b6dd52a1b567b9362dbd44f2f400a507711fda52c573b89597a2265aa7a4",
+      "previousInputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
       "eventStartTimeUtc": null,
       "timeToStartMinutes": null,
       "policyId": "sport:mlb:default",
@@ -1055,8 +1021,8 @@
       "workflow": "vendored_daily_update",
       "eventKey": "sim_1_KC_at_WSH_pk822721_g1",
       "artifactPath": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_1_KC_at_WSH_pk822721_g1.json",
-      "inputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
-      "previousInputFingerprint": "c1eaee72b125e037442e45022c82a58f8716bf7c28209e4e0a936f7ffca35ce1",
+      "inputFingerprint": "7049b6dd52a1b567b9362dbd44f2f400a507711fda52c573b89597a2265aa7a4",
+      "previousInputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
       "eventStartTimeUtc": null,
       "timeToStartMinutes": null,
       "policyId": "sport:mlb:default",
@@ -1075,18 +1041,18 @@
       "workflow": "vendored_daily_update",
       "eventKey": "sim_2_MIA_at_PHI_pk823450_g1",
       "artifactPath": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_2_MIA_at_PHI_pk823450_g1.json",
-      "inputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
-      "previousInputFingerprint": "c1eaee72b125e037442e45022c82a58f8716bf7c28209e4e0a936f7ffca35ce1",
+      "inputFingerprint": "7049b6dd52a1b567b9362dbd44f2f400a507711fda52c573b89597a2265aa7a4",
+      "previousInputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
       "eventStartTimeUtc": null,
       "timeToStartMinutes": null,
-      "policyId": "sport:mlb:balanced",
+      "policyId": "sport:mlb:default",
       "policySource": "sport",
-      "policySelectionMode": "exploratory",
-      "isExploratory": true,
+      "policySelectionMode": "optimal",
+      "isExploratory": false,
       "policyKeyParameters": {
-        "forceWithinMinutes": 30
+        "forceWithinMinutes": 20
       },
-      "forceWithinMinutes": 30,
+      "forceWithinMinutes": 20,
       "decision": "planned",
       "status": "pending"
     },
@@ -1095,8 +1061,8 @@
       "workflow": "vendored_daily_update",
       "eventKey": "sim_3_DET_at_HOU_pk824178_g1",
       "artifactPath": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_3_DET_at_HOU_pk824178_g1.json",
-      "inputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
-      "previousInputFingerprint": "c1eaee72b125e037442e45022c82a58f8716bf7c28209e4e0a936f7ffca35ce1",
+      "inputFingerprint": "7049b6dd52a1b567b9362dbd44f2f400a507711fda52c573b89597a2265aa7a4",
+      "previousInputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
       "eventStartTimeUtc": null,
       "timeToStartMinutes": null,
       "policyId": "sport:mlb:default",
@@ -1115,8 +1081,8 @@
       "workflow": "vendored_daily_update",
       "eventKey": "sim_4_SD_at_STL_pk823044_g1",
       "artifactPath": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_4_SD_at_STL_pk823044_g1.json",
-      "inputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
-      "previousInputFingerprint": "c1eaee72b125e037442e45022c82a58f8716bf7c28209e4e0a936f7ffca35ce1",
+      "inputFingerprint": "7049b6dd52a1b567b9362dbd44f2f400a507711fda52c573b89597a2265aa7a4",
+      "previousInputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
       "eventStartTimeUtc": null,
       "timeToStartMinutes": null,
       "policyId": "sport:mlb:default",
@@ -1135,8 +1101,8 @@
       "workflow": "vendored_daily_update",
       "eventKey": "sim_5_TB_at_LAD_pk823940_g1",
       "artifactPath": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_5_TB_at_LAD_pk823940_g1.json",
-      "inputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
-      "previousInputFingerprint": "c1eaee72b125e037442e45022c82a58f8716bf7c28209e4e0a936f7ffca35ce1",
+      "inputFingerprint": "7049b6dd52a1b567b9362dbd44f2f400a507711fda52c573b89597a2265aa7a4",
+      "previousInputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
       "eventStartTimeUtc": null,
       "timeToStartMinutes": null,
       "policyId": "sport:mlb:default",
@@ -1155,8 +1121,8 @@
       "workflow": "vendored_daily_update",
       "eventKey": "sim_6_LAA_at_AZ_pk825072_g1",
       "artifactPath": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_6_LAA_at_AZ_pk825072_g1.json",
-      "inputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
-      "previousInputFingerprint": "c1eaee72b125e037442e45022c82a58f8716bf7c28209e4e0a936f7ffca35ce1",
+      "inputFingerprint": "7049b6dd52a1b567b9362dbd44f2f400a507711fda52c573b89597a2265aa7a4",
+      "previousInputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
       "eventStartTimeUtc": null,
       "timeToStartMinutes": null,
       "policyId": "sport:mlb:default",
@@ -1175,8 +1141,8 @@
       "workflow": "vendored_daily_update",
       "eventKey": "sim_7_TOR_at_BOS_pk824746_g1",
       "artifactPath": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_7_TOR_at_BOS_pk824746_g1.json",
-      "inputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
-      "previousInputFingerprint": "c1eaee72b125e037442e45022c82a58f8716bf7c28209e4e0a936f7ffca35ce1",
+      "inputFingerprint": "7049b6dd52a1b567b9362dbd44f2f400a507711fda52c573b89597a2265aa7a4",
+      "previousInputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
       "eventStartTimeUtc": null,
       "timeToStartMinutes": null,
       "policyId": "sport:mlb:default",
@@ -1195,8 +1161,8 @@
       "workflow": "vendored_daily_update",
       "eventKey": "sim_8_CWS_at_NYY_pk823536_g1",
       "artifactPath": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_8_CWS_at_NYY_pk823536_g1.json",
-      "inputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
-      "previousInputFingerprint": "c1eaee72b125e037442e45022c82a58f8716bf7c28209e4e0a936f7ffca35ce1",
+      "inputFingerprint": "7049b6dd52a1b567b9362dbd44f2f400a507711fda52c573b89597a2265aa7a4",
+      "previousInputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
       "eventStartTimeUtc": null,
       "timeToStartMinutes": null,
       "policyId": "sport:mlb:default",
@@ -1215,8 +1181,8 @@
       "workflow": "vendored_daily_update",
       "eventKey": "sim_9_SF_at_ATL_pk824913_g1",
       "artifactPath": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_9_SF_at_ATL_pk824913_g1.json",
-      "inputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
-      "previousInputFingerprint": "c1eaee72b125e037442e45022c82a58f8716bf7c28209e4e0a936f7ffca35ce1",
+      "inputFingerprint": "7049b6dd52a1b567b9362dbd44f2f400a507711fda52c573b89597a2265aa7a4",
+      "previousInputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
       "eventStartTimeUtc": null,
       "timeToStartMinutes": null,
       "policyId": "sport:mlb:default",
@@ -1235,8 +1201,8 @@
       "workflow": "vendored_daily_update",
       "eventKey": "smart_sim_2026-06-17_CHI_NYL",
       "artifactPath": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_CHI_NYL.json",
-      "inputFingerprint": "14c67c4d7cd065ed85718e4f6e37dcd27245f4b6d49cb842ce9723e0e397828c",
-      "previousInputFingerprint": "aaada7cb920f3e7bbf0d2a76d6acf7f63b9b56c962e2ea558fe2578985185ae7",
+      "inputFingerprint": "cd99add1ad102f9cc81fdbd68048128eb0c5b2dfb2edb477e8c9d128681d7e87",
+      "previousInputFingerprint": "14c67c4d7cd065ed85718e4f6e37dcd27245f4b6d49cb842ce9723e0e397828c",
       "eventStartTimeUtc": null,
       "timeToStartMinutes": null,
       "policyId": "sport:wnba:default",
@@ -1248,15 +1214,15 @@
       },
       "forceWithinMinutes": 40,
       "decision": "planned",
-      "status": "dry_run"
+      "status": "pending"
     },
     {
       "sport": "wnba",
       "workflow": "vendored_daily_update",
       "eventKey": "smart_sim_2026-06-17_CON_WSH",
       "artifactPath": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_CON_WSH.json",
-      "inputFingerprint": "14c67c4d7cd065ed85718e4f6e37dcd27245f4b6d49cb842ce9723e0e397828c",
-      "previousInputFingerprint": "aaada7cb920f3e7bbf0d2a76d6acf7f63b9b56c962e2ea558fe2578985185ae7",
+      "inputFingerprint": "cd99add1ad102f9cc81fdbd68048128eb0c5b2dfb2edb477e8c9d128681d7e87",
+      "previousInputFingerprint": "14c67c4d7cd065ed85718e4f6e37dcd27245f4b6d49cb842ce9723e0e397828c",
       "eventStartTimeUtc": null,
       "timeToStartMinutes": null,
       "policyId": "sport:wnba:default",
@@ -1268,15 +1234,15 @@
       },
       "forceWithinMinutes": 40,
       "decision": "planned",
-      "status": "dry_run"
+      "status": "pending"
     },
     {
       "sport": "wnba",
       "workflow": "vendored_daily_update",
       "eventKey": "smart_sim_2026-06-17_GSV_DAL",
       "artifactPath": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_GSV_DAL.json",
-      "inputFingerprint": "14c67c4d7cd065ed85718e4f6e37dcd27245f4b6d49cb842ce9723e0e397828c",
-      "previousInputFingerprint": "aaada7cb920f3e7bbf0d2a76d6acf7f63b9b56c962e2ea558fe2578985185ae7",
+      "inputFingerprint": "cd99add1ad102f9cc81fdbd68048128eb0c5b2dfb2edb477e8c9d128681d7e87",
+      "previousInputFingerprint": "14c67c4d7cd065ed85718e4f6e37dcd27245f4b6d49cb842ce9723e0e397828c",
       "eventStartTimeUtc": null,
       "timeToStartMinutes": null,
       "policyId": "sport:wnba:default",
@@ -1288,15 +1254,15 @@
       },
       "forceWithinMinutes": 40,
       "decision": "planned",
-      "status": "dry_run"
+      "status": "pending"
     },
     {
       "sport": "wnba",
       "workflow": "vendored_daily_update",
       "eventKey": "smart_sim_2026-06-17_LAS_MIN",
       "artifactPath": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_LAS_MIN.json",
-      "inputFingerprint": "14c67c4d7cd065ed85718e4f6e37dcd27245f4b6d49cb842ce9723e0e397828c",
-      "previousInputFingerprint": "aaada7cb920f3e7bbf0d2a76d6acf7f63b9b56c962e2ea558fe2578985185ae7",
+      "inputFingerprint": "cd99add1ad102f9cc81fdbd68048128eb0c5b2dfb2edb477e8c9d128681d7e87",
+      "previousInputFingerprint": "14c67c4d7cd065ed85718e4f6e37dcd27245f4b6d49cb842ce9723e0e397828c",
       "eventStartTimeUtc": null,
       "timeToStartMinutes": null,
       "policyId": "sport:wnba:default",
@@ -1308,15 +1274,15 @@
       },
       "forceWithinMinutes": 40,
       "decision": "planned",
-      "status": "dry_run"
+      "status": "pending"
     },
     {
       "sport": "wnba",
       "workflow": "vendored_daily_update",
       "eventKey": "smart_sim_2026-06-17_PHX_LVA",
       "artifactPath": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_PHX_LVA.json",
-      "inputFingerprint": "14c67c4d7cd065ed85718e4f6e37dcd27245f4b6d49cb842ce9723e0e397828c",
-      "previousInputFingerprint": "aaada7cb920f3e7bbf0d2a76d6acf7f63b9b56c962e2ea558fe2578985185ae7",
+      "inputFingerprint": "cd99add1ad102f9cc81fdbd68048128eb0c5b2dfb2edb477e8c9d128681d7e87",
+      "previousInputFingerprint": "14c67c4d7cd065ed85718e4f6e37dcd27245f4b6d49cb842ce9723e0e397828c",
       "eventStartTimeUtc": null,
       "timeToStartMinutes": null,
       "policyId": "sport:wnba:default",
@@ -1328,15 +1294,15 @@
       },
       "forceWithinMinutes": 40,
       "decision": "planned",
-      "status": "dry_run"
+      "status": "pending"
     },
     {
       "sport": "wnba",
       "workflow": "vendored_daily_update",
       "eventKey": "smart_sim_2026-06-17_POR_SEA",
       "artifactPath": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_POR_SEA.json",
-      "inputFingerprint": "14c67c4d7cd065ed85718e4f6e37dcd27245f4b6d49cb842ce9723e0e397828c",
-      "previousInputFingerprint": "aaada7cb920f3e7bbf0d2a76d6acf7f63b9b56c962e2ea558fe2578985185ae7",
+      "inputFingerprint": "cd99add1ad102f9cc81fdbd68048128eb0c5b2dfb2edb477e8c9d128681d7e87",
+      "previousInputFingerprint": "14c67c4d7cd065ed85718e4f6e37dcd27245f4b6d49cb842ce9723e0e397828c",
       "eventStartTimeUtc": null,
       "timeToStartMinutes": null,
       "policyId": "sport:wnba:default",
@@ -1348,7 +1314,7 @@
       },
       "forceWithinMinutes": 40,
       "decision": "planned",
-      "status": "dry_run"
+      "status": "pending"
     },
     {
       "sport": "nhl",
@@ -1377,12 +1343,12 @@
       "workflow": "vendored_daily_update",
       "eventKey": "sim_0_NYM_at_CIN_pk824503_g1",
       "artifactPath": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_0_NYM_at_CIN_pk824503_g1.json",
-      "inputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
-      "previousInputFingerprint": "c1eaee72b125e037442e45022c82a58f8716bf7c28209e4e0a936f7ffca35ce1",
-      "policyId": "sport:mlb:balanced",
+      "inputFingerprint": "7049b6dd52a1b567b9362dbd44f2f400a507711fda52c573b89597a2265aa7a4",
+      "previousInputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
+      "policyId": "sport:mlb:default",
       "policySource": "sport",
       "policyKeyParameters": {
-        "forceWithinMinutes": 30
+        "forceWithinMinutes": 20
       },
       "decision": "planned",
       "status": "pending"
@@ -1392,8 +1358,8 @@
       "workflow": "vendored_daily_update",
       "eventKey": "sim_10_CLE_at_MIL_pk823774_g1",
       "artifactPath": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_10_CLE_at_MIL_pk823774_g1.json",
-      "inputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
-      "previousInputFingerprint": "c1eaee72b125e037442e45022c82a58f8716bf7c28209e4e0a936f7ffca35ce1",
+      "inputFingerprint": "7049b6dd52a1b567b9362dbd44f2f400a507711fda52c573b89597a2265aa7a4",
+      "previousInputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
       "policyId": "sport:mlb:default",
       "policySource": "sport",
       "policyKeyParameters": {
@@ -1407,8 +1373,8 @@
       "workflow": "vendored_daily_update",
       "eventKey": "sim_11_COL_at_CHC_pk824668_g1",
       "artifactPath": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_11_COL_at_CHC_pk824668_g1.json",
-      "inputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
-      "previousInputFingerprint": "c1eaee72b125e037442e45022c82a58f8716bf7c28209e4e0a936f7ffca35ce1",
+      "inputFingerprint": "7049b6dd52a1b567b9362dbd44f2f400a507711fda52c573b89597a2265aa7a4",
+      "previousInputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
       "policyId": "sport:mlb:default",
       "policySource": "sport",
       "policyKeyParameters": {
@@ -1422,12 +1388,12 @@
       "workflow": "vendored_daily_update",
       "eventKey": "sim_12_PIT_at_ATH_pk824992_g1",
       "artifactPath": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_12_PIT_at_ATH_pk824992_g1.json",
-      "inputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
-      "previousInputFingerprint": "c1eaee72b125e037442e45022c82a58f8716bf7c28209e4e0a936f7ffca35ce1",
-      "policyId": "sport:mlb:default",
+      "inputFingerprint": "7049b6dd52a1b567b9362dbd44f2f400a507711fda52c573b89597a2265aa7a4",
+      "previousInputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
+      "policyId": "sport:mlb:balanced",
       "policySource": "sport",
       "policyKeyParameters": {
-        "forceWithinMinutes": 20
+        "forceWithinMinutes": 30
       },
       "decision": "planned",
       "status": "pending"
@@ -1437,8 +1403,8 @@
       "workflow": "vendored_daily_update",
       "eventKey": "sim_13_BAL_at_SEA_pk823127_g1",
       "artifactPath": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_13_BAL_at_SEA_pk823127_g1.json",
-      "inputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
-      "previousInputFingerprint": "c1eaee72b125e037442e45022c82a58f8716bf7c28209e4e0a936f7ffca35ce1",
+      "inputFingerprint": "7049b6dd52a1b567b9362dbd44f2f400a507711fda52c573b89597a2265aa7a4",
+      "previousInputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
       "policyId": "sport:mlb:default",
       "policySource": "sport",
       "policyKeyParameters": {
@@ -1452,8 +1418,8 @@
       "workflow": "vendored_daily_update",
       "eventKey": "sim_1_KC_at_WSH_pk822721_g1",
       "artifactPath": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_1_KC_at_WSH_pk822721_g1.json",
-      "inputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
-      "previousInputFingerprint": "c1eaee72b125e037442e45022c82a58f8716bf7c28209e4e0a936f7ffca35ce1",
+      "inputFingerprint": "7049b6dd52a1b567b9362dbd44f2f400a507711fda52c573b89597a2265aa7a4",
+      "previousInputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
       "policyId": "sport:mlb:default",
       "policySource": "sport",
       "policyKeyParameters": {
@@ -1467,12 +1433,12 @@
       "workflow": "vendored_daily_update",
       "eventKey": "sim_2_MIA_at_PHI_pk823450_g1",
       "artifactPath": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_2_MIA_at_PHI_pk823450_g1.json",
-      "inputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
-      "previousInputFingerprint": "c1eaee72b125e037442e45022c82a58f8716bf7c28209e4e0a936f7ffca35ce1",
-      "policyId": "sport:mlb:balanced",
+      "inputFingerprint": "7049b6dd52a1b567b9362dbd44f2f400a507711fda52c573b89597a2265aa7a4",
+      "previousInputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
+      "policyId": "sport:mlb:default",
       "policySource": "sport",
       "policyKeyParameters": {
-        "forceWithinMinutes": 30
+        "forceWithinMinutes": 20
       },
       "decision": "planned",
       "status": "pending"
@@ -1482,8 +1448,8 @@
       "workflow": "vendored_daily_update",
       "eventKey": "sim_3_DET_at_HOU_pk824178_g1",
       "artifactPath": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_3_DET_at_HOU_pk824178_g1.json",
-      "inputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
-      "previousInputFingerprint": "c1eaee72b125e037442e45022c82a58f8716bf7c28209e4e0a936f7ffca35ce1",
+      "inputFingerprint": "7049b6dd52a1b567b9362dbd44f2f400a507711fda52c573b89597a2265aa7a4",
+      "previousInputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
       "policyId": "sport:mlb:default",
       "policySource": "sport",
       "policyKeyParameters": {
@@ -1497,8 +1463,8 @@
       "workflow": "vendored_daily_update",
       "eventKey": "sim_4_SD_at_STL_pk823044_g1",
       "artifactPath": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_4_SD_at_STL_pk823044_g1.json",
-      "inputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
-      "previousInputFingerprint": "c1eaee72b125e037442e45022c82a58f8716bf7c28209e4e0a936f7ffca35ce1",
+      "inputFingerprint": "7049b6dd52a1b567b9362dbd44f2f400a507711fda52c573b89597a2265aa7a4",
+      "previousInputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
       "policyId": "sport:mlb:default",
       "policySource": "sport",
       "policyKeyParameters": {
@@ -1512,8 +1478,8 @@
       "workflow": "vendored_daily_update",
       "eventKey": "sim_5_TB_at_LAD_pk823940_g1",
       "artifactPath": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_5_TB_at_LAD_pk823940_g1.json",
-      "inputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
-      "previousInputFingerprint": "c1eaee72b125e037442e45022c82a58f8716bf7c28209e4e0a936f7ffca35ce1",
+      "inputFingerprint": "7049b6dd52a1b567b9362dbd44f2f400a507711fda52c573b89597a2265aa7a4",
+      "previousInputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
       "policyId": "sport:mlb:default",
       "policySource": "sport",
       "policyKeyParameters": {
@@ -1527,8 +1493,8 @@
       "workflow": "vendored_daily_update",
       "eventKey": "sim_6_LAA_at_AZ_pk825072_g1",
       "artifactPath": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_6_LAA_at_AZ_pk825072_g1.json",
-      "inputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
-      "previousInputFingerprint": "c1eaee72b125e037442e45022c82a58f8716bf7c28209e4e0a936f7ffca35ce1",
+      "inputFingerprint": "7049b6dd52a1b567b9362dbd44f2f400a507711fda52c573b89597a2265aa7a4",
+      "previousInputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
       "policyId": "sport:mlb:default",
       "policySource": "sport",
       "policyKeyParameters": {
@@ -1542,8 +1508,8 @@
       "workflow": "vendored_daily_update",
       "eventKey": "sim_7_TOR_at_BOS_pk824746_g1",
       "artifactPath": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_7_TOR_at_BOS_pk824746_g1.json",
-      "inputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
-      "previousInputFingerprint": "c1eaee72b125e037442e45022c82a58f8716bf7c28209e4e0a936f7ffca35ce1",
+      "inputFingerprint": "7049b6dd52a1b567b9362dbd44f2f400a507711fda52c573b89597a2265aa7a4",
+      "previousInputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
       "policyId": "sport:mlb:default",
       "policySource": "sport",
       "policyKeyParameters": {
@@ -1557,8 +1523,8 @@
       "workflow": "vendored_daily_update",
       "eventKey": "sim_8_CWS_at_NYY_pk823536_g1",
       "artifactPath": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_8_CWS_at_NYY_pk823536_g1.json",
-      "inputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
-      "previousInputFingerprint": "c1eaee72b125e037442e45022c82a58f8716bf7c28209e4e0a936f7ffca35ce1",
+      "inputFingerprint": "7049b6dd52a1b567b9362dbd44f2f400a507711fda52c573b89597a2265aa7a4",
+      "previousInputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
       "policyId": "sport:mlb:default",
       "policySource": "sport",
       "policyKeyParameters": {
@@ -1572,8 +1538,8 @@
       "workflow": "vendored_daily_update",
       "eventKey": "sim_9_SF_at_ATL_pk824913_g1",
       "artifactPath": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-17\\sim_9_SF_at_ATL_pk824913_g1.json",
-      "inputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
-      "previousInputFingerprint": "c1eaee72b125e037442e45022c82a58f8716bf7c28209e4e0a936f7ffca35ce1",
+      "inputFingerprint": "7049b6dd52a1b567b9362dbd44f2f400a507711fda52c573b89597a2265aa7a4",
+      "previousInputFingerprint": "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
       "policyId": "sport:mlb:default",
       "policySource": "sport",
       "policyKeyParameters": {
@@ -1587,90 +1553,90 @@
       "workflow": "vendored_daily_update",
       "eventKey": "smart_sim_2026-06-17_CHI_NYL",
       "artifactPath": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_CHI_NYL.json",
-      "inputFingerprint": "14c67c4d7cd065ed85718e4f6e37dcd27245f4b6d49cb842ce9723e0e397828c",
-      "previousInputFingerprint": "aaada7cb920f3e7bbf0d2a76d6acf7f63b9b56c962e2ea558fe2578985185ae7",
+      "inputFingerprint": "cd99add1ad102f9cc81fdbd68048128eb0c5b2dfb2edb477e8c9d128681d7e87",
+      "previousInputFingerprint": "14c67c4d7cd065ed85718e4f6e37dcd27245f4b6d49cb842ce9723e0e397828c",
       "policyId": "sport:wnba:default",
       "policySource": "sport",
       "policyKeyParameters": {
         "forceWithinMinutes": 40
       },
       "decision": "planned",
-      "status": "dry_run"
+      "status": "pending"
     },
     {
       "sport": "wnba",
       "workflow": "vendored_daily_update",
       "eventKey": "smart_sim_2026-06-17_CON_WSH",
       "artifactPath": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_CON_WSH.json",
-      "inputFingerprint": "14c67c4d7cd065ed85718e4f6e37dcd27245f4b6d49cb842ce9723e0e397828c",
-      "previousInputFingerprint": "aaada7cb920f3e7bbf0d2a76d6acf7f63b9b56c962e2ea558fe2578985185ae7",
+      "inputFingerprint": "cd99add1ad102f9cc81fdbd68048128eb0c5b2dfb2edb477e8c9d128681d7e87",
+      "previousInputFingerprint": "14c67c4d7cd065ed85718e4f6e37dcd27245f4b6d49cb842ce9723e0e397828c",
       "policyId": "sport:wnba:default",
       "policySource": "sport",
       "policyKeyParameters": {
         "forceWithinMinutes": 40
       },
       "decision": "planned",
-      "status": "dry_run"
+      "status": "pending"
     },
     {
       "sport": "wnba",
       "workflow": "vendored_daily_update",
       "eventKey": "smart_sim_2026-06-17_GSV_DAL",
       "artifactPath": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_GSV_DAL.json",
-      "inputFingerprint": "14c67c4d7cd065ed85718e4f6e37dcd27245f4b6d49cb842ce9723e0e397828c",
-      "previousInputFingerprint": "aaada7cb920f3e7bbf0d2a76d6acf7f63b9b56c962e2ea558fe2578985185ae7",
+      "inputFingerprint": "cd99add1ad102f9cc81fdbd68048128eb0c5b2dfb2edb477e8c9d128681d7e87",
+      "previousInputFingerprint": "14c67c4d7cd065ed85718e4f6e37dcd27245f4b6d49cb842ce9723e0e397828c",
       "policyId": "sport:wnba:default",
       "policySource": "sport",
       "policyKeyParameters": {
         "forceWithinMinutes": 40
       },
       "decision": "planned",
-      "status": "dry_run"
+      "status": "pending"
     },
     {
       "sport": "wnba",
       "workflow": "vendored_daily_update",
       "eventKey": "smart_sim_2026-06-17_LAS_MIN",
       "artifactPath": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_LAS_MIN.json",
-      "inputFingerprint": "14c67c4d7cd065ed85718e4f6e37dcd27245f4b6d49cb842ce9723e0e397828c",
-      "previousInputFingerprint": "aaada7cb920f3e7bbf0d2a76d6acf7f63b9b56c962e2ea558fe2578985185ae7",
+      "inputFingerprint": "cd99add1ad102f9cc81fdbd68048128eb0c5b2dfb2edb477e8c9d128681d7e87",
+      "previousInputFingerprint": "14c67c4d7cd065ed85718e4f6e37dcd27245f4b6d49cb842ce9723e0e397828c",
       "policyId": "sport:wnba:default",
       "policySource": "sport",
       "policyKeyParameters": {
         "forceWithinMinutes": 40
       },
       "decision": "planned",
-      "status": "dry_run"
+      "status": "pending"
     },
     {
       "sport": "wnba",
       "workflow": "vendored_daily_update",
       "eventKey": "smart_sim_2026-06-17_PHX_LVA",
       "artifactPath": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_PHX_LVA.json",
-      "inputFingerprint": "14c67c4d7cd065ed85718e4f6e37dcd27245f4b6d49cb842ce9723e0e397828c",
-      "previousInputFingerprint": "aaada7cb920f3e7bbf0d2a76d6acf7f63b9b56c962e2ea558fe2578985185ae7",
+      "inputFingerprint": "cd99add1ad102f9cc81fdbd68048128eb0c5b2dfb2edb477e8c9d128681d7e87",
+      "previousInputFingerprint": "14c67c4d7cd065ed85718e4f6e37dcd27245f4b6d49cb842ce9723e0e397828c",
       "policyId": "sport:wnba:default",
       "policySource": "sport",
       "policyKeyParameters": {
         "forceWithinMinutes": 40
       },
       "decision": "planned",
-      "status": "dry_run"
+      "status": "pending"
     },
     {
       "sport": "wnba",
       "workflow": "vendored_daily_update",
       "eventKey": "smart_sim_2026-06-17_POR_SEA",
       "artifactPath": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_POR_SEA.json",
-      "inputFingerprint": "14c67c4d7cd065ed85718e4f6e37dcd27245f4b6d49cb842ce9723e0e397828c",
-      "previousInputFingerprint": "aaada7cb920f3e7bbf0d2a76d6acf7f63b9b56c962e2ea558fe2578985185ae7",
+      "inputFingerprint": "cd99add1ad102f9cc81fdbd68048128eb0c5b2dfb2edb477e8c9d128681d7e87",
+      "previousInputFingerprint": "14c67c4d7cd065ed85718e4f6e37dcd27245f4b6d49cb842ce9723e0e397828c",
       "policyId": "sport:wnba:default",
       "policySource": "sport",
       "policyKeyParameters": {
         "forceWithinMinutes": 40
       },
       "decision": "planned",
-      "status": "dry_run"
+      "status": "pending"
     },
     {
       "sport": "nhl",
@@ -1690,42 +1656,6 @@
   ],
   "policyPerformance": [
     {
-      "policyId": "sport:mlb:balanced",
-      "policySource": "sport",
-      "keyParameters": {
-        "forceWithinMinutes": 30
-      },
-      "recordCount": 2,
-      "sampleSize": 2,
-      "exploratoryCount": 2,
-      "exploratoryRate": 1.0,
-      "plannedCount": 2,
-      "skippedCount": 0,
-      "dryRunCount": 0,
-      "withinWindowCount": 0,
-      "averageTimeToStartMinutes": null,
-      "averageForceWithinMinutes": 30.0,
-      "roi": null
-    },
-    {
-      "policyId": "sport:mlb:default",
-      "policySource": "sport",
-      "keyParameters": {
-        "forceWithinMinutes": 20
-      },
-      "recordCount": 12,
-      "sampleSize": 12,
-      "exploratoryCount": 0,
-      "exploratoryRate": 0.0,
-      "plannedCount": 12,
-      "skippedCount": 0,
-      "dryRunCount": 0,
-      "withinWindowCount": 0,
-      "averageTimeToStartMinutes": null,
-      "averageForceWithinMinutes": 20.0,
-      "roi": null
-    },
-    {
       "policyId": "sport:nhl:default",
       "policySource": "sport",
       "keyParameters": {
@@ -1744,21 +1674,21 @@
       "roi": null
     },
     {
-      "policyId": "sport:wnba:default",
+      "policyId": "",
       "policySource": "sport",
       "keyParameters": {
-        "forceWithinMinutes": 40
+        "forceWithinMinutes": 20
       },
-      "recordCount": 6,
-      "sampleSize": 6,
-      "exploratoryCount": 0,
-      "exploratoryRate": 0.0,
-      "plannedCount": 6,
+      "recordCount": 20,
+      "sampleSize": 20,
+      "exploratoryCount": 1,
+      "exploratoryRate": 0.05,
+      "plannedCount": 20,
       "skippedCount": 0,
-      "dryRunCount": 6,
+      "dryRunCount": 0,
       "withinWindowCount": 0,
       "averageTimeToStartMinutes": null,
-      "averageForceWithinMinutes": 40.0,
+      "averageForceWithinMinutes": 26.5,
       "roi": null
     }
   ],
@@ -1995,46 +1925,12 @@
     "state": {
       "runMode": "standard",
       "overallStatus": "started",
-      "currentStage": "queued",
-      "completedStages": [],
+      "currentStage": "refresh_gate",
+      "completedStages": [
+        "source_update"
+      ],
       "failedStage": null,
       "policyPerformance": [
-        {
-          "policyId": "sport:mlb:balanced",
-          "policySource": "sport",
-          "keyParameters": {
-            "forceWithinMinutes": 30
-          },
-          "recordCount": 2,
-          "sampleSize": 2,
-          "exploratoryCount": 2,
-          "exploratoryRate": 1.0,
-          "plannedCount": 2,
-          "skippedCount": 0,
-          "dryRunCount": 0,
-          "withinWindowCount": 0,
-          "averageTimeToStartMinutes": null,
-          "averageForceWithinMinutes": 30.0,
-          "roi": null
-        },
-        {
-          "policyId": "sport:mlb:default",
-          "policySource": "sport",
-          "keyParameters": {
-            "forceWithinMinutes": 20
-          },
-          "recordCount": 12,
-          "sampleSize": 12,
-          "exploratoryCount": 0,
-          "exploratoryRate": 0.0,
-          "plannedCount": 12,
-          "skippedCount": 0,
-          "dryRunCount": 0,
-          "withinWindowCount": 0,
-          "averageTimeToStartMinutes": null,
-          "averageForceWithinMinutes": 20.0,
-          "roi": null
-        },
         {
           "policyId": "sport:nhl:default",
           "policySource": "sport",
@@ -2054,21 +1950,21 @@
           "roi": null
         },
         {
-          "policyId": "sport:wnba:default",
+          "policyId": "",
           "policySource": "sport",
           "keyParameters": {
-            "forceWithinMinutes": 40
+            "forceWithinMinutes": 20
           },
-          "recordCount": 6,
-          "sampleSize": 6,
-          "exploratoryCount": 0,
-          "exploratoryRate": 0.0,
-          "plannedCount": 6,
+          "recordCount": 20,
+          "sampleSize": 20,
+          "exploratoryCount": 1,
+          "exploratoryRate": 0.05,
+          "plannedCount": 20,
           "skippedCount": 0,
-          "dryRunCount": 6,
+          "dryRunCount": 0,
           "withinWindowCount": 0,
           "averageTimeToStartMinutes": null,
-          "averageForceWithinMinutes": 40.0,
+          "averageForceWithinMinutes": 26.5,
           "roi": null
         }
       ],
@@ -2095,10 +1991,154 @@
         "missingIntelligencePublishArtifactPaths": [],
         "status": "skipped"
       },
-      "lastUpdatedAt": "2026-07-04T04:54:56.5851865+00:00"
+      "lastUpdatedAt": "2026-07-04T05:19:07.9007093+00:00"
     }
   },
-  "sportRuns": [],
+  "sportRuns": [
+    {
+      "sport": "mlb",
+      "workflow": "vendored_daily_update",
+      "name": "MLB vendored daily update",
+      "startedAt": "2026-07-04T04:54:59.3279373+00:00",
+      "completedAt": "2026-07-04T05:11:10.0495182+00:00",
+      "status": "ok",
+      "error": null,
+      "workingDirectory": "D:\\a\\Syndicate\\Syndicate\\vendor\\mlb_bettingv2",
+      "environmentOverrides": {
+        "MLB_BETTING_DATA_ROOT": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data",
+        "MLB_LIVE_LENS_DIR": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\live_lens",
+        "ODDS_API_KEY": "77ae1c35140c82da1675af85dde36a44"
+      },
+      "runtimePolicy": {
+        "simsPerGame": 1000,
+        "workers": 3
+      },
+      "command": [
+        "C:\\hostedtoolcache\\windows\\Python\\3.11.9\\x64\\python.exe",
+        "tools\\daily_update.py",
+        "--workflow",
+        "ui-daily",
+        "--date",
+        "2026-07-04",
+        "--season",
+        "2026",
+        "--sims",
+        "1000",
+        "--workers",
+        "3",
+        "--git-push",
+        "off",
+        "--validate-render-frontend",
+        "off",
+        "--build-next-day",
+        "on"
+      ],
+      "mirrorManifestPath": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\manifests\\mirror_refresh_2026-07-04.json",
+      "mirrorManifestExists": false
+    },
+    {
+      "sport": "mlb",
+      "workflow": "syndicate_refresh",
+      "name": "MLB current-day live-lens refresh",
+      "startedAt": "2026-07-04T05:11:10.0803622+00:00",
+      "completedAt": "2026-07-04T05:11:39.3912435+00:00",
+      "status": "ok",
+      "error": null,
+      "workingDirectory": "D:\\a\\Syndicate\\Syndicate",
+      "environmentOverrides": {
+        "MLB_BETTING_DATA_ROOT": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data",
+        "MLB_LIVE_LENS_DIR": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\live_lens",
+        "ODDS_API_KEY": "77ae1c35140c82da1675af85dde36a44"
+      },
+      "runtimePolicy": {
+        "simsPerGame": 1000,
+        "workers": 3
+      },
+      "command": [
+        "C:\\hostedtoolcache\\windows\\Python\\3.11.9\\x64\\python.exe",
+        "scripts\\refresh_mlb_oddsapi.py",
+        "--date",
+        "2026-07-04",
+        "--source-root",
+        "data\\mlb_source\\source_artifacts",
+        "--artifact-root",
+        "data\\mlb_source",
+        "--overwrite",
+        "on"
+      ],
+      "mirrorManifestPath": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\manifests\\mirror_refresh_2026-07-04.json",
+      "mirrorManifestExists": false
+    },
+    {
+      "sport": "wnba",
+      "workflow": "vendored_daily_update",
+      "name": "WNBA vendored daily update",
+      "startedAt": "2026-07-04T05:11:53.8993795+00:00",
+      "completedAt": "2026-07-04T05:18:46.1361399+00:00",
+      "status": "ok",
+      "error": null,
+      "workingDirectory": "D:\\a\\Syndicate\\Syndicate",
+      "environmentOverrides": {
+        "APP_TZ": "America/Chicago",
+        "REFRESH_PLAYER_LOGS_FETCH_ON_MISS": "1",
+        "APP_TZ_OFFSET_HOURS": "-6",
+        "ODDS_API_KEY": "77ae1c35140c82da1675af85dde36a44",
+        "REFRESH_PREDICT_PROPS_SMART_SIM_N_SIMS": "1000",
+        "REFRESH_PREDICT_PROPS_SMART_SIM_WORKERS": "3",
+        "SYNDICATE_WNBA_SOURCE_APP_FALLBACK": "1"
+      },
+      "runtimePolicy": {
+        "smartsimNSims": 1000,
+        "smartsimWorkers": 3
+      },
+      "command": [
+        "C:\\hostedtoolcache\\windows\\Python\\3.11.9\\x64\\python.exe",
+        "scripts\\refresh_wnba_oddsapi_props.py",
+        "--date",
+        "2026-07-04",
+        "--source-root",
+        "vendor\\wnba_betting_repo",
+        "--artifact-root",
+        "data\\wnba_source\\source_artifacts",
+        "--log-file",
+        "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-04\\20260704_045456\\wnba_props_refresh.log",
+        "--force-refresh",
+        "--days-ahead",
+        "0",
+        "--do-edges",
+        "--do-export"
+      ],
+      "mirrorManifestPath": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\manifests\\mirror_refresh_2026-07-04.json",
+      "mirrorManifestExists": false
+    },
+    {
+      "sport": "wnba",
+      "workflow": "syndicate_mirror",
+      "name": "WNBA source mirror refresh",
+      "startedAt": "2026-07-04T05:18:46.1533195+00:00",
+      "completedAt": "2026-07-04T05:18:46.7220930+00:00",
+      "status": "ok",
+      "error": null,
+      "workingDirectory": "D:\\a\\Syndicate\\Syndicate",
+      "environmentOverrides": {},
+      "runtimePolicy": {
+        "smartsimNSims": 1000,
+        "smartsimWorkers": 3
+      },
+      "command": [
+        "powershell.exe",
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "scripts\\refresh_wnba_source_mirror.ps1",
+        "-Date",
+        "2026-07-04"
+      ],
+      "mirrorManifestPath": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\manifests\\mirror_refresh_2026-07-04.json",
+      "mirrorManifestExists": false
+    }
+  ],
   "skipGitPush": true,
   "gitRemote": null,
   "commitMessagePrefix": null,
@@ -2121,17 +2161,28 @@
     "oddsSports": "all",
     "oddsRegions": "us",
     "manifestPath": "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-04\\20260704_045456\\migration\\refresh_status_manifest.json",
-    "runSummaryPath": "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-04\\20260704_045456\\migration\\refresh_and_gate_run.json"
+    "runSummaryPath": "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-04\\20260704_045456\\migration\\refresh_and_gate_run.json",
+    "status": "ok"
   },
-  "pushResults": [],
+  "pushResults": [
+    {
+      "name": "Syndicate",
+      "repoPath": "D:\\a\\Syndicate\\Syndicate",
+      "remote": "",
+      "branch": "main",
+      "commitMessage": " 2026-07-04 (pre-source publish)",
+      "status": "pushed",
+      "commit": "0e68bc1c7245b0795b2a92d242a761cbda0c2441"
+    }
+  ],
   "runTrace": {
     "eventSimExecutionCount": 21,
     "artifactUpdateCount": 21,
     "inputFingerprintCount": 3,
     "artifactPathCount": 21,
     "inputFingerprints": [
-      "7694d2b8df9bfb5f6c537b40a9a9fd7e41797be9e7e0ad9d12dcc38328544fba",
-      "14c67c4d7cd065ed85718e4f6e37dcd27245f4b6d49cb842ce9723e0e397828c",
+      "7049b6dd52a1b567b9362dbd44f2f400a507711fda52c573b89597a2265aa7a4",
+      "cd99add1ad102f9cc81fdbd68048128eb0c5b2dfb2edb477e8c9d128681d7e87",
       "563a06b8e8830bba5d1cdcf73bb91ad105470d2e01ba859ebaa44c2126a6045d"
     ],
     "artifactPaths": [
