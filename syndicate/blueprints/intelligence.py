@@ -49,6 +49,16 @@ def _server_timestamp() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def _log_intelligence_timing(step: str, started_at: float, **fields: Any) -> None:
+    payload = {
+        "event": step,
+        "timestamp": _server_timestamp(),
+        "elapsed_ms": round((time.perf_counter() - started_at) * 1000.0, 3),
+        **fields,
+    }
+    print("[INTEL_STATUS_TIMING]", payload, flush=True)
+
+
 def _log_api_state_read(state: dict[str, object] | None) -> None:
     state = state if isinstance(state, dict) else {}
     print(
@@ -962,16 +972,37 @@ def _empty_default_intelligence_response() -> dict[str, object]:
 
 
 def read_latest_intelligence_state(payload: dict[str, object] | None = None) -> dict[str, object]:
+    started_at = time.perf_counter()
     snapshot = read_latest_intelligence_state_response(payload, force_refresh=False, allow_latest_fallback=False)
+    _log_intelligence_timing(
+        "read_latest_intelligence_state_response",
+        started_at,
+        has_snapshot=isinstance(snapshot, dict),
+        snapshot_candidate_count=_response_candidate_count(snapshot) if isinstance(snapshot, dict) else 0,
+    )
     hydrated_snapshot = _hydrate_board_response_payload(snapshot) if isinstance(snapshot, dict) else None
     hydrated_candidate_count = _response_candidate_count(hydrated_snapshot) if isinstance(hydrated_snapshot, dict) else 0
     if isinstance(hydrated_snapshot, dict) and _response_has_content(hydrated_snapshot) and hydrated_candidate_count > 0 and not (str(hydrated_snapshot.get("query_type") or "").strip().lower() == "explanation" and hydrated_candidate_count <= 0):
         return hydrated_snapshot
+    board_started_at = time.perf_counter()
     board_snapshot = read_latest_intelligence_board_snapshot_response(payload, force_refresh=False)
+    _log_intelligence_timing(
+        "read_latest_intelligence_board_snapshot_response",
+        board_started_at,
+        has_snapshot=isinstance(board_snapshot, dict),
+        snapshot_candidate_count=_response_candidate_count(board_snapshot) if isinstance(board_snapshot, dict) else 0,
+    )
     if not (isinstance(board_snapshot, dict) and _response_candidate_count(board_snapshot) > 0):
         from pipeline.intelligence_state import _latest_non_empty_intelligence_board_snapshot_response
 
+        latest_started_at = time.perf_counter()
         board_snapshot = _latest_non_empty_intelligence_board_snapshot_response(payload)
+        _log_intelligence_timing(
+            "_latest_non_empty_intelligence_board_snapshot_response",
+            latest_started_at,
+            has_snapshot=isinstance(board_snapshot, dict),
+            snapshot_candidate_count=_response_candidate_count(board_snapshot) if isinstance(board_snapshot, dict) else 0,
+        )
     if isinstance(board_snapshot, dict):
         return _hydrate_board_response_payload(board_snapshot)
     return _empty_default_intelligence_response()
@@ -1133,18 +1164,48 @@ def run_intelligence():
 @intelligence_bp.get("/api/intelligence/status")
 def intelligence_status_api():
     try:
+        request_started_at = time.perf_counter()
+        timings: dict[str, Any] = {}
         selected_date = str(request.args.get("date") or "").strip() or central_today_iso()
         refresh_requested = str(request.args.get("refresh") or request.args.get("force_refresh") or "").strip().lower() in {"1", "true", "yes", "on"}
         status_payload = _intelligence_page_payload(selected_date, force_refresh=False)
+        _log_intelligence_timing(
+            "status_route_entered",
+            request_started_at,
+            selected_date=selected_date,
+            refresh_requested=refresh_requested,
+        )
         stale_snapshot = False
         if not refresh_requested:
+            snapshot_started_at = time.perf_counter()
             current_snapshot = read_latest_intelligence_state(dict(status_payload))
+            timings["initial_read_ms"] = round((time.perf_counter() - snapshot_started_at) * 1000.0, 3)
+            _log_intelligence_timing(
+                "status_route_initial_read",
+                snapshot_started_at,
+                has_snapshot=isinstance(current_snapshot, dict),
+                snapshot_candidate_count=_response_candidate_count(current_snapshot) if isinstance(current_snapshot, dict) else 0,
+            )
             stale_snapshot = bool(_response_selected_date(current_snapshot) and _response_selected_date(current_snapshot) != selected_date)
         if refresh_requested:
+            refresh_started_at = time.perf_counter()
             _safe_queue_intelligence_state_refresh(_intelligence_page_payload(selected_date, force_refresh=True))
+            timings["refresh_queue_ms"] = round((time.perf_counter() - refresh_started_at) * 1000.0, 3)
+            _log_intelligence_timing("status_route_refresh_queue", refresh_started_at, reason="refresh_requested")
         elif stale_snapshot:
+            refresh_started_at = time.perf_counter()
             _safe_queue_intelligence_state_refresh(_intelligence_page_payload(selected_date, force_refresh=True))
+            timings["refresh_queue_ms"] = round((time.perf_counter() - refresh_started_at) * 1000.0, 3)
+            _log_intelligence_timing("status_route_refresh_queue", refresh_started_at, reason="stale_snapshot")
+        read_started_at = time.perf_counter()
         status = read_latest_intelligence_state(dict(status_payload))
+        timings["final_read_ms"] = round((time.perf_counter() - read_started_at) * 1000.0, 3)
+        _log_intelligence_timing(
+            "status_route_final_read",
+            read_started_at,
+            has_snapshot=isinstance(status, dict),
+            snapshot_candidate_count=_response_candidate_count(status) if isinstance(status, dict) else 0,
+        )
         if not (isinstance(status, dict) and _response_has_content(status)):
             status = _empty_default_intelligence_response()
         _log_api_state_read(status if isinstance(status, dict) else {})
@@ -1158,6 +1219,14 @@ def intelligence_status_api():
                 continue
             response_payload[key] = normalize_timestamped_payload(value)
     response_payload.update(_debug_state_fields(state_snapshot, source="snapshot_read"))
+    timings["total_ms"] = round((time.perf_counter() - request_started_at) * 1000.0, 3)
+    response_payload["timings"] = timings
+    _log_intelligence_timing(
+        "status_route_response_ready",
+        request_started_at,
+        total_snapshot_candidate_count=_response_candidate_count(status) if isinstance(status, dict) else 0,
+        timings=timings,
+    )
     return _no_cache_response(jsonify(response_payload))
 
 
