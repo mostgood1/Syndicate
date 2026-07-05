@@ -487,12 +487,12 @@ class IntelligenceStateTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         mocked_launch.assert_called_once()
         mocked_queue.assert_called_once()
-        mocked_compute.assert_not_called()
+        mocked_compute.assert_called_once()
         self.assertIn("version", payload)
         self.assertIn("timestamp", payload)
         self.assertIn("response", payload)
-        self.assertEqual(payload["response"]["top_opportunities"], [])
-        self.assertEqual(payload["response"]["analysis"]["recommendations"], [])
+        self.assertEqual(payload["response"]["top_opportunities"][0]["name"], "Computed Play")
+        self.assertEqual(payload["response"]["analysis"]["recommendations"][0]["name"], "Computed Play")
         self.assertEqual(payload["response"]["analysis"]["portfolio"], {})
         self.assertEqual(payload["debug_source"], "snapshot_read")
 
@@ -500,11 +500,19 @@ class IntelligenceStateTests(unittest.TestCase):
         app = Flask(__name__)
         app.register_blueprint(intelligence_bp)
 
-        empty_cached_response = {
+        computed_response = {
             "ok": True,
-            "top_opportunities": [],
-            "by_sport": {},
-            "analysis": {"recommendations": [], "picks": [], "top_live_opportunities": [], "portfolio": {}, "parlays": []},
+            "candidate_count": 5,
+            "state_last_updated": "2026-07-04T20:37:13Z",
+            "top_opportunities": [{"name": "Computed Play"}],
+            "by_sport": {"mlb": [{"name": "Computed Play"}]},
+            "analysis": {
+                "recommendations": [{"name": "Computed Play"}],
+                "picks": [{"name": "Computed Play"}],
+                "top_live_opportunities": [],
+                "portfolio": {},
+                "parlays": [],
+            },
         }
 
         with app.test_request_context(
@@ -512,10 +520,10 @@ class IntelligenceStateTests(unittest.TestCase):
             method="POST",
             json={"question": "top edges today", "force_refresh": False},
         ):
-            with patch("syndicate.blueprints.intelligence.read_latest_intelligence_state", return_value=dict(empty_cached_response)):
+            with patch("syndicate.blueprints.intelligence.read_latest_intelligence_state", return_value=dict({"ok": True, "top_opportunities": [], "by_sport": {}, "analysis": {"recommendations": [], "picks": [], "top_live_opportunities": [], "portfolio": {}, "parlays": []}})):
                 with patch("syndicate.blueprints.intelligence.launch_refresh_run") as mocked_launch:
                     with patch("syndicate.blueprints.intelligence.queue_intelligence_state_refresh") as mocked_queue:
-                        with patch("syndicate.blueprints.intelligence.compute_intelligence_state_response", return_value=dict(empty_cached_response)) as mocked_compute:
+                        with patch("syndicate.blueprints.intelligence.compute_intelligence_state_response", return_value=dict(computed_response)) as mocked_compute:
                             response = intelligence_query_api()
 
         payload = response.get_json()
@@ -523,12 +531,12 @@ class IntelligenceStateTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         mocked_launch.assert_called_once()
         mocked_queue.assert_called_once()
-        mocked_compute.assert_not_called()
+        mocked_compute.assert_called_once()
         self.assertIn("version", payload)
         self.assertIn("timestamp", payload)
         self.assertIn("response", payload)
-        self.assertEqual(payload["response"]["top_opportunities"], [])
-        self.assertEqual(payload["response"]["analysis"]["recommendations"], [])
+        self.assertEqual(payload["response"]["top_opportunities"][0]["name"], "Computed Play")
+        self.assertEqual(payload["response"]["analysis"]["recommendations"][0]["name"], "Computed Play")
         self.assertEqual(payload["response"]["analysis"]["portfolio"], {})
         self.assertEqual(payload["debug_source"], "snapshot_read")
 
@@ -536,11 +544,19 @@ class IntelligenceStateTests(unittest.TestCase):
         app = Flask(__name__)
         app.register_blueprint(intelligence_bp)
 
-        empty_cached_response = {
+        computed_response = {
             "ok": True,
-            "top_opportunities": [],
-            "by_sport": {},
-            "analysis": {"recommendations": [], "picks": [], "top_live_opportunities": [], "portfolio": {}, "parlays": []},
+            "candidate_count": 5,
+            "state_last_updated": "2026-07-04T20:37:13Z",
+            "top_opportunities": [{"name": "Computed Play"}],
+            "by_sport": {"mlb": [{"name": "Computed Play"}]},
+            "analysis": {
+                "recommendations": [{"name": "Computed Play"}],
+                "picks": [{"name": "Computed Play"}],
+                "top_live_opportunities": [],
+                "portfolio": {},
+                "parlays": [],
+            },
         }
 
         with app.test_request_context(
@@ -548,10 +564,10 @@ class IntelligenceStateTests(unittest.TestCase):
             method="POST",
             json={"question": "top edges today", "force_refresh": False},
         ):
-            with patch("syndicate.blueprints.intelligence.read_latest_intelligence_state", return_value=dict(empty_cached_response)):
+            with patch("syndicate.blueprints.intelligence.read_latest_intelligence_state", return_value=dict({"ok": True, "top_opportunities": [], "by_sport": {}, "analysis": {"recommendations": [], "picks": [], "top_live_opportunities": [], "portfolio": {}, "parlays": []}})):
                 with patch("syndicate.blueprints.intelligence.launch_refresh_run") as mocked_launch:
                     with patch("syndicate.blueprints.intelligence.queue_intelligence_state_refresh") as mocked_queue:
-                        with patch("syndicate.blueprints.intelligence.compute_intelligence_state_response", return_value=dict(empty_cached_response)) as mocked_compute:
+                        with patch("syndicate.blueprints.intelligence.compute_intelligence_state_response", return_value=dict(computed_response)) as mocked_compute:
                             response = intelligence_query_api()
 
         payload = response.get_json()
@@ -559,10 +575,10 @@ class IntelligenceStateTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         mocked_launch.assert_called_once()
         mocked_queue.assert_called_once()
-        mocked_compute.assert_not_called()
-        self.assertEqual(payload["response"]["top_opportunities"], [])
-        self.assertEqual(payload["response"]["analysis"]["recommendations"], [])
-        self.assertTrue(payload["response"].get("queued"))
+        mocked_compute.assert_called_once()
+        self.assertEqual(payload["response"]["top_opportunities"][0]["name"], "Computed Play")
+        self.assertEqual(payload["response"]["analysis"]["recommendations"][0]["name"], "Computed Play")
+        self.assertFalse(payload["response"].get("queued"))
         self.assertEqual(payload["debug_source"], "snapshot_read")
 
     def test_run_intelligence_uses_render_refresh_profile_defaults(self) -> None:
