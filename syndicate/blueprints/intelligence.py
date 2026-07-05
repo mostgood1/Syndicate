@@ -954,9 +954,10 @@ def _empty_default_intelligence_response() -> dict[str, object]:
 
 def read_latest_intelligence_state(payload: dict[str, object] | None = None) -> dict[str, object]:
     snapshot = read_latest_intelligence_state_response(payload, force_refresh=False, allow_latest_fallback=False)
-    snapshot_candidate_count = _response_candidate_count(snapshot) if isinstance(snapshot, dict) else 0
-    if isinstance(snapshot, dict) and snapshot_candidate_count > 0 and _response_has_content(snapshot) and not (str(snapshot.get("query_type") or "").strip().lower() == "explanation" and snapshot_candidate_count <= 0):
-        return _hydrate_board_response_payload(snapshot)
+    hydrated_snapshot = _hydrate_board_response_payload(snapshot) if isinstance(snapshot, dict) else None
+    hydrated_candidate_count = _response_candidate_count(hydrated_snapshot) if isinstance(hydrated_snapshot, dict) else 0
+    if isinstance(hydrated_snapshot, dict) and _response_has_content(hydrated_snapshot) and hydrated_candidate_count > 0 and not (str(hydrated_snapshot.get("query_type") or "").strip().lower() == "explanation" and hydrated_candidate_count <= 0):
+        return hydrated_snapshot
     board_snapshot = read_latest_intelligence_board_snapshot_response(payload, force_refresh=False)
     if not (isinstance(board_snapshot, dict) and _response_candidate_count(board_snapshot) > 0):
         from pipeline.intelligence_state import _latest_non_empty_intelligence_board_snapshot_response
@@ -1126,15 +1127,16 @@ def intelligence_status_api():
     try:
         selected_date = str(request.args.get("date") or "").strip() or central_today_iso()
         refresh_requested = str(request.args.get("refresh") or request.args.get("force_refresh") or "").strip().lower() in {"1", "true", "yes", "on"}
+        status_payload = _intelligence_page_payload(selected_date, force_refresh=False)
         stale_snapshot = False
         if not refresh_requested:
-            current_snapshot = read_latest_intelligence_state({"date": selected_date})
+            current_snapshot = read_latest_intelligence_state(dict(status_payload))
             stale_snapshot = bool(_response_selected_date(current_snapshot) and _response_selected_date(current_snapshot) != selected_date)
         if refresh_requested:
             queue_intelligence_state_refresh(_intelligence_page_payload(selected_date, force_refresh=True))
         elif stale_snapshot:
             queue_intelligence_state_refresh(_intelligence_page_payload(selected_date, force_refresh=True))
-        status = read_latest_intelligence_state({"date": selected_date})
+        status = read_latest_intelligence_state(dict(status_payload))
         if not (isinstance(status, dict) and _response_has_content(status)):
             status = _empty_default_intelligence_response()
         _log_api_state_read(status if isinstance(status, dict) else {})

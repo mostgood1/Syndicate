@@ -534,6 +534,36 @@ class IntelligenceStateTests(unittest.TestCase):
         self.assertEqual(payload["top_opportunities"][0]["name"], "Fresh Play")
         mocked_queue.assert_called_once()
 
+    def test_status_endpoint_uses_default_board_payload_shape(self) -> None:
+        app = Flask(__name__)
+        app.register_blueprint(intelligence_bp)
+
+        captured_payloads: list[dict[str, object]] = []
+
+        def _fake_read_latest_intelligence_state(payload: dict[str, object] | None = None) -> dict[str, object]:
+            captured_payloads.append(dict(payload or {}))
+            return {
+                "ok": True,
+                "selected_date": "2026-07-05",
+                "candidate_count": 1,
+                "top_opportunities": [{"name": "Fresh Play"}],
+                "analysis": {"recommendations": [{"name": "Fresh Play"}], "picks": [], "top_live_opportunities": [], "portfolio": {}, "parlays": []},
+            }
+
+        with app.test_request_context("/api/intelligence/status?date=2026-07-05", method="GET"):
+            with patch("syndicate.blueprints.intelligence.read_latest_intelligence_state", side_effect=_fake_read_latest_intelligence_state):
+                with patch("syndicate.blueprints.intelligence.queue_intelligence_state_refresh") as mocked_queue:
+                    response = intelligence_status_api()
+
+        payload = response.get_json()
+        self.assertIsNotNone(payload)
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(captured_payloads)
+        self.assertEqual(captured_payloads[0].get("question"), "top edges today")
+        self.assertEqual(captured_payloads[0].get("mode"), "recommendation")
+        self.assertEqual(payload["status"]["top_opportunities"][0]["name"], "Fresh Play")
+        mocked_queue.assert_not_called()
+
     def test_response_selected_date_reads_nested_evaluation_metadata(self) -> None:
         payload = {
             "analysis": {
@@ -1467,7 +1497,10 @@ class IntelligenceStateTests(unittest.TestCase):
         self.assertEqual((payload.get("status") or {}).get("board_contract", {}).get("schema"), "intelligence_board_v1")
         self.assertEqual((payload.get("status") or {}).get("top_opportunities"), [])
         self.assertGreaterEqual(mocked_read.call_count, 2)
-        mocked_read.assert_any_call({"date": "2026-06-10"})
+        first_payload = mocked_read.call_args_list[0].args[0]
+        self.assertEqual(first_payload.get("question"), "top edges today")
+        self.assertEqual(first_payload.get("mode"), "recommendation")
+        self.assertEqual(first_payload.get("date"), "2026-06-10")
 
     def test_status_endpoint_defaults_to_today_when_missing(self) -> None:
         app = Flask(__name__)
@@ -1483,7 +1516,10 @@ class IntelligenceStateTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(payload["debug_source"], "snapshot_read")
         self.assertEqual(mocked_read.call_count, 2)
-        mocked_read.assert_any_call({"date": "2026-07-04"})
+        first_payload = mocked_read.call_args_list[0].args[0]
+        self.assertEqual(first_payload.get("question"), "top edges today")
+        self.assertEqual(first_payload.get("mode"), "recommendation")
+        self.assertEqual(first_payload.get("date"), "2026-07-04")
 
     def test_status_endpoint_uses_latest_board_snapshot_when_state_is_date_mismatched(self) -> None:
         app = Flask(__name__)
@@ -1587,7 +1623,10 @@ class IntelligenceStateTests(unittest.TestCase):
         self.assertIsNotNone(payload)
         self.assertEqual(payload["debug_source"], "snapshot_read")
         self.assertGreaterEqual(mocked_state_response.call_count, 2)
-        mocked_state_response.assert_any_call({"date": "2026-06-10"})
+        first_payload = mocked_state_response.call_args_list[0].args[0]
+        self.assertEqual(first_payload.get("question"), "top edges today")
+        self.assertEqual(first_payload.get("mode"), "recommendation")
+        self.assertEqual(first_payload.get("date"), "2026-06-10")
         self.assertEqual(response.headers.get("Cache-Control"), "no-cache, no-store, must-revalidate")
         self.assertEqual(response.headers.get("Pragma"), "no-cache")
         self.assertEqual(response.headers.get("Expires"), "0")
