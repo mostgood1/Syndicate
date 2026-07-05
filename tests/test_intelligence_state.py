@@ -817,6 +817,62 @@ class IntelligenceStateTests(unittest.TestCase):
         self.assertEqual(legacy_response["state_meta"]["freshness_status"], "fresh")
         self.assertEqual(legacy_response["state_last_updated"], "2026-06-15T20:00:00Z")
 
+    def test_queue_refresh_persists_pending_payloads_for_worker_reload(self) -> None:
+        service = IntelligenceStateService()
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            temp_root = Path(tmp_dir)
+            state_path = temp_root / "query_state_cache.json"
+            board_snapshot_path = temp_root / "board_snapshot.json"
+            with patch.object(intelligence_state_module, "STATE_PATH", state_path), patch.object(intelligence_state_module, "BOARD_SNAPSHOT_PATH", board_snapshot_path):
+                queued_key = service.queue_refresh({"question": "top edges today", "date": "2026-06-15", "sport": "mlb"})
+                persisted_payload = json.loads(state_path.read_text(encoding="utf-8"))
+
+                self.assertIn("watched_payloads", persisted_payload)
+                self.assertIn("pending_keys", persisted_payload)
+                self.assertIn(queued_key, persisted_payload["watched_payloads"])
+                self.assertIn(queued_key, persisted_payload["pending_keys"])
+
+                reloaded_service = IntelligenceStateService()
+                with patch.object(intelligence_state_module, "STATE_PATH", state_path):
+                    reloaded_service._load_persisted_state_locked(force=True)
+
+                self.assertIn(queued_key, reloaded_service._watched_payloads)
+                self.assertIn(queued_key, reloaded_service._pending_keys)
+
+    def test_background_loop_consumes_persisted_queue_payloads(self) -> None:
+        service = IntelligenceStateService()
+        service._interval_seconds = 0
+
+        payload = {"question": "top edges today", "date": "2026-06-15", "sport": "mlb"}
+        normalized = service._normalize_payload(payload)
+        queued_key = _payload_key(normalized)
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            temp_root = Path(tmp_dir)
+            state_path = temp_root / "query_state_cache.json"
+            board_snapshot_path = temp_root / "board_snapshot.json"
+            persisted_state = {
+                "latest_key": None,
+                "updated_at": "2026-06-15T20:00:00Z",
+                "watched_payloads": {queued_key: normalized},
+                "pending_keys": {queued_key: normalized},
+                "snapshots": {},
+            }
+            refresh_state_store.write_json_file(state_path, persisted_state)
+
+            with patch.object(intelligence_state_module, "STATE_PATH", state_path), patch.object(intelligence_state_module, "BOARD_SNAPSHOT_PATH", board_snapshot_path):
+                def fake_write_latest_intelligence_state(state: dict[str, object]) -> dict[str, object]:
+                    service._stop.set()
+                    return dict(state)
+
+                with patch("pipeline.intelligence_state.run_routed_intelligence_pipeline", return_value={"ok": True, "top_opportunities": [], "by_sport": {}, "analysis": {}}) as mocked_pipeline:
+                    with patch("pipeline.intelligence_state.write_latest_intelligence_state", side_effect=fake_write_latest_intelligence_state) as mocked_write:
+                        service._background_loop()
+
+        mocked_pipeline.assert_called_once_with(normalized)
+        mocked_write.assert_called_once()
+
     def test_state_compute_promotes_candidate_pool_when_ranking_returns_empty(self) -> None:
         service = IntelligenceStateService()
 

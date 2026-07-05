@@ -1260,7 +1260,9 @@ class IntelligenceStateService:
         with self._condition:
             self._watched_payloads[_payload_key(normalized_payload)] = normalized_payload
             self._trim_ordered_dict(self._watched_payloads, self._max_snapshots)
-            return self._enqueue_locked(normalized_payload)
+            key = self._enqueue_locked(normalized_payload)
+            self._persist_locked()
+            return key
 
     def _default_payload(self) -> dict[str, Any]:
         return {
@@ -1313,6 +1315,7 @@ class IntelligenceStateService:
         while not self._stop.is_set():
             payload_to_process: dict[str, Any] | None = None
             with self._condition:
+                self._sync_persisted_queue_locked()
                 if not self._pending_keys:
                     for key, watched_payload in list(self._watched_payloads.items()):
                         snapshot = self._snapshots.get(key)
@@ -1531,34 +1534,72 @@ class IntelligenceStateService:
         if force or _state_backend_kind() == "keyvalue":
             self._snapshots.clear()
             self._latest_key = None
+            self._watched_payloads.clear()
+            self._pending_keys.clear()
         payload = read_json_file(STATE_PATH)
         self._loaded_from_disk = True
         if not isinstance(payload, dict):
             return
         snapshots = payload.get("snapshots")
-        if not isinstance(snapshots, dict):
-            return
-        for key, raw_snapshot in snapshots.items():
-            if not isinstance(raw_snapshot, dict):
-                continue
-            response = raw_snapshot.get("response")
-            if not isinstance(response, dict):
-                continue
-            snapshot = IntelligenceSnapshot(
-                key=str(key),
-                payload=dict(raw_snapshot.get("payload") or {}),
-                response=dict(response),
-                computed_at=str(raw_snapshot.get("computed_at") or _utc_now()),
-                source_fingerprint=str(raw_snapshot.get("source_fingerprint") or ""),
-            )
-            self._snapshots[snapshot.key] = snapshot
+        if isinstance(snapshots, dict):
+            for key, raw_snapshot in snapshots.items():
+                if not isinstance(raw_snapshot, dict):
+                    continue
+                response = raw_snapshot.get("response")
+                if not isinstance(response, dict):
+                    continue
+                snapshot = IntelligenceSnapshot(
+                    key=str(key),
+                    payload=dict(raw_snapshot.get("payload") or {}),
+                    response=dict(response),
+                    computed_at=str(raw_snapshot.get("computed_at") or _utc_now()),
+                    source_fingerprint=str(raw_snapshot.get("source_fingerprint") or ""),
+                )
+                self._snapshots[snapshot.key] = snapshot
+        watched_payloads = payload.get("watched_payloads")
+        if isinstance(watched_payloads, dict):
+            for key, raw_payload in watched_payloads.items():
+                if not isinstance(raw_payload, dict):
+                    continue
+                self._watched_payloads[str(key)] = dict(raw_payload)
+            self._trim_ordered_dict(self._watched_payloads, self._max_snapshots)
+        pending_keys = payload.get("pending_keys")
+        if isinstance(pending_keys, dict):
+            for key, raw_payload in pending_keys.items():
+                if not isinstance(raw_payload, dict):
+                    continue
+                self._pending_keys[str(key)] = dict(raw_payload)
+            self._trim_ordered_dict(self._pending_keys, self._max_snapshots)
         self._latest_key = str(payload.get("latest_key") or "").strip() or (next(reversed(self._snapshots)) if self._snapshots else None)
+
+    def _sync_persisted_queue_locked(self) -> None:
+        payload = read_json_file(STATE_PATH)
+        if not isinstance(payload, dict):
+            return
+        watched_payloads = payload.get("watched_payloads")
+        if isinstance(watched_payloads, dict):
+            self._watched_payloads.clear()
+            for key, raw_payload in watched_payloads.items():
+                if not isinstance(raw_payload, dict):
+                    continue
+                self._watched_payloads[str(key)] = dict(raw_payload)
+            self._trim_ordered_dict(self._watched_payloads, self._max_snapshots)
+        pending_keys = payload.get("pending_keys")
+        if isinstance(pending_keys, dict):
+            self._pending_keys.clear()
+            for key, raw_payload in pending_keys.items():
+                if not isinstance(raw_payload, dict):
+                    continue
+                self._pending_keys[str(key)] = dict(raw_payload)
+            self._trim_ordered_dict(self._pending_keys, self._max_snapshots)
 
     def _persist_locked(self) -> None:
         latest_snapshot = self._snapshots.get(self._latest_key or "") if self._latest_key else None
         payload = {
             "latest_key": self._latest_key,
             "updated_at": _utc_now(),
+            "watched_payloads": dict(self._watched_payloads),
+            "pending_keys": dict(self._pending_keys),
             "snapshots": {
                 key: {
                     "key": snapshot.key,
