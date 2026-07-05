@@ -199,6 +199,54 @@ class IntelligenceStateTests(unittest.TestCase):
         self.assertEqual(int(response.get("candidate_count") or 0), 1)
         self.assertEqual(response.get("state_last_updated"), "2026-07-04T20:45:39Z")
 
+    def test_board_snapshot_reader_accepts_recommendations_only_daily_snapshot(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir, patch.dict(
+            os.environ,
+            {
+                "SYNDICATE_REPORTS_ROOT": str(Path(tmp_dir) / "reports"),
+            },
+            clear=False,
+        ):
+            reports_root = Path(tmp_dir) / "reports"
+            current_snapshot_path = reports_root / "intelligence" / "board_snapshot.json"
+            daily_snapshot_path = reports_root / "intelligence" / "board_snapshot_2026_07_04.json"
+            refresh_state_store.write_json_file(
+                current_snapshot_path,
+                {
+                    "latest_key": "today-key",
+                    "updated_at": "2026-07-05T17:00:00Z",
+                    "response": {
+                        "ok": True,
+                        "selected_date": "2026-07-05",
+                        "top_opportunities": [],
+                        "analysis": {"recommendations": []},
+                    },
+                },
+            )
+            refresh_state_store.write_json_file(
+                daily_snapshot_path,
+                {
+                    "latest_key": "yesterday-key",
+                    "updated_at": "2026-07-04T20:45:39Z",
+                    "response": {
+                        "ok": True,
+                        "selected_date": "2026-07-04",
+                        "top_opportunities": [],
+                        "recommendations": [{"name": "Play 1"}],
+                        "analysis": {"recommendations": [{"name": "Play 1"}]},
+                    },
+                },
+            )
+
+            with patch.object(intelligence_state_module, "BOARD_SNAPSHOT_PATH", current_snapshot_path):
+                with patch.object(intelligence_state_module, "reports_root", return_value=reports_root):
+                    response = intelligence_module.read_latest_intelligence_state({"question": "top edges today", "date": "2026-07-05"})
+
+        self.assertIsNotNone(response)
+        self.assertGreaterEqual(len(response.get("top_opportunities") or []), 1)
+        self.assertEqual(int(response.get("candidate_count") or 0), 1)
+        self.assertEqual(response.get("state_last_updated"), "2026-07-04T20:45:39Z")
+
     def test_read_intelligence_state_prefers_daily_artifact(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir, patch.dict(
             os.environ,

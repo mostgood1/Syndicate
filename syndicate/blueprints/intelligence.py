@@ -566,6 +566,12 @@ def _hydrate_board_response_payload(response_payload: dict[str, object] | None) 
             current["top_opportunities"] = nested_recommendations
 
     if not isinstance(current.get("top_opportunities"), list) or not current.get("top_opportunities"):
+        current_recommendations = current.get("recommendations") if isinstance(current.get("recommendations"), list) else []
+        normalized_current_recommendations = [dict(item) for item in current_recommendations if isinstance(item, dict)]
+        if normalized_current_recommendations:
+            current["top_opportunities"] = normalized_current_recommendations
+
+    if not isinstance(current.get("top_opportunities"), list) or not current.get("top_opportunities"):
         analysis = current.get("analysis") if isinstance(current.get("analysis"), dict) else None
         if isinstance(analysis, dict):
             analysis_recommendations = analysis.get("recommendations")
@@ -949,7 +955,7 @@ def _empty_default_intelligence_response() -> dict[str, object]:
 def read_latest_intelligence_state(payload: dict[str, object] | None = None) -> dict[str, object]:
     snapshot = read_latest_intelligence_state_response(payload, force_refresh=False, allow_latest_fallback=False)
     snapshot_candidate_count = _response_candidate_count(snapshot) if isinstance(snapshot, dict) else 0
-    if isinstance(snapshot, dict) and _response_has_content(snapshot) and not (str(snapshot.get("query_type") or "").strip().lower() == "explanation" and snapshot_candidate_count <= 0):
+    if isinstance(snapshot, dict) and snapshot_candidate_count > 0 and _response_has_content(snapshot) and not (str(snapshot.get("query_type") or "").strip().lower() == "explanation" and snapshot_candidate_count <= 0):
         return _hydrate_board_response_payload(snapshot)
     board_snapshot = read_latest_intelligence_board_snapshot_response(payload, force_refresh=False)
     if not (isinstance(board_snapshot, dict) and _response_candidate_count(board_snapshot) > 0):

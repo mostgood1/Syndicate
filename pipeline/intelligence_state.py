@@ -239,8 +239,11 @@ def _promote_board_contract_cards(state: dict[str, Any] | None) -> dict[str, Any
 def _intelligence_state_candidate_count(state: dict[str, Any] | None) -> int:
     current = dict(state or {})
     opportunities = current.get("top_opportunities")
-    if isinstance(opportunities, list):
+    if isinstance(opportunities, list) and opportunities:
         return len([item for item in opportunities if isinstance(item, Mapping)])
+    recommendations = current.get("recommendations")
+    if isinstance(recommendations, list) and recommendations:
+        return len([item for item in recommendations if isinstance(item, Mapping)])
     board_cards = _board_contract_cards(current)
     if board_cards:
         return len(board_cards)
