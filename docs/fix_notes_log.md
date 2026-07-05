@@ -1,5 +1,19 @@
 # Fix Notes Log
 
+## 2026-07-04 - Intelligence manifests now hydrate from shared state instead of local file existence
+- Symptom: Render’s live `/api/intelligence/status` kept returning `candidate_count: 0` and the board stayed empty even though the deployed revision was current.
+- Root cause: Manifest discovery in the intelligence state service required `Path.exists()` before calling the shared refresh-state reader, so Render could miss manifests stored in the KeyValue-backed state backend when the local filesystem did not have those files.
+- Fix: Read manifest payloads directly through `read_json_file(...)` and treat the shared backend as the source of truth for manifest hydration and source fingerprints.
+- Validation: `pytest -q tests/test_intelligence_state.py -k "available_sport_manifests_reads_shared_manifest_without_local_file or compute_response_reuses_source_cache_until_state_changes" tests/test_intelligence.py -k "intelligence_page_defaults_to_today_without_manifest_scan or intelligence_page_uses_safe_state_reader"` passed.
+- Follow-up: Redeploy Render and recheck `/api/intelligence/status?date=2026-07-04`; the candidate count should now reflect the shared manifest set instead of zeroing out on a local-file miss.
+
+## 2026-07-04 - Intelligence board stopped paying the manifest-scan tax on first render
+- Symptom: The live `/intelligence` route was still returning a Render 502 even though the deployed version was current, and the board shell could not render fast enough to show the cached state.
+- Root cause: The board page defaulted to `_latest_available_intelligence_date()`, which forced a manifest/date scan before it could even read the cached intelligence payload.
+- Fix: Default the board page to `central_today_iso()` when no date is supplied, so the route can render from the cached intelligence reader without an upfront manifest scan.
+- Validation: `pytest -q tests/test_intelligence.py -k "intelligence_page_renders_embedded_console or intelligence_page_uses_safe_state_reader or intelligence_page_defaults_to_today_without_manifest_scan or build_intelligence_overview_falls_back_without_app_context"` passed.
+- Follow-up: Redeploy Render and recheck `/intelligence` plus `/api/intelligence/status?date=2026-07-04` to confirm the cheaper first render actually removes the gateway failure in production.
+
 ## 2026-07-04 - Intelligence queue can now hydrate on the Render web dyno
 - Symptom: The board stopped 502ing, but it stayed empty because the query route queued refresh work into a web process that never consumed the in-memory intelligence queue.
 - Root cause: Render web dynos were skipping the intelligence background loop entirely, so the queue-only fallback had no consumer on the same process.

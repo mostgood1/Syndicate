@@ -556,7 +556,7 @@ class IntelligenceStateService:
     def _sport_manifest_signature(self, sport_slug: str) -> dict[str, Any]:
         manifest_path = reports_root() / "manifests" / f"{str(sport_slug or '').strip().lower()}.json"
         signature = self._artifact_signature(str(manifest_path))
-        manifest = read_json_file(manifest_path) if manifest_path.exists() else None
+        manifest = read_json_file(manifest_path)
         if isinstance(manifest, dict):
             signature.update(
                 {
@@ -610,8 +610,6 @@ class IntelligenceStateService:
             if not sport_slug or sport_slug in manifests:
                 continue
             manifest_path = reports_root() / "manifests" / f"{sport_slug}.json"
-            if not manifest_path.exists():
-                continue
             manifest = read_json_file(manifest_path)
             if not isinstance(manifest, dict):
                 continue

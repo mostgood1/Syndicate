@@ -959,7 +959,7 @@ def read_latest_intelligence_state(payload: dict[str, object] | None = None) -> 
 
 @intelligence_bp.get("/intelligence")
 def intelligence_home():
-    selected_date = str(request.args.get("date") or "").strip() or _latest_available_intelligence_date()
+    selected_date = str(request.args.get("date") or "").strip() or central_today_iso()
     payload = _intelligence_page_payload(selected_date, force_refresh=True)
     initial_response: dict[str, Any] = {}
     try:

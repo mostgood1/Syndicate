@@ -1670,6 +1670,40 @@ class IntelligenceStateTests(unittest.TestCase):
         self.assertIn("request_total", logged_stages)
         self.assertEqual(mocked_pipeline.call_count, 2)
 
+    def test_available_sport_manifests_reads_shared_manifest_without_local_file(self) -> None:
+        service = IntelligenceStateService()
+        status = {
+            "sports": [
+                {
+                    "slug": "mlb",
+                    "name": "MLB",
+                    "context_label": "2026-07-04",
+                    "data_health": "ready",
+                    "active_today": True,
+                    "tracked_ready": True,
+                    "advanced_ready": True,
+                    "advanced_gate": {"ready": True},
+                    "data_warnings": [],
+                    "artifacts": [],
+                    "advanced_inputs": [],
+                }
+            ]
+        }
+        manifest = {
+            "sport": "mlb",
+            "last_updated": "2026-07-04T00:00:00Z",
+            "artifact_paths": ["reports/manifests/mlb.json"],
+            "status": "complete",
+        }
+
+        with patch("pipeline.intelligence_state.build_intelligence_status", return_value=status):
+            with patch("pipeline.intelligence_state.read_json_file", return_value=dict(manifest)):
+                with patch.object(service, "_artifact_signature", return_value={"path": "reports/manifests/mlb.json", "exists": False, "size": None, "mtime_ns": None}):
+                    manifests = service._available_sport_manifests("2026-07-04")
+
+        self.assertIn("mlb", manifests)
+        self.assertEqual(manifests["mlb"]["sport"], "mlb")
+
     def test_compute_response_recomputes_when_cached_snapshot_is_stale(self) -> None:
         service = IntelligenceStateService()
         service._interval_seconds = 1

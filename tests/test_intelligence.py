@@ -5000,6 +5000,28 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertEqual(mocked_state_response.call_args.kwargs.get("allow_latest_fallback"), False)
         mocked_queue.assert_not_called()
 
+    def test_intelligence_page_defaults_to_today_without_manifest_scan(self) -> None:
+        cached_response = {
+            "ok": True,
+            "selected_date": "2026-07-04",
+            "top_opportunities": [{"name": "Play 1"}],
+            "analysis": {"recommendations": [{"name": "Play 1"}], "picks": [], "top_live_opportunities": [], "portfolio": {}, "parlays": []},
+            "response": {"recommendations": [{"name": "Play 1"}], "top_opportunities": [{"name": "Play 1"}]},
+        }
+
+        with patch("syndicate.blueprints.intelligence._latest_available_intelligence_date") as mocked_latest_date:
+            with patch("syndicate.blueprints.intelligence._cached_intelligence_response_with_source", new=None):
+                with patch("syndicate.blueprints.intelligence.read_latest_intelligence_board_snapshot_response", return_value=None):
+                    with patch("syndicate.blueprints.intelligence.read_latest_intelligence_state_response", return_value=cached_response):
+                        with patch("syndicate.blueprints.intelligence.queue_intelligence_state_refresh") as mocked_queue:
+                            response = self.client.get("/intelligence")
+
+        body = response.get_data(as_text=True)
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Betting Board", body)
+        mocked_latest_date.assert_not_called()
+        mocked_queue.assert_not_called()
+
     def test_source_fingerprint_changes_when_sport_manifest_updates(self) -> None:
         from pipeline.intelligence_state import IntelligenceStateService
 
