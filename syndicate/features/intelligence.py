@@ -72,6 +72,7 @@ from syndicate.features.shared.intelligence_contracts import UniversalCandidate
 from syndicate.features.shared.recommendation_engine import filter_candidates as _shared_filter_candidates
 from syndicate.features.shared.recommendation_engine import rank_recommendations as _shared_rank_recommendations
 from syndicate.features.shared.ops_refresh import load_latest_refresh_status
+from syndicate.features.shared.refresh_state_store import reports_root
 from syndicate.features.intelligence_parlay_correlation import parlay_leg_market_key as _runtime_parlay_leg_market_key
 from syndicate.features.intelligence_parlay_correlation import parlay_leg_market_shape as _runtime_parlay_leg_market_shape
 from syndicate.features.intelligence_parlay_correlation import parlay_matches_preferences as _runtime_parlay_matches_preferences
@@ -2523,10 +2524,17 @@ def _odds_history_tracking_root_for_sport(slug: str) -> Path | None:
 
 
 def _odds_history_path_for_sport(slug: str) -> Path | None:
-    root = _odds_history_tracking_root_for_sport(slug)
+    sport_slug = _safe_text(slug, "").lower()
+    shared_path = reports_root() / "odds_control_plane" / "odds_history" / sport_slug / "odds_history.json"
+    if shared_path.exists():
+        return shared_path
+    root = _odds_history_tracking_root_for_sport(sport_slug)
     if root is None:
-        return None
-    return root / "tracking" / "odds_history.json"
+        return shared_path
+    tracking_path = root / "tracking" / "odds_history.json"
+    if tracking_path.exists():
+        return tracking_path
+    return shared_path if shared_path.exists() else tracking_path
 
 
 def _load_odds_history_payload_for_sport(slug: str) -> dict[str, Any] | None:

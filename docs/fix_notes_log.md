@@ -1,5 +1,12 @@
 # Fix Notes Log
 
+## 2026-07-05 - MLB intelligence candidate generation now reads shared odds history first
+- Symptom: Render and local Render-like runs both produced `candidate_count: 0` and an empty board even though the repo already contained populated MLB odds history artifacts.
+- Root cause: The intelligence feature loader only looked for `data/mlb_source/tracking/odds_history.json`, so it missed the populated shared control-plane history under `reports/odds_control_plane/odds_history/mlb/odds_history.json`.
+- Fix: Prefer the shared control-plane MLB odds history path first, then fall back to the sport tracking file if needed.
+- Validation: `python -m unittest tests.test_intelligence_odds_history` passed, and an app-context smoke test returned `odds_data_present: True`, `sample_sports: ['mlb', 'wnba']`, and `recommendation_count: 67`.
+- Follow-up: Recheck the live Render board after deploy; the remaining risk is whether Render has the same shared history files available on its mounted reports root.
+
 ## 2026-07-05 - Intelligence queue fallback rolled back on the web dyno
 - Symptom: Enabling the web-side intelligence background loop on Render caused the live service to return 502 during rollout.
 - Root cause: The web dyno should stay on the read-only request path; the background consumer fallback was not stable in this deployment shape.

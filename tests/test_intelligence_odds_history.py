@@ -1,14 +1,52 @@
 from __future__ import annotations
 
 import unittest
+from pathlib import Path
+from tempfile import TemporaryDirectory
+from unittest.mock import patch
 
 from syndicate.features.intelligence import _candidate_odds_history_context
 from syndicate.features.intelligence import _enrich_candidates_with_odds_history
+from syndicate.features.intelligence import _load_odds_history_payload_for_sport
 from syndicate.features.intelligence import build_pick_card_view
 from syndicate.features.intelligence import score_candidate
+from syndicate.features.shared import refresh_state_store
 
 
 class IntelligenceOddsHistoryTests(unittest.TestCase):
+    def test_mlb_odds_history_prefers_shared_control_plane_history(self) -> None:
+        with TemporaryDirectory() as tmp_dir, patch.dict(
+            "os.environ",
+            {
+                "SYNDICATE_REPORTS_ROOT": str(Path(tmp_dir) / "reports"),
+            },
+            clear=False,
+        ):
+            shared_history_path = Path(tmp_dir) / "reports" / "odds_control_plane" / "odds_history" / "mlb" / "odds_history.json"
+            shared_history_path.parent.mkdir(parents=True, exist_ok=True)
+            refresh_state_store.write_json_file(
+                shared_history_path,
+                {
+                    "date": "2026-07-05",
+                    "history_limit": 50,
+                    "markets": {
+                        "home_team=Home|away_team=Away|market=h2h|bookmaker=draftkings": {
+                            "last_line": -140.0,
+                            "previous_line": -140.0,
+                            "delta": 0.0,
+                            "movement": "flat",
+                            "history": [],
+                        }
+                    },
+                },
+            )
+
+            payload = _load_odds_history_payload_for_sport("mlb")
+
+        self.assertIsNotNone(payload)
+        self.assertEqual(payload.get("date"), "2026-07-05")
+        self.assertIn("markets", payload)
+
     def test_candidate_movement_is_attached_and_rendered(self) -> None:
         candidate = {
             "sport_slug": "nhl",
