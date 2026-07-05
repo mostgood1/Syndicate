@@ -965,7 +965,7 @@ def intelligence_home():
     try:
         cached_loader = _cached_intelligence_response_with_source
         if hasattr(cached_loader, "call_count"):
-            cached_response, _ = cached_loader(payload, force_refresh=True)
+            cached_response, _ = cached_loader(payload, force_refresh=False)
             cached_response_is_usable = isinstance(cached_response, dict) and _response_has_content(cached_response) and not _response_needs_refresh(payload, cached_response)
             if cached_response_is_usable:
                 initial_response = dict(cached_response)
@@ -974,7 +974,7 @@ def intelligence_home():
                 initial_response = _empty_default_intelligence_response()
         else:
             board_snapshot_response = read_latest_intelligence_board_snapshot_response(payload, force_refresh=True)
-            state_response = read_latest_intelligence_state_response(payload, force_refresh=True, allow_latest_fallback=True)
+            state_response = read_latest_intelligence_state_response(payload, force_refresh=False, allow_latest_fallback=False)
             for response_candidate in (state_response, board_snapshot_response):
                 if not isinstance(response_candidate, dict):
                     continue

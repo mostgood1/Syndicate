@@ -4962,17 +4962,7 @@ class IntelligenceBlueprintTests(unittest.TestCase):
             "syndicate.blueprints.intelligence._cached_intelligence_response_with_source",
             return_value=(fake_response, "worker"),
         ):
-            with patch(
-                "syndicate.blueprints.intelligence.build_intelligence_status",
-                return_value={
-                    "selected_date": "2026-06-04",
-                    "sports": [],
-                    "tracked_summary": {"tracked_ok": 0, "tracked_total": 0},
-                    "advanced_summary": {"tracked_ok": 0, "tracked_total": 0},
-                    "readiness_gate": {"ready": False, "ready_sports": [], "partial_sports": [], "blocked_sports": [], "inactive_sports": []},
-                },
-            ):
-                response = self.client.get("/intelligence?date=2026-06-04")
+            response = self.client.get("/intelligence?date=2026-06-04")
 
         body = response.get_data(as_text=True)
         self.assertEqual(response.status_code, 200)
@@ -4985,6 +4975,30 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertIn('Portfolio summary', body)
         self.assertIn('Player A over 1.5 hits', body)
         self.assertIn('2-leg parlay', body)
+
+    def test_intelligence_page_uses_safe_state_reader(self) -> None:
+        cached_response = {
+            "ok": True,
+            "selected_date": "2026-06-04",
+            "top_opportunities": [{"name": "Play 1"}],
+            "analysis": {"recommendations": [{"name": "Play 1"}], "picks": [], "top_live_opportunities": [], "portfolio": {}, "parlays": []},
+            "response": {"recommendations": [{"name": "Play 1"}], "top_opportunities": [{"name": "Play 1"}]},
+        }
+
+        with patch("syndicate.blueprints.intelligence._cached_intelligence_response_with_source", new=None):
+            with patch("syndicate.blueprints.intelligence.read_latest_intelligence_board_snapshot_response", return_value=None) as mocked_board_snapshot:
+                with patch("syndicate.blueprints.intelligence.read_latest_intelligence_state_response", return_value=cached_response) as mocked_state_response:
+                    with patch("syndicate.blueprints.intelligence.queue_intelligence_state_refresh") as mocked_queue:
+                        response = self.client.get("/intelligence?date=2026-06-04")
+
+        body = response.get_data(as_text=True)
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('Betting Board', body)
+        mocked_board_snapshot.assert_called_once()
+        mocked_state_response.assert_called_once()
+        self.assertEqual(mocked_state_response.call_args.kwargs.get("force_refresh"), False)
+        self.assertEqual(mocked_state_response.call_args.kwargs.get("allow_latest_fallback"), False)
+        mocked_queue.assert_not_called()
 
     def test_source_fingerprint_changes_when_sport_manifest_updates(self) -> None:
         from pipeline.intelligence_state import IntelligenceStateService
