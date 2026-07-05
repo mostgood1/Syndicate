@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import hashlib
 import json
 import os
@@ -31,6 +32,7 @@ from syndicate.features.shared.ops_refresh import load_latest_refresh_status
 
 
 intelligence_bp = Blueprint("syndicate_intelligence", __name__)
+_LOGGER = logging.getLogger(__name__)
 
 DEFAULT_QUESTION = "top edges today"
 
@@ -913,6 +915,13 @@ def _intelligence_page_payload(selected_date: str, *, force_refresh: bool = Fals
     }
 
 
+def _safe_queue_intelligence_state_refresh(payload: dict[str, object]) -> None:
+    try:
+        queue_intelligence_state_refresh(dict(payload))
+    except Exception:
+        _LOGGER.warning("Intelligence refresh queue failed; serving cached or empty state instead.", exc_info=True)
+
+
 def _normalize_default_query_payload(payload: dict[str, object]) -> dict[str, object]:
     normalized = dict(payload or {})
     if str(normalized.get("question") or "").strip() == DEFAULT_QUESTION:
@@ -981,7 +990,7 @@ def intelligence_home():
             if cached_response_is_usable:
                 initial_response = dict(cached_response)
             else:
-                queue_intelligence_state_refresh(dict(payload))
+                _safe_queue_intelligence_state_refresh(dict(payload))
                 initial_response = _empty_default_intelligence_response()
         else:
             board_snapshot_response = read_latest_intelligence_board_snapshot_response(payload, force_refresh=True)
@@ -996,10 +1005,9 @@ def intelligence_home():
                 initial_response = dict(response_candidate)
                 break
             if not initial_response:
-                queue_intelligence_state_refresh(dict(payload))
+                _safe_queue_intelligence_state_refresh(dict(payload))
                 initial_response = _empty_default_intelligence_response()
     except Exception:
-        queue_intelligence_state_refresh(dict(payload))
         initial_response = _empty_default_intelligence_response()
     return render_template(
         "intelligence.html",
@@ -1021,10 +1029,10 @@ def intelligence_query_api():
     force_refresh = _query_bool(payload.get("force_refresh"))
     state_payload = read_latest_intelligence_state(dict(payload))
     if force_refresh:
-        queue_intelligence_state_refresh(dict(payload))
+        _safe_queue_intelligence_state_refresh(dict(payload))
     candidate_count = _response_candidate_count(state_payload) if isinstance(state_payload, dict) else 0
     if candidate_count <= 0 or not isinstance(state_payload, dict) or not _response_has_content(state_payload):
-        queue_intelligence_state_refresh(dict(payload))
+        _safe_queue_intelligence_state_refresh(dict(payload))
         queued_state = read_latest_intelligence_state(dict(payload))
         if isinstance(queued_state, dict) and _response_candidate_count(queued_state) > 0:
             state_payload = queued_state
@@ -1118,7 +1126,7 @@ def run_intelligence():
         launched = True
     except Exception:
         launch_result = load_latest_refresh_status()
-    queue_intelligence_state_refresh(_intelligence_page_payload(selected_date, force_refresh=True))
+    _safe_queue_intelligence_state_refresh(_intelligence_page_payload(selected_date, force_refresh=True))
     return jsonify({"ok": True, "selected_date": selected_date, "launched": launched, "refresh": normalize_timestamped_payload(launch_result), "queued": True})
 
 
@@ -1133,9 +1141,9 @@ def intelligence_status_api():
             current_snapshot = read_latest_intelligence_state(dict(status_payload))
             stale_snapshot = bool(_response_selected_date(current_snapshot) and _response_selected_date(current_snapshot) != selected_date)
         if refresh_requested:
-            queue_intelligence_state_refresh(_intelligence_page_payload(selected_date, force_refresh=True))
+            _safe_queue_intelligence_state_refresh(_intelligence_page_payload(selected_date, force_refresh=True))
         elif stale_snapshot:
-            queue_intelligence_state_refresh(_intelligence_page_payload(selected_date, force_refresh=True))
+            _safe_queue_intelligence_state_refresh(_intelligence_page_payload(selected_date, force_refresh=True))
         status = read_latest_intelligence_state(dict(status_payload))
         if not (isinstance(status, dict) and _response_has_content(status)):
             status = _empty_default_intelligence_response()

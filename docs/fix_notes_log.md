@@ -1,5 +1,12 @@
 # Fix Notes Log
 
+## 2026-07-05 - Intelligence page stopped hard-failing when refresh queueing was unavailable
+- Symptom: The `/intelligence` request path could turn a refresh-state backend failure into a 500/502 instead of rendering the cached or empty board shell.
+- Root cause: The route caught exceptions around the initial read path but immediately retried `queue_intelligence_state_refresh(...)`, so a storage/backend failure could escape the handler.
+- Fix: Route intelligence page and status/query refresh requests through a safe queue helper that logs and swallows refresh-queue errors, then render the fallback response.
+- Validation: `syndicate/blueprints/intelligence.py` and `tests/test_intelligence.py` both passed syntax/error checks after the change.
+- Follow-up: Re-run the Render-like local probe with the hosted-storage env vars to confirm `/intelligence` now returns 200 instead of stalling on the queue path.
+
 ## 2026-07-05 - Intelligence overview stopped inheriting the home-page filter
 - Symptom: The intelligence board and `/api/intelligence/status` kept collapsing to `candidate_count: 0` even though the sports artifacts were present.
 - Root cause: `build_intelligence_overview()` was reusing `build_home_overview()`, so the `show_on_home` filter could shrink the pipeline sport set to zero before candidate generation.

@@ -1568,7 +1568,24 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertTrue(payload["ok"])
         self.assertTrue(payload["launched"])
         self.assertEqual(payload["refresh"]["pid"], 4321)
-        mocked_launch.assert_called_once_with(date="2026-06-10", mode="fast")
+        mocked_launch.assert_called_once_with(date="2026-06-10", mode=None, phase=None, regions=None, execution_mode=None, skip_mirror=None)
+        mocked_queue.assert_called_once()
+
+    def test_run_intelligence_degrades_when_queue_refresh_fails(self) -> None:
+        app = create_app()
+        app.testing = True
+
+        with patch("syndicate.blueprints.intelligence.central_today_iso", return_value="2026-06-10"):
+            with patch("syndicate.blueprints.intelligence.launch_refresh_run", return_value={"ok": True, "pid": 4321, "state": "running"}) as mocked_launch:
+                with patch("syndicate.blueprints.intelligence.queue_intelligence_state_refresh", side_effect=RuntimeError("backend unavailable")) as mocked_queue:
+                    response = app.test_client().get("/intelligence/run")
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json()
+        self.assertTrue(payload["ok"])
+        self.assertTrue(payload["launched"])
+        self.assertEqual(payload["refresh"]["pid"], 4321)
+        mocked_launch.assert_called_once_with(date="2026-06-10", mode=None, phase=None, regions=None, execution_mode=None, skip_mirror=None)
         mocked_queue.assert_called_once()
 
     def test_query_preferences_does_not_infer_nba_from_wnba_token(self) -> None:
@@ -1956,6 +1973,34 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         queue_mock.assert_called_once()
         cached_mock.assert_called_once()
         compute_mock.assert_not_called()
+
+    def test_intelligence_query_api_degrades_when_queue_refresh_fails(self) -> None:
+        state_response = {
+            "ok": True,
+            "selected_date": "2026-06-04",
+            "analysis": {"recommendations": [{"name": "Play 1"}], "top_live_opportunities": [], "picks": [], "portfolio": {}, "parlays": []},
+            "response": {"analysis": {"recommendations": [{"name": "Play 1"}]}, "top_opportunities": [{"name": "Play 1"}]},
+            "board_contract": {"schema": "intelligence_board_v1", "cards": [{"name": "Play 1"}]},
+        }
+
+        with patch("syndicate.blueprints.intelligence.queue_intelligence_state_refresh", side_effect=RuntimeError("backend unavailable")) as queue_mock:
+            with patch("syndicate.blueprints.intelligence.read_latest_intelligence_state_response", return_value=dict(state_response)):
+                response = self.client.post(
+                    "/api/intelligence/query",
+                    json={
+                        "question": "Analyze Jayson Tatum tonight",
+                        "date": "2026-06-04",
+                        "force_refresh": True,
+                    },
+                )
+
+        payload = response.get_json()
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("response", payload)
+        result = payload.get("response") or {}
+        structured = result.get("response") if isinstance(result.get("response"), dict) else result
+        self.assertEqual((structured.get("top_opportunities") or [])[0].get("name"), "Play 1")
+        queue_mock.assert_called_once()
 
     def test_intelligence_query_api_returns_live_recommendations_with_sparse_advanced_signals(self) -> None:
         advanced_rows = [
@@ -4916,6 +4961,31 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         build_status_mock.assert_called_once_with(selected_date="2026-06-10")
         load_cache_mock.assert_not_called()
 
+    def test_status_endpoint_degrades_when_queue_refresh_fails(self) -> None:
+        app = Flask(__name__)
+        app.register_blueprint(intelligence_bp)
+
+        status_payload = {
+            "ok": True,
+            "threadAlive": True,
+            "cachedSnapshots": 2,
+            "candidate_count": 1,
+            "last_updated": "2026-06-11T16:05:00Z",
+            "candidates": [{"name": "Play 1"}],
+        }
+
+        with app.test_request_context("/api/intelligence/status?date=2026-06-10&refresh=1", method="GET"):
+            with patch("syndicate.blueprints.intelligence.queue_intelligence_state_refresh", side_effect=RuntimeError("backend unavailable")) as queue_mock:
+                with patch("syndicate.blueprints.intelligence.read_latest_intelligence_state_response", return_value=dict(status_payload)):
+                    response = intelligence_status_api()
+
+        payload = response.get_json()
+        self.assertIsNotNone(payload)
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(payload.get("ok"))
+        self.assertEqual((payload.get("status") or {}).get("candidate_count"), 1)
+        queue_mock.assert_called_once()
+
     def test_status_endpoint_render_hosted_branch_uses_payload_dict(self) -> None:
         app = Flask(__name__)
         app.register_blueprint(intelligence_bp)
@@ -5072,6 +5142,18 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         mocked_state_response.assert_called_once()
         mocked_compute.assert_called_once()
         mocked_queue.assert_not_called()
+
+    def test_intelligence_page_degrades_when_queue_refresh_fails(self) -> None:
+        with patch("syndicate.blueprints.intelligence._cached_intelligence_response_with_source", new=None):
+            with patch("syndicate.blueprints.intelligence.read_latest_intelligence_board_snapshot_response", return_value=None):
+                with patch("syndicate.blueprints.intelligence.read_latest_intelligence_state_response", return_value=None):
+                    with patch("syndicate.blueprints.intelligence.queue_intelligence_state_refresh", side_effect=RuntimeError("backend unavailable")) as mocked_queue:
+                        response = self.client.get("/intelligence?date=2026-07-05")
+
+        body = response.get_data(as_text=True)
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Betting Board", body)
+        mocked_queue.assert_called_once()
 
     def test_source_fingerprint_changes_when_sport_manifest_updates(self) -> None:
         from pipeline.intelligence_state import IntelligenceStateService
