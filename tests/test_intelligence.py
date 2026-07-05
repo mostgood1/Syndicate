@@ -5022,6 +5022,32 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         mocked_latest_date.assert_not_called()
         mocked_queue.assert_not_called()
 
+    def test_intelligence_page_computes_when_cache_is_empty(self) -> None:
+        computed_response = {
+            "ok": True,
+            "selected_date": "2026-07-04",
+            "top_opportunities": [{"name": "Play 1"}],
+            "by_sport": {"mlb": [{"name": "Play 1"}]},
+            "analysis": {"recommendations": [{"name": "Play 1"}], "picks": [], "top_live_opportunities": [], "portfolio": {}, "parlays": []},
+            "response": {"recommendations": [{"name": "Play 1"}], "top_opportunities": [{"name": "Play 1"}]},
+            "board_contract": {"schema": "intelligence_board_v1", "top_overall": [{"name": "Play 1"}], "by_sport": {"mlb": [{"name": "Play 1"}]}, "live": [], "pregame": [], "portfolio": {}, "parlays": []},
+        }
+
+        with patch("syndicate.blueprints.intelligence.read_latest_intelligence_board_snapshot_response", return_value=None) as mocked_board_snapshot:
+            with patch("syndicate.blueprints.intelligence.read_latest_intelligence_state_response", return_value=None) as mocked_state_response:
+                with patch("syndicate.blueprints.intelligence.compute_intelligence_state_response", return_value=dict(computed_response)) as mocked_compute:
+                    with patch("syndicate.blueprints.intelligence.queue_intelligence_state_refresh") as mocked_queue:
+                        response = self.client.get("/intelligence?date=2026-07-04")
+
+        body = response.get_data(as_text=True)
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Betting Board", body)
+        self.assertIn("Play 1", body)
+        mocked_board_snapshot.assert_called_once()
+        mocked_state_response.assert_called_once()
+        mocked_compute.assert_called_once()
+        mocked_queue.assert_not_called()
+
     def test_source_fingerprint_changes_when_sport_manifest_updates(self) -> None:
         from pipeline.intelligence_state import IntelligenceStateService
 

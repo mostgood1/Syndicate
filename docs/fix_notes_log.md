@@ -1,5 +1,12 @@
 # Fix Notes Log
 
+## 2026-07-04 - Intelligence board now computes once when the cache is empty
+- Symptom: The live /intelligence slate stayed empty even after the deploy was current because the board route only read cached snapshots and fell back to the shell when none existed.
+- Root cause: The board page never asked the compute path to rebuild a populated response on cold cache, so the worker/state publisher had to win before the UI could show anything.
+- Fix: Make the board route call `compute_intelligence_state_response(...)` when both the cached state and board snapshot are empty, then hydrate and render the computed response so the slate repopulates immediately.
+- Validation: `pytest -q tests/test_intelligence.py -k "intelligence_page_computes_when_cache_is_empty or intelligence_page_uses_safe_state_reader or intelligence_page_defaults_to_today_without_manifest_scan"` passed.
+- Follow-up: Keep the compute fallback limited to the board bootstrap path so the query API and worker-owned refresh flow stay intact.
+
 ## 2026-07-04 - Intelligence manifests now hydrate from shared state instead of local file existence
 - Symptom: Render’s live `/api/intelligence/status` kept returning `candidate_count: 0` and the board stayed empty even though the deployed revision was current.
 - Root cause: Manifest discovery in the intelligence state service required `Path.exists()` before calling the shared refresh-state reader, so Render could miss manifests stored in the KeyValue-backed state backend when the local filesystem did not have those files.
