@@ -346,6 +346,8 @@ def build_response(*, recommendations: list[dict[str, Any]], parlays: list[dict[
         )
 
     visible_recommendations = [dict(candidate) for candidate in recommendations if _response_state(candidate) not in {"final", "stale"}]
+    if not visible_recommendations and recommendations:
+        visible_recommendations = [dict(candidate) for candidate in recommendations if isinstance(candidate, dict)]
 
     def _frontend_parlay(parlay: dict[str, Any]) -> dict[str, Any]:
         correlation_profile = parlay.get("correlation_profile") if isinstance(parlay.get("correlation_profile"), dict) else {}
@@ -398,6 +400,7 @@ def build_response(*, recommendations: list[dict[str, Any]], parlays: list[dict[
 
     response = {
         "recommendations": recommendation_payloads,
+        "top_opportunities": recommendation_payloads,
         "picks": pick_payloads,
         "top_live_opportunities": get_top_live_opportunities(ordered_recommendations, limit=5),
         "portfolio": Portfolio.model_validate(_frontend_portfolio(ordered_recommendations)).model_dump(),

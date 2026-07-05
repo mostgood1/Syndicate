@@ -7,6 +7,7 @@ from syndicate.features.intelligence_board import build_intelligence_board_contr
 from syndicate.features.intelligence import collect_all_recommendations
 from syndicate.features.intelligence import run_intelligence_query
 from syndicate.features.intelligence.api.response_builder import build_response
+from syndicate.features.intelligence_board import build_intelligence_board_contract
 from syndicate.blueprints.intelligence import _hydrate_board_response_payload
 
 
@@ -189,6 +190,30 @@ class IntelligenceBoardContractTests(unittest.TestCase):
 
         self.assertEqual(contract["lane_counts"]["archived"], 1)
         self.assertEqual(contract["cards"][0]["lane"], "archived")
+
+    def test_build_response_keeps_final_only_recommendations_visible(self) -> None:
+        response = build_response(
+            recommendations=[
+                {
+                    "sport": "nba",
+                    "sport_slug": "nba",
+                    "team": "Boston Celtics",
+                    "name": "Jayson Tatum",
+                    "market": "points",
+                    "line": 28.5,
+                    "score": 200.0,
+                    "confidence": "91%",
+                    "edge": 0.16,
+                    "is_live": False,
+                    "settlement": {"status": "settled", "result": "won"},
+                }
+            ]
+        )
+
+        self.assertEqual(len(response["recommendations"]), 1)
+        self.assertEqual(response["recommendations"][0]["name"], "Jayson Tatum")
+        self.assertEqual(response["top_opportunities"][0]["name"], "Jayson Tatum")
+        self.assertEqual(build_intelligence_board_contract(response)["lane_counts"]["archived"], 1)
 
     def test_build_intelligence_board_contract_keeps_time_like_mlb_props_pregame(self) -> None:
         contract = build_intelligence_board_contract(

@@ -1,5 +1,12 @@
 # Fix Notes Log
 
+## 2026-07-04 - Intelligence response stopped collapsing to an empty board contract
+- Symptom: Render stayed healthy, but `/api/intelligence/status` and `/intelligence` kept showing `candidate_count: 0`, `active_lanes: []`, and no board cards even though the engine was generating candidates upstream.
+- Root cause: The visible response builder was discarding all recommendations marked `final` or `stale`, and the response shape no longer exposed `top_opportunities`, so the board could serialize to an empty contract even when the engine had useful recommendations.
+- Fix: Keep the full recommendation set when the final/stale filter would empty the slate, and restore the `top_opportunities` alias so the board template and status reader see the same visible payload.
+- Validation: `python -m pytest -q tests/test_intelligence_board_contract.py -k "build_response_keeps_final_only_recommendations_visible or marks_settled_cards_archived or interleaves_active_sports_in_order"` and `python -m pytest -q tests/test_intelligence_state.py -k "query_endpoint_queues_refresh_when_default_cache_is_empty or query_endpoint_returns_empty_default_response_when_default_cache_exists_but_is_empty or query_endpoint_returns_queued_response_when_default_cache_is_empty or query_endpoint_returns_empty_board_when_cached_live_snapshot_is_missing_hydration" tests/test_intelligence.py -k "intelligence_page_uses_safe_state_reader or intelligence_page_defaults_to_today_without_manifest_scan"` passed.
+- Follow-up: Redeploy Render so the live web dyno picks up the visible-board fallback and the status route stops flattening to zero.
+
 ## 2026-07-04 - Intelligence web requests stopped timing out by removing inline compute
 - Symptom: Render stayed healthy on `/healthz`, but `/versionz`, `/intelligence`, and `/api/intelligence/status` would flip to 502 after the board tried to repopulate.
 - Root cause: The web request path was calling the full intelligence compute pipeline inline, which ran long enough to hit Gunicorn’s 60-second timeout and get the worker killed.
