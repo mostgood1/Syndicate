@@ -948,10 +948,15 @@ def _empty_default_intelligence_response() -> dict[str, object]:
 
 def read_latest_intelligence_state(payload: dict[str, object] | None = None) -> dict[str, object]:
     snapshot = read_latest_intelligence_state_response(payload, force_refresh=False, allow_latest_fallback=False)
-    if isinstance(snapshot, dict) and _response_has_content(snapshot):
+    snapshot_candidate_count = _response_candidate_count(snapshot) if isinstance(snapshot, dict) else 0
+    if isinstance(snapshot, dict) and _response_has_content(snapshot) and not (str(snapshot.get("query_type") or "").strip().lower() == "explanation" and snapshot_candidate_count <= 0):
         return _hydrate_board_response_payload(snapshot)
     board_snapshot = read_latest_intelligence_board_snapshot_response(payload, force_refresh=False)
-    if isinstance(board_snapshot, dict) and _response_has_content(board_snapshot):
+    if not (isinstance(board_snapshot, dict) and _response_candidate_count(board_snapshot) > 0):
+        from pipeline.intelligence_state import _latest_non_empty_intelligence_board_snapshot_response
+
+        board_snapshot = _latest_non_empty_intelligence_board_snapshot_response(payload)
+    if isinstance(board_snapshot, dict):
         return _hydrate_board_response_payload(board_snapshot)
     return _empty_default_intelligence_response()
 

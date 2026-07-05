@@ -1662,65 +1662,111 @@ def read_latest_intelligence_state_response(
     return _promote_board_contract_cards(response) if isinstance(response, dict) else response
 
 
+def _decorate_intelligence_board_snapshot_response(
+    snapshot: dict[str, Any],
+    *,
+    requested_date: str | None,
+    source_label: str,
+    strict_date: bool,
+) -> dict[str, Any] | None:
+    updated_at = str(snapshot.get("updated_at") or "").strip() or None
+    response = snapshot.get("response")
+    if isinstance(response, dict):
+        if strict_date and requested_date and _selected_date_from_response(response) not in {None, requested_date}:
+            return None
+        decorated = _promote_board_contract_cards(dict(response))
+        candidate_count = _intelligence_state_candidate_count(decorated)
+        state_meta = dict(decorated.get("state_meta") or {})
+        if not state_meta:
+            freshness_sla_seconds = _env_int("SYNDICATE_INTELLIGENCE_REFRESH_INTERVAL_SECONDS", 30)
+            normalized_updated_at = _utc_timestamp_string(updated_at or decorated.get("state_last_updated") or decorated.get("last_updated") or decorated.get("updated_at"))
+            state_meta = {
+                "source": source_label,
+                "computed_at": normalized_updated_at,
+                "age_seconds": 0.0,
+                "freshness_sla_seconds": freshness_sla_seconds,
+                "freshness_status": "fresh",
+                "is_fresh": True,
+                "source_fingerprint": decorated.get("source_fingerprint"),
+                "run_key": snapshot.get("latest_key"),
+                "last_run_started_at": None,
+                "last_run_finished_at": None,
+            }
+        decorated.setdefault("state_meta", state_meta)
+        decorated.setdefault("freshness", dict(state_meta))
+        decorated.setdefault("state_freshness", dict(state_meta))
+        decorated["state_last_updated"] = _utc_timestamp_string(updated_at or decorated.get("state_last_updated") or decorated.get("last_updated") or decorated.get("updated_at"))
+        decorated["candidate_count"] = candidate_count
+        return decorated if candidate_count > 0 else None
+    if all(key in snapshot for key in ("ok", "analysis", "top_opportunities")):
+        if strict_date and requested_date and _selected_date_from_response(snapshot) not in {None, requested_date}:
+            return None
+        decorated = _promote_board_contract_cards(dict(snapshot))
+        updated_at = str(decorated.get("updated_at") or decorated.get("state_last_updated") or "").strip() or None
+        freshness_sla_seconds = _env_int("SYNDICATE_INTELLIGENCE_REFRESH_INTERVAL_SECONDS", 30)
+        state_meta = decorated.get("state_meta") if isinstance(decorated.get("state_meta"), dict) else {}
+        candidate_count = _intelligence_state_candidate_count(decorated)
+        if not state_meta:
+            state_meta = {
+                "source": source_label,
+                "computed_at": _utc_timestamp_string(updated_at),
+                "age_seconds": 0.0,
+                "freshness_sla_seconds": freshness_sla_seconds,
+                "freshness_status": "fresh",
+                "is_fresh": True,
+                "source_fingerprint": decorated.get("source_fingerprint"),
+                "run_key": snapshot.get("latest_key"),
+                "last_run_started_at": None,
+                "last_run_finished_at": None,
+            }
+        decorated.setdefault("state_meta", state_meta)
+        decorated.setdefault("freshness", dict(state_meta))
+        decorated.setdefault("state_freshness", dict(state_meta))
+        decorated["state_last_updated"] = _utc_timestamp_string(updated_at)
+        decorated["candidate_count"] = candidate_count
+        return decorated if candidate_count > 0 else None
+    return None
+
+
+def _latest_non_empty_intelligence_board_snapshot_response(payload: dict[str, Any] | None = None) -> dict[str, Any] | None:
+    requested_date = _selected_date_from_payload(payload)
+    candidate_paths: list[Path] = []
+    seen_paths: set[str] = set()
+    for path in [
+        _intelligence_state_read_path("board_snapshot", BOARD_SNAPSHOT_PATH),
+        *_intelligence_state_daily_candidates().get("board_snapshot", []),
+        BOARD_SNAPSHOT_PATH,
+    ]:
+        if not isinstance(path, Path):
+            continue
+        normalized = str(path)
+        if normalized in seen_paths:
+            continue
+        seen_paths.add(normalized)
+        candidate_paths.append(path)
+
+    for path in candidate_paths:
+        snapshot = read_json_file(path)
+        if not isinstance(snapshot, dict):
+            continue
+        decorated = _decorate_intelligence_board_snapshot_response(snapshot, requested_date=requested_date, source_label="board_snapshot_latest", strict_date=False)
+        if isinstance(decorated, dict):
+            return decorated
+    return None
+
+
 def read_latest_intelligence_board_snapshot_response(payload: dict[str, Any] | None = None, *, force_refresh: bool = True) -> dict[str, Any] | None:
     requested_date = _selected_date_from_payload(payload)
     _ = force_refresh
     snapshot_path = _intelligence_state_read_path("board_snapshot", BOARD_SNAPSHOT_PATH)
     snapshot = read_json_file(snapshot_path)
     if isinstance(snapshot, dict):
-        updated_at = str(snapshot.get("updated_at") or "").strip() or None
-        response = snapshot.get("response")
-        if isinstance(response, dict):
-            if requested_date and _selected_date_from_response(response) not in {None, requested_date}:
+        decorated = _decorate_intelligence_board_snapshot_response(snapshot, requested_date=requested_date, source_label="board_snapshot", strict_date=False)
+        if isinstance(decorated, dict):
+            if requested_date and _selected_date_from_response(decorated) not in {None, requested_date}:
                 return None
-            decorated = _promote_board_contract_cards(dict(response))
-            state_meta = dict(decorated.get("state_meta") or {})
-            if not state_meta:
-                freshness_sla_seconds = _env_int("SYNDICATE_INTELLIGENCE_REFRESH_INTERVAL_SECONDS", 30)
-                normalized_updated_at = _utc_timestamp_string(updated_at or decorated.get("state_last_updated") or decorated.get("last_updated") or decorated.get("updated_at"))
-                state_meta = {
-                    "source": "board_snapshot",
-                    "computed_at": normalized_updated_at,
-                    "age_seconds": 0.0,
-                    "freshness_sla_seconds": freshness_sla_seconds,
-                    "freshness_status": "fresh",
-                    "is_fresh": True,
-                    "source_fingerprint": decorated.get("source_fingerprint"),
-                    "run_key": snapshot.get("latest_key"),
-                    "last_run_started_at": None,
-                    "last_run_finished_at": None,
-                }
-            decorated.setdefault("state_meta", state_meta)
-            decorated.setdefault("freshness", dict(state_meta))
-            decorated.setdefault("state_freshness", dict(state_meta))
-            decorated["state_last_updated"] = _utc_timestamp_string(updated_at or decorated.get("state_last_updated") or decorated.get("last_updated") or decorated.get("updated_at"))
             return decorated
-        if all(key in snapshot for key in ("ok", "analysis", "top_opportunities")):
-            if requested_date and _selected_date_from_response(snapshot) not in {None, requested_date}:
-                return None
-            decorated = _promote_board_contract_cards(dict(snapshot))
-            updated_at = str(decorated.get("updated_at") or decorated.get("state_last_updated") or "").strip() or None
-            freshness_sla_seconds = _env_int("SYNDICATE_INTELLIGENCE_REFRESH_INTERVAL_SECONDS", 30)
-            state_meta = decorated.get("state_meta") if isinstance(decorated.get("state_meta"), dict) else {}
-            if not state_meta:
-                state_meta = {
-                    "source": "board_snapshot",
-                    "computed_at": _utc_timestamp_string(updated_at),
-                    "age_seconds": 0.0,
-                    "freshness_sla_seconds": freshness_sla_seconds,
-                    "freshness_status": "fresh",
-                    "is_fresh": True,
-                    "source_fingerprint": decorated.get("source_fingerprint"),
-                    "run_key": snapshot.get("latest_key"),
-                    "last_run_started_at": None,
-                    "last_run_finished_at": None,
-                }
-            decorated.setdefault("state_meta", state_meta)
-            decorated.setdefault("freshness", dict(state_meta))
-            decorated.setdefault("state_freshness", dict(state_meta))
-            decorated["state_last_updated"] = _utc_timestamp_string(updated_at)
-            return decorated
-    return None
+    return _latest_non_empty_intelligence_board_snapshot_response(payload)
 
 
 def intelligence_state_status(*, force_refresh: bool = True) -> dict[str, Any]:
