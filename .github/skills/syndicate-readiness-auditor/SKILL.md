@@ -12,7 +12,8 @@ Use this skill when the task is about release readiness, migration gates, artifa
 2. Inspect the artifact paths the feature actually consumes, not just adjacent files.
 3. Separate active-slate blockers from off-season or zero-game sports.
 4. Confirm tracked versus untracked artifact expectations.
-5. Validate with the migration gate or the narrow readiness test slice.
+5. Validate the readiness path in a local Render-emulated environment when deployment runtime, disk layout, env vars, or worker/web split behavior could affect the gate.
+6. Validate with the migration gate or the narrow readiness test slice after the runtime-equivalent local check.
 
 ## Typical outputs
 - Missing artifact list.

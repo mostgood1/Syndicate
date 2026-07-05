@@ -42,9 +42,6 @@ DECISIONS:
 INTELLIGENCE / BETTING BOARD ASSESSMENT:
 {load("docs/intelligence_betting_board_assessment.md")}
 
-WORLD CLASS PLAN:
-{load("docs/syndicate_world_class_implementation_plan.md")}
-
 DAILY UPDATE WORKFLOW:
 {load("docs/daily_update_workflow.md")}
 

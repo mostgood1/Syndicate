@@ -9,10 +9,10 @@ Use this skill when the question is whether the deployed app is actually serving
 
 ## Workflow
 1. Identify the route, artifact, or payload that looks stale.
-2. Check the local file or response contract first.
-3. Compare deployed revision, published artifacts, and data-root expectations.
-4. Distinguish code drift from stale mirrors or stale deployment.
-5. End with a concrete parity statement: local only, deploy only, or full parity.
+2. Check the local file or response contract first, and reproduce the behavior in a local Render-emulated environment when runtime shape or startup behavior could matter.
+3. Compare deployed revision, published artifacts, and data-root expectations after the local runtime-equivalent check.
+4. Distinguish code drift from stale mirrors, stale deployment, or a runtime-equivalence mismatch.
+5. End with a concrete parity statement: local only, deploy only, runtime-equivalent local only, or full parity.
 
 ## Good fits
 - Render mismatches.

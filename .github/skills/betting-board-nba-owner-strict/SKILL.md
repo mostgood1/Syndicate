@@ -15,9 +15,11 @@ Use this skill when NBA board work needs a stricter contract-first approach.
 - The visible response should expose NBA opportunities through the fields the UI consumes.
 - The board should remain readable even when worker state is stale or the snapshot is partial.
 - Render parity should be verified before calling the board fixed.
+- When runtime behavior is suspect, reproduce the issue in a local Render-emulated environment before leaning on live Render checks.
 
 ## Validation Bar
 A change is not complete until at least one of these passes:
+- local Render-emulated runtime reproduction for the NBA board path
 - `/nba` renders populated board content locally
 - targeted NBA regression tests pass
 - Render version and NBA board state agree

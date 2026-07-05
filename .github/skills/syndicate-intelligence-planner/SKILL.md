@@ -18,7 +18,8 @@ Use this skill when the request is about expanding what Syndicate intelligence c
 2. Trace the current intelligence path first: parser, candidate collection, advanced enrichment, ranking, API response, then UI rendering.
 3. Prefer stable ids and tracked artifacts over name matching or ad hoc scraping.
 4. Keep changes local and testable: backend payload first, then rendering, then focused tests.
-5. Validate with the narrowest intelligence test slice before widening scope.
+5. Reproduce runtime-sensitive changes in a local Render-emulated environment when deployed behavior, startup timing, disk state, or worker/web split behavior could affect the intelligence path.
+6. Validate with the narrowest intelligence test slice before widening scope.
 
 ## Deliverables
 - Concrete file targets.

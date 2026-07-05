@@ -9,10 +9,11 @@ Use this skill when the problem is about live cards, live props, scoreboard stat
 
 ## Workflow
 1. Identify the sport, event date, route, and artifact path involved.
-2. Check the owning live payload, mirror artifact, and home/card rendering surface.
-3. Verify whether the issue is source freshness, payload shape, fallback merge logic, or UI rendering.
-4. Prefer focused archive or route tests for the affected sport before broader smoke runs.
-5. Preserve event ids and existing artifact contracts unless the task explicitly changes them.
+2. Reproduce the issue in a local Render-emulated environment first when the symptom could depend on runtime behavior, startup timing, disk mounts, env vars, or worker/web split behavior.
+3. Check the owning local payload, mirror artifact, and home/card rendering surface before comparing with live Render.
+4. Verify whether the issue is source freshness, payload shape, fallback merge logic, runtime-equivalence mismatch, or UI rendering.
+5. Prefer focused archive or route tests for the affected sport before broader smoke runs.
+6. Preserve event ids and existing artifact contracts unless the task explicitly changes them.
 
 ## Useful targets
 - Live lens payload builders.

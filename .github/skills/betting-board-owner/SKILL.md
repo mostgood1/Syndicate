@@ -20,6 +20,8 @@ The board should:
 - remain stable on Render and locally
 - degrade safely when cache or worker state is stale
 
+When the live intelligence endpoint is involved, use the end-to-end intelligence workflow in [.github/skills/intelligence-end-to-end/skills.md](.github/skills/intelligence-end-to-end/skills.md) to classify the failure bucket before making changes. If the same empty or 502 symptom recurs after a deploy, trigger that workflow automatically.
+
 ## Scope
 This skill applies to work on:
 - `/intelligence`
@@ -43,21 +45,35 @@ This skill applies to work on:
 3. Confirm whether the response is empty, stale, queued, or computed.
 4. Determine whether the worker, cache, or request path owns the failure.
 5. Verify the visible board shape matches what the template expects.
-6. Validate locally with the same request path the UI uses.
+6. Reproduce the issue in a local Render-emulated environment when the symptom could depend on Render runtime behavior, startup timing, disk mounts, env vars, or worker/web split behavior.
+7. Validate locally with the same request path the UI uses after the runtime-equivalent environment check.
+8. If the board is still empty, separate the failure into one of these buckets before editing code:
+  - deploy mismatch
+  - request-path timeout
+  - worker ownership / queue issue
+  - cache or snapshot freshness issue
+  - response-shape / alias issue
+  - template hydration issue
+9. If the live deploy is healthy but the board still fails, re-run deploy parity and endpoint checks before widening scope.
 
 ## Validation Expectations
 When changing the board, validate at least one of:
+- local Render-emulated runtime reproduction when the issue is tied to startup, disk, env, or worker parity
 - local Flask test-client flow for `/intelligence`
 - local POST to `/api/intelligence/query`
 - local GET to `/api/intelligence/status`
 - targeted regression tests for the touched slice
 - Render version/status parity when deploy behavior is involved
 
+If the live board still fails after the code change, re-run the same live parity checks before widening scope.
+
 ## Guardrails
 - Do not widen scope into unrelated sports modules unless the board surface depends on them.
 - Do not treat a healthy deploy as success if the board still renders empty.
 - Do not stop at queued refresh if the board can be computed immediately.
 - Do not change board shape without updating the UI expectations and tests.
+- Do not let the web request path block long enough to trip Render timeouts.
+- Do not hide final or archived recommendations if that would collapse the visible board to zero.
 
 ## Expected Output
 When this skill is used, the result should usually include:

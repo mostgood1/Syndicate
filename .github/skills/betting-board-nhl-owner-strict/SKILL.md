@@ -15,9 +15,11 @@ Use this skill when NHL board work needs a stricter contract-first approach.
 - The visible response should expose NHL opportunities through the fields the UI consumes.
 - The board should remain readable even when worker state is stale or the snapshot is partial.
 - Render parity should be verified before calling the board fixed.
+- When runtime behavior is suspect, reproduce the issue in a local Render-emulated environment before leaning on live Render checks.
 
 ## Validation Bar
 A change is not complete until at least one of these passes:
+- local Render-emulated runtime reproduction for the NHL board path
 - `/nhl` renders populated board content locally
 - targeted NHL regression tests pass
 - Render version and NHL board state agree

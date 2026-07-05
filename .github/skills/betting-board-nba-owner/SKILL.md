@@ -41,10 +41,12 @@ This skill applies to work on:
 3. Confirm whether the response is empty, stale, queued, or computed.
 4. Determine whether the worker, cache, or request path owns the failure.
 5. Verify the visible NBA board shape matches what the template expects.
-6. Validate locally with the same request path the UI uses.
+6. Reproduce the issue in a local Render-emulated environment when the symptom could depend on runtime behavior, startup timing, disk mounts, env vars, or worker/web split behavior.
+7. Validate locally with the same request path the UI uses after the runtime-equivalent environment check.
 
 ## Validation Expectations
 When changing the NBA board, validate at least one of:
+- local Render-emulated runtime reproduction when the issue is tied to startup, disk, env, or worker parity
 - local Flask test-client flow for `/nba`
 - NBA API or board route checks
 - targeted regression tests for the touched slice

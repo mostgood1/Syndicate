@@ -15,7 +15,7 @@ Use this skill for NHL questions where state, pace, or shots/goals context matte
 
 ## Workflow
 1. Identify whether the ask is live or pregame.
-2. Start from the actual NHL candidate or live-lens row in Syndicate.
+2. Start from the actual NHL candidate or live-lens row in Syndicate, and reproduce the state in a local Render-emulated environment when runtime behavior or freshness could explain the change.
 3. Use the game-state context that matters to hockey props: score state, shot volume, power-play environment, goalie context, and recent event flow when available.
 4. Preserve live-state freshness and avoid mixing final-state rows into active recommendations.
 5. Return a short rationale plus structured support fields.
