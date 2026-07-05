@@ -35,9 +35,10 @@ class RenderYamlEnvTests(unittest.TestCase):
 
         self.assertIn("SYNDICATE_BOOTSTRAP_ON_START", web_section)
         self.assertIn("SYNDICATE_BOOTSTRAP_WNBA_TODAY", web_section)
+        self.assertIn("SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP", web_section)
         self.assertIn("/opt/render/project/data/wnba_source", web_section)
         self.assertIn("SYNDICATE_REPORTS_ROOT", web_section)
-        self.assertIn("./reports", web_section)
+        self.assertIn("/opt/render/project/data/reports", web_section)
 
         self.assertIn("disk:", worker_section)
         self.assertIn("/opt/render/project/data/", worker_section)

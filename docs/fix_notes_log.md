@@ -1,5 +1,12 @@
 # Fix Notes Log
 
+## 2026-07-05 - Render web dyno now runs bootstrap and intelligence background loop
+- Symptom: The Render web service could start without bootstrapping data or the intelligence background loop, which left the live board dependent on stale or missing cache state.
+- Root cause: The web startup path short-circuited bootstrap on Render web dynos and the Render env still left the intelligence background loop disabled.
+- Fix: Allow the web dyno bootstrap path to run when `SYNDICATE_BOOTSTRAP_ON_START` is enabled, and turn on `SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP` in `render.yaml`.
+- Validation: `python -m pytest tests/test_app_bootstrap.py tests/test_render_yaml_envs.py` passed.
+- Follow-up: Redeploy Render and confirm the web dyno now hydrates cached intelligence state without relying on manual refreshes.
+
 ## 2026-07-05 - MLB intelligence candidate generation now reads shared odds history first
 - Symptom: Render and local Render-like runs both produced `candidate_count: 0` and an empty board even though the repo already contained populated MLB odds history artifacts.
 - Root cause: The intelligence feature loader only looked for `data/mlb_source/tracking/odds_history.json`, so it missed the populated shared control-plane history under `reports/odds_control_plane/odds_history/mlb/odds_history.json`.
