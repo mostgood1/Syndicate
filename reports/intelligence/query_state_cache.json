@@ -1,6 +1,6 @@
 {
-  "latest_key": "928315208c68c7117c06911c88c130237572a6ae6d0a2ab034f65d17f0a112ce",
-  "updated_at": "2026-07-03T21:30:22-05:00",
+  "latest_key": "cd71ce034e3f520a2eb180b6b5a64952237796158153d165c2eca35a5299a3ed",
+  "updated_at": "2026-07-05T02:06:10-05:00",
   "snapshots": {
     "928315208c68c7117c06911c88c130237572a6ae6d0a2ab034f65d17f0a112ce": {
       "key": "928315208c68c7117c06911c88c130237572a6ae6d0a2ab034f65d17f0a112ce",
@@ -320,6 +320,94 @@
       },
       "computed_at": "2026-07-04T02:30:22Z",
       "source_fingerprint": "fingerprint-1"
+    },
+    "cd71ce034e3f520a2eb180b6b5a64952237796158153d165c2eca35a5299a3ed": {
+      "key": "cd71ce034e3f520a2eb180b6b5a64952237796158153d165c2eca35a5299a3ed",
+      "payload": {
+        "question": "top edges today",
+        "date": "2026-07-05",
+        "mode": "live",
+        "sport": "all",
+        "timing": "",
+        "limit": 10,
+        "include_props": true,
+        "include_games": true,
+        "force_refresh": true
+      },
+      "response": {
+        "recommendations": [],
+        "portfolio": {
+          "total_exposure": 0.0,
+          "risk_level": "low",
+          "expected_return": 0.0,
+          "risk_label": "low risk",
+          "diversification_score": 1.0,
+          "average_correlation": 0.0
+        },
+        "parlays": [],
+        "evidence": [],
+        "supporting_evidence": [],
+        "evaluation_record": {},
+        "query_type": "explanation",
+        "preferences": {},
+        "parsed_request": {},
+        "analysis_views": {},
+        "structured_response": {
+          "intent": "explanation",
+          "summary": "No summary was returned, so the board should be read through the returned recommendations and evidence.",
+          "clear_summary": "No summary was returned, so the board should be read through the returned recommendations and evidence.",
+          "deep_analysis": [
+            "The returned board is being summarized at the candidate, evidence, and risk level so the answer stays actionable rather than superficial."
+          ],
+          "context_awareness": {
+            "is_vague": true,
+            "confidence": "low",
+            "detected_signals": [
+              "sport=all",
+              "mode=live",
+              "intent=explanation"
+            ],
+            "detected_sports": [],
+            "multi_sport": false,
+            "assumptions": [
+              "I assumed you want the strongest board-wide read because no specific sport or market was named.",
+              "I treated the request as a explanation prompt so the engine could answer instead of waiting for more input."
+            ],
+            "clarifying_questions": [
+              "Do you want props, game plays, or both?"
+            ],
+            "reasoning": "The request was handled as a general explanation because the prompt did not pin down a narrower market frame. Because the prompt was vague, the pipeline also made best-effort assumptions and preserved clarifying questions for follow-up.",
+            "recommendation_count": 0,
+            "reasoning_step_count": 0
+          },
+          "routing_context": {
+            "question": "top edges today",
+            "query_type": "explanation",
+            "mode": "live",
+            "selected_date": "2026-07-05",
+            "preview_subject": null,
+            "player_subject": null,
+            "sport": "all",
+            "game_state": null,
+            "limit": 10,
+            "include_props": true,
+            "include_games": true
+          },
+          "odds_control_plane": {},
+          "key_insights": [],
+          "supporting_evidence": [],
+          "risks_uncertainty": [],
+          "recommended_interpretation": "Best takeaway: use the returned evidence and risks to interpret the board directionally, since no single standout candidate was returned.",
+          "final_takeaway": "Best takeaway: use the returned evidence and risks to interpret the board directionally, since no single standout candidate was returned.",
+          "reasoning_steps": []
+        },
+        "reasoning_steps": [],
+        "board_notes": [],
+        "readiness_gate": {},
+        "candidate_count": 0
+      },
+      "computed_at": "2026-07-05T07:06:10Z",
+      "source_fingerprint": ""
     }
   }
 }

@@ -1,5 +1,4 @@
 {
-  "latest_key": "cd71ce034e3f520a2eb180b6b5a64952237796158153d165c2eca35a5299a3ed",
   "updated_at": "2026-07-05T02:06:10-05:00",
   "response": {
     "recommendations": [],
@@ -73,6 +72,6 @@
     "readiness_gate": {},
     "candidate_count": 0
   },
-  "state_meta": null,
+  "state_meta": {},
   "board_contract": null
 }
