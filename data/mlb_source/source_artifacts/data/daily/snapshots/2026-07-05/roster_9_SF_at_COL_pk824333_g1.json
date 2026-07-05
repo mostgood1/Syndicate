@@ -54,18 +54,18 @@
     "lineup_source": "projected_rotowire_today_lineup",
     "lineup_confidence": 0.44,
     "probable_pitcher": {
-      "id": null,
-      "source": "none",
-      "confidence": 0.0,
-      "raw_schedule_id": null,
-      "raw_feed_id": null
+      "id": 641816,
+      "source": "feed_gameData_probablePitchers",
+      "confidence": 0.75,
+      "raw_schedule_id": 641816,
+      "raw_feed_id": 641816
     },
     "starter": {
-      "id": 592662,
-      "name": "Robbie Ray",
+      "id": 641816,
+      "name": "Tyler Mahle",
       "role": "SP",
-      "selection_source": "heuristic",
-      "requested_id": null
+      "selection_source": "probable",
+      "requested_id": 641816
     },
     "bullpen": [
       {
@@ -83,18 +83,12 @@
       {
         "id": 669062,
         "name": "Erik Miller",
-        "role": "SU",
-        "lev": 0.7
-      },
-      {
-        "id": 664141,
-        "name": "JT Brubaker",
         "role": "MR",
         "lev": 0.5
       },
       {
-        "id": 657424,
-        "name": "Matt Gage",
+        "id": 664141,
+        "name": "JT Brubaker",
         "role": "MR",
         "lev": 0.5
       },
@@ -109,6 +103,12 @@
         "name": "Sam Hentges",
         "role": "MR",
         "lev": 0.5
+      },
+      {
+        "id": 702352,
+        "name": "Spencer Bivens",
+        "role": "SU",
+        "lev": 0.7
       }
     ],
     "lineup": [
@@ -434,25 +434,25 @@
         "pos": "LF",
         "bat": "R",
         "throw": "R",
-        "k_rate": 0.23727395411605937,
-        "bb_rate": 0.05847503373819163,
+        "k_rate": 0.23060344827586207,
+        "bb_rate": 0.057094827586206896,
         "hbp_rate": 0.0,
-        "hr_rate": 0.03404858299595142,
-        "inplay_hit_rate": 0.3116498316498316,
-        "xb_hit_share": 0.2857142857142857,
+        "hr_rate": 0.03325862068965517,
+        "inplay_hit_rate": 0.31055410990356647,
+        "xb_hit_share": 0.3,
         "vs_pitch_type": {},
         "vs_pitch_type_hr": {},
         "platoon_mult_vs_lhp": {
-          "k": 1.077790495961779,
-          "bb": 1.037857719824602,
-          "hr": 0.7865289338089575,
-          "inplay": 1.1118004537597235
+          "k": 1.0921279654924514,
+          "bb": 1.0057555836885446,
+          "hr": 0.78,
+          "inplay": 1.1078103711110097
         },
         "platoon_mult_vs_rhp": {
-          "k": 1.017672410791185,
-          "bb": 0.9618761097792452,
-          "hr": 0.9994349939738083,
-          "inplay": 0.9811537622408136
+          "k": 1.0301465016418287,
+          "bb": 0.9707079342667445,
+          "hr": 1.0086846566628838,
+          "inplay": 0.9779025537392347
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -488,44 +488,44 @@
       }
     ],
     "starter_profile": {
-      "id": 592662,
-      "name": "Robbie Ray",
-      "throw": "L",
+      "id": 641816,
+      "name": "Tyler Mahle",
+      "throw": "R",
       "role": "SP",
       "leverage_skill": 0.5,
-      "stamina_pitches": 100,
+      "stamina_pitches": 94,
       "availability_mult": 1.0,
       "platoon_mult_vs_lhb": {
-        "k": 1.1262261919123855,
-        "bb": 0.8461177641001445,
-        "hr": 0.78,
-        "inplay": 1.0757442667343657
+        "k": 1.098958298155493,
+        "bb": 0.8522888334082839,
+        "hr": 0.9095544470268125,
+        "inplay": 0.9818067344464135
       },
       "platoon_mult_vs_rhb": {
-        "k": 0.9567980910815902,
-        "bb": 1.0235001694526817,
-        "hr": 1.2046939010073312,
-        "inplay": 0.9977052220272196
+        "k": 0.9242949724131926,
+        "bb": 1.1449448991534994,
+        "hr": 1.1828030371508633,
+        "inplay": 1.1170909037354135
       },
       "statcast_quality_mult": {},
       "arsenal_source": "statsapi_pitchArsenal",
-      "arsenal_sample_size": 1526,
+      "arsenal_sample_size": 1036,
       "statcast_splits_found": false,
       "statcast_splits_source": "",
       "statcast_splits_n_pitches": 0,
       "statcast_splits_start_date": "",
       "statcast_splits_end_date": "",
-      "k_rate": 0.2186390650552431,
-      "bb_rate": 0.11943879382553547,
+      "k_rate": 0.22983378561736767,
+      "bb_rate": 0.09268995929443691,
       "hbp_rate": 0.0,
-      "hr_rate": 0.03470344222408361,
-      "inplay_hit_rate": 0.2783352176370831,
+      "hr_rate": 0.04056987788331072,
+      "inplay_hit_rate": 0.35799587153178314,
       "arsenal": {
-        "FF": 0.40694626796526867,
-        "CH": 0.1631716991841415,
-        "SI": 0.07142857464285712,
-        "KC": 0.0904324995478375,
-        "SL": 0.26802095865989517
+        "FF": 0.4845559917625482,
+        "SI": 0.01640926672104247,
+        "SL": 0.10714285817857143,
+        "FC": 0.14382238755501942,
+        "FS": 0.24806949578281862
       },
       "pitch_type_whiff_mult": {},
       "pitch_type_inplay_mult": {},
@@ -539,7 +539,7 @@
         "role": "CL",
         "leverage_skill": 0.85,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.875,
         "platoon_mult_vs_lhb": {
           "k": 0.8936080903970812,
           "bb": 0.9137523606989256,
@@ -582,7 +582,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.8666666666666667,
         "platoon_mult_vs_lhb": {
           "k": 1.1925000000000001,
           "bb": 0.8075,
@@ -623,8 +623,8 @@
         "id": 669062,
         "name": "Erik Miller",
         "throw": "L",
-        "role": "SU",
-        "leverage_skill": 0.7,
+        "role": "MR",
+        "leverage_skill": 0.5,
         "stamina_pitches": 25,
         "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
@@ -669,7 +669,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.895,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 0.9850086128280474,
           "bb": 1.1664373524383294,
@@ -707,56 +707,13 @@
         "pitch_type_hr_mult": {}
       },
       {
-        "id": 657424,
-        "name": "Matt Gage",
-        "throw": "L",
-        "role": "MR",
-        "leverage_skill": 0.5,
-        "stamina_pitches": 25,
-        "availability_mult": 0.745,
-        "platoon_mult_vs_lhb": {
-          "k": 1.1925000000000001,
-          "bb": 1.1925000000000001,
-          "hr": 0.78,
-          "inplay": 0.9219038522763452
-        },
-        "platoon_mult_vs_rhb": {
-          "k": 0.8075,
-          "bb": 0.8587591240875913,
-          "hr": 1.0670798898071625,
-          "inplay": 0.9689670397001315
-        },
-        "statcast_quality_mult": {},
-        "arsenal_source": "statsapi_pitchArsenal",
-        "arsenal_sample_size": 453,
-        "statcast_splits_found": false,
-        "statcast_splits_source": "",
-        "statcast_splits_n_pitches": 0,
-        "statcast_splits_start_date": "",
-        "statcast_splits_end_date": "",
-        "k_rate": 0.16785714285714284,
-        "bb_rate": 0.12232142857142857,
-        "hbp_rate": 0.008928571428571428,
-        "hr_rate": 0.05401785714285714,
-        "inplay_hit_rate": 0.3399350649350649,
-        "arsenal": {
-          "FF": 0.3112582956423839,
-          "CH": 0.15452537783664472,
-          "SI": 0.06181015313465787,
-          "SL": 0.4724061733863137
-        },
-        "pitch_type_whiff_mult": {},
-        "pitch_type_inplay_mult": {},
-        "pitch_type_hr_mult": {}
-      },
-      {
         "id": 676254,
         "name": "Ryan Walker",
         "throw": "R",
         "role": "SU",
         "leverage_skill": 0.7,
         "stamina_pitches": 25,
-        "availability_mult": 0.785,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 1.1033036377134373,
           "bb": 1.1925000000000001,
@@ -798,7 +755,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.9,
         "platoon_mult_vs_lhb": {
           "k": 1.0396259636432854,
           "bb": 1.1925000000000001,
@@ -829,6 +786,40 @@
           "CU": 0.1351351313513513,
           "SI": 0.25868726258687263,
           "SL": 0.3243243032432431
+        },
+        "pitch_type_whiff_mult": {},
+        "pitch_type_inplay_mult": {},
+        "pitch_type_hr_mult": {}
+      },
+      {
+        "id": 702352,
+        "name": "Spencer Bivens",
+        "throw": "R",
+        "role": "SU",
+        "leverage_skill": 0.7,
+        "stamina_pitches": 24,
+        "availability_mult": 1.0,
+        "platoon_mult_vs_lhb": {},
+        "platoon_mult_vs_rhb": {},
+        "statcast_quality_mult": {},
+        "arsenal_source": "default",
+        "arsenal_sample_size": 0,
+        "statcast_splits_found": false,
+        "statcast_splits_source": "",
+        "statcast_splits_n_pitches": 0,
+        "statcast_splits_start_date": "",
+        "statcast_splits_end_date": "",
+        "k_rate": 0.24,
+        "bb_rate": 0.08,
+        "hbp_rate": 0.008,
+        "hr_rate": 0.03,
+        "inplay_hit_rate": 0.0,
+        "arsenal": {
+          "FF": 0.45,
+          "SL": 0.22,
+          "CH": 0.12,
+          "SI": 0.13,
+          "CU": 0.08
         },
         "pitch_type_whiff_mult": {},
         "pitch_type_inplay_mult": {},
@@ -864,7 +855,7 @@
       691720
     ],
     "lineup_source": "projected_rotowire_default_vs_rhp",
-    "lineup_confidence": 0.58,
+    "lineup_confidence": 0.66,
     "probable_pitcher": {
       "id": 685299,
       "source": "feed_gameData_probablePitchers",
@@ -883,8 +874,8 @@
       {
         "id": 622608,
         "name": "Antonio Senzatela",
-        "role": "SU",
-        "lev": 0.7
+        "role": "MR",
+        "lev": 0.5
       },
       {
         "id": 687312,
@@ -893,16 +884,16 @@
         "lev": 0.5
       },
       {
+        "id": 605447,
+        "name": "Jordan Romano",
+        "role": "SU",
+        "lev": 0.7
+      },
+      {
         "id": 675848,
         "name": "Juan Mejia",
         "role": "CL",
         "lev": 0.85
-      },
-      {
-        "id": 678020,
-        "name": "Seth Halvorsen",
-        "role": "MR",
-        "lev": 0.5
       },
       {
         "id": 680767,
@@ -1347,10 +1338,10 @@
         "id": 622608,
         "name": "Antonio Senzatela",
         "throw": "R",
-        "role": "SU",
-        "leverage_skill": 0.7,
+        "role": "MR",
+        "leverage_skill": 0.5,
         "stamina_pitches": 26,
-        "availability_mult": 1.0,
+        "availability_mult": 0.9166666666666666,
         "platoon_mult_vs_lhb": {
           "k": 1.0451501082611594,
           "bb": 0.9939405183240096,
@@ -1395,7 +1386,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 26,
-        "availability_mult": 0.7350000000000001,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 0.8075,
           "bb": 1.1925000000000001,
@@ -1432,13 +1423,55 @@
         "pitch_type_hr_mult": {}
       },
       {
+        "id": 605447,
+        "name": "Jordan Romano",
+        "throw": "R",
+        "role": "SU",
+        "leverage_skill": 0.7,
+        "stamina_pitches": 22,
+        "availability_mult": 0.9166666666666666,
+        "platoon_mult_vs_lhb": {
+          "k": 1.1407492138808863,
+          "bb": 1.0693521156484118,
+          "hr": 1.275,
+          "inplay": 0.9011154855643044
+        },
+        "platoon_mult_vs_rhb": {
+          "k": 0.8426363952586091,
+          "bb": 0.8900659769080821,
+          "hr": 0.78,
+          "inplay": 1.0329800121138704
+        },
+        "statcast_quality_mult": {},
+        "arsenal_source": "statsapi_pitchArsenal",
+        "arsenal_sample_size": 202,
+        "statcast_splits_found": false,
+        "statcast_splits_source": "",
+        "statcast_splits_n_pitches": 0,
+        "statcast_splits_start_date": "",
+        "statcast_splits_end_date": "",
+        "k_rate": 0.2949025487256372,
+        "bb_rate": 0.1315592203898051,
+        "hbp_rate": 0.021739130434782608,
+        "hr_rate": 0.023650674662668663,
+        "inplay_hit_rate": 0.508,
+        "arsenal": {
+          "FF": 0.4851485117524753,
+          "SL": 0.47029703200495043,
+          "FS": 0.04455445624257424
+        },
+        "pitch_type_whiff_mult": {},
+        "pitch_type_inplay_mult": {},
+        "pitch_type_hr_mult": {}
+      },
+      {
         "id": 675848,
         "name": "Juan Mejia",
         "throw": "R",
         "role": "CL",
         "leverage_skill": 0.85,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.8083333333333333,
         "platoon_mult_vs_lhb": {
           "k": 1.0539697090474291,
           "bb": 0.962942371160193,
@@ -1470,48 +1503,6 @@
           "CH": 0.030837005585903108,
           "SI": 0.08223201156240821,
           "SL": 0.029368576558002957
-        },
-        "pitch_type_whiff_mult": {},
-        "pitch_type_inplay_mult": {},
-        "pitch_type_hr_mult": {}
-      },
-      {
-        "id": 678020,
-        "name": "Seth Halvorsen",
-        "throw": "R",
-        "role": "MR",
-        "leverage_skill": 0.5,
-        "stamina_pitches": 25,
-        "availability_mult": 1.0,
-        "platoon_mult_vs_lhb": {
-          "k": 1.005253568667034,
-          "bb": 1.1925000000000001,
-          "hr": 0.9633295664680501,
-          "inplay": 1.1925000000000001
-        },
-        "platoon_mult_vs_rhb": {
-          "k": 1.0476687718290991,
-          "bb": 0.8122933584686776,
-          "hr": 0.7815253450106157,
-          "inplay": 0.8075
-        },
-        "statcast_quality_mult": {},
-        "arsenal_source": "statsapi_pitchArsenal",
-        "arsenal_sample_size": 325,
-        "statcast_splits_found": false,
-        "statcast_splits_source": "",
-        "statcast_splits_n_pitches": 0,
-        "statcast_splits_start_date": "",
-        "statcast_splits_end_date": "",
-        "k_rate": 0.19171711612548156,
-        "bb_rate": 0.18976334617501375,
-        "hbp_rate": 0.0,
-        "hr_rate": 0.034562465602641715,
-        "inplay_hit_rate": 0.30306122448979594,
-        "arsenal": {
-          "FF": 0.6123076859199998,
-          "SL": 0.3046153879200001,
-          "FS": 0.08307692616000008
         },
         "pitch_type_whiff_mult": {},
         "pitch_type_inplay_mult": {},

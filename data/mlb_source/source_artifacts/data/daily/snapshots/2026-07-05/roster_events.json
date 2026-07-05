@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "date": "2026-07-05",
-  "generated_at": "2026-07-04T07:10:23.533328",
+  "generated_at": "2026-07-05T07:07:25.659680",
   "include_baseline": false,
   "teams": {
     "108": {
@@ -9,15 +9,15 @@
       "team_abbr": "LAA",
       "roster_types": {
         "40Man": {
-          "prev_date": "2026-07-04",
+          "prev_date": null,
           "n_players": 46,
-          "n_added": 0,
+          "n_added": 46,
           "n_removed": 0
         },
         "active": {
-          "prev_date": "2026-07-04",
+          "prev_date": null,
           "n_players": 26,
-          "n_added": 0,
+          "n_added": 26,
           "n_removed": 0
         }
       }
@@ -27,15 +27,15 @@
       "team_abbr": "AZ",
       "roster_types": {
         "40Man": {
-          "prev_date": "2026-07-04",
+          "prev_date": null,
           "n_players": 47,
-          "n_added": 0,
+          "n_added": 47,
           "n_removed": 0
         },
         "active": {
-          "prev_date": "2026-07-04",
+          "prev_date": null,
           "n_players": 26,
-          "n_added": 0,
+          "n_added": 26,
           "n_removed": 0
         }
       }
@@ -45,31 +45,15 @@
       "team_abbr": "BAL",
       "roster_types": {
         "40Man": {
-          "prev_date": "2026-07-04",
-          "n_players": 46,
-          "n_added": 1,
-          "n_removed": 0,
-          "added": [
-            {
-              "full_name": "Chadwick Tromp",
-              "player_id": 644433,
-              "position": "C",
-              "status": {
-                "code": "A",
-                "description": "Active"
-              }
-            }
-          ],
-          "removed": [],
-          "added_ids": [
-            644433
-          ],
-          "removed_ids": []
+          "prev_date": null,
+          "n_players": 45,
+          "n_added": 45,
+          "n_removed": 0
         },
         "active": {
-          "prev_date": "2026-07-04",
+          "prev_date": null,
           "n_players": 26,
-          "n_added": 0,
+          "n_added": 26,
           "n_removed": 0
         }
       }
@@ -79,15 +63,15 @@
       "team_abbr": "BOS",
       "roster_types": {
         "40Man": {
-          "prev_date": "2026-07-04",
+          "prev_date": null,
           "n_players": 48,
-          "n_added": 0,
+          "n_added": 48,
           "n_removed": 0
         },
         "active": {
-          "prev_date": "2026-07-04",
+          "prev_date": null,
           "n_players": 26,
-          "n_added": 0,
+          "n_added": 26,
           "n_removed": 0
         }
       }
@@ -97,31 +81,15 @@
       "team_abbr": "CHC",
       "roster_types": {
         "40Man": {
-          "prev_date": "2026-07-04",
-          "n_players": 46,
-          "n_added": 0,
-          "n_removed": 1,
-          "added": [],
-          "removed": [
-            {
-              "full_name": "Drew Pomeranz",
-              "player_id": 519141,
-              "position": "P",
-              "status": {
-                "code": "A",
-                "description": "Active"
-              }
-            }
-          ],
-          "added_ids": [],
-          "removed_ids": [
-            519141
-          ]
+          "prev_date": null,
+          "n_players": 47,
+          "n_added": 47,
+          "n_removed": 0
         },
         "active": {
-          "prev_date": "2026-07-04",
+          "prev_date": null,
           "n_players": 26,
-          "n_added": 0,
+          "n_added": 26,
           "n_removed": 0
         }
       }
@@ -131,15 +99,15 @@
       "team_abbr": "CIN",
       "roster_types": {
         "40Man": {
-          "prev_date": "2026-07-04",
-          "n_players": 43,
-          "n_added": 0,
+          "prev_date": null,
+          "n_players": 42,
+          "n_added": 42,
           "n_removed": 0
         },
         "active": {
-          "prev_date": "2026-07-04",
+          "prev_date": null,
           "n_players": 26,
-          "n_added": 0,
+          "n_added": 26,
           "n_removed": 0
         }
       }
@@ -149,15 +117,15 @@
       "team_abbr": "CLE",
       "roster_types": {
         "40Man": {
-          "prev_date": "2026-07-04",
+          "prev_date": null,
           "n_players": 40,
-          "n_added": 0,
+          "n_added": 40,
           "n_removed": 0
         },
         "active": {
-          "prev_date": "2026-07-04",
+          "prev_date": null,
           "n_players": 26,
-          "n_added": 0,
+          "n_added": 26,
           "n_removed": 0
         }
       }
@@ -167,15 +135,15 @@
       "team_abbr": "COL",
       "roster_types": {
         "40Man": {
-          "prev_date": "2026-07-04",
-          "n_players": 45,
-          "n_added": 0,
+          "prev_date": null,
+          "n_players": 46,
+          "n_added": 46,
           "n_removed": 0
         },
         "active": {
-          "prev_date": "2026-07-04",
+          "prev_date": null,
           "n_players": 26,
-          "n_added": 0,
+          "n_added": 26,
           "n_removed": 0
         }
       }
@@ -185,15 +153,15 @@
       "team_abbr": "DET",
       "roster_types": {
         "40Man": {
-          "prev_date": "2026-07-04",
+          "prev_date": null,
           "n_players": 50,
-          "n_added": 0,
+          "n_added": 50,
           "n_removed": 0
         },
         "active": {
-          "prev_date": "2026-07-04",
+          "prev_date": null,
           "n_players": 26,
-          "n_added": 0,
+          "n_added": 26,
           "n_removed": 0
         }
       }
@@ -203,32 +171,16 @@
       "team_abbr": "HOU",
       "roster_types": {
         "40Man": {
-          "prev_date": "2026-07-04",
+          "prev_date": null,
           "n_players": 45,
-          "n_added": 0,
+          "n_added": 45,
           "n_removed": 0
         },
         "active": {
-          "prev_date": "2026-07-04",
-          "n_players": 25,
-          "n_added": 0,
-          "n_removed": 1,
-          "added": [],
-          "removed": [
-            {
-              "full_name": "Cristian Javier",
-              "player_id": 664299,
-              "position": "P",
-              "status": {
-                "code": "A",
-                "description": "Active"
-              }
-            }
-          ],
-          "added_ids": [],
-          "removed_ids": [
-            664299
-          ]
+          "prev_date": null,
+          "n_players": 26,
+          "n_added": 26,
+          "n_removed": 0
         }
       }
     },
@@ -237,15 +189,15 @@
       "team_abbr": "KC",
       "roster_types": {
         "40Man": {
-          "prev_date": "2026-07-04",
+          "prev_date": null,
           "n_players": 46,
-          "n_added": 0,
+          "n_added": 46,
           "n_removed": 0
         },
         "active": {
-          "prev_date": "2026-07-04",
+          "prev_date": null,
           "n_players": 26,
-          "n_added": 0,
+          "n_added": 26,
           "n_removed": 0
         }
       }
@@ -255,15 +207,15 @@
       "team_abbr": "LAD",
       "roster_types": {
         "40Man": {
-          "prev_date": "2026-07-04",
-          "n_players": 49,
-          "n_added": 0,
+          "prev_date": null,
+          "n_players": 50,
+          "n_added": 50,
           "n_removed": 0
         },
         "active": {
-          "prev_date": "2026-07-04",
+          "prev_date": null,
           "n_players": 26,
-          "n_added": 0,
+          "n_added": 26,
           "n_removed": 0
         }
       }
@@ -273,15 +225,15 @@
       "team_abbr": "WSH",
       "roster_types": {
         "40Man": {
-          "prev_date": "2026-07-04",
+          "prev_date": null,
           "n_players": 46,
-          "n_added": 0,
+          "n_added": 46,
           "n_removed": 0
         },
         "active": {
-          "prev_date": "2026-07-04",
-          "n_players": 26,
-          "n_added": 0,
+          "prev_date": null,
+          "n_players": 25,
+          "n_added": 25,
           "n_removed": 0
         }
       }
@@ -291,15 +243,15 @@
       "team_abbr": "NYM",
       "roster_types": {
         "40Man": {
-          "prev_date": "2026-07-04",
+          "prev_date": null,
           "n_players": 46,
-          "n_added": 0,
+          "n_added": 46,
           "n_removed": 0
         },
         "active": {
-          "prev_date": "2026-07-04",
+          "prev_date": null,
           "n_players": 26,
-          "n_added": 0,
+          "n_added": 26,
           "n_removed": 0
         }
       }
@@ -309,60 +261,16 @@
       "team_abbr": "ATH",
       "roster_types": {
         "40Man": {
-          "prev_date": "2026-07-04",
+          "prev_date": null,
           "n_players": 43,
-          "n_added": 1,
-          "n_removed": 0,
-          "added": [
-            {
-              "full_name": "Geoff Hartlieb",
-              "player_id": 664129,
-              "position": "P",
-              "status": {
-                "code": "A",
-                "description": "Active"
-              }
-            }
-          ],
-          "removed": [],
-          "added_ids": [
-            664129
-          ],
-          "removed_ids": []
+          "n_added": 43,
+          "n_removed": 0
         },
         "active": {
-          "prev_date": "2026-07-04",
+          "prev_date": null,
           "n_players": 26,
-          "n_added": 1,
-          "n_removed": 1,
-          "added": [
-            {
-              "full_name": "Geoff Hartlieb",
-              "player_id": 664129,
-              "position": "P",
-              "status": {
-                "code": "A",
-                "description": "Active"
-              }
-            }
-          ],
-          "removed": [
-            {
-              "full_name": "Mark Leiter Jr.",
-              "player_id": 643410,
-              "position": "P",
-              "status": {
-                "code": "A",
-                "description": "Active"
-              }
-            }
-          ],
-          "added_ids": [
-            664129
-          ],
-          "removed_ids": [
-            643410
-          ]
+          "n_added": 26,
+          "n_removed": 0
         }
       }
     },
@@ -371,15 +279,15 @@
       "team_abbr": "PIT",
       "roster_types": {
         "40Man": {
-          "prev_date": "2026-07-04",
+          "prev_date": null,
           "n_players": 41,
-          "n_added": 0,
+          "n_added": 41,
           "n_removed": 0
         },
         "active": {
-          "prev_date": "2026-07-04",
+          "prev_date": null,
           "n_players": 26,
-          "n_added": 0,
+          "n_added": 26,
           "n_removed": 0
         }
       }
@@ -389,15 +297,15 @@
       "team_abbr": "SD",
       "roster_types": {
         "40Man": {
-          "prev_date": "2026-07-04",
+          "prev_date": null,
           "n_players": 43,
-          "n_added": 0,
+          "n_added": 43,
           "n_removed": 0
         },
         "active": {
-          "prev_date": "2026-07-04",
+          "prev_date": null,
           "n_players": 26,
-          "n_added": 0,
+          "n_added": 26,
           "n_removed": 0
         }
       }
@@ -407,31 +315,15 @@
       "team_abbr": "SEA",
       "roster_types": {
         "40Man": {
-          "prev_date": "2026-07-04",
-          "n_players": 43,
-          "n_added": 0,
-          "n_removed": 1,
-          "added": [],
-          "removed": [
-            {
-              "full_name": "Miles Mastrobuoni",
-              "player_id": 670156,
-              "position": "3B",
-              "status": {
-                "code": "A",
-                "description": "Active"
-              }
-            }
-          ],
-          "added_ids": [],
-          "removed_ids": [
-            670156
-          ]
+          "prev_date": null,
+          "n_players": 44,
+          "n_added": 44,
+          "n_removed": 0
         },
         "active": {
-          "prev_date": "2026-07-04",
+          "prev_date": null,
           "n_players": 26,
-          "n_added": 0,
+          "n_added": 26,
           "n_removed": 0
         }
       }
@@ -441,15 +333,15 @@
       "team_abbr": "SF",
       "roster_types": {
         "40Man": {
-          "prev_date": "2026-07-04",
+          "prev_date": null,
           "n_players": 45,
-          "n_added": 0,
+          "n_added": 45,
           "n_removed": 0
         },
         "active": {
-          "prev_date": "2026-07-04",
+          "prev_date": null,
           "n_players": 26,
-          "n_added": 0,
+          "n_added": 26,
           "n_removed": 0
         }
       }
@@ -459,15 +351,15 @@
       "team_abbr": "STL",
       "roster_types": {
         "40Man": {
-          "prev_date": "2026-07-04",
+          "prev_date": null,
           "n_players": 41,
-          "n_added": 0,
+          "n_added": 41,
           "n_removed": 0
         },
         "active": {
-          "prev_date": "2026-07-04",
+          "prev_date": null,
           "n_players": 26,
-          "n_added": 0,
+          "n_added": 26,
           "n_removed": 0
         }
       }
@@ -477,15 +369,15 @@
       "team_abbr": "TB",
       "roster_types": {
         "40Man": {
-          "prev_date": "2026-07-04",
+          "prev_date": null,
           "n_players": 46,
-          "n_added": 0,
+          "n_added": 46,
           "n_removed": 0
         },
         "active": {
-          "prev_date": "2026-07-04",
+          "prev_date": null,
           "n_players": 26,
-          "n_added": 0,
+          "n_added": 26,
           "n_removed": 0
         }
       }
@@ -495,15 +387,15 @@
       "team_abbr": "TEX",
       "roster_types": {
         "40Man": {
-          "prev_date": "2026-07-04",
+          "prev_date": null,
           "n_players": 44,
-          "n_added": 0,
+          "n_added": 44,
           "n_removed": 0
         },
         "active": {
-          "prev_date": "2026-07-04",
+          "prev_date": null,
           "n_players": 26,
-          "n_added": 0,
+          "n_added": 26,
           "n_removed": 0
         }
       }
@@ -513,15 +405,15 @@
       "team_abbr": "TOR",
       "roster_types": {
         "40Man": {
-          "prev_date": "2026-07-04",
+          "prev_date": null,
           "n_players": 46,
-          "n_added": 0,
+          "n_added": 46,
           "n_removed": 0
         },
         "active": {
-          "prev_date": "2026-07-04",
+          "prev_date": null,
           "n_players": 26,
-          "n_added": 0,
+          "n_added": 26,
           "n_removed": 0
         }
       }
@@ -531,15 +423,15 @@
       "team_abbr": "MIN",
       "roster_types": {
         "40Man": {
-          "prev_date": "2026-07-04",
+          "prev_date": null,
           "n_players": 42,
-          "n_added": 0,
+          "n_added": 42,
           "n_removed": 0
         },
         "active": {
-          "prev_date": "2026-07-04",
+          "prev_date": null,
           "n_players": 26,
-          "n_added": 0,
+          "n_added": 26,
           "n_removed": 0
         }
       }
@@ -549,15 +441,15 @@
       "team_abbr": "PHI",
       "roster_types": {
         "40Man": {
-          "prev_date": "2026-07-04",
+          "prev_date": null,
           "n_players": 42,
-          "n_added": 0,
+          "n_added": 42,
           "n_removed": 0
         },
         "active": {
-          "prev_date": "2026-07-04",
-          "n_players": 25,
-          "n_added": 0,
+          "prev_date": null,
+          "n_players": 26,
+          "n_added": 26,
           "n_removed": 0
         }
       }
@@ -567,15 +459,15 @@
       "team_abbr": "ATL",
       "roster_types": {
         "40Man": {
-          "prev_date": "2026-07-04",
+          "prev_date": null,
           "n_players": 45,
-          "n_added": 0,
+          "n_added": 45,
           "n_removed": 0
         },
         "active": {
-          "prev_date": "2026-07-04",
+          "prev_date": null,
           "n_players": 26,
-          "n_added": 0,
+          "n_added": 26,
           "n_removed": 0
         }
       }
@@ -585,15 +477,15 @@
       "team_abbr": "CWS",
       "roster_types": {
         "40Man": {
-          "prev_date": "2026-07-04",
+          "prev_date": null,
           "n_players": 48,
-          "n_added": 0,
+          "n_added": 48,
           "n_removed": 0
         },
         "active": {
-          "prev_date": "2026-07-04",
+          "prev_date": null,
           "n_players": 26,
-          "n_added": 0,
+          "n_added": 26,
           "n_removed": 0
         }
       }
@@ -603,44 +495,16 @@
       "team_abbr": "MIA",
       "roster_types": {
         "40Man": {
-          "prev_date": "2026-07-04",
+          "prev_date": null,
           "n_players": 45,
-          "n_added": 0,
+          "n_added": 45,
           "n_removed": 0
         },
         "active": {
-          "prev_date": "2026-07-04",
+          "prev_date": null,
           "n_players": 26,
-          "n_added": 1,
-          "n_removed": 1,
-          "added": [
-            {
-              "full_name": "Ryan Gusto",
-              "player_id": 687473,
-              "position": "P",
-              "status": {
-                "code": "A",
-                "description": "Active"
-              }
-            }
-          ],
-          "removed": [
-            {
-              "full_name": "William Kempner",
-              "player_id": 687531,
-              "position": "P",
-              "status": {
-                "code": "A",
-                "description": "Active"
-              }
-            }
-          ],
-          "added_ids": [
-            687473
-          ],
-          "removed_ids": [
-            687531
-          ]
+          "n_added": 26,
+          "n_removed": 0
         }
       }
     },
@@ -649,15 +513,15 @@
       "team_abbr": "NYY",
       "roster_types": {
         "40Man": {
-          "prev_date": "2026-07-04",
+          "prev_date": null,
           "n_players": 41,
-          "n_added": 0,
+          "n_added": 41,
           "n_removed": 0
         },
         "active": {
-          "prev_date": "2026-07-04",
+          "prev_date": null,
           "n_players": 25,
-          "n_added": 0,
+          "n_added": 25,
           "n_removed": 0
         }
       }
@@ -667,15 +531,15 @@
       "team_abbr": "MIL",
       "roster_types": {
         "40Man": {
-          "prev_date": "2026-07-04",
+          "prev_date": null,
           "n_players": 43,
-          "n_added": 0,
+          "n_added": 43,
           "n_removed": 0
         },
         "active": {
-          "prev_date": "2026-07-04",
+          "prev_date": null,
           "n_players": 26,
-          "n_added": 0,
+          "n_added": 26,
           "n_removed": 0
         }
       }

@@ -1,12 +1,34 @@
 {
   "date": "2026-07-05",
-  "generatedAt": "2026-07-04T02:13:18-05:00",
+  "generatedAt": "2026-07-05T02:16:41-05:00",
   "summary": {
     "cards": 15,
-    "badges": 0,
-    "sources": {},
-    "tones": {},
-    "stats": {},
+    "badges": 63,
+    "sources": {
+      "none": 63
+    },
+    "tones": {
+      "solid": 29,
+      "strong": 21,
+      "soft": 13
+    },
+    "stats": {
+      "hits_allowed": {
+        "badges": 15,
+        "rungWins": 0,
+        "rungLosses": 0
+      },
+      "outs": {
+        "badges": 21,
+        "rungWins": 0,
+        "rungLosses": 0
+      },
+      "strikeouts": {
+        "badges": 27,
+        "rungWins": 0,
+        "rungLosses": 0
+      }
+    },
     "final": {
       "badges": 0,
       "rungWins": 0,
@@ -19,5 +41,1317 @@
   },
   "largestLosses": [],
   "mixedFinalBadges": [],
-  "rows": []
+  "rows": [
+    {
+      "gamePk": 824902,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "away",
+      "starter": "Nolan McLean",
+      "label": "K up to 7",
+      "stat": "strikeouts",
+      "tone": "solid",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 2,
+      "targets": [
+        6,
+        7
+      ],
+      "detail": "Supported ladders: 6/7 Last supported rung: 7"
+    },
+    {
+      "gamePk": 824902,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "away",
+      "starter": "Nolan McLean",
+      "label": "O 19/20",
+      "stat": "outs",
+      "tone": "strong",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 2,
+      "targets": [
+        19,
+        20
+      ],
+      "detail": "Supported ladders: 19/20 Last supported rung: 20"
+    },
+    {
+      "gamePk": 824902,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "home",
+      "starter": "Mart\u00edn P\u00e9rez",
+      "label": "K up to 7",
+      "stat": "strikeouts",
+      "tone": "solid",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 3,
+      "targets": [
+        5,
+        6,
+        7
+      ],
+      "detail": "Supported ladders: 5/6/7 Last supported rung: 7"
+    },
+    {
+      "gamePk": 824902,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "home",
+      "starter": "Mart\u00edn P\u00e9rez",
+      "label": "O 17/18",
+      "stat": "outs",
+      "tone": "strong",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 2,
+      "targets": [
+        17,
+        18
+      ],
+      "detail": "Supported ladders: 17/18 Last supported rung: 18"
+    },
+    {
+      "gamePk": 824902,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "home",
+      "starter": "Mart\u00edn P\u00e9rez",
+      "label": "H up to 8",
+      "stat": "hits_allowed",
+      "tone": "soft",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 3,
+      "targets": [
+        6,
+        7,
+        8
+      ],
+      "detail": "Supported ladders: 6/7/8 Last supported rung: 8"
+    },
+    {
+      "gamePk": 822715,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "away",
+      "starter": "Bubba Chandler",
+      "label": "K up to 7",
+      "stat": "strikeouts",
+      "tone": "solid",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 3,
+      "targets": [
+        5,
+        6,
+        7
+      ],
+      "detail": "Supported ladders: 5/6/7 Last supported rung: 7"
+    },
+    {
+      "gamePk": 822715,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "away",
+      "starter": "Bubba Chandler",
+      "label": "O 17/18",
+      "stat": "outs",
+      "tone": "strong",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 2,
+      "targets": [
+        17,
+        18
+      ],
+      "detail": "Supported ladders: 17/18 Last supported rung: 18"
+    },
+    {
+      "gamePk": 822715,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "away",
+      "starter": "Bubba Chandler",
+      "label": "H up to 9",
+      "stat": "hits_allowed",
+      "tone": "soft",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 4,
+      "targets": [
+        6,
+        7,
+        8,
+        9
+      ],
+      "detail": "Supported ladders: 6/7/8/9 Last supported rung: 9"
+    },
+    {
+      "gamePk": 822715,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "home",
+      "starter": "Cade Cavalli",
+      "label": "K up to 7",
+      "stat": "strikeouts",
+      "tone": "solid",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 1,
+      "targets": [
+        7
+      ],
+      "detail": "Supported ladders: 7 Last supported rung: 7"
+    },
+    {
+      "gamePk": 822715,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "home",
+      "starter": "Cade Cavalli",
+      "label": "O 19/20",
+      "stat": "outs",
+      "tone": "strong",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 2,
+      "targets": [
+        19,
+        20
+      ],
+      "detail": "Supported ladders: 19/20 Last supported rung: 20"
+    },
+    {
+      "gamePk": 824497,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "away",
+      "starter": "Kyle Bradish",
+      "label": "K up to 7",
+      "stat": "strikeouts",
+      "tone": "solid",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 1,
+      "targets": [
+        7
+      ],
+      "detail": "Supported ladders: 7 Last supported rung: 7"
+    },
+    {
+      "gamePk": 824497,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "away",
+      "starter": "Kyle Bradish",
+      "label": "O 18/19",
+      "stat": "outs",
+      "tone": "strong",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 2,
+      "targets": [
+        18,
+        19
+      ],
+      "detail": "Supported ladders: 18/19 Last supported rung: 19"
+    },
+    {
+      "gamePk": 824497,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "away",
+      "starter": "Kyle Bradish",
+      "label": "H up to 10",
+      "stat": "hits_allowed",
+      "tone": "soft",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 5,
+      "targets": [
+        6,
+        7,
+        8,
+        9,
+        10
+      ],
+      "detail": "Supported ladders: 6/7/8/9/10 Last supported rung: 10"
+    },
+    {
+      "gamePk": 824497,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "home",
+      "starter": "Nick Lodolo",
+      "label": "K up to 7",
+      "stat": "strikeouts",
+      "tone": "solid",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 2,
+      "targets": [
+        6,
+        7
+      ],
+      "detail": "Supported ladders: 6/7 Last supported rung: 7"
+    },
+    {
+      "gamePk": 824497,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "home",
+      "starter": "Nick Lodolo",
+      "label": "O 17/18",
+      "stat": "outs",
+      "tone": "strong",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 2,
+      "targets": [
+        17,
+        18
+      ],
+      "detail": "Supported ladders: 17/18 Last supported rung: 18"
+    },
+    {
+      "gamePk": 823525,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "away",
+      "starter": "Joe Ryan",
+      "label": "K up to 7",
+      "stat": "strikeouts",
+      "tone": "solid",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 1,
+      "targets": [
+        7
+      ],
+      "detail": "Supported ladders: 7 Last supported rung: 7"
+    },
+    {
+      "gamePk": 823525,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "home",
+      "starter": "Ryan Weathers",
+      "label": "K up to 7",
+      "stat": "strikeouts",
+      "tone": "solid",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 2,
+      "targets": [
+        6,
+        7
+      ],
+      "detail": "Supported ladders: 6/7 Last supported rung: 7"
+    },
+    {
+      "gamePk": 823525,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "home",
+      "starter": "Ryan Weathers",
+      "label": "H up to 9",
+      "stat": "hits_allowed",
+      "tone": "solid",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 5,
+      "targets": [
+        5,
+        6,
+        7,
+        8,
+        9
+      ],
+      "detail": "Supported ladders: 5/6/7/8/9 Last supported rung: 9"
+    },
+    {
+      "gamePk": 824413,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "home",
+      "starter": "Tanner Bibee",
+      "label": "K up to 7",
+      "stat": "strikeouts",
+      "tone": "solid",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 3,
+      "targets": [
+        5,
+        6,
+        7
+      ],
+      "detail": "Supported ladders: 5/6/7 Last supported rung: 7"
+    },
+    {
+      "gamePk": 824413,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "home",
+      "starter": "Tanner Bibee",
+      "label": "H up to 9",
+      "stat": "hits_allowed",
+      "tone": "soft",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 4,
+      "targets": [
+        6,
+        7,
+        8,
+        9
+      ],
+      "detail": "Supported ladders: 6/7/8/9 Last supported rung: 9"
+    },
+    {
+      "gamePk": 824656,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "away",
+      "starter": "Matthew Liberatore",
+      "label": "K up to 7",
+      "stat": "strikeouts",
+      "tone": "solid",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 4,
+      "targets": [
+        4,
+        5,
+        6,
+        7
+      ],
+      "detail": "Supported ladders: 4/5/6/7 Last supported rung: 7"
+    },
+    {
+      "gamePk": 824656,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "home",
+      "starter": "Javier Assad",
+      "label": "K up to 7",
+      "stat": "strikeouts",
+      "tone": "solid",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 4,
+      "targets": [
+        4,
+        5,
+        6,
+        7
+      ],
+      "detail": "Supported ladders: 4/5/6/7 Last supported rung: 7"
+    },
+    {
+      "gamePk": 824656,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "home",
+      "starter": "Javier Assad",
+      "label": "H up to 9",
+      "stat": "hits_allowed",
+      "tone": "soft",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 5,
+      "targets": [
+        5,
+        6,
+        7,
+        8,
+        9
+      ],
+      "detail": "Supported ladders: 5/6/7/8/9 Last supported rung: 9"
+    },
+    {
+      "gamePk": 824091,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "away",
+      "starter": "Aaron Nola",
+      "label": "K up to 7",
+      "stat": "strikeouts",
+      "tone": "solid",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 2,
+      "targets": [
+        6,
+        7
+      ],
+      "detail": "Supported ladders: 6/7 Last supported rung: 7"
+    },
+    {
+      "gamePk": 824091,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "away",
+      "starter": "Aaron Nola",
+      "label": "O 18/19",
+      "stat": "outs",
+      "tone": "strong",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 2,
+      "targets": [
+        18,
+        19
+      ],
+      "detail": "Supported ladders: 18/19 Last supported rung: 19"
+    },
+    {
+      "gamePk": 824091,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "away",
+      "starter": "Aaron Nola",
+      "label": "H up to 10",
+      "stat": "hits_allowed",
+      "tone": "soft",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 5,
+      "targets": [
+        6,
+        7,
+        8,
+        9,
+        10
+      ],
+      "detail": "Supported ladders: 6/7/8/9/10 Last supported rung: 10"
+    },
+    {
+      "gamePk": 824091,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "home",
+      "starter": "Luinder Avila",
+      "label": "K up to 7",
+      "stat": "strikeouts",
+      "tone": "solid",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 4,
+      "targets": [
+        4,
+        5,
+        6,
+        7
+      ],
+      "detail": "Supported ladders: 4/5/6/7 Last supported rung: 7"
+    },
+    {
+      "gamePk": 824091,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "home",
+      "starter": "Luinder Avila",
+      "label": "O 16/17",
+      "stat": "outs",
+      "tone": "strong",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 2,
+      "targets": [
+        16,
+        17
+      ],
+      "detail": "Supported ladders: 16/17 Last supported rung: 17"
+    },
+    {
+      "gamePk": 822879,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "away",
+      "starter": "Casey Mize",
+      "label": "K up to 7",
+      "stat": "strikeouts",
+      "tone": "solid",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 3,
+      "targets": [
+        5,
+        6,
+        7
+      ],
+      "detail": "Supported ladders: 5/6/7 Last supported rung: 7"
+    },
+    {
+      "gamePk": 822879,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "away",
+      "starter": "Casey Mize",
+      "label": "O 19/20",
+      "stat": "outs",
+      "tone": "strong",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 2,
+      "targets": [
+        19,
+        20
+      ],
+      "detail": "Supported ladders: 19/20 Last supported rung: 20"
+    },
+    {
+      "gamePk": 822879,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "home",
+      "starter": "Kumar Rocker",
+      "label": "K up to 7",
+      "stat": "strikeouts",
+      "tone": "solid",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 3,
+      "targets": [
+        5,
+        6,
+        7
+      ],
+      "detail": "Supported ladders: 5/6/7 Last supported rung: 7"
+    },
+    {
+      "gamePk": 822879,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "home",
+      "starter": "Kumar Rocker",
+      "label": "O 17/18",
+      "stat": "outs",
+      "tone": "strong",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 2,
+      "targets": [
+        17,
+        18
+      ],
+      "detail": "Supported ladders: 17/18 Last supported rung: 18"
+    },
+    {
+      "gamePk": 822879,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "home",
+      "starter": "Kumar Rocker",
+      "label": "H up to 9",
+      "stat": "hits_allowed",
+      "tone": "soft",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 5,
+      "targets": [
+        5,
+        6,
+        7,
+        8,
+        9
+      ],
+      "detail": "Supported ladders: 5/6/7/8/9 Last supported rung: 9"
+    },
+    {
+      "gamePk": 824333,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "away",
+      "starter": "Tyler Mahle",
+      "label": "K up to 7",
+      "stat": "strikeouts",
+      "tone": "solid",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 4,
+      "targets": [
+        4,
+        5,
+        6,
+        7
+      ],
+      "detail": "Supported ladders: 4/5/6/7 Last supported rung: 7"
+    },
+    {
+      "gamePk": 824333,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "away",
+      "starter": "Tyler Mahle",
+      "label": "O 17/18",
+      "stat": "outs",
+      "tone": "strong",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 2,
+      "targets": [
+        17,
+        18
+      ],
+      "detail": "Supported ladders: 17/18 Last supported rung: 18"
+    },
+    {
+      "gamePk": 824333,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "away",
+      "starter": "Tyler Mahle",
+      "label": "H up to 10",
+      "stat": "hits_allowed",
+      "tone": "solid",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 4,
+      "targets": [
+        7,
+        8,
+        9,
+        10
+      ],
+      "detail": "Supported ladders: 7/8/9/10 Last supported rung: 10"
+    },
+    {
+      "gamePk": 824333,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "home",
+      "starter": "Tanner Gordon",
+      "label": "K up to 7",
+      "stat": "strikeouts",
+      "tone": "solid",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 4,
+      "targets": [
+        4,
+        5,
+        6,
+        7
+      ],
+      "detail": "Supported ladders: 4/5/6/7 Last supported rung: 7"
+    },
+    {
+      "gamePk": 824333,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "home",
+      "starter": "Tanner Gordon",
+      "label": "O 16/17",
+      "stat": "outs",
+      "tone": "strong",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 2,
+      "targets": [
+        16,
+        17
+      ],
+      "detail": "Supported ladders: 16/17 Last supported rung: 17"
+    },
+    {
+      "gamePk": 825061,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "away",
+      "starter": "Brandon Sproat",
+      "label": "K up to 7",
+      "stat": "strikeouts",
+      "tone": "soft",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 3,
+      "targets": [
+        5,
+        6,
+        7
+      ],
+      "detail": "Supported ladders: 5/6/7 Last supported rung: 7"
+    },
+    {
+      "gamePk": 825061,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "away",
+      "starter": "Brandon Sproat",
+      "label": "O 17/18",
+      "stat": "outs",
+      "tone": "strong",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 2,
+      "targets": [
+        17,
+        18
+      ],
+      "detail": "Supported ladders: 17/18 Last supported rung: 18"
+    },
+    {
+      "gamePk": 825061,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "home",
+      "starter": "Eduardo Rodriguez",
+      "label": "K up to 7",
+      "stat": "strikeouts",
+      "tone": "solid",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 3,
+      "targets": [
+        5,
+        6,
+        7
+      ],
+      "detail": "Supported ladders: 5/6/7 Last supported rung: 7"
+    },
+    {
+      "gamePk": 825061,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "home",
+      "starter": "Eduardo Rodriguez",
+      "label": "O 19/20",
+      "stat": "outs",
+      "tone": "strong",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 2,
+      "targets": [
+        19,
+        20
+      ],
+      "detail": "Supported ladders: 19/20 Last supported rung: 20"
+    },
+    {
+      "gamePk": 825061,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "home",
+      "starter": "Eduardo Rodriguez",
+      "label": "H up to 9",
+      "stat": "hits_allowed",
+      "tone": "soft",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 4,
+      "targets": [
+        6,
+        7,
+        8,
+        9
+      ],
+      "detail": "Supported ladders: 6/7/8/9 Last supported rung: 9"
+    },
+    {
+      "gamePk": 824980,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "away",
+      "starter": "Eury P\u00e9rez",
+      "label": "K up to 7",
+      "stat": "strikeouts",
+      "tone": "solid",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 2,
+      "targets": [
+        6,
+        7
+      ],
+      "detail": "Supported ladders: 6/7 Last supported rung: 7"
+    },
+    {
+      "gamePk": 824980,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "home",
+      "starter": "Gage Jump",
+      "label": "K up to 7",
+      "stat": "strikeouts",
+      "tone": "solid",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 2,
+      "targets": [
+        6,
+        7
+      ],
+      "detail": "Supported ladders: 6/7 Last supported rung: 7"
+    },
+    {
+      "gamePk": 824980,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "home",
+      "starter": "Gage Jump",
+      "label": "O 19/20",
+      "stat": "outs",
+      "tone": "strong",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 2,
+      "targets": [
+        19,
+        20
+      ],
+      "detail": "Supported ladders: 19/20 Last supported rung: 20"
+    },
+    {
+      "gamePk": 824980,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "home",
+      "starter": "Gage Jump",
+      "label": "H up to 9",
+      "stat": "hits_allowed",
+      "tone": "soft",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 4,
+      "targets": [
+        6,
+        7,
+        8,
+        9
+      ],
+      "detail": "Supported ladders: 6/7/8/9 Last supported rung: 9"
+    },
+    {
+      "gamePk": 823117,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "away",
+      "starter": "Trey Yesavage",
+      "label": "K up to 7",
+      "stat": "strikeouts",
+      "tone": "solid",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 2,
+      "targets": [
+        6,
+        7
+      ],
+      "detail": "Supported ladders: 6/7 Last supported rung: 7"
+    },
+    {
+      "gamePk": 823117,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "away",
+      "starter": "Trey Yesavage",
+      "label": "O 18/19",
+      "stat": "outs",
+      "tone": "strong",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 2,
+      "targets": [
+        18,
+        19
+      ],
+      "detail": "Supported ladders: 18/19 Last supported rung: 19"
+    },
+    {
+      "gamePk": 823117,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "home",
+      "starter": "Emerson Hancock",
+      "label": "K up to 7",
+      "stat": "strikeouts",
+      "tone": "solid",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 3,
+      "targets": [
+        5,
+        6,
+        7
+      ],
+      "detail": "Supported ladders: 5/6/7 Last supported rung: 7"
+    },
+    {
+      "gamePk": 823117,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "home",
+      "starter": "Emerson Hancock",
+      "label": "O 19/20",
+      "stat": "outs",
+      "tone": "strong",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 2,
+      "targets": [
+        19,
+        20
+      ],
+      "detail": "Supported ladders: 19/20 Last supported rung: 20"
+    },
+    {
+      "gamePk": 823117,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "home",
+      "starter": "Emerson Hancock",
+      "label": "H up to 9",
+      "stat": "hits_allowed",
+      "tone": "solid",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 4,
+      "targets": [
+        6,
+        7,
+        8,
+        9
+      ],
+      "detail": "Supported ladders: 6/7/8/9 Last supported rung: 9"
+    },
+    {
+      "gamePk": 823931,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "away",
+      "starter": "JP Sears",
+      "label": "K up to 6",
+      "stat": "strikeouts",
+      "tone": "solid",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 2,
+      "targets": [
+        5,
+        6
+      ],
+      "detail": "Supported ladders: 5/6 Last supported rung: 6"
+    },
+    {
+      "gamePk": 823931,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "away",
+      "starter": "JP Sears",
+      "label": "O 17/18",
+      "stat": "outs",
+      "tone": "strong",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 2,
+      "targets": [
+        17,
+        18
+      ],
+      "detail": "Supported ladders: 17/18 Last supported rung: 18"
+    },
+    {
+      "gamePk": 823931,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "away",
+      "starter": "JP Sears",
+      "label": "H up to 9",
+      "stat": "hits_allowed",
+      "tone": "soft",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 4,
+      "targets": [
+        6,
+        7,
+        8,
+        9
+      ],
+      "detail": "Supported ladders: 6/7/8/9 Last supported rung: 9"
+    },
+    {
+      "gamePk": 823931,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "home",
+      "starter": "Emmet Sheehan",
+      "label": "K up to 7",
+      "stat": "strikeouts",
+      "tone": "solid",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 2,
+      "targets": [
+        6,
+        7
+      ],
+      "detail": "Supported ladders: 6/7 Last supported rung: 7"
+    },
+    {
+      "gamePk": 823931,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "home",
+      "starter": "Emmet Sheehan",
+      "label": "O 17/18",
+      "stat": "outs",
+      "tone": "strong",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 2,
+      "targets": [
+        17,
+        18
+      ],
+      "detail": "Supported ladders: 17/18 Last supported rung: 18"
+    },
+    {
+      "gamePk": 824010,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "away",
+      "starter": "Ranger Suarez",
+      "label": "K up to 7",
+      "stat": "strikeouts",
+      "tone": "solid",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 1,
+      "targets": [
+        7
+      ],
+      "detail": "Supported ladders: 7 Last supported rung: 7"
+    },
+    {
+      "gamePk": 824010,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "away",
+      "starter": "Ranger Suarez",
+      "label": "O 19/20",
+      "stat": "outs",
+      "tone": "strong",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 2,
+      "targets": [
+        19,
+        20
+      ],
+      "detail": "Supported ladders: 19/20 Last supported rung: 20"
+    },
+    {
+      "gamePk": 824010,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "away",
+      "starter": "Ranger Suarez",
+      "label": "H up to 9",
+      "stat": "hits_allowed",
+      "tone": "soft",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 5,
+      "targets": [
+        5,
+        6,
+        7,
+        8,
+        9
+      ],
+      "detail": "Supported ladders: 5/6/7/8/9 Last supported rung: 9"
+    },
+    {
+      "gamePk": 824010,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "home",
+      "starter": "Ryan Johnson",
+      "label": "K up to 7",
+      "stat": "strikeouts",
+      "tone": "solid",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 3,
+      "targets": [
+        5,
+        6,
+        7
+      ],
+      "detail": "Supported ladders: 5/6/7 Last supported rung: 7"
+    },
+    {
+      "gamePk": 824010,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "home",
+      "starter": "Ryan Johnson",
+      "label": "O 17/18",
+      "stat": "outs",
+      "tone": "strong",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 2,
+      "targets": [
+        17,
+        18
+      ],
+      "detail": "Supported ladders: 17/18 Last supported rung: 18"
+    },
+    {
+      "gamePk": 824010,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "home",
+      "starter": "Ryan Johnson",
+      "label": "H up to 10",
+      "stat": "hits_allowed",
+      "tone": "soft",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 5,
+      "targets": [
+        6,
+        7,
+        8,
+        9,
+        10
+      ],
+      "detail": "Supported ladders: 6/7/8/9/10 Last supported rung: 10"
+    }
+  ]
 }

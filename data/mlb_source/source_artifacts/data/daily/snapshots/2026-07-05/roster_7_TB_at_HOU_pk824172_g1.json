@@ -505,7 +505,7 @@
       "role": "SP",
       "leverage_skill": 0.5,
       "stamina_pitches": 91,
-      "availability_mult": 1.0,
+      "availability_mult": 0.3583333333333333,
       "platoon_mult_vs_lhb": {
         "k": 0.9282563569641183,
         "bb": 1.1925000000000001,
@@ -551,7 +551,7 @@
         "role": "CL",
         "leverage_skill": 0.85,
         "stamina_pitches": 25,
-        "availability_mult": 0.9400000000000001,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 0.8792609966687063,
           "bb": 1.0242296918767506,
@@ -636,7 +636,7 @@
         "role": "SU",
         "leverage_skill": 0.7,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.8333333333333334,
         "platoon_mult_vs_lhb": {
           "k": 1.0059950457469335,
           "bb": 1.0258157100834329,
@@ -679,7 +679,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.8416666666666667,
         "platoon_mult_vs_lhb": {
           "k": 0.8339081358331921,
           "bb": 1.1925000000000001,
@@ -723,7 +723,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.8833333333333333,
         "platoon_mult_vs_lhb": {
           "k": 0.9189746343881682,
           "bb": 1.1925000000000001,
@@ -766,7 +766,7 @@
         "role": "SU",
         "leverage_skill": 0.7,
         "stamina_pitches": 25,
-        "availability_mult": 0.965,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 0.8075,
           "bb": 1.1925000000000001,
@@ -1276,6 +1276,35 @@
         "vs_pitcher_history": {}
       },
       {
+        "id": 664774,
+        "name": "LaMonte Wade Jr.",
+        "pos": "1B",
+        "bat": "L",
+        "throw": "L",
+        "k_rate": 0.3,
+        "bb_rate": 0.0,
+        "hbp_rate": 0.0,
+        "hr_rate": 0.1,
+        "inplay_hit_rate": 0.2857142857142857,
+        "xb_hit_share": 0.3333333333333333,
+        "vs_pitch_type": {},
+        "vs_pitch_type_hr": {},
+        "platoon_mult_vs_lhp": {
+          "k": 0.8075,
+          "bb": 1.0,
+          "hr": 0.78,
+          "inplay": 1.1925000000000001
+        },
+        "platoon_mult_vs_rhp": {
+          "k": 1.1375,
+          "bb": 1.0,
+          "hr": 1.1375,
+          "inplay": 0.835
+        },
+        "statcast_quality_mult": {},
+        "vs_pitcher_history": {}
+      },
+      {
         "id": 669397,
         "name": "Nick Allen",
         "pos": "SS",
@@ -1358,6 +1387,35 @@
           "bb": 1.0786923891080535,
           "hr": 0.9256497051758026,
           "inplay": 1.0752136752136752
+        },
+        "statcast_quality_mult": {},
+        "vs_pitcher_history": {}
+      },
+      {
+        "id": 701305,
+        "name": "Zach Dezenzo",
+        "pos": "LF",
+        "bat": "R",
+        "throw": "R",
+        "k_rate": 0.3784313725490196,
+        "bb_rate": 0.07990196078431372,
+        "hbp_rate": 0.0,
+        "hr_rate": 0.016666666666666666,
+        "inplay_hit_rate": 0.29579831932773104,
+        "xb_hit_share": 0.4444444444444444,
+        "vs_pitch_type": {},
+        "vs_pitch_type_hr": {},
+        "platoon_mult_vs_lhp": {
+          "k": 0.8463730569948187,
+          "bb": 1.0757668711656443,
+          "hr": 1.275,
+          "inplay": 0.8075
+        },
+        "platoon_mult_vs_rhp": {
+          "k": 1.0313471502590674,
+          "bb": 0.9662576687116564,
+          "hr": 0.78,
+          "inplay": 1.0697916666666667
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -1503,7 +1561,7 @@
         "role": "SU",
         "leverage_skill": 0.7,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.8166666666666667,
         "platoon_mult_vs_lhb": {
           "k": 1.0735138662738104,
           "bb": 1.046069238478656,
@@ -1546,7 +1604,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.895,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 0.8618564742589704,
           "bb": 0.8075,
@@ -1588,7 +1646,7 @@
         "role": "SU",
         "leverage_skill": 0.7,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.8583333333333334,
         "platoon_mult_vs_lhb": {
           "k": 0.8448717948717949,
           "bb": 0.8075,
@@ -1629,7 +1687,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.85,
         "platoon_mult_vs_lhb": {
           "k": 1.0019178612940722,
           "bb": 0.8472023422251138,
@@ -1673,7 +1731,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.875,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 0.8500893655049151,
           "bb": 0.8990189932927974,

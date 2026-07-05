@@ -2064,7 +2064,7 @@
           "arsenal_sample_size": 293,
           "stamina_pitches": 25,
           "role": "MR",
-          "availability_mult": 1.0,
+          "availability_mult": 0.9083333333333333,
           "platoon_mult_vs_lhb": {
             "k": 1.153209242618742,
             "bb": 0.9652047150291555,
@@ -2302,7 +2302,7 @@
           "arsenal_sample_size": 362,
           "stamina_pitches": 25,
           "role": "MR",
-          "availability_mult": 1.0,
+          "availability_mult": 0.9333333333333333,
           "platoon_mult_vs_lhb": {
             "k": 0.9679386088425795,
             "bb": 0.8075,
@@ -2388,7 +2388,7 @@
           "arsenal_sample_size": 473,
           "stamina_pitches": 25,
           "role": "CL",
-          "availability_mult": 0.89,
+          "availability_mult": 1.0,
           "platoon_mult_vs_lhb": {
             "k": 1.104924076437975,
             "bb": 1.144400606022347,
@@ -2475,7 +2475,7 @@
           "arsenal_sample_size": 568,
           "stamina_pitches": 25,
           "role": "MR",
-          "availability_mult": 0.95,
+          "availability_mult": 0.8666666666666667,
           "platoon_mult_vs_lhb": {
             "k": 0.9728032091736911,
             "bb": 0.8745308331133191,
@@ -2562,7 +2562,7 @@
           "arsenal_sample_size": 413,
           "stamina_pitches": 25,
           "role": "MR",
-          "availability_mult": 0.9299999999999999,
+          "availability_mult": 0.8416666666666667,
           "platoon_mult_vs_lhb": {
             "k": 0.8075,
             "bb": 1.1447368421052633,
@@ -4483,7 +4483,7 @@
           "arsenal_sample_size": 207,
           "stamina_pitches": 25,
           "role": "MR",
-          "availability_mult": 0.9299999999999999,
+          "availability_mult": 1.0,
           "platoon_mult_vs_lhb": {
             "k": 0.9321428571428572,
             "bb": 0.8075,
@@ -4566,7 +4566,7 @@
           "statcast_splits_end_date": "",
           "arsenal_source": "statsapi_pitchArsenal",
           "arsenal_sample_size": 237,
-          "stamina_pitches": 25,
+          "stamina_pitches": 20,
           "role": "CL",
           "availability_mult": 1.0,
           "platoon_mult_vs_lhb": {
@@ -4653,7 +4653,7 @@
           "arsenal_sample_size": 35,
           "stamina_pitches": 25,
           "role": "MR",
-          "availability_mult": 0.9400000000000001,
+          "availability_mult": 0.8166666666666667,
           "platoon_mult_vs_lhb": {
             "k": 0.8075,
             "bb": 0.8075,
@@ -4802,7 +4802,7 @@
           "arsenal_sample_size": 593,
           "stamina_pitches": 25,
           "role": "MR",
-          "availability_mult": 1.0,
+          "availability_mult": 0.8833333333333333,
           "platoon_mult_vs_lhb": {
             "k": 1.0870373657584096,
             "bb": 0.8465720013891957,
@@ -4943,104 +4943,6 @@
           "bb_pu_rate": 0.11,
           "bb_inplay_n": 0,
           "leverage_skill": 0.5
-        },
-        {
-          "player": {
-            "mlbam_id": 695534,
-            "full_name": "Chase Petty",
-            "primary_position": "P",
-            "bat_side": "R",
-            "throw_side": "R"
-          },
-          "k_rate": 0.10928500496524328,
-          "bb_rate": 0.050397219463753716,
-          "hbp_rate": 0.02631578947368421,
-          "hr_rate": 0.03921300893743793,
-          "inplay_hit_rate": 0.2431451612903226,
-          "batters_faced": 76.0,
-          "balls_in_play": 62.0,
-          "arsenal": {
-            "FF": 0.15564202466926075,
-            "OTHER": 0.13229571396887144,
-            "CH": 0.24513619735408593,
-            "SI": 0.30739298922178965,
-            "SL": 0.15953307478599224
-          },
-          "pitch_type_whiff_mult": {},
-          "pitch_type_inplay_mult": {},
-          "pitch_type_hr_mult": {},
-          "statcast_splits_source": "",
-          "statcast_splits_n_pitches": 0,
-          "statcast_splits_start_date": "",
-          "statcast_splits_end_date": "",
-          "arsenal_source": "statsapi_pitchArsenal",
-          "arsenal_sample_size": 257,
-          "stamina_pitches": 28,
-          "role": "LR",
-          "availability_mult": 0.915,
-          "platoon_mult_vs_lhb": {
-            "k": 1.0091902670503308,
-            "bb": 1.0562944718117133,
-            "hr": 0.78,
-            "inplay": 0.9024046434494196
-          },
-          "platoon_mult_vs_rhb": {
-            "k": 0.9532712403452978,
-            "bb": 0.995665024630542,
-            "hr": 1.275,
-            "inplay": 1.0861940298507462
-          },
-          "venue_mult_home": {
-            "k": 1.0677350216304842,
-            "bb": 0.9519490254872564,
-            "hr": 0.86,
-            "inplay": 1.0098673300165837
-          },
-          "venue_mult_away": {
-            "k": 0.8775000000000001,
-            "bb": 1.1129885057471265,
-            "hr": 1.175,
-            "inplay": 0.9821852277076157
-          },
-          "vs_venue_hr_mult": {
-            "112": 1.0380699726110354,
-            "113": 0.86
-          },
-          "vs_venue_k_mult": {
-            "112": 0.8775000000000001,
-            "113": 1.0677350216304842
-          },
-          "vs_venue_bb_mult": {
-            "112": 1.1225,
-            "113": 0.9519490254872564
-          },
-          "vs_venue_inplay_mult": {
-            "112": 0.937893864013267,
-            "113": 1.0098673300165837
-          },
-          "vs_venue_history": {
-            "112": {
-              "bf": 23.0,
-              "k_mult": 0.65,
-              "bb_mult": 1.35,
-              "hr_mult": 1.108771350317244,
-              "inplay_mult": 0.8225538971807629
-            },
-            "113": {
-              "bf": 46.0,
-              "k_mult": 1.1935286332299548,
-              "bb_mult": 0.8627115013921611,
-              "hr_mult": 0.6,
-              "inplay_mult": 1.0281923714759535
-            }
-          },
-          "statcast_quality_mult": {},
-          "bb_gb_rate": 0.44,
-          "bb_fb_rate": 0.25,
-          "bb_ld_rate": 0.2,
-          "bb_pu_rate": 0.11,
-          "bb_inplay_n": 0,
-          "leverage_skill": 0.35
         }
       ]
     }

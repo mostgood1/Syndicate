@@ -2,7 +2,7 @@
   "date": "2026-07-05",
   "season": 2026,
   "spring_mode": false,
-  "generated_at": "2026-07-04T07:12:11.453902",
+  "generated_at": "2026-07-05T07:10:15.709385",
   "games": [
     {
       "idx": 0,
@@ -80,7 +80,7 @@
         "abbr": "WSH"
       },
       "away_probable_id": 696149,
-      "home_probable_id": 571945,
+      "home_probable_id": 676917,
       "away_source": "feed_gameData_probablePitchers",
       "home_source": "feed_gameData_probablePitchers",
       "away_confidence": 0.75,
@@ -105,8 +105,8 @@
       },
       "home_validation": {
         "status": "ok",
-        "selected_id": 571945,
-        "selected_name": "Miles Mikolas",
+        "selected_id": 676917,
+        "selected_name": "Cade Cavalli",
         "selected_source": "feed_gameData_probablePitchers",
         "override_reason": "",
         "roster_team_ids": [
@@ -123,13 +123,13 @@
       },
       "raw": {
         "away_schedule_id": 696149,
-        "home_schedule_id": 571945,
+        "home_schedule_id": 676917,
         "away_schedule_name": "Bubba Chandler",
-        "home_schedule_name": "Miles Mikolas",
+        "home_schedule_name": "Cade Cavalli",
         "away_feed_id": 696149,
-        "home_feed_id": 571945,
+        "home_feed_id": 676917,
         "away_feed_name": "Bubba Chandler",
-        "home_feed_name": "Miles Mikolas"
+        "home_feed_name": "Cade Cavalli"
       }
     },
     {
@@ -271,7 +271,7 @@
         "team_id": 114,
         "abbr": "CLE"
       },
-      "away_probable_id": 607200,
+      "away_probable_id": 669684,
       "home_probable_id": 676440,
       "away_source": "feed_gameData_probablePitchers",
       "home_source": "feed_gameData_probablePitchers",
@@ -279,8 +279,8 @@
       "home_confidence": 0.75,
       "away_validation": {
         "status": "ok",
-        "selected_id": 607200,
-        "selected_name": "Erick Fedde",
+        "selected_id": 669684,
+        "selected_name": "Chris Murphy",
         "selected_source": "feed_gameData_probablePitchers",
         "override_reason": "",
         "roster_team_ids": [
@@ -314,13 +314,13 @@
         "rejected_candidates": []
       },
       "raw": {
-        "away_schedule_id": 607200,
+        "away_schedule_id": 669684,
         "home_schedule_id": 676440,
-        "away_schedule_name": "Erick Fedde",
+        "away_schedule_name": "Chris Murphy",
         "home_schedule_name": "Tanner Bibee",
-        "away_feed_id": 607200,
+        "away_feed_id": 669684,
         "home_feed_id": 676440,
-        "away_feed_name": "Erick Fedde",
+        "away_feed_name": "Chris Murphy",
         "home_feed_name": "Tanner Bibee"
       }
     },
@@ -524,7 +524,7 @@
         "abbr": "TEX"
       },
       "away_probable_id": 663554,
-      "home_probable_id": 615698,
+      "home_probable_id": 677958,
       "away_source": "feed_gameData_probablePitchers",
       "home_source": "feed_gameData_probablePitchers",
       "away_confidence": 0.75,
@@ -549,8 +549,8 @@
       },
       "home_validation": {
         "status": "ok",
-        "selected_id": 615698,
-        "selected_name": "Cal Quantrill",
+        "selected_id": 677958,
+        "selected_name": "Kumar Rocker",
         "selected_source": "feed_gameData_probablePitchers",
         "override_reason": "",
         "roster_team_ids": [
@@ -567,13 +567,13 @@
       },
       "raw": {
         "away_schedule_id": 663554,
-        "home_schedule_id": 615698,
+        "home_schedule_id": 677958,
         "away_schedule_name": "Casey Mize",
-        "home_schedule_name": "Cal Quantrill",
+        "home_schedule_name": "Kumar Rocker",
         "away_feed_id": 663554,
-        "home_feed_id": 615698,
+        "home_feed_id": 677958,
         "away_feed_name": "Casey Mize",
-        "home_feed_name": "Cal Quantrill"
+        "home_feed_name": "Kumar Rocker"
       }
     },
     {
@@ -587,23 +587,27 @@
         "team_id": 115,
         "abbr": "COL"
       },
-      "away_probable_id": null,
+      "away_probable_id": 641816,
       "home_probable_id": 685299,
-      "away_source": "none",
+      "away_source": "feed_gameData_probablePitchers",
       "home_source": "feed_gameData_probablePitchers",
-      "away_confidence": 0.0,
+      "away_confidence": 0.75,
       "home_confidence": 0.75,
       "away_validation": {
-        "status": "none",
-        "selected_id": null,
-        "selected_name": "",
-        "selected_source": "none",
+        "status": "ok",
+        "selected_id": 641816,
+        "selected_name": "Tyler Mahle",
+        "selected_source": "feed_gameData_probablePitchers",
         "override_reason": "",
-        "roster_team_ids": [],
-        "registry_team_ids": [],
-        "on_expected_team": false,
+        "roster_team_ids": [
+          137
+        ],
+        "registry_team_ids": [
+          137
+        ],
+        "on_expected_team": true,
         "on_opponent_team": false,
-        "on_expected_registry_team": false,
+        "on_expected_registry_team": true,
         "on_opponent_registry_team": false,
         "rejected_candidates": []
       },
@@ -626,13 +630,13 @@
         "rejected_candidates": []
       },
       "raw": {
-        "away_schedule_id": null,
+        "away_schedule_id": 641816,
         "home_schedule_id": 685299,
-        "away_schedule_name": "",
+        "away_schedule_name": "Tyler Mahle",
         "home_schedule_name": "Tanner Gordon",
-        "away_feed_id": null,
+        "away_feed_id": 641816,
         "home_feed_id": 685299,
-        "away_feed_name": "",
+        "away_feed_name": "Tyler Mahle",
         "home_feed_name": "Tanner Gordon"
       }
     },
@@ -776,7 +780,7 @@
         "abbr": "SEA"
       },
       "away_probable_id": 702056,
-      "home_probable_id": 669923,
+      "home_probable_id": 676106,
       "away_source": "feed_gameData_probablePitchers",
       "home_source": "feed_gameData_probablePitchers",
       "away_confidence": 0.75,
@@ -801,8 +805,8 @@
       },
       "home_validation": {
         "status": "ok",
-        "selected_id": 669923,
-        "selected_name": "George Kirby",
+        "selected_id": 676106,
+        "selected_name": "Emerson Hancock",
         "selected_source": "feed_gameData_probablePitchers",
         "override_reason": "",
         "roster_team_ids": [
@@ -819,13 +823,13 @@
       },
       "raw": {
         "away_schedule_id": 702056,
-        "home_schedule_id": 669923,
+        "home_schedule_id": 676106,
         "away_schedule_name": "Trey Yesavage",
-        "home_schedule_name": "George Kirby",
+        "home_schedule_name": "Emerson Hancock",
         "away_feed_id": 702056,
-        "home_feed_id": 669923,
+        "home_feed_id": 676106,
         "away_feed_name": "Trey Yesavage",
-        "home_feed_name": "George Kirby"
+        "home_feed_name": "Emerson Hancock"
       }
     },
     {

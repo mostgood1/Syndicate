@@ -593,7 +593,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.9083333333333333,
         "platoon_mult_vs_lhb": {
           "k": 1.153209242618742,
           "bb": 0.9652047150291555,
@@ -721,7 +721,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.9333333333333333,
         "platoon_mult_vs_lhb": {
           "k": 0.9679386088425795,
           "bb": 0.8075,
@@ -765,7 +765,7 @@
         "role": "CL",
         "leverage_skill": 0.85,
         "stamina_pitches": 25,
-        "availability_mult": 0.89,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 1.104924076437975,
           "bb": 1.144400606022347,
@@ -808,7 +808,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.95,
+        "availability_mult": 0.8666666666666667,
         "platoon_mult_vs_lhb": {
           "k": 0.9728032091736911,
           "bb": 0.8745308331133191,
@@ -852,7 +852,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.9299999999999999,
+        "availability_mult": 0.8416666666666667,
         "platoon_mult_vs_lhb": {
           "k": 0.8075,
           "bb": 1.1447368421052633,
@@ -976,12 +976,6 @@
         "name": "Tejay Antone",
         "role": "MR",
         "lev": 0.5
-      },
-      {
-        "id": 695534,
-        "name": "Chase Petty",
-        "role": "LR",
-        "lev": 0.35
       }
     ],
     "lineup": [
@@ -1459,7 +1453,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.9299999999999999,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 0.9321428571428572,
           "bb": 0.8075,
@@ -1501,7 +1495,7 @@
         "throw": "R",
         "role": "CL",
         "leverage_skill": 0.85,
-        "stamina_pitches": 25,
+        "stamina_pitches": 20,
         "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 1.14280205655527,
@@ -1544,7 +1538,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.9400000000000001,
+        "availability_mult": 0.8166666666666667,
         "platoon_mult_vs_lhb": {
           "k": 0.8075,
           "bb": 0.8075,
@@ -1627,7 +1621,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.8833333333333333,
         "platoon_mult_vs_lhb": {
           "k": 1.0870373657584096,
           "bb": 0.8465720013891957,
@@ -1703,50 +1697,6 @@
           "SI": 0.07228915407228914,
           "SL": 0.024096385024096386,
           "FC": 0.1927710801927711
-        },
-        "pitch_type_whiff_mult": {},
-        "pitch_type_inplay_mult": {},
-        "pitch_type_hr_mult": {}
-      },
-      {
-        "id": 695534,
-        "name": "Chase Petty",
-        "throw": "R",
-        "role": "LR",
-        "leverage_skill": 0.35,
-        "stamina_pitches": 28,
-        "availability_mult": 0.915,
-        "platoon_mult_vs_lhb": {
-          "k": 1.0091902670503308,
-          "bb": 1.0562944718117133,
-          "hr": 0.78,
-          "inplay": 0.9024046434494196
-        },
-        "platoon_mult_vs_rhb": {
-          "k": 0.9532712403452978,
-          "bb": 0.995665024630542,
-          "hr": 1.275,
-          "inplay": 1.0861940298507462
-        },
-        "statcast_quality_mult": {},
-        "arsenal_source": "statsapi_pitchArsenal",
-        "arsenal_sample_size": 257,
-        "statcast_splits_found": false,
-        "statcast_splits_source": "",
-        "statcast_splits_n_pitches": 0,
-        "statcast_splits_start_date": "",
-        "statcast_splits_end_date": "",
-        "k_rate": 0.10928500496524328,
-        "bb_rate": 0.050397219463753716,
-        "hbp_rate": 0.02631578947368421,
-        "hr_rate": 0.03921300893743793,
-        "inplay_hit_rate": 0.2431451612903226,
-        "arsenal": {
-          "FF": 0.15564202466926075,
-          "OTHER": 0.13229571396887144,
-          "CH": 0.24513619735408593,
-          "SI": 0.30739298922178965,
-          "SL": 0.15953307478599224
         },
         "pitch_type_whiff_mult": {},
         "pitch_type_inplay_mult": {},

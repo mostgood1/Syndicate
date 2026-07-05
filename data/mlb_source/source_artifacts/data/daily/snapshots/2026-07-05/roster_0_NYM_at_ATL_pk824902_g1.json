@@ -546,7 +546,7 @@
         "role": "SU",
         "leverage_skill": 0.7,
         "stamina_pitches": 25,
-        "availability_mult": 0.91,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 1.0689422400631294,
           "bb": 1.1925000000000001,
@@ -718,7 +718,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 26,
-        "availability_mult": 0.98,
+        "availability_mult": 0.8166666666666667,
         "platoon_mult_vs_lhb": {
           "k": 0.8899999999999999,
           "bb": 0.8075,
@@ -886,12 +886,6 @@
       "requested_id": 527048
     },
     "bullpen": [
-      {
-        "id": 683627,
-        "name": "Anthony Molina",
-        "role": "MR",
-        "lev": 0.5
-      },
       {
         "id": 664849,
         "name": "Danny Young",
@@ -1194,35 +1188,6 @@
     ],
     "bench": [
       {
-        "id": 673490,
-        "name": "Ha-Seong Kim",
-        "pos": "SS",
-        "bat": "R",
-        "throw": "R",
-        "k_rate": 0.25304054054054054,
-        "bb_rate": 0.09480105105105105,
-        "hbp_rate": 0.0,
-        "hr_rate": 0.0,
-        "inplay_hit_rate": 0.09667553191489361,
-        "xb_hit_share": 0.05,
-        "vs_pitch_type": {},
-        "vs_pitch_type_hr": {},
-        "platoon_mult_vs_lhp": {
-          "k": 1.0791897969222122,
-          "bb": 0.9080229032291677,
-          "hr": 1.0,
-          "inplay": 0.924094452086199
-        },
-        "platoon_mult_vs_rhp": {
-          "k": 0.8974986256184717,
-          "bb": 1.132543934223858,
-          "hr": 1.0,
-          "inplay": 1.1920608815262246
-        },
-        "statcast_quality_mult": {},
-        "vs_pitcher_history": {}
-      },
-      {
         "id": 805347,
         "name": "Jim Jarvis",
         "pos": "SS",
@@ -1308,6 +1273,35 @@
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
+      },
+      {
+        "id": 571657,
+        "name": "Kyle Farmer",
+        "pos": "DH",
+        "bat": "R",
+        "throw": "R",
+        "k_rate": 0.26666666666666666,
+        "bb_rate": 0.0,
+        "hbp_rate": 0.0,
+        "hr_rate": 0.0,
+        "inplay_hit_rate": 0.36363636363636365,
+        "xb_hit_share": 0.25,
+        "vs_pitch_type": {},
+        "vs_pitch_type_hr": {},
+        "platoon_mult_vs_lhp": {
+          "k": 1.0125,
+          "bb": 1.0,
+          "hr": 1.0,
+          "inplay": 1.0171875
+        },
+        "platoon_mult_vs_rhp": {
+          "k": 0.965625,
+          "bb": 1.0,
+          "hr": 1.0,
+          "inplay": 0.9541666666666666
+        },
+        "statcast_quality_mult": {},
+        "vs_pitcher_history": {}
       }
     ],
     "starter_profile": {
@@ -1356,55 +1350,13 @@
     },
     "bullpen_profiles": [
       {
-        "id": 683627,
-        "name": "Anthony Molina",
-        "throw": "R",
-        "role": "MR",
-        "leverage_skill": 0.5,
-        "stamina_pitches": 30,
-        "availability_mult": 1.0,
-        "platoon_mult_vs_lhb": {
-          "k": 1.0,
-          "bb": 0.8075,
-          "hr": 1.0,
-          "inplay": 1.0
-        },
-        "platoon_mult_vs_rhb": {
-          "k": 1.0,
-          "bb": 1.1925000000000001,
-          "hr": 1.0,
-          "inplay": 1.0
-        },
-        "statcast_quality_mult": {},
-        "arsenal_source": "statsapi_pitchArsenal",
-        "arsenal_sample_size": 26,
-        "statcast_splits_found": false,
-        "statcast_splits_source": "",
-        "statcast_splits_n_pitches": 0,
-        "statcast_splits_start_date": "",
-        "statcast_splits_end_date": "",
-        "k_rate": 0.0,
-        "bb_rate": 0.16666666666666666,
-        "hbp_rate": 0.0,
-        "hr_rate": 0.0,
-        "inplay_hit_rate": 0.0,
-        "arsenal": {
-          "FF": 0.42307692153846166,
-          "CU": 0.346153853076923,
-          "CH": 0.2307692253846155
-        },
-        "pitch_type_whiff_mult": {},
-        "pitch_type_inplay_mult": {},
-        "pitch_type_hr_mult": {}
-      },
-      {
         "id": 664849,
         "name": "Danny Young",
         "throw": "L",
         "role": "MR",
         "leverage_skill": 0.5,
-        "stamina_pitches": 25,
-        "availability_mult": 0.9400000000000001,
+        "stamina_pitches": 22,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 1.0,
           "bb": 1.1925000000000001,
@@ -1445,7 +1397,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.885,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 1.087356102119706,
           "bb": 0.978816331134044,
@@ -1488,7 +1440,7 @@
         "role": "SU",
         "leverage_skill": 0.7,
         "stamina_pitches": 25,
-        "availability_mult": 0.91,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 1.021714428642893,
           "bb": 1.1248776784207861,
@@ -1531,7 +1483,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.9083333333333333,
         "platoon_mult_vs_lhb": {
           "k": 1.078293545534925,
           "bb": 1.0372553938785751,
@@ -1573,7 +1525,7 @@
         "role": "CL",
         "leverage_skill": 0.85,
         "stamina_pitches": 25,
-        "availability_mult": 0.89,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 0.8541659901185312,
           "bb": 1.1638342252749567,

@@ -552,7 +552,7 @@
         "role": "SU",
         "leverage_skill": 0.7,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.9,
         "platoon_mult_vs_lhb": {
           "k": 1.1270272349592245,
           "bb": 0.918785514054095,
@@ -596,7 +596,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.85,
         "platoon_mult_vs_lhb": {
           "k": 1.1656538297990349,
           "bb": 0.8308966209434594,
@@ -725,7 +725,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.8300000000000001,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 0.8075,
           "bb": 1.0611111111111111,
@@ -770,7 +770,7 @@
         "role": "CL",
         "leverage_skill": 0.85,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.8916666666666666,
         "platoon_mult_vs_lhb": {
           "k": 0.9187207342198914,
           "bb": 0.9304031354983202,
@@ -856,7 +856,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.935,
+        "availability_mult": 0.9083333333333333,
         "platoon_mult_vs_lhb": {
           "k": 1.031100108376029,
           "bb": 1.0275206257366336,
@@ -960,14 +960,20 @@
       {
         "id": 657097,
         "name": "Jacob Webb",
+        "role": "SU",
+        "lev": 0.7
+      },
+      {
+        "id": 663765,
+        "name": "Jake Woodford",
         "role": "CL",
         "lev": 0.85
       },
       {
         "id": 669020,
         "name": "Ryan Rolison",
-        "role": "SU",
-        "lev": 0.7
+        "role": "MR",
+        "lev": 0.5
       },
       {
         "id": 663423,
@@ -980,12 +986,6 @@
         "name": "Tyler Ferguson",
         "role": "MR",
         "lev": 0.5
-      },
-      {
-        "id": 669060,
-        "name": "Bryse Wilson",
-        "role": "LR",
-        "lev": 0.35
       }
     ],
     "lineup": [
@@ -1418,7 +1418,7 @@
         "role": "SU",
         "leverage_skill": 0.7,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.9,
         "platoon_mult_vs_lhb": {
           "k": 0.8893897364771151,
           "bb": 0.8075,
@@ -1461,7 +1461,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.945,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 1.1925000000000001,
           "bb": 0.8075,
@@ -1502,7 +1502,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.915,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 1.1925000000000001,
           "bb": 0.8533333333333333,
@@ -1542,8 +1542,8 @@
         "id": 657097,
         "name": "Jacob Webb",
         "throw": "R",
-        "role": "CL",
-        "leverage_skill": 0.85,
+        "role": "SU",
+        "leverage_skill": 0.7,
         "stamina_pitches": 25,
         "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
@@ -1583,13 +1583,58 @@
         "pitch_type_hr_mult": {}
       },
       {
+        "id": 663765,
+        "name": "Jake Woodford",
+        "throw": "R",
+        "role": "CL",
+        "leverage_skill": 0.85,
+        "stamina_pitches": 25,
+        "availability_mult": 1.0,
+        "platoon_mult_vs_lhb": {
+          "k": 0.8075,
+          "bb": 0.9992198581560283,
+          "hr": 0.8631077579637251,
+          "inplay": 1.0849460857016875
+        },
+        "platoon_mult_vs_rhb": {
+          "k": 1.18352187385827,
+          "bb": 0.9418386789456971,
+          "hr": 1.0049208689064963,
+          "inplay": 0.9063205911425839
+        },
+        "statcast_quality_mult": {},
+        "arsenal_source": "statsapi_pitchArsenal",
+        "arsenal_sample_size": 400,
+        "statcast_splits_found": false,
+        "statcast_splits_source": "",
+        "statcast_splits_n_pitches": 0,
+        "statcast_splits_start_date": "",
+        "statcast_splits_end_date": "",
+        "k_rate": 0.17905844155844156,
+        "bb_rate": 0.06676136363636363,
+        "hbp_rate": 0.0,
+        "hr_rate": 0.02958603896103896,
+        "inplay_hit_rate": 0.4103125,
+        "arsenal": {
+          "FF": 0.012500000000000002,
+          "OTHER": 0.15250000000000002,
+          "CH": 0.15250000000000002,
+          "SI": 0.29000000000000004,
+          "SL": 0.012500000000000002,
+          "FC": 0.38000000000000006
+        },
+        "pitch_type_whiff_mult": {},
+        "pitch_type_inplay_mult": {},
+        "pitch_type_hr_mult": {}
+      },
+      {
         "id": 669020,
         "name": "Ryan Rolison",
         "throw": "L",
-        "role": "SU",
-        "leverage_skill": 0.7,
+        "role": "MR",
+        "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.8666666666666667,
         "platoon_mult_vs_lhb": {
           "k": 1.1150061065758181,
           "bb": 0.901175037205423,
@@ -1634,7 +1679,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.7833333333333333,
         "platoon_mult_vs_lhb": {
           "k": 1.0804813203508046,
           "bb": 1.1107682425953067,
@@ -1678,7 +1723,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.8666666666666667,
         "platoon_mult_vs_lhb": {
           "k": 0.8075,
           "bb": 1.0,
@@ -1711,50 +1756,6 @@
           "SI": 0.10256410276923075,
           "SL": 0.10256410276923075,
           "FC": 0.10256410276923075
-        },
-        "pitch_type_whiff_mult": {},
-        "pitch_type_inplay_mult": {},
-        "pitch_type_hr_mult": {}
-      },
-      {
-        "id": 669060,
-        "name": "Bryse Wilson",
-        "throw": "R",
-        "role": "LR",
-        "leverage_skill": 0.35,
-        "stamina_pitches": 34,
-        "availability_mult": 0.64,
-        "platoon_mult_vs_lhb": {
-          "k": 1.0,
-          "bb": 1.1925000000000001,
-          "hr": 1.0,
-          "inplay": 1.1925000000000001
-        },
-        "platoon_mult_vs_rhb": {
-          "k": 1.0,
-          "bb": 0.8075,
-          "hr": 1.0,
-          "inplay": 0.8075
-        },
-        "statcast_quality_mult": {},
-        "arsenal_source": "statsapi_pitchArsenal",
-        "arsenal_sample_size": 29,
-        "statcast_splits_found": false,
-        "statcast_splits_source": "",
-        "statcast_splits_n_pitches": 0,
-        "statcast_splits_start_date": "",
-        "statcast_splits_end_date": "",
-        "k_rate": 0.0,
-        "bb_rate": 0.14285714285714285,
-        "hbp_rate": 0.0,
-        "hr_rate": 0.0,
-        "inplay_hit_rate": 0.16666666666666666,
-        "arsenal": {
-          "FF": 0.06896552068965521,
-          "CU": 0.13793103137931031,
-          "CH": 0.13793103137931031,
-          "SI": 0.37931034379310347,
-          "FC": 0.27586207275862074
         },
         "pitch_type_whiff_mult": {},
         "pitch_type_inplay_mult": {},

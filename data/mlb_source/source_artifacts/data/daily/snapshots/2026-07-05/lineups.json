@@ -2,11 +2,11 @@
   "date": "2026-07-05",
   "season": 2026,
   "spring_mode": false,
-  "generated_at": "2026-07-04T07:12:11.449885",
+  "generated_at": "2026-07-05T07:10:15.707361",
   "summary": {
     "games": 15,
     "projected_teams": 30,
-    "adjusted_teams": 8,
+    "adjusted_teams": 9,
     "partial_teams": 0,
     "fallback_pool_teams": 0,
     "confirmed_teams": 0,
@@ -407,7 +407,7 @@
         "missing_ids": [],
         "backfilled_ids": [],
         "pool_source": "active+40Man",
-        "pool_size": 18,
+        "pool_size": 17,
         "raw_names": [
           "Taylor Ward",
           "Gunnar Henderson",
@@ -461,7 +461,7 @@
           695490
         ],
         "pool_source": "active+40Man",
-        "pool_size": 17,
+        "pool_size": 16,
         "raw_names": [
           "Blake Dunn",
           "Elly De La Cruz",
@@ -819,7 +819,7 @@
       "away_source": "projected_rotowire_default_vs_rhp",
       "home_source": "projected_rotowire_default_vs_rhp",
       "away_confidence": 0.66,
-      "home_confidence": 0.66,
+      "home_confidence": 0.56,
       "away_comparison": {
         "status": "projected_only",
         "is_true_mismatch": false,
@@ -1285,7 +1285,7 @@
           694728
         ],
         "pool_source": "active+40Man",
-        "pool_size": 17,
+        "pool_size": 18,
         "raw_names": [
           "Jeremy Pena",
           "Yordan Alvarez",
@@ -1647,7 +1647,7 @@
       "away_source": "projected_rotowire_today_lineup",
       "home_source": "projected_rotowire_default_vs_rhp",
       "away_confidence": 0.44,
-      "home_confidence": 0.58,
+      "home_confidence": 0.66,
       "away_comparison": {
         "status": "projected_only",
         "is_true_mismatch": false,
@@ -1864,7 +1864,7 @@
         691777,
         643446,
         675961,
-        666126
+        661531
       ],
       "away_projected_validation": {
         "status": "ok",
@@ -1940,14 +1940,14 @@
           691777,
           643446,
           675961,
-          666126
+          661531
         ],
         "missing_ids": [],
         "backfilled_ids": [
-          666126
+          661531
         ],
         "pool_source": "active+40Man",
-        "pool_size": 13,
+        "pool_size": 15,
         "raw_names": [
           "Henry Bolte",
           "Nick Kurtz",
@@ -2024,13 +2024,13 @@
       "home_projected_ids": [
         641487,
         663728,
-        677594,
         647304,
         668227,
         670042,
         702284,
         641598,
-        806068
+        806068,
+        671083
       ],
       "away_projected_validation": {
         "status": "ok",
@@ -2086,11 +2086,10 @@
         "mapping_source": "projected_rotowire_default_vs_lhp"
       },
       "home_projected_validation": {
-        "status": "ok",
+        "status": "adjusted",
         "raw_ids": [
           641487,
           663728,
-          677594,
           647304,
           668227,
           670042,
@@ -2101,18 +2100,20 @@
         "ids": [
           641487,
           663728,
-          677594,
           647304,
           668227,
           670042,
           702284,
           641598,
-          806068
+          806068,
+          671083
         ],
         "missing_ids": [],
-        "backfilled_ids": [],
+        "backfilled_ids": [
+          671083
+        ],
         "pool_source": "active+40Man",
-        "pool_size": 20,
+        "pool_size": 19,
         "raw_names": [
           "J.P. Crawford",
           "Cal Raleigh",
@@ -2127,7 +2128,6 @@
         "matched_names": [
           "J.P. Crawford",
           "Cal Raleigh",
-          "Julio Rodr\u00edguez",
           "Josh Naylor",
           "Randy Arozarena",
           "Luke Raley",
@@ -2135,13 +2135,15 @@
           "Mitch Garver",
           "Colt Emerson"
         ],
-        "missing_name_labels": [],
+        "missing_name_labels": [
+          "Julio Rodriguez"
+        ],
         "mapping_source": "projected_rotowire_today_lineup"
       },
       "away_source": "projected_rotowire_default_vs_lhp",
       "home_source": "projected_rotowire_today_lineup",
       "away_confidence": 0.56,
-      "home_confidence": 0.72,
+      "home_confidence": 0.48000000000000004,
       "away_comparison": {
         "status": "projected_only",
         "is_true_mismatch": false,
@@ -2278,7 +2280,7 @@
         "missing_ids": [],
         "backfilled_ids": [],
         "pool_source": "active+40Man",
-        "pool_size": 16,
+        "pool_size": 17,
         "raw_names": [
           "Shohei Ohtani",
           "Andy Pages",
