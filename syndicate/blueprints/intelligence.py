@@ -970,12 +970,8 @@ def intelligence_home():
             if cached_response_is_usable:
                 initial_response = dict(cached_response)
             else:
-                computed_response = compute_intelligence_state_response(dict(payload), force_refresh=True)
-                if isinstance(computed_response, dict) and _response_has_content(computed_response):
-                    initial_response = _hydrate_board_response_payload(dict(computed_response))
-                else:
-                    queue_intelligence_state_refresh(dict(payload))
-                    initial_response = _empty_default_intelligence_response()
+                queue_intelligence_state_refresh(dict(payload))
+                initial_response = _empty_default_intelligence_response()
         else:
             board_snapshot_response = read_latest_intelligence_board_snapshot_response(payload, force_refresh=True)
             state_response = read_latest_intelligence_state_response(payload, force_refresh=False, allow_latest_fallback=False)
@@ -989,22 +985,11 @@ def intelligence_home():
                 initial_response = dict(response_candidate)
                 break
             if not initial_response:
-                computed_response = compute_intelligence_state_response(dict(payload), force_refresh=True)
-                if isinstance(computed_response, dict) and _response_has_content(computed_response):
-                    initial_response = _hydrate_board_response_payload(dict(computed_response))
-                else:
-                    queue_intelligence_state_refresh(dict(payload))
-                    initial_response = _empty_default_intelligence_response()
+                queue_intelligence_state_refresh(dict(payload))
+                initial_response = _empty_default_intelligence_response()
     except Exception:
-        try:
-            computed_response = compute_intelligence_state_response(dict(payload), force_refresh=True)
-        except Exception:
-            computed_response = None
-        if isinstance(computed_response, dict) and _response_has_content(computed_response):
-            initial_response = _hydrate_board_response_payload(dict(computed_response))
-        else:
-            queue_intelligence_state_refresh(dict(payload))
-            initial_response = _empty_default_intelligence_response()
+        queue_intelligence_state_refresh(dict(payload))
+        initial_response = _empty_default_intelligence_response()
     return render_template(
         "intelligence.html",
         initial_intelligence_response=initial_response,
@@ -1041,20 +1026,12 @@ def intelligence_query_api():
         except Exception:
             pass
         queue_intelligence_state_refresh(dict(payload))
-        computed_state = None
-        try:
-            computed_state = compute_intelligence_state_response(dict(payload), force_refresh=True)
-        except Exception:
-            computed_state = None
-        if isinstance(computed_state, dict) and _response_has_content(computed_state):
-            state_payload = computed_state
+        queued_state = read_latest_intelligence_state(dict(payload))
+        if isinstance(queued_state, dict) and _response_candidate_count(queued_state) > 0:
+            state_payload = queued_state
         else:
-            queued_state = read_latest_intelligence_state(dict(payload))
-            if isinstance(queued_state, dict) and _response_candidate_count(queued_state) > 0:
-                state_payload = queued_state
-            else:
-                state_payload = _empty_default_intelligence_response()
-                state_payload["queued"] = True
+            state_payload = _empty_default_intelligence_response()
+            state_payload["queued"] = True
     response = dict(state_payload)
     response.setdefault("ok", True)
     response.setdefault("response", dict(response))

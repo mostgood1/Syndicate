@@ -1,5 +1,12 @@
 # Fix Notes Log
 
+## 2026-07-04 - Intelligence web requests stopped timing out by removing inline compute
+- Symptom: Render stayed healthy on `/healthz`, but `/versionz`, `/intelligence`, and `/api/intelligence/status` would flip to 502 after the board tried to repopulate.
+- Root cause: The web request path was calling the full intelligence compute pipeline inline, which ran long enough to hit Gunicorn’s 60-second timeout and get the worker killed.
+- Fix: Make the board routes cache-first and nonblocking again. They now read cached state, enqueue refresh work, and return immediately instead of computing the slate synchronously on the web dyno.
+- Validation: `python -m pytest -q tests/test_intelligence_state.py -k "query_endpoint_queues_refresh_when_default_cache_is_empty or query_endpoint_returns_empty_default_response_when_default_cache_exists_but_is_empty or query_endpoint_returns_queued_response_when_default_cache_is_empty or query_endpoint_returns_empty_board_when_cached_live_snapshot_is_missing_hydration"` passed.
+- Follow-up: Let the worker own repopulation and keep the web request path under the Render timeout ceiling.
+
 ## 2026-07-04 - Intelligence board now computes once when the cache is empty
 - Symptom: The live /intelligence slate stayed empty even after the deploy was current because the board route only read cached snapshots and fell back to the shell when none existed.
 - Root cause: The board page never asked the compute path to rebuild a populated response on cold cache, so the worker/state publisher had to win before the UI could show anything.
