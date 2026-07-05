@@ -1,0 +1,480 @@
+{
+  "date": "2026-07-06",
+  "season": 2026,
+  "spring_mode": false,
+  "generated_at": "2026-07-05T07:21:03.625435",
+  "games": [
+    {
+      "idx": 0,
+      "game_pk": 824089,
+      "away": {
+        "team_id": 143,
+        "abbr": "PHI"
+      },
+      "home": {
+        "team_id": 118,
+        "abbr": "KC"
+      },
+      "away_probable_id": 650911,
+      "home_probable_id": 702070,
+      "away_source": "feed_gameData_probablePitchers",
+      "home_source": "feed_gameData_probablePitchers",
+      "away_confidence": 0.75,
+      "home_confidence": 0.75,
+      "away_validation": {
+        "status": "ok",
+        "selected_id": 650911,
+        "selected_name": "Cristopher S\u00e1nchez",
+        "selected_source": "feed_gameData_probablePitchers",
+        "override_reason": "",
+        "roster_team_ids": [
+          143
+        ],
+        "registry_team_ids": [
+          143
+        ],
+        "on_expected_team": true,
+        "on_opponent_team": false,
+        "on_expected_registry_team": true,
+        "on_opponent_registry_team": false,
+        "rejected_candidates": []
+      },
+      "home_validation": {
+        "status": "ok",
+        "selected_id": 702070,
+        "selected_name": "Noah Cameron",
+        "selected_source": "feed_gameData_probablePitchers",
+        "override_reason": "",
+        "roster_team_ids": [
+          118
+        ],
+        "registry_team_ids": [
+          118
+        ],
+        "on_expected_team": true,
+        "on_opponent_team": false,
+        "on_expected_registry_team": true,
+        "on_opponent_registry_team": false,
+        "rejected_candidates": []
+      },
+      "raw": {
+        "away_schedule_id": 650911,
+        "home_schedule_id": 702070,
+        "away_schedule_name": "Cristopher S\u00e1nchez",
+        "home_schedule_name": "Noah Cameron",
+        "away_feed_id": 650911,
+        "home_feed_id": 702070,
+        "away_feed_name": "Cristopher S\u00e1nchez",
+        "home_feed_name": "Noah Cameron"
+      }
+    },
+    {
+      "idx": 1,
+      "game_pk": 822958,
+      "away": {
+        "team_id": 147,
+        "abbr": "NYY"
+      },
+      "home": {
+        "team_id": 139,
+        "abbr": "TB"
+      },
+      "away_probable_id": null,
+      "home_probable_id": null,
+      "away_source": "none",
+      "home_source": "none",
+      "away_confidence": 0.0,
+      "home_confidence": 0.0,
+      "away_validation": {
+        "status": "none",
+        "selected_id": null,
+        "selected_name": "",
+        "selected_source": "none",
+        "override_reason": "",
+        "roster_team_ids": [],
+        "registry_team_ids": [],
+        "on_expected_team": false,
+        "on_opponent_team": false,
+        "on_expected_registry_team": false,
+        "on_opponent_registry_team": false,
+        "rejected_candidates": []
+      },
+      "home_validation": {
+        "status": "none",
+        "selected_id": null,
+        "selected_name": "",
+        "selected_source": "none",
+        "override_reason": "",
+        "roster_team_ids": [],
+        "registry_team_ids": [],
+        "on_expected_team": false,
+        "on_opponent_team": false,
+        "on_expected_registry_team": false,
+        "on_opponent_registry_team": false,
+        "rejected_candidates": []
+      },
+      "raw": {
+        "away_schedule_id": null,
+        "home_schedule_id": null,
+        "away_schedule_name": "",
+        "home_schedule_name": "",
+        "away_feed_id": null,
+        "home_feed_id": null,
+        "away_feed_name": "",
+        "home_feed_name": ""
+      }
+    },
+    {
+      "idx": 2,
+      "game_pk": 822712,
+      "away": {
+        "team_id": 117,
+        "abbr": "HOU"
+      },
+      "home": {
+        "team_id": 120,
+        "abbr": "WSH"
+      },
+      "away_probable_id": null,
+      "home_probable_id": null,
+      "away_source": "none",
+      "home_source": "none",
+      "away_confidence": 0.0,
+      "home_confidence": 0.0,
+      "away_validation": {
+        "status": "none",
+        "selected_id": null,
+        "selected_name": "",
+        "selected_source": "none",
+        "override_reason": "",
+        "roster_team_ids": [],
+        "registry_team_ids": [],
+        "on_expected_team": false,
+        "on_opponent_team": false,
+        "on_expected_registry_team": false,
+        "on_opponent_registry_team": false,
+        "rejected_candidates": []
+      },
+      "home_validation": {
+        "status": "none",
+        "selected_id": null,
+        "selected_name": "",
+        "selected_source": "none",
+        "override_reason": "",
+        "roster_team_ids": [],
+        "registry_team_ids": [],
+        "on_expected_team": false,
+        "on_opponent_team": false,
+        "on_expected_registry_team": false,
+        "on_opponent_registry_team": false,
+        "rejected_candidates": []
+      },
+      "raw": {
+        "away_schedule_id": null,
+        "home_schedule_id": null,
+        "away_schedule_name": "",
+        "home_schedule_name": "",
+        "away_feed_id": null,
+        "home_feed_id": null,
+        "away_feed_name": "",
+        "home_feed_name": ""
+      }
+    },
+    {
+      "idx": 3,
+      "game_pk": 824900,
+      "away": {
+        "team_id": 121,
+        "abbr": "NYM"
+      },
+      "home": {
+        "team_id": 144,
+        "abbr": "ATL"
+      },
+      "away_probable_id": 642547,
+      "home_probable_id": 625643,
+      "away_source": "feed_gameData_probablePitchers",
+      "home_source": "feed_gameData_probablePitchers",
+      "away_confidence": 0.75,
+      "home_confidence": 0.75,
+      "away_validation": {
+        "status": "ok",
+        "selected_id": 642547,
+        "selected_name": "Freddy Peralta",
+        "selected_source": "feed_gameData_probablePitchers",
+        "override_reason": "",
+        "roster_team_ids": [
+          121
+        ],
+        "registry_team_ids": [
+          121
+        ],
+        "on_expected_team": true,
+        "on_opponent_team": false,
+        "on_expected_registry_team": true,
+        "on_opponent_registry_team": false,
+        "rejected_candidates": []
+      },
+      "home_validation": {
+        "status": "ok",
+        "selected_id": 625643,
+        "selected_name": "Reynaldo L\u00f3pez",
+        "selected_source": "feed_gameData_probablePitchers",
+        "override_reason": "",
+        "roster_team_ids": [
+          144
+        ],
+        "registry_team_ids": [
+          144
+        ],
+        "on_expected_team": true,
+        "on_opponent_team": false,
+        "on_expected_registry_team": true,
+        "on_opponent_registry_team": false,
+        "rejected_candidates": []
+      },
+      "raw": {
+        "away_schedule_id": 642547,
+        "home_schedule_id": 625643,
+        "away_schedule_name": "Freddy Peralta",
+        "home_schedule_name": "Reynaldo L\u00f3pez",
+        "away_feed_id": 642547,
+        "home_feed_id": 625643,
+        "away_feed_name": "Freddy Peralta",
+        "home_feed_name": "Reynaldo L\u00f3pez"
+      }
+    },
+    {
+      "idx": 4,
+      "game_pk": 823036,
+      "away": {
+        "team_id": 158,
+        "abbr": "MIL"
+      },
+      "home": {
+        "team_id": 138,
+        "abbr": "STL"
+      },
+      "away_probable_id": 675660,
+      "home_probable_id": 700241,
+      "away_source": "feed_gameData_probablePitchers",
+      "home_source": "feed_gameData_probablePitchers",
+      "away_confidence": 0.75,
+      "home_confidence": 0.75,
+      "away_validation": {
+        "status": "ok",
+        "selected_id": 675660,
+        "selected_name": "Shane Drohan",
+        "selected_source": "feed_gameData_probablePitchers",
+        "override_reason": "",
+        "roster_team_ids": [
+          158
+        ],
+        "registry_team_ids": [
+          158
+        ],
+        "on_expected_team": true,
+        "on_opponent_team": false,
+        "on_expected_registry_team": true,
+        "on_opponent_registry_team": false,
+        "rejected_candidates": []
+      },
+      "home_validation": {
+        "status": "ok",
+        "selected_id": 700241,
+        "selected_name": "Michael McGreevy",
+        "selected_source": "feed_gameData_probablePitchers",
+        "override_reason": "",
+        "roster_team_ids": [
+          138
+        ],
+        "registry_team_ids": [
+          138
+        ],
+        "on_expected_team": true,
+        "on_opponent_team": false,
+        "on_expected_registry_team": true,
+        "on_opponent_registry_team": false,
+        "rejected_candidates": []
+      },
+      "raw": {
+        "away_schedule_id": 675660,
+        "home_schedule_id": 700241,
+        "away_schedule_name": "Shane Drohan",
+        "home_schedule_name": "Michael McGreevy",
+        "away_feed_id": 675660,
+        "home_feed_id": 700241,
+        "away_feed_name": "Shane Drohan",
+        "home_feed_name": "Michael McGreevy"
+      }
+    },
+    {
+      "idx": 5,
+      "game_pk": 823282,
+      "away": {
+        "team_id": 109,
+        "abbr": "AZ"
+      },
+      "home": {
+        "team_id": 135,
+        "abbr": "SD"
+      },
+      "away_probable_id": null,
+      "home_probable_id": null,
+      "away_source": "none",
+      "home_source": "none",
+      "away_confidence": 0.0,
+      "home_confidence": 0.0,
+      "away_validation": {
+        "status": "none",
+        "selected_id": null,
+        "selected_name": "",
+        "selected_source": "none",
+        "override_reason": "",
+        "roster_team_ids": [],
+        "registry_team_ids": [],
+        "on_expected_team": false,
+        "on_opponent_team": false,
+        "on_expected_registry_team": false,
+        "on_opponent_registry_team": false,
+        "rejected_candidates": []
+      },
+      "home_validation": {
+        "status": "none",
+        "selected_id": null,
+        "selected_name": "",
+        "selected_source": "none",
+        "override_reason": "",
+        "roster_team_ids": [],
+        "registry_team_ids": [],
+        "on_expected_team": false,
+        "on_opponent_team": false,
+        "on_expected_registry_team": false,
+        "on_opponent_registry_team": false,
+        "rejected_candidates": []
+      },
+      "raw": {
+        "away_schedule_id": null,
+        "home_schedule_id": null,
+        "away_schedule_name": "",
+        "home_schedule_name": "",
+        "away_feed_id": null,
+        "home_feed_id": null,
+        "away_feed_name": "",
+        "home_feed_name": ""
+      }
+    },
+    {
+      "idx": 6,
+      "game_pk": 823205,
+      "away": {
+        "team_id": 141,
+        "abbr": "TOR"
+      },
+      "home": {
+        "team_id": 137,
+        "abbr": "SF"
+      },
+      "away_probable_id": null,
+      "home_probable_id": null,
+      "away_source": "none",
+      "home_source": "none",
+      "away_confidence": 0.0,
+      "home_confidence": 0.0,
+      "away_validation": {
+        "status": "none",
+        "selected_id": null,
+        "selected_name": "",
+        "selected_source": "none",
+        "override_reason": "",
+        "roster_team_ids": [],
+        "registry_team_ids": [],
+        "on_expected_team": false,
+        "on_opponent_team": false,
+        "on_expected_registry_team": false,
+        "on_opponent_registry_team": false,
+        "rejected_candidates": []
+      },
+      "home_validation": {
+        "status": "none",
+        "selected_id": null,
+        "selected_name": "",
+        "selected_source": "none",
+        "override_reason": "",
+        "roster_team_ids": [],
+        "registry_team_ids": [],
+        "on_expected_team": false,
+        "on_opponent_team": false,
+        "on_expected_registry_team": false,
+        "on_opponent_registry_team": false,
+        "rejected_candidates": []
+      },
+      "raw": {
+        "away_schedule_id": null,
+        "home_schedule_id": null,
+        "away_schedule_name": "",
+        "home_schedule_name": "",
+        "away_feed_id": null,
+        "home_feed_id": null,
+        "away_feed_name": "",
+        "home_feed_name": ""
+      }
+    },
+    {
+      "idx": 7,
+      "game_pk": 823930,
+      "away": {
+        "team_id": 115,
+        "abbr": "COL"
+      },
+      "home": {
+        "team_id": 119,
+        "abbr": "LAD"
+      },
+      "away_probable_id": null,
+      "home_probable_id": null,
+      "away_source": "none",
+      "home_source": "none",
+      "away_confidence": 0.0,
+      "home_confidence": 0.0,
+      "away_validation": {
+        "status": "none",
+        "selected_id": null,
+        "selected_name": "",
+        "selected_source": "none",
+        "override_reason": "",
+        "roster_team_ids": [],
+        "registry_team_ids": [],
+        "on_expected_team": false,
+        "on_opponent_team": false,
+        "on_expected_registry_team": false,
+        "on_opponent_registry_team": false,
+        "rejected_candidates": []
+      },
+      "home_validation": {
+        "status": "none",
+        "selected_id": null,
+        "selected_name": "",
+        "selected_source": "none",
+        "override_reason": "",
+        "roster_team_ids": [],
+        "registry_team_ids": [],
+        "on_expected_team": false,
+        "on_opponent_team": false,
+        "on_expected_registry_team": false,
+        "on_opponent_registry_team": false,
+        "rejected_candidates": []
+      },
+      "raw": {
+        "away_schedule_id": null,
+        "home_schedule_id": null,
+        "away_schedule_name": "",
+        "home_schedule_name": "",
+        "away_feed_id": null,
+        "home_feed_id": null,
+        "away_feed_name": "",
+        "home_feed_name": ""
+      }
+    }
+  ]
+}

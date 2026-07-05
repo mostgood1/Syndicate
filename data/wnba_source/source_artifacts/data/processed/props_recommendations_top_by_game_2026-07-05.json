@@ -1,0 +1,262 @@
+{
+  "date": "2026-07-05",
+  "data": [
+    {
+      "game_key": "DAL@TOR",
+      "game_id": "054f91bf5767bbff2f9bb1f444a6fc510",
+      "player": "Arike Ogunbowale",
+      "team": "DAL",
+      "team_tricode": "DAL",
+      "opponent": "TOR",
+      "score": 70.33337576053329,
+      "score_adj": 70.33337576053329,
+      "tier": "High",
+      "model": {
+        "pts": 14.955714285714285,
+        "reb": 2.3285714285714283,
+        "ast": 3.5,
+        "threes": 2.918571428571428,
+        "stl": 0.7178914285714285,
+        "blk": 0.5873657142857143,
+        "tov": 1.9578857142857145,
+        "pra": 20.784285714285712,
+        "pr": 17.284285714285712,
+        "pa": 18.455714285714286,
+        "ra": 5.828571428571428
+      },
+      "top_play": {
+        "market": "threes",
+        "side": "OVER",
+        "line": 1.5,
+        "price": -118.0,
+        "edge": 0.38070359356618944,
+        "ev": 0.7033337576053329,
+        "ev_pct": 70.33337576053329,
+        "book": "draftkings",
+        "p_win": 1.0,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 70.3%",
+        "Regular price range (-150 to +150)",
+        "Consensus: 5 books aligned",
+        "Best line available"
+      ],
+      "basketball_summary": "model 2.9 vs line 1.5 (+1.4)"
+    },
+    {
+      "game_key": "IND@LVA",
+      "game_id": "0f784500c59f1f83757bec7c0ef787879",
+      "player": "Kelsey Mitchell",
+      "team": "IND",
+      "team_tricode": "IND",
+      "opponent": "LVA",
+      "score": 53.76667834321037,
+      "score_adj": 53.76667834321037,
+      "tier": "High",
+      "model": {
+        "pts": 19.80777777777778,
+        "reb": 0.4955555555555555,
+        "ast": 2.335555555555556,
+        "threes": 1.3777777777777778,
+        "stl": 0.6437199999999998,
+        "blk": 0.5266799999999998,
+        "tov": 1.7555999999999996,
+        "pra": 22.63888888888889,
+        "pr": 20.303333333333335,
+        "pa": 22.143333333333334,
+        "ra": 2.8311111111111114
+      },
+      "top_play": {
+        "market": "threes",
+        "side": "UNDER",
+        "line": 2.5,
+        "price": -130.0,
+        "edge": 0.3038986167224934,
+        "ev": 0.5376667834321037,
+        "ev_pct": 53.76667834321037,
+        "book": "fanduel",
+        "p_win": 1.0,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 53.8%",
+        "Regular price range (-150 to +150)",
+        "Consensus: 4 books aligned",
+        "Best line available"
+      ],
+      "basketball_summary": "model 1.4 vs line 2.5 (-1.1)"
+    },
+    {
+      "game_key": "DAL@TOR",
+      "game_id": "054f91bf5767bbff2f9bb1f444a6fc510",
+      "player": "Maria Conde",
+      "team": "TOR",
+      "team_tricode": "TOR",
+      "opponent": "DAL",
+      "score": 45.62293818881208,
+      "score_adj": 45.62293818881208,
+      "tier": "High",
+      "model": {
+        "pts": 5.23,
+        "reb": 3.355,
+        "ast": 1.215,
+        "threes": 0.925,
+        "stl": 0.51601,
+        "blk": 0.4221899999999999,
+        "tov": 1.4072999999999998,
+        "pra": 9.8,
+        "pr": 8.585,
+        "pa": 6.445,
+        "ra": 4.57
+      },
+      "top_play": {
+        "market": "threes",
+        "side": "UNDER",
+        "line": 1.5,
+        "price": 103.0,
+        "edge": 0.22474353787592155,
+        "ev": 0.4562293818881208,
+        "ev_pct": 45.62293818881208,
+        "book": "williamhill_us",
+        "p_win": 0.9488402193265444,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 45.6%",
+        "Regular price range (-150 to +150)",
+        "Consensus: 4 books aligned",
+        "Best line available"
+      ],
+      "basketball_summary": "model 0.9 vs line 1.5 (-0.6)"
+    },
+    {
+      "game_key": "DAL@TOR",
+      "game_id": "054f91bf5767bbff2f9bb1f444a6fc510",
+      "player": "Nyara Sabally",
+      "team": "TOR",
+      "team_tricode": "TOR",
+      "opponent": "DAL",
+      "score": 40.89543909774947,
+      "score_adj": 40.89543909774947,
+      "tier": "High",
+      "model": {
+        "pts": 5.55,
+        "reb": 2.57,
+        "ast": 0.7649999999999999,
+        "threes": 0.345,
+        "stl": 0.3089899999999999,
+        "blk": 0.2528099999999999,
+        "tov": 0.8426999999999999,
+        "pra": 8.885,
+        "pr": 8.12,
+        "pa": 6.3149999999999995,
+        "ra": 3.335
+      },
+      "top_play": {
+        "market": "pts",
+        "side": "UNDER",
+        "line": 11.5,
+        "price": -106.0,
+        "edge": 0.21043284195929335,
+        "ev": 0.40895439097749464,
+        "ev_pct": 40.89543909774947,
+        "book": "betonlineag",
+        "p_win": 0.9235174977736111,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 40.9%",
+        "Regular price range (-150 to +150)",
+        "Consensus: 4 books aligned"
+      ],
+      "basketball_summary": "model 5.5 vs line 11.5 (-6.0)"
+    },
+    {
+      "game_key": "IND@LVA",
+      "game_id": "0f784500c59f1f83757bec7c0ef787879",
+      "player": "Monique Billings",
+      "team": "IND",
+      "team_tricode": "IND",
+      "opponent": "LVA",
+      "score": 37.64984426730842,
+      "score_adj": 37.64984426730842,
+      "tier": "High",
+      "model": {
+        "pts": 5.335555555555556,
+        "reb": 4.591111111111111,
+        "ast": 0.8677777777777778,
+        "threes": 0.2066666666666666,
+        "stl": 0.4079777777777778,
+        "blk": 0.3338,
+        "tov": 1.1126666666666667,
+        "pra": 10.794444444444444,
+        "pr": 9.926666666666666,
+        "pa": 6.203333333333333,
+        "ra": 5.458888888888889
+      },
+      "top_play": {
+        "market": "pts",
+        "side": "UNDER",
+        "line": 8.5,
+        "price": -110.0,
+        "edge": 0.19721346997161548,
+        "ev": 0.3764984426730842,
+        "ev_pct": 37.64984426730842,
+        "book": "williamhill_us",
+        "p_win": 0.900307966482608,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 37.6%",
+        "Regular price range (-150 to +150)",
+        "Consensus: 4 books aligned",
+        "Best line available"
+      ],
+      "basketball_summary": "model 5.3 vs line 8.5 (-3.2)"
+    },
+    {
+      "game_key": "IND@LVA",
+      "game_id": "0f784500c59f1f83757bec7c0ef787879",
+      "player": "Jackie Young",
+      "team": "LVA",
+      "team_tricode": "LVA",
+      "opponent": "IND",
+      "score": 32.91666666666666,
+      "score_adj": 32.91666666666666,
+      "tier": "High",
+      "model": {
+        "pts": 6.605,
+        "reb": 4.365,
+        "ast": 4.9,
+        "threes": 0.265,
+        "stl": 0.5860799999999999,
+        "blk": 0.4795199999999999,
+        "tov": 1.5983999999999998,
+        "pra": 15.87,
+        "pr": 10.97,
+        "pa": 11.505,
+        "ra": 9.265
+      },
+      "top_play": {
+        "market": "pts",
+        "side": "UNDER",
+        "line": 20.5,
+        "price": -120.0,
+        "edge": 0.17954545454545456,
+        "ev": 0.3291666666666666,
+        "ev_pct": 32.91666666666666,
+        "book": "fanduel",
+        "p_win": 0.874621212121212,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 32.9%",
+        "Regular price range (-150 to +150)",
+        "Consensus: 4 books aligned",
+        "Best line available"
+      ],
+      "basketball_summary": "model 6.6 vs line 20.5 (-13.9)"
+    }
+  ]
+}

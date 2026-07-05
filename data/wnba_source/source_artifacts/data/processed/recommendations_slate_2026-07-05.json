@@ -1,0 +1,133 @@
+{
+  "date": "2026-07-05",
+  "counts": {
+    "games": 2,
+    "picks": 6
+  },
+  "per_game": [
+    {
+      "home": "TOR",
+      "away": "DAL",
+      "matchup": "DAL @ TOR",
+      "picks": [
+        {
+          "market": "PROPS",
+          "team": "DAL",
+          "display_pick": "Arike Ogunbowale OVER 1.5",
+          "selection": "OVER 1.5",
+          "price": -118.0,
+          "score": 70.33337576053329,
+          "ev_pct": 70.33337576053329,
+          "win_prob": 0.5412844036697247,
+          "p_win": 0.5412844036697247,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 70.3%",
+            "Regular price range (-150 to +150)",
+            "Consensus: 5 books aligned",
+            "Best line available"
+          ],
+          "matchup": "DAL @ TOR"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Julie Allemand UNDER 12.5",
+          "selection": "UNDER 12.5",
+          "price": -102.0,
+          "score": 17.63436914350549,
+          "ev_pct": 17.63436914350549,
+          "win_prob": 0.504950495049505,
+          "p_win": 0.504950495049505,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 17.6%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "DAL @ TOR"
+        },
+        {
+          "market": "PROPS",
+          "team": "DAL",
+          "display_pick": "Paige Bueckers UNDER 10.5",
+          "selection": "UNDER 10.5",
+          "price": -108.0,
+          "score": 17.497501561864492,
+          "ev_pct": 17.497501561864492,
+          "win_prob": 0.5192307692307693,
+          "p_win": 0.5192307692307693,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 17.5%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "DAL @ TOR"
+        }
+      ]
+    },
+    {
+      "home": "LVA",
+      "away": "IND",
+      "matchup": "IND @ LVA",
+      "picks": [
+        {
+          "market": "PROPS",
+          "team": "LVA",
+          "display_pick": "Jackie Young UNDER 20.5",
+          "selection": "UNDER 20.5",
+          "price": -120.0,
+          "score": 32.91666666666666,
+          "ev_pct": 32.91666666666666,
+          "win_prob": 0.5454545454545454,
+          "p_win": 0.5454545454545454,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 32.9%",
+            "Regular price range (-150 to +150)",
+            "Consensus: 4 books aligned",
+            "Best line available"
+          ],
+          "matchup": "IND @ LVA"
+        },
+        {
+          "market": "PROPS",
+          "team": "IND",
+          "display_pick": "Aliyah Boston UNDER 17.5",
+          "selection": "UNDER 17.5",
+          "price": -105.0,
+          "score": 31.249518431922397,
+          "ev_pct": 31.249518431922397,
+          "win_prob": 0.5121951219512195,
+          "p_win": 0.5121951219512195,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 31.2%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "IND @ LVA"
+        },
+        {
+          "market": "PROPS",
+          "team": "IND",
+          "display_pick": "Raven Johnson UNDER 6.5",
+          "selection": "UNDER 6.5",
+          "price": -108.0,
+          "score": 18.706139469654858,
+          "ev_pct": 18.706139469654858,
+          "win_prob": 0.5192307692307693,
+          "p_win": 0.5192307692307693,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 18.7%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "IND @ LVA"
+        }
+      ]
+    }
+  ]
+}
