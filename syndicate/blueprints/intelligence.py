@@ -1041,12 +1041,20 @@ def intelligence_query_api():
         except Exception:
             pass
         queue_intelligence_state_refresh(dict(payload))
-        queued_state = read_latest_intelligence_state(dict(payload))
-        if isinstance(queued_state, dict) and _response_candidate_count(queued_state) > 0:
-            state_payload = queued_state
+        computed_state = None
+        try:
+            computed_state = compute_intelligence_state_response(dict(payload), force_refresh=True)
+        except Exception:
+            computed_state = None
+        if isinstance(computed_state, dict) and _response_has_content(computed_state):
+            state_payload = computed_state
         else:
-            state_payload = _empty_default_intelligence_response()
-            state_payload["queued"] = True
+            queued_state = read_latest_intelligence_state(dict(payload))
+            if isinstance(queued_state, dict) and _response_candidate_count(queued_state) > 0:
+                state_payload = queued_state
+            else:
+                state_payload = _empty_default_intelligence_response()
+                state_payload["queued"] = True
     response = dict(state_payload)
     response.setdefault("ok", True)
     response.setdefault("response", dict(response))
