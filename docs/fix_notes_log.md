@@ -1,11 +1,11 @@
 # Fix Notes Log
 
-## 2026-07-05 - Intelligence board needed a web-side background consumer on Render
-- Symptom: The deployed betting board stayed empty on Render even after the queue persistence fix and a fresh deploy, with `/api/intelligence/query` still returning `candidate_count: 0` and `queued: true` after the refresh interval.
-- Root cause: The worker path was not hydrating the shared intelligence queue quickly enough on Render, so the queue-backed board had no consumer available when the web dyno served the page.
-- Fix: Allow the Render web service to start the intelligence background loop so it can consume the shared refresh queue as a fallback while keeping the live odds loop disabled.
-- Validation: Live browser POST probes to `/api/intelligence/query` still returned the empty queued snapshot before this deploy-side fallback.
-- Follow-up: Recheck `/versionz`, `/api/intelligence/status`, and `/intelligence` after the next Render deploy lands to confirm the board now hydrates from the shared queue.
+## 2026-07-05 - Intelligence queue fallback rolled back on the web dyno
+- Symptom: Enabling the web-side intelligence background loop on Render caused the live service to return 502 during rollout.
+- Root cause: The web dyno should stay on the read-only request path; the background consumer fallback was not stable in this deployment shape.
+- Fix: Revert the web-side loop toggle and keep the shared queue persistence fix as the live-safe change.
+- Validation: Live browser requests to `/versionz` showed 502 while the web-side loop fallback was enabled.
+- Follow-up: Recheck the worker-side queue consumer path and keep the web dyno read-only.
 
 ## 2026-07-04 - Intelligence response stopped collapsing to an empty board contract
 - Symptom: Render stayed healthy, but `/api/intelligence/status` and `/intelligence` kept showing `candidate_count: 0`, `active_lanes: []`, and no board cards even though the engine was generating candidates upstream.
