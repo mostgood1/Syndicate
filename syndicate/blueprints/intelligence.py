@@ -12,7 +12,6 @@ from flask import Blueprint, jsonify, render_template, request
 from flask import redirect
 
 from pipeline.intelligence_state import read_latest_intelligence_board_snapshot_response
-from pipeline.intelligence_state import compute_intelligence_state_response
 from pipeline.intelligence_state import read_latest_intelligence_state_response
 from pipeline.intelligence_state import queue_intelligence_state_refresh
 from pipeline.intelligence_state import _INTELLIGENCE_STATE_SERVICE
@@ -1030,12 +1029,8 @@ def intelligence_query_api():
         if isinstance(queued_state, dict) and _response_candidate_count(queued_state) > 0:
             state_payload = queued_state
         else:
-            computed_state = compute_intelligence_state_response(dict(payload), force_refresh=True)
-            if isinstance(computed_state, dict) and _response_has_content(computed_state):
-                state_payload = computed_state
-            else:
-                state_payload = _empty_default_intelligence_response()
-                state_payload["queued"] = True
+            state_payload = _empty_default_intelligence_response()
+            state_payload["queued"] = True
     response = dict(state_payload)
     response.setdefault("ok", True)
     response.setdefault("response", dict(response))

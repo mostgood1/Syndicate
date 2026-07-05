@@ -479,20 +479,18 @@ class IntelligenceStateTests(unittest.TestCase):
             with patch("syndicate.blueprints.intelligence.read_latest_intelligence_state", return_value=None):
                 with patch("syndicate.blueprints.intelligence.launch_refresh_run") as mocked_launch:
                     with patch("syndicate.blueprints.intelligence.queue_intelligence_state_refresh") as mocked_queue:
-                        with patch("syndicate.blueprints.intelligence.compute_intelligence_state_response", return_value=dict(computed_response)) as mocked_compute:
-                            response = intelligence_query_api()
+                        response = intelligence_query_api()
 
         payload = response.get_json()
         self.assertIsNotNone(payload)
         self.assertEqual(response.status_code, 200)
         mocked_launch.assert_called_once()
         mocked_queue.assert_called_once()
-        mocked_compute.assert_called_once()
         self.assertIn("version", payload)
         self.assertIn("timestamp", payload)
         self.assertIn("response", payload)
-        self.assertEqual(payload["response"]["top_opportunities"][0]["name"], "Computed Play")
-        self.assertEqual(payload["response"]["analysis"]["recommendations"][0]["name"], "Computed Play")
+        self.assertEqual(payload["response"]["top_opportunities"], [])
+        self.assertEqual(payload["response"]["analysis"]["recommendations"], [])
         self.assertEqual(payload["response"]["analysis"]["portfolio"], {})
         self.assertEqual(payload["debug_source"], "snapshot_read")
 
@@ -523,20 +521,18 @@ class IntelligenceStateTests(unittest.TestCase):
             with patch("syndicate.blueprints.intelligence.read_latest_intelligence_state", return_value=dict({"ok": True, "top_opportunities": [], "by_sport": {}, "analysis": {"recommendations": [], "picks": [], "top_live_opportunities": [], "portfolio": {}, "parlays": []}})):
                 with patch("syndicate.blueprints.intelligence.launch_refresh_run") as mocked_launch:
                     with patch("syndicate.blueprints.intelligence.queue_intelligence_state_refresh") as mocked_queue:
-                        with patch("syndicate.blueprints.intelligence.compute_intelligence_state_response", return_value=dict(computed_response)) as mocked_compute:
-                            response = intelligence_query_api()
+                        response = intelligence_query_api()
 
         payload = response.get_json()
         self.assertIsNotNone(payload)
         self.assertEqual(response.status_code, 200)
         mocked_launch.assert_called_once()
         mocked_queue.assert_called_once()
-        mocked_compute.assert_called_once()
         self.assertIn("version", payload)
         self.assertIn("timestamp", payload)
         self.assertIn("response", payload)
-        self.assertEqual(payload["response"]["top_opportunities"][0]["name"], "Computed Play")
-        self.assertEqual(payload["response"]["analysis"]["recommendations"][0]["name"], "Computed Play")
+        self.assertEqual(payload["response"]["top_opportunities"], [])
+        self.assertEqual(payload["response"]["analysis"]["recommendations"], [])
         self.assertEqual(payload["response"]["analysis"]["portfolio"], {})
         self.assertEqual(payload["debug_source"], "snapshot_read")
 
@@ -567,18 +563,16 @@ class IntelligenceStateTests(unittest.TestCase):
             with patch("syndicate.blueprints.intelligence.read_latest_intelligence_state", return_value=dict({"ok": True, "top_opportunities": [], "by_sport": {}, "analysis": {"recommendations": [], "picks": [], "top_live_opportunities": [], "portfolio": {}, "parlays": []}})):
                 with patch("syndicate.blueprints.intelligence.launch_refresh_run") as mocked_launch:
                     with patch("syndicate.blueprints.intelligence.queue_intelligence_state_refresh") as mocked_queue:
-                        with patch("syndicate.blueprints.intelligence.compute_intelligence_state_response", return_value=dict(computed_response)) as mocked_compute:
-                            response = intelligence_query_api()
+                        response = intelligence_query_api()
 
         payload = response.get_json()
         self.assertIsNotNone(payload)
         self.assertEqual(response.status_code, 200)
         mocked_launch.assert_called_once()
         mocked_queue.assert_called_once()
-        mocked_compute.assert_called_once()
-        self.assertEqual(payload["response"]["top_opportunities"][0]["name"], "Computed Play")
-        self.assertEqual(payload["response"]["analysis"]["recommendations"][0]["name"], "Computed Play")
-        self.assertFalse(payload["response"].get("queued"))
+        self.assertEqual(payload["response"]["top_opportunities"], [])
+        self.assertEqual(payload["response"]["analysis"]["recommendations"], [])
+        self.assertTrue(payload["response"].get("queued"))
         self.assertEqual(payload["debug_source"], "snapshot_read")
 
     def test_run_intelligence_uses_render_refresh_profile_defaults(self) -> None:
