@@ -1,5 +1,12 @@
 # Fix Notes Log
 
+## 2026-07-05 - Render web dyno stopped bootstrapping at startup
+- Symptom: Redeploying the web service still produced 502s on `/intelligence` and `/api/intelligence/status`.
+- Root cause: The web dyno was running `bootstrap_data_root.main()` during app creation, which can block startup long enough for Render to return a bad gateway.
+- Fix: Skip startup bootstrap on the Render web dyno, keep the bootstrap path available off-Render, and keep the Render env contract explicit in the tests.
+- Validation: `python -m pytest tests/test_app_bootstrap.py tests/test_render_yaml_envs.py` passed after the rollback.
+- Follow-up: Redeploy again and verify the web process comes up cleanly before re-checking whether the cache is populated.
+
 ## 2026-07-05 - Render web dyno now runs bootstrap and intelligence background loop
 - Symptom: The Render web service could start without bootstrapping data or the intelligence background loop, which left the live board dependent on stale or missing cache state.
 - Root cause: The web startup path short-circuited bootstrap on Render web dynos and the Render env still left the intelligence background loop disabled.

@@ -39,6 +39,7 @@ class RenderYamlEnvTests(unittest.TestCase):
         self.assertIn("/opt/render/project/data/wnba_source", web_section)
         self.assertIn("SYNDICATE_REPORTS_ROOT", web_section)
         self.assertIn("/opt/render/project/data/reports", web_section)
+        self.assertIn('value: "0"', web_section)
 
         self.assertIn("disk:", worker_section)
         self.assertIn("/opt/render/project/data/", worker_section)

@@ -37,6 +37,28 @@ The intelligence layer must:
 - Avoid direct pipeline execution from request handlers unless there is no cache-backed alternative and the route explicitly requires it
 - Ensure only one refresh owner computes intelligence state and prevent concurrent intelligence recomputation across requests/workers
 
+### Troubleshooting Hierarchy
+Syndicate troubleshooting must identify the first point where expected data disappears.
+
+Pipeline:
+Odds sources -> candidate generation -> artifact generation -> artifact storage -> artifact read -> API response -> UI
+
+Rules:
+- Always verify earlier stages before spending time on later stages.
+- When a later stage is empty, first determine whether candidate generation or artifact generation is already empty.
+- Do not spend significant effort on readers, hydration, endpoints, or UI until candidate counts and artifact counts are known.
+- Production telemetry and artifact counts outrank unit-test success during incident triage.
+
+Expected diagnostic output:
+- odds_loaded=
+- games_loaded=
+- candidates_generated=
+- artifact_candidates=
+- api_candidates=
+- ui_candidates=
+
+The first stage that becomes zero is the controlling defect.
+
 ### Daily Update Root Direction
 The root daily update system is evolving from a time-driven wrapper into a state-aware execution controller.
 
