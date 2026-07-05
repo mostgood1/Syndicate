@@ -31,6 +31,7 @@ import hashlib
 import json
 import logging
 import threading
+import time
 from pathlib import Path
 import re
 import subprocess
@@ -129,6 +130,15 @@ def _intel_trace(event: str, **fields: Any) -> None:
         print(f"[INTEL_TRACE] {json.dumps({'event': event, **fields}, sort_keys=True, default=str)}", flush=True)
     except Exception:
         print(f"[INTEL_TRACE] {event}", flush=True)
+
+
+def _intel_trace_timed(event: str, started_at: float, **fields: Any) -> None:
+    payload = dict(fields)
+    try:
+        payload["duration_ms"] = round((time.perf_counter() - started_at) * 1000.0, 3)
+    except Exception:
+        pass
+    _intel_trace(event, **payload)
 
 
 def _cache_query_response(cache_key: str, response_payload: dict[str, Any]) -> None:
@@ -4473,6 +4483,7 @@ def _collect_candidates(overview: list[dict[str, Any]], preferences: dict[str, A
     for sport in overview:
         if not isinstance(sport, dict) or not _sport_matches_preferences(sport, preferences):
             continue
+        sport_started_at = time.perf_counter()
         sport_start_count = len(candidates)
         sport_slug = _safe_text(sport.get("slug"), "").lower()
         sport_health = _safe_text(sport.get("data_health"), "").lower()
@@ -4524,18 +4535,21 @@ def _collect_candidates(overview: list[dict[str, Any]], preferences: dict[str, A
         for candidate in sport_candidates:
             market_key = _safe_text(candidate.get("candidate_type") or candidate.get("type"), "candidate").lower() or "candidate"
             sport_market_counts[market_key] = sport_market_counts.get(market_key, 0) + 1
-        _intel_trace(
+        _intel_trace_timed(
             "candidate_generation",
+            sport_started_at,
             sport=sport_slug,
             context_label=_safe_text(sport.get("context_label"), ""),
             generated=len(sport_candidates),
             markets=sport_market_counts,
         )
 
+    stage_started_at = time.perf_counter()
     odds_history_by_sport = _odds_history_payloads_by_sport(overview)
     candidates = _enrich_candidates_with_odds_history(candidates, odds_history_by_sport)
 
-    _intel_trace("candidate_generation", stage="post_odds_enrichment", total_candidates=len(candidates))
+    _intel_trace_timed("candidate_generation", stage_started_at, stage="post_odds_enrichment", total_candidates=len(candidates))
+    stage_started_at = time.perf_counter()
     validated_candidates: list[dict[str, Any]] = []
     for candidate in candidates:
         if not isinstance(candidate, dict):
@@ -4545,11 +4559,12 @@ def _collect_candidates(overview: list[dict[str, Any]], preferences: dict[str, A
             continue
         validated_candidates.append(candidate)
     candidates = validated_candidates
-    _intel_trace("candidate_generation", stage="post_state_filter", total_candidates=len(candidates))
+    _intel_trace_timed("candidate_generation", stage_started_at, stage="post_state_filter", total_candidates=len(candidates))
 
-    _intel_trace("candidate_generation", stage="pre_requested_market_filter", total_candidates=len(candidates))
+    stage_started_at = time.perf_counter()
+    _intel_trace_timed("candidate_generation", stage_started_at, stage="pre_requested_market_filter", total_candidates=len(candidates))
     candidates = _filter_candidates_to_requested_markets(candidates, preferences.get("requested_markets") or [])
-    _intel_trace("candidate_generation", stage="post_requested_market_filter", total_candidates=len(candidates))
+    _intel_trace_timed("candidate_generation", stage_started_at, stage="post_requested_market_filter", total_candidates=len(candidates))
 
     deduped: list[dict[str, Any]] = []
     seen: set[tuple[str, str, str, str, str]] = set()
@@ -6191,6 +6206,7 @@ def _score_candidates(
     advanced_by_sport: dict[str, list[dict[str, Any]]],
     preferences: dict[str, Any],
 ) -> list[dict[str, Any]]:
+    score_started_at = time.perf_counter()
     scored_candidates: list[dict[str, Any]] = []
     state_invalid_filtered = 0
     final_filtered = 0
@@ -6216,8 +6232,9 @@ def _score_candidates(
         sport_counts[sport_key] = sport_counts.get(sport_key, 0) + 1
         market_key = _safe_text(candidate.get("candidate_type") or candidate.get("type"), "candidate").lower() or "candidate"
         market_counts[market_key] = market_counts.get(market_key, 0) + 1
-    _intel_trace(
+    _intel_trace_timed(
         "candidate_scoring",
+        score_started_at,
         input_count=len(candidates),
         output_count=len(scored_candidates),
         state_invalid_filtered=state_invalid_filtered,
@@ -6293,13 +6310,19 @@ def collect_all_recommendations(*, selected_date: str | None = None, force_refre
         for sport_row in overview
         if isinstance(sport_row, dict)
     }
+    candidate_started_at = time.perf_counter()
     candidates = _primary_query_candidates(overview, preferences, odds_history_by_sport)
+    _intel_trace_timed("candidate_collection", candidate_started_at, pipeline="collect_all_recommendations", candidate_count=len(candidates))
+    scoring_started_at = time.perf_counter()
     candidates = _enrich_candidates_with_odds_history(candidates, odds_history_by_sport)
     candidates = _score_candidates(candidates, advanced_by_sport, preferences)
+    _intel_trace_timed("scoring", scoring_started_at, pipeline="collect_all_recommendations", candidate_count=len(candidates))
+    ranking_started_at = time.perf_counter()
     filtered_candidates = filter_candidates(candidates, sport=_safe_text(preferences.get("sport"), "") or None)
     ranked_recommendations = _balanced_recommendation_order(filtered_candidates)
     if not ranked_recommendations:
         ranked_recommendations = _balanced_recommendation_order(candidates)
+    _intel_trace_timed("ranking", ranking_started_at, pipeline="collect_all_recommendations", recommendation_count=len(ranked_recommendations))
     _intel_trace(
         "opportunity_generation",
         pipeline="collect_all_recommendations",
@@ -6431,6 +6454,7 @@ def run_intelligence_query(
     policy: str | None = None,
     force_refresh: bool = False,
 ) -> dict[str, Any]:
+    request_started_at = time.perf_counter()
     preferences = _query_preferences(
         question,
         mode=mode,
@@ -6473,8 +6497,17 @@ def run_intelligence_query(
         ):
             cached_response = None
         if cached_response is not None:
+            _intel_trace_timed(
+                "response_assembly",
+                request_started_at,
+                pipeline="run_intelligence_query",
+                cache_hit=True,
+                recommendation_count=len(cached_response.get("recommendations") or []),
+            )
             return cached_response
+    candidate_started_at = time.perf_counter()
     candidates = _primary_query_candidates(overview, preferences, odds_history_by_sport)
+    _intel_trace_timed("candidate_generation", candidate_started_at, pipeline="run_intelligence_query", candidate_count=len(candidates))
     resolved_requested_subjects = _resolved_requested_subjects(question, candidates)
     if resolved_requested_subjects != (preferences.get("requested_subjects") or []):
         preferences = {**preferences, "requested_subjects": resolved_requested_subjects}
@@ -6486,17 +6519,23 @@ def run_intelligence_query(
     resolved_analysis_focus = _analysis_focus_from_resolved_candidates(question, candidates, preferences)
     if resolved_analysis_focus and resolved_analysis_focus != preferences.get("analysis_focus"):
         preferences = {**preferences, "analysis_focus": resolved_analysis_focus}
+    scoring_started_at = time.perf_counter()
     candidates = _enrich_candidates_with_odds_history(candidates, odds_history_by_sport)
     candidates = _score_candidates(candidates, advanced_by_sport, preferences)
+    _intel_trace_timed("scoring", scoring_started_at, pipeline="run_intelligence_query", candidate_count=len(candidates))
+    ranking_started_at = time.perf_counter()
     filtered_candidates = filter_candidates(candidates, sport=_safe_text(preferences.get("sport"), "") or None)
     ranked_recommendations = _balanced_recommendation_order(filtered_candidates)
     if not ranked_recommendations:
         ranked_recommendations = _balanced_recommendation_order(candidates)
+    _intel_trace_timed("ranking", ranking_started_at, pipeline="run_intelligence_query", recommendation_count=len(ranked_recommendations))
+    evaluation_started_at = time.perf_counter()
     recommendations = _greedy_low_correlation_selection(
         [dict(candidate) for candidate in ranked_recommendations],
         limit=preferences["limit"],
         threshold=MAX_CORRELATION_THRESHOLD,
     )
+    _intel_trace_timed("evaluation", evaluation_started_at, pipeline="run_intelligence_query", recommendation_count=len(recommendations))
     _intel_trace(
         "opportunity_generation",
         pipeline="run_intelligence_query",
@@ -6515,6 +6554,7 @@ def run_intelligence_query(
         pipeline_name="run_intelligence_query",
     )
     if ENABLE_PREDICTION_TRACKING:
+        tracking_started_at = time.perf_counter()
         for recommendation in recommendations:
             if recommendation.get("is_final") is False:
                 continue
@@ -6565,6 +6605,8 @@ def run_intelligence_query(
                 )
             except Exception:
                 pass
+        _intel_trace_timed("snapshot_write", tracking_started_at, pipeline="run_intelligence_query", recommendation_count=len(recommendations))
+    response_started_at = time.perf_counter()
     parlay_limit = preferences["limit"] if preferences.get("parlay_type") == "round_robin" else min(3, preferences["limit"])
     parlays = _build_parlays(filtered_candidates, limit=parlay_limit, preferences=preferences) if preferences.get("intent") == "parlay" or "parlay" in preferences.get("question", "").lower() else []
     analysis_views = _analysis_views_for_query(candidates, preferences)
@@ -6668,4 +6710,18 @@ def run_intelligence_query(
     final_response["portfolio_events"] = dict(final_response.get("evaluation_bundle", {}).get("portfolio_events") or {})
     final_response["portfolio_event_records"] = list(final_response.get("evaluation_bundle", {}).get("portfolio_event_records") or [])
     _attach_intelligence_response_aliases(final_response)
+    _intel_trace_timed(
+        "response_assembly",
+        response_started_at,
+        pipeline="run_intelligence_query",
+        recommendation_count=len(recommendations),
+        parlay_count=len(parlays),
+    )
+    _intel_trace_timed(
+        "request_total",
+        request_started_at,
+        pipeline="run_intelligence_query",
+        recommendation_count=len(recommendations),
+        parlay_count=len(parlays),
+    )
     return final_response
