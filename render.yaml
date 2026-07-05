@@ -88,7 +88,7 @@ services:
       - key: GUNICORN_KEEPALIVE
         value: "5"
       - key: SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP
-        value: "true"
+        value: "false"
       - key: SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP
         value: "false"
       - key: SYNDICATE_LIVE_ODDS_REFRESH_INTERVAL_SECONDS
