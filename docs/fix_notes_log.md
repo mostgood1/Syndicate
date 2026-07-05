@@ -1,5 +1,12 @@
 # Fix Notes Log
 
+## 2026-07-05 - Intelligence overview stopped inheriting the home-page filter
+- Symptom: The intelligence board and `/api/intelligence/status` kept collapsing to `candidate_count: 0` even though the sports artifacts were present.
+- Root cause: `build_intelligence_overview()` was reusing `build_home_overview()`, so the `show_on_home` filter could shrink the pipeline sport set to zero before candidate generation.
+- Fix: Build intelligence sports with `_build_sport_overview()` for every configured sport and keep the home visibility filter confined to the home route.
+- Validation: Targeted tests in `tests/test_intelligence.py` passed, and the local probe returned `overview_len 7` with `recs_len 48` and a populated board contract.
+- Follow-up: Keep the generated intelligence report artifacts out of the push unless they are intentionally part of the release payload.
+
 ## 2026-07-05 - Render web dyno stopped bootstrapping at startup
 - Symptom: Redeploying the web service still produced 502s on `/intelligence` and `/api/intelligence/status`.
 - Root cause: The web dyno was running `bootstrap_data_root.main()` during app creation, which can block startup long enough for Render to return a bad gateway.

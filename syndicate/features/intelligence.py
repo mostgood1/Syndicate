@@ -41,8 +41,8 @@ from flask import current_app
 
 __path__ = [str(Path(__file__).with_name("intelligence"))]
 
+from syndicate.blueprints.home import _build_sport_overview
 from syndicate.blueprints.home import _build_prop_dashboard_row
-from syndicate.blueprints.home import build_home_overview
 from syndicate.blueprints.home import _game_bet_candidates_from_game
 from syndicate.features.mlb.sources import daily_artifact_path as mlb_daily_artifact_path
 from syndicate.features.mlb.sources import daily_snapshot_oddsapi_pitcher_props_path as mlb_daily_snapshot_oddsapi_pitcher_props_path
@@ -2361,7 +2361,16 @@ def _query_preferences(
 def build_intelligence_overview(*, selected_date: str | None = None, force_refresh: bool = False) -> list[dict[str, Any]]:
     effective_date = _effective_date(selected_date)
     sports = _configured_syndicate_sports()
-    overview = build_home_overview(sports, selected_date=effective_date, force_refresh=force_refresh)
+    overview = [
+        _build_sport_overview(
+            sport,
+            effective_date,
+            force_refresh=force_refresh,
+            preserve_requested_date=selected_date is not None,
+        )
+        for sport in sports
+        if isinstance(sport, dict)
+    ]
     for sport_overview in overview:
         if _safe_text(sport_overview.get("slug"), "").lower() == "wnba":
             home_rails = sport_overview.get("home_rails") if isinstance(sport_overview.get("home_rails"), dict) else {}

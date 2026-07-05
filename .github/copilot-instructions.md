@@ -59,6 +59,35 @@ Expected diagnostic output:
 
 The first stage that becomes zero is the controlling defect.
 
+### Root Cause Protocol
+When troubleshooting, keep the current first-zero location explicit and stable.
+
+Rules:
+- Identify the first stage where expected data disappears.
+- Do not modify downstream systems until the first-zero stage is explained.
+- Every code change must reference the current root-cause hypothesis.
+- If a proposed change does not affect the current first-zero location, stop and justify it.
+- Stay in incident mode until the first-zero condition is explained and validated.
+
+Current root-cause ledger:
+- Status: active
+- Evidence: the first-zero stage and its immediate input path
+- Next target: the next upstream stage that can explain the first zero
+- Excluded until explained: downstream readers, hydration, routing, and UI
+
+### Development vs Incident Mode
+Use incident mode only when the investigation is active.
+
+Incident mode:
+- No feature work.
+- No refactors unrelated to the first-zero path.
+- No instruction edits unless they directly constrain the active investigation.
+
+Development mode:
+- Assume the system is healthy.
+- Build features and minimize investigation.
+- Exit incident mode explicitly once the first-zero path is explained.
+
 ### Daily Update Root Direction
 The root daily update system is evolving from a time-driven wrapper into a state-aware execution controller.
 
