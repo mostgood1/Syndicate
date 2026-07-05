@@ -1012,18 +1012,6 @@ def intelligence_query_api():
         queue_intelligence_state_refresh(dict(payload))
     candidate_count = _response_candidate_count(state_payload) if isinstance(state_payload, dict) else 0
     if candidate_count <= 0 or not isinstance(state_payload, dict) or not _response_has_content(state_payload):
-        selected_date = str(payload.get("date") or payload.get("selected_date") or "").strip() or central_today_iso()
-        try:
-            launch_refresh_run(
-                date=selected_date,
-                mode=None,
-                phase=None,
-                regions=None,
-                execution_mode=None,
-                skip_mirror=None,
-            )
-        except Exception:
-            pass
         queue_intelligence_state_refresh(dict(payload))
         queued_state = read_latest_intelligence_state(dict(payload))
         if isinstance(queued_state, dict) and _response_candidate_count(queued_state) > 0:
