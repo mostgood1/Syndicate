@@ -110,6 +110,40 @@ def _safe_write_json(path: Path, payload: dict[str, Any]) -> None:
         pass
 
 
+def _queue_intelligence_snapshot_refresh(*, run_summary_path: Path) -> tuple[str, dict[str, Any]] | None:
+    store = _refresh_state_store()
+    read_json_file = store["read_json_file"]
+    run_summary = read_json_file(run_summary_path) or {}
+    if not isinstance(run_summary, dict):
+        return None
+
+    selected_date = str(
+        run_summary.get("date")
+        or run_summary.get("selectedDate")
+        or run_summary.get("selected_date")
+        or ""
+    ).strip()
+    if not selected_date:
+        return None
+
+    payload: dict[str, Any] = {
+        "date": selected_date,
+        "question": "top edges today",
+        "mode": "live",
+        "sport": "all",
+        "timing": "",
+        "limit": 10,
+        "include_props": True,
+        "include_games": True,
+        "force_refresh": True,
+    }
+
+    from pipeline.intelligence_state import queue_intelligence_state_refresh
+
+    queued_key = queue_intelligence_state_refresh(payload)
+    return queued_key, payload
+
+
 def main() -> int:
     print("[refresh_job] script entry reached", flush=True)
     store = _refresh_state_store()
@@ -250,6 +284,18 @@ def main() -> int:
         finished_at=finished_at,
         command=command,
     )
+    if return_code == 0:
+        try:
+            queued = _queue_intelligence_snapshot_refresh(run_summary_path=run_summary_path)
+            if queued is not None:
+                queued_key, queued_payload = queued
+                print(
+                    f"[refresh_job_intelligence_refresh_queued] key={queued_key} date={queued_payload.get('date')}",
+                    flush=True,
+                )
+        except Exception:
+            print("[refresh_job_intelligence_refresh_failed]", file=sys.stderr, flush=True)
+            print(traceback.format_exc(), file=sys.stderr, flush=True)
     return int(return_code)
 
 

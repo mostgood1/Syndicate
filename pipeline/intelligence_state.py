@@ -9,6 +9,7 @@ import time
 from collections import OrderedDict
 from dataclasses import dataclass
 from datetime import datetime
+from datetime import date
 from datetime import timezone
 from pathlib import Path
 from typing import Any, Mapping
@@ -38,6 +39,11 @@ from syndicate.features.shared.refresh_state_store import write_json_file
 from syndicate.features.shared.source_roots import repo_root_from
 from syndicate.features.shared.timezone import central_today_iso
 from syndicate.features.shared.timezone import normalize_timestamped_payload
+from syndicate.features.mlb.sources import available_daily_summary_dates as mlb_available_daily_summary_dates
+from syndicate.features.nba.sources import available_dates as nba_available_dates
+from syndicate.features.ncaab.sources import available_dates as ncaab_available_dates
+from syndicate.features.nhl.sources import available_dates as nhl_available_dates
+from syndicate.features.wnba.sources import available_dates as wnba_available_dates
 
 
 REPO_ROOT = repo_root_from(__file__)
@@ -52,6 +58,40 @@ _INTELLIGENCE_LAST_RUN_STARTED_AT: float = 0.0
 _INTELLIGENCE_LAST_RUN_FINISHED_AT: float = 0.0
 _INTELLIGENCE_LAST_RUN_KEY: str | None = None
 _INTELLIGENCE_GUARD_OWNER = threading.local()
+
+
+def _supported_intelligence_dates() -> list[str]:
+    dates: set[str] = set()
+    for loader in (
+        mlb_available_daily_summary_dates,
+        nba_available_dates,
+        wnba_available_dates,
+        ncaab_available_dates,
+        nhl_available_dates,
+    ):
+        try:
+            for value in loader():
+                text = str(value or "").strip()
+                if len(text) != 10:
+                    continue
+                try:
+                    date.fromisoformat(text)
+                except Exception:
+                    continue
+                dates.add(text)
+        except Exception:
+            continue
+    return sorted(dates)
+
+
+def _next_supported_intelligence_date(current_date: str | None) -> str | None:
+    reference = str(current_date or "").strip() or central_today_iso()
+    try:
+        reference_date = date.fromisoformat(reference)
+    except Exception:
+        return None
+    future_dates = [value for value in _supported_intelligence_dates() if date.fromisoformat(value) > reference_date]
+    return future_dates[0] if future_dates else None
 
 
 def _state_backend_kind() -> str:
@@ -432,6 +472,9 @@ def write_latest_intelligence_state(state: Any) -> dict[str, Any] | None:
     state_meta = dict(normalized.get("state_meta") or {})
     board_snapshot_payload = {
         "updated_at": _utc_now(),
+        "snapshot_generated_at": normalized.get("snapshot_generated_at") or normalized.get("state_last_updated") or normalized.get("last_updated") or _utc_now(),
+        "selected_date": normalized.get("selected_date"),
+        "candidate_count": int(normalized.get("candidate_count") or 0),
         "response": dict(normalized),
         "state_meta": state_meta,
         "board_contract": normalized.get("board_contract") if isinstance(normalized.get("board_contract"), dict) else None,
@@ -1419,6 +1462,7 @@ class IntelligenceStateService:
 
         source_fingerprint = self._source_state_fingerprint(selected_date)
         cache_key = _payload_key(request_payload)
+        logger.info("BETTING_BOARD_REFRESH_START", extra={"selected_date": selected_date, "force_refresh": bool(force_refresh), "question": question})
         with self._condition:
             snapshot = self._snapshots.get(cache_key)
             if not force_refresh and snapshot is not None and snapshot.source_fingerprint == source_fingerprint and not self._is_stale(snapshot):
@@ -1444,6 +1488,18 @@ class IntelligenceStateService:
                 self._last_run_started_at = time.time()
 
             candidate_pool = self._build_candidate_pool(selected_date, source_fingerprint)
+            candidate_pool_count = int(candidate_pool.get("candidate_count") or 0)
+            if candidate_pool_count <= 0 and selected_date == central_today_iso():
+                rollover_date = _next_supported_intelligence_date(selected_date)
+                if rollover_date and rollover_date != selected_date:
+                    logger.info("BETTING_BOARD_REFRESH_DATE", extra={"requested_date": selected_date, "selected_date": rollover_date, "rollover": True})
+                    selected_date = rollover_date
+                    request_payload["date"] = rollover_date
+                    source_fingerprint = self._source_state_fingerprint(selected_date)
+                    cache_key = _payload_key(request_payload)
+                    candidate_pool = self._build_candidate_pool(selected_date, source_fingerprint)
+                    candidate_pool_count = int(candidate_pool.get("candidate_count") or 0)
+            logger.info("BETTING_BOARD_REFRESH_DATE", extra={"requested_date": str(payload.get("date") or payload.get("selected_date") or "").strip() or None, "selected_date": selected_date, "candidate_count": candidate_pool_count})
             candidates = [self._serialize_candidate(candidate) for candidate in candidate_pool.get("candidates") if isinstance(candidate, Mapping)]
 
             ranked_candidates = _profile_stage("candidate_scoring", _balanced_recommendation_order, candidates)
@@ -1489,15 +1545,18 @@ class IntelligenceStateService:
                 "by_sport": by_sport,
                 "analysis": analysis,
                 "candidate_pool": candidate_pool,
+                "selected_date": selected_date,
             }
             response_last_updated = _utc_now()
             response_candidate_count = len(candidates)
             response["state_last_updated"] = response_last_updated
             response["last_updated"] = response_last_updated
+            response["snapshot_generated_at"] = response_last_updated
             response["candidate_count"] = response_candidate_count
             if analysis:
                 analysis["state_last_updated"] = response_last_updated
                 analysis["last_updated"] = response_last_updated
+                analysis["snapshot_generated_at"] = response_last_updated
                 analysis["candidate_count"] = response_candidate_count
                 response["response"] = analysis
             board_payload = dict(response)
@@ -1506,6 +1565,7 @@ class IntelligenceStateService:
             response = _promote_board_contract_cards(response)
             _log_stage_timing("response_building", (time.perf_counter() - response_build_started_at) * 1000.0)
             response = _decorate_response_with_state_meta(dict(response), None, source="worker", run_key=cache_key, sla_seconds=self._interval_seconds) or dict(response)
+            logger.info("BETTING_BOARD_REFRESH_CANDIDATE_COUNT", extra={"selected_date": selected_date, "candidate_count": response_candidate_count})
             persist_on_request_path = not _env_bool("SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP", default=False)
             with self._condition:
                 snapshot = IntelligenceSnapshot(
@@ -1528,6 +1588,7 @@ class IntelligenceStateService:
                     logger.info("COMPUTE_RESPONSE PERSIST DEFERRED", extra={"candidate_count": response_candidate_count})
             _log_stage_timing("request_total", (time.perf_counter() - request_started_at) * 1000.0)
             logger.info("before return", extra={"candidate_count": response_candidate_count})
+            logger.info("BETTING_BOARD_REFRESH_COMPLETE", extra={"selected_date": selected_date, "candidate_count": response_candidate_count, "snapshot_generated_at": response_last_updated})
             return response
         finally:
             if guard_acquired:
