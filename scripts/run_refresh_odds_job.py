@@ -48,14 +48,22 @@ def _update_state(
     manifest["state"] = state
     manifest["exitCode"] = int(exit_code)
     manifest["finishedAt"] = finished_at
+    manifest_text = json.dumps(manifest, indent=2)
+    print(f"SAFE_WRITE_BEGIN path={manifest_path} payload_size={len(manifest_text.encode('utf-8'))}", flush=True)
     write_json_file(manifest_path, manifest)
+    print(f"SAFE_WRITE_SUCCESS path={manifest_path}", flush=True)
+    print(f"SAFE_WRITE_BEGIN path={latest_path} payload_size={len(manifest_text.encode('utf-8'))}", flush=True)
     write_json_file(latest_path, manifest)
+    print(f"SAFE_WRITE_SUCCESS path={latest_path}", flush=True)
 
     run_summary = read_json_file(run_summary_path) or {}
     run_summary["state"] = state
     run_summary["exitCode"] = int(exit_code)
     run_summary["finishedAt"] = finished_at
+    run_summary_text = json.dumps(run_summary, indent=2)
+    print(f"SAFE_WRITE_BEGIN path={run_summary_path} payload_size={len(run_summary_text.encode('utf-8'))}", flush=True)
     write_json_file(run_summary_path, run_summary)
+    print(f"SAFE_WRITE_SUCCESS path={run_summary_path}", flush=True)
 
 
 def _update_job_status(
@@ -90,30 +98,46 @@ def _update_job_status(
         payload["command"] = [str(part) for part in command]
     if extra:
         payload.update(extra)
+    payload_text = json.dumps(payload, indent=2)
+    print(f"SAFE_WRITE_BEGIN path={status_path} payload_size={len(payload_text.encode('utf-8'))}", flush=True)
     write_json_file(status_path, payload)
+    print(f"SAFE_WRITE_SUCCESS path={status_path}", flush=True)
 
 
 def _safe_write_text(path: Path, payload: str) -> None:
     try:
+        payload_text = str(payload or "")
+        print(f"SAFE_WRITE_BEGIN path={path} payload_size={len(payload_text.encode('utf-8'))}", flush=True)
         _refresh_state_store()["write_text_file"](path, payload)
+        print(f"SAFE_WRITE_SUCCESS path={path}", flush=True)
         print(f"[refresh_job_write_text_ok] path={path}", flush=True)
-    except Exception:
+    except Exception as exc:
+        print(
+            f"SAFE_WRITE_EXCEPTION exception_type={type(exc).__name__} exception_message={exc} path={path}",
+            file=sys.stderr,
+            flush=True,
+        )
         print(f"[refresh_job_write_text_failed] path={path}", file=sys.stderr, flush=True)
         print(traceback.format_exc(), file=sys.stderr, flush=True)
-        pass
+        raise
 
 
 def _safe_write_json(path: Path, payload: dict[str, Any]) -> None:
     try:
-        print(f"RESULT_FILE_WRITE_BEGIN path={path}", flush=True)
-        _refresh_state_store()["write_text_file"](path, json.dumps(payload, indent=2))
+        payload_text = json.dumps(payload, indent=2)
+        print(f"SAFE_WRITE_BEGIN path={path} payload_size={len(payload_text.encode('utf-8'))}", flush=True)
+        _refresh_state_store()["write_text_file"](path, payload_text)
+        print(f"SAFE_WRITE_SUCCESS path={path}", flush=True)
         print(f"[refresh_job_write_json_ok] path={path}", flush=True)
-        print(f"RESULT_FILE_WRITE_END path={path}", flush=True)
-    except Exception:
-        print(f"RESULT_FILE_WRITE_END path={path} status=failed", flush=True)
+    except Exception as exc:
+        print(
+            f"SAFE_WRITE_EXCEPTION exception_type={type(exc).__name__} exception_message={exc} path={path}",
+            file=sys.stderr,
+            flush=True,
+        )
         print(f"[refresh_job_write_json_failed] path={path}", file=sys.stderr, flush=True)
         print(traceback.format_exc(), file=sys.stderr, flush=True)
-        pass
+        raise
 
 
 def _wait_for_child_process(
