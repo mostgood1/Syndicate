@@ -18354,6 +18354,25 @@
           },
           {
             "person": {
+              "id": 670871,
+              "fullName": "Guillo Zu\u00f1iga",
+              "link": "/api/v1/people/670871"
+            },
+            "jerseyNumber": "46",
+            "position": {
+              "code": "1",
+              "name": "Pitcher",
+              "type": "Pitcher",
+              "abbreviation": "P"
+            },
+            "status": {
+              "code": "A",
+              "description": "Active"
+            },
+            "parentTeamId": 121
+          },
+          {
+            "person": {
               "id": 623211,
               "fullName": "Huascar Brazob\u00e1n",
               "link": "/api/v1/people/623211"
@@ -18383,25 +18402,6 @@
               "name": "First Base",
               "type": "Infielder",
               "abbreviation": "1B"
-            },
-            "status": {
-              "code": "A",
-              "description": "Active"
-            },
-            "parentTeamId": 121
-          },
-          {
-            "person": {
-              "id": 680702,
-              "fullName": "Joey Gerber",
-              "link": "/api/v1/people/680702"
-            },
-            "jerseyNumber": "56",
-            "position": {
-              "code": "1",
-              "name": "Pitcher",
-              "type": "Pitcher",
-              "abbreviation": "P"
             },
             "status": {
               "code": "A",
@@ -27782,6 +27782,25 @@
           },
           {
             "person": {
+              "id": 669438,
+              "fullName": "Mason Englert",
+              "link": "/api/v1/people/669438"
+            },
+            "jerseyNumber": "59",
+            "position": {
+              "code": "1",
+              "name": "Pitcher",
+              "type": "Pitcher",
+              "abbreviation": "P"
+            },
+            "status": {
+              "code": "A",
+              "description": "Active"
+            },
+            "parentTeamId": 139
+          },
+          {
+            "person": {
               "id": 663743,
               "fullName": "Nick Fortes",
               "link": "/api/v1/people/663743"
@@ -27887,25 +27906,6 @@
               "name": "Shortstop",
               "type": "Infielder",
               "abbreviation": "SS"
-            },
-            "status": {
-              "code": "A",
-              "description": "Active"
-            },
-            "parentTeamId": 139
-          },
-          {
-            "person": {
-              "id": 694680,
-              "fullName": "Trevor Martin",
-              "link": "/api/v1/people/694680"
-            },
-            "jerseyNumber": "70",
-            "position": {
-              "code": "1",
-              "name": "Pitcher",
-              "type": "Pitcher",
-              "abbreviation": "P"
             },
             "status": {
               "code": "A",
@@ -38436,6 +38436,25 @@
           },
           {
             "person": {
+              "id": 683409,
+              "fullName": "Angel Chivilli",
+              "link": "/api/v1/people/683409"
+            },
+            "jerseyNumber": "57",
+            "position": {
+              "code": "1",
+              "name": "Pitcher",
+              "type": "Pitcher",
+              "abbreviation": "P"
+            },
+            "status": {
+              "code": "A",
+              "description": "Active"
+            },
+            "parentTeamId": 147
+          },
+          {
+            "person": {
               "id": 683011,
               "fullName": "Anthony Volpe",
               "link": "/api/v1/people/683011"
@@ -39765,25 +39784,6 @@
           },
           {
             "person": {
-              "id": 605540,
-              "fullName": "Brandon Woodruff",
-              "link": "/api/v1/people/605540"
-            },
-            "jerseyNumber": "53",
-            "position": {
-              "code": "1",
-              "name": "Pitcher",
-              "type": "Pitcher",
-              "abbreviation": "P"
-            },
-            "status": {
-              "code": "A",
-              "description": "Active"
-            },
-            "parentTeamId": 158
-          },
-          {
-            "person": {
               "id": 668930,
               "fullName": "Brice Turang",
               "link": "/api/v1/people/668930"
@@ -39889,6 +39889,25 @@
               "name": "Third Base",
               "type": "Infielder",
               "abbreviation": "3B"
+            },
+            "status": {
+              "code": "A",
+              "description": "Active"
+            },
+            "parentTeamId": 158
+          },
+          {
+            "person": {
+              "id": 680723,
+              "fullName": "Drew Rom",
+              "link": "/api/v1/people/680723"
+            },
+            "jerseyNumber": "38",
+            "position": {
+              "code": "1",
+              "name": "Pitcher",
+              "type": "Pitcher",
+              "abbreviation": "P"
             },
             "status": {
               "code": "A",

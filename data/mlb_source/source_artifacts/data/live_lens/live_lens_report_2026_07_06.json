@@ -1,6 +1,6 @@
 {
   "date": "2026-07-06",
-  "generatedAt": "2026-07-06T02:30:48-05:00",
+  "generatedAt": "2026-07-06T02:53:12-05:00",
   "dataRoot": "data",
   "liveLensDir": "data/live_lens",
   "optimizationRegime": {
@@ -25,9 +25,9 @@
   "performance": {
     "marketsRefreshed": false,
     "marketRefreshMs": 0.0,
-    "totalMs": 690.8,
-    "snapshotLoadMs": 0.9,
-    "simContextLoadMs": 0.7,
+    "totalMs": 623.3,
+    "snapshotLoadMs": 1.0,
+    "simContextLoadMs": 0.6,
     "propEvalMs": 0.1,
     "gameLensMs": 1.0,
     "gameCount": 8,

@@ -636,7 +636,7 @@
         "role": "SU",
         "leverage_skill": 0.7,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.935,
         "platoon_mult_vs_lhb": {
           "k": 0.9789410413751032,
           "bb": 0.9798346513299785,
@@ -678,7 +678,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 30,
-        "availability_mult": 1.0,
+        "availability_mult": 0.95,
         "platoon_mult_vs_lhb": {
           "k": 1.153259559486105,
           "bb": 0.9926383595432027,

@@ -45,12 +45,12 @@
   },
   "results": {
     "hitter_hits": {
-      "n": 2,
-      "wins": 1,
-      "losses": 1,
-      "stake_u": 1.0,
-      "profit_u": -0.1552,
-      "roi": -0.1552
+      "n": 4,
+      "wins": 2,
+      "losses": 2,
+      "stake_u": 2.0,
+      "profit_u": -0.2848,
+      "roi": -0.1424
     },
     "hitter_total_bases": {
       "n": 6,
@@ -77,20 +77,20 @@
       "roi": -1.0
     },
     "hitter_props": {
-      "n": 8,
-      "wins": 3,
-      "losses": 5,
-      "stake_u": 4.0,
-      "profit_u": -1.4465,
-      "roi": -0.3616
+      "n": 10,
+      "wins": 4,
+      "losses": 6,
+      "stake_u": 5.0,
+      "profit_u": -1.5761,
+      "roi": -0.3152
     },
     "combined": {
-      "n": 10,
-      "wins": 3,
-      "losses": 7,
-      "stake_u": 6.0,
-      "profit_u": -3.4465,
-      "roi": -0.5744
+      "n": 12,
+      "wins": 4,
+      "losses": 8,
+      "stake_u": 7.0,
+      "profit_u": -3.5761,
+      "roi": -0.5109
     }
   },
   "playable_results": {
@@ -103,12 +103,12 @@
       "roi": 0.2478
     },
     "hitter_total_bases": {
-      "n": 14,
-      "wins": 9,
-      "losses": 5,
-      "stake_u": 7.0,
-      "profit_u": 1.9012,
-      "roi": 0.2716
+      "n": 17,
+      "wins": 11,
+      "losses": 6,
+      "stake_u": 8.5,
+      "profit_u": 2.1072,
+      "roi": 0.2479
     },
     "pitcher_props": {
       "n": 16,
@@ -119,20 +119,20 @@
       "roi": -0.169
     },
     "hitter_props": {
-      "n": 21,
-      "wins": 14,
-      "losses": 7,
-      "stake_u": 10.5,
-      "profit_u": 2.7684,
-      "roi": 0.2637
+      "n": 24,
+      "wins": 16,
+      "losses": 8,
+      "stake_u": 12.0,
+      "profit_u": 2.9744,
+      "roi": 0.2479
     },
     "combined": {
-      "n": 37,
-      "wins": 21,
-      "losses": 16,
-      "stake_u": 26.5,
-      "profit_u": 0.0638,
-      "roi": 0.0024
+      "n": 40,
+      "wins": 23,
+      "losses": 17,
+      "stake_u": 28.0,
+      "profit_u": 0.2698,
+      "roi": 0.0096
     }
   },
   "shadow_results": {
@@ -155,20 +155,20 @@
   },
   "all_results": {
     "hitter_hits": {
-      "n": 9,
-      "wins": 6,
-      "losses": 3,
-      "stake_u": 4.5,
-      "profit_u": 0.712,
-      "roi": 0.1582
+      "n": 11,
+      "wins": 7,
+      "losses": 4,
+      "stake_u": 5.5,
+      "profit_u": 0.5824,
+      "roi": 0.1059
     },
     "hitter_total_bases": {
-      "n": 20,
-      "wins": 11,
-      "losses": 9,
-      "stake_u": 10.0,
-      "profit_u": 0.6099,
-      "roi": 0.061
+      "n": 23,
+      "wins": 13,
+      "losses": 10,
+      "stake_u": 11.5,
+      "profit_u": 0.8159,
+      "roi": 0.0709
     },
     "ml": {
       "n": 1,
@@ -187,177 +187,34 @@
       "roi": -0.2179
     },
     "hitter_props": {
-      "n": 29,
-      "wins": 17,
-      "losses": 12,
-      "stake_u": 14.5,
-      "profit_u": 1.3219,
-      "roi": 0.0912
+      "n": 34,
+      "wins": 20,
+      "losses": 14,
+      "stake_u": 17.0,
+      "profit_u": 1.3983,
+      "roi": 0.0823
     },
     "combined": {
-      "n": 47,
-      "wins": 24,
-      "losses": 23,
-      "stake_u": 32.5,
-      "profit_u": -3.3827,
-      "roi": -0.1041
+      "n": 52,
+      "wins": 27,
+      "losses": 25,
+      "stake_u": 35.0,
+      "profit_u": -3.3063,
+      "roi": -0.0945
     }
   },
-  "settled_n": 10,
-  "playable_settled_n": 37,
+  "settled_n": 12,
+  "playable_settled_n": 40,
   "shadow_settled_n": 4,
-  "all_settled_n": 47,
-  "unresolved_n": 2,
-  "playable_unresolved_n": 3,
+  "all_settled_n": 52,
+  "unresolved_n": 0,
+  "playable_unresolved_n": 0,
   "shadow_unresolved_n": 0,
-  "all_unresolved_n": 5,
-  "unresolved_recommendations": [
-    {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_07_05_locked_policy.json",
-      "date": "2026-07-05",
-      "game_pk": 824010,
-      "market": "hitter_hits",
-      "player_name": "Logan O'Hoppe",
-      "pitcher_name": "Logan O'Hoppe",
-      "team": "LAA",
-      "prop": "batter_hits",
-      "selection": "over",
-      "market_line": 0.5,
-      "reason": "game not final",
-      "recommendation_tier": "official"
-    },
-    {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_07_05_locked_policy.json",
-      "date": "2026-07-05",
-      "game_pk": 824010,
-      "market": "hitter_hits",
-      "player_name": "Jorge Soler",
-      "pitcher_name": "Jorge Soler",
-      "team": "LAA",
-      "prop": "batter_hits",
-      "selection": "over",
-      "market_line": 0.5,
-      "reason": "game not final",
-      "recommendation_tier": "official"
-    }
-  ],
-  "playable_unresolved_recommendations": [
-    {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_07_05_locked_policy.json",
-      "date": "2026-07-05",
-      "game_pk": 824010,
-      "market": "hitter_total_bases",
-      "player_name": "Logan O'Hoppe",
-      "pitcher_name": "Logan O'Hoppe",
-      "team": "LAA",
-      "prop": "batter_total_bases",
-      "selection": "over",
-      "market_line": 0.5,
-      "reason": "game not final",
-      "recommendation_tier": "candidate"
-    },
-    {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_07_05_locked_policy.json",
-      "date": "2026-07-05",
-      "game_pk": 824010,
-      "market": "hitter_total_bases",
-      "player_name": "Jorge Soler",
-      "pitcher_name": "Jorge Soler",
-      "team": "LAA",
-      "prop": "batter_total_bases",
-      "selection": "over",
-      "market_line": 0.5,
-      "reason": "game not final",
-      "recommendation_tier": "candidate"
-    },
-    {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_07_05_locked_policy.json",
-      "date": "2026-07-05",
-      "game_pk": 824010,
-      "market": "hitter_total_bases",
-      "player_name": "Denzer Guzman",
-      "pitcher_name": "Denzer Guzman",
-      "team": "LAA",
-      "prop": "batter_total_bases",
-      "selection": "over",
-      "market_line": 0.5,
-      "reason": "game not final",
-      "recommendation_tier": "candidate"
-    }
-  ],
+  "all_unresolved_n": 0,
+  "unresolved_recommendations": [],
+  "playable_unresolved_recommendations": [],
   "shadow_unresolved_recommendations": [],
-  "all_unresolved_recommendations": [
-    {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_07_05_locked_policy.json",
-      "date": "2026-07-05",
-      "game_pk": 824010,
-      "market": "hitter_hits",
-      "player_name": "Logan O'Hoppe",
-      "pitcher_name": "Logan O'Hoppe",
-      "team": "LAA",
-      "prop": "batter_hits",
-      "selection": "over",
-      "market_line": 0.5,
-      "reason": "game not final",
-      "recommendation_tier": "official"
-    },
-    {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_07_05_locked_policy.json",
-      "date": "2026-07-05",
-      "game_pk": 824010,
-      "market": "hitter_hits",
-      "player_name": "Jorge Soler",
-      "pitcher_name": "Jorge Soler",
-      "team": "LAA",
-      "prop": "batter_hits",
-      "selection": "over",
-      "market_line": 0.5,
-      "reason": "game not final",
-      "recommendation_tier": "official"
-    },
-    {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_07_05_locked_policy.json",
-      "date": "2026-07-05",
-      "game_pk": 824010,
-      "market": "hitter_total_bases",
-      "player_name": "Logan O'Hoppe",
-      "pitcher_name": "Logan O'Hoppe",
-      "team": "LAA",
-      "prop": "batter_total_bases",
-      "selection": "over",
-      "market_line": 0.5,
-      "reason": "game not final",
-      "recommendation_tier": "candidate"
-    },
-    {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_07_05_locked_policy.json",
-      "date": "2026-07-05",
-      "game_pk": 824010,
-      "market": "hitter_total_bases",
-      "player_name": "Jorge Soler",
-      "pitcher_name": "Jorge Soler",
-      "team": "LAA",
-      "prop": "batter_total_bases",
-      "selection": "over",
-      "market_line": 0.5,
-      "reason": "game not final",
-      "recommendation_tier": "candidate"
-    },
-    {
-      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_07_05_locked_policy.json",
-      "date": "2026-07-05",
-      "game_pk": 824010,
-      "market": "hitter_total_bases",
-      "player_name": "Denzer Guzman",
-      "pitcher_name": "Denzer Guzman",
-      "team": "LAA",
-      "prop": "batter_total_bases",
-      "selection": "over",
-      "market_line": 0.5,
-      "reason": "game not final",
-      "recommendation_tier": "candidate"
-    }
-  ],
+  "all_unresolved_recommendations": [],
   "_settled_rows": [
     {
       "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_07_05_locked_policy.json",
@@ -429,6 +286,42 @@
       "actual": 1.0,
       "result": "win",
       "profit_u": 0.3448,
+      "recommendation_tier": "official"
+    },
+    {
+      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_07_05_locked_policy.json",
+      "date": "2026-07-05",
+      "game_pk": 824010,
+      "market": "hitter_hits",
+      "player_name": "Logan O'Hoppe",
+      "pitcher_name": "Logan O'Hoppe",
+      "team": "LAA",
+      "prop": "batter_hits",
+      "selection": "over",
+      "market_line": 0.5,
+      "odds": "-135",
+      "stake_u": 0.5,
+      "actual": 1.0,
+      "result": "win",
+      "profit_u": 0.3704,
+      "recommendation_tier": "official"
+    },
+    {
+      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_07_05_locked_policy.json",
+      "date": "2026-07-05",
+      "game_pk": 824010,
+      "market": "hitter_hits",
+      "player_name": "Jorge Soler",
+      "pitcher_name": "Jorge Soler",
+      "team": "LAA",
+      "prop": "batter_hits",
+      "selection": "over",
+      "market_line": 0.5,
+      "odds": "-141",
+      "stake_u": 0.5,
+      "actual": 0.0,
+      "result": "loss",
+      "profit_u": -0.5,
       "recommendation_tier": "official"
     },
     {
@@ -994,6 +887,42 @@
     {
       "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_07_05_locked_policy.json",
       "date": "2026-07-05",
+      "game_pk": 824010,
+      "market": "hitter_total_bases",
+      "player_name": "Logan O'Hoppe",
+      "pitcher_name": "Logan O'Hoppe",
+      "team": "LAA",
+      "prop": "batter_total_bases",
+      "selection": "over",
+      "market_line": 0.5,
+      "odds": "-135",
+      "stake_u": 0.5,
+      "actual": 1.0,
+      "result": "win",
+      "profit_u": 0.3704,
+      "recommendation_tier": "candidate"
+    },
+    {
+      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_07_05_locked_policy.json",
+      "date": "2026-07-05",
+      "game_pk": 824010,
+      "market": "hitter_total_bases",
+      "player_name": "Jorge Soler",
+      "pitcher_name": "Jorge Soler",
+      "team": "LAA",
+      "prop": "batter_total_bases",
+      "selection": "over",
+      "market_line": 0.5,
+      "odds": "-130",
+      "stake_u": 0.5,
+      "actual": 0.0,
+      "result": "loss",
+      "profit_u": -0.5,
+      "recommendation_tier": "candidate"
+    },
+    {
+      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_07_05_locked_policy.json",
+      "date": "2026-07-05",
       "game_pk": 822879,
       "market": "hitter_total_bases",
       "player_name": "Nicky Lopez",
@@ -1115,6 +1044,24 @@
       "actual": 2.0,
       "result": "win",
       "profit_u": 0.4065,
+      "recommendation_tier": "candidate"
+    },
+    {
+      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_07_05_locked_policy.json",
+      "date": "2026-07-05",
+      "game_pk": 824010,
+      "market": "hitter_total_bases",
+      "player_name": "Denzer Guzman",
+      "pitcher_name": "Denzer Guzman",
+      "team": "LAA",
+      "prop": "batter_total_bases",
+      "selection": "over",
+      "market_line": 0.5,
+      "odds": "-149",
+      "stake_u": 0.5,
+      "actual": 1.0,
+      "result": "win",
+      "profit_u": 0.3356,
       "recommendation_tier": "candidate"
     },
     {
@@ -1353,6 +1300,42 @@
       "actual": 1.0,
       "result": "win",
       "profit_u": 0.3448,
+      "recommendation_tier": "official"
+    },
+    {
+      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_07_05_locked_policy.json",
+      "date": "2026-07-05",
+      "game_pk": 824010,
+      "market": "hitter_hits",
+      "player_name": "Logan O'Hoppe",
+      "pitcher_name": "Logan O'Hoppe",
+      "team": "LAA",
+      "prop": "batter_hits",
+      "selection": "over",
+      "market_line": 0.5,
+      "odds": "-135",
+      "stake_u": 0.5,
+      "actual": 1.0,
+      "result": "win",
+      "profit_u": 0.3704,
+      "recommendation_tier": "official"
+    },
+    {
+      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_07_05_locked_policy.json",
+      "date": "2026-07-05",
+      "game_pk": 824010,
+      "market": "hitter_hits",
+      "player_name": "Jorge Soler",
+      "pitcher_name": "Jorge Soler",
+      "team": "LAA",
+      "prop": "batter_hits",
+      "selection": "over",
+      "market_line": 0.5,
+      "odds": "-141",
+      "stake_u": 0.5,
+      "actual": 0.0,
+      "result": "loss",
+      "profit_u": -0.5,
       "recommendation_tier": "official"
     },
     {
@@ -1916,6 +1899,42 @@
     {
       "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_07_05_locked_policy.json",
       "date": "2026-07-05",
+      "game_pk": 824010,
+      "market": "hitter_total_bases",
+      "player_name": "Logan O'Hoppe",
+      "pitcher_name": "Logan O'Hoppe",
+      "team": "LAA",
+      "prop": "batter_total_bases",
+      "selection": "over",
+      "market_line": 0.5,
+      "odds": "-135",
+      "stake_u": 0.5,
+      "actual": 1.0,
+      "result": "win",
+      "profit_u": 0.3704,
+      "recommendation_tier": "candidate"
+    },
+    {
+      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_07_05_locked_policy.json",
+      "date": "2026-07-05",
+      "game_pk": 824010,
+      "market": "hitter_total_bases",
+      "player_name": "Jorge Soler",
+      "pitcher_name": "Jorge Soler",
+      "team": "LAA",
+      "prop": "batter_total_bases",
+      "selection": "over",
+      "market_line": 0.5,
+      "odds": "-130",
+      "stake_u": 0.5,
+      "actual": 0.0,
+      "result": "loss",
+      "profit_u": -0.5,
+      "recommendation_tier": "candidate"
+    },
+    {
+      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_07_05_locked_policy.json",
+      "date": "2026-07-05",
       "game_pk": 822879,
       "market": "hitter_total_bases",
       "player_name": "Nicky Lopez",
@@ -2037,6 +2056,24 @@
       "actual": 2.0,
       "result": "win",
       "profit_u": 0.4065,
+      "recommendation_tier": "candidate"
+    },
+    {
+      "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_07_05_locked_policy.json",
+      "date": "2026-07-05",
+      "game_pk": 824010,
+      "market": "hitter_total_bases",
+      "player_name": "Denzer Guzman",
+      "pitcher_name": "Denzer Guzman",
+      "team": "LAA",
+      "prop": "batter_total_bases",
+      "selection": "over",
+      "market_line": 0.5,
+      "odds": "-149",
+      "stake_u": 0.5,
+      "actual": 1.0,
+      "result": "win",
+      "profit_u": 0.3356,
       "recommendation_tier": "candidate"
     },
     {

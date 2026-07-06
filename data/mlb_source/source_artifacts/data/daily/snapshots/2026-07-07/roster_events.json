@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "date": "2026-07-07",
-  "generated_at": "2026-07-06T04:01:14.824855",
+  "generated_at": "2026-07-06T07:40:47.228825",
   "include_baseline": false,
   "teams": {
     "108": {
@@ -307,36 +307,8 @@
         "active": {
           "prev_date": "2026-07-06",
           "n_players": 26,
-          "n_added": 1,
-          "n_removed": 1,
-          "added": [
-            {
-              "full_name": "Joey Gerber",
-              "player_id": 680702,
-              "position": "P",
-              "status": {
-                "code": "A",
-                "description": "Active"
-              }
-            }
-          ],
-          "removed": [
-            {
-              "full_name": "Guillo Zu\u00f1iga",
-              "player_id": 670871,
-              "position": "P",
-              "status": {
-                "code": "A",
-                "description": "Active"
-              }
-            }
-          ],
-          "added_ids": [
-            680702
-          ],
-          "removed_ids": [
-            670871
-          ]
+          "n_added": 0,
+          "n_removed": 0
         }
       }
     },
@@ -461,36 +433,8 @@
         "active": {
           "prev_date": "2026-07-06",
           "n_players": 26,
-          "n_added": 1,
-          "n_removed": 1,
-          "added": [
-            {
-              "full_name": "Trevor Martin",
-              "player_id": 694680,
-              "position": "P",
-              "status": {
-                "code": "A",
-                "description": "Active"
-              }
-            }
-          ],
-          "removed": [
-            {
-              "full_name": "Mason Englert",
-              "player_id": 669438,
-              "position": "P",
-              "status": {
-                "code": "A",
-                "description": "Active"
-              }
-            }
-          ],
-          "added_ids": [
-            694680
-          ],
-          "removed_ids": [
-            669438
-          ]
+          "n_added": 0,
+          "n_removed": 0
         }
       }
     },
@@ -632,25 +576,9 @@
         },
         "active": {
           "prev_date": "2026-07-06",
-          "n_players": 25,
+          "n_players": 26,
           "n_added": 0,
-          "n_removed": 1,
-          "added": [],
-          "removed": [
-            {
-              "full_name": "Angel Chivilli",
-              "player_id": 683409,
-              "position": "P",
-              "status": {
-                "code": "A",
-                "description": "Active"
-              }
-            }
-          ],
-          "added_ids": [],
-          "removed_ids": [
-            683409
-          ]
+          "n_removed": 0
         }
       }
     },
@@ -667,36 +595,8 @@
         "active": {
           "prev_date": "2026-07-06",
           "n_players": 26,
-          "n_added": 1,
-          "n_removed": 1,
-          "added": [
-            {
-              "full_name": "Brandon Woodruff",
-              "player_id": 605540,
-              "position": "P",
-              "status": {
-                "code": "A",
-                "description": "Active"
-              }
-            }
-          ],
-          "removed": [
-            {
-              "full_name": "Drew Rom",
-              "player_id": 680723,
-              "position": "P",
-              "status": {
-                "code": "A",
-                "description": "Active"
-              }
-            }
-          ],
-          "added_ids": [
-            605540
-          ],
-          "removed_ids": [
-            680723
-          ]
+          "n_added": 0,
+          "n_removed": 0
         }
       }
     }

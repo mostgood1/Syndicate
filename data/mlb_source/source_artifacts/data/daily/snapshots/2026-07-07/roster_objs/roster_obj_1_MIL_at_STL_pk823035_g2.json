@@ -1954,6 +1954,76 @@
         },
         {
           "player": {
+            "mlbam_id": 680723,
+            "full_name": "Drew Rom",
+            "primary_position": "P",
+            "bat_side": "L",
+            "throw_side": "L"
+          },
+          "k_rate": 0.38461538461538464,
+          "bb_rate": 0.15384615384615385,
+          "hbp_rate": 0.0,
+          "hr_rate": 0.038461538461538464,
+          "inplay_hit_rate": 0.5,
+          "batters_faced": 26.0,
+          "balls_in_play": 12.0,
+          "arsenal": {
+            "FF": 0.6226415124528303,
+            "OTHER": 0.1603773532075471,
+            "SI": 0.17924528358490568,
+            "FS": 0.03773585075471702
+          },
+          "pitch_type_whiff_mult": {},
+          "pitch_type_inplay_mult": {},
+          "pitch_type_hr_mult": {},
+          "statcast_splits_source": "",
+          "statcast_splits_n_pitches": 0,
+          "statcast_splits_start_date": "",
+          "statcast_splits_end_date": "",
+          "arsenal_source": "statsapi_pitchArsenal",
+          "arsenal_sample_size": 106,
+          "stamina_pitches": 25,
+          "role": "MR",
+          "availability_mult": 0.965,
+          "platoon_mult_vs_lhb": {
+            "k": 1.0,
+            "bb": 1.1925000000000001,
+            "hr": 1.275,
+            "inplay": 0.89
+          },
+          "platoon_mult_vs_rhb": {
+            "k": 1.0,
+            "bb": 0.8075,
+            "hr": 0.78,
+            "inplay": 1.0785714285714285
+          },
+          "venue_mult_home": {
+            "k": 1.014,
+            "bb": 1.1225,
+            "hr": 0.86,
+            "inplay": 0.93
+          },
+          "venue_mult_away": {
+            "k": 0.980909090909091,
+            "bb": 0.8775000000000001,
+            "hr": 1.175,
+            "inplay": 1.05
+          },
+          "vs_venue_hr_mult": {},
+          "vs_venue_k_mult": {},
+          "vs_venue_bb_mult": {},
+          "vs_venue_inplay_mult": {},
+          "vs_venue_history": {},
+          "statcast_quality_mult": {},
+          "bb_gb_rate": 0.44,
+          "bb_fb_rate": 0.25,
+          "bb_ld_rate": 0.2,
+          "bb_pu_rate": 0.11,
+          "bb_inplay_n": 0,
+          "leverage_skill": 0.5
+        },
+        {
+          "player": {
             "mlbam_id": 668831,
             "full_name": "Garrett Stallings",
             "primary_position": "P",

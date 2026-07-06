@@ -1877,6 +1877,70 @@
       "bullpen": [
         {
           "player": {
+            "mlbam_id": 683409,
+            "full_name": "Angel Chivilli",
+            "primary_position": "P",
+            "bat_side": "R",
+            "throw_side": "R"
+          },
+          "k_rate": 0.2222222222222222,
+          "bb_rate": 0.16666666666666666,
+          "hbp_rate": 0.05555555555555555,
+          "hr_rate": 0.05555555555555555,
+          "inplay_hit_rate": 0.2959090909090909,
+          "batters_faced": 18.0,
+          "balls_in_play": 10.0,
+          "arsenal": {
+            "FF": 0.2375,
+            "CH": 0.4625,
+            "SL": 0.3
+          },
+          "pitch_type_whiff_mult": {},
+          "pitch_type_inplay_mult": {},
+          "pitch_type_hr_mult": {},
+          "statcast_splits_source": "",
+          "statcast_splits_n_pitches": 0,
+          "statcast_splits_start_date": "",
+          "statcast_splits_end_date": "",
+          "arsenal_source": "statsapi_pitchArsenal",
+          "arsenal_sample_size": 80,
+          "stamina_pitches": 25,
+          "role": "MR",
+          "availability_mult": 0.9,
+          "platoon_mult_vs_lhb": {
+            "k": 1.1925000000000001,
+            "bb": 0.8075,
+            "hr": 0.78,
+            "inplay": 0.8075
+          },
+          "platoon_mult_vs_rhb": {
+            "k": 0.8625,
+            "bb": 1.1925000000000001,
+            "hr": 1.275,
+            "inplay": 1.1925000000000001
+          },
+          "venue_mult_home": {
+            "k": 1.0,
+            "bb": 1.0,
+            "hr": 1.0,
+            "inplay": 1.0048387096774194
+          },
+          "venue_mult_away": {},
+          "vs_venue_hr_mult": {},
+          "vs_venue_k_mult": {},
+          "vs_venue_bb_mult": {},
+          "vs_venue_inplay_mult": {},
+          "vs_venue_history": {},
+          "statcast_quality_mult": {},
+          "bb_gb_rate": 0.44,
+          "bb_fb_rate": 0.25,
+          "bb_ld_rate": 0.2,
+          "bb_pu_rate": 0.11,
+          "bb_inplay_n": 0,
+          "leverage_skill": 0.5
+        },
+        {
+          "player": {
             "mlbam_id": 687396,
             "full_name": "Brent Headrick",
             "primary_position": "P",
@@ -4824,25 +4888,27 @@
         },
         {
           "player": {
-            "mlbam_id": 694680,
-            "full_name": "Trevor Martin",
+            "mlbam_id": 669438,
+            "full_name": "Mason Englert",
             "primary_position": "P",
-            "bat_side": "R",
+            "bat_side": "S",
             "throw_side": "R"
           },
-          "k_rate": 0.12,
-          "bb_rate": 0.08,
-          "hbp_rate": 0.04,
-          "hr_rate": 0.08,
-          "inplay_hit_rate": 0.33953947368421056,
-          "batters_faced": 50.0,
-          "balls_in_play": 38.0,
+          "k_rate": 0.17955685618729095,
+          "bb_rate": 0.0427257525083612,
+          "hbp_rate": 0.010869565217391304,
+          "hr_rate": 0.03984113712374582,
+          "inplay_hit_rate": 0.35357529794149517,
+          "batters_faced": 92.0,
+          "balls_in_play": 71.0,
           "arsenal": {
-            "FF": 0.4397590376867469,
-            "CU": 0.04216867181927718,
-            "SI": 0.06024096331325302,
-            "FC": 0.2409638532530121,
-            "FS": 0.21686747392771072
+            "FF": 0.17836257678947362,
+            "OTHER": 0.008771929842105263,
+            "CU": 0.1725146168947369,
+            "CH": 0.3099415244210526,
+            "SI": 0.2105263162105263,
+            "SL": 0.0409356722631579,
+            "FC": 0.07894736357894747
           },
           "pitch_type_whiff_mult": {},
           "pitch_type_inplay_mult": {},
@@ -4852,53 +4918,53 @@
           "statcast_splits_start_date": "",
           "statcast_splits_end_date": "",
           "arsenal_source": "statsapi_pitchArsenal",
-          "arsenal_sample_size": 166,
+          "arsenal_sample_size": 342,
           "stamina_pitches": 27,
           "role": "MR",
-          "availability_mult": 1.0,
+          "availability_mult": 0.495,
           "platoon_mult_vs_lhb": {
-            "k": 0.9410714285714286,
-            "bb": 0.9410714285714286,
-            "hr": 0.78,
-            "inplay": 0.9429951222799761
+            "k": 0.9373108265424913,
+            "bb": 1.1925000000000001,
+            "hr": 1.077492130115425,
+            "inplay": 0.9990135996178768
           },
           "platoon_mult_vs_rhb": {
-            "k": 1.075,
-            "bb": 1.0750000000000002,
-            "hr": 1.275,
-            "inplay": 1.0979364464251113
+            "k": 1.0243306169965076,
+            "bb": 0.8075,
+            "hr": 1.0252011192724728,
+            "inplay": 1.0385821473380843
           },
           "venue_mult_home": {
-            "k": 1.0550925925925927,
-            "bb": 0.8930555555555555,
-            "hr": 1.0145833333333332,
-            "inplay": 1.0317807344255705
+            "k": 0.9098991074893287,
+            "bb": 1.0140791476407915,
+            "hr": 0.86,
+            "inplay": 1.0349565054559693
           },
           "venue_mult_away": {
-            "k": 0.8775000000000001,
-            "bb": 1.1225,
-            "hr": 0.9625,
-            "inplay": 0.931129449895193
+            "k": 1.064732618334035,
+            "bb": 0.9985864179539493,
+            "hr": 1.175,
+            "inplay": 0.9893902252183239
           },
           "vs_venue_hr_mult": {
-            "139": 1.0145833333333332
+            "139": 0.86
           },
           "vs_venue_k_mult": {
-            "139": 1.0550925925925927
+            "139": 0.9098991074893287
           },
           "vs_venue_bb_mult": {
-            "139": 0.8930555555555555
+            "139": 1.0140791476407915
           },
           "vs_venue_inplay_mult": {
-            "139": 1.0317807344255705
+            "139": 1.0349565054559693
           },
           "vs_venue_history": {
             "139": {
-              "bf": 36.0,
-              "k_mult": 1.1574074074074074,
-              "bb_mult": 0.6944444444444444,
-              "hr_mult": 1.0416666666666665,
-              "inplay_mult": 1.0908020983587732
+              "bf": 45.0,
+              "k_mult": 0.7425688785409391,
+              "bb_mult": 1.0402261361165472,
+              "hr_mult": 0.6,
+              "inplay_mult": 1.0998757298741977
             }
           },
           "statcast_quality_mult": {},

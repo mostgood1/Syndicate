@@ -90,45 +90,44 @@
     {
       "game_key": "GSV@WSH",
       "game_id": "01fbe348b23c9f547e63ce18ccf0888db",
-      "player": "Janelle Salaun",
+      "player": "Veronica Burton",
       "team": "GSV",
       "team_tricode": "GSV",
       "opponent": "WSH",
-      "score": 12.554047319739524,
-      "score_adj": 12.554047319739524,
+      "score": 11.61552788132455,
+      "score_adj": 11.61552788132455,
       "tier": "High",
       "model": {
-        "pts": 9.030699999999998,
-        "reb": 2.5672666666666664,
-        "ast": 0.4979333333333333,
-        "threes": 1.4938,
-        "stl": 0.4617976,
-        "blk": 0.3778343999999999,
-        "tov": 1.259448,
-        "pra": 12.0959,
-        "pr": 11.597966666666665,
-        "pa": 9.528633333333332,
-        "ra": 3.0651999999999995
+        "pts": 14.905666666666663,
+        "reb": 2.942333333333333,
+        "ast": 5.098966666666667,
+        "threes": 2.1016666666666666,
+        "stl": 0.6409113333333333,
+        "blk": 0.5243819999999999,
+        "tov": 1.7479399999999998,
+        "pra": 22.946966666666665,
+        "pr": 17.847999999999995,
+        "pa": 20.00463333333333,
+        "ra": 8.0413
       },
       "top_play": {
-        "market": "threes",
-        "side": "UNDER",
-        "line": 1.5,
-        "price": 124.0,
-        "edge": 0.05604485410597998,
-        "ev": 0.12554047319739525,
-        "ev_pct": 12.554047319739524,
-        "book": "draftkings",
-        "p_win": 0.5719690446259666,
+        "market": "pr",
+        "side": "OVER",
+        "line": 14.5,
+        "price": -112.0,
+        "edge": 0.061365052957941035,
+        "ev": 0.1161552788132455,
+        "ev_pct": 11.61552788132455,
+        "book": "fanduel",
+        "p_win": 0.6444571656056983,
         "snapshot_ts": null
       },
       "top_play_reasons": [
-        "EV 12.6%",
+        "EV 11.6%",
         "Regular price range (-150 to +150)",
-        "Consensus: 4 books aligned",
         "Best line available"
       ],
-      "basketball_summary": "model 1.5 vs line 1.5 (-0.0)"
+      "basketball_summary": "model 17.8 vs line 14.5 (+3.3)"
     }
   ]
 }

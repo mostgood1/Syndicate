@@ -87,6 +87,12 @@
         "lev": 0.5
       },
       {
+        "id": 680723,
+        "name": "Drew Rom",
+        "role": "MR",
+        "lev": 0.5
+      },
+      {
         "id": 668831,
         "name": "Garrett Stallings",
         "role": "MR",
@@ -666,6 +672,49 @@
           "OTHER": 0.009615384663461537,
           "CH": 0.4711538435096155,
           "FC": 0.1346153852884615
+        },
+        "pitch_type_whiff_mult": {},
+        "pitch_type_inplay_mult": {},
+        "pitch_type_hr_mult": {}
+      },
+      {
+        "id": 680723,
+        "name": "Drew Rom",
+        "throw": "L",
+        "role": "MR",
+        "leverage_skill": 0.5,
+        "stamina_pitches": 25,
+        "availability_mult": 0.965,
+        "platoon_mult_vs_lhb": {
+          "k": 1.0,
+          "bb": 1.1925000000000001,
+          "hr": 1.275,
+          "inplay": 0.89
+        },
+        "platoon_mult_vs_rhb": {
+          "k": 1.0,
+          "bb": 0.8075,
+          "hr": 0.78,
+          "inplay": 1.0785714285714285
+        },
+        "statcast_quality_mult": {},
+        "arsenal_source": "statsapi_pitchArsenal",
+        "arsenal_sample_size": 106,
+        "statcast_splits_found": false,
+        "statcast_splits_source": "",
+        "statcast_splits_n_pitches": 0,
+        "statcast_splits_start_date": "",
+        "statcast_splits_end_date": "",
+        "k_rate": 0.38461538461538464,
+        "bb_rate": 0.15384615384615385,
+        "hbp_rate": 0.0,
+        "hr_rate": 0.038461538461538464,
+        "inplay_hit_rate": 0.5,
+        "arsenal": {
+          "FF": 0.6226415124528303,
+          "OTHER": 0.1603773532075471,
+          "SI": 0.17924528358490568,
+          "FS": 0.03773585075471702
         },
         "pitch_type_whiff_mult": {},
         "pitch_type_inplay_mult": {},

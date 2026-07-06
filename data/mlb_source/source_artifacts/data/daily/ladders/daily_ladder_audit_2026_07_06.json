@@ -1,30 +1,35 @@
 {
   "date": "2026-07-06",
-  "generatedAt": "2026-07-05T22:58:10-05:00",
+  "generatedAt": "2026-07-06T02:37:24-05:00",
   "summary": {
     "cards": 8,
-    "badges": 31,
+    "badges": 43,
     "sources": {
-      "none": 31
+      "none": 43
     },
     "tones": {
-      "soft": 6,
-      "strong": 9,
-      "solid": 16
+      "soft": 11,
+      "strong": 13,
+      "solid": 19
     },
     "stats": {
       "hits_allowed": {
-        "badges": 6,
+        "badges": 12,
         "rungWins": 0,
         "rungLosses": 0
       },
       "outs": {
-        "badges": 9,
+        "badges": 13,
         "rungWins": 0,
         "rungLosses": 0
       },
       "strikeouts": {
         "badges": 16,
+        "rungWins": 0,
+        "rungLosses": 0
+      },
+      "walks_allowed": {
+        "badges": 2,
         "rungWins": 0,
         "rungLosses": 0
       }
@@ -86,6 +91,49 @@
       "gamePk": 824089,
       "matchup": "? @ ?",
       "status": "",
+      "side": "away",
+      "starter": "Cristopher S\u00e1nchez",
+      "label": "H up to 10",
+      "stat": "hits_allowed",
+      "tone": "soft",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 5,
+      "targets": [
+        6,
+        7,
+        8,
+        9,
+        10
+      ],
+      "detail": "Supported ladders: 6/7/8/9/10 Last supported rung: 10"
+    },
+    {
+      "gamePk": 824089,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "away",
+      "starter": "Cristopher S\u00e1nchez",
+      "label": "BB up to 3",
+      "stat": "walks_allowed",
+      "tone": "soft",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 2,
+      "targets": [
+        2,
+        3
+      ],
+      "detail": "Supported ladders: 2/3 Last supported rung: 3"
+    },
+    {
+      "gamePk": 824089,
+      "matchup": "? @ ?",
+      "status": "",
       "side": "home",
       "starter": "Noah Cameron",
       "label": "K up to 7",
@@ -95,12 +143,13 @@
       "actual": null,
       "wins": 0,
       "losses": 0,
-      "targetCount": 2,
+      "targetCount": 3,
       "targets": [
+        5,
         6,
         7
       ],
-      "detail": "Supported ladders: 6/7 Last supported rung: 7"
+      "detail": "Supported ladders: 5/6/7 Last supported rung: 7"
     },
     {
       "gamePk": 824089,
@@ -143,6 +192,26 @@
         9
       ],
       "detail": "Supported ladders: 6/7/8/9 Last supported rung: 9"
+    },
+    {
+      "gamePk": 824089,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "home",
+      "starter": "Noah Cameron",
+      "label": "BB up to 3",
+      "stat": "walks_allowed",
+      "tone": "soft",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 2,
+      "targets": [
+        2,
+        3
+      ],
+      "detail": "Supported ladders: 2/3 Last supported rung: 3"
     },
     {
       "gamePk": 822958,
@@ -373,6 +442,29 @@
         18
       ],
       "detail": "Supported ladders: 17/18 Last supported rung: 18"
+    },
+    {
+      "gamePk": 824900,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "away",
+      "starter": "Freddy Peralta",
+      "label": "H up to 10",
+      "stat": "hits_allowed",
+      "tone": "soft",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 5,
+      "targets": [
+        6,
+        7,
+        8,
+        9,
+        10
+      ],
+      "detail": "Supported ladders: 6/7/8/9/10 Last supported rung: 10"
     },
     {
       "gamePk": 824900,
@@ -612,6 +704,29 @@
       "detail": "Supported ladders: 17/18 Last supported rung: 18"
     },
     {
+      "gamePk": 823282,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "home",
+      "starter": "Walker Buehler",
+      "label": "H up to 9",
+      "stat": "hits_allowed",
+      "tone": "soft",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 5,
+      "targets": [
+        5,
+        6,
+        7,
+        8,
+        9
+      ],
+      "detail": "Supported ladders: 5/6/7/8/9 Last supported rung: 9"
+    },
+    {
       "gamePk": 823205,
       "matchup": "? @ ?",
       "status": "",
@@ -636,6 +751,48 @@
       "gamePk": 823205,
       "matchup": "? @ ?",
       "status": "",
+      "side": "away",
+      "starter": "Kevin Gausman",
+      "label": "O 19/20",
+      "stat": "outs",
+      "tone": "strong",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 2,
+      "targets": [
+        19,
+        20
+      ],
+      "detail": "Supported ladders: 19/20 Last supported rung: 20"
+    },
+    {
+      "gamePk": 823205,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "away",
+      "starter": "Kevin Gausman",
+      "label": "H up to 9",
+      "stat": "hits_allowed",
+      "tone": "solid",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 4,
+      "targets": [
+        6,
+        7,
+        8,
+        9
+      ],
+      "detail": "Supported ladders: 6/7/8/9 Last supported rung: 9"
+    },
+    {
+      "gamePk": 823205,
+      "matchup": "? @ ?",
+      "status": "",
       "side": "home",
       "starter": "Landen Roupp",
       "label": "K up to 7",
@@ -652,6 +809,48 @@
         7
       ],
       "detail": "Supported ladders: 5/6/7 Last supported rung: 7"
+    },
+    {
+      "gamePk": 823205,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "home",
+      "starter": "Landen Roupp",
+      "label": "O 19/20",
+      "stat": "outs",
+      "tone": "strong",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 2,
+      "targets": [
+        19,
+        20
+      ],
+      "detail": "Supported ladders: 19/20 Last supported rung: 20"
+    },
+    {
+      "gamePk": 823205,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "home",
+      "starter": "Landen Roupp",
+      "label": "H up to 9",
+      "stat": "hits_allowed",
+      "tone": "solid",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 4,
+      "targets": [
+        6,
+        7,
+        8,
+        9
+      ],
+      "detail": "Supported ladders: 6/7/8/9 Last supported rung: 9"
     },
     {
       "gamePk": 823930,
@@ -678,6 +877,26 @@
       "gamePk": 823930,
       "matchup": "? @ ?",
       "status": "",
+      "side": "away",
+      "starter": "Kyle Freeland",
+      "label": "O 17/18",
+      "stat": "outs",
+      "tone": "strong",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 2,
+      "targets": [
+        17,
+        18
+      ],
+      "detail": "Supported ladders: 17/18 Last supported rung: 18"
+    },
+    {
+      "gamePk": 823930,
+      "matchup": "? @ ?",
+      "status": "",
       "side": "home",
       "starter": "Eric Lauer",
       "label": "K up to 7",
@@ -694,6 +913,48 @@
         7
       ],
       "detail": "Supported ladders: 5/6/7 Last supported rung: 7"
+    },
+    {
+      "gamePk": 823930,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "home",
+      "starter": "Eric Lauer",
+      "label": "O 19/20",
+      "stat": "outs",
+      "tone": "strong",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 2,
+      "targets": [
+        19,
+        20
+      ],
+      "detail": "Supported ladders: 19/20 Last supported rung: 20"
+    },
+    {
+      "gamePk": 823930,
+      "matchup": "? @ ?",
+      "status": "",
+      "side": "home",
+      "starter": "Eric Lauer",
+      "label": "H up to 9",
+      "stat": "hits_allowed",
+      "tone": "solid",
+      "source": "none",
+      "actual": null,
+      "wins": 0,
+      "losses": 0,
+      "targetCount": 4,
+      "targets": [
+        6,
+        7,
+        8,
+        9
+      ],
+      "detail": "Supported ladders: 6/7/8/9 Last supported rung: 9"
     }
   ]
 }

@@ -480,8 +480,8 @@
         "pos": "SS",
         "bat": "L",
         "throw": "R",
-        "k_rate": 0.2,
-        "bb_rate": 0.05,
+        "k_rate": 0.23809523809523808,
+        "bb_rate": 0.047619047619047616,
         "hbp_rate": 0.0,
         "hr_rate": 0.0,
         "inplay_hit_rate": 0.26666666666666666,
@@ -496,9 +496,9 @@
         },
         "platoon_mult_vs_rhp": {
           "k": 0.8075,
-          "bb": 1.1925000000000001,
+          "bb": 1.1294117647058823,
           "hr": 1.0,
-          "inplay": 0.8075
+          "inplay": 1.0
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -598,7 +598,7 @@
         "role": "CL",
         "leverage_skill": 0.85,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.935,
         "platoon_mult_vs_lhb": {
           "k": 1.0557927658417188,
           "bb": 1.107370517928287,
@@ -685,7 +685,7 @@
         "role": "SU",
         "leverage_skill": 0.7,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.95,
         "platoon_mult_vs_lhb": {
           "k": 1.1469418795111328,
           "bb": 1.1925000000000001,
@@ -772,7 +772,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.91,
         "platoon_mult_vs_lhb": {
           "k": 1.0902116402116404,
           "bb": 0.8075,
