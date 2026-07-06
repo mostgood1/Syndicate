@@ -3923,6 +3923,11 @@ def _mlb_candidate_live_state(candidate: dict[str, Any], actual_payload: dict[st
     status = ((actual_payload.get("gameData") or {}).get("status")) if isinstance((actual_payload.get("gameData") or {}), dict) else {}
     abstract_state = _safe_text((status or {}).get("abstractGameState"), "")
     detailed_state = _safe_text((status or {}).get("detailedState"), "")
+    status_code = _safe_text((status or {}).get("statusCode"), "")
+    snapshot_timestamp = _safe_text(
+        candidate.get("updated_at"),
+        _safe_text(candidate.get("timestamp"), _safe_text(candidate.get("last_updated"), _safe_text(candidate.get("state_last_updated"), ""))),
+    )
     if abstract_state or detailed_state:
         state["status_display"] = detailed_state or abstract_state
     if abstract_state.lower() == "final" or detailed_state.lower() in {"final", "game over", "completed"}:
@@ -3958,6 +3963,16 @@ def _mlb_candidate_live_state(candidate: dict[str, Any], actual_payload: dict[st
                 current_label = current_pitcher_name or "another pitcher"
                 state["state_invalid"] = True
                 state["state_note"] = f"{pitcher_name or 'The listed pitcher'} is no longer the current pitcher; {current_label} is on the mound now."
+    if _safe_int(candidate.get("gamePk")) == 823931:
+        logger.info(
+            "MLB live-state diagnostic gamePk=%s snapshot_timestamp=%s abstractGameState=%s detailedState=%s statusCode=%s decision=%s",
+            _safe_int(candidate.get("gamePk")) or candidate.get("gamePk"),
+            snapshot_timestamp or "-",
+            abstract_state or "-",
+            detailed_state or "-",
+            status_code or "-",
+            "drop" if bool(state.get("is_final")) or bool(state.get("state_invalid")) else "keep",
+        )
     return state
 
 
