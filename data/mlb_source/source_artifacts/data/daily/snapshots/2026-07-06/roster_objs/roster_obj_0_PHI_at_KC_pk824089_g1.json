@@ -1978,7 +1978,7 @@
           "arsenal_sample_size": 392,
           "stamina_pitches": 25,
           "role": "MR",
-          "availability_mult": 0.9,
+          "availability_mult": 1.0,
           "platoon_mult_vs_lhb": {
             "k": 0.925388588220162,
             "bb": 1.1925000000000001,
@@ -2149,7 +2149,7 @@
           "arsenal_sample_size": 168,
           "stamina_pitches": 25,
           "role": "MR",
-          "availability_mult": 1.0,
+          "availability_mult": 0.9,
           "platoon_mult_vs_lhb": {
             "k": 1.0221040189125294,
             "bb": 1.1925000000000001,
@@ -2306,7 +2306,7 @@
           "arsenal_sample_size": 528,
           "stamina_pitches": 25,
           "role": "SU",
-          "availability_mult": 0.9299999999999999,
+          "availability_mult": 1.0,
           "platoon_mult_vs_lhb": {
             "k": 1.0782736478142751,
             "bb": 0.9812662721893491,
@@ -2393,7 +2393,7 @@
           "arsenal_sample_size": 134,
           "stamina_pitches": 25,
           "role": "MR",
-          "availability_mult": 1.0,
+          "availability_mult": 0.8833333333333333,
           "platoon_mult_vs_lhb": {
             "k": 0.9541666666666666,
             "bb": 0.8075,
@@ -2550,7 +2550,7 @@
           "arsenal_sample_size": 536,
           "stamina_pitches": 25,
           "role": "LR",
-          "availability_mult": 0.945,
+          "availability_mult": 1.0,
           "platoon_mult_vs_lhb": {
             "k": 0.9214254253152012,
             "bb": 1.0256302521008402,
@@ -4255,7 +4255,7 @@
           "arsenal_sample_size": 648,
           "stamina_pitches": 25,
           "role": "SU",
-          "availability_mult": 1.0,
+          "availability_mult": 0.9083333333333333,
           "platoon_mult_vs_lhb": {
             "k": 1.0168828836021075,
             "bb": 0.8225541156365708,
@@ -4342,7 +4342,7 @@
           "arsenal_sample_size": 174,
           "stamina_pitches": 25,
           "role": "MR",
-          "availability_mult": 0.89,
+          "availability_mult": 1.0,
           "platoon_mult_vs_lhb": {
             "k": 1.132045026061883,
             "bb": 1.073479318734793,
@@ -4429,7 +4429,7 @@
           "arsenal_sample_size": 509,
           "stamina_pitches": 25,
           "role": "MR",
-          "availability_mult": 1.0,
+          "availability_mult": 0.9,
           "platoon_mult_vs_lhb": {
             "k": 1.004023582063861,
             "bb": 0.8075,
@@ -4516,7 +4516,7 @@
           "arsenal_sample_size": 505,
           "stamina_pitches": 25,
           "role": "SU",
-          "availability_mult": 1.0,
+          "availability_mult": 0.8833333333333333,
           "platoon_mult_vs_lhb": {
             "k": 0.8123385423638068,
             "bb": 1.1925000000000001,
@@ -4572,6 +4572,72 @@
         },
         {
           "player": {
+            "mlbam_id": 621016,
+            "full_name": "Jose Cuas",
+            "primary_position": "P",
+            "bat_side": "R",
+            "throw_side": "R"
+          },
+          "k_rate": 0.23076923076923078,
+          "bb_rate": 0.0,
+          "hbp_rate": 0.0,
+          "hr_rate": 0.0,
+          "inplay_hit_rate": 0.4,
+          "batters_faced": 13.0,
+          "balls_in_play": 10.0,
+          "arsenal": {
+            "FF": 0.35593220355932204,
+            "OTHER": 0.27118644271186443,
+            "CH": 0.033898305338983054,
+            "SI": 0.3050847430508475,
+            "FC": 0.033898305338983054
+          },
+          "pitch_type_whiff_mult": {},
+          "pitch_type_inplay_mult": {},
+          "pitch_type_hr_mult": {},
+          "statcast_splits_source": "",
+          "statcast_splits_n_pitches": 0,
+          "statcast_splits_start_date": "",
+          "statcast_splits_end_date": "",
+          "arsenal_source": "statsapi_pitchArsenal",
+          "arsenal_sample_size": 59,
+          "stamina_pitches": 25,
+          "role": "MR",
+          "availability_mult": 1.0,
+          "platoon_mult_vs_lhb": {
+            "k": 1.0458333333333334,
+            "bb": 1.0,
+            "hr": 1.0,
+            "inplay": 1.1375
+          },
+          "platoon_mult_vs_rhb": {
+            "k": 0.9266666666666666,
+            "bb": 1.0,
+            "hr": 1.0,
+            "inplay": 0.8075
+          },
+          "venue_mult_home": {
+            "k": 1.0,
+            "bb": 1.0,
+            "hr": 1.0,
+            "inplay": 1.0
+          },
+          "venue_mult_away": {},
+          "vs_venue_hr_mult": {},
+          "vs_venue_k_mult": {},
+          "vs_venue_bb_mult": {},
+          "vs_venue_inplay_mult": {},
+          "vs_venue_history": {},
+          "statcast_quality_mult": {},
+          "bb_gb_rate": 0.44,
+          "bb_fb_rate": 0.25,
+          "bb_ld_rate": 0.2,
+          "bb_pu_rate": 0.11,
+          "bb_inplay_n": 0,
+          "leverage_skill": 0.5
+        },
+        {
+          "player": {
             "mlbam_id": 668674,
             "full_name": "Lucas Erceg",
             "primary_position": "P",
@@ -4602,7 +4668,7 @@
           "arsenal_sample_size": 549,
           "stamina_pitches": 25,
           "role": "CL",
-          "availability_mult": 0.895,
+          "availability_mult": 1.0,
           "platoon_mult_vs_lhb": {
             "k": 0.9452763819095478,
             "bb": 0.8851434878587197,
@@ -4689,7 +4755,7 @@
           "arsenal_sample_size": 438,
           "stamina_pitches": 25,
           "role": "MR",
-          "availability_mult": 1.0,
+          "availability_mult": 0.8166666666666667,
           "platoon_mult_vs_lhb": {
             "k": 0.9578859197515731,
             "bb": 0.8075,

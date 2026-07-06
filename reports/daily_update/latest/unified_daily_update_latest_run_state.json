@@ -4,15 +4,18 @@
   "runMode": "standard",
   "overallStatus": "started",
   "generatedAt": "2026-07-06T03:51:06.1539355+00:00",
-  "updatedAt": "2026-07-06T03:51:06.3118511+00:00",
+  "updatedAt": "2026-07-06T04:13:14.0574915+00:00",
   "runManifestPath": "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-06\\20260706_035105\\unified_daily_update_run.json",
   "latestManifestPath": "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest.json",
   "runCheckpointPath": "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-06\\20260706_035105\\unified_daily_update_checkpoint.json",
   "latestCheckpointPath": "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest_checkpoint.json",
   "currentStage": "queued",
-  "completedStages": [],
+  "completedStages": [
+    "source_update",
+    "refresh_gate"
+  ],
   "failedStage": null,
-  "lastUpdatedAt": "2026-07-06T03:51:06.2897236+00:00",
+  "lastUpdatedAt": "2026-07-06T04:13:14.0569332+00:00",
   "replayContext": {
     "latestCheckpointLoaded": true,
     "latestCheckpointPath": "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest_checkpoint.json",
@@ -97,8 +100,8 @@
     "inputFingerprintCount": 3,
     "artifactPathCount": 21,
     "inputFingerprints": [
-      "d40b1f9fbc45a4bb34d61c23c2e2f4cc1695651cf208ee262c58ec802a434368",
-      "4d2c55ee2ae1ca3e851700fbbe70bac1878d1955cc8ec554f0c44a3a2f512d36",
+      "d71e7045cfb8375a7ef0ece94873f5743ebcfbd3b606a8d09cc7395eef196e2b",
+      "4ac86ec74f910549d44403f29e89b4c258082da7a2ba48ace284e66e0167d779",
       "563a06b8e8830bba5d1cdcf73bb91ad105470d2e01ba859ebaa44c2126a6045d"
     ],
     "artifactPaths": [

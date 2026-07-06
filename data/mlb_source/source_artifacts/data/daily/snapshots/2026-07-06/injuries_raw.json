@@ -4409,9 +4409,11 @@
         "abbreviation": "MIL"
       },
       "injured_ids": [
+        605540,
         642239,
         663604,
         669084,
+        669270,
         672582,
         682990,
         689441,
@@ -4447,6 +4449,21 @@
             "name": "Outfielder",
             "type": "Outfielder",
             "abbreviation": "LF"
+          },
+          "roster_type_source": "40Man"
+        },
+        {
+          "player_id": 605540,
+          "full_name": "Brandon Woodruff",
+          "status": {
+            "code": "D15",
+            "description": "Injured 15-Day"
+          },
+          "position": {
+            "code": "1",
+            "name": "Pitcher",
+            "type": "Pitcher",
+            "abbreviation": "P"
           },
           "roster_type_source": "40Man"
         },
@@ -4498,6 +4515,21 @@
         {
           "player_id": 669084,
           "full_name": "DL Hall",
+          "status": {
+            "code": "D15",
+            "description": "Injured 15-Day"
+          },
+          "position": {
+            "code": "1",
+            "name": "Pitcher",
+            "type": "Pitcher",
+            "abbreviation": "P"
+          },
+          "roster_type_source": "40Man"
+        },
+        {
+          "player_id": 669270,
+          "full_name": "Joel Kuhnel",
           "status": {
             "code": "D15",
             "description": "Injured 15-Day"
@@ -8673,6 +8705,22 @@
     },
     {
       "team_id": 158,
+      "player_id": 605540,
+      "full_name": "Brandon Woodruff",
+      "status": {
+        "code": "D15",
+        "description": "Injured 15-Day"
+      },
+      "position": {
+        "code": "1",
+        "name": "Pitcher",
+        "type": "Pitcher",
+        "abbreviation": "P"
+      },
+      "roster_type_source": "40Man"
+    },
+    {
+      "team_id": 158,
       "player_id": 702153,
       "full_name": "Brian Fitzpatrick",
       "status": {
@@ -8723,6 +8771,22 @@
       "team_id": 158,
       "player_id": 669084,
       "full_name": "DL Hall",
+      "status": {
+        "code": "D15",
+        "description": "Injured 15-Day"
+      },
+      "position": {
+        "code": "1",
+        "name": "Pitcher",
+        "type": "Pitcher",
+        "abbreviation": "P"
+      },
+      "roster_type_source": "40Man"
+    },
+    {
+      "team_id": 158,
+      "player_id": 669270,
+      "full_name": "Joel Kuhnel",
       "status": {
         "code": "D15",
         "description": "Injured 15-Day"

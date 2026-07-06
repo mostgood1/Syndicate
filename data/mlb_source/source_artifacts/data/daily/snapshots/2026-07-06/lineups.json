@@ -2,7 +2,7 @@
   "date": "2026-07-06",
   "season": 2026,
   "spring_mode": false,
-  "generated_at": "2026-07-05T07:21:03.623418",
+  "generated_at": "2026-07-06T03:53:28.559481",
   "summary": {
     "games": 8,
     "projected_teams": 16,
@@ -79,7 +79,7 @@
         "missing_ids": [],
         "backfilled_ids": [],
         "pool_source": "active+40Man",
-        "pool_size": 17,
+        "pool_size": 18,
         "raw_names": [
           "Trea Turner",
           "Kyle Schwarber",
@@ -324,7 +324,7 @@
       },
       "away_source": "projected_rotowire_default_vs_rhp",
       "home_source": "projected_rotowire_today_lineup",
-      "away_confidence": 0.58,
+      "away_confidence": 0.66,
       "home_confidence": 0.72,
       "away_comparison": {
         "status": "projected_only",
@@ -462,7 +462,7 @@
         "missing_ids": [],
         "backfilled_ids": [],
         "pool_source": "active+40Man",
-        "pool_size": 19,
+        "pool_size": 18,
         "raw_names": [
           "James Wood",
           "Luis Garcia",
@@ -491,7 +491,7 @@
       "away_source": "projected_rotowire_default_vs_rhp",
       "home_source": "projected_rotowire_default_vs_rhp",
       "away_confidence": 0.48000000000000004,
-      "home_confidence": 0.58,
+      "home_confidence": 0.66,
       "away_comparison": {
         "status": "projected_only",
         "is_true_mismatch": false,
@@ -984,7 +984,7 @@
       },
       "away_source": "projected_rotowire_default_vs_rhp",
       "home_source": "projected_rotowire_default_vs_rhp",
-      "away_confidence": 0.58,
+      "away_confidence": 0.66,
       "home_confidence": 0.48000000000000004,
       "away_comparison": {
         "status": "projected_only",
@@ -1150,7 +1150,7 @@
       },
       "away_source": "projected_rotowire_default_vs_lhp",
       "home_source": "projected_rotowire_today_lineup",
-      "away_confidence": 0.58,
+      "away_confidence": 0.56,
       "home_confidence": 0.44,
       "away_comparison": {
         "status": "projected_only",
@@ -1185,13 +1185,13 @@
       "away_confirmed_ids": [],
       "home_confirmed_ids": [],
       "away_projected_ids": [
-        664983,
-        666160,
-        681198,
-        696100,
         650489,
         671289,
+        681198,
+        696100,
         694249,
+        664983,
+        690924,
         678662,
         691720
       ],
@@ -1200,33 +1200,33 @@
         681624,
         518692,
         605141,
-        571970,
         663656,
-        669242,
+        669743,
+        500743,
         687221,
-        669899
+        690976
       ],
       "away_projected_validation": {
         "status": "ok",
         "raw_ids": [
-          664983,
-          666160,
-          681198,
-          696100,
           650489,
           671289,
+          681198,
+          696100,
           694249,
+          664983,
+          690924,
           678662,
           691720
         ],
         "ids": [
-          664983,
-          666160,
-          681198,
-          696100,
           650489,
           671289,
+          681198,
+          696100,
           694249,
+          664983,
+          690924,
           678662,
           691720
         ],
@@ -1235,29 +1235,29 @@
         "pool_source": "active+40Man",
         "pool_size": 19,
         "raw_names": [
-          "Jake McCarthy",
-          "Mickey Moniak",
-          "TJ Rumfield",
-          "Hunter Goodman",
           "Willi Castro",
           "Tyler Freeman",
+          "TJ Rumfield",
+          "Hunter Goodman",
           "Cole Carrigg",
+          "Jake McCarthy",
+          "Braxton Fulford",
           "Ezequiel Tovar",
           "Kyle Karros"
         ],
         "matched_names": [
-          "Jake McCarthy",
-          "Mickey Moniak",
-          "TJ Rumfield",
-          "Hunter Goodman",
           "Willi Castro",
           "Tyler Freeman",
+          "TJ Rumfield",
+          "Hunter Goodman",
           "Cole Carrigg",
+          "Jake McCarthy",
+          "Braxton Fulford",
           "Ezequiel Tovar",
           "Kyle Karros"
         ],
         "missing_name_labels": [],
-        "mapping_source": "projected_rotowire_default_vs_rhp"
+        "mapping_source": "projected_rotowire_default_vs_lhp"
       },
       "home_projected_validation": {
         "status": "ok",
@@ -1266,22 +1266,22 @@
           681624,
           518692,
           605141,
-          571970,
           663656,
-          669242,
+          669743,
+          500743,
           687221,
-          669899
+          690976
         ],
         "ids": [
           660271,
           681624,
           518692,
           605141,
-          571970,
           663656,
-          669242,
+          669743,
+          500743,
           687221,
-          669899
+          690976
         ],
         "missing_ids": [],
         "backfilled_ids": [],
@@ -1292,30 +1292,30 @@
           "Andy Pages",
           "Freddie Freeman",
           "Mookie Betts",
-          "Max Muncy",
           "Kyle Tucker",
-          "Tommy Edman",
+          "Alex Call",
+          "Miguel Rojas",
           "Dalton Rushing",
-          "Ryan Ward"
+          "Alex Freeland"
         ],
         "matched_names": [
           "Shohei Ohtani",
           "Andy Pages",
           "Freddie Freeman",
           "Mookie Betts",
-          "Max Muncy",
           "Kyle Tucker",
-          "Tommy Edman",
+          "Alex Call",
+          "Miguel Rojas",
           "Dalton Rushing",
-          "Ryan Ward"
+          "Alex Freeland"
         ],
         "missing_name_labels": [],
-        "mapping_source": "projected_rotowire_default_vs_rhp"
+        "mapping_source": "projected_rotowire_default_vs_lhp"
       },
-      "away_source": "projected_rotowire_default_vs_rhp",
-      "home_source": "projected_rotowire_default_vs_rhp",
-      "away_confidence": 0.58,
-      "home_confidence": 0.58,
+      "away_source": "projected_rotowire_default_vs_lhp",
+      "home_source": "projected_rotowire_default_vs_lhp",
+      "away_confidence": 0.66,
+      "home_confidence": 0.66,
       "away_comparison": {
         "status": "projected_only",
         "is_true_mismatch": false,

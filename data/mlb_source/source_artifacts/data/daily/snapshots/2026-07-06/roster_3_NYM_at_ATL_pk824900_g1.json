@@ -83,8 +83,8 @@
       {
         "id": 672335,
         "name": "Cionel P\u00e9rez",
-        "role": "SU",
-        "lev": 0.7
+        "role": "MR",
+        "lev": 0.5
       },
       {
         "id": 642207,
@@ -93,10 +93,10 @@
         "lev": 0.85
       },
       {
-        "id": 680702,
-        "name": "Joey Gerber",
-        "role": "MR",
-        "lev": 0.5
+        "id": 670871,
+        "name": "Guillo Zu\u00f1iga",
+        "role": "SU",
+        "lev": 0.7
       },
       {
         "id": 596133,
@@ -616,7 +616,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.9333333333333333,
         "platoon_mult_vs_lhb": {
           "k": 1.0246562559512473,
           "bb": 1.0105439144003567,
@@ -656,8 +656,8 @@
         "id": 672335,
         "name": "Cionel P\u00e9rez",
         "throw": "L",
-        "role": "SU",
-        "leverage_skill": 0.7,
+        "role": "MR",
+        "leverage_skill": 0.5,
         "stamina_pitches": 25,
         "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
@@ -702,7 +702,7 @@
         "role": "CL",
         "leverage_skill": 0.85,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.8166666666666667,
         "platoon_mult_vs_lhb": {
           "k": 0.9774906986358,
           "bb": 1.1496551682121143,
@@ -739,42 +739,34 @@
         "pitch_type_hr_mult": {}
       },
       {
-        "id": 680702,
-        "name": "Joey Gerber",
+        "id": 670871,
+        "name": "Guillo Zu\u00f1iga",
         "throw": "R",
-        "role": "MR",
-        "leverage_skill": 0.5,
-        "stamina_pitches": 26,
-        "availability_mult": 0.89,
-        "platoon_mult_vs_lhb": {
-          "k": 0.8899999999999999,
-          "bb": 0.8075,
-          "hr": 1.0,
-          "inplay": 0.8625
-        },
-        "platoon_mult_vs_rhb": {
-          "k": 1.1099999999999999,
-          "bb": 1.1925000000000001,
-          "hr": 1.0,
-          "inplay": 1.1925000000000001
-        },
+        "role": "SU",
+        "leverage_skill": 0.7,
+        "stamina_pitches": 22,
+        "availability_mult": 1.0,
+        "platoon_mult_vs_lhb": {},
+        "platoon_mult_vs_rhb": {},
         "statcast_quality_mult": {},
-        "arsenal_source": "statsapi_pitchArsenal",
-        "arsenal_sample_size": 57,
+        "arsenal_source": "default",
+        "arsenal_sample_size": 0,
         "statcast_splits_found": false,
         "statcast_splits_source": "",
         "statcast_splits_n_pitches": 0,
         "statcast_splits_start_date": "",
         "statcast_splits_end_date": "",
-        "k_rate": 0.4166666666666667,
-        "bb_rate": 0.08333333333333333,
-        "hbp_rate": 0.0,
-        "hr_rate": 0.0,
-        "inplay_hit_rate": 0.3333333333333333,
+        "k_rate": 0.24,
+        "bb_rate": 0.08,
+        "hbp_rate": 0.008,
+        "hr_rate": 0.03,
+        "inplay_hit_rate": 0.0,
         "arsenal": {
-          "FF": 0.6315789378947363,
-          "SL": 0.05263158315789498,
-          "FC": 0.3157894789473687
+          "FF": 0.45,
+          "SL": 0.22,
+          "CH": 0.12,
+          "SI": 0.13,
+          "CU": 0.08
         },
         "pitch_type_whiff_mult": {},
         "pitch_type_inplay_mult": {},
@@ -787,7 +779,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.8666666666666667,
         "platoon_mult_vs_lhb": {
           "k": 0.9517680339462518,
           "bb": 1.0966796875000002,
@@ -830,7 +822,7 @@
         "role": "LR",
         "leverage_skill": 0.35,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.8333333333333334,
         "platoon_mult_vs_lhb": {
           "k": 0.8075,
           "bb": 1.1594277673545967,
@@ -913,6 +905,12 @@
       "requested_id": 625643
     },
     "bullpen": [
+      {
+        "id": 471911,
+        "name": "Carlos Carrasco",
+        "role": "MR",
+        "lev": 0.5
+      },
       {
         "id": 664849,
         "name": "Danny Young",
@@ -1220,11 +1218,11 @@
         "pos": "SS",
         "bat": "L",
         "throw": "R",
-        "k_rate": 0.3333333333333333,
+        "k_rate": 0.2727272727272727,
         "bb_rate": 0.0,
         "hbp_rate": 0.0,
         "hr_rate": 0.0,
-        "inplay_hit_rate": 0.3333333333333333,
+        "inplay_hit_rate": 0.25,
         "xb_hit_share": 0.05,
         "vs_pitch_type": {},
         "vs_pitch_type_hr": {},
@@ -1235,10 +1233,10 @@
           "inplay": 0.8075
         },
         "platoon_mult_vs_rhp": {
-          "k": 1.06875,
+          "k": 1.0550000000000002,
           "bb": 1.0,
           "hr": 1.0,
-          "inplay": 1.11
+          "inplay": 1.0785714285714285
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -1376,41 +1374,85 @@
     },
     "bullpen_profiles": [
       {
-        "id": 664849,
-        "name": "Danny Young",
-        "throw": "L",
+        "id": 471911,
+        "name": "Carlos Carrasco",
+        "throw": "R",
         "role": "MR",
         "leverage_skill": 0.5,
-        "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "stamina_pitches": 26,
+        "availability_mult": 0.6333333333333333,
         "platoon_mult_vs_lhb": {
-          "k": 1.0,
-          "bb": 1.1925000000000001,
-          "hr": 1.0,
-          "inplay": 1.0
+          "k": 0.8075,
+          "bb": 0.8075,
+          "hr": 1.275,
+          "inplay": 1.0813339385626461
         },
         "platoon_mult_vs_rhb": {
-          "k": 1.0,
-          "bb": 0.8075,
-          "hr": 1.0,
-          "inplay": 1.0
+          "k": 1.1925000000000001,
+          "bb": 1.1925000000000001,
+          "hr": 0.78,
+          "inplay": 0.8312601057553642
         },
         "statcast_quality_mult": {},
         "arsenal_source": "statsapi_pitchArsenal",
-        "arsenal_sample_size": 12,
+        "arsenal_sample_size": 172,
         "statcast_splits_found": false,
         "statcast_splits_source": "",
         "statcast_splits_n_pitches": 0,
         "statcast_splits_start_date": "",
         "statcast_splits_end_date": "",
-        "k_rate": 0.0,
-        "bb_rate": 0.3333333333333333,
+        "k_rate": 0.1111111111111111,
+        "bb_rate": 0.018518518518518517,
+        "hbp_rate": 0.037037037037037035,
+        "hr_rate": 0.018518518518518517,
+        "inplay_hit_rate": 0.3091252955082742,
+        "arsenal": {
+          "FF": 0.08139535081395351,
+          "CH": 0.29069766290697663,
+          "SI": 0.2790697827906978,
+          "SL": 0.17441860174418602,
+          "FC": 0.17441860174418602
+        },
+        "pitch_type_whiff_mult": {},
+        "pitch_type_inplay_mult": {},
+        "pitch_type_hr_mult": {}
+      },
+      {
+        "id": 664849,
+        "name": "Danny Young",
+        "throw": "L",
+        "role": "MR",
+        "leverage_skill": 0.5,
+        "stamina_pitches": 22,
+        "availability_mult": 0.85,
+        "platoon_mult_vs_lhb": {
+          "k": 1.0916666666666668,
+          "bb": 1.1925000000000001,
+          "hr": 1.0,
+          "inplay": 1.1925000000000001
+        },
+        "platoon_mult_vs_rhb": {
+          "k": 0.93125,
+          "bb": 0.8075,
+          "hr": 1.0,
+          "inplay": 0.8075
+        },
+        "statcast_quality_mult": {},
+        "arsenal_source": "statsapi_pitchArsenal",
+        "arsenal_sample_size": 30,
+        "statcast_splits_found": false,
+        "statcast_splits_source": "",
+        "statcast_splits_n_pitches": 0,
+        "statcast_splits_start_date": "",
+        "statcast_splits_end_date": "",
+        "k_rate": 0.2857142857142857,
+        "bb_rate": 0.14285714285714285,
         "hbp_rate": 0.0,
         "hr_rate": 0.0,
-        "inplay_hit_rate": 0.0,
+        "inplay_hit_rate": 0.25,
         "arsenal": {
-          "OTHER": 0.41666667666666707,
-          "SI": 0.583333323333333
+          "OTHER": 0.4666666560000003,
+          "SI": 0.5333333439999997
         },
         "pitch_type_whiff_mult": {},
         "pitch_type_inplay_mult": {},
@@ -1466,7 +1508,7 @@
         "role": "SU",
         "leverage_skill": 0.7,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.8666666666666667,
         "platoon_mult_vs_lhb": {
           "k": 1.021714428642893,
           "bb": 1.1248776784207861,
@@ -1509,7 +1551,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.945,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 1.078293545534925,
           "bb": 1.0372553938785751,
@@ -1594,7 +1636,7 @@
         "role": "SU",
         "leverage_skill": 0.7,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.9416666666666667,
         "platoon_mult_vs_lhb": {
           "k": 1.0415674165563888,
           "bb": 1.0960717009916094,

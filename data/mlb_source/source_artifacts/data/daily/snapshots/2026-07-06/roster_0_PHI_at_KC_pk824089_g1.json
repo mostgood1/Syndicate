@@ -598,7 +598,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.9,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 0.925388588220162,
           "bb": 1.1925000000000001,
@@ -686,7 +686,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.9,
         "platoon_mult_vs_lhb": {
           "k": 1.0221040189125294,
           "bb": 1.1925000000000001,
@@ -772,7 +772,7 @@
         "role": "SU",
         "leverage_skill": 0.7,
         "stamina_pitches": 25,
-        "availability_mult": 0.9299999999999999,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 1.0782736478142751,
           "bb": 0.9812662721893491,
@@ -815,7 +815,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.8833333333333333,
         "platoon_mult_vs_lhb": {
           "k": 0.9541666666666666,
           "bb": 0.8075,
@@ -903,7 +903,7 @@
         "role": "LR",
         "leverage_skill": 0.35,
         "stamina_pitches": 25,
-        "availability_mult": 0.945,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 0.9214254253152012,
           "bb": 1.0256302521008402,
@@ -1008,6 +1008,12 @@
         "name": "John Schreiber",
         "role": "SU",
         "lev": 0.7
+      },
+      {
+        "id": 621016,
+        "name": "Jose Cuas",
+        "role": "MR",
+        "lev": 0.5
       },
       {
         "id": 668674,
@@ -1454,7 +1460,7 @@
         "role": "SU",
         "leverage_skill": 0.7,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.9083333333333333,
         "platoon_mult_vs_lhb": {
           "k": 1.0168828836021075,
           "bb": 0.8225541156365708,
@@ -1498,7 +1504,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.89,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 1.132045026061883,
           "bb": 1.073479318734793,
@@ -1542,7 +1548,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.9,
         "platoon_mult_vs_lhb": {
           "k": 1.004023582063861,
           "bb": 0.8075,
@@ -1586,7 +1592,7 @@
         "role": "SU",
         "leverage_skill": 0.7,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.8833333333333333,
         "platoon_mult_vs_lhb": {
           "k": 0.8123385423638068,
           "bb": 1.1925000000000001,
@@ -1624,13 +1630,57 @@
         "pitch_type_hr_mult": {}
       },
       {
+        "id": 621016,
+        "name": "Jose Cuas",
+        "throw": "R",
+        "role": "MR",
+        "leverage_skill": 0.5,
+        "stamina_pitches": 25,
+        "availability_mult": 1.0,
+        "platoon_mult_vs_lhb": {
+          "k": 1.0458333333333334,
+          "bb": 1.0,
+          "hr": 1.0,
+          "inplay": 1.1375
+        },
+        "platoon_mult_vs_rhb": {
+          "k": 0.9266666666666666,
+          "bb": 1.0,
+          "hr": 1.0,
+          "inplay": 0.8075
+        },
+        "statcast_quality_mult": {},
+        "arsenal_source": "statsapi_pitchArsenal",
+        "arsenal_sample_size": 59,
+        "statcast_splits_found": false,
+        "statcast_splits_source": "",
+        "statcast_splits_n_pitches": 0,
+        "statcast_splits_start_date": "",
+        "statcast_splits_end_date": "",
+        "k_rate": 0.23076923076923078,
+        "bb_rate": 0.0,
+        "hbp_rate": 0.0,
+        "hr_rate": 0.0,
+        "inplay_hit_rate": 0.4,
+        "arsenal": {
+          "FF": 0.35593220355932204,
+          "OTHER": 0.27118644271186443,
+          "CH": 0.033898305338983054,
+          "SI": 0.3050847430508475,
+          "FC": 0.033898305338983054
+        },
+        "pitch_type_whiff_mult": {},
+        "pitch_type_inplay_mult": {},
+        "pitch_type_hr_mult": {}
+      },
+      {
         "id": 668674,
         "name": "Lucas Erceg",
         "throw": "R",
         "role": "CL",
         "leverage_skill": 0.85,
         "stamina_pitches": 25,
-        "availability_mult": 0.895,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 0.9452763819095478,
           "bb": 0.8851434878587197,
@@ -1673,7 +1723,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.8166666666666667,
         "platoon_mult_vs_lhb": {
           "k": 0.9578859197515731,
           "bb": 0.8075,

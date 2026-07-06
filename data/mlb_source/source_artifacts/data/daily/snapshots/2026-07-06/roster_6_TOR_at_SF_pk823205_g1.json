@@ -52,20 +52,20 @@
       664702
     ],
     "lineup_source": "projected_rotowire_default_vs_lhp",
-    "lineup_confidence": 0.58,
+    "lineup_confidence": 0.56,
     "probable_pitcher": {
-      "id": null,
-      "source": "none",
-      "confidence": 0.0,
-      "raw_schedule_id": null,
-      "raw_feed_id": null
+      "id": 592332,
+      "source": "feed_gameData_probablePitchers",
+      "confidence": 0.75,
+      "raw_schedule_id": 592332,
+      "raw_feed_id": 592332
     },
     "starter": {
       "id": 592332,
       "name": "Kevin Gausman",
       "role": "SP",
-      "selection_source": "heuristic",
-      "requested_id": null
+      "selection_source": "probable",
+      "requested_id": 592332
     },
     "bullpen": [
       {
@@ -486,10 +486,10 @@
         "pos": "3B",
         "bat": "L",
         "throw": "R",
-        "k_rate": 0.2631578947368421,
+        "k_rate": 0.3333333333333333,
         "bb_rate": 0.0,
         "hbp_rate": 0.0,
-        "hr_rate": 0.05263157894736841,
+        "hr_rate": 0.047619047619047616,
         "inplay_hit_rate": 0.21428571428571427,
         "xb_hit_share": 0.25,
         "vs_pitch_type": {},
@@ -501,9 +501,9 @@
           "inplay": 0.8075
         },
         "platoon_mult_vs_rhp": {
-          "k": 0.9144444444444444,
+          "k": 0.9450000000000001,
           "bb": 1.0,
-          "hr": 1.0305555555555557,
+          "hr": 1.0275,
           "inplay": 1.0
         },
         "statcast_quality_mult": {},
@@ -589,7 +589,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.835,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 1.0953978731206453,
           "bb": 0.8985219164118247,
@@ -719,7 +719,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.935,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 1.027105161039969,
           "bb": 1.1925000000000001,
@@ -761,7 +761,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.95,
         "platoon_mult_vs_lhb": {
           "k": 1.0401640735922375,
           "bb": 1.0774085104462796,
@@ -802,7 +802,7 @@
         "role": "SU",
         "leverage_skill": 0.7,
         "stamina_pitches": 25,
-        "availability_mult": 0.915,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 1.0246393318147304,
           "bb": 1.121288209606987,
@@ -870,18 +870,18 @@
     "lineup_source": "projected_rotowire_today_lineup",
     "lineup_confidence": 0.44,
     "probable_pitcher": {
-      "id": null,
-      "source": "none",
-      "confidence": 0.0,
-      "raw_schedule_id": null,
-      "raw_feed_id": null
+      "id": 694738,
+      "source": "feed_gameData_probablePitchers",
+      "confidence": 0.75,
+      "raw_schedule_id": 694738,
+      "raw_feed_id": 694738
     },
     "starter": {
-      "id": 592662,
-      "name": "Robbie Ray",
+      "id": 694738,
+      "name": "Landen Roupp",
       "role": "SP",
-      "selection_source": "heuristic",
-      "requested_id": null
+      "selection_source": "probable",
+      "requested_id": 694738
     },
     "bullpen": [
       {
@@ -1166,20 +1166,25 @@
         "pos": "C",
         "bat": "L",
         "throw": "R",
-        "k_rate": 0.16666666666666666,
-        "bb_rate": 0.05555555555555555,
+        "k_rate": 0.22727272727272727,
+        "bb_rate": 0.045454545454545456,
         "hbp_rate": 0.0,
         "hr_rate": 0.0,
-        "inplay_hit_rate": 0.2857142857142857,
+        "inplay_hit_rate": 0.25,
         "xb_hit_share": 0.05,
         "vs_pitch_type": {},
         "vs_pitch_type_hr": {},
-        "platoon_mult_vs_lhp": {},
-        "platoon_mult_vs_rhp": {
-          "k": 1.0,
-          "bb": 1.0,
+        "platoon_mult_vs_lhp": {
+          "k": 0.8075,
+          "bb": 0.8075,
           "hr": 1.0,
-          "inplay": 1.0
+          "inplay": 0.8075
+        },
+        "platoon_mult_vs_rhp": {
+          "k": 1.0261904761904763,
+          "bb": 1.026190476190476,
+          "hr": 1.0,
+          "inplay": 1.0366666666666666
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -1250,25 +1255,25 @@
         "pos": "LF",
         "bat": "R",
         "throw": "R",
-        "k_rate": 0.23060344827586207,
-        "bb_rate": 0.057094827586206896,
+        "k_rate": 0.23594873914840842,
+        "bb_rate": 0.062467961967755274,
         "hbp_rate": 0.0,
-        "hr_rate": 0.03325862068965517,
-        "inplay_hit_rate": 0.31055410990356647,
-        "xb_hit_share": 0.3,
+        "hr_rate": 0.0325051674245556,
+        "inplay_hit_rate": 0.3104070305272896,
+        "xb_hit_share": 0.29411764705882354,
         "vs_pitch_type": {},
         "vs_pitch_type_hr": {},
         "platoon_mult_vs_lhp": {
-          "k": 1.0921279654924514,
-          "bb": 1.0057555836885446,
+          "k": 1.0775809042733846,
+          "bb": 0.9579526885661489,
           "hr": 0.78,
-          "inplay": 1.1078103711110097
+          "inplay": 1.108122059731358
         },
         "platoon_mult_vs_rhp": {
-          "k": 1.0301465016418287,
-          "bb": 0.9707079342667445,
-          "hr": 1.0086846566628838,
-          "inplay": 0.9779025537392347
+          "k": 1.0289448491336173,
+          "bb": 0.9679125452047008,
+          "hr": 1.0029538111399547,
+          "inplay": 0.984903270608941
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -1304,44 +1309,44 @@
       }
     ],
     "starter_profile": {
-      "id": 592662,
-      "name": "Robbie Ray",
-      "throw": "L",
+      "id": 694738,
+      "name": "Landen Roupp",
+      "throw": "R",
       "role": "SP",
       "leverage_skill": 0.5,
-      "stamina_pitches": 100,
-      "availability_mult": 0.56,
+      "stamina_pitches": 96,
+      "availability_mult": 1.0,
       "platoon_mult_vs_lhb": {
-        "k": 1.1262261919123855,
-        "bb": 0.8461177641001445,
-        "hr": 0.78,
-        "inplay": 1.0757442667343657
+        "k": 0.9945591936688798,
+        "bb": 1.1652007862959843,
+        "hr": 0.9918971709675224,
+        "inplay": 0.9717717864930506
       },
       "platoon_mult_vs_rhb": {
-        "k": 0.9567980910815902,
-        "bb": 1.0235001694526817,
-        "hr": 1.2046939010073312,
-        "inplay": 0.9977052220272196
+        "k": 1.0345980720403964,
+        "bb": 0.8075,
+        "hr": 0.9250879307112525,
+        "inplay": 1.0069570549901148
       },
       "statcast_quality_mult": {},
       "arsenal_source": "statsapi_pitchArsenal",
-      "arsenal_sample_size": 1526,
+      "arsenal_sample_size": 1440,
       "statcast_splits_found": false,
       "statcast_splits_source": "",
       "statcast_splits_n_pitches": 0,
       "statcast_splits_start_date": "",
       "statcast_splits_end_date": "",
-      "k_rate": 0.2186390650552431,
-      "bb_rate": 0.11943879382553547,
-      "hbp_rate": 0.0,
-      "hr_rate": 0.03470344222408361,
-      "inplay_hit_rate": 0.2783352176370831,
+      "k_rate": 0.2577581738867534,
+      "bb_rate": 0.09612685181186023,
+      "hbp_rate": 0.005917159763313609,
+      "hr_rate": 0.015858636029888133,
+      "inplay_hit_rate": 0.33945615430503084,
       "arsenal": {
-        "FF": 0.40694626796526867,
-        "CH": 0.1631716991841415,
-        "SI": 0.07142857464285712,
-        "KC": 0.0904324995478375,
-        "SL": 0.26802095865989517
+        "FF": 0.039583332089583353,
+        "CU": 0.27013889378680545,
+        "CH": 0.1999999954000001,
+        "SI": 0.36249999166250013,
+        "FC": 0.12777778706111087
       },
       "pitch_type_whiff_mult": {},
       "pitch_type_inplay_mult": {},
@@ -1355,7 +1360,7 @@
         "role": "CL",
         "leverage_skill": 0.85,
         "stamina_pitches": 25,
-        "availability_mult": 0.925,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 0.8936080903970812,
           "bb": 0.9137523606989256,
@@ -1398,7 +1403,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.92,
+        "availability_mult": 0.8333333333333334,
         "platoon_mult_vs_lhb": {
           "k": 1.1925000000000001,
           "bb": 0.8075,
@@ -1442,7 +1447,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.8916666666666666,
         "platoon_mult_vs_lhb": {
           "k": 1.0625249264077485,
           "bb": 0.8075,
@@ -1571,7 +1576,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.9400000000000001,
+        "availability_mult": 0.9333333333333333,
         "platoon_mult_vs_lhb": {
           "k": 1.0396259636432854,
           "bb": 1.1925000000000001,
@@ -1613,7 +1618,7 @@
         "throw": "R",
         "role": "SU",
         "leverage_skill": 0.7,
-        "stamina_pitches": 25,
+        "stamina_pitches": 24,
         "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {},
         "platoon_mult_vs_rhb": {},

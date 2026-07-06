@@ -52,22 +52,28 @@
       683011
     ],
     "lineup_source": "projected_rotowire_default_vs_rhp",
-    "lineup_confidence": 0.58,
+    "lineup_confidence": 0.66,
     "probable_pitcher": {
-      "id": null,
-      "source": "none",
-      "confidence": 0.0,
-      "raw_schedule_id": null,
-      "raw_feed_id": null
+      "id": 693645,
+      "source": "feed_gameData_probablePitchers",
+      "confidence": 0.75,
+      "raw_schedule_id": 693645,
+      "raw_feed_id": 693645
     },
     "starter": {
       "id": 693645,
       "name": "Cam Schlittler",
       "role": "SP",
-      "selection_source": "heuristic",
-      "requested_id": null
+      "selection_source": "probable",
+      "requested_id": 693645
     },
     "bullpen": [
+      {
+        "id": 683409,
+        "name": "Angel Chivilli",
+        "role": "MR",
+        "lev": 0.5
+      },
       {
         "id": 687396,
         "name": "Brent Headrick",
@@ -533,7 +539,7 @@
       "throw": "R",
       "role": "SP",
       "leverage_skill": 0.5,
-      "stamina_pitches": 93,
+      "stamina_pitches": 94,
       "availability_mult": 1.0,
       "platoon_mult_vs_lhb": {
         "k": 1.0306918724945069,
@@ -573,13 +579,55 @@
     },
     "bullpen_profiles": [
       {
+        "id": 683409,
+        "name": "Angel Chivilli",
+        "throw": "R",
+        "role": "MR",
+        "leverage_skill": 0.5,
+        "stamina_pitches": 24,
+        "availability_mult": 0.8333333333333334,
+        "platoon_mult_vs_lhb": {
+          "k": 1.1925000000000001,
+          "bb": 0.8075,
+          "hr": 0.78,
+          "inplay": 0.8075
+        },
+        "platoon_mult_vs_rhb": {
+          "k": 0.8625,
+          "bb": 1.1925000000000001,
+          "hr": 1.275,
+          "inplay": 1.1925000000000001
+        },
+        "statcast_quality_mult": {},
+        "arsenal_source": "statsapi_pitchArsenal",
+        "arsenal_sample_size": 80,
+        "statcast_splits_found": false,
+        "statcast_splits_source": "",
+        "statcast_splits_n_pitches": 0,
+        "statcast_splits_start_date": "",
+        "statcast_splits_end_date": "",
+        "k_rate": 0.2222222222222222,
+        "bb_rate": 0.16666666666666666,
+        "hbp_rate": 0.05555555555555555,
+        "hr_rate": 0.05555555555555555,
+        "inplay_hit_rate": 0.2959090909090909,
+        "arsenal": {
+          "FF": 0.2375,
+          "CH": 0.4625,
+          "SL": 0.3
+        },
+        "pitch_type_whiff_mult": {},
+        "pitch_type_inplay_mult": {},
+        "pitch_type_hr_mult": {}
+      },
+      {
         "id": 687396,
         "name": "Brent Headrick",
         "throw": "L",
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.9299999999999999,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 1.049964851938792,
           "bb": 1.0531485629554846,
@@ -622,7 +670,7 @@
         "role": "SU",
         "leverage_skill": 0.7,
         "stamina_pitches": 25,
-        "availability_mult": 0.865,
+        "availability_mult": 0.8333333333333334,
         "platoon_mult_vs_lhb": {
           "k": 0.9204202340938995,
           "bb": 1.008651026392962,
@@ -750,7 +798,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.925,
+        "availability_mult": 0.8083333333333333,
         "platoon_mult_vs_lhb": {
           "k": 0.901686823007004,
           "bb": 0.9391139037861203,
@@ -793,7 +841,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.8083333333333333,
         "platoon_mult_vs_lhb": {
           "k": 0.9912460615916252,
           "bb": 1.149982912242158,
@@ -839,7 +887,7 @@
         "role": "SU",
         "leverage_skill": 0.7,
         "stamina_pitches": 26,
-        "availability_mult": 0.825,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 0.9412007184789852,
           "bb": 1.1482818899210867,
@@ -883,7 +931,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.895,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 1.078626561951799,
           "bb": 0.8075,
@@ -950,18 +998,18 @@
     "lineup_source": "projected_rotowire_today_lineup",
     "lineup_confidence": 0.72,
     "probable_pitcher": {
-      "id": null,
-      "source": "none",
-      "confidence": 0.0,
-      "raw_schedule_id": null,
-      "raw_feed_id": null
+      "id": 643377,
+      "source": "feed_gameData_probablePitchers",
+      "confidence": 0.75,
+      "raw_schedule_id": 643377,
+      "raw_feed_id": 643377
     },
     "starter": {
-      "id": 656876,
-      "name": "Drew Rasmussen",
+      "id": 643377,
+      "name": "Griffin Jax",
       "role": "SP",
-      "selection_source": "heuristic",
-      "requested_id": null
+      "selection_source": "probable",
+      "requested_id": 643377
     },
     "bullpen": [
       {
@@ -1001,8 +1049,8 @@
         "lev": 0.7
       },
       {
-        "id": 694680,
-        "name": "Trevor Martin",
+        "id": 669438,
+        "name": "Mason Englert",
         "role": "MR",
         "lev": 0.5
       },
@@ -1395,45 +1443,45 @@
       }
     ],
     "starter_profile": {
-      "id": 656876,
-      "name": "Drew Rasmussen",
+      "id": 643377,
+      "name": "Griffin Jax",
       "throw": "R",
       "role": "SP",
       "leverage_skill": 0.5,
-      "stamina_pitches": 91,
-      "availability_mult": 0.615,
+      "stamina_pitches": 94,
+      "availability_mult": 1.0,
       "platoon_mult_vs_lhb": {
-        "k": 0.9282563569641183,
-        "bb": 1.1925000000000001,
-        "hr": 1.275,
-        "inplay": 1.1925000000000001
+        "k": 0.9311657521535665,
+        "bb": 1.0731615258573606,
+        "hr": 1.0780680650054875,
+        "inplay": 1.0410557505173987
       },
       "platoon_mult_vs_rhb": {
-        "k": 0.8933360515349922,
-        "bb": 0.8580843414468251,
-        "hr": 0.9346995008511497,
-        "inplay": 0.8075
+        "k": 0.9776170907039108,
+        "bb": 1.1925000000000001,
+        "hr": 1.1141047572599005,
+        "inplay": 0.94599083959502
       },
       "statcast_quality_mult": {},
       "arsenal_source": "statsapi_pitchArsenal",
-      "arsenal_sample_size": 1307,
+      "arsenal_sample_size": 838,
       "statcast_splits_found": false,
       "statcast_splits_source": "",
       "statcast_splits_n_pitches": 0,
       "statcast_splits_start_date": "",
       "statcast_splits_end_date": "",
-      "k_rate": 0.27568753273965424,
-      "bb_rate": 0.044925353588266104,
-      "hbp_rate": 0.006024096385542169,
-      "hr_rate": 0.025216081718177057,
-      "inplay_hit_rate": 0.2669247787610619,
+      "k_rate": 0.23924454006657464,
+      "bb_rate": 0.08210197288300722,
+      "hbp_rate": 0.004424778761061947,
+      "hr_rate": 0.040730291467078024,
+      "inplay_hit_rate": 0.3411973684210526,
       "arsenal": {
-        "FF": 0.26778883,
-        "OTHER": 0.030604437,
-        "CU": 0.044376433,
-        "CH": 0.11476664,
-        "SI": 0.21805662,
-        "FC": 0.32440704
+        "FF": 0.17064438829355613,
+        "OTHER": 0.25298329747016707,
+        "CU": 0.08472553915274461,
+        "CH": 0.22195703778042963,
+        "SI": 0.21002386789976132,
+        "FC": 0.059665869403341315
       },
       "pitch_type_whiff_mult": {},
       "pitch_type_inplay_mult": {},
@@ -1489,7 +1537,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.875,
         "platoon_mult_vs_lhb": {
           "k": 1.1925000000000001,
           "bb": 1.1925000000000001,
@@ -1532,7 +1580,7 @@
         "role": "SU",
         "leverage_skill": 0.7,
         "stamina_pitches": 25,
-        "availability_mult": 0.9,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 1.0059950457469335,
           "bb": 1.0258157100834329,
@@ -1575,7 +1623,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.905,
+        "availability_mult": 0.9,
         "platoon_mult_vs_lhb": {
           "k": 0.8339081358331921,
           "bb": 1.1925000000000001,
@@ -1619,7 +1667,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.9299999999999999,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 0.9189746343881682,
           "bb": 1.1925000000000001,
@@ -1700,44 +1748,46 @@
         "pitch_type_hr_mult": {}
       },
       {
-        "id": 694680,
-        "name": "Trevor Martin",
+        "id": 669438,
+        "name": "Mason Englert",
         "throw": "R",
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 27,
-        "availability_mult": 1.0,
+        "availability_mult": 0.35,
         "platoon_mult_vs_lhb": {
-          "k": 0.9410714285714286,
-          "bb": 0.9410714285714286,
-          "hr": 0.78,
-          "inplay": 0.9429951222799761
+          "k": 0.9373108265424913,
+          "bb": 1.1925000000000001,
+          "hr": 1.077492130115425,
+          "inplay": 0.9990135996178768
         },
         "platoon_mult_vs_rhb": {
-          "k": 1.075,
-          "bb": 1.0750000000000002,
-          "hr": 1.275,
-          "inplay": 1.0979364464251113
+          "k": 1.0243306169965076,
+          "bb": 0.8075,
+          "hr": 1.0252011192724728,
+          "inplay": 1.0385821473380843
         },
         "statcast_quality_mult": {},
         "arsenal_source": "statsapi_pitchArsenal",
-        "arsenal_sample_size": 166,
+        "arsenal_sample_size": 342,
         "statcast_splits_found": false,
         "statcast_splits_source": "",
         "statcast_splits_n_pitches": 0,
         "statcast_splits_start_date": "",
         "statcast_splits_end_date": "",
-        "k_rate": 0.12,
-        "bb_rate": 0.08,
-        "hbp_rate": 0.04,
-        "hr_rate": 0.08,
-        "inplay_hit_rate": 0.33953947368421056,
+        "k_rate": 0.17955685618729095,
+        "bb_rate": 0.0427257525083612,
+        "hbp_rate": 0.010869565217391304,
+        "hr_rate": 0.03984113712374582,
+        "inplay_hit_rate": 0.35357529794149517,
         "arsenal": {
-          "FF": 0.4397590376867469,
-          "CU": 0.04216867181927718,
-          "SI": 0.06024096331325302,
-          "FC": 0.2409638532530121,
-          "FS": 0.21686747392771072
+          "FF": 0.17836257678947362,
+          "OTHER": 0.008771929842105263,
+          "CU": 0.1725146168947369,
+          "CH": 0.3099415244210526,
+          "SI": 0.2105263162105263,
+          "SL": 0.0409356722631579,
+          "FC": 0.07894736357894747
         },
         "pitch_type_whiff_mult": {},
         "pitch_type_inplay_mult": {},

@@ -87,6 +87,12 @@
         "lev": 0.5
       },
       {
+        "id": 680723,
+        "name": "Drew Rom",
+        "role": "MR",
+        "lev": 0.5
+      },
+      {
         "id": 668831,
         "name": "Garrett Stallings",
         "role": "MR",
@@ -551,7 +557,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.8666666666666667,
         "platoon_mult_vs_lhb": {
           "k": 1.0122391143499323,
           "bb": 0.8882850470239222,
@@ -595,7 +601,7 @@
         "role": "SU",
         "leverage_skill": 0.7,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.8083333333333333,
         "platoon_mult_vs_lhb": {
           "k": 0.8075,
           "bb": 0.8075,
@@ -636,7 +642,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.865,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 0.8330357142857143,
           "bb": 1.1925000000000001,
@@ -667,6 +673,49 @@
           "OTHER": 0.009615384663461537,
           "CH": 0.4711538435096155,
           "FC": 0.1346153852884615
+        },
+        "pitch_type_whiff_mult": {},
+        "pitch_type_inplay_mult": {},
+        "pitch_type_hr_mult": {}
+      },
+      {
+        "id": 680723,
+        "name": "Drew Rom",
+        "throw": "L",
+        "role": "MR",
+        "leverage_skill": 0.5,
+        "stamina_pitches": 25,
+        "availability_mult": 0.9416666666666667,
+        "platoon_mult_vs_lhb": {
+          "k": 1.0,
+          "bb": 1.1925000000000001,
+          "hr": 1.275,
+          "inplay": 0.89
+        },
+        "platoon_mult_vs_rhb": {
+          "k": 1.0,
+          "bb": 0.8075,
+          "hr": 0.78,
+          "inplay": 1.0785714285714285
+        },
+        "statcast_quality_mult": {},
+        "arsenal_source": "statsapi_pitchArsenal",
+        "arsenal_sample_size": 106,
+        "statcast_splits_found": false,
+        "statcast_splits_source": "",
+        "statcast_splits_n_pitches": 0,
+        "statcast_splits_start_date": "",
+        "statcast_splits_end_date": "",
+        "k_rate": 0.38461538461538464,
+        "bb_rate": 0.15384615384615385,
+        "hbp_rate": 0.0,
+        "hr_rate": 0.038461538461538464,
+        "inplay_hit_rate": 0.5,
+        "arsenal": {
+          "FF": 0.6226415124528303,
+          "OTHER": 0.1603773532075471,
+          "SI": 0.17924528358490568,
+          "FS": 0.03773585075471702
         },
         "pitch_type_whiff_mult": {},
         "pitch_type_inplay_mult": {},
@@ -723,7 +772,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.8666666666666667,
         "platoon_mult_vs_lhb": {
           "k": 0.9647556881760537,
           "bb": 1.1925000000000001,
@@ -766,7 +815,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.87,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 1.1925000000000001,
           "bb": 0.8075,
@@ -810,7 +859,7 @@
         "role": "CL",
         "leverage_skill": 0.85,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.8666666666666667,
         "platoon_mult_vs_lhb": {
           "k": 0.8647634698578572,
           "bb": 0.9495052226498076,
@@ -920,18 +969,18 @@
     "lineup_source": "projected_rotowire_default_vs_lhp",
     "lineup_confidence": 0.66,
     "probable_pitcher": {
-      "id": 700241,
+      "id": 669160,
       "source": "feed_gameData_probablePitchers",
       "confidence": 0.75,
-      "raw_schedule_id": 700241,
-      "raw_feed_id": 700241
+      "raw_schedule_id": 669160,
+      "raw_feed_id": 669160
     },
     "starter": {
-      "id": 700241,
-      "name": "Michael McGreevy",
+      "id": 669160,
+      "name": "Dustin May",
       "role": "SP",
       "selection_source": "probable",
-      "requested_id": 700241
+      "requested_id": 669160
     },
     "bullpen": [
       {
@@ -1365,46 +1414,45 @@
       }
     ],
     "starter_profile": {
-      "id": 700241,
-      "name": "Michael McGreevy",
+      "id": 669160,
+      "name": "Dustin May",
       "throw": "R",
       "role": "SP",
       "leverage_skill": 0.5,
       "stamina_pitches": 94,
       "availability_mult": 1.0,
       "platoon_mult_vs_lhb": {
-        "k": 0.915888921325354,
-        "bb": 1.017636762061078,
-        "hr": 1.0222102678512497,
-        "inplay": 0.9798268284491949
+        "k": 0.935499895630951,
+        "bb": 1.1925000000000001,
+        "hr": 1.0831606064849963,
+        "inplay": 1.0911269974768714
       },
       "platoon_mult_vs_rhb": {
-        "k": 1.1925000000000001,
-        "bb": 0.9586025388067259,
-        "hr": 0.9260789428522396,
-        "inplay": 0.9831176783153389
+        "k": 1.0292896481960212,
+        "bb": 0.8075,
+        "hr": 0.8529203859449977,
+        "inplay": 0.8942696039863625
       },
       "statcast_quality_mult": {},
       "arsenal_source": "statsapi_pitchArsenal",
-      "arsenal_sample_size": 1317,
+      "arsenal_sample_size": 1295,
       "statcast_splits_found": false,
       "statcast_splits_source": "",
       "statcast_splits_n_pitches": 0,
       "statcast_splits_start_date": "",
       "statcast_splits_end_date": "",
-      "k_rate": 0.15324303176415852,
-      "bb_rate": 0.06055809330457218,
-      "hbp_rate": 0.0,
-      "hr_rate": 0.03696865879964471,
-      "inplay_hit_rate": 0.30277188328912463,
+      "k_rate": 0.23735967046570197,
+      "bb_rate": 0.06234259614974175,
+      "hbp_rate": 0.014619883040935672,
+      "hr_rate": 0.020682332351560164,
+      "inplay_hit_rate": 0.3194805194805195,
       "arsenal": {
-        "FF": 0.2505694625056946,
-        "OTHER": 0.11085801110858011,
-        "CU": 0.1093394110933941,
-        "CH": 0.211085802110858,
-        "SI": 0.1716021317160213,
-        "SL": 0.0372057703720577,
-        "FC": 0.1093394110933941
+        "FF": 0.2633204747335905,
+        "OTHER": 0.19768339604633206,
+        "CU": 0.06949806861003861,
+        "CH": 0.07181466856370662,
+        "SI": 0.17915057641698845,
+        "FC": 0.21853281562934365
       },
       "pitch_type_whiff_mult": {},
       "pitch_type_inplay_mult": {},
@@ -1418,7 +1466,7 @@
         "role": "SU",
         "leverage_skill": 0.7,
         "stamina_pitches": 25,
-        "availability_mult": 0.9400000000000001,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 1.1270272349592245,
           "bb": 0.918785514054095,
@@ -1462,7 +1510,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.91,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 1.1656538297990349,
           "bb": 0.8308966209434594,
@@ -1549,7 +1597,7 @@
         "role": "SU",
         "leverage_skill": 0.7,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.675,
         "platoon_mult_vs_lhb": {
           "k": 0.8922776119702506,
           "bb": 1.064822481291266,
@@ -1636,7 +1684,7 @@
         "role": "CL",
         "leverage_skill": 0.85,
         "stamina_pitches": 25,
-        "availability_mult": 0.935,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 0.9187207342198914,
           "bb": 0.9304031354983202,
@@ -1679,7 +1727,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.875,
         "platoon_mult_vs_lhb": {
           "k": 1.0516563217413486,
           "bb": 0.8139490806223479,
@@ -1722,7 +1770,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.945,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 1.031100108376029,
           "bb": 1.0275206257366336,
