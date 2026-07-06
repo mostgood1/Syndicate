@@ -11,6 +11,19 @@ from unittest.mock import patch
 
 
 class RefreshOddsJobTests(unittest.TestCase):
+    class _FakeProcess:
+        def __init__(self, *, pid: int = 4321, stdout_text: str = "", stderr_text: str = "", returncode: int = 0):
+            self.pid = pid
+            self._stdout_text = stdout_text
+            self._stderr_text = stderr_text
+            self.returncode = returncode
+
+        def poll(self):
+            return self.returncode
+
+        def communicate(self, timeout=None):
+            return self._stdout_text, self._stderr_text
+
     @staticmethod
     def _load_module(repo_root: Path):
         script_path = repo_root / "scripts" / "run_refresh_odds_job.py"
@@ -61,8 +74,8 @@ class RefreshOddsJobTests(unittest.TestCase):
                 ],
             ), patch.object(
                 module.subprocess,
-                "run",
-                return_value=subprocess.CompletedProcess(args=["python"], returncode=0, stdout="ok\n", stderr=""),
+                "Popen",
+                return_value=self._FakeProcess(stdout_text="ok\n", stderr_text="", returncode=0),
             ), patch.object(module, "print") as mocked_print:
                 exit_code = module.main()
 
@@ -118,8 +131,8 @@ class RefreshOddsJobTests(unittest.TestCase):
                 ],
             ), patch.object(
                 module.subprocess,
-                "run",
-                return_value=subprocess.CompletedProcess(args=["python"], returncode=0, stdout="ok\n", stderr=""),
+                "Popen",
+                return_value=self._FakeProcess(stdout_text="ok\n", stderr_text="", returncode=0),
             ), patch.object(
                 module,
                 "_queue_intelligence_snapshot_refresh",

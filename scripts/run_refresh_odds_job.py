@@ -113,6 +113,34 @@ def _safe_write_json(path: Path, payload: dict[str, Any]) -> None:
         pass
 
 
+def _wait_for_child_process(process: subprocess.Popen[str], *, timeout_seconds: int = 5) -> tuple[str, str, int]:
+    stdout_chunks: list[str] = []
+    stderr_chunks: list[str] = []
+    print(
+        f"WRAPPER_WAIT_BEGIN pid={int(process.pid)} poll={process.poll()} returncode={process.returncode}",
+        flush=True,
+    )
+    while True:
+        try:
+            stdout_text, stderr_text = process.communicate(timeout=timeout_seconds)
+            stdout_chunks.append(str(stdout_text or ""))
+            stderr_chunks.append(str(stderr_text or ""))
+            print(
+                f"WRAPPER_WAIT_END pid={int(process.pid)} poll={process.poll()} returncode={process.returncode}",
+                flush=True,
+            )
+            return "".join(stdout_chunks), "".join(stderr_chunks), int(process.returncode or 0)
+        except subprocess.TimeoutExpired as exc:
+            if exc.output:
+                stdout_chunks.append(str(exc.output))
+            if exc.stderr:
+                stderr_chunks.append(str(exc.stderr))
+            print(
+                f"WRAPPER_WAIT_TICK pid={int(process.pid)} poll={process.poll()} returncode={process.returncode} timeout_seconds={timeout_seconds}",
+                flush=True,
+            )
+
+
 def _queue_intelligence_snapshot_refresh(*, run_summary_path: Path) -> tuple[str, dict[str, Any]] | None:
     store = _refresh_state_store()
     read_json_file = store["read_json_file"]
@@ -190,12 +218,7 @@ def main() -> int:
         print(f"LAUNCH_COMMAND command={json.dumps(command)}", flush=True)
         process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         print(f"LAUNCH_PID pid={int(process.pid)}", flush=True)
-        print("WAIT_BEGIN", flush=True)
-        stdout_text, stderr_text = process.communicate()
-        print("WAIT_END", flush=True)
-        return_code = int(process.returncode or 0)
-        stdout_text = str(stdout_text or "")
-        stderr_text = str(stderr_text or "")
+        stdout_text, stderr_text, return_code = _wait_for_child_process(process, timeout_seconds=5)
         print(f"RETURN_CODE return_code={return_code}", flush=True)
         print(f"STDOUT_LENGTH length={len(stdout_text)}", flush=True)
         print(f"STDERR_LENGTH length={len(stderr_text)}", flush=True)

@@ -12,6 +12,7 @@ Constraints:
 
 from __future__ import annotations
 
+import atexit
 import argparse
 import json
 import os
@@ -1248,6 +1249,13 @@ def _build_summary(args: argparse.Namespace) -> dict[str, Any]:
 
 
 def main() -> int:
+    child_pid = os.getpid()
+
+    def _emit_child_exit() -> None:
+        print(f"CHILD_PROCESS_EXIT pid={child_pid}", file=sys.stderr, flush=True)
+
+    atexit.register(_emit_child_exit)
+
     parser = argparse.ArgumentParser(
         description="Refresh pregame/live odds in the source sport repos, then optionally mirror the refreshed artifacts into Syndicate.",
     )
