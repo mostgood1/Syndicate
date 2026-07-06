@@ -21,6 +21,7 @@ import sys
 import shutil
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import as_completed
+from threading import enumerate as enumerate_threads
 from threading import Lock
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -78,6 +79,15 @@ class SportSpec:
 
 def _utc_now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+
+def _dump_child_runtime_state(*, label: str) -> None:
+    print(f"[refresh_odds_sources] RUNTIME_SNAPSHOT label={label} ts={_utc_now()} pid={os.getpid()} ppid={os.getppid()}", file=sys.stderr, flush=True)
+    print(
+        f"[refresh_odds_sources] THREADS label={label} active={len(enumerate_threads())} names={[thread.name for thread in enumerate_threads()]}",
+        file=sys.stderr,
+        flush=True,
+    )
 
 
 def _source_root_env_var(slug: str) -> str:
@@ -719,8 +729,10 @@ def _run_command(step: RefreshStep, *, dry_run: bool = False) -> dict[str, Any]:
         except ValueError:
             timeout_seconds = None
     print(f"[refresh_odds_sources] START step={step.name} cwd={step.cwd}", flush=True)
+    _dump_child_runtime_state(label=f"step_start:{step.name}")
     if dry_run:
         print(f"[refresh_odds_sources] END step={step.name} dry_run=true", flush=True)
+        _dump_child_runtime_state(label=f"step_end:{step.name}:dry_run")
         return {
             "name": step.name,
             "description": step.description,
@@ -747,6 +759,7 @@ def _run_command(step: RefreshStep, *, dry_run: bool = False) -> dict[str, Any]:
         f"[refresh_odds_sources] END step={step.name} return_code={result.returncode} timeout_seconds={timeout_seconds if timeout_seconds is not None else 'none'}",
         flush=True,
     )
+    _dump_child_runtime_state(label=f"step_end:{step.name}:rc={result.returncode}")
     return {
         "name": step.name,
         "description": step.description,
@@ -1252,7 +1265,8 @@ def main() -> int:
     child_pid = os.getpid()
 
     def _emit_child_exit() -> None:
-        print(f"CHILD_PROCESS_EXIT pid={child_pid}", file=sys.stderr, flush=True)
+        print(f"CHILD_PROCESS_EXIT ts={_utc_now()} pid={child_pid} ppid={os.getppid()}", file=sys.stderr, flush=True)
+        _dump_child_runtime_state(label="atexit")
 
     atexit.register(_emit_child_exit)
 
@@ -1309,19 +1323,24 @@ def main() -> int:
     except Exception as exc:
         payload = {"ok": False, "error": f"{type(exc).__name__}: {exc}"}
         print(f"CHILD_PROCESS_STARTED argv={json.dumps(sys.argv)} cwd={os.getcwd()} pid={os.getpid()}", file=sys.stderr, flush=True)
+        _dump_child_runtime_state(label="json_exception_before_write")
         print("CHILD_JSON_WRITE_BEGIN", file=sys.stderr, flush=True)
         print(json.dumps(payload, indent=2))
         print("CHILD_JSON_WRITE_END", file=sys.stderr, flush=True)
+        _dump_child_runtime_state(label="json_exception_after_write")
         return 1
 
     summary["odds_control_plane"] = write_odds_control_plane_snapshot(summary)
 
     print(f"CHILD_PROCESS_STARTED argv={json.dumps(sys.argv)} cwd={os.getcwd()} pid={os.getpid()}", file=sys.stderr, flush=True)
     if args.json:
+        _dump_child_runtime_state(label="json_before_write")
         print("CHILD_JSON_WRITE_BEGIN", file=sys.stderr, flush=True)
         print(json.dumps(summary, indent=2))
         print("CHILD_JSON_WRITE_END", file=sys.stderr, flush=True)
+        _dump_child_runtime_state(label="json_after_write")
     else:
+        _dump_child_runtime_state(label="non_json_before_write")
         for sport_result in summary.get("results", []):
             sport = sport_result["sport"]
             status = "ok" if sport_result.get("ok") else "failed"
@@ -1339,6 +1358,8 @@ def main() -> int:
             if isinstance(mirror, dict):
                 marker = "dry-run" if mirror.get("dry_run") else ("ok" if mirror.get("ok") else "failed")
                 print(f"  - mirror: {marker}")
+
+        _dump_child_runtime_state(label="non_json_after_write")
 
     return 0 if summary.get("ok") else 1
 
