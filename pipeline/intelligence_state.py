@@ -1325,7 +1325,10 @@ class IntelligenceStateService:
         return key
 
     def _background_loop(self) -> None:
+        loop_started_at = time.time()
+        logger.info("BACKGROUND_LOOP_START", extra={"elapsed_ms": 0.0})
         while not self._stop.is_set():
+            iteration_started_at = time.time()
             payload_to_process: dict[str, Any] | None = None
             with self._condition:
                 self._sync_persisted_queue_locked()
@@ -1342,6 +1345,10 @@ class IntelligenceStateService:
                     continue
             if payload_to_process is None:
                 continue
+            logger.info(
+                "BACKGROUND_LOOP_ITERATION",
+                extra={"elapsed_ms": round((time.time() - loop_started_at) * 1000.0, 3)},
+            )
             guard_acquired = False
             run_started_at = time.time()
             try:
@@ -1354,8 +1361,24 @@ class IntelligenceStateService:
                         self._condition.wait(timeout=min(1.0, float(self._interval_seconds)))
                     continue
                 logger.info("WORKER RUN", extra={"payload_key": _payload_key(payload_to_process)})
+                logger.info(
+                    "BACKGROUND_LOOP_PRE_COMPUTE",
+                    extra={"elapsed_ms": round((time.time() - iteration_started_at) * 1000.0, 3)},
+                )
                 state = run_routed_intelligence_pipeline(payload_to_process)
+                logger.info(
+                    "BACKGROUND_LOOP_POST_COMPUTE",
+                    extra={"elapsed_ms": round((time.time() - iteration_started_at) * 1000.0, 3)},
+                )
+                logger.info(
+                    "BACKGROUND_LOOP_PRE_PERSIST",
+                    extra={"elapsed_ms": round((time.time() - iteration_started_at) * 1000.0, 3)},
+                )
                 written_state = write_latest_intelligence_state(state)
+                logger.info(
+                    "BACKGROUND_LOOP_POST_PERSIST",
+                    extra={"elapsed_ms": round((time.time() - iteration_started_at) * 1000.0, 3)},
+                )
                 if written_state is None:
                     response = {
                         "ok": False,
