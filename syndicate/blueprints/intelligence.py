@@ -18,6 +18,7 @@ from pipeline.intelligence_state import queue_intelligence_state_refresh
 from pipeline.intelligence_state import _INTELLIGENCE_STATE_SERVICE
 from syndicate.features.intelligence import _market_focus_labels
 from syndicate.features.intelligence import _parlay_request_summary
+from syndicate.features.intelligence import run_intelligence_query
 from syndicate.features.intelligence import _query_preferences
 from syndicate.features.intelligence import _attach_intelligence_response_aliases
 from syndicate.features.intelligence_board import build_intelligence_board_contract
@@ -719,6 +720,7 @@ def _debug_state_fields(response_payload: dict[str, object] | None, *, source: s
         state_last_updated
         or state_meta.get("computed_at")
         or state_meta.get("latestComputedAt")
+        or current.get("snapshot_generated_at")
         or current.get("timestamp")
         or current.get("state_last_updated")
         or current.get("computed_at")
@@ -730,6 +732,8 @@ def _debug_state_fields(response_payload: dict[str, object] | None, *, source: s
     debug_fields = {
         "state_last_updated": derived_last_updated,
         "candidate_count": _response_candidate_count(current),
+        "selected_date": str(current.get("selected_date") or current.get("date") or "").strip() or None,
+        "snapshot_generated_at": str(current.get("snapshot_generated_at") or derived_last_updated or "").strip() or None,
         "debug_source": source,
     }
     debug_fields.update(_line_move_tracking_fields(current))
@@ -1058,6 +1062,50 @@ def intelligence_query_api():
         response.status_code = 400
         return _no_cache_response(response)
     force_refresh = _query_bool(payload.get("force_refresh"))
+    _LOGGER.info("BETTING_BOARD_REFRESH_START", extra={"selected_date": str(payload.get("date") or payload.get("selected_date") or central_today_iso()).strip() or None, "force_refresh": force_refresh, "source": "query_api"})
+    if force_refresh:
+        try:
+            computed_response = run_intelligence_query(
+                question,
+                selected_date=str(payload.get("date") or payload.get("selected_date") or central_today_iso()).strip() or central_today_iso(),
+                mode=str(payload.get("mode") or "").strip() or None,
+                sport=str(payload.get("sport") or "").strip() or None,
+                game_state=str(payload.get("game_state") or "").strip() or None,
+                limit=payload.get("limit"),
+                timing=str(payload.get("timing") or "").strip() or None,
+                include_props=payload.get("include_props"),
+                include_games=payload.get("include_games"),
+                policy=str(payload.get("policy") or "").strip() or None,
+                force_refresh=True,
+            )
+            if isinstance(computed_response, dict):
+                state_payload = dict(computed_response)
+                state_payload["candidate_count"] = len(state_payload.get("recommendations") or [])
+                response = dict(state_payload)
+                response.setdefault("ok", True)
+                response.setdefault("response", dict(response))
+                response.setdefault(
+                    "board_contract",
+                    {
+                        "schema": "intelligence_board_v1",
+                        "top_overall": [],
+                        "by_sport": {},
+                        "live": [],
+                        "pregame": [],
+                        "portfolio": {},
+                        "parlays": [],
+                    },
+                )
+                _attach_intelligence_response_aliases(response)
+                LAST_RESULT = dict(response.get("response") or response.get("analysis") or {})
+                versioned_response = _versioned_query_response(response)
+                versioned_response.update(_debug_state_fields(response, source="snapshot_read"))
+                versioned_response["selected_date"] = str(payload.get("date") or payload.get("selected_date") or central_today_iso()).strip() or central_today_iso()
+                _LOGGER.info("BETTING_BOARD_REFRESH_CANDIDATE_COUNT", extra={"selected_date": versioned_response.get("selected_date"), "candidate_count": state_payload.get("candidate_count", 0), "source": "query_api"})
+                _LOGGER.info("BETTING_BOARD_REFRESH_COMPLETE", extra={"selected_date": versioned_response.get("selected_date"), "candidate_count": state_payload.get("candidate_count", 0), "source": "query_api"})
+                return _no_cache_response(jsonify(versioned_response))
+        except Exception:
+            _LOGGER.exception("BETTING_BOARD_REFRESH_FAILURE")
     state_payload = read_latest_intelligence_state(dict(payload))
     if force_refresh:
         _safe_queue_intelligence_state_refresh(dict(payload))
@@ -1089,6 +1137,9 @@ def intelligence_query_api():
     LAST_RESULT = dict(response.get("response") or response.get("analysis") or {})
     versioned_response = _versioned_query_response(response)
     versioned_response.update(_debug_state_fields(response, source="snapshot_read"))
+    versioned_response["selected_date"] = str(payload.get("date") or payload.get("selected_date") or central_today_iso()).strip() or central_today_iso()
+    _LOGGER.info("BETTING_BOARD_REFRESH_CANDIDATE_COUNT", extra={"selected_date": versioned_response.get("selected_date"), "candidate_count": candidate_count, "source": "query_api"})
+    _LOGGER.info("BETTING_BOARD_REFRESH_COMPLETE", extra={"selected_date": versioned_response.get("selected_date"), "candidate_count": candidate_count, "source": "query_api"})
     return _no_cache_response(jsonify(versioned_response))
 
 
@@ -1166,6 +1217,8 @@ def run_intelligence():
 def intelligence_status_api():
     selected_date = str(request.args.get("date") or "").strip() or central_today_iso()
     refresh_requested = str(request.args.get("refresh") or request.args.get("force_refresh") or "").strip().lower() in {"1", "true", "yes", "on"}
+    if refresh_requested:
+        _LOGGER.info("BETTING_BOARD_REFRESH_START", extra={"selected_date": selected_date, "source": "status_api", "refresh_requested": True})
     status_payload = _intelligence_page_payload(selected_date, force_refresh=False)
     stale_snapshot = False
     if not refresh_requested:
@@ -1186,6 +1239,9 @@ def intelligence_status_api():
                 continue
             response_payload[key] = normalize_timestamped_payload(value)
     response_payload.update(_debug_state_fields(state_snapshot, source="snapshot_read"))
+    response_payload["selected_date"] = selected_date
+    _LOGGER.info("BETTING_BOARD_REFRESH_DATE", extra={"selected_date": selected_date, "candidate_count": _response_candidate_count(state_snapshot), "source": "status_api"})
+    _LOGGER.info("BETTING_BOARD_REFRESH_COMPLETE", extra={"selected_date": selected_date, "candidate_count": _response_candidate_count(state_snapshot), "source": "status_api"})
     return _no_cache_response(jsonify(response_payload))
 
 

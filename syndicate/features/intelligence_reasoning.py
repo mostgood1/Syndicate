@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import time
 
 from typing import Any
 from typing import Callable
@@ -11,6 +12,16 @@ def _intel_trace(event: str, **fields: Any) -> None:
         print(f"[INTEL_TRACE] {json.dumps({'event': event, **fields}, sort_keys=True, default=str)}", flush=True)
     except Exception:
         print(f"[INTEL_TRACE] {event}", flush=True)
+
+
+def _intel_trace_timed(event: str, started_at: float, **fields: Any) -> None:
+    try:
+        duration_ms = round((time.perf_counter() - float(started_at)) * 1000.0, 3)
+    except Exception:
+        duration_ms = None
+    if duration_ms is not None:
+        fields = {**fields, "duration_ms": duration_ms}
+    _intel_trace(event, **fields)
 
 
 def _analysis_brief_driver_items(

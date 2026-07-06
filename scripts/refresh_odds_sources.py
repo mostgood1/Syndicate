@@ -38,6 +38,15 @@ from syndicate.features.shared.publish_parity import build_publish_parity_summar
 from syndicate.features.shared.odds_refresh_tracking import sync_sport_post_refresh_tracking
 from syndicate.features.shared.manifest import publish_sport_manifest
 from syndicate.features.shared.refresh_state_store import data_root
+from syndicate.features.mlb.sources import available_daily_summary_dates as mlb_available_daily_summary_dates
+from syndicate.features.nba.sources import available_dates as nba_available_dates
+from syndicate.features.ncaab.sources import available_dates as ncaab_available_dates
+from syndicate.features.ncaaf.sources import default_season as ncaaf_default_season
+from syndicate.features.ncaaf.sources import week_summaries as ncaaf_week_summaries
+from syndicate.features.nfl.sources import latest_season as nfl_latest_season
+from syndicate.features.nfl.sources import week_summaries as nfl_week_summaries
+from syndicate.features.nhl.sources import available_dates as nhl_available_dates
+from syndicate.features.wnba.sources import available_dates as wnba_available_dates
 
 
 _PUBLISH_MANIFEST_LOCK = Lock()
@@ -146,6 +155,80 @@ def _merge_pythonpath(existing: str | None, extra: str) -> str:
 
 def _json_payload(data: dict[str, Any]) -> str:
     return json.dumps(data, separators=(",", ":"))
+
+
+def _date_span(values: Sequence[str]) -> dict[str, Any]:
+    cleaned = sorted({str(value).strip() for value in values if str(value).strip()})
+    return {
+        "count": len(cleaned),
+        "earliest": cleaned[0] if cleaned else None,
+        "latest": cleaned[-1] if cleaned else None,
+        "dates": cleaned,
+    }
+
+
+def _week_span(values: Sequence[int], *, season_label: str | None = None) -> dict[str, Any]:
+    cleaned = sorted({int(value) for value in values if str(value).strip()})
+    label = season_label or "season"
+    return {
+        "count": len(cleaned),
+        "earliest": f"{label} Week {cleaned[0]}" if cleaned else None,
+        "latest": f"{label} Week {cleaned[-1]}" if cleaned else None,
+        "weeks": cleaned,
+    }
+
+
+def _coverage_report_for_sport(sport: str, *, requested_date: str) -> dict[str, Any]:
+    slug = str(sport or "").strip().lower()
+    today_text = str(requested_date or "").strip()
+    coverage_kind = "dates"
+    if slug == "mlb":
+        span = _date_span(mlb_available_daily_summary_dates())
+    elif slug == "nba":
+        span = _date_span(nba_available_dates())
+    elif slug == "wnba":
+        span = _date_span(wnba_available_dates())
+    elif slug == "nhl":
+        span = _date_span(nhl_available_dates())
+    elif slug == "ncaab":
+        span = _date_span(ncaab_available_dates())
+    elif slug == "nfl":
+        season = nfl_latest_season()
+        weeks = [item.get("week") for item in nfl_week_summaries() if int(item.get("season") or 0) == int(season)]
+        span = _week_span([int(value) for value in weeks if value is not None], season_label=str(season))
+        coverage_kind = "weeks"
+    elif slug == "ncaaf":
+        season = ncaaf_default_season()
+        weeks = [item.get("week") for item in ncaaf_week_summaries() if int(item.get("season") or season) == int(season) and item.get("has_data")]
+        span = _week_span([int(value) for value in weeks if value is not None], season_label=str(season))
+        coverage_kind = "weeks"
+    else:
+        span = {"count": 0, "earliest": None, "latest": None}
+
+    latest_value = span.get("latest")
+    future_available = bool(latest_value and today_text and coverage_kind == "dates" and str(latest_value) > today_text)
+    return {
+        "sport": slug,
+        "requested_date": today_text or None,
+        "coverage_kind": coverage_kind,
+        "earliest_collected": span.get("earliest"),
+        "latest_collected": span.get("latest"),
+        "count": int(span.get("count") or 0),
+        "future_available": future_available,
+        "details": span,
+    }
+
+
+def _build_odds_coverage_audit(*, requested_date: str) -> dict[str, Any]:
+    sports = list(REGISTRY.keys())
+    sport_reports = [_coverage_report_for_sport(sport, requested_date=requested_date) for sport in sports]
+    future_supported = [item["sport"] for item in sport_reports if item.get("future_available")]
+    return {
+        "requested_date": requested_date,
+        "sports": sport_reports,
+        "future_supported_sports": future_supported,
+        "all_sports_have_future_coverage": len(future_supported) == len(sport_reports) and bool(sport_reports),
+    }
 
 
 def _infer_nfl_context(source_root: Path | None, artifact_root: Path, season: int | None, week: int | None) -> tuple[int, int]:
@@ -1160,6 +1243,7 @@ def _build_summary(args: argparse.Namespace) -> dict[str, Any]:
         forced_paths=publish_parity_paths,
         intelligence_paths=[],
     )
+    summary["coverage_audit"] = _build_odds_coverage_audit(requested_date=str(summary.get("date") or "").strip())
     return summary
 
 
@@ -1182,6 +1266,7 @@ def main() -> int:
     parser.add_argument("--continue-on-error", action="store_true", default=True, help="Continue across sports even when one refresh fails.")
     parser.add_argument("--no-continue-on-error", action="store_false", dest="continue_on_error")
     parser.add_argument("--dry-run", action="store_true", help="Resolve commands and source roots without executing refresh or mirror steps.")
+    parser.add_argument("--audit-coverage", action="store_true", help="Print a cross-sport odds coverage audit without running refresh commands.")
     parser.add_argument("--json", action="store_true", help="Print machine-readable JSON output.")
     parser.add_argument("--list", action="store_true", help="List supported sports and exit.")
     args = parser.parse_args()
@@ -1198,6 +1283,15 @@ def main() -> int:
                 }
                 for spec in REGISTRY.values()
             ]
+        }
+        print(json.dumps(payload, indent=2))
+        return 0
+
+    if args.audit_coverage:
+        payload = {
+            "ok": True,
+            "date": args.date,
+            "coverage_audit": _build_odds_coverage_audit(requested_date=args.date),
         }
         print(json.dumps(payload, indent=2))
         return 0

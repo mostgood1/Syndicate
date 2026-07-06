@@ -1,5 +1,12 @@
 # Fix Notes Log
 
+## 2026-07-06 - Intelligence refresh now computes the requested future slate directly
+- Symptom: The betting board refresh path could still return an old empty snapshot even when tomorrow's slate had candidates upstream.
+- Root cause: The query/status refresh flow was reading the persisted snapshot path instead of computing a fresh board for `force_refresh=true`, and two runtime helpers were missing `time`/timed-trace support.
+- Fix: Make `/api/intelligence/query` compute the board directly on refresh, add the missing timed-trace helper and `time` imports in the reasoning/evaluation modules, and expose the selected date/snapshot timestamp in the board UI and debug payloads.
+- Validation: Local Flask test-client probes returned `200` with `selected_date=2026-07-06`, `candidate_count=2`, `recommendations=2`, and `boardContract.schema=intelligence_board_v1`; the odds coverage audit test also passed.
+- Follow-up: Keep the generated `reports/intelligence/*` artifacts out of the commit unless they are intentionally part of a release snapshot.
+
 ## 2026-07-05 - Intelligence state persistence retried Redis writes after connection close
 - Symptom: Render intelligence compute completed, but the background writer thread crashed in `_background_loop()` while persisting the latest state.
 - Root cause: `write_json_file()` used a cached Redis/keyvalue client for the refresh-state backend, and the connection could close server-side before `_persist_locked()` finished writing `query_state_cache.json`.

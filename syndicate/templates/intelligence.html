@@ -633,6 +633,8 @@ function renderSupportingEvidence(response) {
     evidenceBits.push(`
       <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; font-size:12px;">
         <span style="padding:5px 8px; border-radius:999px; background:rgba(255,255,255,.08);">Last Updated: ${escapeHtml(data.state_last_updated || "—")}</span>
+        <span style="padding:5px 8px; border-radius:999px; background:rgba(255,255,255,.08);">Snapshot: ${escapeHtml(data.snapshot_generated_at || "—")}</span>
+        <span style="padding:5px 8px; border-radius:999px; background:rgba(255,255,255,.08);">Date: ${escapeHtml(data.selected_date || "—")}</span>
         <span style="padding:5px 8px; border-radius:999px; background:rgba(255,255,255,.08);">Candidates: ${escapeHtml(data.candidate_count ?? "—")}</span>
       </div>
     `);

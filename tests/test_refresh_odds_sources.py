@@ -127,6 +127,38 @@ class RefreshOddsSourcesTests(unittest.TestCase):
         self.assertEqual(summary["publish_parity"]["totalForcedPublishPaths"], 3)
         mocked_publish_parity.assert_called_once()
 
+    def test_build_odds_coverage_audit_reports_date_and_week_spans(self) -> None:
+        module = self._load_module()
+
+        with patch.object(module, "mlb_available_daily_summary_dates", return_value=["2026-07-05", "2026-07-06"]), patch.object(
+            module,
+            "nba_available_dates",
+            return_value=["2026-07-04", "2026-07-05"],
+        ), patch.object(module, "wnba_available_dates", return_value=["2026-07-05"]), patch.object(
+            module,
+            "nhl_available_dates",
+            return_value=["2026-07-03", "2026-07-04"],
+        ), patch.object(module, "ncaab_available_dates", return_value=["2026-07-02", "2026-07-05"]), patch.object(
+            module,
+            "nfl_latest_season",
+            return_value=2025,
+        ), patch.object(module, "nfl_week_summaries", return_value=[{"season": 2025, "week": 1}, {"season": 2025, "week": 2}]), patch.object(
+            module,
+            "ncaaf_default_season",
+            return_value=2025,
+        ), patch.object(module, "ncaaf_week_summaries", return_value=[{"season": 2025, "week": 1, "has_data": True}, {"season": 2025, "week": 2, "has_data": True}]):
+            audit = module._build_odds_coverage_audit(requested_date="2026-07-05")
+
+        self.assertEqual(audit["requested_date"], "2026-07-05")
+        self.assertIn("mlb", audit["future_supported_sports"])
+        self.assertEqual(audit["sports"][0]["coverage_kind"], "dates")
+        self.assertEqual(audit["sports"][0]["earliest_collected"], "2026-07-05")
+        self.assertEqual(audit["sports"][0]["latest_collected"], "2026-07-06")
+        nfl_report = next(item for item in audit["sports"] if item["sport"] == "nfl")
+        self.assertEqual(nfl_report["coverage_kind"], "weeks")
+        self.assertEqual(nfl_report["earliest_collected"], "2025 Week 1")
+        self.assertEqual(nfl_report["latest_collected"], "2025 Week 2")
+
     def test_interval_market_defaults_are_forwarded_for_basketball_sports(self) -> None:
         module = self._load_module()
         args = argparse.Namespace(
