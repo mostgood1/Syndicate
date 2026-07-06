@@ -131,7 +131,7 @@ def _wait_for_child_process(
     stderr_chunks: list[str] = []
     wait_started_at = _utc_now()
     print(
-        f"WRAPPER_WAIT_BEGIN pid={int(process.pid)} poll={process.poll()} returncode={process.returncode}",
+        f"WRAPPER_WAIT_BEGIN pid={int(process.pid)} poll={process.poll()} returncode={process.returncode} stdout_len=0 stderr_len=0",
         flush=True,
     )
     _update_job_status(
@@ -153,11 +153,15 @@ def _wait_for_child_process(
     )
     while True:
         try:
+            print(
+                f"WRAPPER_WAIT_POLL pid={int(process.pid)} poll={process.poll()} returncode={process.returncode} stdout_len={sum(len(chunk) for chunk in stdout_chunks)} stderr_len={sum(len(chunk) for chunk in stderr_chunks)}",
+                flush=True,
+            )
             stdout_text, stderr_text = process.communicate(timeout=timeout_seconds)
             stdout_chunks.append(str(stdout_text or ""))
             stderr_chunks.append(str(stderr_text or ""))
             print(
-                f"WRAPPER_WAIT_END pid={int(process.pid)} poll={process.poll()} returncode={process.returncode}",
+                f"WRAPPER_WAIT_END pid={int(process.pid)} poll={process.poll()} returncode={process.returncode} stdout_len={sum(len(chunk) for chunk in stdout_chunks)} stderr_len={sum(len(chunk) for chunk in stderr_chunks)}",
                 flush=True,
             )
             _update_job_status(
@@ -175,6 +179,8 @@ def _wait_for_child_process(
                     "childPid": int(process.pid),
                     "childPoll": process.poll(),
                     "childReturnCode": process.returncode,
+                    "stdoutBufferLen": sum(len(chunk) for chunk in stdout_chunks),
+                    "stderrBufferLen": sum(len(chunk) for chunk in stderr_chunks),
                 },
             )
             return "".join(stdout_chunks), "".join(stderr_chunks), int(process.returncode or 0)
@@ -184,7 +190,7 @@ def _wait_for_child_process(
             if exc.stderr:
                 stderr_chunks.append(str(exc.stderr))
             print(
-                f"WRAPPER_WAIT_TICK pid={int(process.pid)} poll={process.poll()} returncode={process.returncode} timeout_seconds={timeout_seconds}",
+                f"WRAPPER_WAIT_TIMEOUT pid={int(process.pid)} poll={process.poll()} returncode={process.returncode} stdout_len={sum(len(chunk) for chunk in stdout_chunks)} stderr_len={sum(len(chunk) for chunk in stderr_chunks)} timeout_seconds={timeout_seconds}",
                 flush=True,
             )
             _update_job_status(
@@ -202,6 +208,8 @@ def _wait_for_child_process(
                     "childPid": int(process.pid),
                     "childPoll": process.poll(),
                     "childReturnCode": process.returncode,
+                    "stdoutBufferLen": sum(len(chunk) for chunk in stdout_chunks),
+                    "stderrBufferLen": sum(len(chunk) for chunk in stderr_chunks),
                 },
             )
 
