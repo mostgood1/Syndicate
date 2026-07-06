@@ -215,6 +215,33 @@ def _recover_stuck_claim(latest_manifest_path: Path, *, timeout_minutes: int) ->
     return True
 
 
+def _recover_dead_active_contract(latest_manifest_path: Path) -> bool:
+    payload = _latest_manifest_payload(latest_manifest_path)
+    state = str(payload.get("state") or "").strip().lower()
+    if state not in {"launched", "running"}:
+        return False
+
+    launch_pid_raw = payload.get("launchPid")
+    pid_raw = payload.get("pid")
+    launch_pid = int(launch_pid_raw) if isinstance(launch_pid_raw, int) else None
+    pid = int(pid_raw) if isinstance(pid_raw, int) else None
+
+    if launch_pid is not None and _pid_is_running(launch_pid):
+        return False
+    if pid is not None and _pid_is_running(pid):
+        return False
+    if launch_pid is None and pid is None:
+        return False
+
+    payload["state"] = "failed"
+    payload["workerRecoveredAt"] = datetime.utcnow().isoformat(timespec="seconds") + "Z"
+    payload["workerRecoveryReason"] = "dead_refresh_process"
+    for key in ("launchPid", "pid", "workerClaimedAt", "workerKind"):
+        payload.pop(key, None)
+    _refresh_state_store()["write_json_file"](latest_manifest_path, payload)
+    return True
+
+
 def _has_pending_external_contract(latest_manifest_path: Path) -> bool:
     payload = _refresh_state_store()["read_json_file"](latest_manifest_path) or {}
     state = str(payload.get("state") or "").strip().lower()
@@ -339,6 +366,18 @@ def main() -> int:
                 latest_manifest_path=latest_manifest_path,
                 state="recovered",
                 detail=f"Recovered a stuck claimed refresh contract older than {stuck_claim_timeout_minutes} minutes.",
+                ran_job=False,
+                latest_manifest_state=str((_latest_manifest_payload(latest_manifest_path).get("state") or "")).strip().lower() or None,
+                refresh_cycle=refresh_cycle,
+            )
+
+        if _recover_dead_active_contract(latest_manifest_path):
+            refresh_cycle["reclaimed_count"] = max(1, int(refresh_cycle.get("reclaimed_count") or 0))
+            _write_worker_status(
+                worker_status_path=worker_status_path,
+                latest_manifest_path=latest_manifest_path,
+                state="recovered",
+                detail="Recovered a dead refresh contract and released the active-job cap.",
                 ran_job=False,
                 latest_manifest_state=str((_latest_manifest_payload(latest_manifest_path).get("state") or "")).strip().lower() or None,
                 refresh_cycle=refresh_cycle,
