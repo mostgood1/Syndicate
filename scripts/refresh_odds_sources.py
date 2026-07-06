@@ -19,6 +19,10 @@ import os
 import subprocess
 import sys
 import shutil
+import threading
+import time
+import traceback
+import faulthandler
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import as_completed
 from threading import enumerate as enumerate_threads
@@ -124,6 +128,48 @@ def _dump_child_runtime_state(*, label: str) -> None:
     )
     print(f"[refresh_odds_sources] THREADS label={label} data={json.dumps(thread_snapshot, default=str)}", file=sys.stderr, flush=True)
     print(f"[refresh_odds_sources] CHILD_PROCESSES label={label} data={json.dumps(child_processes, default=str)}", file=sys.stderr, flush=True)
+
+
+def _dump_main_thread_stack(*, label: str) -> None:
+    main_thread = threading.main_thread()
+    frame = sys._current_frames().get(main_thread.ident) if main_thread.ident is not None else None
+    if frame is None:
+        print(
+            f"[refresh_odds_sources] MAIN_THREAD_STACK label={label} ts={_utc_now()} pid={os.getpid()} status=unavailable",
+            file=sys.stderr,
+            flush=True,
+        )
+        return
+
+    stack = traceback.extract_stack(frame)
+    current = stack[-1] if stack else None
+    frame_payload = {
+        "function": current.name if current is not None else None,
+        "file": current.filename if current is not None else None,
+        "line": current.lineno if current is not None else None,
+    }
+    print(
+        f"[refresh_odds_sources] MAIN_THREAD_STACK label={label} ts={_utc_now()} pid={os.getpid()} frame={json.dumps(frame_payload, sort_keys=True)} stack={json.dumps([str(item) for item in stack])}",
+        file=sys.stderr,
+        flush=True,
+    )
+
+
+def _start_json_watchdog(*, label: str, delay_seconds: int = 10) -> None:
+    started_at = _utc_now()
+
+    def _watchdog() -> None:
+        time.sleep(delay_seconds)
+        print(
+            f"[refresh_odds_sources] JSON_WATCHDOG ts={_utc_now()} started_at={started_at} label={label} pid={os.getpid()}",
+            file=sys.stderr,
+            flush=True,
+        )
+        _dump_child_runtime_state(label=f"watchdog:{label}")
+        _dump_main_thread_stack(label=f"watchdog:{label}")
+        faulthandler.dump_traceback(file=sys.stderr, all_threads=True)
+
+    threading.Thread(target=_watchdog, name=f"json-watchdog:{label}", daemon=True).start()
 
 
 def _source_root_env_var(slug: str) -> str:
@@ -1302,6 +1348,7 @@ def main() -> int:
 
     def _emit_child_exit() -> None:
         print(f"CHILD_PROCESS_EXIT ts={_utc_now()} pid={child_pid} ppid={os.getppid()}", file=sys.stderr, flush=True)
+        _dump_main_thread_stack(label="child_exit")
         _dump_child_runtime_state(label="atexit")
 
     atexit.register(_emit_child_exit)
@@ -1360,10 +1407,13 @@ def main() -> int:
         payload = {"ok": False, "error": f"{type(exc).__name__}: {exc}"}
         print(f"CHILD_PROCESS_STARTED argv={json.dumps(sys.argv)} cwd={os.getcwd()} pid={os.getpid()}", file=sys.stderr, flush=True)
         _dump_child_runtime_state(label="json_exception_before_write")
+        _dump_main_thread_stack(label="json_exception_before_write")
         print("CHILD_JSON_WRITE_BEGIN", file=sys.stderr, flush=True)
         print(json.dumps(payload, indent=2))
-        print("CHILD_JSON_WRITE_END", file=sys.stderr, flush=True)
+        print(f"CHILD_JSON_WRITE_END ts={_utc_now()} pid={os.getpid()} ppid={os.getppid()}", file=sys.stderr, flush=True)
         _dump_child_runtime_state(label="json_exception_after_write")
+        _dump_main_thread_stack(label="json_exception_after_write")
+        _start_json_watchdog(label="json_exception_after_write")
         return 1
 
     summary["odds_control_plane"] = write_odds_control_plane_snapshot(summary)
@@ -1371,13 +1421,17 @@ def main() -> int:
     print(f"CHILD_PROCESS_STARTED argv={json.dumps(sys.argv)} cwd={os.getcwd()} pid={os.getpid()}", file=sys.stderr, flush=True)
     if args.json:
         _dump_child_runtime_state(label="json_before_write")
+        _dump_main_thread_stack(label="json_before_write")
         print("CHILD_JSON_WRITE_BEGIN", file=sys.stderr, flush=True)
         print(json.dumps(summary, indent=2))
-        print("CHILD_JSON_WRITE_END", file=sys.stderr, flush=True)
+        print(f"CHILD_JSON_WRITE_END ts={_utc_now()} pid={os.getpid()} ppid={os.getppid()}", file=sys.stderr, flush=True)
         print(f"CHILD_JSON_RETURN ts={_utc_now()} pid={os.getpid()} ppid={os.getppid()}", file=sys.stderr, flush=True)
         _dump_child_runtime_state(label="json_after_write")
+        _dump_main_thread_stack(label="json_after_write")
+        _start_json_watchdog(label="json_after_write")
     else:
         _dump_child_runtime_state(label="non_json_before_write")
+        _dump_main_thread_stack(label="non_json_before_write")
         for sport_result in summary.get("results", []):
             sport = sport_result["sport"]
             status = "ok" if sport_result.get("ok") else "failed"
@@ -1397,8 +1451,10 @@ def main() -> int:
                 print(f"  - mirror: {marker}")
 
         _dump_child_runtime_state(label="non_json_after_write")
+        _dump_main_thread_stack(label="non_json_after_write")
 
     print(f"MAIN_RETURN ts={_utc_now()} pid={os.getpid()} ppid={os.getppid()}", file=sys.stderr, flush=True)
+    _dump_main_thread_stack(label="main_return")
     return 0 if summary.get("ok") else 1
 
 
