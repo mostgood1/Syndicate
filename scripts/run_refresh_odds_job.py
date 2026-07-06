@@ -69,6 +69,7 @@ def _update_job_status(
     started_at: str | None = None,
     finished_at: str | None = None,
     command: list[str] | None = None,
+    extra: dict[str, Any] | None = None,
 ) -> None:
     store = _refresh_state_store()
     write_json_file = store["write_json_file"]
@@ -87,6 +88,8 @@ def _update_job_status(
         payload["exitCode"] = int(exit_code)
     if command is not None:
         payload["command"] = [str(part) for part in command]
+    if extra:
+        payload.update(extra)
     write_json_file(status_path, payload)
 
 
@@ -113,12 +116,40 @@ def _safe_write_json(path: Path, payload: dict[str, Any]) -> None:
         pass
 
 
-def _wait_for_child_process(process: subprocess.Popen[str], *, timeout_seconds: int = 5) -> tuple[str, str, int]:
+def _wait_for_child_process(
+    process: subprocess.Popen[str],
+    *,
+    timeout_seconds: int = 5,
+    status_path: Path,
+    manifest_path: Path,
+    latest_path: Path,
+    run_summary_path: Path,
+    started_at: str,
+    command: list[str],
+) -> tuple[str, str, int]:
     stdout_chunks: list[str] = []
     stderr_chunks: list[str] = []
+    wait_started_at = _utc_now()
     print(
         f"WRAPPER_WAIT_BEGIN pid={int(process.pid)} poll={process.poll()} returncode={process.returncode}",
         flush=True,
+    )
+    _update_job_status(
+        status_path=status_path,
+        manifest_path=manifest_path,
+        latest_path=latest_path,
+        run_summary_path=run_summary_path,
+        state="running",
+        started_at=started_at,
+        command=command,
+        extra={
+            "waitState": "waiting",
+            "waitStartedAt": wait_started_at,
+            "waitTimeoutSeconds": timeout_seconds,
+            "childPid": int(process.pid),
+            "childPoll": process.poll(),
+            "childReturnCode": process.returncode,
+        },
     )
     while True:
         try:
@@ -129,6 +160,23 @@ def _wait_for_child_process(process: subprocess.Popen[str], *, timeout_seconds: 
                 f"WRAPPER_WAIT_END pid={int(process.pid)} poll={process.poll()} returncode={process.returncode}",
                 flush=True,
             )
+            _update_job_status(
+                status_path=status_path,
+                manifest_path=manifest_path,
+                latest_path=latest_path,
+                run_summary_path=run_summary_path,
+                state="running",
+                started_at=started_at,
+                command=command,
+                extra={
+                    "waitState": "complete",
+                    "waitFinishedAt": _utc_now(),
+                    "waitTimeoutSeconds": timeout_seconds,
+                    "childPid": int(process.pid),
+                    "childPoll": process.poll(),
+                    "childReturnCode": process.returncode,
+                },
+            )
             return "".join(stdout_chunks), "".join(stderr_chunks), int(process.returncode or 0)
         except subprocess.TimeoutExpired as exc:
             if exc.output:
@@ -138,6 +186,23 @@ def _wait_for_child_process(process: subprocess.Popen[str], *, timeout_seconds: 
             print(
                 f"WRAPPER_WAIT_TICK pid={int(process.pid)} poll={process.poll()} returncode={process.returncode} timeout_seconds={timeout_seconds}",
                 flush=True,
+            )
+            _update_job_status(
+                status_path=status_path,
+                manifest_path=manifest_path,
+                latest_path=latest_path,
+                run_summary_path=run_summary_path,
+                state="running",
+                started_at=started_at,
+                command=command,
+                extra={
+                    "waitState": "waiting",
+                    "waitTickAt": _utc_now(),
+                    "waitTimeoutSeconds": timeout_seconds,
+                    "childPid": int(process.pid),
+                    "childPoll": process.poll(),
+                    "childReturnCode": process.returncode,
+                },
             )
 
 
@@ -218,7 +283,16 @@ def main() -> int:
         print(f"LAUNCH_COMMAND command={json.dumps(command)}", flush=True)
         process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         print(f"LAUNCH_PID pid={int(process.pid)}", flush=True)
-        stdout_text, stderr_text, return_code = _wait_for_child_process(process, timeout_seconds=5)
+        stdout_text, stderr_text, return_code = _wait_for_child_process(
+            process,
+            timeout_seconds=5,
+            status_path=status_path,
+            manifest_path=manifest_path,
+            latest_path=latest_path,
+            run_summary_path=run_summary_path,
+            started_at=started_at,
+            command=command,
+        )
         print(f"RETURN_CODE return_code={return_code}", flush=True)
         print(f"STDOUT_LENGTH length={len(stdout_text)}", flush=True)
         print(f"STDERR_LENGTH length={len(stderr_text)}", flush=True)
