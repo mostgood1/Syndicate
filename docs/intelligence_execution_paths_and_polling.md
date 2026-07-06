@@ -7,6 +7,23 @@ Render deployment note:
 - the `orchestrator-worker` owns the mounted disk and background refresh/write paths
 - the Render Key Value backend remains the shared refresh-state store for both surfaces
 
+## Persistence boundary for intelligence state
+
+The critical write path for worker-owned intelligence state is:
+
+- `IntelligenceStateService._background_loop()` -> `_persist_locked()` -> `write_json_file()` -> Redis/keyvalue backend
+
+Observed failure mode before the reconnect fix:
+
+- `redis.exceptions.ConnectionError: Connection closed by server`
+- The request-path compute had already completed; the failure occurred only while persisting the worker snapshot.
+
+Implication:
+
+- Candidate generation, scoring, ranking, and response assembly were not the controlling defect for this incident.
+- The controlling boundary was the Redis-backed refresh-state writer used by `write_json_file()`.
+- After the fix, the keyvalue client is retried once after cache clear so a closed connection can recover instead of killing the writer thread.
+
 ## Public entrypoints
 
 - [pipeline/intelligence_pipeline.py](../pipeline/intelligence_pipeline.py): `run_intelligence_pipeline()`
@@ -184,6 +201,7 @@ Concurrency:
 
 - [syndicate/templates/intelligence.html](../syndicate/templates/intelligence.html) polls the intelligence query API on an interval and also refreshes on focus and visibility changes.
 - [pipeline/intelligence_state.py](../pipeline/intelligence_state.py) runs `IntelligenceStateService._background_loop()` which now routes work through `run_routed_intelligence_pipeline()` and persists with `write_latest_intelligence_state()`.
+- The same service also persists request-path worker snapshots through `_persist_locked()`, which depends on `write_json_file()` in [syndicate/features/shared/refresh_state_store.py](../syndicate/features/shared/refresh_state_store.py).
 - [scripts/run_refresh_worker.py](../scripts/run_refresh_worker.py) runs a separate forever refresh loop.
 - [syndicate/app.py](../syndicate/app.py) can optionally start `start_intelligence_state_background_loop(app)`.
 

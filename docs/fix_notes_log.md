@@ -1,5 +1,12 @@
 # Fix Notes Log
 
+## 2026-07-05 - Intelligence state persistence retried Redis writes after connection close
+- Symptom: Render intelligence compute completed, but the background writer thread crashed in `_background_loop()` while persisting the latest state.
+- Root cause: `write_json_file()` used a cached Redis/keyvalue client for the refresh-state backend, and the connection could close server-side before `_persist_locked()` finished writing `query_state_cache.json`.
+- Fix: Add a reconnect-and-retry wrapper around keyvalue reads and writes in `syndicate/features/shared/refresh_state_store.py`, and clear the cached client when Redis raises `ConnectionError`.
+- Validation: `pipeline/intelligence_state.py` and `syndicate/features/shared/refresh_state_store.py` both passed syntax checks after the fix.
+- Follow-up: Recheck Render logs for `COMPUTE_RESPONSE PRE_PERSIST` / `POST_PERSIST` and confirm the background loop no longer dies on Redis connection closure.
+
 ## 2026-07-05 - Intelligence page stopped hard-failing when refresh queueing was unavailable
 - Symptom: The `/intelligence` request path could turn a refresh-state backend failure into a 500/502 instead of rendering the cached or empty board shell.
 - Root cause: The route caught exceptions around the initial read path but immediately retried `queue_intelligence_state_refresh(...)`, so a storage/backend failure could escape the handler.

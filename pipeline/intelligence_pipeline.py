@@ -1068,6 +1068,14 @@ def _call_intelligence(normalized_request: IntelligencePipelineRequest, context:
             print("Invalid raw_response - using fallback")
             raw_response = {}
 
+        _log_json_event(
+            "intelligence_call_returned",
+            response_type=type(raw_response).__name__,
+            response_keys=sorted(raw_response.keys())[:20] if isinstance(raw_response, dict) else [],
+            recommendation_count=len(raw_response.get("recommendations") or []) if isinstance(raw_response, dict) else 0,
+            parlay_count=len(raw_response.get("parlays") or []) if isinstance(raw_response, dict) else 0,
+        )
+
     except Exception as e:
         print("intelligence_call failed:", e)
 
@@ -1109,6 +1117,13 @@ def _call_intelligence(normalized_request: IntelligencePipelineRequest, context:
     raw_response.setdefault("supporting_evidence", [])
     raw_response.setdefault("evaluation_record", {})
 
+    _log_json_event(
+        "post_processing_input_ready",
+        recommendation_count=len(raw_response.get("recommendations") or []),
+        parlay_count=len(raw_response.get("parlays") or []),
+        evidence_count=len(raw_response.get("evidence") or []),
+    )
+
     print("STEP: post_processing")
 
 
@@ -1126,12 +1141,26 @@ def _call_intelligence(normalized_request: IntelligencePipelineRequest, context:
         ),
     )
 
+    _log_json_event(
+        "post_processing_stage_complete",
+        stage="post_processing",
+        recommendation_count=len(result.recommendations or []),
+        evidence_count=len(result.evidence or []),
+    )
+
     result = _time_stage(
         "post_processing_evidence",
         attach_evidence,
         result,
         raw_response,
         selected_date=normalized_request.selected_date,
+    )
+
+    _log_json_event(
+        "post_processing_stage_complete",
+        stage="post_processing_evidence",
+        recommendation_count=len(result.recommendations or []),
+        evidence_count=len(result.evidence or []),
     )
 
     
@@ -1147,6 +1176,13 @@ def _call_intelligence(normalized_request: IntelligencePipelineRequest, context:
         _build_structured_response,
         result,
         context
+    )
+
+    _log_json_event(
+        "post_processing_stage_complete",
+        stage="post_processing_structured_response",
+        recommendation_count=len(result.recommendations or []),
+        structured_response_keys=sorted(structured_response.keys())[:20] if isinstance(structured_response, dict) else [],
     )
 
     if reasoning_steps:
@@ -1170,6 +1206,13 @@ def _call_intelligence(normalized_request: IntelligencePipelineRequest, context:
             response=result.to_dict(),
         )
         result = replace(result, evaluation_record=evaluation_record, structured_response={**structured_response, "evaluation_history": evaluation_record.get("history", {})})
+
+        _log_json_event(
+            "post_processing_stage_complete",
+            stage="evaluation_record_build",
+            recommendation_count=len(result.recommendations or []),
+            evaluation_history_keys=sorted(evaluation_record.keys())[:20] if isinstance(evaluation_record, dict) else [],
+        )
 
     return result
 
