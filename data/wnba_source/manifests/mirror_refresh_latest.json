@@ -1,7 +1,7 @@
 ﻿{
     "sport":  "wnba",
     "date":  "2026-07-06",
-    "refreshedAtUtc":  "2026-07-06T04:13:12.3144894Z",
+    "refreshedAtUtc":  "2026-07-06T07:53:22.5059379Z",
     "sourceRepo":  "D:\\a\\Syndicate\\Syndicate\\",
     "sourceArtifactRoot":  "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts",
     "sourceRootEnvVar":  "SYNDICATE_SOURCE_ROOT_WNBA",
@@ -9,10 +9,10 @@
     "destinationRoot":  "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source",
     "usedExistingMirrorArtifacts":  false,
     "usedArtifactBundle":  true,
-    "copiedArtifactCount":  23,
+    "copiedArtifactCount":  24,
     "artifactGroups":  {
                            "processed":  16,
-                           "live_lens":  6,
+                           "live_lens":  7,
                            "raw":  1,
                            "other":  0
                        },
@@ -38,6 +38,7 @@
                             "live_snapshots\\live_state_2026-07-06.jsonl",
                             "live_snapshots\\live_pbp_stats_2026-07-06.jsonl",
                             "live_snapshots\\live_lines_2026-07-06.jsonl",
+                            "live_snapshots\\live_player_boxscore_2026-07-06.jsonl",
                             "live_snapshots\\live_player_lens_2026-07-06.jsonl",
                             "raw\\odds_wnba_player_props_2026-07-06.csv"
                         ]
