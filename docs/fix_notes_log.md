@@ -1,5 +1,12 @@
 # Fix Notes Log
 
+## 2026-07-06 - Odds refresh now queues an intelligence snapshot refresh
+- Symptom: An odds refresh could finish successfully while the persisted intelligence state still lagged behind the freshly computed board.
+- Root cause: The odds-job wrapper returned as soon as the refresh subprocess succeeded, so nothing queued the follow-up intelligence snapshot refresh contract.
+- Fix: After a successful odds refresh, `scripts/run_refresh_odds_job.py` now reads the run summary date and queues `queue_intelligence_state_refresh(...)` with the live board payload, while the existing intelligence state service persists the queued snapshot.
+- Validation: `pytest tests/test_refresh_odds_job.py -q` passed, and the touched Python files were error-free.
+- Follow-up: Keep the generated `reports/*` artifacts out of the commit unless a release explicitly needs them.
+
 ## 2026-07-06 - Intelligence refresh now computes the requested future slate directly
 - Symptom: The betting board refresh path could still return an old empty snapshot even when tomorrow's slate had candidates upstream.
 - Root cause: The query/status refresh flow was reading the persisted snapshot path instead of computing a fresh board for `force_refresh=true`, and two runtime helpers were missing `time`/timed-trace support.
