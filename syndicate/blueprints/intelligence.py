@@ -1164,60 +1164,20 @@ def run_intelligence():
 
 @intelligence_bp.get("/api/intelligence/status")
 def intelligence_status_api():
-    request_started_at = time.time()
-    _LOGGER.info("START status route")
-    timings: dict[str, Any] = {}
     selected_date = str(request.args.get("date") or "").strip() or central_today_iso()
     refresh_requested = str(request.args.get("refresh") or request.args.get("force_refresh") or "").strip().lower() in {"1", "true", "yes", "on"}
     status_payload = _intelligence_page_payload(selected_date, force_refresh=False)
-    _log_intelligence_timing(
-        "status_route_entered",
-        request_started_at,
-        selected_date=selected_date,
-        refresh_requested=refresh_requested,
-    )
     stale_snapshot = False
     if not refresh_requested:
-        snapshot_started_at = time.time()
-        _LOGGER.info("before read_latest_intelligence_state")
         current_snapshot = read_latest_intelligence_state(dict(status_payload))
-        _LOGGER.info("after read_latest_intelligence_state")
-        timings["initial_read_ms"] = round((time.time() - snapshot_started_at) * 1000.0, 3)
-        _log_intelligence_timing(
-            "status_route_initial_read",
-            snapshot_started_at,
-            has_snapshot=isinstance(current_snapshot, dict),
-            snapshot_candidate_count=_response_candidate_count(current_snapshot) if isinstance(current_snapshot, dict) else 0,
-        )
         stale_snapshot = bool(_response_selected_date(current_snapshot) and _response_selected_date(current_snapshot) != selected_date)
     if refresh_requested:
-        refresh_started_at = time.time()
-        _LOGGER.info("before _safe_queue_intelligence_state_refresh")
         _safe_queue_intelligence_state_refresh(_intelligence_page_payload(selected_date, force_refresh=True))
-        _LOGGER.info("after _safe_queue_intelligence_state_refresh")
-        timings["refresh_queue_ms"] = round((time.time() - refresh_started_at) * 1000.0, 3)
-        _log_intelligence_timing("status_route_refresh_queue", refresh_started_at, reason="refresh_requested")
     elif stale_snapshot:
-        refresh_started_at = time.time()
-        _LOGGER.info("before _safe_queue_intelligence_state_refresh")
         _safe_queue_intelligence_state_refresh(_intelligence_page_payload(selected_date, force_refresh=True))
-        _LOGGER.info("after _safe_queue_intelligence_state_refresh")
-        timings["refresh_queue_ms"] = round((time.time() - refresh_started_at) * 1000.0, 3)
-        _log_intelligence_timing("status_route_refresh_queue", refresh_started_at, reason="stale_snapshot")
-    read_started_at = time.time()
-    _LOGGER.info("before read_latest_intelligence_state")
     status = read_latest_intelligence_state(dict(status_payload))
-    _LOGGER.info("after read_latest_intelligence_state")
-    timings["final_read_ms"] = round((time.time() - read_started_at) * 1000.0, 3)
-    _log_intelligence_timing(
-        "status_route_final_read",
-        read_started_at,
-        has_snapshot=isinstance(status, dict),
-        snapshot_candidate_count=_response_candidate_count(status) if isinstance(status, dict) else 0,
-    )
     if not (isinstance(status, dict) and _response_has_content(status)):
         status = _empty_default_intelligence_response()
-    _log_api_state_read(status if isinstance(status, dict) else {})
     state_snapshot = dict(status)
     response_payload = {"ok": True, "status": state_snapshot}
     if isinstance(status, dict) and _response_has_content(status):
@@ -1226,15 +1186,6 @@ def intelligence_status_api():
                 continue
             response_payload[key] = normalize_timestamped_payload(value)
     response_payload.update(_debug_state_fields(state_snapshot, source="snapshot_read"))
-    timings["total_ms"] = round((time.time() - request_started_at) * 1000.0, 3)
-    response_payload["timings"] = timings
-    _LOGGER.info("before return")
-    _log_intelligence_timing(
-        "status_route_response_ready",
-        request_started_at,
-        total_snapshot_candidate_count=_response_candidate_count(status) if isinstance(status, dict) else 0,
-        timings=timings,
-    )
     return _no_cache_response(jsonify(response_payload))
 
 

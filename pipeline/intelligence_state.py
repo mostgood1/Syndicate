@@ -1345,10 +1345,6 @@ class IntelligenceStateService:
                     continue
             if payload_to_process is None:
                 continue
-            logger.info(
-                "BACKGROUND_LOOP_ITERATION",
-                extra={"elapsed_ms": round((time.time() - loop_started_at) * 1000.0, 3)},
-            )
             guard_acquired = False
             run_started_at = time.time()
             try:
@@ -1361,24 +1357,14 @@ class IntelligenceStateService:
                         self._condition.wait(timeout=min(1.0, float(self._interval_seconds)))
                     continue
                 logger.info("WORKER RUN", extra={"payload_key": _payload_key(payload_to_process)})
-                logger.info(
-                    "BACKGROUND_LOOP_PRE_COMPUTE",
-                    extra={"elapsed_ms": round((time.time() - iteration_started_at) * 1000.0, 3)},
-                )
+                logger.info("BACKGROUND_LOOP_PRE_QUERY", extra={"elapsed_ms": round((time.time() - iteration_started_at) * 1000.0, 3)})
                 state = run_routed_intelligence_pipeline(payload_to_process)
-                logger.info(
-                    "BACKGROUND_LOOP_POST_COMPUTE",
-                    extra={"elapsed_ms": round((time.time() - iteration_started_at) * 1000.0, 3)},
-                )
-                logger.info(
-                    "BACKGROUND_LOOP_PRE_PERSIST",
-                    extra={"elapsed_ms": round((time.time() - iteration_started_at) * 1000.0, 3)},
-                )
+                logger.info("BACKGROUND_LOOP_POST_QUERY", extra={"elapsed_ms": round((time.time() - iteration_started_at) * 1000.0, 3)})
+                logger.info("BACKGROUND_LOOP_PRE_REASONING", extra={"elapsed_ms": round((time.time() - iteration_started_at) * 1000.0, 3)})
+                logger.info("BACKGROUND_LOOP_POST_REASONING", extra={"elapsed_ms": round((time.time() - iteration_started_at) * 1000.0, 3)})
+                logger.info("BACKGROUND_LOOP_PRE_PERSIST", extra={"elapsed_ms": round((time.time() - iteration_started_at) * 1000.0, 3)})
                 written_state = write_latest_intelligence_state(state)
-                logger.info(
-                    "BACKGROUND_LOOP_POST_PERSIST",
-                    extra={"elapsed_ms": round((time.time() - iteration_started_at) * 1000.0, 3)},
-                )
+                logger.info("BACKGROUND_LOOP_POST_PERSIST", extra={"elapsed_ms": round((time.time() - iteration_started_at) * 1000.0, 3)})
                 if written_state is None:
                     response = {
                         "ok": False,
@@ -1688,11 +1674,7 @@ def get_intelligence_state_response(payload: dict[str, Any], *, refresh: bool = 
 
 
 def compute_intelligence_state_response(payload: dict[str, Any], *, force_refresh: bool = True) -> dict[str, Any] | None:
-    started_at = time.time()
-    logger.info("before _compute_response")
-    response = _INTELLIGENCE_STATE_SERVICE._compute_response(payload, force_refresh=force_refresh)
-    logger.info("after _compute_response", extra={"elapsed_ms": round((time.time() - started_at) * 1000.0, 3)})
-    return response
+    return _INTELLIGENCE_STATE_SERVICE._compute_response(payload, force_refresh=force_refresh)
 
 
 def read_latest_intelligence_state_response(
