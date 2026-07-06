@@ -28,6 +28,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Sequence
 
+try:
+    import psutil
+except Exception:  # pragma: no cover - psutil is optional in local test environments
+    psutil = None
+
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 WORKSPACE_ROOT = REPO_ROOT.parent
@@ -82,12 +87,43 @@ def _utc_now() -> str:
 
 
 def _dump_child_runtime_state(*, label: str) -> None:
-    print(f"[refresh_odds_sources] RUNTIME_SNAPSHOT label={label} ts={_utc_now()} pid={os.getpid()} ppid={os.getppid()}", file=sys.stderr, flush=True)
+    current_process = None
+    child_processes: list[dict[str, Any]] = []
+    if psutil is not None:
+        try:
+            current_process = psutil.Process()
+            for child in current_process.children(recursive=True):
+                try:
+                    child_processes.append(
+                        {
+                            "pid": child.pid,
+                            "ppid": child.ppid(),
+                            "name": child.name(),
+                            "status": child.status(),
+                            "cmdline": child.cmdline(),
+                        }
+                    )
+                except Exception as child_exc:
+                    child_processes.append({"pid": child.pid, "error": f"{type(child_exc).__name__}: {child_exc}"})
+        except Exception as exc:
+            child_processes.append({"error": f"{type(exc).__name__}: {exc}"})
+
+    threads = enumerate_threads()
+    thread_snapshot = [
+        {
+            "name": thread.name,
+            "daemon": thread.daemon,
+            "alive": thread.is_alive(),
+        }
+        for thread in threads
+    ]
     print(
-        f"[refresh_odds_sources] THREADS label={label} active={len(enumerate_threads())} names={[thread.name for thread in enumerate_threads()]}",
+        f"[refresh_odds_sources] RUNTIME_SNAPSHOT label={label} ts={_utc_now()} pid={os.getpid()} ppid={os.getppid()} child_count={len(child_processes)}",
         file=sys.stderr,
         flush=True,
     )
+    print(f"[refresh_odds_sources] THREADS label={label} data={json.dumps(thread_snapshot, default=str)}", file=sys.stderr, flush=True)
+    print(f"[refresh_odds_sources] CHILD_PROCESSES label={label} data={json.dumps(child_processes, default=str)}", file=sys.stderr, flush=True)
 
 
 def _source_root_env_var(slug: str) -> str:
@@ -1338,6 +1374,7 @@ def main() -> int:
         print("CHILD_JSON_WRITE_BEGIN", file=sys.stderr, flush=True)
         print(json.dumps(summary, indent=2))
         print("CHILD_JSON_WRITE_END", file=sys.stderr, flush=True)
+        print(f"CHILD_JSON_RETURN ts={_utc_now()} pid={os.getpid()} ppid={os.getppid()}", file=sys.stderr, flush=True)
         _dump_child_runtime_state(label="json_after_write")
     else:
         _dump_child_runtime_state(label="non_json_before_write")
@@ -1361,6 +1398,7 @@ def main() -> int:
 
         _dump_child_runtime_state(label="non_json_after_write")
 
+    print(f"MAIN_RETURN ts={_utc_now()} pid={os.getpid()} ppid={os.getppid()}", file=sys.stderr, flush=True)
     return 0 if summary.get("ok") else 1
 
 
