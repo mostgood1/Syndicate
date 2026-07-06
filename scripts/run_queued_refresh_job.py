@@ -149,6 +149,10 @@ def _build_wrapper_command(contract: dict[str, Any]) -> list[str]:
     ]
 
 
+def _contract_id(contract: dict[str, Any]) -> str:
+    return str(contract.get("runStamp") or contract.get("date") or contract.get("kind") or "unknown").strip() or "unknown"
+
+
 def _mark_wrapper_failure(*, contract: dict[str, Any], error_message: str, trace_text: str) -> None:
     finished_at = _utc_now()
     manifest_path = Path(str(contract.get("manifestPath") or "").strip())
@@ -205,6 +209,8 @@ def main() -> int:
         latest_manifest_path=latest_manifest_path,
         expected_run_stamp=str(args.run_stamp or "").strip() or None,
     )
+    contract_id = _contract_id(contract)
+    print(f"CONTRACT_CLAIMED contract_id={contract_id} latest_manifest={latest_manifest_path}", flush=True)
     wrapper_command = _build_wrapper_command(contract)
 
     if args.dry_run:
@@ -214,6 +220,7 @@ def main() -> int:
     try:
         print(f"[queue_runner] launching refresh job: {json.dumps(wrapper_command)}", flush=True)
         result = subprocess.run(wrapper_command)
+        print(f"CONTRACT_EXECUTED contract_id={contract_id} return_code={result.returncode}", flush=True)
         print(f"[queue_runner] return code: {result.returncode}", flush=True)
         return int(result.returncode)
     except Exception as exc:

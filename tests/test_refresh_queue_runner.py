@@ -234,7 +234,7 @@ class RefreshQueueRunnerTests(unittest.TestCase):
                 module.subprocess,
                 "run",
                 return_value=subprocess.CompletedProcess(args=["python"], returncode=0),
-            ) as mocked_run:
+            ) as mocked_run, patch.object(module, "print") as mocked_print:
                 exit_code = module.main()
 
             self.assertEqual(exit_code, 0)
@@ -242,6 +242,9 @@ class RefreshQueueRunnerTests(unittest.TestCase):
             called_command = mocked_run.call_args.args[0]
             self.assertIn(str(repo_root / "scripts" / "run_refresh_odds_job.py"), called_command)
             self.assertIn("--manifest-path", called_command)
+            printed = " ".join(" ".join(str(part) for part in call.args) for call in mocked_print.call_args_list)
+            self.assertIn("CONTRACT_CLAIMED", printed)
+            self.assertIn("CONTRACT_EXECUTED", printed)
 
     def test_main_writes_failure_artifacts_when_wrapper_launch_fails(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]

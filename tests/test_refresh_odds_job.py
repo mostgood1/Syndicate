@@ -63,7 +63,7 @@ class RefreshOddsJobTests(unittest.TestCase):
                 module.subprocess,
                 "run",
                 return_value=subprocess.CompletedProcess(args=["python"], returncode=0, stdout="ok\n", stderr=""),
-            ):
+            ), patch.object(module, "print") as mocked_print:
                 exit_code = module.main()
 
             self.assertEqual(exit_code, 0)
@@ -73,6 +73,9 @@ class RefreshOddsJobTests(unittest.TestCase):
             self.assertIn("startedAt", status_payload)
             self.assertIn("finishedAt", status_payload)
             self.assertEqual(status_payload["manifestPath"], str(manifest_path))
+            printed = " ".join(" ".join(str(part) for part in call.args) for call in mocked_print.call_args_list)
+            self.assertIn("SNAPSHOT_WRITTEN", printed)
+            self.assertIn("ODDS_REFRESH_SUCCESS", printed)
 
     def test_main_queues_intelligence_refresh_after_success(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]
@@ -121,7 +124,7 @@ class RefreshOddsJobTests(unittest.TestCase):
                 module,
                 "_queue_intelligence_snapshot_refresh",
                 return_value=("queued-key", {"date": "2026-07-06", "force_refresh": True}),
-            ) as mocked_queue:
+            ) as mocked_queue, patch.object(module, "print") as mocked_print:
                 exit_code = module.main()
 
             self.assertEqual(exit_code, 0)
@@ -130,6 +133,8 @@ class RefreshOddsJobTests(unittest.TestCase):
             self.assertEqual(str(queued_args["run_summary_path"]), str(run_summary_path))
             status_payload = json.loads(status_path.read_text(encoding="utf-8"))
             self.assertEqual(status_payload["state"], "finished")
+            printed = " ".join(" ".join(str(part) for part in call.args) for call in mocked_print.call_args_list)
+            self.assertIn("INTELLIGENCE_REFRESH_ENQUEUED", printed)
 
     def test_main_writes_failure_payload_when_command_cannot_start(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]

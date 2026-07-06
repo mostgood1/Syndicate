@@ -265,6 +265,7 @@ def main() -> int:
         if stdout_text.strip() and not stdout_payload:
             failure_payload["stdout"] = stdout_text
         _safe_write_json(stdout_path, failure_payload)
+    print(f"SNAPSHOT_WRITTEN path={stdout_path} ok={return_code == 0}", flush=True)
     _safe_write_text(stderr_path, stderr_text)
     _update_state(
         manifest_path=manifest_path,
@@ -285,12 +286,13 @@ def main() -> int:
         command=command,
     )
     if return_code == 0:
+        print(f"ODDS_REFRESH_SUCCESS manifest={manifest_path} latest={latest_path}", flush=True)
         try:
             queued = _queue_intelligence_snapshot_refresh(run_summary_path=run_summary_path)
             if queued is not None:
                 queued_key, queued_payload = queued
                 print(
-                    f"[refresh_job_intelligence_refresh_queued] key={queued_key} date={queued_payload.get('date')}",
+                    f"INTELLIGENCE_REFRESH_ENQUEUED key={queued_key} date={queued_payload.get('date')}",
                     flush=True,
                 )
         except Exception:
