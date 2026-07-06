@@ -71,6 +71,13 @@ def _env_int(name: str, default: int) -> int:
         return int(default)
 
 
+def _env_bool(name: str, default: bool = False) -> bool:
+    raw = str(os.environ.get(name) or "").strip().lower()
+    if not raw:
+        return bool(default)
+    return raw in {"1", "true", "t", "yes", "y", "on"}
+
+
 def _stable_payload(payload: dict[str, Any]) -> dict[str, Any]:
     normalized = dict(payload)
     normalized.pop("user_profile", None)
@@ -1490,6 +1497,7 @@ class IntelligenceStateService:
             response = _promote_board_contract_cards(response)
             _log_stage_timing("response_building", (time.perf_counter() - response_build_started_at) * 1000.0)
             response = _decorate_response_with_state_meta(dict(response), None, source="worker", run_key=cache_key, sla_seconds=self._interval_seconds) or dict(response)
+            persist_on_request_path = not _env_bool("SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP", default=False)
             with self._condition:
                 snapshot = IntelligenceSnapshot(
                     key=cache_key,
@@ -1503,9 +1511,12 @@ class IntelligenceStateService:
                 self._latest_key = snapshot.key
                 self._last_run_finished_at = time.time()
                 self._trim_ordered_dict(self._snapshots, self._max_snapshots)
-                logger.info("COMPUTE_RESPONSE PRE_PERSIST", extra={"candidate_count": response_candidate_count})
-                self._persist_locked()
-                logger.info("COMPUTE_RESPONSE POST_PERSIST", extra={"candidate_count": response_candidate_count})
+                if persist_on_request_path:
+                    logger.info("COMPUTE_RESPONSE PRE_PERSIST", extra={"candidate_count": response_candidate_count})
+                    self._persist_locked()
+                    logger.info("COMPUTE_RESPONSE POST_PERSIST", extra={"candidate_count": response_candidate_count})
+                else:
+                    logger.info("COMPUTE_RESPONSE PERSIST DEFERRED", extra={"candidate_count": response_candidate_count})
             _log_stage_timing("request_total", (time.perf_counter() - request_started_at) * 1000.0)
             return response
         finally:
