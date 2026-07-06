@@ -1503,7 +1503,9 @@ class IntelligenceStateService:
                 self._latest_key = snapshot.key
                 self._last_run_finished_at = time.time()
                 self._trim_ordered_dict(self._snapshots, self._max_snapshots)
+                logger.info("COMPUTE_RESPONSE PRE_PERSIST", extra={"candidate_count": response_candidate_count})
                 self._persist_locked()
+                logger.info("COMPUTE_RESPONSE POST_PERSIST", extra={"candidate_count": response_candidate_count})
             _log_stage_timing("request_total", (time.perf_counter() - request_started_at) * 1000.0)
             return response
         finally:
