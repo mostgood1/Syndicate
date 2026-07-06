@@ -1512,12 +1512,13 @@ class IntelligenceStateService:
                 self._last_run_finished_at = time.time()
                 self._trim_ordered_dict(self._snapshots, self._max_snapshots)
                 if persist_on_request_path:
-                    logger.info("COMPUTE_RESPONSE PRE_PERSIST", extra={"candidate_count": response_candidate_count})
+                    logger.info("before _persist_locked", extra={"candidate_count": response_candidate_count})
                     self._persist_locked()
-                    logger.info("COMPUTE_RESPONSE POST_PERSIST", extra={"candidate_count": response_candidate_count})
+                    logger.info("after _persist_locked", extra={"candidate_count": response_candidate_count})
                 else:
                     logger.info("COMPUTE_RESPONSE PERSIST DEFERRED", extra={"candidate_count": response_candidate_count})
             _log_stage_timing("request_total", (time.perf_counter() - request_started_at) * 1000.0)
+            logger.info("before return", extra={"candidate_count": response_candidate_count})
             return response
         finally:
             if guard_acquired:
@@ -1664,7 +1665,11 @@ def get_intelligence_state_response(payload: dict[str, Any], *, refresh: bool = 
 
 
 def compute_intelligence_state_response(payload: dict[str, Any], *, force_refresh: bool = True) -> dict[str, Any] | None:
-    return _INTELLIGENCE_STATE_SERVICE._compute_response(payload, force_refresh=force_refresh)
+    started_at = time.time()
+    logger.info("before _compute_response")
+    response = _INTELLIGENCE_STATE_SERVICE._compute_response(payload, force_refresh=force_refresh)
+    logger.info("after _compute_response", extra={"elapsed_ms": round((time.time() - started_at) * 1000.0, 3)})
+    return response
 
 
 def read_latest_intelligence_state_response(
