@@ -1,0 +1,134 @@
+{
+  "date": "2026-07-06",
+  "data": [
+    {
+      "game_key": "GSV@WSH",
+      "game_id": "01fbe348b23c9f547e63ce18ccf0888db",
+      "player": "Kayla Thornton",
+      "team": "GSV",
+      "team_tricode": "GSV",
+      "opponent": "WSH",
+      "score": 24.63378512409733,
+      "score_adj": 24.63378512409733,
+      "tier": "High",
+      "model": {
+        "pts": 9.030699999999998,
+        "reb": 3.989933333333333,
+        "ast": 0.2974666666666666,
+        "threes": 0.9764666666666666,
+        "stl": 0.6004364666666666,
+        "blk": 0.4912661999999999,
+        "tov": 1.637554,
+        "pra": 13.318099999999998,
+        "pr": 13.02063333333333,
+        "pa": 9.328166666666664,
+        "ra": 4.2874
+      },
+      "top_play": {
+        "market": "threes",
+        "side": "UNDER",
+        "line": 1.5,
+        "price": -128.0,
+        "edge": 0.13829493403002013,
+        "ev": 0.2463378512409733,
+        "ev_pct": 24.63378512409733,
+        "book": "fanduel",
+        "p_win": 0.8077413600129031,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 24.6%",
+        "Regular price range (-150 to +150)",
+        "Consensus: 4 books aligned",
+        "Best line available"
+      ],
+      "basketball_summary": "model 1.0 vs line 1.5 (-0.5)"
+    },
+    {
+      "game_key": "GSV@WSH",
+      "game_id": "01fbe348b23c9f547e63ce18ccf0888db",
+      "player": "Gabby Williams",
+      "team": "GSV",
+      "team_tricode": "GSV",
+      "opponent": "WSH",
+      "score": 24.382830511639042,
+      "score_adj": 24.382830511639042,
+      "tier": "High",
+      "model": {
+        "pts": 11.3684,
+        "reb": 2.4832,
+        "ast": 2.321533333333333,
+        "threes": 1.8818,
+        "stl": 0.5193444666666667,
+        "blk": 0.4249181999999999,
+        "tov": 1.416394,
+        "pra": 16.173133333333332,
+        "pr": 13.8516,
+        "pa": 13.689933333333332,
+        "ra": 4.804733333333333
+      },
+      "top_play": {
+        "market": "threes",
+        "side": "OVER",
+        "line": 1.5,
+        "price": -109.0,
+        "edge": 0.12716404429515105,
+        "ev": 0.24382830511639042,
+        "ev_pct": 24.382830511639042,
+        "book": "betonlineag",
+        "p_win": 0.7653594055948593,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 24.4%",
+        "Regular price range (-150 to +150)",
+        "Consensus: 4 books aligned",
+        "Best line available"
+      ],
+      "basketball_summary": "model 1.9 vs line 1.5 (+0.4)"
+    },
+    {
+      "game_key": "GSV@WSH",
+      "game_id": "01fbe348b23c9f547e63ce18ccf0888db",
+      "player": "Janelle Salaun",
+      "team": "GSV",
+      "team_tricode": "GSV",
+      "opponent": "WSH",
+      "score": 12.554047319739524,
+      "score_adj": 12.554047319739524,
+      "tier": "High",
+      "model": {
+        "pts": 9.030699999999998,
+        "reb": 2.5672666666666664,
+        "ast": 0.4979333333333333,
+        "threes": 1.4938,
+        "stl": 0.4617976,
+        "blk": 0.3778343999999999,
+        "tov": 1.259448,
+        "pra": 12.0959,
+        "pr": 11.597966666666665,
+        "pa": 9.528633333333332,
+        "ra": 3.0651999999999995
+      },
+      "top_play": {
+        "market": "threes",
+        "side": "UNDER",
+        "line": 1.5,
+        "price": 124.0,
+        "edge": 0.05604485410597998,
+        "ev": 0.12554047319739525,
+        "ev_pct": 12.554047319739524,
+        "book": "draftkings",
+        "p_win": 0.5719690446259666,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 12.6%",
+        "Regular price range (-150 to +150)",
+        "Consensus: 4 books aligned",
+        "Best line available"
+      ],
+      "basketball_summary": "model 1.5 vs line 1.5 (-0.0)"
+    }
+  ]
+}

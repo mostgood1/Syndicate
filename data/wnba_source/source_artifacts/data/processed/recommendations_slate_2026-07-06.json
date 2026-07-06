@@ -1,0 +1,73 @@
+{
+  "date": "2026-07-06",
+  "counts": {
+    "games": 1,
+    "picks": 3
+  },
+  "per_game": [
+    {
+      "home": "WSH",
+      "away": "GSV",
+      "matchup": "GSV @ WSH",
+      "picks": [
+        {
+          "market": "PROPS",
+          "team": "WSH",
+          "display_pick": "Shakira Austin UNDER 8.5",
+          "selection": "UNDER 8.5",
+          "price": -139.0,
+          "score": 8.932013421624452,
+          "ev_pct": 8.932013421624452,
+          "win_prob": 0.5815899581589958,
+          "p_win": 0.5815899581589958,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 8.9%",
+            "Regular price range (-150 to +150)",
+            "Consensus: 3 books aligned",
+            "Best line available"
+          ],
+          "matchup": "GSV @ WSH"
+        },
+        {
+          "market": "PROPS",
+          "team": "WSH",
+          "display_pick": "Sonia Citron OVER 3.5",
+          "selection": "OVER 3.5",
+          "price": 122.0,
+          "score": 7.620357191193039,
+          "ev_pct": 7.620357191193039,
+          "win_prob": 0.45045045045045046,
+          "p_win": 0.45045045045045046,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 7.6%",
+            "Regular price range (-150 to +150)",
+            "Consensus: 4 books aligned",
+            "Best line available"
+          ],
+          "matchup": "GSV @ WSH"
+        },
+        {
+          "market": "PROPS",
+          "team": "WSH",
+          "display_pick": "Kiki Iriafen UNDER 9.5",
+          "selection": "UNDER 9.5",
+          "price": -136.0,
+          "score": 1.0910925072020072,
+          "ev_pct": 1.0910925072020072,
+          "win_prob": 0.576271186440678,
+          "p_win": 0.576271186440678,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 1.1%",
+            "Regular price range (-150 to +150)",
+            "Consensus: 3 books aligned",
+            "Best line available"
+          ],
+          "matchup": "GSV @ WSH"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,46 @@
+{
+  "date": "2026-07-07",
+  "season": 2026,
+  "generated_at": "2026-07-06T04:04:04.133818",
+  "tool": "tools/daily_update_multi_profile.py",
+  "locked": true,
+  "source_profile": "game_recos",
+  "source_sim_dir": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-07-07",
+  "thresholds": {
+    "nrfi_min_prob": 0.55,
+    "nrfi_max_mean_runs": 0.8,
+    "yrfi_max_nrfi_prob": 0.5,
+    "yrfi_min_mean_runs": 0.95,
+    "yrfi_min_side_lead_prob": 0.24
+  },
+  "counts": {
+    "rows": 1,
+    "games": 1
+  },
+  "signals": [
+    {
+      "game_pk": 822881,
+      "date": "2026-07-07",
+      "away": "Los Angeles Angels",
+      "home": "Texas Rangers",
+      "away_abbr": "LAA",
+      "home_abbr": "TEX",
+      "away_team_id": 108,
+      "home_team_id": 140,
+      "starter_names": {
+        "away": "Jos\u00e9 Soriano",
+        "home": "Jacob deGrom"
+      },
+      "signal": {
+        "label": "F1 NRFI",
+        "tone": "nrfi",
+        "summary": "0-run sim 59.6% | F1 mean 0.79",
+        "detail": "Season filter qualified: simulated scoreless first inning 59.6% with only 0.79 expected runs in the opening frame.",
+        "nrfiProb": 0.596,
+        "yrfiProb": 0.404,
+        "meanTotalRuns": 0.791,
+        "maxSideLeadProb": 0.21
+      }
+    }
+  ]
+}

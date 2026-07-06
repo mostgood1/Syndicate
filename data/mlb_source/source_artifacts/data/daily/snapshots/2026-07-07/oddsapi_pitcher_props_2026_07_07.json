@@ -1,0 +1,23 @@
+{
+  "date": "2026-07-07",
+  "mode": "live",
+  "retrieved_at": "2026-07-06T04:01:10.131627",
+  "pitcher_props": {},
+  "meta": {
+    "markets": [
+      "pitcher_strikeouts",
+      "pitcher_outs",
+      "pitcher_hits_allowed",
+      "pitcher_walks",
+      "pitcher_earned_runs"
+    ],
+    "regions": "us",
+    "bookmakers": null,
+    "counts": {
+      "players": 0,
+      "markets": {},
+      "events_matched": 0
+    },
+    "warnings": []
+  }
+}
