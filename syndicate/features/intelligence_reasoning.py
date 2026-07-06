@@ -221,6 +221,7 @@ def build_analysis_brief(
     safe_text: Callable[[Any, str], str],
     humanize_signal_key: Callable[[str], str],
 ) -> dict[str, Any] | None:
+    reasoning_started_at = time.perf_counter()
     if not recommendations:
         return None
 
@@ -230,6 +231,14 @@ def build_analysis_brief(
 
     _intel_trace(
         "reasoning_input",
+        recommendation_count=len(recommendations),
+        has_analysis_views=bool(analysis_views),
+        has_supporting_evidence=bool(supporting_evidence),
+        focus=str((analysis_views or {}).get("focus") or "").strip().lower() if isinstance(analysis_views, dict) else None,
+    )
+    _intel_trace_timed(
+        "reasoning_input",
+        reasoning_started_at,
         recommendation_count=len(recommendations),
         has_analysis_views=bool(analysis_views),
         has_supporting_evidence=bool(supporting_evidence),
@@ -319,6 +328,12 @@ def build_analysis_brief(
 
     _intel_trace(
         "reasoning_output",
+        section_count=len(sections),
+        top_recommendation=target_name,
+    )
+    _intel_trace_timed(
+        "reasoning_output",
+        reasoning_started_at,
         section_count=len(sections),
         top_recommendation=target_name,
     )

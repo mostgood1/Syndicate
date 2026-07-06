@@ -992,6 +992,7 @@ def adjust_confidence(base_confidence: float, *, records: Iterable[Mapping[str, 
 
 
 def build_intelligence_evaluation_bundle(*, query: Any, response: Any, persist: bool = True, ledger_path: Path | str | None = None) -> dict[str, Any]:
+    evaluation_started_at = time.perf_counter()
     query_payload = _copy_mapping(query)
     response_payload = _copy_mapping(response)
     recommendation_rows = [item for item in response_payload.get("recommendations") or [] if isinstance(item, Mapping)]
@@ -1034,6 +1035,15 @@ def build_intelligence_evaluation_bundle(*, query: Any, response: Any, persist: 
     )
     _intel_trace(
         "evaluation_bundle",
+        recommendation_count=len(recommendation_rows),
+        recommendation_records=len(recommendation_records),
+        portfolio_event_records=len(portfolio_event_records),
+        market_features=len(market_features),
+        history_status=history_summary.get("history_status") if isinstance(history_summary, dict) else None,
+    )
+    _intel_trace_timed(
+        "evaluation_bundle",
+        evaluation_started_at,
         recommendation_count=len(recommendation_rows),
         recommendation_records=len(recommendation_records),
         portfolio_event_records=len(portfolio_event_records),

@@ -6694,6 +6694,14 @@ def run_intelligence_query(
     board_payload = dict(final_response)
     board_payload["board"] = _build_board_dictionary(ranked_recommendations)
     final_response["board_contract"] = build_intelligence_board_contract(board_payload)
+    persist_started_at = time.perf_counter()
+    _intel_trace_timed(
+        "persist_before",
+        persist_started_at,
+        pipeline="run_intelligence_query",
+        recommendation_count=len(recommendations),
+        parlay_count=len(parlays),
+    )
     final_response["evaluation_bundle"] = build_intelligence_evaluation_bundle(
         query={
             "question": question,
@@ -6703,6 +6711,13 @@ def run_intelligence_query(
         },
         response=final_response,
         persist=True,
+    )
+    _intel_trace_timed(
+        "persist_after",
+        persist_started_at,
+        pipeline="run_intelligence_query",
+        recommendation_count=len(recommendations),
+        parlay_count=len(parlays),
     )
     final_response["policy_control"] = dict(final_response.get("evaluation_bundle", {}).get("policy_control") or {})
     final_response["recommendation_history"] = dict(final_response.get("evaluation_bundle", {}).get("history") or {})
