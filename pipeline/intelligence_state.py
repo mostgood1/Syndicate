@@ -419,6 +419,8 @@ def write_latest_intelligence_state(state: Any) -> dict[str, Any] | None:
     if not _is_intelligence_state_payload_valid(normalized):
         logger.info("STATE WRITTEN", extra={"written": False, "candidate_count": 0})
         return None
+    candidate_count = int(normalized.get("candidate_count") or 0)
+    logger.info("INTELLIGENCE STATE PERSIST BEFORE", extra={"candidate_count": candidate_count})
     daily_paths = _intelligence_state_daily_paths()
     state_meta = dict(normalized.get("state_meta") or {})
     board_snapshot_payload = {
@@ -440,6 +442,7 @@ def write_latest_intelligence_state(state: Any) -> dict[str, Any] | None:
         history_file.write("\n")
     write_json_file(BOARD_SNAPSHOT_PATH, board_snapshot_payload)
     write_json_file(daily_paths["board_snapshot"], board_snapshot_payload)
+    logger.info("INTELLIGENCE STATE PERSIST AFTER", extra={"candidate_count": candidate_count})
     logger.info("STATE WRITTEN", extra={"written": True, "candidate_count": int(normalized.get("candidate_count") or 0)})
     return normalized
 
