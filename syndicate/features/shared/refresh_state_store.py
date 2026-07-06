@@ -70,6 +70,28 @@ def _get_keyvalue_client() -> Any:
     return redis.Redis.from_url(url, decode_responses=True)
 
 
+def _execute_keyvalue_operation(operation):
+    try:
+        import redis
+    except ImportError:
+        redis = None
+
+    last_error: Exception | None = None
+    for attempt in range(2):
+        client = _get_keyvalue_client()
+        try:
+            return operation(client)
+        except Exception as exc:
+            last_error = exc
+            if redis is not None and isinstance(exc, redis.exceptions.ConnectionError):
+                _get_keyvalue_client.cache_clear()
+                continue
+            break
+    if last_error is not None:
+        raise last_error
+    raise RuntimeError("keyvalue operation failed")
+
+
 def _normalize_state_path(path: Path) -> str:
     try:
         normalized = path.expanduser().resolve()
@@ -115,16 +137,18 @@ def _record_refresh_status_history(path: Path) -> None:
     relative_path = _refresh_status_history_relative_path(path)
     if not relative_path:
         return
-    client = _get_keyvalue_client()
-    raw_paths = client.get(_history_index_key())
-    try:
-        existing_paths = json.loads(raw_paths) if raw_paths else []
-    except Exception:
-        existing_paths = []
-    if not isinstance(existing_paths, list):
-        existing_paths = []
-    updated_paths = [relative_path, *[item for item in existing_paths if item != relative_path]]
-    client.set(_history_index_key(), json.dumps(updated_paths[:50]))
+    def _write_history(client):
+        raw_paths = client.get(_history_index_key())
+        try:
+            existing_paths = json.loads(raw_paths) if raw_paths else []
+        except Exception:
+            existing_paths = []
+        if not isinstance(existing_paths, list):
+            existing_paths = []
+        updated_paths = [relative_path, *[item for item in existing_paths if item != relative_path]]
+        client.set(_history_index_key(), json.dumps(updated_paths[:50]))
+
+    _execute_keyvalue_operation(_write_history)
 
 
 def reports_root() -> Path:
@@ -217,7 +241,7 @@ def data_root() -> Path:
 def read_json_file(path: Path) -> dict[str, Any] | None:
     if _state_backend_kind() == "keyvalue":
         try:
-            payload_text = _get_keyvalue_client().get(_state_key_for_path(path))
+            payload_text = _execute_keyvalue_operation(lambda client: client.get(_state_key_for_path(path)))
         except Exception:
             return None
         if not payload_text:
@@ -237,7 +261,7 @@ def read_json_file(path: Path) -> dict[str, Any] | None:
 def read_text_file(path: Path) -> str | None:
     if _state_backend_kind() == "keyvalue":
         try:
-            payload_text = _get_keyvalue_client().get(_state_key_for_path(path))
+            payload_text = _execute_keyvalue_operation(lambda client: client.get(_state_key_for_path(path)))
         except Exception:
             return None
         if payload_text is None:
@@ -252,8 +276,11 @@ def read_text_file(path: Path) -> str | None:
 def write_json_file(path: Path, payload: dict[str, Any]) -> None:
     normalized_payload = normalize_timestamped_payload(payload)
     if _state_backend_kind() == "keyvalue":
-        _get_keyvalue_client().set(_state_key_for_path(path), json.dumps(normalized_payload, indent=2))
-        _record_refresh_status_history(path)
+        def _write_json(client):
+            client.set(_state_key_for_path(path), json.dumps(normalized_payload, indent=2))
+            _record_refresh_status_history(path)
+
+        _execute_keyvalue_operation(_write_json)
         return
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(normalized_payload, indent=2), encoding="utf-8")
@@ -261,7 +288,7 @@ def write_json_file(path: Path, payload: dict[str, Any]) -> None:
 
 def write_text_file(path: Path, payload: str) -> None:
     if _state_backend_kind() == "keyvalue":
-        _get_keyvalue_client().set(_state_key_for_path(path), str(payload or ""))
+        _execute_keyvalue_operation(lambda client: client.set(_state_key_for_path(path), str(payload or "")))
         return
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(str(payload or ""), encoding="utf-8")
@@ -270,7 +297,7 @@ def write_text_file(path: Path, payload: str) -> None:
 def path_exists(path: Path) -> bool:
     if _state_backend_kind() == "keyvalue":
         try:
-            return bool(_get_keyvalue_client().exists(_state_key_for_path(path)))
+            return bool(_execute_keyvalue_operation(lambda client: client.exists(_state_key_for_path(path))))
         except Exception:
             return False
     return path.exists()
@@ -279,7 +306,7 @@ def path_exists(path: Path) -> bool:
 def path_size(path: Path) -> int:
     if _state_backend_kind() == "keyvalue":
         try:
-            payload_text = _get_keyvalue_client().get(_state_key_for_path(path))
+            payload_text = _execute_keyvalue_operation(lambda client: client.get(_state_key_for_path(path)))
         except Exception:
             return 0
         if payload_text is None:
@@ -291,7 +318,7 @@ def path_size(path: Path) -> int:
 def list_refresh_status_manifest_paths(*, limit: int = 6) -> list[Path]:
     if _state_backend_kind() == "keyvalue":
         try:
-            raw_paths = _get_keyvalue_client().get(_history_index_key())
+            raw_paths = _execute_keyvalue_operation(lambda client: client.get(_history_index_key()))
         except Exception:
             raw_paths = None
         try:
