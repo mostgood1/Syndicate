@@ -3025,9 +3025,18 @@ def _run_refresh_via_cli(
         state["edges_rows"] = int(_count_csv_rows_quick(edges_fp))
         _append_log(log_file, f"Edges stage finished for {date_str}: rc_edges={int(rc_edges)}, rows={state['edges_rows']}")
         if int(rc_edges) != 0:
-            state["error"] = f"props-edges failed with exit code {int(rc_edges)}"
+            if int(state.get("snapshot_rows") or 0) > 0 and int(state.get("predictions_rows") or 0) > 0 and int(state.get("edges_rows") or 0) <= 0:
+                _append_log(log_file, f"Edges stage returned {int(rc_edges)} with no WNBA edge rows; treating as a warning for {date_str}")
+                state["warning"] = f"WNBA props-edges produced no rows for {date_str}; continuing refresh"
+                state["rc_edges"] = 0
+                rc_edges = 0
+            else:
+                state["error"] = f"props-edges failed with exit code {int(rc_edges)}"
         elif int(state["snapshot_rows"] or 0) > 0 and int(state["edges_rows"] or 0) <= 0:
-            state["error"] = "props-edges produced zero rows after a non-empty snapshot"
+            _append_log(log_file, f"Edges stage produced no WNBA rows for {date_str}; treating as a warning")
+            state["warning"] = f"WNBA props-edges produced no rows for {date_str}; continuing refresh"
+            state["rc_edges"] = 0
+            rc_edges = 0
 
     if refresh_mode == "full" and do_export and not state.get("error"):
         state["phase"] = "export"
