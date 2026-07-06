@@ -1,5 +1,12 @@
 # Fix Notes Log
 
+## 2026-07-06 - Refresh wrapper and child boundary are now instrumented
+- Symptom: The live odds refresh still disappeared before `odds_refresh.json` was written, with no useful stdout/stderr persisted on the failing run.
+- Root cause: Not yet isolated; the current failure point is still somewhere between wrapper launch, child startup, child JSON write, and wrapper result persistence.
+- Fix: Add explicit markers in `scripts/run_refresh_odds_job.py` for launch, wait, return code, and result-file writes, and add child-side markers in `scripts/refresh_odds_sources.py` for process start and JSON emission.
+- Validation: `pytest tests/test_refresh_odds_job.py tests/test_refresh_odds_sources.py -q` passed after updating the wrapper test to mock `Popen`.
+- Follow-up: Re-run a fresh Render refresh and check which of `CHILD_PROCESS_STARTED`, `CHILD_JSON_WRITE_BEGIN`, `CHILD_JSON_WRITE_END`, `RESULT_FILE_WRITE_BEGIN`, and `RESULT_FILE_WRITE_END` never appears first.
+
 ## 2026-07-06 - Odds refresh now queues an intelligence snapshot refresh
 - Symptom: An odds refresh could finish successfully while the persisted intelligence state still lagged behind the freshly computed board.
 - Root cause: The odds-job wrapper returned as soon as the refresh subprocess succeeded, so nothing queued the follow-up intelligence snapshot refresh contract.

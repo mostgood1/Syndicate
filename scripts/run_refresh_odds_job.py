@@ -102,9 +102,12 @@ def _safe_write_text(path: Path, payload: str) -> None:
 
 def _safe_write_json(path: Path, payload: dict[str, Any]) -> None:
     try:
+        print(f"RESULT_FILE_WRITE_BEGIN path={path}", flush=True)
         _refresh_state_store()["write_text_file"](path, json.dumps(payload, indent=2))
         print(f"[refresh_job_write_json_ok] path={path}", flush=True)
+        print(f"RESULT_FILE_WRITE_END path={path}", flush=True)
     except Exception:
+        print(f"RESULT_FILE_WRITE_END path={path} status=failed", flush=True)
         print(f"[refresh_job_write_json_failed] path={path}", file=sys.stderr, flush=True)
         print(traceback.format_exc(), file=sys.stderr, flush=True)
         pass
@@ -184,14 +187,19 @@ def main() -> int:
             started_at=started_at,
             command=command,
         )
-        return_code = 1
-        stdout_text = ""
-        stderr_text = ""
+        print(f"LAUNCH_COMMAND command={json.dumps(command)}", flush=True)
+        process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        print(f"LAUNCH_PID pid={int(process.pid)}", flush=True)
+        print("WAIT_BEGIN", flush=True)
+        stdout_text, stderr_text = process.communicate()
+        print("WAIT_END", flush=True)
+        return_code = int(process.returncode or 0)
+        stdout_text = str(stdout_text or "")
+        stderr_text = str(stderr_text or "")
+        print(f"RETURN_CODE return_code={return_code}", flush=True)
+        print(f"STDOUT_LENGTH length={len(stdout_text)}", flush=True)
+        print(f"STDERR_LENGTH length={len(stderr_text)}", flush=True)
         failure_error = None
-        result = subprocess.run(command, capture_output=True, text=True)
-        return_code = int(result.returncode)
-        stdout_text = str(result.stdout or "")
-        stderr_text = str(result.stderr or "")
     except Exception as exc:
         started_at = locals().get("started_at", _utc_now())
         failure_error = f"{type(exc).__name__}: {exc}"
@@ -260,13 +268,17 @@ def main() -> int:
             print("[refresh_job_child_stderr]", flush=True)
             print(stderr_text, flush=True)
     if return_code == 0 and stdout_payload:
+        print(f"RESULT_FILE_WRITE_BEGIN path={stdout_path}", flush=True)
         _safe_write_json(stdout_path, stdout_payload)
     else:
         if stdout_text.strip() and not stdout_payload:
             failure_payload["stdout"] = stdout_text
+        print(f"RESULT_FILE_WRITE_BEGIN path={stdout_path}", flush=True)
         _safe_write_json(stdout_path, failure_payload)
     print(f"SNAPSHOT_WRITTEN path={stdout_path} ok={return_code == 0}", flush=True)
+    print(f"RESULT_FILE_WRITE_BEGIN path={stderr_path}", flush=True)
     _safe_write_text(stderr_path, stderr_text)
+    print(f"RESULT_FILE_WRITE_END path={stderr_path}", flush=True)
     _update_state(
         manifest_path=manifest_path,
         latest_path=latest_path,

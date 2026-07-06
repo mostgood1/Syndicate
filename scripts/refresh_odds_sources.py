@@ -1300,13 +1300,19 @@ def main() -> int:
         summary = _build_summary(args)
     except Exception as exc:
         payload = {"ok": False, "error": f"{type(exc).__name__}: {exc}"}
+        print(f"CHILD_PROCESS_STARTED argv={json.dumps(sys.argv)} cwd={os.getcwd()} pid={os.getpid()}", file=sys.stderr, flush=True)
+        print("CHILD_JSON_WRITE_BEGIN", file=sys.stderr, flush=True)
         print(json.dumps(payload, indent=2))
+        print("CHILD_JSON_WRITE_END", file=sys.stderr, flush=True)
         return 1
 
     summary["odds_control_plane"] = write_odds_control_plane_snapshot(summary)
 
+    print(f"CHILD_PROCESS_STARTED argv={json.dumps(sys.argv)} cwd={os.getcwd()} pid={os.getpid()}", file=sys.stderr, flush=True)
     if args.json:
+        print("CHILD_JSON_WRITE_BEGIN", file=sys.stderr, flush=True)
         print(json.dumps(summary, indent=2))
+        print("CHILD_JSON_WRITE_END", file=sys.stderr, flush=True)
     else:
         for sport_result in summary.get("results", []):
             sport = sport_result["sport"]

@@ -175,7 +175,7 @@ class RefreshOddsJobTests(unittest.TestCase):
                     "-c",
                     "print('ok')",
                 ],
-            ), patch.object(module.subprocess, "run", side_effect=OSError("spawn failed")):
+            ), patch.object(module.subprocess, "Popen", side_effect=OSError("spawn failed")):
                 exit_code = module.main()
 
             self.assertEqual(exit_code, 1)
