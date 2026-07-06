@@ -1136,8 +1136,9 @@ def intelligence_portfolio_event_api():
             "recommendationHistory": dict(bundle.get("history") or {}),
         }
         return _no_cache_response(jsonify(response_payload))
-    except Exception as exc:
-        return _api_error_response(exc)
+    except Exception:
+        _LOGGER.exception("INTELLIGENCE STATUS FAILURE")
+        raise
 
 
 @intelligence_bp.get("/intelligence/run")
@@ -1209,8 +1210,9 @@ def intelligence_status_api():
         if not (isinstance(status, dict) and _response_has_content(status)):
             status = _empty_default_intelligence_response()
         _log_api_state_read(status if isinstance(status, dict) else {})
-    except Exception as exc:
-        return _api_error_response(exc)
+    except Exception:
+        _LOGGER.exception("INTELLIGENCE STATUS FAILURE")
+        raise
     state_snapshot = dict(status)
     response_payload = {"ok": True, "status": state_snapshot}
     if isinstance(status, dict) and _response_has_content(status):
