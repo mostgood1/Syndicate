@@ -122,6 +122,7 @@ class BootstrapDataRootTests(unittest.TestCase):
                     "reports/odds_control_plane",
                     "reports/daily_update/latest",
                     "reports/refresh_status/latest",
+                    "vendor/wnba_betting_repo/src",
                     "reports/intelligence/board_snapshot.json",
                     "reports/intelligence/intelligence_state.json",
                     "reports/intelligence/intelligence_state_history.jsonl",

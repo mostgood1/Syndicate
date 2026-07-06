@@ -38,6 +38,10 @@ BOOTSTRAP_ROOTS = (
     Path("reports/refresh_status/latest"),
 )
 
+BOOTSTRAP_VENDOR_ROOTS = (
+    (Path("vendor/wnba_betting_repo/src"), Path("wnba_source/src")),
+)
+
 BOOTSTRAP_FILES = (
     Path("reports/intelligence/board_snapshot.json"),
     Path("reports/intelligence/intelligence_state.json"),
@@ -90,6 +94,10 @@ def _bootstrap_root_pairs(repo_root: Path, data_root: Path) -> list[tuple[Path, 
         else:
             dest_relative = relative_root
         dst = data_root / dest_relative
+        pairs.append((src, dst, str(relative_root)))
+    for relative_root, data_relative_root in BOOTSTRAP_VENDOR_ROOTS:
+        src = repo_root / relative_root
+        dst = data_root / data_relative_root
         pairs.append((src, dst, str(relative_root)))
     for relative_file in BOOTSTRAP_FILES:
         src = repo_root / relative_file
