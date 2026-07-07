@@ -180,6 +180,36 @@ def _latest_manifest_payload(latest_manifest_path: Path) -> dict[str, Any]:
     return payload if isinstance(payload, dict) else {}
 
 
+def _artifact_path_text(payload: dict[str, Any], *keys: str) -> str:
+    for key in keys:
+        value = payload.get(key)
+        if isinstance(value, str) and str(value).strip():
+            return str(value).strip()
+    return ""
+
+
+def _job_status_path_from_manifest(payload: dict[str, Any]) -> Path | None:
+    run_summary_path_text = _artifact_path_text(payload, "runSummaryPath")
+    if not run_summary_path_text:
+        external_runner = payload.get("externalRunner") if isinstance(payload.get("externalRunner"), dict) else {}
+        if isinstance(external_runner, dict):
+            run_summary_path_text = _artifact_path_text(external_runner, "runSummaryPath")
+    if not run_summary_path_text:
+        return None
+    return Path(run_summary_path_text).parent / "refresh_job_status.json"
+
+
+def _odds_refresh_path_from_manifest(payload: dict[str, Any]) -> Path | None:
+    odds_refresh_path_text = _artifact_path_text(payload, "oddsRefreshPath", "stdoutPath")
+    if not odds_refresh_path_text:
+        external_runner = payload.get("externalRunner") if isinstance(payload.get("externalRunner"), dict) else {}
+        if isinstance(external_runner, dict):
+            odds_refresh_path_text = _artifact_path_text(external_runner, "stdoutPath")
+    if not odds_refresh_path_text:
+        return None
+    return Path(odds_refresh_path_text)
+
+
 def _current_active_job_count(latest_manifest_path: Path) -> int:
     payload = _latest_manifest_payload(latest_manifest_path)
     state = str(payload.get("state") or "").strip().lower()
@@ -232,6 +262,35 @@ def _recover_dead_active_contract(latest_manifest_path: Path) -> bool:
         return False
     if launch_pid is None and pid is None:
         return False
+
+    job_status_path = _job_status_path_from_manifest(payload)
+    job_status = _refresh_state_store()["read_json_file"](job_status_path) if job_status_path is not None else {}
+    job_status = job_status if isinstance(job_status, dict) else {}
+    job_status_state = str(job_status.get("state") or "").strip().lower()
+    job_status_updated_at = _parse_utc_timestamp(str(job_status.get("updatedAt") or ""))
+    if job_status_state == "running" and job_status_updated_at is not None:
+        if (datetime.utcnow() - job_status_updated_at).total_seconds() < 120:
+            return False
+    if job_status_state in {"finished", "failed"}:
+        return False
+
+    odds_refresh_path = _odds_refresh_path_from_manifest(payload)
+    if odds_refresh_path is not None:
+        odds_refresh_payload = _refresh_state_store()["read_json_file"](odds_refresh_path)
+        if isinstance(odds_refresh_payload, dict):
+            return False
+
+    run_summary_path_text = _artifact_path_text(payload, "runSummaryPath")
+    if not run_summary_path_text:
+        external_runner = payload.get("externalRunner") if isinstance(payload.get("externalRunner"), dict) else {}
+        if isinstance(external_runner, dict):
+            run_summary_path_text = _artifact_path_text(external_runner, "runSummaryPath")
+    if run_summary_path_text:
+        run_summary = _refresh_state_store()["read_json_file"](Path(run_summary_path_text)) or {}
+        if isinstance(run_summary, dict):
+            run_summary_state = str(run_summary.get("state") or "").strip().lower()
+            if run_summary_state in {"finished", "failed"} or run_summary.get("finishedAt"):
+                return False
 
     payload["state"] = "failed"
     payload["workerRecoveredAt"] = datetime.utcnow().isoformat(timespec="seconds") + "Z"

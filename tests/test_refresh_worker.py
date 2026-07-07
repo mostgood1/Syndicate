@@ -325,6 +325,120 @@ class RefreshWorkerTests(unittest.TestCase):
             self.assertIn("workerRecoveredAt", latest_payload)
             self.assertEqual(latest_payload["workerRecoveryReason"], "dead_refresh_process")
 
+    def test_recover_dead_active_contract_defers_when_job_status_is_recently_running(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        module = self._load_module(repo_root)
+
+        with TemporaryDirectory() as tmp_dir:
+            latest_manifest_path = Path(tmp_dir) / "refresh_status_latest.json"
+            run_summary_path = Path(tmp_dir) / "migration_runs" / "2026-07-06" / "odds_refresh_20260706_211933" / "refresh_and_gate_run.json"
+            job_status_path = run_summary_path.parent / "refresh_job_status.json"
+            run_summary_path.parent.mkdir(parents=True, exist_ok=True)
+            latest_manifest_path.write_text(
+                json.dumps(
+                    {
+                        "state": "running",
+                        "pid": 4321,
+                        "runSummaryPath": str(run_summary_path),
+                        "oddsRefreshPath": str(run_summary_path.parent / "odds_refresh.json"),
+                        "externalRunner": {
+                            "kind": "external_runner",
+                            "queue_state": "queued",
+                            "runSummaryPath": str(run_summary_path),
+                            "stdoutPath": str(run_summary_path.parent / "odds_refresh.json"),
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+            run_summary_path.write_text(json.dumps({"state": "running"}), encoding="utf-8")
+            recent_updated_at = (datetime.utcnow() - timedelta(seconds=30)).isoformat(timespec="seconds") + "Z"
+            job_status_path.write_text(json.dumps({"state": "running", "updatedAt": recent_updated_at}), encoding="utf-8")
+
+            with patch.object(module, "_pid_is_running", return_value=False):
+                recovered = module._recover_dead_active_contract(latest_manifest_path)
+
+            self.assertFalse(recovered)
+            latest_payload = json.loads(latest_manifest_path.read_text(encoding="utf-8"))
+            self.assertEqual(latest_payload["state"], "running")
+
+    def test_recover_dead_active_contract_defers_when_completed_artifacts_exist(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        module = self._load_module(repo_root)
+
+        with TemporaryDirectory() as tmp_dir:
+            latest_manifest_path = Path(tmp_dir) / "refresh_status_latest.json"
+            run_summary_path = Path(tmp_dir) / "migration_runs" / "2026-07-06" / "odds_refresh_20260706_211933" / "refresh_and_gate_run.json"
+            odds_refresh_path = run_summary_path.parent / "odds_refresh.json"
+            job_status_path = run_summary_path.parent / "refresh_job_status.json"
+            run_summary_path.parent.mkdir(parents=True, exist_ok=True)
+            latest_manifest_path.write_text(
+                json.dumps(
+                    {
+                        "state": "running",
+                        "pid": 4321,
+                        "runSummaryPath": str(run_summary_path),
+                        "oddsRefreshPath": str(odds_refresh_path),
+                        "externalRunner": {
+                            "kind": "external_runner",
+                            "queue_state": "queued",
+                            "runSummaryPath": str(run_summary_path),
+                            "stdoutPath": str(odds_refresh_path),
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+            run_summary_path.write_text(json.dumps({"state": "running"}), encoding="utf-8")
+            job_status_path.write_text(json.dumps({"state": "running", "updatedAt": (datetime.utcnow() - timedelta(minutes=10)).isoformat(timespec="seconds") + "Z"}), encoding="utf-8")
+            odds_refresh_path.write_text(json.dumps({"ok": True, "returnCode": 0}), encoding="utf-8")
+
+            with patch.object(module, "_pid_is_running", return_value=False):
+                recovered = module._recover_dead_active_contract(latest_manifest_path)
+
+            self.assertFalse(recovered)
+            latest_payload = json.loads(latest_manifest_path.read_text(encoding="utf-8"))
+            self.assertEqual(latest_payload["state"], "running")
+
+    def test_recover_dead_active_contract_marks_failed_for_stale_running_status_without_artifacts(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        module = self._load_module(repo_root)
+
+        with TemporaryDirectory() as tmp_dir:
+            latest_manifest_path = Path(tmp_dir) / "refresh_status_latest.json"
+            run_summary_path = Path(tmp_dir) / "migration_runs" / "2026-07-06" / "odds_refresh_20260706_211933" / "refresh_and_gate_run.json"
+            job_status_path = run_summary_path.parent / "refresh_job_status.json"
+            run_summary_path.parent.mkdir(parents=True, exist_ok=True)
+            latest_manifest_path.write_text(
+                json.dumps(
+                    {
+                        "state": "running",
+                        "pid": 4321,
+                        "runSummaryPath": str(run_summary_path),
+                        "oddsRefreshPath": str(run_summary_path.parent / "odds_refresh.json"),
+                        "externalRunner": {
+                            "kind": "external_runner",
+                            "queue_state": "queued",
+                            "runSummaryPath": str(run_summary_path),
+                            "stdoutPath": str(run_summary_path.parent / "odds_refresh.json"),
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+            run_summary_path.write_text(json.dumps({"state": "running"}), encoding="utf-8")
+            stale_updated_at = (datetime.utcnow() - timedelta(minutes=10)).isoformat(timespec="seconds") + "Z"
+            job_status_path.write_text(json.dumps({"state": "running", "updatedAt": stale_updated_at}), encoding="utf-8")
+
+            with patch.object(module, "_pid_is_running", return_value=False):
+                recovered = module._recover_dead_active_contract(latest_manifest_path)
+
+            self.assertTrue(recovered)
+            latest_payload = json.loads(latest_manifest_path.read_text(encoding="utf-8"))
+            self.assertEqual(latest_payload["state"], "failed")
+            self.assertEqual(latest_payload["workerRecoveryReason"], "dead_refresh_process")
+            self.assertIn("workerRecoveredAt", latest_payload)
+
     def test_main_run_once_recovers_stuck_claim_before_launch(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]
         module = self._load_module(repo_root)
