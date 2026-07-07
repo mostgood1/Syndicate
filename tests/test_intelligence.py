@@ -15,7 +15,10 @@ from syndicate.app import create_app
 from syndicate.blueprints.intelligence import intelligence_bp
 from syndicate.blueprints.intelligence import intelligence_query_api
 from syndicate.blueprints.intelligence import intelligence_status_api
+from syndicate.blueprints.home import _finalize_home_prop_rows
+from syndicate.blueprints.home import _load_home_pregame_prop_items
 from syndicate.blueprints.home import _game_bet_candidates_from_game
+from syndicate.features.intelligence_board import build_intelligence_board_contract
 from syndicate.features.intelligence import _advanced_signals_from_item
 from syndicate.features.intelligence import _advanced_input_rows_for_sport
 from syndicate.features.intelligence import _advanced_signals_from_item
@@ -773,6 +776,54 @@ def _sample_nhl_market_overview() -> list[dict[str, object]]:
 
 
 class IntelligenceBlueprintTests(unittest.TestCase):
+    def test_collect_candidates_promotes_wnba_props_csv_into_board_contract(self) -> None:
+        candidate_item = {
+            "name": "Dearica Hamby Over 1.5 AST",
+            "market": "AST",
+            "pick": "Over 1.5",
+            "matchup": "LAS at SEA",
+            "projected": 3.5,
+            "line": 1.5,
+            "odds": "-112",
+            "confidence": "0.0",
+            "edge": "12.0%",
+            "writeup": "OVER 1.5 AST | model 3.5 vs line 1.5 (+2.0)",
+            "href": "/wnba/cards?date=2026-07-06",
+        }
+        overview = [
+            {
+                "slug": "wnba",
+                "name": "WNBA",
+                "context_label": "2026-07-06",
+                "data_health": "healthy",
+                "data_warnings": [],
+                "active_today": True,
+                "home_rails": {
+                    "compact": {"title": "Compact game rail", "items": [], "links": [], "empty_summary": ""},
+                    "pregame": {"title": "Pregame props", "items": [candidate_item], "links": [], "empty_summary": ""},
+                    "live": {"title": "Top Live Props", "items": [], "links": [], "empty_summary": ""},
+                },
+                "dashboard_games": [],
+            }
+        ]
+
+        preferences = {
+            "question": "top edges today",
+            "mode": "recommendation",
+            "sport": "all",
+            "timing": "all",
+            "include_props": True,
+            "include_games": True,
+            "requested_markets": [],
+        }
+        candidates = collect_candidates(overview, preferences)
+        board = build_intelligence_board_contract({"recommendations": candidates})
+
+        self.assertTrue(any(candidate.get("sport_slug") == "wnba" for candidate in candidates))
+        self.assertTrue(any(card.get("sport") == "wnba" for card in board["cards"]))
+        self.assertEqual(board["lane_counts"]["pregame"], 1)
+        self.assertGreaterEqual(board["recommendation_count"], 1)
+
     def setUp(self) -> None:
         app = create_app()
         app.config.update(TESTING=True)

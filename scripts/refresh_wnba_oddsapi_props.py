@@ -1498,6 +1498,28 @@ def _build_local_game_cards_artifact(*, source_root: Path, processed_root: Path,
         if log_file is not None:
             _append_log(log_file, message)
 
+    def _prediction_matchups() -> set[tuple[str, str]]:
+        predictions_path = processed_root / f"predictions_{date_str}.csv"
+        if not predictions_path.exists() or not predictions_path.is_file() or _count_csv_rows_quick(predictions_path) <= 0:
+            return set()
+
+        matchups: set[tuple[str, str]] = set()
+        try:
+            with predictions_path.open("r", encoding="utf-8", newline="") as handle:
+                for row in csv.DictReader(handle):
+                    if not isinstance(row, dict):
+                        continue
+                    home_name = str(row.get("home_team") or "").strip().casefold()
+                    away_name = str(row.get("visitor_team") or row.get("away_team") or "").strip().casefold()
+                    if home_name and away_name:
+                        matchups.add((home_name, away_name))
+        except Exception:
+            return set()
+        return matchups
+
+    expected_matchups = _prediction_matchups()
+    snapshot_matchups: set[tuple[str, str]] = set()
+
     raw_candidates = [
         source_root / "data" / "raw" / f"odds_wnba_current_{date_str}.csv",
         source_root / "data" / "raw" / f"odds_wnba_current_{date_str}.parquet",
@@ -1527,6 +1549,7 @@ def _build_local_game_cards_artifact(*, source_root: Path, processed_root: Path,
                         away_name = str(away_team or "").strip()
                         if not home_name or not away_name:
                             continue
+                        snapshot_matchups.add((home_name.casefold(), away_name.casefold()))
                         rows_out.append(
                             {
                                 "date": date_str,
@@ -1545,7 +1568,7 @@ def _build_local_game_cards_artifact(*, source_root: Path, processed_root: Path,
                             }
                         )
 
-                    if rows_out:
+                    if rows_out and (not expected_matchups or expected_matchups.issubset(snapshot_matchups)):
                         header_order = [
                             "date",
                             "game_id",
@@ -1571,6 +1594,13 @@ def _build_local_game_cards_artifact(*, source_root: Path, processed_root: Path,
                         _log(f"Built local game_cards from raw player props snapshot fallback: {out_path} (rows={len(rows_out)})")
                         return len(rows_out), out_path
 
+                    if rows_out and expected_matchups and not expected_matchups.issubset(snapshot_matchups):
+                        missing_matchups = sorted(expected_matchups.difference(snapshot_matchups))
+                        missing_text = ", ".join(f"{away.upper()} @ {home.upper()}" for home, away in missing_matchups)
+                        _log(
+                            f"Raw player props snapshot only covered {len(snapshot_matchups)} of {len(expected_matchups)} predicted games for {date_str}; missing={missing_text}; falling back to processed game_odds"
+                        )
+
         # Fallback to processed game_odds when raw team odds snapshots are unavailable.
         game_odds_path = source_root / "data" / "processed" / f"game_odds_{date_str}.csv"
         if not game_odds_path.exists() or not game_odds_path.is_file() or _count_csv_rows_quick(game_odds_path) <= 0:
@@ -1579,7 +1609,7 @@ def _build_local_game_cards_artifact(*, source_root: Path, processed_root: Path,
 
         allowed_matchups: set[tuple[str, str]] = set()
         props_snapshot_path = source_root / "data" / "raw" / f"odds_wnba_player_props_{date_str}.csv"
-        if props_snapshot_path.exists() and props_snapshot_path.is_file() and _count_csv_rows_quick(props_snapshot_path) > 0:
+        if (not expected_matchups or expected_matchups.issubset(snapshot_matchups)) and props_snapshot_path.exists() and props_snapshot_path.is_file() and _count_csv_rows_quick(props_snapshot_path) > 0:
             try:
                 with props_snapshot_path.open("r", encoding="utf-8", newline="") as props_handle:
                     props_reader = csv.DictReader(props_handle)

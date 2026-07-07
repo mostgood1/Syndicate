@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+from tempfile import TemporaryDirectory
 import unittest
 from unittest.mock import patch
 
@@ -443,6 +445,47 @@ class HomePageCommandCenterTests(unittest.TestCase):
 
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0]["name"], "MLB top prop")
+
+    def test_load_home_pregame_prop_items_uses_wnba_props_recommendations_csv(self) -> None:
+        home_games = [
+            {
+                "gamePk": 42,
+                "away": {"abbr": "LAS", "name": "Las Vegas Aces"},
+                "home": {"abbr": "SEA", "name": "Seattle Storm"},
+                "away_tri": "LAS",
+                "home_tri": "SEA",
+                "detail": "7:00 PM ET",
+                "status_badge": "Scheduled",
+                "status": {"abstract": "Scheduled", "detailed": "Scheduled"},
+            }
+        ]
+
+        csv_text = (
+            "player,team,plays,ladders,sim_ladders,model,_plays_list,top_play,top_play_explain,top_play_baseline,top_play_reasons,top_play_consensus,top_play_line_adv\n"
+            "Dearica Hamby,LAS,\"[]\",[],[],\"{}\",[],\"{'market': 'ast', 'side': 'OVER', 'line': 1.5, 'price': -112.0, 'edge': 0.06, 'ev': 0.12, 'ev_pct': 12.0, 'book': 'fanduel'}\",model 3.5 vs line 1.5 (+2.0),3.5,\"['EV 12.0%']\",0.0,1.0\n"
+        )
+
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            processed = root / "data" / "processed"
+            processed.mkdir(parents=True, exist_ok=True)
+            (processed / "props_recommendations_2026-07-06.csv").write_text(csv_text, encoding="utf-8")
+
+            with patch("syndicate.features.wnba.sources._source_roots", return_value=[root]), patch(
+                "syndicate.blueprints.home._pregame_prop_rows_from_betting_card",
+                return_value=[],
+            ):
+                rows = _load_home_pregame_prop_items(
+                    "wnba",
+                    context_label="2026-07-06",
+                    home_games=home_games,
+                    is_active_today=True,
+                )
+
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["team"], "LAS")
+        self.assertEqual(rows[0]["market"], "AST")
+        self.assertFalse(rows[0]["is_live"])
 
     def test_live_rows_require_live_odds_backing(self) -> None:
         game = {

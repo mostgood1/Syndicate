@@ -219,6 +219,168 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
         self.assertEqual(written[0].get("away_tri"), "WSH")
         self.assertEqual(written[0].get("bookmaker"), "oddsapi_consensus")
 
+    def test_build_local_game_cards_artifact_promotes_full_slate_when_snapshot_is_partial(self) -> None:
+        module = self._load_module()
+
+        games = [
+            ("Washington Mystics", "Golden State Valkyries", "WSH", "GSV", "2026-07-06T23:40:00Z", 401, 24.5, 22.5, -4.5, 4.5, 166.5),
+            ("Minnesota Lynx", "Connecticut Sun", "MIN", "CON", "2026-07-07T00:00:00Z", 402, 25.0, 21.0, -6.5, 6.5, 162.5),
+            ("Los Angeles Sparks", "Seattle Storm", "LAS", "SEA", "2026-07-07T02:10:00Z", 403, 26.0, 24.0, -2.5, 2.5, 169.5),
+        ]
+
+        def write_csv(path: Path, fieldnames: list[str], rows: list[dict[str, object]]) -> None:
+            with path.open("w", encoding="utf-8", newline="") as handle:
+                writer = csv.DictWriter(handle, fieldnames=fieldnames)
+                writer.writeheader()
+                for row in rows:
+                    writer.writerow(row)
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            source_root = Path(tmp_dir) / "source"
+            processed_root = source_root / "data" / "processed"
+            raw_root = source_root / "data" / "raw"
+            processed_root.mkdir(parents=True, exist_ok=True)
+            raw_root.mkdir(parents=True, exist_ok=True)
+            date_str = "2026-07-06"
+
+            write_csv(
+                raw_root / f"odds_wnba_player_props_{date_str}.csv",
+                ["snapshot_ts", "event_id", "commence_time", "bookmaker", "bookmaker_title", "market", "outcome_name", "player_name", "point", "price", "last_update", "home_team", "away_team"],
+                [
+                    {
+                        "snapshot_ts": "2026-07-06T20:00:00Z",
+                        "event_id": "401",
+                        "commence_time": "2026-07-07T02:07:44Z",
+                        "bookmaker": "draftkings",
+                        "bookmaker_title": "DraftKings",
+                        "market": "player_points",
+                        "outcome_name": "Over",
+                        "player_name": "Ariel Atkins",
+                        "point": 12.5,
+                        "price": -115,
+                        "last_update": "2026-07-06T20:00:00Z",
+                        "home_team": "Los Angeles Sparks",
+                        "away_team": "Seattle Storm",
+                    }
+                ],
+            )
+
+            write_csv(
+                processed_root / f"predictions_{date_str}.csv",
+                ["date", "home_team", "visitor_team", "home_win_prob", "spread_margin", "totals", "commence_time"],
+                [
+                    {"date": date_str, "home_team": home, "visitor_team": away, "home_win_prob": 0.5, "spread_margin": "", "totals": "", "commence_time": commence}
+                    for home, away, _, _, commence, _, _, _, _, _, _ in games
+                ],
+            )
+
+            write_csv(
+                processed_root / f"game_odds_{date_str}.csv",
+                ["game_id", "home_team", "visitor_team", "commence_time", "home_ml", "away_ml", "home_spread", "away_spread", "total", "bookmaker"],
+                [
+                    {
+                        "game_id": game_id,
+                        "home_team": home,
+                        "visitor_team": away,
+                        "commence_time": commence,
+                        "home_ml": -110,
+                        "away_ml": -110,
+                        "home_spread": home_spread,
+                        "away_spread": away_spread,
+                        "total": total,
+                        "bookmaker": "oddsapi_consensus",
+                    }
+                    for home, away, _, _, commence, game_id, _, _, home_spread, away_spread, total in games
+                ],
+            )
+
+            for home, away, home_tri, away_tri, _, _, _, _, _, _, _ in games:
+                smart_path = processed_root / f"smart_sim_{date_str}_{home_tri}_{away_tri}.json"
+                smart_path.write_text(
+                    json.dumps(
+                        {
+                            "date": date_str,
+                            "home": home_tri,
+                            "away": away_tri,
+                            "quarters": [
+                                {"home_pts_mu": 24.0, "away_pts_mu": 20.0},
+                                {"home_pts_mu": 23.0, "away_pts_mu": 21.0},
+                                {"home_pts_mu": 22.0, "away_pts_mu": 20.0},
+                                {"home_pts_mu": 21.0, "away_pts_mu": 19.0},
+                            ],
+                        }
+                    ),
+                    encoding="utf-8",
+                )
+
+            rows, out_path = module._build_local_game_cards_artifact(
+                source_root=source_root,
+                processed_root=processed_root,
+                date_str=date_str,
+                log_file=Path(tmp_dir) / "refresh.log",
+            )
+
+            self.assertEqual(rows, 3)
+            self.assertIsNotNone(out_path)
+            assert out_path is not None
+            with out_path.open("r", encoding="utf-8", newline="") as handle:
+                written_cards = list(csv.DictReader(handle))
+
+            write_csv(
+                processed_root / f"props_recommendations_{date_str}.csv",
+                ["player", "team", "model", "top_play", "top_play_reasons", "top_play_explain"],
+                [
+                    {
+                        "player": f"Player {home_tri}",
+                        "team": home_tri,
+                        "model": json.dumps({"pts": 10.0}),
+                        "top_play": json.dumps(
+                            {
+                                "market": "pts",
+                                "stat": "pts",
+                                "side": "OVER",
+                                "line": 8.5,
+                                "price": -110,
+                                "edge": 0.12,
+                                "ev": 0.12,
+                                "ev_pct": 12.0,
+                                "p_win": 0.56,
+                                "proj": 10.0,
+                                "book": "draftkings",
+                            }
+                        ),
+                        "top_play_reasons": json.dumps(["EV 12.0%", "Best line available"]),
+                        "top_play_explain": "model 10.0 vs line 8.5 (+1.5)",
+                    }
+                    for _, _, home_tri, _, _, _, _, _, _, _, _ in games
+                ],
+            )
+
+            prop_rows, prop_path = module._build_local_cards_props_snapshot_artifact(processed_root=processed_root, date_str=date_str)
+            self.assertEqual(prop_rows, 3)
+            self.assertIsNotNone(prop_path)
+            assert prop_path is not None
+            prop_payload = json.loads(prop_path.read_text(encoding="utf-8"))
+            self.assertEqual(len(prop_payload.get("games") or []), 3)
+
+            recommendation_rows, recommendation_path = module._build_local_game_recommendations_artifact(processed_root=processed_root, date_str=date_str)
+            self.assertEqual(recommendation_rows, 6)
+            self.assertIsNotNone(recommendation_path)
+
+            slate_rows, slate_path = module._build_local_recommendations_slate_artifact(processed_root=processed_root, date_str=date_str)
+            self.assertEqual(slate_rows, 3)
+            self.assertIsNotNone(slate_path)
+            assert slate_path is not None
+            slate_payload = json.loads(slate_path.read_text(encoding="utf-8"))
+            self.assertEqual(slate_payload.get("counts", {}).get("games"), 3)
+            self.assertEqual(len(slate_payload.get("per_game") or []), 3)
+
+            self.assertEqual(len(written_cards), 3)
+            self.assertEqual(
+                sorted((row.get("home_tri"), row.get("away_tri")) for row in written_cards),
+                [("LAS", "SEA"), ("MIN", "CON"), ("WSH", "GSV")],
+            )
+
     def test_repair_predictions_slate_rebuilds_when_predictions_missing(self) -> None:
         module = self._load_module()
 

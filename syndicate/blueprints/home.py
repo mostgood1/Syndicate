@@ -3384,7 +3384,10 @@ def _prop_rows_from_props_recommendations_csv(
                 edge_text = _pct_text(top_play.get("ev") if top_play.get("ev") is not None else top_play.get("edge"))
                 rows.append(
                     {
-                        "matchup": team,
+                        "team": team,
+                        "opponent": _safe_text(raw.get("opponent") or raw.get("opp"), ""),
+                        "away_label": team,
+                        "matchup": _safe_text(raw.get("matchup") or team, team),
                         "heading": "Props",
                         "name": f"{player} ({team})",
                         "is_live": False,
@@ -4375,8 +4378,18 @@ def _build_sport_overview(
                 home_games = list(wnba_overview.get("games") or [])
                 game_items = _compact_game_cards(home_games)
                 game_count = len(game_items)
+                wnba_prop_rows = list(wnba_overview.get("prop_rows") or [])
+                if not wnba_prop_rows:
+                    wnba_prop_rows = _load_home_pregame_prop_items(
+                        slug,
+                        context_label=context_label,
+                        home_games=home_games,
+                        season=season,
+                        week=selected_week,
+                        is_active_today=active_today,
+                    )
                 pregame_prop_items = _finalize_home_prop_rows(
-                    list(wnba_overview.get("prop_rows") or []),
+                    wnba_prop_rows,
                     slug=slug,
                     context_label=context_label,
                     home_games=home_games,

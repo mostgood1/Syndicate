@@ -1,5 +1,19 @@
 # Fix Notes Log
 
+## 2026-07-07 - WNBA game-card writer now preserves the full slate when the player-props snapshot is partial
+- Symptom: `predictions_2026-07-06.csv` and smart-sim artifacts contained 3 WNBA games, but `game_cards_2026-07-06.csv`, `cards_props_snapshot_2026-07-06.json`, and `recommendations_slate_2026-07-06.json` collapsed to 1 game.
+- Root cause: `_build_local_game_cards_artifact()` preferred the raw player-props snapshot fallback and then reused that same partial snapshot to restrict the processed `game_odds` fallback through `allowed_matchups`.
+- Fix: Track the predicted matchup set up front, only use the raw player-props snapshot when it covers the full slate, and skip the raw-snapshot matchup filter when the snapshot is incomplete so the processed `game_odds` slate can pass through.
+- Validation: `tests.test_wnba_refresh_runner.WnbaRefreshRunnerTests.test_build_local_game_cards_artifact_promotes_full_slate_when_snapshot_is_partial` passed alongside the existing raw-snapshot fallback regression, and both edited Python files were error-free.
+- Follow-up: Keep the writer on the processed `game_odds` fallback whenever the raw props snapshot trails the prediction slate again; the downstream cards and slate builders now inherit the full game set from `game_cards`.
+
+## 2026-07-07 - WNBA props recommendations now publish into the intelligence board
+- Symptom: `props_recommendations_2026-07-06.csv` was present, but the WNBA intelligence board path was not receiving a WNBA pregame candidate from it.
+- Root cause: The WNBA home overview returned no `prop_rows`, so the shared candidate collector never saw the stored WNBA props CSV unless the home route explicitly loaded the CSV fallback.
+- Fix: Make the WNBA home overview fall back to `_load_home_pregame_prop_items(...)` when `get_wnba_overview()` has no `prop_rows`, and preserve `team`/`opponent` labels in the CSV-derived rows so they survive hydration and matching.
+- Validation: `python.exe -m unittest tests.test_home.HomePageCommandCenterTests.test_load_home_pregame_prop_items_uses_wnba_props_recommendations_csv tests.test_intelligence.IntelligenceBlueprintTests.test_collect_candidates_promotes_wnba_props_csv_into_board_contract` passed, with `candidate_generation` reporting one WNBA prop candidate and `board_input` showing `pregame: 1`.
+- Follow-up: Keep WNBA props publication tied to the home overview path so future `props_recommendations_*.csv` files continue to reach the intelligence board contract.
+
 ## 2026-07-06 - Refresh wrapper and child boundary are now instrumented
 - Symptom: The live odds refresh still disappeared before `odds_refresh.json` was written, with no useful stdout/stderr persisted on the failing run.
 - Root cause: Not yet isolated; the current failure point is still somewhere between wrapper launch, child startup, child JSON write, and wrapper result persistence.
