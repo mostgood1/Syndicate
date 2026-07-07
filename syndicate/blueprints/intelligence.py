@@ -914,12 +914,12 @@ def _apply_user_profile_to_response(response_payload: dict[str, object], user_pr
     return response_payload
 
 
-def _intelligence_page_payload(selected_date: str, *, force_refresh: bool = False) -> dict[str, object]:
+def _intelligence_page_payload(selected_date: str, *, sport: str | None = None, force_refresh: bool = False) -> dict[str, object]:
     return {
         "question": DEFAULT_QUESTION,
         "date": selected_date,
         "mode": "recommendation",
-        "sport": "all",
+        "sport": str(sport or "").strip().lower() or "all",
         "game_state": "all",
         "timing": "all",
         "limit": 5,
@@ -1216,18 +1216,19 @@ def run_intelligence():
 @intelligence_bp.get("/api/intelligence/status")
 def intelligence_status_api():
     selected_date = str(request.args.get("date") or "").strip() or central_today_iso()
+    selected_sport = str(request.args.get("sport") or "").strip() or "all"
     refresh_requested = str(request.args.get("refresh") or request.args.get("force_refresh") or "").strip().lower() in {"1", "true", "yes", "on"}
     if refresh_requested:
         _LOGGER.info("BETTING_BOARD_REFRESH_START", extra={"selected_date": selected_date, "source": "status_api", "refresh_requested": True})
-    status_payload = _intelligence_page_payload(selected_date, force_refresh=False)
+    status_payload = _intelligence_page_payload(selected_date, sport=selected_sport, force_refresh=False)
     stale_snapshot = False
     if not refresh_requested:
         current_snapshot = read_latest_intelligence_state(dict(status_payload))
         stale_snapshot = bool(_response_selected_date(current_snapshot) and _response_selected_date(current_snapshot) != selected_date)
     if refresh_requested:
-        _safe_queue_intelligence_state_refresh(_intelligence_page_payload(selected_date, force_refresh=True))
+        _safe_queue_intelligence_state_refresh(_intelligence_page_payload(selected_date, sport=selected_sport, force_refresh=True))
     elif stale_snapshot:
-        _safe_queue_intelligence_state_refresh(_intelligence_page_payload(selected_date, force_refresh=True))
+        _safe_queue_intelligence_state_refresh(_intelligence_page_payload(selected_date, sport=selected_sport, force_refresh=True))
     status = read_latest_intelligence_state(dict(status_payload))
     if not (isinstance(status, dict) and _response_has_content(status)):
         status = _empty_default_intelligence_response()
@@ -1248,4 +1249,8 @@ def intelligence_status_api():
 @intelligence_bp.get("/intelligence/status")
 def intelligence_status_page():
     selected_date = str(request.args.get("date") or "").strip() or central_today_iso()
-    return redirect(f"/api/intelligence/status?date={selected_date}", code=302)
+    selected_sport = str(request.args.get("sport") or "").strip()
+    redirect_target = f"/api/intelligence/status?date={selected_date}"
+    if selected_sport:
+        redirect_target = f"{redirect_target}&sport={selected_sport}"
+    return redirect(redirect_target, code=302)

@@ -16,6 +16,7 @@ from syndicate.app import create_app
 from syndicate.blueprints.intelligence import intelligence_bp
 from syndicate.blueprints.intelligence import intelligence_query_api
 from syndicate.blueprints.intelligence import intelligence_status_api
+from pipeline.intelligence_state import _payload_key
 from syndicate.blueprints.home import _finalize_home_prop_rows
 from syndicate.blueprints.home import _load_home_pregame_prop_items
 from syndicate.blueprints.home import _game_bet_candidates_from_game
@@ -5159,6 +5160,41 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertTrue(cached_response_probe.called)
         self.assertEqual(response.headers.get("Cache-Control"), "no-cache, no-store, must-revalidate")
         self.assertEqual(response.headers.get("Pragma"), "no-cache")
+
+    def test_status_endpoint_preserves_requested_sport_in_payload_key(self) -> None:
+        app = Flask(__name__)
+        app.register_blueprint(intelligence_bp)
+
+        captured_payloads: list[dict[str, object]] = []
+
+        def capture_latest_state(payload: dict[str, object], *args, **kwargs):
+            captured_payloads.append(dict(payload))
+            selected_date = str(payload.get("date") or payload.get("selected_date") or "2026-07-07")
+            return {
+                "ok": True,
+                "selected_date": selected_date,
+                "candidate_count": 1,
+                "response": {"selected_date": selected_date},
+                "top_opportunities": [{"name": "Play 1"}],
+                "recommendations": [{"name": "Play 1"}],
+                "analysis": {"recommendations": [{"name": "Play 1"}], "picks": [], "top_live_opportunities": [], "portfolio": {}, "parlays": []},
+            }
+
+        with app.test_request_context("/api/intelligence/status?date=2026-07-07&sport=wnba", method="GET"):
+            with patch("syndicate.blueprints.intelligence.read_latest_intelligence_state_response", side_effect=capture_latest_state):
+                with patch("syndicate.blueprints.intelligence._response_has_content", side_effect=lambda payload: bool(payload)):
+                    with patch("syndicate.blueprints.intelligence._safe_queue_intelligence_state_refresh"):
+                        response = intelligence_status_api()
+
+        payload = response.get_json()
+        self.assertIsNotNone(payload)
+        self.assertGreaterEqual(len(captured_payloads), 1)
+        requested_payload = captured_payloads[0]
+        self.assertEqual(str(requested_payload.get("sport") or "").lower(), "wnba")
+
+        all_payload = dict(requested_payload)
+        all_payload["sport"] = "all"
+        self.assertNotEqual(_payload_key(requested_payload), _payload_key(all_payload))
 
     def test_intelligence_page_renders_embedded_console(self) -> None:
         fake_response = {
