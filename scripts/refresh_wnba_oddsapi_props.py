@@ -3104,11 +3104,12 @@ def _run_refresh_via_cli(
                 export_artifacts_ready = (
                     int(state.get("snapshot_rows") or 0) > 0
                     and int(state.get("predictions_rows") or 0) > 0
-                    and (not do_edges or int(state.get("edges_rows") or 0) > 0)
                     and int(state.get("recs_rows") or 0) > 0
                     and int(game_cards_rows or 0) > 0
                 )
                 if export_artifacts_ready:
+                    if do_edges and int(state.get("edges_rows") or 0) <= 0:
+                        _append_log(log_file, f"Export stage missing WNBA edges rows for {date_str}; continuing with warning because recommendations and game cards are present")
                     _append_log(log_file, f"Export stage returned {rc_export} but required WNBA artifacts were present; treating as warning for {date_str}")
                     state["rc_export"] = 0
                     rc_export = 0

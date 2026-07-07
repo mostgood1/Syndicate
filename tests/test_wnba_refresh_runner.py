@@ -663,6 +663,12 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
                 out_path.write_text("player\nA\n", encoding="utf-8")
                 return 1, out_path
 
+            def _fake_recommendations_export(*, processed_root, date_str, max_plus_odds=125.0):
+                out_path = processed_root / f"props_recommendations_{date_str}.csv"
+                out_path.parent.mkdir(parents=True, exist_ok=True)
+                out_path.write_text("player\nA\n", encoding="utf-8")
+                return 1, out_path
+
             def _fake_edges_export(**kwargs):
                 out_path = kwargs["out_path"]
                 out_path.parent.mkdir(parents=True, exist_ok=True)
@@ -695,6 +701,67 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
         self.assertEqual(int(state["rc_edges"]), 0)
         self.assertEqual(int(state["rc_export"]), 0)
         self.assertEqual(int(state["edges_rows"]), 0)
+        self.assertIn("WNBA props-edges produced no rows", str(state.get("warning")))
+
+    def test_run_refresh_via_cli_allows_missing_edges_when_recs_and_game_cards_exist(self) -> None:
+        module = self._load_module()
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_root = Path(tmp_dir)
+            source_root = tmp_root / "source"
+            raw_root = source_root / "data" / "raw"
+            processed_root = source_root / "data" / "processed"
+            raw_root.mkdir(parents=True, exist_ok=True)
+            processed_root.mkdir(parents=True, exist_ok=True)
+
+            def _fake_run(args, log_file, **kwargs):
+                if "--out" in args:
+                    out_idx = args.index("--out") + 1
+                    out_path = Path(args[out_idx])
+                    out_path.parent.mkdir(parents=True, exist_ok=True)
+                    out_path.write_text("snapshot_ts,event_id\n2026-05-22T12:00:00Z,evt-1\n", encoding="utf-8")
+                return 0
+
+            def _fake_predict_export(**kwargs):
+                out_path = kwargs["out_path"]
+                out_path.parent.mkdir(parents=True, exist_ok=True)
+                out_path.write_text("player\nA\n", encoding="utf-8")
+                return 1, out_path
+
+            def _fake_edges_export(**kwargs):
+                out_path = kwargs["out_path"]
+                out_path.parent.mkdir(parents=True, exist_ok=True)
+                out_path.write_text("", encoding="utf-8")
+                raise RuntimeError("simulated zero-row edges failure")
+
+            def _fake_game_cards_artifact(*, source_root, processed_root, date_str, log_file):
+                game_cards_path = source_root / "data" / "processed" / f"game_cards_{date_str}.csv"
+                game_cards_path.write_text("game_id\n1\n", encoding="utf-8")
+                return 1, game_cards_path
+
+            def _fake_recommendations_export(*, processed_root, date_str, max_plus_odds=125.0):
+                out_path = processed_root / f"props_recommendations_{date_str}.csv"
+                out_path.parent.mkdir(parents=True, exist_ok=True)
+                out_path.write_text("player\nA\n", encoding="utf-8")
+                return 1, out_path
+
+            with patch.object(module, "_run_to_file", side_effect=_fake_run), patch.object(module, "export_props_predictions_local", side_effect=_fake_predict_export), patch.object(module, "export_props_edges_local", side_effect=_fake_edges_export), patch.object(module, "export_props_recommendations_local", side_effect=_fake_recommendations_export), patch.object(module, "_build_local_game_cards_artifact", side_effect=_fake_game_cards_artifact), patch.object(module, "_build_local_game_recommendations_artifact", return_value=(0, None)), patch.object(module, "_ensure_player_logs_for_props_refresh", return_value=(True, None)), patch.object(module, "_ensure_game_predictions_for_props_refresh", return_value=(True, None)), patch.object(module, "_ensure_source_game_inputs", return_value={"schedule": 1, "fetch": 0, "build_features": 0, "predict_date": 0}):
+                state = module._run_refresh_via_cli(
+                    source_root=source_root,
+                    date_str="2026-05-22",
+                    regions="us",
+                    bookmakers="",
+                    markets="",
+                    do_edges=True,
+                    do_export=True,
+                    do_push=False,
+                    log_file=tmp_root / "refresh.log",
+                )
+
+        self.assertEqual(int(state["rc_edges"]), 0)
+        self.assertEqual(int(state["rc_export"]), 0)
+        self.assertEqual(int(state["edges_rows"]), 0)
+        self.assertGreater(int(state["recs_rows"]), 0)
         self.assertIn("WNBA props-edges produced no rows", str(state.get("warning")))
 
     def test_run_refresh_via_cli_uses_inprocess_export_props_recommendations(self) -> None:
