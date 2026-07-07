@@ -1604,70 +1604,6 @@
       "bullpen": [
         {
           "player": {
-            "mlbam_id": 687941,
-            "full_name": "Alec Gamboa",
-            "primary_position": "P",
-            "bat_side": "S",
-            "throw_side": "L"
-          },
-          "k_rate": 0.6666666666666666,
-          "bb_rate": 0.0,
-          "hbp_rate": 0.0,
-          "hr_rate": 0.0,
-          "inplay_hit_rate": 0.0,
-          "batters_faced": 3.0,
-          "balls_in_play": 1.0,
-          "arsenal": {
-            "FF": 0.7142857121428573,
-            "SI": 0.07142857321428567,
-            "SL": 0.21428571464285717
-          },
-          "pitch_type_whiff_mult": {},
-          "pitch_type_inplay_mult": {},
-          "pitch_type_hr_mult": {},
-          "statcast_splits_source": "",
-          "statcast_splits_n_pitches": 0,
-          "statcast_splits_start_date": "",
-          "statcast_splits_end_date": "",
-          "arsenal_source": "statsapi_pitchArsenal",
-          "arsenal_sample_size": 14,
-          "stamina_pitches": 25,
-          "role": "MR",
-          "availability_mult": 1.0,
-          "platoon_mult_vs_lhb": {
-            "k": 1.1925000000000001,
-            "bb": 1.0,
-            "hr": 1.0,
-            "inplay": 1.0
-          },
-          "platoon_mult_vs_rhb": {
-            "k": 0.8625,
-            "bb": 1.0,
-            "hr": 1.0,
-            "inplay": 1.0
-          },
-          "venue_mult_home": {},
-          "venue_mult_away": {
-            "k": 1.0,
-            "bb": 1.0,
-            "hr": 1.0,
-            "inplay": 1.0
-          },
-          "vs_venue_hr_mult": {},
-          "vs_venue_k_mult": {},
-          "vs_venue_bb_mult": {},
-          "vs_venue_inplay_mult": {},
-          "vs_venue_history": {},
-          "statcast_quality_mult": {},
-          "bb_gb_rate": 0.44,
-          "bb_fb_rate": 0.25,
-          "bb_ld_rate": 0.2,
-          "bb_pu_rate": 0.11,
-          "bb_inplay_n": 0,
-          "leverage_skill": 0.5
-        },
-        {
-          "player": {
             "mlbam_id": 547973,
             "full_name": "Aroldis Chapman",
             "primary_position": "P",
@@ -1698,7 +1634,7 @@
           "arsenal_sample_size": 340,
           "stamina_pitches": 25,
           "role": "CL",
-          "availability_mult": 0.935,
+          "availability_mult": 1.0,
           "platoon_mult_vs_lhb": {
             "k": 1.0557927658417188,
             "bb": 1.107370517928287,
@@ -1870,7 +1806,7 @@
           "arsenal_sample_size": 387,
           "stamina_pitches": 25,
           "role": "SU",
-          "availability_mult": 0.95,
+          "availability_mult": 1.0,
           "platoon_mult_vs_lhb": {
             "k": 1.1469418795111328,
             "bb": 1.1925000000000001,
@@ -1958,7 +1894,7 @@
           "arsenal_sample_size": 497,
           "stamina_pitches": 25,
           "role": "MR",
-          "availability_mult": 0.91,
+          "availability_mult": 1.0,
           "platoon_mult_vs_lhb": {
             "k": 0.8075,
             "bb": 1.1925000000000001,
@@ -2045,7 +1981,7 @@
           "arsenal_sample_size": 282,
           "stamina_pitches": 25,
           "role": "MR",
-          "availability_mult": 0.91,
+          "availability_mult": 1.0,
           "platoon_mult_vs_lhb": {
             "k": 1.0902116402116404,
             "bb": 0.8075,
@@ -2219,7 +2155,7 @@
           "arsenal_sample_size": 217,
           "stamina_pitches": 25,
           "role": "MR",
-          "availability_mult": 0.87,
+          "availability_mult": 1.0,
           "platoon_mult_vs_lhb": {
             "k": 1.182461355529132,
             "bb": 1.1925000000000001,
@@ -4008,7 +3944,7 @@
           "arsenal_sample_size": 258,
           "stamina_pitches": 25,
           "role": "MR",
-          "availability_mult": 0.845,
+          "availability_mult": 1.0,
           "platoon_mult_vs_lhb": {
             "k": 0.8797129328203611,
             "bb": 1.1925000000000001,
@@ -4182,7 +4118,7 @@
           "arsenal_sample_size": 724,
           "stamina_pitches": 25,
           "role": "MR",
-          "availability_mult": 0.89,
+          "availability_mult": 1.0,
           "platoon_mult_vs_lhb": {
             "k": 0.9504568288267481,
             "bb": 1.1806977871103217,
@@ -4354,7 +4290,7 @@
           "arsenal_sample_size": 383,
           "stamina_pitches": 25,
           "role": "SU",
-          "availability_mult": 0.89,
+          "availability_mult": 1.0,
           "platoon_mult_vs_lhb": {
             "k": 0.8075,
             "bb": 1.1048340108797952,

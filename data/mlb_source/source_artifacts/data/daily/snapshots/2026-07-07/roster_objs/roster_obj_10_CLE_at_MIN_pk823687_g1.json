@@ -1777,7 +1777,7 @@
           "arsenal_sample_size": 635,
           "stamina_pitches": 25,
           "role": "CL",
-          "availability_mult": 0.92,
+          "availability_mult": 1.0,
           "platoon_mult_vs_lhb": {
             "k": 1.065329405123236,
             "bb": 0.8956867731976902,
@@ -1864,7 +1864,7 @@
           "arsenal_sample_size": 439,
           "stamina_pitches": 25,
           "role": "SU",
-          "availability_mult": 0.92,
+          "availability_mult": 1.0,
           "platoon_mult_vs_lhb": {
             "k": 0.9832088141773954,
             "bb": 0.931352121723072,
@@ -1949,7 +1949,7 @@
           "arsenal_sample_size": 398,
           "stamina_pitches": 25,
           "role": "MR",
-          "availability_mult": 0.95,
+          "availability_mult": 1.0,
           "platoon_mult_vs_lhb": {
             "k": 0.9879996787798917,
             "bb": 0.8075,
@@ -2034,7 +2034,7 @@
           "arsenal_sample_size": 84,
           "stamina_pitches": 24,
           "role": "MR",
-          "availability_mult": 0.91,
+          "availability_mult": 1.0,
           "platoon_mult_vs_lhb": {
             "k": 1.11,
             "bb": 1.1925000000000001,
@@ -2099,7 +2099,7 @@
           "arsenal_sample_size": 393,
           "stamina_pitches": 25,
           "role": "MR",
-          "availability_mult": 0.945,
+          "availability_mult": 1.0,
           "platoon_mult_vs_lhb": {
             "k": 0.817588671254632,
             "bb": 1.0450723085163365,
@@ -2271,7 +2271,7 @@
           "arsenal_sample_size": 398,
           "stamina_pitches": 25,
           "role": "MR",
-          "availability_mult": 0.9,
+          "availability_mult": 1.0,
           "platoon_mult_vs_lhb": {
             "k": 1.1925000000000001,
             "bb": 1.0871063266443701,
@@ -2358,7 +2358,7 @@
           "arsenal_sample_size": 465,
           "stamina_pitches": 25,
           "role": "MR",
-          "availability_mult": 0.965,
+          "availability_mult": 1.0,
           "platoon_mult_vs_lhb": {
             "k": 1.0912434209276254,
             "bb": 0.8075,
@@ -4212,91 +4212,6 @@
       "bullpen": [
         {
           "player": {
-            "mlbam_id": 689520,
-            "full_name": "Cody Laweryson",
-            "primary_position": "P",
-            "bat_side": "L",
-            "throw_side": "R"
-          },
-          "k_rate": 0.24153225806451611,
-          "bb_rate": 0.10685483870967741,
-          "hbp_rate": 0.029411764705882353,
-          "hr_rate": 0.047177419354838705,
-          "inplay_hit_rate": 0.3130952380952381,
-          "batters_faced": 68.0,
-          "balls_in_play": 42.0,
-          "arsenal": {
-            "FF": 0.6795366932046331,
-            "CH": 0.14671813853281862,
-            "FC": 0.17374516826254832
-          },
-          "pitch_type_whiff_mult": {},
-          "pitch_type_inplay_mult": {},
-          "pitch_type_hr_mult": {},
-          "statcast_splits_source": "",
-          "statcast_splits_n_pitches": 0,
-          "statcast_splits_start_date": "",
-          "statcast_splits_end_date": "",
-          "arsenal_source": "statsapi_pitchArsenal",
-          "arsenal_sample_size": 259,
-          "stamina_pitches": 25,
-          "role": "MR",
-          "availability_mult": 1.0,
-          "platoon_mult_vs_lhb": {
-            "k": 1.0572342793544798,
-            "bb": 1.1362893081761007,
-            "hr": 1.2272079772079774,
-            "inplay": 0.9666629389398345
-          },
-          "platoon_mult_vs_rhb": {
-            "k": 0.9893199191635181,
-            "bb": 0.8563555114200596,
-            "hr": 0.78,
-            "inplay": 1.01212927756654
-          },
-          "venue_mult_home": {
-            "k": 1.1188205833251499,
-            "bb": 0.9390122086570478,
-            "hr": 0.8682001005530418,
-            "inplay": 1.0030118070842506
-          },
-          "venue_mult_away": {
-            "k": 0.9057203181773544,
-            "bb": 1.0353496115427303,
-            "hr": 1.0864002011060834,
-            "inplay": 0.9902215242188792
-          },
-          "vs_venue_hr_mult": {
-            "142": 0.8682001005530418
-          },
-          "vs_venue_k_mult": {
-            "142": 1.1188205833251499
-          },
-          "vs_venue_bb_mult": {
-            "142": 0.9390122086570478
-          },
-          "vs_venue_inplay_mult": {
-            "142": 1.0030118070842506
-          },
-          "vs_venue_history": {
-            "142": {
-              "bf": 34.0,
-              "k_mult": 1.3394873809289995,
-              "bb_mult": 0.825749167591565,
-              "hr_mult": 0.6234288587229764,
-              "inplay_mult": 1.0086051630978587
-            }
-          },
-          "statcast_quality_mult": {},
-          "bb_gb_rate": 0.44,
-          "bb_fb_rate": 0.25,
-          "bb_ld_rate": 0.2,
-          "bb_pu_rate": 0.11,
-          "bb_inplay_n": 0,
-          "leverage_skill": 0.5
-        },
-        {
-          "player": {
             "mlbam_id": 679358,
             "full_name": "Eric Orze",
             "primary_position": "P",
@@ -4724,7 +4639,7 @@
           "arsenal_sample_size": 630,
           "stamina_pitches": 25,
           "role": "CL",
-          "availability_mult": 0.9299999999999999,
+          "availability_mult": 1.0,
           "platoon_mult_vs_lhb": {
             "k": 1.0940090186815548,
             "bb": 0.9976149176062445,
@@ -4823,7 +4738,7 @@
           "arsenal_sample_size": 657,
           "stamina_pitches": 25,
           "role": "LR",
-          "availability_mult": 0.915,
+          "availability_mult": 1.0,
           "platoon_mult_vs_lhb": {
             "k": 0.9691264940254603,
             "bb": 1.0005128435720607,

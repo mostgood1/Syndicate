@@ -54,18 +54,18 @@
     "lineup_source": "projected_rotowire_today_lineup",
     "lineup_confidence": 0.72,
     "probable_pitcher": {
-      "id": null,
-      "source": "none",
-      "confidence": 0.0,
-      "raw_schedule_id": null,
-      "raw_feed_id": null
+      "id": 607625,
+      "source": "feed_gameData_probablePitchers",
+      "confidence": 0.75,
+      "raw_schedule_id": 607625,
+      "raw_feed_id": 607625
     },
     "starter": {
-      "id": 608379,
-      "name": "Michael Wacha",
+      "id": 607625,
+      "name": "Seth Lugo",
       "role": "SP",
-      "selection_source": "heuristic",
-      "requested_id": null
+      "selection_source": "probable",
+      "requested_id": 607625
     },
     "bullpen": [
       {
@@ -446,16 +446,26 @@
         "pos": "C",
         "bat": "R",
         "throw": "R",
-        "k_rate": 0.22,
-        "bb_rate": 0.08,
-        "hbp_rate": 0.008,
-        "hr_rate": 0.03,
+        "k_rate": 0.0,
+        "bb_rate": 0.2,
+        "hbp_rate": 0.0,
+        "hr_rate": 0.2,
         "inplay_hit_rate": 0.0,
-        "xb_hit_share": 0.22,
+        "xb_hit_share": 0.05,
         "vs_pitch_type": {},
         "vs_pitch_type_hr": {},
-        "platoon_mult_vs_lhp": {},
-        "platoon_mult_vs_rhp": {},
+        "platoon_mult_vs_lhp": {
+          "k": 1.0,
+          "bb": 0.8075,
+          "hr": 1.1375,
+          "inplay": 1.0
+        },
+        "platoon_mult_vs_rhp": {
+          "k": 1.0,
+          "bb": 1.1925000000000001,
+          "hr": 0.78,
+          "inplay": 1.0
+        },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
       },
@@ -490,45 +500,46 @@
       }
     ],
     "starter_profile": {
-      "id": 608379,
-      "name": "Michael Wacha",
+      "id": 607625,
+      "name": "Seth Lugo",
       "throw": "R",
       "role": "SP",
       "leverage_skill": 0.5,
       "stamina_pitches": 94,
       "availability_mult": 1.0,
       "platoon_mult_vs_lhb": {
-        "k": 1.058914115567135,
-        "bb": 1.0416791612534202,
-        "hr": 1.0580902426284349,
-        "inplay": 0.9974590665126707
+        "k": 1.0768409370556573,
+        "bb": 1.0799063482115079,
+        "hr": 0.78,
+        "inplay": 1.0463916042507682
       },
       "platoon_mult_vs_rhb": {
-        "k": 0.977271999513441,
-        "bb": 0.9866528048174301,
-        "hr": 0.9708966696630913,
-        "inplay": 0.9793345713401423
+        "k": 0.9607949994776613,
+        "bb": 0.8899653570584994,
+        "hr": 1.1280383105397127,
+        "inplay": 0.9330771994431222
       },
       "statcast_quality_mult": {},
       "arsenal_source": "statsapi_pitchArsenal",
-      "arsenal_sample_size": 1464,
+      "arsenal_sample_size": 1431,
       "statcast_splits_found": false,
       "statcast_splits_source": "",
       "statcast_splits_n_pitches": 0,
       "statcast_splits_start_date": "",
       "statcast_splits_end_date": "",
-      "k_rate": 0.1806494498777506,
-      "bb_rate": 0.06870644865525671,
-      "hbp_rate": 0.009779951100244499,
-      "hr_rate": 0.02359489608801956,
-      "inplay_hit_rate": 0.3001672240802676,
+      "k_rate": 0.17393700787401575,
+      "bb_rate": 0.0769291338582677,
+      "hbp_rate": 0.0026246719160104987,
+      "hr_rate": 0.03119860017497813,
+      "inplay_hit_rate": 0.33017497034400944,
       "arsenal": {
-        "FF": 0.27459016,
-        "CU": 0.10245901,
-        "CH": 0.22677596,
-        "SI": 0.14890711,
-        "SL": 0.09631147,
-        "FC": 0.15095629
+        "FF": 0.16911250422781263,
+        "OTHER": 0.15583507889587697,
+        "CU": 0.1460517036512926,
+        "CH": 0.08595388214884706,
+        "SI": 0.19846262496156564,
+        "SL": 0.09294200232355006,
+        "FC": 0.1516422037910551
       },
       "pitch_type_whiff_mult": {},
       "pitch_type_inplay_mult": {},
@@ -542,7 +553,7 @@
         "role": "SU",
         "leverage_skill": 0.7,
         "stamina_pitches": 25,
-        "availability_mult": 0.945,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 1.0168828836021075,
           "bb": 0.8225541156365708,
@@ -586,7 +597,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.825,
         "platoon_mult_vs_lhb": {
           "k": 1.132045026061883,
           "bb": 1.073479318734793,
@@ -630,7 +641,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.9400000000000001,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 1.004023582063861,
           "bb": 0.8075,
@@ -674,7 +685,7 @@
         "role": "SU",
         "leverage_skill": 0.7,
         "stamina_pitches": 25,
-        "availability_mult": 0.9299999999999999,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 0.8123385423638068,
           "bb": 1.1925000000000001,
@@ -718,38 +729,38 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.7,
         "platoon_mult_vs_lhb": {
-          "k": 1.0458333333333334,
+          "k": 1.0141025641025643,
           "bb": 1.0,
           "hr": 1.0,
-          "inplay": 1.1375
+          "inplay": 1.1344444444444446
         },
         "platoon_mult_vs_rhb": {
-          "k": 0.9266666666666666,
+          "k": 0.9738095238095238,
           "bb": 1.0,
           "hr": 1.0,
           "inplay": 0.8075
         },
         "statcast_quality_mult": {},
         "arsenal_source": "statsapi_pitchArsenal",
-        "arsenal_sample_size": 59,
+        "arsenal_sample_size": 95,
         "statcast_splits_found": false,
         "statcast_splits_source": "",
         "statcast_splits_n_pitches": 0,
         "statcast_splits_start_date": "",
         "statcast_splits_end_date": "",
-        "k_rate": 0.23076923076923078,
+        "k_rate": 0.3,
         "bb_rate": 0.0,
         "hbp_rate": 0.0,
         "hr_rate": 0.0,
-        "inplay_hit_rate": 0.4,
+        "inplay_hit_rate": 0.3571428571428571,
         "arsenal": {
-          "FF": 0.35593220355932204,
-          "OTHER": 0.27118644271186443,
-          "CH": 0.033898305338983054,
-          "SI": 0.3050847430508475,
-          "FC": 0.033898305338983054
+          "FF": 0.41052630944210516,
+          "OTHER": 0.231578955326316,
+          "CH": 0.021052632484210552,
+          "SI": 0.2947368367789473,
+          "FC": 0.042105265968421124
         },
         "pitch_type_whiff_mult": {},
         "pitch_type_inplay_mult": {},
@@ -805,7 +816,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.89,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 0.9578859197515731,
           "bb": 0.8075,
@@ -877,10 +888,10 @@
         "inplay_hit_rate": 0.4,
         "arsenal": {
           "FF": 0.15625,
-          "CU": 0.078125,
+          "OTHER": 0.3125,
           "CH": 0.15625,
           "SI": 0.296875,
-          "SL": 0.3125
+          "SL": 0.078125
         },
         "pitch_type_whiff_mult": {},
         "pitch_type_inplay_mult": {},
@@ -893,7 +904,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.85,
         "platoon_mult_vs_lhb": {
           "k": 1.0460887140828146,
           "bb": 1.0339197324414717,
@@ -959,7 +970,7 @@
       669004
     ],
     "lineup_source": "projected_rotowire_default_vs_rhp",
-    "lineup_confidence": 0.58,
+    "lineup_confidence": 0.66,
     "probable_pitcher": {
       "id": null,
       "source": "none",
@@ -1435,7 +1446,7 @@
       "role": "SP",
       "leverage_skill": 0.5,
       "stamina_pitches": 95,
-      "availability_mult": 1.0,
+      "availability_mult": 0.35,
       "platoon_mult_vs_lhb": {
         "k": 1.0218637596614304,
         "bb": 1.0176311762964507,
@@ -1480,7 +1491,7 @@
         "role": "SU",
         "leverage_skill": 0.7,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.8666666666666667,
         "platoon_mult_vs_lhb": {
           "k": 1.0689422400631294,
           "bb": 1.1925000000000001,
@@ -1523,7 +1534,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.96,
+        "availability_mult": 0.975,
         "platoon_mult_vs_lhb": {
           "k": 1.0246562559512473,
           "bb": 1.0105439144003567,
@@ -1566,7 +1577,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.8666666666666667,
         "platoon_mult_vs_lhb": {
           "k": 0.8771383684394274,
           "bb": 0.9134343434343434,
@@ -1609,7 +1620,7 @@
         "role": "CL",
         "leverage_skill": 0.85,
         "stamina_pitches": 25,
-        "availability_mult": 0.89,
+        "availability_mult": 0.75,
         "platoon_mult_vs_lhb": {
           "k": 0.9774906986358,
           "bb": 1.1496551682121143,
@@ -1651,29 +1662,38 @@
         "throw": "R",
         "role": "SU",
         "leverage_skill": 0.7,
-        "stamina_pitches": 25,
-        "availability_mult": 1.0,
-        "platoon_mult_vs_lhb": {},
-        "platoon_mult_vs_rhb": {},
+        "stamina_pitches": 22,
+        "availability_mult": 0.85,
+        "platoon_mult_vs_lhb": {
+          "k": 1.1833333333333333,
+          "bb": 1.1833333333333333,
+          "hr": 1.0,
+          "inplay": 1.0
+        },
+        "platoon_mult_vs_rhb": {
+          "k": 0.8075,
+          "bb": 0.8075,
+          "hr": 1.0,
+          "inplay": 1.0
+        },
         "statcast_quality_mult": {},
-        "arsenal_source": "default",
-        "arsenal_sample_size": 0,
+        "arsenal_source": "statsapi_pitchArsenal",
+        "arsenal_sample_size": 18,
         "statcast_splits_found": false,
         "statcast_splits_source": "",
         "statcast_splits_n_pitches": 0,
         "statcast_splits_start_date": "",
         "statcast_splits_end_date": "",
-        "k_rate": 0.24,
-        "bb_rate": 0.08,
-        "hbp_rate": 0.008,
-        "hr_rate": 0.03,
+        "k_rate": 0.25,
+        "bb_rate": 0.25,
+        "hbp_rate": 0.0,
+        "hr_rate": 0.0,
         "inplay_hit_rate": 0.0,
         "arsenal": {
-          "FF": 0.45,
-          "SL": 0.22,
-          "CH": 0.12,
-          "SI": 0.13,
-          "CU": 0.08
+          "FF": 0.33333333666666665,
+          "OTHER": 0.22222221777777784,
+          "CH": 0.11111110888888892,
+          "SI": 0.33333333666666665
         },
         "pitch_type_whiff_mult": {},
         "pitch_type_inplay_mult": {},
@@ -1686,7 +1706,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.92,
+        "availability_mult": 0.8416666666666667,
         "platoon_mult_vs_lhb": {
           "k": 0.9517680339462518,
           "bb": 1.0966796875000002,
@@ -1729,7 +1749,7 @@
         "role": "LR",
         "leverage_skill": 0.35,
         "stamina_pitches": 25,
-        "availability_mult": 0.9,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 0.8075,
           "bb": 1.1594277673545967,

@@ -1772,7 +1772,7 @@
           "arsenal_sample_size": 510,
           "stamina_pitches": 25,
           "role": "CL",
-          "availability_mult": 0.9299999999999999,
+          "availability_mult": 1.0,
           "platoon_mult_vs_lhb": {
             "k": 0.901618254311494,
             "bb": 1.1535013566141865,
@@ -2032,7 +2032,7 @@
           "arsenal_sample_size": 303,
           "stamina_pitches": 25,
           "role": "SU",
-          "availability_mult": 0.965,
+          "availability_mult": 1.0,
           "platoon_mult_vs_lhb": {
             "k": 1.107320793726835,
             "bb": 0.8075,
@@ -4353,7 +4353,7 @@
           "arsenal_sample_size": 555,
           "stamina_pitches": 25,
           "role": "MR",
-          "availability_mult": 0.955,
+          "availability_mult": 1.0,
           "platoon_mult_vs_lhb": {
             "k": 0.9548950283006408,
             "bb": 1.0843260023150585,
@@ -4439,7 +4439,7 @@
           "arsenal_sample_size": 444,
           "stamina_pitches": 25,
           "role": "CL",
-          "availability_mult": 0.855,
+          "availability_mult": 1.0,
           "platoon_mult_vs_lhb": {
             "k": 0.90491247116298,
             "bb": 1.1925000000000001,

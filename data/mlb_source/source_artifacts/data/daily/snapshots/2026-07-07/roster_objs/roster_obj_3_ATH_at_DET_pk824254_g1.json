@@ -1695,7 +1695,7 @@
           "arsenal_sample_size": 349,
           "stamina_pitches": 25,
           "role": "SU",
-          "availability_mult": 0.86,
+          "availability_mult": 1.0,
           "platoon_mult_vs_lhb": {
             "k": 1.1572376357056695,
             "bb": 1.0996998799519808,
@@ -1782,7 +1782,7 @@
           "arsenal_sample_size": 724,
           "stamina_pitches": 25,
           "role": "CL",
-          "availability_mult": 0.915,
+          "availability_mult": 1.0,
           "platoon_mult_vs_lhb": {
             "k": 1.0472005576798311,
             "bb": 1.0076142056739692,
@@ -1966,7 +1966,7 @@
           "arsenal_sample_size": 589,
           "stamina_pitches": 25,
           "role": "MR",
-          "availability_mult": 0.915,
+          "availability_mult": 1.0,
           "platoon_mult_vs_lhb": {
             "k": 1.0113433997825074,
             "bb": 0.954273962484438,
@@ -2022,89 +2022,6 @@
         },
         {
           "player": {
-            "mlbam_id": 695034,
-            "full_name": "Kade Morris",
-            "primary_position": "P",
-            "bat_side": "R",
-            "throw_side": "R"
-          },
-          "k_rate": 0.18181818181818182,
-          "bb_rate": 0.13636363636363635,
-          "hbp_rate": 0.0,
-          "hr_rate": 0.13636363636363635,
-          "inplay_hit_rate": 0.6,
-          "batters_faced": 22.0,
-          "balls_in_play": 15.0,
-          "arsenal": {
-            "FF": 0.12222221926666668,
-            "OTHER": 0.17777777893333332,
-            "CU": 0.06666666959999998,
-            "CH": 0.05555555566666666,
-            "SI": 0.3999999976,
-            "SL": 0.17777777893333332
-          },
-          "pitch_type_whiff_mult": {},
-          "pitch_type_inplay_mult": {},
-          "pitch_type_hr_mult": {},
-          "statcast_splits_source": "",
-          "statcast_splits_n_pitches": 0,
-          "statcast_splits_start_date": "",
-          "statcast_splits_end_date": "",
-          "arsenal_source": "statsapi_pitchArsenal",
-          "arsenal_sample_size": 90,
-          "stamina_pitches": 28,
-          "role": "MR",
-          "availability_mult": 1.0,
-          "platoon_mult_vs_lhb": {
-            "k": 0.8075,
-            "bb": 1.1925000000000001,
-            "hr": 1.275,
-            "inplay": 1.1833333333333333
-          },
-          "platoon_mult_vs_rhb": {
-            "k": 1.1925000000000001,
-            "bb": 0.8075,
-            "hr": 0.78,
-            "inplay": 0.9083333333333333
-          },
-          "venue_mult_home": {},
-          "venue_mult_away": {
-            "k": 1.0,
-            "bb": 1.0,
-            "hr": 1.0,
-            "inplay": 1.0
-          },
-          "vs_venue_hr_mult": {
-            "117": 1.0
-          },
-          "vs_venue_k_mult": {
-            "117": 1.0
-          },
-          "vs_venue_bb_mult": {
-            "117": 1.0
-          },
-          "vs_venue_inplay_mult": {
-            "117": 1.0
-          },
-          "vs_venue_history": {
-            "117": {
-              "bf": 22.0,
-              "k_mult": 1.0,
-              "bb_mult": 1.0,
-              "hr_mult": 1.0,
-              "inplay_mult": 1.0
-            }
-          },
-          "statcast_quality_mult": {},
-          "bb_gb_rate": 0.44,
-          "bb_fb_rate": 0.25,
-          "bb_ld_rate": 0.2,
-          "bb_pu_rate": 0.11,
-          "bb_inplay_n": 0,
-          "leverage_skill": 0.5
-        },
-        {
-          "player": {
             "mlbam_id": 665622,
             "full_name": "Luis Medina",
             "primary_position": "P",
@@ -2136,7 +2053,7 @@
           "arsenal_sample_size": 609,
           "stamina_pitches": 25,
           "role": "MR",
-          "availability_mult": 0.895,
+          "availability_mult": 1.0,
           "platoon_mult_vs_lhb": {
             "k": 1.1133320239186417,
             "bb": 1.1857232624022833,
@@ -2311,7 +2228,7 @@
           "arsenal_sample_size": 237,
           "stamina_pitches": 27,
           "role": "MR",
-          "availability_mult": 0.84,
+          "availability_mult": 1.0,
           "platoon_mult_vs_lhb": {
             "k": 0.8075,
             "bb": 1.0155347508727388,
@@ -4212,7 +4129,7 @@
           "arsenal_sample_size": 110,
           "stamina_pitches": 25,
           "role": "MR",
-          "availability_mult": 0.98,
+          "availability_mult": 1.0,
           "platoon_mult_vs_lhb": {
             "k": 1.00391532409142,
             "bb": 0.8075,
@@ -4351,7 +4268,7 @@
           "arsenal_sample_size": 293,
           "stamina_pitches": 25,
           "role": "CL",
-          "availability_mult": 0.96,
+          "availability_mult": 1.0,
           "platoon_mult_vs_lhb": {
             "k": 1.1407951333415263,
             "bb": 1.1925000000000001,
@@ -4522,7 +4439,7 @@
           "arsenal_sample_size": 821,
           "stamina_pitches": 28,
           "role": "SU",
-          "availability_mult": 0.945,
+          "availability_mult": 1.0,
           "platoon_mult_vs_lhb": {
             "k": 0.9184085903083701,
             "bb": 0.8804807692307692,

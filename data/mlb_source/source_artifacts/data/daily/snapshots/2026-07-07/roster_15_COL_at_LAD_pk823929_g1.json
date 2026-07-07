@@ -93,14 +93,20 @@
         "lev": 0.7
       },
       {
+        "id": 669298,
+        "name": "TJ Shook",
+        "role": "MR",
+        "lev": 0.5
+      },
+      {
         "id": 680767,
         "name": "Victor Vodnik",
         "role": "SU",
         "lev": 0.7
       },
       {
-        "id": 688642,
-        "name": "Zach Agnos",
+        "id": 685299,
+        "name": "Tanner Gordon",
         "role": "LR",
         "lev": 0.35
       }
@@ -540,7 +546,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 26,
-        "availability_mult": 1.0,
+        "availability_mult": 0.9083333333333333,
         "platoon_mult_vs_lhb": {
           "k": 1.0451501082611594,
           "bb": 0.9939405183240096,
@@ -627,8 +633,8 @@
         "throw": "R",
         "role": "CL",
         "leverage_skill": 0.85,
-        "stamina_pitches": 25,
-        "availability_mult": 0.895,
+        "stamina_pitches": 22,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 1.101503380587199,
           "bb": 1.1230475066649184,
@@ -708,13 +714,56 @@
         "pitch_type_hr_mult": {}
       },
       {
+        "id": 669298,
+        "name": "TJ Shook",
+        "throw": "R",
+        "role": "MR",
+        "leverage_skill": 0.5,
+        "stamina_pitches": 25,
+        "availability_mult": 1.0,
+        "platoon_mult_vs_lhb": {
+          "k": 1.1925000000000001,
+          "bb": 1.0,
+          "hr": 1.275,
+          "inplay": 1.1925000000000001
+        },
+        "platoon_mult_vs_rhb": {
+          "k": 0.8075,
+          "bb": 1.0,
+          "hr": 0.78,
+          "inplay": 0.8821428571428571
+        },
+        "statcast_quality_mult": {},
+        "arsenal_source": "statsapi_pitchArsenal",
+        "arsenal_sample_size": 48,
+        "statcast_splits_found": false,
+        "statcast_splits_source": "",
+        "statcast_splits_n_pitches": 0,
+        "statcast_splits_start_date": "",
+        "statcast_splits_end_date": "",
+        "k_rate": 0.21428571428571427,
+        "bb_rate": 0.0,
+        "hbp_rate": 0.0,
+        "hr_rate": 0.14285714285714285,
+        "inplay_hit_rate": 0.36363636363636365,
+        "arsenal": {
+          "FF": 0.45833334,
+          "OTHER": 0.20833333,
+          "CH": 0.1875,
+          "FC": 0.14583333
+        },
+        "pitch_type_whiff_mult": {},
+        "pitch_type_inplay_mult": {},
+        "pitch_type_hr_mult": {}
+      },
+      {
         "id": 680767,
         "name": "Victor Vodnik",
         "throw": "R",
         "role": "SU",
         "leverage_skill": 0.7,
         "stamina_pitches": 25,
-        "availability_mult": 0.875,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 1.1518177096857958,
           "bb": 0.8075,
@@ -752,45 +801,44 @@
         "pitch_type_hr_mult": {}
       },
       {
-        "id": 688642,
-        "name": "Zach Agnos",
+        "id": 685299,
+        "name": "Tanner Gordon",
         "throw": "R",
         "role": "LR",
         "leverage_skill": 0.35,
-        "stamina_pitches": 33,
+        "stamina_pitches": 38,
         "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
-          "k": 1.1710728690263392,
-          "bb": 1.0858994122747856,
-          "hr": 0.8795833981203919,
-          "inplay": 0.9376365275155001
+          "k": 1.1376437590743511,
+          "bb": 1.069523213048345,
+          "hr": 1.275,
+          "inplay": 1.1349248561087335
         },
         "platoon_mult_vs_rhb": {
-          "k": 0.9053650279658522,
-          "bb": 0.8880841121495326,
-          "hr": 0.9925727814801825,
-          "inplay": 1.00767886510409
+          "k": 0.8929234801096555,
+          "bb": 0.9820611123826962,
+          "hr": 0.78,
+          "inplay": 0.9043686122370553
         },
         "statcast_quality_mult": {},
         "arsenal_source": "statsapi_pitchArsenal",
-        "arsenal_sample_size": 826,
+        "arsenal_sample_size": 592,
         "statcast_splits_found": false,
         "statcast_splits_source": "",
         "statcast_splits_n_pitches": 0,
         "statcast_splits_start_date": "",
         "statcast_splits_end_date": "",
-        "k_rate": 0.14154166666666668,
-        "bb_rate": 0.09808333333333334,
-        "hbp_rate": 0.013333333333333334,
-        "hr_rate": 0.03959722222222222,
-        "inplay_hit_rate": 0.3649053473848556,
+        "k_rate": 0.21913226073583342,
+        "bb_rate": 0.04864545131905832,
+        "hbp_rate": 0.006329113924050633,
+        "hr_rate": 0.035082219330415235,
+        "inplay_hit_rate": 0.4096978557504873,
         "arsenal": {
-          "FF": 0.24939467000000004,
-          "OTHER": 0.15375303000000004,
-          "SI": 0.12348668000000002,
-          "SL": 0.13196126000000002,
-          "FC": 0.23486683000000003,
-          "FS": 0.10653753000000002
+          "FF": 0.3277027052432433,
+          "CU": 0.09797297556756761,
+          "CH": 0.22297297356756757,
+          "SI": 0.07939189127027027,
+          "SL": 0.27195945435135127
         },
         "pitch_type_whiff_mult": {},
         "pitch_type_inplay_mult": {},
@@ -861,6 +909,12 @@
         "lev": 0.5
       },
       {
+        "id": 623465,
+        "name": "Evan Phillips",
+        "role": "MR",
+        "lev": 0.5
+      },
+      {
         "id": 676263,
         "name": "Jack Dreyer",
         "role": "MR",
@@ -871,12 +925,6 @@
         "name": "Kyle Hurt",
         "role": "SU",
         "lev": 0.7
-      },
-      {
-        "id": 801434,
-        "name": "Paul Gervase",
-        "role": "MR",
-        "lev": 0.5
       },
       {
         "id": 656945,
@@ -1350,7 +1398,7 @@
         "role": "SU",
         "leverage_skill": 0.7,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.8083333333333333,
         "platoon_mult_vs_lhb": {
           "k": 0.9477122347066167,
           "bb": 0.9972067805915861,
@@ -1392,7 +1440,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.8916666666666666,
         "platoon_mult_vs_lhb": {
           "k": 0.8075,
           "bb": 1.1925000000000001,
@@ -1435,7 +1483,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.7666666666666666,
         "platoon_mult_vs_lhb": {
           "k": 0.9125031589588072,
           "bb": 1.1925000000000001,
@@ -1473,13 +1521,47 @@
         "pitch_type_hr_mult": {}
       },
       {
+        "id": 623465,
+        "name": "Evan Phillips",
+        "throw": "R",
+        "role": "MR",
+        "leverage_skill": 0.5,
+        "stamina_pitches": 22,
+        "availability_mult": 1.0,
+        "platoon_mult_vs_lhb": {},
+        "platoon_mult_vs_rhb": {},
+        "statcast_quality_mult": {},
+        "arsenal_source": "default",
+        "arsenal_sample_size": 0,
+        "statcast_splits_found": false,
+        "statcast_splits_source": "",
+        "statcast_splits_n_pitches": 0,
+        "statcast_splits_start_date": "",
+        "statcast_splits_end_date": "",
+        "k_rate": 0.24,
+        "bb_rate": 0.08,
+        "hbp_rate": 0.008,
+        "hr_rate": 0.03,
+        "inplay_hit_rate": 0.0,
+        "arsenal": {
+          "FF": 0.45,
+          "SL": 0.22,
+          "CH": 0.12,
+          "SI": 0.13,
+          "CU": 0.08
+        },
+        "pitch_type_whiff_mult": {},
+        "pitch_type_inplay_mult": {},
+        "pitch_type_hr_mult": {}
+      },
+      {
         "id": 676263,
         "name": "Jack Dreyer",
         "throw": "L",
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.865,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 0.8075,
           "bb": 0.9245324979673825,
@@ -1521,7 +1603,7 @@
         "role": "SU",
         "leverage_skill": 0.7,
         "stamina_pitches": 25,
-        "availability_mult": 0.89,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 1.1026142516785793,
           "bb": 1.1025294525294527,
@@ -1557,56 +1639,13 @@
         "pitch_type_hr_mult": {}
       },
       {
-        "id": 801434,
-        "name": "Paul Gervase",
-        "throw": "R",
-        "role": "MR",
-        "leverage_skill": 0.5,
-        "stamina_pitches": 25,
-        "availability_mult": 0.84,
-        "platoon_mult_vs_lhb": {
-          "k": 1.0275,
-          "bb": 0.8075,
-          "hr": 1.0,
-          "inplay": 0.8075
-        },
-        "platoon_mult_vs_rhb": {
-          "k": 0.9633333333333334,
-          "bb": 1.1925000000000001,
-          "hr": 1.0,
-          "inplay": 1.1925000000000001
-        },
-        "statcast_quality_mult": {},
-        "arsenal_source": "statsapi_pitchArsenal",
-        "arsenal_sample_size": 71,
-        "statcast_splits_found": false,
-        "statcast_splits_source": "",
-        "statcast_splits_n_pitches": 0,
-        "statcast_splits_start_date": "",
-        "statcast_splits_end_date": "",
-        "k_rate": 0.23809523809523808,
-        "bb_rate": 0.09523809523809523,
-        "hbp_rate": 0.0,
-        "hr_rate": 0.0,
-        "inplay_hit_rate": 0.3571428571428571,
-        "arsenal": {
-          "FF": 0.5070422268732381,
-          "CH": 0.014084507746478911,
-          "SL": 0.35211269866197303,
-          "FC": 0.12676056671831004
-        },
-        "pitch_type_whiff_mult": {},
-        "pitch_type_inplay_mult": {},
-        "pitch_type_hr_mult": {}
-      },
-      {
         "id": 656945,
         "name": "Tanner Scott",
         "throw": "L",
         "role": "CL",
         "leverage_skill": 0.85,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.8,
         "platoon_mult_vs_lhb": {
           "k": 1.0769337768815226,
           "bb": 1.0865375418460068,

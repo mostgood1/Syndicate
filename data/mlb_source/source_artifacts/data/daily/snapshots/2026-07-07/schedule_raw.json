@@ -67,10 +67,10 @@
           "active": true
         },
         "leagueRecord": {
-          "wins": 55,
+          "wins": 56,
           "losses": 33,
           "ties": 0,
-          "pct": ".625"
+          "pct": ".629"
         },
         "probablePitcher": {
           "id": 694819,
@@ -136,9 +136,9 @@
         },
         "leagueRecord": {
           "wins": 47,
-          "losses": 40,
+          "losses": 41,
           "ties": 0,
-          "pct": ".540"
+          "pct": ".534"
         },
         "splitSquad": false,
         "seriesNumber": 30,
@@ -243,10 +243,10 @@
           "active": true
         },
         "leagueRecord": {
-          "wins": 55,
+          "wins": 56,
           "losses": 33,
           "ties": 0,
-          "pct": ".625"
+          "pct": ".629"
         },
         "splitSquad": false,
         "seriesNumber": 30,
@@ -307,9 +307,9 @@
         },
         "leagueRecord": {
           "wins": 47,
-          "losses": 40,
+          "losses": 41,
           "ties": 0,
-          "pct": ".540"
+          "pct": ".534"
         },
         "splitSquad": false,
         "seriesNumber": 30,
@@ -774,9 +774,14 @@
         },
         "leagueRecord": {
           "wins": 52,
-          "losses": 36,
+          "losses": 37,
           "ties": 0,
-          "pct": ".591"
+          "pct": ".584"
+        },
+        "probablePitcher": {
+          "id": 694462,
+          "fullName": "Hurston Waldrep",
+          "link": "/api/v1/people/694462"
         },
         "splitSquad": false,
         "seriesNumber": 30,
@@ -1123,10 +1128,10 @@
           "active": true
         },
         "leagueRecord": {
-          "wins": 49,
+          "wins": 50,
           "losses": 40,
           "ties": 0,
-          "pct": ".551"
+          "pct": ".556"
         },
         "probablePitcher": {
           "id": 701542,
@@ -1192,9 +1197,14 @@
         },
         "leagueRecord": {
           "wins": 52,
-          "losses": 35,
+          "losses": 36,
           "ties": 0,
-          "pct": ".598"
+          "pct": ".591"
+        },
+        "probablePitcher": {
+          "id": 693855,
+          "fullName": "Ian Seymour",
+          "link": "/api/v1/people/693855"
         },
         "splitSquad": false,
         "seriesNumber": 30,
@@ -1299,9 +1309,9 @@
         },
         "leagueRecord": {
           "wins": 45,
-          "losses": 47,
+          "losses": 48,
           "ties": 0,
-          "pct": ".489"
+          "pct": ".484"
         },
         "probablePitcher": {
           "id": 837227,
@@ -1366,10 +1376,10 @@
           "active": true
         },
         "leagueRecord": {
-          "wins": 46,
+          "wins": 47,
           "losses": 45,
           "ties": 0,
-          "pct": ".505"
+          "pct": ".511"
         },
         "probablePitcher": {
           "id": 674841,
@@ -1478,10 +1488,15 @@
           "active": true
         },
         "leagueRecord": {
-          "wins": 36,
+          "wins": 37,
           "losses": 54,
           "ties": 0,
-          "pct": ".400"
+          "pct": ".407"
+        },
+        "probablePitcher": {
+          "id": 607625,
+          "fullName": "Seth Lugo",
+          "link": "/api/v1/people/607625"
         },
         "splitSquad": false,
         "seriesNumber": 30,
@@ -1541,10 +1556,10 @@
           "active": true
         },
         "leagueRecord": {
-          "wins": 37,
+          "wins": 38,
           "losses": 53,
           "ties": 0,
-          "pct": ".411"
+          "pct": ".418"
         },
         "splitSquad": false,
         "seriesNumber": 30,
@@ -1649,9 +1664,9 @@
         },
         "leagueRecord": {
           "wins": 50,
-          "losses": 40,
+          "losses": 41,
           "ties": 0,
-          "pct": ".556"
+          "pct": ".549"
         },
         "splitSquad": false,
         "seriesNumber": 30,
@@ -2363,10 +2378,10 @@
           "active": true
         },
         "leagueRecord": {
-          "wins": 44,
+          "wins": 45,
           "losses": 45,
           "ties": 0,
-          "pct": ".494"
+          "pct": ".500"
         },
         "probablePitcher": {
           "id": 668678,
@@ -2432,9 +2447,14 @@
         },
         "leagueRecord": {
           "wins": 44,
-          "losses": 45,
+          "losses": 46,
           "ties": 0,
-          "pct": ".494"
+          "pct": ".489"
+        },
+        "probablePitcher": {
+          "id": 608566,
+          "fullName": "Germ\u00e1n M\u00e1rquez",
+          "link": "/api/v1/people/608566"
         },
         "splitSquad": false,
         "seriesNumber": 30,
@@ -2539,9 +2559,9 @@
         },
         "leagueRecord": {
           "wins": 42,
-          "losses": 48,
+          "losses": 49,
           "ties": 0,
-          "pct": ".467"
+          "pct": ".462"
         },
         "splitSquad": false,
         "seriesNumber": 30,
@@ -2601,10 +2621,10 @@
           "active": true
         },
         "leagueRecord": {
-          "wins": 37,
+          "wins": 38,
           "losses": 52,
           "ties": 0,
-          "pct": ".416"
+          "pct": ".422"
         },
         "probablePitcher": {
           "id": 686790,
@@ -2714,9 +2734,9 @@
         },
         "leagueRecord": {
           "wins": 37,
-          "losses": 54,
+          "losses": 55,
           "ties": 0,
-          "pct": ".407"
+          "pct": ".402"
         },
         "probablePitcher": {
           "id": 547179,
@@ -2781,10 +2801,10 @@
           "active": true
         },
         "leagueRecord": {
-          "wins": 59,
+          "wins": 60,
           "losses": 32,
           "ties": 0,
-          "pct": ".648"
+          "pct": ".652"
         },
         "probablePitcher": {
           "id": 680736,

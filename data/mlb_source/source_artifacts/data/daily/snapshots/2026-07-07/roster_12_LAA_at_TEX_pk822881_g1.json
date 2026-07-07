@@ -111,6 +111,12 @@
         "lev": 0.5
       },
       {
+        "id": 642048,
+        "name": "Tayler Saucedo",
+        "role": "MR",
+        "lev": 0.5
+      },
+      {
         "id": 608718,
         "name": "Brent Suter",
         "role": "SU",
@@ -550,7 +556,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.85,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 0.9507461008564829,
           "bb": 1.1925000000000001,
@@ -593,7 +599,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.865,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 0.8585183579398946,
           "bb": 1.1925000000000001,
@@ -636,7 +642,7 @@
         "role": "SU",
         "leverage_skill": 0.7,
         "stamina_pitches": 25,
-        "availability_mult": 0.935,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 0.9789410413751032,
           "bb": 0.9798346513299785,
@@ -678,7 +684,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 30,
-        "availability_mult": 0.95,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 1.153259559486105,
           "bb": 0.9926383595432027,
@@ -837,6 +843,50 @@
           "FF": 0.7692307769230766,
           "SL": 0.2097902037062939,
           "FS": 0.020979019370629418
+        },
+        "pitch_type_whiff_mult": {},
+        "pitch_type_inplay_mult": {},
+        "pitch_type_hr_mult": {}
+      },
+      {
+        "id": 642048,
+        "name": "Tayler Saucedo",
+        "throw": "L",
+        "role": "MR",
+        "leverage_skill": 0.5,
+        "stamina_pitches": 25,
+        "availability_mult": 1.0,
+        "platoon_mult_vs_lhb": {
+          "k": 0.8075,
+          "bb": 1.0,
+          "hr": 1.0,
+          "inplay": 0.8280068728522336
+        },
+        "platoon_mult_vs_rhb": {
+          "k": 1.1925000000000001,
+          "bb": 1.0,
+          "hr": 1.0,
+          "inplay": 1.1925000000000001
+        },
+        "statcast_quality_mult": {},
+        "arsenal_source": "statsapi_pitchArsenal",
+        "arsenal_sample_size": 29,
+        "statcast_splits_found": false,
+        "statcast_splits_source": "",
+        "statcast_splits_n_pitches": 0,
+        "statcast_splits_start_date": "",
+        "statcast_splits_end_date": "",
+        "k_rate": 0.375,
+        "bb_rate": 0.0,
+        "hbp_rate": 0.125,
+        "hr_rate": 0.0,
+        "inplay_hit_rate": 0.485,
+        "arsenal": {
+          "FF": 0.10344828206896566,
+          "OTHER": 0.27586207551724157,
+          "CH": 0.2413793048275861,
+          "SI": 0.13793103275862068,
+          "SL": 0.2413793048275861
         },
         "pitch_type_whiff_mult": {},
         "pitch_type_inplay_mult": {},
@@ -1549,7 +1599,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.875,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 0.8264348841934173,
           "bb": 1.1925000000000001,
@@ -1593,7 +1643,7 @@
         "role": "SU",
         "leverage_skill": 0.7,
         "stamina_pitches": 25,
-        "availability_mult": 0.845,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 0.9738177979265064,
           "bb": 0.9257738746178054,
@@ -1679,7 +1729,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.91,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 0.9826315789473685,
           "bb": 1.1925000000000001,
@@ -1721,7 +1771,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.905,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 1.1455736224028907,
           "bb": 0.8075,

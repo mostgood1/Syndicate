@@ -556,7 +556,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.92,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 1.0122391143499323,
           "bb": 0.8882850470239222,
@@ -600,7 +600,7 @@
         "role": "SU",
         "leverage_skill": 0.7,
         "stamina_pitches": 25,
-        "availability_mult": 0.885,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 0.8075,
           "bb": 0.8075,
@@ -684,7 +684,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.965,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 1.0,
           "bb": 1.1925000000000001,
@@ -771,7 +771,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.92,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 0.9647556881760537,
           "bb": 1.1925000000000001,
@@ -858,7 +858,7 @@
         "role": "CL",
         "leverage_skill": 0.85,
         "stamina_pitches": 25,
-        "availability_mult": 0.92,
+        "availability_mult": 0.875,
         "platoon_mult_vs_lhb": {
           "k": 0.8647634698578572,
           "bb": 0.9495052226498076,
@@ -899,7 +899,7 @@
         "role": "LR",
         "leverage_skill": 0.35,
         "stamina_pitches": 37,
-        "availability_mult": 1.0,
+        "availability_mult": 0.35,
         "platoon_mult_vs_lhb": {
           "k": 0.938633666231521,
           "bb": 0.8075,
@@ -990,6 +990,12 @@
         "lev": 0.7
       },
       {
+        "id": 700669,
+        "name": "Gordon Graceffo",
+        "role": "SU",
+        "lev": 0.7
+      },
+      {
         "id": 668941,
         "name": "JoJo Romero",
         "role": "MR",
@@ -1004,12 +1010,6 @@
       {
         "id": 694335,
         "name": "Matt Svanson",
-        "role": "SU",
-        "lev": 0.7
-      },
-      {
-        "id": 691008,
-        "name": "Max Rajcic",
         "role": "MR",
         "lev": 0.5
       },
@@ -1420,7 +1420,7 @@
       "role": "SP",
       "leverage_skill": 0.5,
       "stamina_pitches": 88,
-      "availability_mult": 0.6100000000000001,
+      "availability_mult": 1.0,
       "platoon_mult_vs_lhb": {
         "k": 1.118399423975273,
         "bb": 0.8075,
@@ -1505,6 +1505,50 @@
         "pitch_type_hr_mult": {}
       },
       {
+        "id": 700669,
+        "name": "Gordon Graceffo",
+        "throw": "R",
+        "role": "SU",
+        "leverage_skill": 0.7,
+        "stamina_pitches": 25,
+        "availability_mult": 0.7916666666666666,
+        "platoon_mult_vs_lhb": {
+          "k": 0.8075,
+          "bb": 1.0491158267020337,
+          "hr": 1.275,
+          "inplay": 0.8075
+        },
+        "platoon_mult_vs_rhb": {
+          "k": 1.1925000000000001,
+          "bb": 0.8438008523827975,
+          "hr": 0.78,
+          "inplay": 1.1241880341880341
+        },
+        "statcast_quality_mult": {},
+        "arsenal_source": "statsapi_pitchArsenal",
+        "arsenal_sample_size": 553,
+        "statcast_splits_found": false,
+        "statcast_splits_source": "",
+        "statcast_splits_n_pitches": 0,
+        "statcast_splits_start_date": "",
+        "statcast_splits_end_date": "",
+        "k_rate": 0.09837662337662337,
+        "bb_rate": 0.1412337662337662,
+        "hbp_rate": 0.012987012987012988,
+        "hr_rate": 0.026623376623376625,
+        "inplay_hit_rate": 0.21336206896551724,
+        "arsenal": {
+          "FF": 0.419529832517179,
+          "CU": 0.17540687105244124,
+          "CH": 0.08860759453164557,
+          "SI": 0.05967450035804701,
+          "SL": 0.25678120154068723
+        },
+        "pitch_type_whiff_mult": {},
+        "pitch_type_inplay_mult": {},
+        "pitch_type_hr_mult": {}
+      },
+      {
         "id": 668941,
         "name": "JoJo Romero",
         "throw": "L",
@@ -1554,7 +1598,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.8083333333333333,
         "platoon_mult_vs_lhb": {
           "k": 0.976460104195229,
           "bb": 0.8157142857142857,
@@ -1595,10 +1639,10 @@
         "id": 694335,
         "name": "Matt Svanson",
         "throw": "R",
-        "role": "SU",
-        "leverage_skill": 0.7,
+        "role": "MR",
+        "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.805,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 0.8922776119702506,
           "bb": 1.064822481291266,
@@ -1628,51 +1672,6 @@
           "OTHER": 0.31699346683006535,
           "SI": 0.47058823529411764,
           "FC": 0.21241829787581704
-        },
-        "pitch_type_whiff_mult": {},
-        "pitch_type_inplay_mult": {},
-        "pitch_type_hr_mult": {}
-      },
-      {
-        "id": 691008,
-        "name": "Max Rajcic",
-        "throw": "R",
-        "role": "MR",
-        "leverage_skill": 0.5,
-        "stamina_pitches": 25,
-        "availability_mult": 1.0,
-        "platoon_mult_vs_lhb": {
-          "k": 0.8075,
-          "bb": 1.0611111111111111,
-          "hr": 0.78,
-          "inplay": 0.8075
-        },
-        "platoon_mult_vs_rhb": {
-          "k": 1.1925000000000001,
-          "bb": 0.95,
-          "hr": 1.275,
-          "inplay": 1.1925000000000001
-        },
-        "statcast_quality_mult": {},
-        "arsenal_source": "statsapi_pitchArsenal",
-        "arsenal_sample_size": 80,
-        "statcast_splits_found": false,
-        "statcast_splits_source": "",
-        "statcast_splits_n_pitches": 0,
-        "statcast_splits_start_date": "",
-        "statcast_splits_end_date": "",
-        "k_rate": 0.2,
-        "bb_rate": 0.1,
-        "hbp_rate": 0.0,
-        "hr_rate": 0.05,
-        "inplay_hit_rate": 0.21428571428571427,
-        "arsenal": {
-          "FF": 0.425,
-          "OTHER": 0.1125,
-          "CU": 0.2125,
-          "CH": 0.125,
-          "SI": 0.0625,
-          "SL": 0.0625
         },
         "pitch_type_whiff_mult": {},
         "pitch_type_inplay_mult": {},
@@ -1728,7 +1727,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.925,
+        "availability_mult": 0.8583333333333334,
         "platoon_mult_vs_lhb": {
           "k": 1.0516563217413486,
           "bb": 0.8139490806223479,
@@ -1771,7 +1770,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.9083333333333333,
         "platoon_mult_vs_lhb": {
           "k": 1.031100108376029,
           "bb": 1.0275206257366336,

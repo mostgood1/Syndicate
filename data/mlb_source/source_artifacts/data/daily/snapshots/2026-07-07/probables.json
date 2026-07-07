@@ -2,7 +2,7 @@
   "date": "2026-07-07",
   "season": 2026,
   "spring_mode": false,
-  "generated_at": "2026-07-06T07:43:48.862746",
+  "generated_at": "2026-07-07T07:14:20.124995",
   "games": [
     {
       "idx": 0,
@@ -259,23 +259,27 @@
         "team_id": 134,
         "abbr": "PIT"
       },
-      "away_probable_id": null,
+      "away_probable_id": 694462,
       "home_probable_id": 694973,
-      "away_source": "none",
+      "away_source": "feed_gameData_probablePitchers",
       "home_source": "feed_gameData_probablePitchers",
-      "away_confidence": 0.0,
+      "away_confidence": 0.75,
       "home_confidence": 0.75,
       "away_validation": {
-        "status": "none",
-        "selected_id": null,
-        "selected_name": "",
-        "selected_source": "none",
+        "status": "ok",
+        "selected_id": 694462,
+        "selected_name": "Hurston Waldrep",
+        "selected_source": "feed_gameData_probablePitchers",
         "override_reason": "",
-        "roster_team_ids": [],
-        "registry_team_ids": [],
-        "on_expected_team": false,
+        "roster_team_ids": [
+          144
+        ],
+        "registry_team_ids": [
+          144
+        ],
+        "on_expected_team": true,
         "on_opponent_team": false,
-        "on_expected_registry_team": false,
+        "on_expected_registry_team": true,
         "on_opponent_registry_team": false,
         "rejected_candidates": []
       },
@@ -298,13 +302,13 @@
         "rejected_candidates": []
       },
       "raw": {
-        "away_schedule_id": null,
+        "away_schedule_id": 694462,
         "home_schedule_id": 694973,
-        "away_schedule_name": "",
+        "away_schedule_name": "Hurston Waldrep",
         "home_schedule_name": "Paul Skenes",
-        "away_feed_id": null,
+        "away_feed_id": 694462,
         "home_feed_id": 694973,
-        "away_feed_name": "",
+        "away_feed_name": "Hurston Waldrep",
         "home_feed_name": "Paul Skenes"
       }
     },
@@ -380,11 +384,11 @@
         "abbr": "TB"
       },
       "away_probable_id": 701542,
-      "home_probable_id": null,
+      "home_probable_id": 693855,
       "away_source": "feed_gameData_probablePitchers",
-      "home_source": "none",
+      "home_source": "feed_gameData_probablePitchers",
       "away_confidence": 0.75,
-      "home_confidence": 0.0,
+      "home_confidence": 0.75,
       "away_validation": {
         "status": "ok",
         "selected_id": 701542,
@@ -404,28 +408,32 @@
         "rejected_candidates": []
       },
       "home_validation": {
-        "status": "none",
-        "selected_id": null,
-        "selected_name": "",
-        "selected_source": "none",
+        "status": "ok",
+        "selected_id": 693855,
+        "selected_name": "Ian Seymour",
+        "selected_source": "feed_gameData_probablePitchers",
         "override_reason": "",
-        "roster_team_ids": [],
-        "registry_team_ids": [],
-        "on_expected_team": false,
+        "roster_team_ids": [
+          139
+        ],
+        "registry_team_ids": [
+          139
+        ],
+        "on_expected_team": true,
         "on_opponent_team": false,
-        "on_expected_registry_team": false,
+        "on_expected_registry_team": true,
         "on_opponent_registry_team": false,
         "rejected_candidates": []
       },
       "raw": {
         "away_schedule_id": 701542,
-        "home_schedule_id": null,
+        "home_schedule_id": 693855,
         "away_schedule_name": "Will Warren",
-        "home_schedule_name": "",
+        "home_schedule_name": "Ian Seymour",
         "away_feed_id": 701542,
-        "home_feed_id": null,
+        "home_feed_id": 693855,
         "away_feed_name": "Will Warren",
-        "home_feed_name": ""
+        "home_feed_name": "Ian Seymour"
       }
     },
     {
@@ -503,23 +511,27 @@
         "team_id": 121,
         "abbr": "NYM"
       },
-      "away_probable_id": null,
+      "away_probable_id": 607625,
       "home_probable_id": null,
-      "away_source": "none",
+      "away_source": "feed_gameData_probablePitchers",
       "home_source": "none",
-      "away_confidence": 0.0,
+      "away_confidence": 0.75,
       "home_confidence": 0.0,
       "away_validation": {
-        "status": "none",
-        "selected_id": null,
-        "selected_name": "",
-        "selected_source": "none",
+        "status": "ok",
+        "selected_id": 607625,
+        "selected_name": "Seth Lugo",
+        "selected_source": "feed_gameData_probablePitchers",
         "override_reason": "",
-        "roster_team_ids": [],
-        "registry_team_ids": [],
-        "on_expected_team": false,
+        "roster_team_ids": [
+          118
+        ],
+        "registry_team_ids": [
+          118
+        ],
+        "on_expected_team": true,
         "on_opponent_team": false,
-        "on_expected_registry_team": false,
+        "on_expected_registry_team": true,
         "on_opponent_registry_team": false,
         "rejected_candidates": []
       },
@@ -538,13 +550,13 @@
         "rejected_candidates": []
       },
       "raw": {
-        "away_schedule_id": null,
+        "away_schedule_id": 607625,
         "home_schedule_id": null,
-        "away_schedule_name": "",
+        "away_schedule_name": "Seth Lugo",
         "home_schedule_name": "",
-        "away_feed_id": null,
+        "away_feed_id": 607625,
         "home_feed_id": null,
-        "away_feed_name": "",
+        "away_feed_name": "Seth Lugo",
         "home_feed_name": ""
       }
     },
@@ -812,11 +824,11 @@
         "abbr": "SD"
       },
       "away_probable_id": 668678,
-      "home_probable_id": null,
+      "home_probable_id": 608566,
       "away_source": "feed_gameData_probablePitchers",
-      "home_source": "none",
+      "home_source": "feed_gameData_probablePitchers",
       "away_confidence": 0.75,
-      "home_confidence": 0.0,
+      "home_confidence": 0.75,
       "away_validation": {
         "status": "ok",
         "selected_id": 668678,
@@ -836,28 +848,32 @@
         "rejected_candidates": []
       },
       "home_validation": {
-        "status": "none",
-        "selected_id": null,
-        "selected_name": "",
-        "selected_source": "none",
+        "status": "ok",
+        "selected_id": 608566,
+        "selected_name": "Germ\u00e1n M\u00e1rquez",
+        "selected_source": "feed_gameData_probablePitchers",
         "override_reason": "",
-        "roster_team_ids": [],
-        "registry_team_ids": [],
-        "on_expected_team": false,
+        "roster_team_ids": [
+          135
+        ],
+        "registry_team_ids": [
+          135
+        ],
+        "on_expected_team": true,
         "on_opponent_team": false,
-        "on_expected_registry_team": false,
+        "on_expected_registry_team": true,
         "on_opponent_registry_team": false,
         "rejected_candidates": []
       },
       "raw": {
         "away_schedule_id": 668678,
-        "home_schedule_id": null,
+        "home_schedule_id": 608566,
         "away_schedule_name": "Zac Gallen",
-        "home_schedule_name": "",
+        "home_schedule_name": "Germ\u00e1n M\u00e1rquez",
         "away_feed_id": 668678,
-        "home_feed_id": null,
+        "home_feed_id": 608566,
         "away_feed_name": "Zac Gallen",
-        "home_feed_name": ""
+        "home_feed_name": "Germ\u00e1n M\u00e1rquez"
       }
     },
     {
