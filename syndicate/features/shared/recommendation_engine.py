@@ -12,6 +12,7 @@ Constraints:
 
 from __future__ import annotations
 
+import logging
 import hashlib
 import json
 import uuid
@@ -29,6 +30,7 @@ SCHEMA_VERSION = 1
 MODEL_VERSION = "recommendation-engine-v1"
 DEFAULT_EVALUATION_LEDGER = repo_root_from(__file__) / "reports" / "intelligence" / "evaluation_ledger.jsonl"
 DEFAULT_PERFORMANCE_SUMMARY = repo_root_from(__file__) / "reports" / "intelligence" / "performance_summary.json"
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -911,6 +913,7 @@ def filter_candidates(
     sport_profile = build_reliability_profile(records=history_rows, sport=sport)
     policy_spec = _policy_spec(policy or select_policy(history_rows, sport=sport))
     filtered: list[dict[str, Any]] = []
+    rejected: list[dict[str, Any]] = []
     for candidate in candidate_rows:
         market = _market(candidate)
         market_profile = _market_profile(history_rows, sport=sport, market=market)
@@ -932,6 +935,20 @@ def filter_candidates(
         if reliability_multiplier < 0.88:
             threshold += 0.01
         if edge is not None and edge < threshold:
+            rejected.append(
+                {
+                    "sport": str(candidate.get("sport_slug") or candidate.get("sport") or "").strip().lower(),
+                    "name": _selection(candidate),
+                    "market": market,
+                    "edge": edge,
+                    "threshold": round(threshold, 4),
+                    "market_sample": market_sample,
+                    "market_roi": market_roi,
+                    "calibration_error": round(calibration_error, 4),
+                    "reliability_multiplier": round(reliability_multiplier, 4),
+                    "reason": "edge_below_threshold",
+                }
+            )
             continue
         enriched = dict(candidate)
         enriched.update(
@@ -963,6 +980,37 @@ def filter_candidates(
             }
         )
         filtered.append(_standardize_recommendation_fields(enriched, edge=edge, fair_probability=fair_probability, implied_probability=implied_probability))
+    if logger.isEnabledFor(logging.INFO):
+        before_rows = candidate_rows
+        after_rows = filtered
+
+        def _summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
+            def _count(target: str) -> int:
+                return sum(1 for row in rows if str(row.get("sport_slug") or row.get("sport") or "").strip().lower() == target)
+
+            return {
+                "total": len(rows),
+                "wnba": _count("wnba"),
+                "mlb": _count("mlb"),
+            }
+
+        logger.info(
+            json.dumps(
+                {
+                    "event": "recommendation_filter_stage",
+                    "stage": "filter_candidates",
+                    "before": _summary(before_rows),
+                    "after": _summary(after_rows),
+                    "rejected_reasons": {
+                        reason: sum(1 for item in rejected if item.get("reason") == reason)
+                        for reason in sorted({item.get("reason") for item in rejected if item.get("reason")})
+                    },
+                    "rejected_wnba": [item for item in rejected if item.get("sport") == "wnba"][:10],
+                },
+                sort_keys=True,
+                default=str,
+            )
+        )
     return filtered
 
 

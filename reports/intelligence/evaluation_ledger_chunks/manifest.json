@@ -5,7 +5,13 @@
       "path": "D:\\a\\Syndicate\\Syndicate\\reports\\intelligence\\evaluation_ledger_chunks\\2026-07-05.jsonl",
       "record_count": 1,
       "updated_at": "2026-07-05T07:06:10Z"
+    },
+    {
+      "chunk": "2026-07-06",
+      "path": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\intelligence\\evaluation_ledger_chunks\\2026-07-06.jsonl",
+      "record_count": 14,
+      "updated_at": "2026-07-07T05:10:53Z"
     }
   ],
-  "updated_at": "2026-07-05T07:06:10Z"
+  "updated_at": "2026-07-07T05:10:53Z"
 }

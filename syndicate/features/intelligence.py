@@ -4505,34 +4505,46 @@ def _collect_candidates(overview: list[dict[str, Any]], preferences: dict[str, A
         dashboard_games = sport.get("dashboard_games") if isinstance(sport.get("dashboard_games"), list) else []
         home_rails = sport.get("home_rails") if isinstance(sport.get("home_rails"), dict) else {}
         if preferences.get("include_props"):
+            pregame_candidates: list[dict[str, Any]] = []
             pregame = home_rails.get("pregame") if isinstance(home_rails.get("pregame"), dict) else {}
             for item in pregame.get("items") or []:
                 if isinstance(item, dict):
-                    candidates.append(
-                        _prop_candidate_from_item(
-                            sport,
-                            item,
-                            surface_key="pregame",
-                            surface_title=_safe_text(pregame.get("title"), "Pregame props"),
-                        )
+                    candidate = _prop_candidate_from_item(
+                        sport,
+                        item,
+                        surface_key="pregame",
+                        surface_title=_safe_text(pregame.get("title"), "Pregame props"),
                     )
+                    candidates.append(candidate)
+                    pregame_candidates.append(candidate)
+            if pregame_candidates:
+                _log_candidate_stage(pipeline_name="collect_candidates", stage="pregame_prop_candidate_creation", before=[], after=pregame_candidates)
+            live_candidates: list[dict[str, Any]] = []
             live = home_rails.get("live") if isinstance(home_rails.get("live"), dict) else {}
             for item in live.get("items") or []:
                 if isinstance(item, dict):
-                    candidates.append(
-                        _prop_candidate_from_item(
-                            sport,
-                            item,
-                            surface_key="live",
-                            surface_title=_safe_text(live.get("title"), "Top Live Props"),
-                        )
+                    candidate = _prop_candidate_from_item(
+                        sport,
+                        item,
+                        surface_key="live",
+                        surface_title=_safe_text(live.get("title"), "Top Live Props"),
                     )
+                    candidates.append(candidate)
+                    live_candidates.append(candidate)
+            if live_candidates:
+                _log_candidate_stage(pipeline_name="collect_candidates", stage="live_prop_candidate_creation", before=[], after=live_candidates)
         if preferences.get("include_games"):
             game_candidates = _game_candidates_for_sport(sport)
             candidates.extend(game_candidates)
+            if game_candidates:
+                _log_candidate_stage(pipeline_name="collect_candidates", stage="game_candidate_creation", before=[], after=game_candidates)
         if wants_mlb_hr_targets:
-            candidates.extend(_mlb_home_run_candidates_from_artifact(sport))
+            hr_candidates = _mlb_home_run_candidates_from_artifact(sport)
+            candidates.extend(hr_candidates)
+            if hr_candidates:
+                _log_candidate_stage(pipeline_name="collect_candidates", stage="mlb_home_run_backfill", before=[], after=hr_candidates)
         if wants_ranked_mlb_market_backfill:
+            backfill_candidates: list[dict[str, Any]] = []
             for artifact_candidate in _mlb_market_prop_candidates_from_artifact(sport, preferences):
                 artifact_subject = _candidate_subject_key(artifact_candidate)
                 artifact_market = _candidate_market_key(artifact_candidate)
@@ -4545,6 +4557,9 @@ def _collect_candidates(overview: list[dict[str, Any]], preferences: dict[str, A
                 ):
                     continue
                 candidates.append(artifact_candidate)
+                backfill_candidates.append(artifact_candidate)
+            if backfill_candidates:
+                _log_candidate_stage(pipeline_name="collect_candidates", stage="mlb_market_backfill", before=[], after=backfill_candidates)
         sport_candidates = candidates[sport_start_count:]
         sport_market_counts: dict[str, int] = {}
         for candidate in sport_candidates:
@@ -4562,28 +4577,49 @@ def _collect_candidates(overview: list[dict[str, Any]], preferences: dict[str, A
     stage_started_at = time.perf_counter()
     odds_history_by_sport = _odds_history_payloads_by_sport(overview)
     candidates = _enrich_candidates_with_odds_history(candidates, odds_history_by_sport)
+    _log_candidate_stage(pipeline_name="collect_candidates", stage="post_odds_enrichment", before=[], after=candidates)
 
     _intel_trace_timed("candidate_generation", stage_started_at, stage="post_odds_enrichment", total_candidates=len(candidates))
     stage_started_at = time.perf_counter()
     validated_candidates: list[dict[str, Any]] = []
+    state_pruned_candidates: list[dict[str, Any]] = []
     for candidate in candidates:
         if not isinstance(candidate, dict):
+            state_pruned_candidates.append({"stage": "post_state_filter", "reason": "non_dict_candidate"})
             continue
         _apply_candidate_state_guard(candidate)
         if bool(candidate.get("state_invalid")):
+            state_pruned_candidates.append(_collect_candidate_trace(candidate, reason=_safe_text(candidate.get("state_note"), "state_invalid"), stage="post_state_filter"))
             continue
         validated_candidates.append(candidate)
     candidates = validated_candidates
+    _log_candidate_stage(pipeline_name="collect_candidates", stage="post_state_filter", before=[], after=candidates)
+    for removed_candidate in state_pruned_candidates:
+        _log_json_event(logging.INFO, "collect_candidates_pruned", pipeline="collect_candidates", **removed_candidate)
     _intel_trace_timed("candidate_generation", stage_started_at, stage="post_state_filter", total_candidates=len(candidates))
 
     stage_started_at = time.perf_counter()
     _intel_trace_timed("candidate_generation", stage_started_at, stage="pre_requested_market_filter", total_candidates=len(candidates))
+    requested_market_pruned: list[dict[str, Any]] = []
+    requested_market_input = list(candidates)
     candidates = _filter_candidates_to_requested_markets(candidates, preferences.get("requested_markets") or [])
+    for candidate in requested_market_input:
+        if candidate not in candidates:
+            requested_market_pruned.append(_collect_candidate_trace(candidate, reason="requested_market_mismatch", stage="post_requested_market_filter"))
+    _log_candidate_stage(pipeline_name="collect_candidates", stage="post_requested_market_filter", before=[], after=candidates)
+    for removed_candidate in requested_market_pruned:
+        _log_json_event(logging.INFO, "collect_candidates_pruned", pipeline="collect_candidates", **removed_candidate)
     _intel_trace_timed("candidate_generation", stage_started_at, stage="post_requested_market_filter", total_candidates=len(candidates))
+
+    normalized_candidates = [normalize_candidate(candidate) for candidate in candidates]
+    _log_candidate_stage(pipeline_name="collect_candidates", stage="normalize_candidate", before=candidates, after=normalized_candidates)
 
     deduped: list[dict[str, Any]] = []
     seen: set[tuple[str, str, str, str, str]] = set()
-    for row in sorted(candidates, key=lambda candidate: float(candidate.get("score") or 0.0), reverse=True):
+    classified_candidates: list[dict[str, Any]] = []
+    classification_pruned: list[dict[str, Any]] = []
+    dedupe_pruned: list[dict[str, Any]] = []
+    for row in sorted(normalized_candidates, key=lambda candidate: float(candidate.get("score") or 0.0), reverse=True):
         identity = (
             _safe_text(row.get("candidate_type"), "candidate"),
             _safe_text(row.get("sport_slug"), "sport"),
@@ -4592,12 +4628,20 @@ def _collect_candidates(overview: list[dict[str, Any]], preferences: dict[str, A
             _safe_text(row.get("pick") or row.get("name"), "pick"),
         )
         if identity in seen:
+            dedupe_pruned.append(_collect_candidate_trace(row, reason="duplicate_identity", stage="deduplication"))
             continue
         seen.add(identity)
         classified_row = classify_candidate(row)
         if classified_row is None:
+            classification_pruned.append(_collect_candidate_trace(row, reason=_candidate_classification_removal_reason(row), stage="candidate_classification"))
             continue
+        classified_candidates.append(classified_row)
         deduped.append(classified_row)
+    _log_candidate_stage(pipeline_name="collect_candidates", stage="classify_candidate", before=normalized_candidates, after=classified_candidates)
+    _log_candidate_stage(pipeline_name="collect_candidates", stage="deduplication", before=classified_candidates, after=deduped)
+    for removed_candidate in classification_pruned + dedupe_pruned:
+        _log_json_event(logging.INFO, "collect_candidates_pruned", pipeline="collect_candidates", **removed_candidate)
+    _log_candidate_stage(pipeline_name="collect_candidates", stage="post_dedupe_and_classify", before=[], after=deduped)
     return deduped
 
 
@@ -6150,13 +6194,94 @@ def _log_candidate_pipeline(
         _log_json_event(logging.DEBUG, "intelligence_candidate_decision", **payload)
 
 
+def _sport_candidate_summary(candidates: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
+    rows = [dict(candidate) for candidate in candidates if isinstance(candidate, Mapping)]
+
+    def _sport_count(target_sport: str) -> int:
+        return sum(1 for candidate in rows if _safe_text(candidate.get("sport_slug") or candidate.get("sport"), "").lower() == target_sport)
+
+    def _candidate_metrics(candidate: Mapping[str, Any]) -> dict[str, Any]:
+        market_profile = candidate.get("market_profile") if isinstance(candidate.get("market_profile"), Mapping) else {}
+        sport_profile = candidate.get("sport_profile") if isinstance(candidate.get("sport_profile"), Mapping) else {}
+        calibration_error = _numeric_hint(market_profile.get("calibration_error"))
+        if calibration_error is None:
+            calibration_error = _numeric_hint(sport_profile.get("calibration_error"))
+        return {
+            "sport": _safe_text(candidate.get("sport_slug") or candidate.get("sport"), "").lower(),
+            "name": _safe_text(candidate.get("name"), candidate.get("pick"), candidate.get("selection"), candidate.get("player_name")),
+            "score": _numeric_hint(candidate.get("score")),
+            "edge": _numeric_hint(candidate.get("edge")),
+            "adjusted_score": _numeric_hint(candidate.get("adjusted_score")),
+            "reliability": _numeric_hint(candidate.get("performance_multiplier") or candidate.get("reliability_multiplier") or candidate.get("source_strength")),
+            "calibration_error": calibration_error,
+        }
+
+    scored_rows = sorted(rows, key=lambda candidate: float(candidate.get("score") or 0.0), reverse=True)
+    wnba_rows = [candidate for candidate in scored_rows if _safe_text(candidate.get("sport_slug") or candidate.get("sport"), "").lower() == "wnba"]
+    mlb_rows = [candidate for candidate in scored_rows if _safe_text(candidate.get("sport_slug") or candidate.get("sport"), "").lower() == "mlb"]
+    return {
+        "total": len(rows),
+        "wnba": _sport_count("wnba"),
+        "mlb": _sport_count("mlb"),
+        "top_wnba": [_candidate_metrics(candidate) for candidate in wnba_rows[:10]],
+        "top_mlb": [_candidate_metrics(candidate) for candidate in mlb_rows[:10]],
+    }
+
+
+def _log_candidate_stage(
+    *,
+    pipeline_name: str,
+    stage: str,
+    before: Iterable[Mapping[str, Any]],
+    after: Iterable[Mapping[str, Any]],
+) -> None:
+    _log_json_event(
+        logging.INFO,
+        "intelligence_candidate_stage",
+        pipeline=pipeline_name,
+        stage=stage,
+        before=_sport_candidate_summary(before),
+        after=_sport_candidate_summary(after),
+    )
+
+
+def _collect_candidate_trace(candidate: Mapping[str, Any], *, reason: str, stage: str) -> dict[str, Any]:
+    return {
+        "stage": stage,
+        "reason": reason,
+        "sport": _safe_text(candidate.get("sport_slug") or candidate.get("sport"), "").lower(),
+        "player": _safe_text(candidate.get("player_name") or candidate.get("name") or candidate.get("selection"), ""),
+        "market": _safe_text(candidate.get("market") or candidate.get("market_key") or candidate.get("candidate_type"), ""),
+        "selection": _safe_text(candidate.get("selection") or candidate.get("pick") or candidate.get("name"), ""),
+    }
+
+
+def _candidate_classification_removal_reason(candidate: Mapping[str, Any]) -> str:
+    if not _safe_text(candidate.get("selection"), ""):
+        return "missing_selection"
+    if not _safe_text(candidate.get("type"), ""):
+        return "missing_type"
+    has_projection = candidate.get("projection") is not None and _safe_text(candidate.get("projection"), "") not in {"", "-"}
+    has_odds = candidate.get("odds") is not None and _safe_text(candidate.get("odds"), "") not in {"", "-"}
+    if not (has_projection or has_odds):
+        return "missing_projection_or_odds"
+    return "classification_rejected"
+
+
 def collect_candidates(overview: list[dict[str, Any]], preferences: dict[str, Any], odds_history_by_sport: dict[str, dict[str, Any]] | None = None) -> list[dict[str, Any]]:
     if odds_history_by_sport is None:
         odds_history_by_sport = _odds_history_payloads_by_sport(overview)
     candidates = _collect_candidates(overview, preferences)
-    normalized_candidates = [normalize_candidate(candidate) for candidate in _enrich_candidates_with_odds_history(candidates, odds_history_by_sport)]
+    _log_candidate_stage(pipeline_name="collect_candidates", stage="_collect_candidates", before=[], after=candidates)
+    enriched_candidates = _enrich_candidates_with_odds_history(candidates, odds_history_by_sport)
+    _log_candidate_stage(pipeline_name="collect_candidates", stage="_enrich_candidates_with_odds_history", before=candidates, after=enriched_candidates)
+    normalized_candidates = [normalize_candidate(candidate) for candidate in enriched_candidates]
+    _log_candidate_stage(pipeline_name="collect_candidates", stage="normalize_candidate", before=enriched_candidates, after=normalized_candidates)
     classified_candidates = [classified for candidate in normalized_candidates if (classified := classify_candidate(candidate)) is not None]
-    return [candidate for candidate in (UniversalCandidate.from_raw(classified) for classified in classified_candidates) if candidate is not None]
+    _log_candidate_stage(pipeline_name="collect_candidates", stage="classify_candidate", before=normalized_candidates, after=classified_candidates)
+    universal_candidates = [candidate for candidate in (UniversalCandidate.from_raw(classified) for classified in classified_candidates) if candidate is not None]
+    _log_candidate_stage(pipeline_name="collect_candidates", stage="UniversalCandidate.from_raw", before=classified_candidates, after=universal_candidates)
+    return universal_candidates
 
 
 def score_candidate(
@@ -6523,6 +6648,7 @@ def run_intelligence_query(
     candidate_started_at = time.perf_counter()
     candidates = _primary_query_candidates(overview, preferences, odds_history_by_sport)
     _intel_trace_timed("candidate_generation", candidate_started_at, pipeline="run_intelligence_query", candidate_count=len(candidates))
+    _log_candidate_stage(pipeline_name="run_intelligence_query", stage="collect_candidates", before=[], after=candidates)
     resolved_requested_subjects = _resolved_requested_subjects(question, candidates)
     if resolved_requested_subjects != (preferences.get("requested_subjects") or []):
         preferences = {**preferences, "requested_subjects": resolved_requested_subjects}
@@ -6535,21 +6661,31 @@ def run_intelligence_query(
     if resolved_analysis_focus and resolved_analysis_focus != preferences.get("analysis_focus"):
         preferences = {**preferences, "analysis_focus": resolved_analysis_focus}
     scoring_started_at = time.perf_counter()
+    pre_enrich_candidates = [dict(candidate) for candidate in candidates if isinstance(candidate, Mapping)]
     candidates = _enrich_candidates_with_odds_history(candidates, odds_history_by_sport)
+    _log_candidate_stage(pipeline_name="run_intelligence_query", stage="_enrich_candidates_with_odds_history", before=pre_enrich_candidates, after=candidates)
+    pre_score_candidates = [dict(candidate) for candidate in candidates if isinstance(candidate, Mapping)]
     candidates = _score_candidates(candidates, advanced_by_sport, preferences)
+    _log_candidate_stage(pipeline_name="run_intelligence_query", stage="_score_candidates", before=pre_score_candidates, after=candidates)
     _intel_trace_timed("scoring", scoring_started_at, pipeline="run_intelligence_query", candidate_count=len(candidates))
     ranking_started_at = time.perf_counter()
+    pre_filter_candidates = [dict(candidate) for candidate in candidates if isinstance(candidate, Mapping)]
     filtered_candidates = filter_candidates(candidates, sport=_safe_text(preferences.get("sport"), "") or None)
+    _log_candidate_stage(pipeline_name="run_intelligence_query", stage="filter_candidates", before=pre_filter_candidates, after=filtered_candidates)
+    pre_balance_candidates = [dict(candidate) for candidate in filtered_candidates if isinstance(candidate, Mapping)]
     ranked_recommendations = _balanced_recommendation_order(filtered_candidates)
+    _log_candidate_stage(pipeline_name="run_intelligence_query", stage="_balanced_recommendation_order", before=pre_balance_candidates, after=ranked_recommendations)
     if not ranked_recommendations:
         ranked_recommendations = _balanced_recommendation_order(candidates)
     _intel_trace_timed("ranking", ranking_started_at, pipeline="run_intelligence_query", recommendation_count=len(ranked_recommendations))
     evaluation_started_at = time.perf_counter()
+    pre_selection_recommendations = [dict(candidate) for candidate in ranked_recommendations if isinstance(candidate, Mapping)]
     recommendations = _greedy_low_correlation_selection(
         [dict(candidate) for candidate in ranked_recommendations],
         limit=preferences["limit"],
         threshold=MAX_CORRELATION_THRESHOLD,
     )
+    _log_candidate_stage(pipeline_name="run_intelligence_query", stage="_greedy_low_correlation_selection", before=pre_selection_recommendations, after=recommendations)
     _intel_trace_timed("evaluation", evaluation_started_at, pipeline="run_intelligence_query", recommendation_count=len(recommendations))
     _intel_trace(
         "opportunity_generation",
