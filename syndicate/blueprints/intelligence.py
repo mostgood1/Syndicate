@@ -1222,10 +1222,13 @@ def intelligence_status_api():
         _LOGGER.info("BETTING_BOARD_REFRESH_START", extra={"selected_date": selected_date, "source": "status_api", "refresh_requested": True})
     status_payload = _intelligence_page_payload(selected_date, sport=selected_sport, force_refresh=False)
     stale_snapshot = False
+    current_snapshot = read_latest_intelligence_state(dict(status_payload))
+    has_snapshot = isinstance(current_snapshot, dict) and _response_has_content(current_snapshot)
     if not refresh_requested:
-        current_snapshot = read_latest_intelligence_state(dict(status_payload))
         stale_snapshot = bool(_response_selected_date(current_snapshot) and _response_selected_date(current_snapshot) != selected_date)
     if refresh_requested:
+        _safe_queue_intelligence_state_refresh(_intelligence_page_payload(selected_date, sport=selected_sport, force_refresh=True))
+    elif not has_snapshot:
         _safe_queue_intelligence_state_refresh(_intelligence_page_payload(selected_date, sport=selected_sport, force_refresh=True))
     elif stale_snapshot:
         _safe_queue_intelligence_state_refresh(_intelligence_page_payload(selected_date, sport=selected_sport, force_refresh=True))

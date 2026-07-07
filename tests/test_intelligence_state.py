@@ -86,6 +86,53 @@ class IntelligenceStateTests(unittest.TestCase):
 
         self.assertIsNone(response)
 
+    def test_read_latest_response_does_not_fall_back_to_other_sport(self) -> None:
+        service = IntelligenceStateService()
+        mlb_payload = {
+            "question": "top edges today",
+            "date": "2026-07-07",
+            "mode": "recommendation",
+            "sport": "mlb",
+            "game_state": "all",
+            "timing": "all",
+            "limit": 5,
+            "include_props": True,
+            "include_games": True,
+        }
+        snapshot = IntelligenceSnapshot(
+            key=_payload_key(mlb_payload),
+            payload=dict(mlb_payload),
+            response={
+                "ok": True,
+                "selected_date": "2026-07-07",
+                "recommendations": [{"sport": "MLB", "name": "Play 1"}],
+                "top_opportunities": [{"sport": "MLB", "name": "Play 1"}],
+                "board_contract": {"cards": [{"sport": "mlb", "name": "Play 1"}]},
+            },
+            computed_at="2026-07-07T00:00:00Z",
+            source_fingerprint="fingerprint-1",
+        )
+        service._snapshots[snapshot.key] = snapshot
+        service._latest_key = snapshot.key
+
+        response = service.read_latest_response(
+            {
+                "question": "top edges today",
+                "date": "2026-07-07",
+                "mode": "recommendation",
+                "sport": "wnba",
+                "game_state": "all",
+                "timing": "all",
+                "limit": 5,
+                "include_props": True,
+                "include_games": True,
+            },
+            force_refresh=False,
+            allow_latest_fallback=False,
+        )
+
+        self.assertIsNone(response)
+
     def test_read_latest_response_can_opt_into_latest_fallback(self) -> None:
         service = IntelligenceStateService()
         snapshot = {

@@ -164,6 +164,52 @@ def _selected_date_from_payload(payload: dict[str, Any] | None) -> str | None:
     current = dict(payload or {})
     return str(current.get("date") or current.get("selected_date") or "").strip() or None
 
+def _requested_sport_from_payload(payload: dict[str, Any] | None) -> str | None:
+    current = dict(payload or {})
+    return str(current.get("sport") or current.get("selected_sport") or current.get("sport_slug") or "").strip().lower() or None
+
+
+def _snapshot_sport(snapshot: "IntelligenceSnapshot") -> str | None:
+    payload = dict(snapshot.payload or {}) if isinstance(snapshot.payload, dict) else {}
+    for key in ("sport", "selected_sport", "sport_slug"):
+        value = str(payload.get(key) or "").strip().lower()
+        if value:
+            return value
+    response = dict(snapshot.response or {}) if isinstance(snapshot.response, dict) else {}
+    for key in ("top_opportunities", "recommendations"):
+        entries = response.get(key)
+        if not isinstance(entries, list):
+            continue
+        for entry in entries:
+            if not isinstance(entry, Mapping):
+                continue
+            value = str(entry.get("sport") or entry.get("sport_slug") or entry.get("source_sport") or "").strip().lower()
+            if value:
+                return value
+    board_contract = response.get("board_contract")
+    if isinstance(board_contract, dict):
+        cards = board_contract.get("cards")
+        if isinstance(cards, list):
+            for card in cards:
+                if not isinstance(card, Mapping):
+                    continue
+                value = str(card.get("sport") or card.get("sport_slug") or "").strip().lower()
+                if value:
+                    return value
+    return None
+
+
+def _snapshot_matches_payload(snapshot: "IntelligenceSnapshot", payload: dict[str, Any]) -> bool:
+    requested_date = _selected_date_from_payload(payload)
+    snapshot_date = _selected_date_from_payload(snapshot.payload if isinstance(snapshot.payload, dict) else None)
+    if requested_date and snapshot_date and snapshot_date != requested_date:
+        return False
+    requested_sport = _requested_sport_from_payload(payload)
+    if not requested_sport or requested_sport == "all":
+        return True
+    snapshot_sport = _snapshot_sport(snapshot)
+    return snapshot_sport == requested_sport
+
 
 def _selected_date_from_response(response: dict[str, Any] | None) -> str | None:
     current = dict(response or {})
@@ -1291,15 +1337,28 @@ class IntelligenceStateService:
         normalized_payload = self._normalize_payload(payload or self._default_payload())
         key = _payload_key(normalized_payload)
         requested_date = _selected_date_from_payload(normalized_payload)
+        requested_sport = _requested_sport_from_payload(normalized_payload)
         with self._lock:
             snapshot = self._snapshots.get(key)
             if snapshot is not None:
                 return dict(snapshot.response)
+            if requested_sport and requested_sport != "all":
+                for candidate_snapshot in reversed(list(self._snapshots.values())):
+                    if _snapshot_matches_payload(candidate_snapshot, normalized_payload):
+                        return dict(candidate_snapshot.response)
             if self._latest_key and self._latest_key in self._snapshots:
                 latest_snapshot = self._snapshots[self._latest_key]
                 latest_date = _selected_date_from_payload(latest_snapshot.payload)
+                latest_sport = _snapshot_sport(latest_snapshot)
                 if allow_latest_fallback or requested_date is None or latest_date is None or latest_date == requested_date:
-                    return dict(latest_snapshot.response)
+                    if not requested_sport or requested_sport == "all" or latest_sport == requested_sport:
+                        return dict(latest_snapshot.response)
+            if requested_sport and requested_sport != "all":
+                self._sync_persisted_state_locked(force=force_refresh)
+                for candidate_snapshot in reversed(list(self._snapshots.values())):
+                    if _snapshot_matches_payload(candidate_snapshot, normalized_payload):
+                        return dict(candidate_snapshot.response)
+                return None
             self._sync_persisted_state_locked(force=force_refresh)
             snapshot = self._snapshots.get(key)
             if snapshot is not None:
@@ -1307,8 +1366,10 @@ class IntelligenceStateService:
             latest_snapshot = self._snapshots.get(self._latest_key or "") if self._latest_key else None
             if latest_snapshot is not None:
                 latest_date = _selected_date_from_payload(latest_snapshot.payload)
+                latest_sport = _snapshot_sport(latest_snapshot)
                 if allow_latest_fallback or requested_date is None or latest_date is None or latest_date == requested_date:
-                    return dict(latest_snapshot.response)
+                    if not requested_sport or requested_sport == "all" or latest_sport == requested_sport:
+                        return dict(latest_snapshot.response)
             return None
 
     def queue_refresh(self, payload: dict[str, Any]) -> str:

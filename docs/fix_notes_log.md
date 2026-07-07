@@ -1,3 +1,10 @@
+# 2026-07-07
+- Symptom: `/api/intelligence/status?date=2026-07-07&sport=wnba` could return MLB recommendations from a fallback snapshot.
+- Root cause: `read_latest_response()` fell through from an exact payload-key miss to the latest snapshot without enforcing sport match, and the status route did not queue a sport-specific refresh on miss.
+- Fix: made snapshot fallback sport-aware, queued an exact-sport refresh when no matching snapshot exists, and added regressions for WNBA-vs-MLB fallback behavior.
+- Validation: targeted `pytest` coverage for `tests/test_intelligence_state.py` and `tests/test_intelligence.py` after patching the snapshot reader and status route.
+- Follow-up: watch for any persisted snapshots missing `sport` metadata in older files; new refreshes should now produce sport-scoped keys.
+
 # Fix Notes Log
 
 ## 2026-07-06 - WNBA intelligence overview now accepts the artifact-backed slate without boxscores_placeholder

@@ -5196,6 +5196,29 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         all_payload["sport"] = "all"
         self.assertNotEqual(_payload_key(requested_payload), _payload_key(all_payload))
 
+    def test_status_endpoint_queues_refresh_for_missing_requested_sport(self) -> None:
+        app = Flask(__name__)
+        app.register_blueprint(intelligence_bp)
+
+        queued_payloads: list[dict[str, object]] = []
+
+        def queue_refresh_spy(payload: dict[str, object]) -> None:
+            queued_payloads.append(dict(payload))
+
+        with app.test_request_context("/api/intelligence/status?date=2026-07-07&sport=wnba", method="GET"):
+            with patch("syndicate.blueprints.intelligence.read_latest_intelligence_state", side_effect=[None, None]):
+                with patch("syndicate.blueprints.intelligence._response_has_content", side_effect=lambda payload: bool(payload)):
+                    with patch("syndicate.blueprints.intelligence._safe_queue_intelligence_state_refresh", side_effect=queue_refresh_spy):
+                        response = intelligence_status_api()
+
+        payload = response.get_json()
+        self.assertIsNotNone(payload)
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(payload.get("ok"))
+        self.assertGreaterEqual(len(queued_payloads), 1)
+        self.assertEqual(str(queued_payloads[0].get("sport") or "").lower(), "wnba")
+        self.assertEqual((payload.get("status") or {}).get("board_contract", {}).get("cards", []), [])
+
     def test_intelligence_page_renders_embedded_console(self) -> None:
         fake_response = {
             "headline": "The Syndicate brief",
