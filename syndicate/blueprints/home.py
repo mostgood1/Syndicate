@@ -1472,20 +1472,21 @@ def _basketball_player_id_index(sport_slug: str) -> dict[tuple[str, str], int]:
                             index[(team_key, name_key)] = player_id
                         index.setdefault(("", name_key), player_id)
         elif sport_slug == "wnba":
-            from syndicate.features.wnba.sources import processed_path
+            from syndicate.features.wnba.sources import _source_roots
 
-            processed_root = processed_path("boxscores_placeholder.csv").parent
-            for boxscore_path in sorted(processed_root.glob("boxscores_*.csv"), reverse=True):
-                with boxscore_path.open("r", encoding="utf-8", newline="") as handle:
-                    for row in csv.DictReader(handle):
-                        name_key = _mlb_name_key(row.get("player_name") or row.get("PLAYER_NAME"))
-                        player_id = _int_or_none(row.get("player_id") or row.get("PLAYER_ID"))
-                        team_key = _basketball_canonical_team(sport_slug, row.get("team") or row.get("TEAM_ABBREVIATION"))
-                        if not name_key or player_id is None:
-                            continue
-                        if team_key:
-                            index.setdefault((team_key, name_key), player_id)
-                        index.setdefault(("", name_key), player_id)
+            for root in _source_roots():
+                processed_root = root / "data" / "processed"
+                for boxscore_path in sorted(processed_root.glob("boxscores_*.csv"), reverse=True):
+                    with boxscore_path.open("r", encoding="utf-8", newline="") as handle:
+                        for row in csv.DictReader(handle):
+                            name_key = _mlb_name_key(row.get("player_name") or row.get("PLAYER_NAME"))
+                            player_id = _int_or_none(row.get("player_id") or row.get("PLAYER_ID"))
+                            team_key = _basketball_canonical_team(sport_slug, row.get("team") or row.get("TEAM_ABBREVIATION"))
+                            if not name_key or player_id is None:
+                                continue
+                            if team_key:
+                                index.setdefault((team_key, name_key), player_id)
+                            index.setdefault(("", name_key), player_id)
     except Exception:
         index = {}
 
@@ -4453,7 +4454,10 @@ def _build_sport_overview(
     active_game_ids = _game_identity_set(active_games)
     game_item_ids = _game_identity_set(game_items)
     prop_item_ids = _game_identity_set(list(pregame_prop_items) + list(live_prop_items))
+    artifact_home_games = list(home_games)
     hydrated_game_ids = {identifier for identifier in active_game_ids if identifier in game_item_ids}
+    if slug == "wnba" and not hydrated_game_ids and home_games:
+        hydrated_game_ids = _game_identity_set(home_games)
     if active_today and not hydrated_game_ids and active_game_ids and prop_item_ids:
         hydrated_game_ids = {identifier for identifier in active_game_ids if identifier in prop_item_ids}
     if active_today and not hydrated_game_ids and active_game_ids:
@@ -4462,6 +4466,8 @@ def _build_sport_overview(
     pregame_prop_items = [item for item in pregame_prop_items if _game_identifier(item) in hydrated_game_ids]
     live_prop_items = [item for item in live_prop_items if _game_identifier(item) in hydrated_game_ids]
     home_games = [game for game in active_games if _game_identifier(game) in hydrated_game_ids]
+    if slug == "wnba" and not home_games and artifact_home_games and hydrated_game_ids:
+        home_games = [game for game in artifact_home_games if _game_identifier(game) in hydrated_game_ids]
     for item in game_items:
         item["is_live"] = _live_odds_backed_live_flag(_game_identifier(item), live_odds_game_ids, bool(item.get("is_live")))
     for item in pregame_prop_items:

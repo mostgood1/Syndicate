@@ -6,6 +6,7 @@ import tempfile
 import unittest
 from collections import OrderedDict
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -901,6 +902,59 @@ class IntelligenceBlueprintTests(unittest.TestCase):
 
         self.assertEqual([sport["slug"] for sport in overview], ["mlb", "nba"])
         self.assertEqual(mocked_build.call_count, 2)
+
+    def test_build_intelligence_overview_accepts_artifact_backed_wnba_slate_without_placeholder(self) -> None:
+        app = create_app()
+        app.config.update(TESTING=True)
+        app.config["SYNDICATE_SPORTS"] = [{"slug": "wnba", "name": "WNBA"}]
+
+        with TemporaryDirectory() as temp_dir:
+            processed_dir = Path(temp_dir) / "data" / "processed"
+            processed_dir.mkdir(parents=True, exist_ok=True)
+            (processed_dir / "game_cards_2026-07-06.csv").write_text(
+                "away_tri,home_tri,visitor_team,home_team,commence_time\n"
+                "LAS,SEA,Las Vegas Aces,Seattle Storm,2026-07-06T23:00:00Z\n",
+                encoding="utf-8",
+            )
+            (processed_dir / "recommendations_slate_2026-07-06.json").write_text("{}", encoding="utf-8")
+            (processed_dir / "cards_props_snapshot_2026-07-06.json").write_text("{}", encoding="utf-8")
+            (processed_dir / "cards_sim_detail_2026-07-06.json").write_text("{}", encoding="utf-8")
+
+            with app.app_context():
+                with patch("syndicate.features.wnba.sources._source_roots", return_value=[Path(temp_dir)]), patch(
+                    "syndicate.features.wnba.cards._wnba_source_roots",
+                    return_value=[Path(temp_dir)],
+                ), patch(
+                    "syndicate.features.wnba.cards._render_web_dyno",
+                    return_value=True,
+                ):
+                    from syndicate.features.wnba.cards import get_wnba_overview
+
+                    overview_payload = get_wnba_overview("2026-07-06")
+                    self.assertEqual(overview_payload.get("status"), "ok")
+
+                    overview = build_intelligence_overview(selected_date="2026-07-06", force_refresh=True)
+
+        self.assertEqual([sport["slug"] for sport in overview], ["wnba"])
+        self.assertGreater(len(overview[0].get("dashboard_games") or []), 0)
+
+        preferences = _query_preferences(
+            "top edges today",
+            mode="recommendation",
+            sport="all",
+            timing="all",
+            include_props=True,
+            include_games=True,
+        )
+        trace_events: list[tuple[str, dict[str, object]]] = []
+
+        def _capture_trace(event: str, **fields: object) -> None:
+            trace_events.append((event, dict(fields)))
+
+        with patch("syndicate.features.intelligence._intel_trace", side_effect=_capture_trace):
+            collect_candidates(overview, preferences)
+
+        self.assertTrue(any(event == "candidate_generation" and fields.get("sport") == "wnba" for event, fields in trace_events))
 
     def tearDown(self) -> None:
         self._shared_recommendations_patcher.stop()

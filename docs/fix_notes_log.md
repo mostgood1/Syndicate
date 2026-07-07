@@ -1,5 +1,12 @@
 # Fix Notes Log
 
+## 2026-07-06 - WNBA intelligence overview now accepts the artifact-backed slate without boxscores_placeholder
+- Symptom: `build_intelligence_overview()` returned `status="no_games"` for 2026-07-06 even though the WNBA cards page showed 3 games and the published artifacts existed.
+- Root cause: The WNBA gate still depended on the stale `boxscores_placeholder.csv` anchor and the home overview hydration filter could drop artifact-backed WNBA games to zero before candidate generation.
+- Fix: Make the WNBA date gate accept any published WNBA artifact date, stop anchoring the WNBA player-id cache to `boxscores_placeholder.csv`, and preserve artifact-backed WNBA games through the home hydration filter.
+- Validation: `tests/test_intelligence.py -k wnba_slate_without_placeholder` passed, along with the existing WNBA home/cards merge-alias slice tests.
+- Follow-up: Keep WNBA readiness tied to the published artifact bundle rather than the legacy boxscore placeholder file.
+
 ## 2026-07-07 - WNBA game-card writer now preserves the full slate when the player-props snapshot is partial
 - Symptom: `predictions_2026-07-06.csv` and smart-sim artifacts contained 3 WNBA games, but `game_cards_2026-07-06.csv`, `cards_props_snapshot_2026-07-06.json`, and `recommendations_slate_2026-07-06.json` collapsed to 1 game.
 - Root cause: `_build_local_game_cards_artifact()` preferred the raw player-props snapshot fallback and then reused that same partial snapshot to restrict the processed `game_odds` fallback through `allowed_matchups`.

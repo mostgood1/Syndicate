@@ -59,6 +59,9 @@ def has_games_for_date(date_str: str) -> bool | None:
     if not selected_date:
         return None
 
+    if selected_date in available_dates():
+        return True
+
     score_date = selected_date.replace("-", "")
     url = f"https://site.api.espn.com/apis/site/v2/sports/basketball/wnba/scoreboard?dates={score_date}"
     request = urllib_request.Request(url, headers={"User-Agent": "Syndicate-WNBA/1.0"})
