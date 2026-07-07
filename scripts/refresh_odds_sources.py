@@ -63,6 +63,7 @@ from syndicate.features.wnba.sources import available_dates as wnba_available_da
 _PUBLISH_MANIFEST_LOCK = Lock()
 
 _DEFAULT_INTERVAL_MARKETS = "h2h,spreads,totals,spreads_h1,totals_h1,spreads_h2,totals_h2"
+_WNBA_PLAYER_PROP_MARKETS = "player_points,player_rebounds,player_assists,player_points_rebounds_assists,player_threes,player_steals,player_blocks,player_turnovers,player_points_rebounds,player_points_assists,player_rebounds_assists,player_double_double,player_triple_double"
 
 
 @dataclass(frozen=True)
@@ -506,7 +507,7 @@ def _build_wnba_steps(args: argparse.Namespace) -> list[RefreshStep]:
     payload = _build_nba_payload(args, env_key="WNBA_BETTING_ODDSAPI_PROPS_JOB")["WNBA_BETTING_ODDSAPI_PROPS_JOB"]
     payload_data = json.loads(payload)
     artifact_root = _local_source_artifact_root("wnba")
-    markets = _effective_markets("wnba", args.markets)
+    markets = str(args.markets or "").strip() or _WNBA_PLAYER_PROP_MARKETS
     command = [
         python_exe,
         "scripts/refresh_wnba_oddsapi_props.py",

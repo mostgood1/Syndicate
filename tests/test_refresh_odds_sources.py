@@ -159,7 +159,7 @@ class RefreshOddsSourcesTests(unittest.TestCase):
         self.assertEqual(nfl_report["earliest_collected"], "2025 Week 1")
         self.assertEqual(nfl_report["latest_collected"], "2025 Week 2")
 
-    def test_interval_market_defaults_are_forwarded_for_basketball_sports(self) -> None:
+    def test_wnba_uses_player_prop_markets_while_other_basketball_sports_keep_interval_defaults(self) -> None:
         module = self._load_module()
         args = argparse.Namespace(
             date="2026-06-07",
@@ -172,13 +172,16 @@ class RefreshOddsSourcesTests(unittest.TestCase):
         wnba_steps = module._build_wnba_steps(args)
         ncaab_steps = module._build_ncaab_steps(args)
 
-        expected_markets = "h2h,spreads,totals,spreads_h1,totals_h1,spreads_h2,totals_h2"
+        interval_markets = "h2h,spreads,totals,spreads_h1,totals_h1,spreads_h2,totals_h2"
+        player_prop_markets = "player_points,player_rebounds,player_assists,player_points_rebounds_assists,player_threes,player_steals,player_blocks,player_turnovers,player_points_rebounds,player_points_assists,player_rebounds_assists,player_double_double,player_triple_double"
+
         self.assertIn("--markets", nba_steps[0].command)
-        self.assertIn(expected_markets, nba_steps[0].command)
+        self.assertIn(interval_markets, nba_steps[0].command)
         self.assertIn("--markets", wnba_steps[0].command)
-        self.assertIn(expected_markets, wnba_steps[0].command)
+        self.assertIn(player_prop_markets, wnba_steps[0].command)
+        self.assertNotIn(interval_markets, wnba_steps[0].command)
         self.assertIn("--markets", ncaab_steps[0].command)
-        self.assertIn(expected_markets, ncaab_steps[0].command)
+        self.assertIn(interval_markets, ncaab_steps[0].command)
 
     def test_source_root_helpers_prefer_render_disk(self) -> None:
         module = self._load_module()
