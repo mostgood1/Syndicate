@@ -1,6 +1,6 @@
 {
   "date": "2026-07-07",
-  "generatedAt": "2026-07-07T02:36:11-05:00",
+  "generatedAt": "2026-07-07T12:21:40-05:00",
   "dataRoot": "data",
   "liveLensDir": "data/live_lens",
   "optimizationRegime": {
@@ -25,11 +25,11 @@
   "performance": {
     "marketsRefreshed": false,
     "marketRefreshMs": 0.0,
-    "totalMs": 823.6,
-    "snapshotLoadMs": 2.0,
-    "simContextLoadMs": 1.5,
+    "totalMs": 1234.2,
+    "snapshotLoadMs": 2.9,
+    "simContextLoadMs": 5.5,
     "propEvalMs": 0.2,
-    "gameLensMs": 2.0,
+    "gameLensMs": 2.1,
     "gameCount": 16,
     "liveGameCount": 0,
     "feedFetchCount": 16,
@@ -40,7 +40,7 @@
       "gamePk": 823062,
       "status": {
         "abstract": "Preview",
-        "detailed": "Scheduled"
+        "detailed": "Pre-Game"
       },
       "startTime": "1:15 PM",
       "matchup": {
@@ -92,7 +92,7 @@
             "outs": 0,
             "outsRecorded": 0,
             "remainingOuts": 54,
-            "label": "Scheduled"
+            "label": "Pre-Game"
           },
           "baselineHomeWinProb": null,
           "modelHomeWinProb": null,
@@ -149,7 +149,7 @@
             "outs": 0,
             "outsRecorded": 0,
             "remainingOuts": 54,
-            "label": "Scheduled"
+            "label": "Pre-Game"
           },
           "baselineHomeWinProb": null,
           "modelHomeWinProb": null,
@@ -206,7 +206,7 @@
             "outs": 0,
             "outsRecorded": 0,
             "remainingOuts": 54,
-            "label": "Scheduled"
+            "label": "Pre-Game"
           },
           "baselineHomeWinProb": null,
           "modelHomeWinProb": null,
@@ -263,7 +263,7 @@
             "outs": 0,
             "outsRecorded": 0,
             "remainingOuts": 54,
-            "label": "Scheduled"
+            "label": "Pre-Game"
           },
           "baselineHomeWinProb": null,
           "modelHomeWinProb": null,
