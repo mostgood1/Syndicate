@@ -1,18 +1,15 @@
 {
   "scope": "daily_update",
-  "date": "2026-07-06",
+  "date": "2026-07-07",
   "runMode": "standard",
-  "overallStatus": "ok",
-  "generatedAt": "2026-07-06T07:30:59.8090297+00:00",
-  "updatedAt": "2026-07-06T07:54:00.4461397+00:00",
-  "runDir": "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-06\\20260706_073059",
+  "overallStatus": "started",
+  "generatedAt": "2026-07-07T07:10:28.7653787+00:00",
+  "updatedAt": "2026-07-07T07:10:28.9940171+00:00",
+  "runDir": "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-07\\20260707_071028",
   "latestDir": "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest",
-  "lastUpdatedAt": "2026-07-06T07:54:00.4249715+00:00",
-  "currentStage": "completed",
-  "completedStages": [
-    "source_update",
-    "refresh_gate"
-  ],
+  "lastUpdatedAt": "2026-07-07T07:10:28.9122932+00:00",
+  "currentStage": "queued",
+  "completedStages": [],
   "failedStage": null,
   "stageDecisions": [
     {
