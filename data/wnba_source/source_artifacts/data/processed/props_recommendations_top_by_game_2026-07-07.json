@@ -1,0 +1,262 @@
+{
+  "date": "2026-07-07",
+  "data": [
+    {
+      "game_key": "DAL@NYL",
+      "game_id": "60",
+      "player": "Arike Ogunbowale",
+      "team": "DAL",
+      "team_tricode": "DAL",
+      "opponent": "NYL",
+      "score": 64.22911200764722,
+      "score_adj": 64.22911200764722,
+      "tier": "High",
+      "model": {
+        "pts": 14.955714285714285,
+        "reb": 2.3285714285714283,
+        "ast": 3.5,
+        "threes": 2.918571428571428,
+        "stl": 0.7178914285714285,
+        "blk": 0.5873657142857143,
+        "tov": 1.9578857142857145,
+        "pra": 20.784285714285712,
+        "pr": 17.284285714285712,
+        "pa": 18.455714285714286,
+        "ra": 5.828571428571428
+      },
+      "top_play": {
+        "market": "threes",
+        "side": "OVER",
+        "line": 1.5,
+        "price": -128.0,
+        "edge": 0.3605844884639844,
+        "ev": 0.6422911200764722,
+        "ev_pct": 64.22911200764722,
+        "book": "betonlineag",
+        "p_win": 1.0,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 64.2%",
+        "Regular price range (-150 to +150)",
+        "Consensus: 3 books aligned",
+        "Best line available"
+      ],
+      "basketball_summary": "model 2.9 vs line 1.5 (+1.4)"
+    },
+    {
+      "game_key": "DAL@NYL",
+      "game_id": "60",
+      "player": "Jonquel Jones",
+      "team": "NYL",
+      "team_tricode": "NYL",
+      "opponent": "DAL",
+      "score": 59.06284158918083,
+      "score_adj": 59.06284158918083,
+      "tier": "High",
+      "model": {
+        "pts": 12.695,
+        "reb": 7.555,
+        "ast": 2.41,
+        "threes": 0.6749999999999999,
+        "stl": 0.60544,
+        "blk": 0.4953599999999999,
+        "tov": 1.6512,
+        "pra": 22.66,
+        "pr": 20.25,
+        "pa": 15.105,
+        "ra": 9.965
+      },
+      "top_play": {
+        "market": "threes",
+        "side": "UNDER",
+        "line": 1.5,
+        "price": 100.0,
+        "edge": 0.29531420794590413,
+        "ev": 0.5906284158918083,
+        "ev_pct": 59.06284158918083,
+        "book": "fanduel",
+        "p_win": 1.0,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 59.1%",
+        "Regular price range (-150 to +150)",
+        "Consensus: 3 books aligned",
+        "Best line available"
+      ],
+      "basketball_summary": "model 0.7 vs line 1.5 (-0.8)"
+    },
+    {
+      "game_key": "CHI@PHX",
+      "game_id": "126",
+      "player": "Sydney Taylor",
+      "team": "CHI",
+      "team_tricode": "CHI",
+      "opponent": "PHX",
+      "score": 58.715339192219474,
+      "score_adj": 58.715339192219474,
+      "tier": "High",
+      "model": {
+        "pts": 5.97,
+        "reb": 0.96,
+        "ast": 0.8599999999999999,
+        "threes": 0.96,
+        "stl": 0.2269299999999999,
+        "blk": 0.1856699999999999,
+        "tov": 0.6188999999999999,
+        "pra": 7.789999999999999,
+        "pr": 6.93,
+        "pa": 6.83,
+        "ra": 1.8199999999999998
+      },
+      "top_play": {
+        "market": "threes",
+        "side": "UNDER",
+        "line": 1.5,
+        "price": 125.0,
+        "edge": 0.260957063076531,
+        "ev": 0.5871533919221947,
+        "ev_pct": 58.715339192219474,
+        "book": "betonlineag",
+        "p_win": 1.0,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 58.7%",
+        "Regular price range (-150 to +150)",
+        "Consensus: 4 books aligned",
+        "Best line available"
+      ],
+      "basketball_summary": "model 1.0 vs line 1.5 (-0.5)"
+    },
+    {
+      "game_key": "CHI@PHX",
+      "game_id": "126",
+      "player": "Kahleah Copper",
+      "team": "PHX",
+      "team_tricode": "PHX",
+      "opponent": "CHI",
+      "score": 55.76140037219295,
+      "score_adj": 55.76140037219295,
+      "tier": "High",
+      "model": {
+        "pts": 20.20111111111111,
+        "reb": 3.2288888888888887,
+        "ast": 1.9277777777777776,
+        "threes": 0.9888888888888888,
+        "stl": 0.715488888888889,
+        "blk": 0.5854,
+        "tov": 1.9513333333333327,
+        "pra": 25.357777777777777,
+        "pr": 23.43,
+        "pa": 22.128888888888888,
+        "ra": 5.156666666666666
+      },
+      "top_play": {
+        "market": "threes",
+        "side": "UNDER",
+        "line": 1.5,
+        "price": 124.0,
+        "edge": 0.24893482309014708,
+        "ev": 0.5576140037219295,
+        "ev_pct": 55.76140037219295,
+        "book": "betonlineag",
+        "p_win": 1.0,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 55.8%",
+        "Regular price range (-150 to +150)",
+        "Best line available"
+      ],
+      "basketball_summary": "model 1.0 vs line 1.5 (-0.5)"
+    },
+    {
+      "game_key": "DAL@NYL",
+      "game_id": "60",
+      "player": "Leonie Fiebich",
+      "team": "NYL",
+      "team_tricode": "NYL",
+      "opponent": "DAL",
+      "score": 53.9141372948408,
+      "score_adj": 53.9141372948408,
+      "tier": "High",
+      "model": {
+        "pts": 0.0,
+        "reb": 0.0,
+        "ast": 0.0,
+        "threes": 0.0,
+        "stl": 0.176,
+        "blk": 0.144,
+        "tov": 0.48,
+        "pra": 0.0,
+        "pr": 0.0,
+        "pa": 0.0,
+        "ra": 0.0
+      },
+      "top_play": {
+        "market": "threes",
+        "side": "UNDER",
+        "line": 1.5,
+        "price": -132.0,
+        "edge": 0.3067528501258183,
+        "ev": 0.539141372948408,
+        "ev_pct": 53.9141372948408,
+        "book": "fanduel",
+        "p_win": 1.0,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 53.9%",
+        "Regular price range (-150 to +150)",
+        "Consensus: 3 books aligned",
+        "Best line available"
+      ],
+      "basketball_summary": "model 0.0 vs line 1.5 (-1.5)"
+    },
+    {
+      "game_key": "CHI@PHX",
+      "game_id": "126",
+      "player": "DeWanna Bonner",
+      "team": "PHX",
+      "team_tricode": "PHX",
+      "opponent": "CHI",
+      "score": 47.41944308614533,
+      "score_adj": 47.41944308614533,
+      "tier": "High",
+      "model": {
+        "pts": 8.5,
+        "reb": 4.536666666666666,
+        "ast": 1.0444444444444445,
+        "threes": 0.4655555555555555,
+        "stl": 0.6057577777777777,
+        "blk": 0.4956199999999999,
+        "tov": 1.6520666666666666,
+        "pra": 14.08111111111111,
+        "pr": 13.036666666666665,
+        "pa": 9.544444444444444,
+        "ra": 5.5811111111111105
+      },
+      "top_play": {
+        "market": "threes",
+        "side": "UNDER",
+        "line": 1.5,
+        "price": -136.0,
+        "edge": 0.2732645872760917,
+        "ev": 0.4741944308614533,
+        "ev_pct": 47.41944308614533,
+        "book": "fanduel",
+        "p_win": 1.0,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 47.4%",
+        "Regular price range (-150 to +150)",
+        "Consensus: 4 books aligned",
+        "Best line available"
+      ],
+      "basketball_summary": "model 0.5 vs line 1.5 (-1.0)"
+    }
+  ]
+}
