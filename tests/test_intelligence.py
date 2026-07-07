@@ -1557,6 +1557,41 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertEqual(candidates[0].get("market"), "Total")
         self.assertNotEqual(candidates[0].get("projected"), "-")
 
+    def test_wnba_total_market_shell_rows_are_not_emitted(self) -> None:
+        sport = {"slug": "wnba", "name": "WNBA", "hub_href": "/wnba"}
+        game = {
+            "gamePk": 401857043,
+            "summary": "Oddsapi consensus market snapshot",
+            "detail": "7/6 - 7:30 PM EDT",
+            "betting": {
+                "home_ml": -2113,
+                "away_ml": 2113,
+                "home_ml_ev": 0.0,
+                "away_ml_ev": 0.0,
+                "p_home_win": 0.955,
+                "p_away_win": 0.045,
+                "total": 162.5,
+                "p_total_over": 0.501,
+                "p_total_under": 0.499,
+            },
+            "gameMarkets": {"total": {"line": 162.5, "pick": "Over", "reason": "Consensus total"}},
+        }
+
+        candidates = _game_bet_candidates_from_game(sport, game, fallback_epoch=0.0)
+
+        self.assertTrue(any(candidate.get("market") == "Moneyline" for candidate in candidates))
+        self.assertFalse(any(candidate.get("market") == "Total" for candidate in candidates))
+
+    def test_collect_candidates_keeps_valid_wnba_props_after_classification(self) -> None:
+        overview = _sample_overview_with_secondary_sport()
+        preferences = _query_preferences("top edges today", mode="recommendation", sport="all", timing="all", include_props=True, include_games=True)
+
+        candidates = collect_candidates(overview, preferences)
+        wnba_candidates = [candidate for candidate in candidates if str(candidate.get("sport_slug") or "").lower() == "wnba"]
+
+        self.assertGreater(len(wnba_candidates), 0)
+        self.assertTrue(all(classify_candidate(candidate) is not None for candidate in wnba_candidates))
+
     def test_is_valid_candidate_requires_selection_type_and_value(self) -> None:
         valid_candidate = normalize_candidate(
             {
