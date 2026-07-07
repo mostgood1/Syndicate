@@ -358,6 +358,7 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
 
             prop_rows, prop_path = module._build_local_cards_props_snapshot_artifact(processed_root=processed_root, date_str=date_str)
             self.assertEqual(prop_rows, 3)
+
             self.assertIsNotNone(prop_path)
             assert prop_path is not None
             prop_payload = json.loads(prop_path.read_text(encoding="utf-8"))
@@ -380,6 +381,54 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
                 sorted((row.get("home_tri"), row.get("away_tri")) for row in written_cards),
                 [("LAS", "SEA"), ("MIN", "CON"), ("WSH", "GSV")],
             )
+
+    def test_build_local_game_cards_artifact_keeps_slate_games_on_next_utc_day(self) -> None:
+        module = self._load_module()
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            source_root = Path(tmp_dir) / "source"
+            processed_root = source_root / "data" / "processed"
+            raw_root = source_root / "data" / "raw"
+            processed_root.mkdir(parents=True, exist_ok=True)
+            raw_root.mkdir(parents=True, exist_ok=True)
+            date_str = "2026-07-07"
+
+            (raw_root / f"odds_wnba_player_props_{date_str}.csv").write_text(
+                "snapshot_ts,event_id,commence_time,bookmaker,bookmaker_title,market,outcome_name,player_name,point,price,last_update,home_team,away_team\n"
+                "2026-07-07T07:35:03Z,a5c10cf00d97057ef1bd2f450afb222d,2026-07-08T00:00:00Z,draftkings,DraftKings,player_points,Over,Paige Bueckers,21.5,-106,2026-07-07T07:34:08Z,New York Liberty,Dallas Wings\n"
+                "2026-07-07T07:35:03Z,a5c10cf00d97057ef1bd2f450afb222d,2026-07-08T00:00:00Z,draftkings,DraftKings,player_points,Under,Sabrina Ionescu,14.5,-108,2026-07-07T07:34:08Z,New York Liberty,Dallas Wings\n"
+                "2026-07-07T07:35:03Z,7cc2478497e9ecb0694604a911b80966ea11323e152b7aaedf3b94acc3a54d95,2026-07-08T02:00:00Z,draftkings,DraftKings,player_points,Over,Alyssa Thomas,17.5,-110,2026-07-07T07:34:08Z,Phoenix Mercury,Chicago Sky\n"
+                "2026-07-07T07:35:03Z,7cc2478497e9ecb0694604a911b80966ea11323e152b7aaedf3b94acc3a54d95,2026-07-08T02:00:00Z,draftkings,DraftKings,player_points,Under,Courtney Vandersloot,12.5,-110,2026-07-07T07:34:08Z,Phoenix Mercury,Chicago Sky\n",
+                encoding="utf-8",
+            )
+
+            (processed_root / f"predictions_{date_str}.csv").write_text(
+                "date,home_team,visitor_team,home_win_prob,spread_margin,totals,commence_time\n"
+                "2026-07-07,New York Liberty,Dallas Wings,0.5,,,2026-07-08T00:00:00Z\n"
+                "2026-07-07,Phoenix Mercury,Chicago Sky,0.5,,,2026-07-08T02:00:00Z\n",
+                encoding="utf-8",
+            )
+
+            rows, out_path = module._build_local_game_cards_artifact(
+                source_root=source_root,
+                processed_root=processed_root,
+                date_str=date_str,
+                log_file=Path(tmp_dir) / "refresh.log",
+            )
+
+            self.assertEqual(rows, 2)
+            self.assertIsNotNone(out_path)
+            assert out_path is not None
+            with out_path.open("r", encoding="utf-8", newline="") as handle:
+                written = list(csv.DictReader(handle))
+
+        self.assertEqual(len(written), 2)
+        self.assertEqual(
+            {(row.get("home_team"), row.get("visitor_team")) for row in written},
+            {("New York Liberty", "Dallas Wings"), ("Phoenix Mercury", "Chicago Sky")},
+        )
+        self.assertEqual({row.get("home_tri") for row in written}, {"NYL", "PHX"})
+        self.assertEqual({row.get("away_tri") for row in written}, {"DAL", "CHI"})
 
     def test_repair_predictions_slate_rebuilds_when_predictions_missing(self) -> None:
         module = self._load_module()

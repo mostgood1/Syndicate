@@ -1517,6 +1517,13 @@ def _build_local_game_cards_artifact(*, source_root: Path, processed_root: Path,
             return set()
         return matchups
 
+    def _game_card_date_prefixes() -> tuple[str, str]:
+        try:
+            game_date = dt.date.fromisoformat(date_str)
+        except Exception:
+            return (date_str, date_str)
+        return (date_str, (game_date + dt.timedelta(days=1)).isoformat())
+
     expected_matchups = _prediction_matchups()
     snapshot_matchups: set[tuple[str, str]] = set()
 
@@ -1540,7 +1547,7 @@ def _build_local_game_cards_artifact(*, source_root: Path, processed_root: Path,
             if not props_frame.empty and required_columns.issubset(set(str(column) for column in props_frame.columns)):
                 working = props_frame.copy()
                 working["commence_time"] = working["commence_time"].astype(str)
-                working = working[working["commence_time"].str.startswith(date_str)].copy()
+                working = working[working["commence_time"].str.startswith(_game_card_date_prefixes())].copy()
                 if not working.empty:
                     rows_out: list[dict[str, object]] = []
                     grouped = working.groupby(["event_id", "commence_time", "home_team", "away_team"], dropna=False, sort=True)
@@ -1705,7 +1712,7 @@ def _build_local_game_cards_artifact(*, source_root: Path, processed_root: Path,
 
     working = raw_frame.copy()
     working["commence_time"] = working["commence_time"].astype(str)
-    working = working[working["commence_time"].str.startswith(date_str)].copy()
+    working = working[working["commence_time"].str.startswith(_game_card_date_prefixes())].copy()
     if working.empty:
         return 0, None
 
