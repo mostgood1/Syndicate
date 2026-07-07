@@ -1,7 +1,7 @@
 {
   "state": "idle",
   "detail": "No queued external refresh contract was available.",
-  "latestManifestPath": "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpkvllkh70\\refresh_status_latest.json",
+  "latestManifestPath": "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmp8gjbphi3\\refresh_status_latest.json",
   "ranJob": false,
   "runExitCode": null,
   "latestManifestState": "idle",
@@ -11,5 +11,5 @@
     "reclaimed_count": 0,
     "skipped_due_to_cap": 0
   },
-  "updatedAt": "2026-07-04T14:55:52-05:00"
+  "updatedAt": "2026-07-06T17:25:20-05:00"
 }

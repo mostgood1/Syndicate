@@ -333,8 +333,8 @@
       }
     },
     "wnba_artifact_bundle::2026-05-22:1:1": {
-      "inputHash": "2258a185430524d1e8d7275eea888be1f1b096e0850a4e744e60d9f2557d3f3e",
-      "updatedAt": "2026-06-28T16:18:42-05:00",
+      "inputHash": "21fb86eb7bb6617ae6d55369fdb701b837f6fe8135bd64fbae5064262cec0a67",
+      "updatedAt": "2026-07-07T01:26:38-05:00",
       "outputs": [],
       "metadata": {
         "date": "2026-05-22",
@@ -992,6 +992,56 @@
         "date": "2026-07-06",
         "reused": false,
         "artifact_root": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts"
+      }
+    },
+    "wnba_artifact_bundle:C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmph5u1lmea\\bundle:2026-05-22:1:1": {
+      "inputHash": "dd4a39afe130efed2d79894b54a262d12466d4645db0d4d264d3f8053445d02a",
+      "updatedAt": "2026-07-07T01:26:48-05:00",
+      "outputs": [],
+      "metadata": {
+        "date": "2026-05-22",
+        "reused": false,
+        "artifact_root": "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmph5u1lmea\\bundle"
+      }
+    },
+    "wnba_artifact_bundle:C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpo5ic5kzu\\bundle:2026-05-22:1:1": {
+      "inputHash": "68916866477eb67eee8761d75537ec05f749ba2c2956e65cc1dabe511113bb18",
+      "updatedAt": "2026-07-07T01:26:48-05:00",
+      "outputs": [],
+      "metadata": {
+        "date": "2026-05-22",
+        "reused": true,
+        "artifact_root": "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpo5ic5kzu\\bundle"
+      }
+    },
+    "wnba_artifact_bundle:C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmp90zdkky8\\bundle:2026-05-22:1:1": {
+      "inputHash": "2e24ee51bf228371e9adbe7cc8857a6187f9bda977f30c6040d397aa429b9444",
+      "updatedAt": "2026-07-07T01:26:48-05:00",
+      "outputs": [],
+      "metadata": {
+        "date": "2026-05-22",
+        "reused": true,
+        "artifact_root": "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmp90zdkky8\\bundle"
+      }
+    },
+    "wnba_artifact_bundle:C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\wnba_source\\source_artifacts:2026-07-06:1:1": {
+      "inputHash": "b36aae1650baf6494b2a1b3fcaf31639ba66616a7cad1d5fbe5a3de34e4fa59b",
+      "updatedAt": "2026-07-07T02:27:07-05:00",
+      "outputs": [],
+      "metadata": {
+        "date": "2026-07-06",
+        "reused": true,
+        "artifact_root": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\wnba_source\\source_artifacts"
+      }
+    },
+    "wnba_artifact_bundle:C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\wnba_source:2026-07-06:1:1": {
+      "inputHash": "fd6107d331c302070dc629ecd38593dc34dbd0f5b8210db23003e1636f64eb39",
+      "updatedAt": "2026-07-07T02:50:02-05:00",
+      "outputs": [],
+      "metadata": {
+        "date": "2026-07-06",
+        "reused": false,
+        "artifact_root": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\wnba_source"
       }
     }
   }

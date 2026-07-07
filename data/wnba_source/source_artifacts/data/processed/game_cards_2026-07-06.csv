@@ -1,2 +1,2 @@
 date,game_id,home_team,visitor_team,commence_time,home_ml,away_ml,home_spread,away_spread,total,bookmaker,home_tri,away_tri
-2026-07-06,01fbe348b23c9f547e63ce18ccf0888db,Washington Mystics,Golden State Valkyries,2026-07-06T23:40:00Z,,,,,,oddsapi_consensus,WSH,GSV
+2026-07-06,3,Los Angeles Sparks,Seattle Storm,2026-07-07T02:10:00Z,,,,,,oddsapi_consensus,LAS,SEA

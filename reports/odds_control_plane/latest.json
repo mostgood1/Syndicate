@@ -1,15 +1,15 @@
 {
-  "generated_at": "2026-06-27T15:39:11-05:00",
-  "date": "2026-06-27",
+  "generated_at": "2026-07-06T21:27:08-05:00",
+  "date": "2026-07-06",
   "phase": "all",
   "execution_mode": "source",
   "dry_run": false,
   "publish_parity": {
-    "generatedAt": "2026-06-27T15:39:11-05:00",
-    "date": "2026-06-27",
-    "totalForcedPublishPaths": 2,
+    "generatedAt": "2026-07-06T21:27:08-05:00",
+    "date": "2026-07-06",
+    "totalForcedPublishPaths": 7,
     "totalIntelligencePublishPaths": 0,
-    "totalPublishPaths": 2,
+    "totalPublishPaths": 7,
     "sports": [
       {
         "sport": "mlb",
@@ -28,9 +28,9 @@
       {
         "sport": "wnba",
         "rootPrefix": "data/wnba_source/",
-        "forcedPublishPathCount": 0,
+        "forcedPublishPathCount": 5,
         "intelligencePublishPathCount": 0,
-        "totalPublishPathCount": 0
+        "totalPublishPathCount": 5
       },
       {
         "sport": "nhl",
@@ -65,10 +65,10 @@
   "sports": [
     {
       "sport": "wnba",
-      "ok": false,
+      "ok": true,
       "generation_mode": "local_artifact_bundle",
       "ingestion_mode": null,
-      "source_repo": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\vendor\\wnba_betting_repo",
+      "source_repo": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\wnba_source",
       "source_root_env_var": "SYNDICATE_SOURCE_ROOT_WNBA",
       "artifact_paths": [],
       "post_refresh_ok": null,
@@ -80,7 +80,7 @@
           "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\wnba_source\\artifacts\\wnba\\odds_history.json",
           "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\wnba_source\\tracking\\odds_history.json"
         ],
-        "active_path": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\wnba_source\\artifacts\\wnba\\odds_history.json",
+        "active_path": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\odds_control_plane\\odds_history\\wnba\\odds_history.json",
         "has_payload": true,
         "source_precedence": [
           "shared_history",
@@ -91,8 +91,9 @@
     }
   ],
   "source_precedence": [
+    "shared_history",
     "artifact_history",
     "tracking_history"
   ],
-  "summary_ok": false
+  "summary_ok": true
 }
