@@ -1,3 +1,10 @@
+# 2026-07-08 - Intelligence background worker now bypasses the nested guard and computes fresh state
+- Symptom: The persisted intelligence snapshot stayed empty/null even though the live recommendation pipeline was producing candidates.
+- Root cause: `IntelligenceStateService._background_loop()` called `run_routed_intelligence_pipeline()` while already holding the execution guard, so the routed wrapper could short-circuit into cached fallback behavior instead of computing fresh state.
+- Fix: Make the background loop call `run_intelligence_pipeline()` directly, leaving the guard-aware routed wrapper only on the request path.
+- Validation: `pytest tests/test_intelligence_state.py -k background_loop_consumes_persisted_queue_payloads` passed, and `pipeline/intelligence_state.py` plus `tests/test_intelligence_state.py` had no errors.
+- Follow-up: Recheck the deployed `/intelligence/status` snapshot after the next refresh cycle to confirm the board state now persists.
+
 # 2026-07-08 - WNBA candidate classification collapses because every game row lacks projection or odds
 - Symptom: The 2026-07-08 WNBA slate built 15 raw game candidates, but `collect_candidates()` reduced them to 0 before the board snapshot was written.
 - Root cause: `classify_candidate()` rejects every normalized WNBA game row because each row has a `selection` and `type` but no usable `projection` or `odds`, so the classifier returns `None` with `missing_projection_or_odds`.

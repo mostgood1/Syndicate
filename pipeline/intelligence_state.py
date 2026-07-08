@@ -18,6 +18,7 @@ from flask import Flask
 from flask import current_app
 
 from pipeline.intelligence_entrypoint import run_routed_intelligence_pipeline
+from pipeline.intelligence_pipeline import run_intelligence_pipeline
 from syndicate.features.intelligence import build_intelligence_status
 from syndicate.features.intelligence import build_intelligence_overview
 from syndicate.features.intelligence import _build_board_dictionary
@@ -1462,7 +1463,7 @@ class IntelligenceStateService:
                     continue
                 logger.info("WORKER RUN", extra={"payload_key": _payload_key(payload_to_process)})
                 logger.info("BACKGROUND_LOOP_PRE_QUERY", extra={"elapsed_ms": round((time.time() - iteration_started_at) * 1000.0, 3)})
-                state = run_routed_intelligence_pipeline(payload_to_process)
+                state = run_intelligence_pipeline(payload_to_process)
                 logger.info("BACKGROUND_LOOP_POST_QUERY", extra={"elapsed_ms": round((time.time() - iteration_started_at) * 1000.0, 3)})
                 logger.info("BACKGROUND_LOOP_PRE_REASONING", extra={"elapsed_ms": round((time.time() - iteration_started_at) * 1000.0, 3)})
                 logger.info("BACKGROUND_LOOP_POST_REASONING", extra={"elapsed_ms": round((time.time() - iteration_started_at) * 1000.0, 3)})

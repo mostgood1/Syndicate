@@ -1038,7 +1038,7 @@ class IntelligenceStateTests(unittest.TestCase):
                     service._stop.set()
                     return dict(state)
 
-                with patch("pipeline.intelligence_state.run_routed_intelligence_pipeline", return_value={"ok": True, "top_opportunities": [], "by_sport": {}, "analysis": {}}) as mocked_pipeline:
+                with patch("pipeline.intelligence_state.run_intelligence_pipeline", return_value={"ok": True, "top_opportunities": [], "by_sport": {}, "analysis": {}}) as mocked_pipeline:
                     with patch("pipeline.intelligence_state.write_latest_intelligence_state", side_effect=fake_write_latest_intelligence_state) as mocked_write:
                         service._background_loop()
 
