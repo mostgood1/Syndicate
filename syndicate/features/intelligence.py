@@ -2363,7 +2363,7 @@ def _query_preferences(
         "requested_date": requested_date,
         "wants_table": wants_table,
         "wants_chart": wants_chart,
-        "limit": max(1, min(requested_limit, 10)),
+        "limit": max(1, requested_limit),
         "question": str(question or "").strip(),
     }
 
@@ -5152,7 +5152,7 @@ def _candidate_settlement_summary(candidate: dict[str, Any]) -> dict[str, Any]:
 
 
 
-def build_edge_board_view(response: dict[str, Any], *, top_limit: int = 10) -> dict[str, Any]:
+def build_edge_board_view(response: dict[str, Any], *, top_limit: int | None = None) -> dict[str, Any]:
     picks = response.get("picks") if isinstance(response.get("picks"), list) else []
     portfolio = response.get("portfolio") if isinstance(response.get("portfolio"), dict) else {}
     parlays = response.get("parlays") if isinstance(response.get("parlays"), list) else []
@@ -5167,7 +5167,7 @@ def build_edge_board_view(response: dict[str, Any], *, top_limit: int = 10) -> d
             return float("-inf")
 
     sorted_picks = sorted((pick for pick in picks if isinstance(pick, dict)), key=_edge_value, reverse=True)
-    top_picks = sorted_picks[: max(0, int(top_limit))]
+    top_picks = list(sorted_picks)
 
     picks_by_sport: dict[str, list[dict[str, Any]]] = {}
     picks_by_game: dict[str, list[dict[str, Any]]] = {}
@@ -5413,8 +5413,7 @@ def _build_supporting_evidence(
 
     source_items: list[dict[str, Any]] = []
     seen_sources: set[str] = set()
-    recommendation_limit = max(3, min(len(recommendations), int(display_limit or len(recommendations) or 3)))
-    for recommendation in recommendations[:recommendation_limit]:
+    for recommendation in recommendations:
         if not isinstance(recommendation, dict):
             continue
         for item in (recommendation.get("advanced_inputs") or [])[:3]:
@@ -6682,7 +6681,7 @@ def run_intelligence_query(
     pre_selection_recommendations = [dict(candidate) for candidate in ranked_recommendations if isinstance(candidate, Mapping)]
     recommendations = _greedy_low_correlation_selection(
         [dict(candidate) for candidate in ranked_recommendations],
-        limit=preferences["limit"],
+        limit=len(ranked_recommendations),
         threshold=MAX_CORRELATION_THRESHOLD,
     )
     _log_candidate_stage(pipeline_name="run_intelligence_query", stage="_greedy_low_correlation_selection", before=pre_selection_recommendations, after=recommendations)
