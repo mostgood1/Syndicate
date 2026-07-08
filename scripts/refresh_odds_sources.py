@@ -66,6 +66,7 @@ _PUBLISH_MANIFEST_LOCK = Lock()
 
 _DEFAULT_INTERVAL_MARKETS = "h2h,spreads,totals,spreads_h1,totals_h1,spreads_h2,totals_h2"
 _WNBA_PLAYER_PROP_MARKETS = "player_points,player_rebounds,player_assists,player_points_rebounds_assists,player_threes,player_steals,player_blocks,player_turnovers,player_points_rebounds,player_points_assists,player_rebounds_assists,player_double_double,player_triple_double"
+_MEMORY_TRACE_LAST_RSS_BYTES: int | None = None
 
 
 @dataclass(frozen=True)
@@ -172,6 +173,40 @@ def _largest_gc_object_summary() -> dict[str, Any] | None:
     return largest
 
 
+def _largest_gc_container_summary(container_type: type[Any]) -> dict[str, Any] | None:
+    largest: dict[str, Any] | None = None
+    largest_size = -1
+    try:
+        for obj in gc.get_objects():
+            if not isinstance(obj, container_type):
+                continue
+            try:
+                size = sys.getsizeof(obj)
+            except Exception:
+                continue
+            if size <= largest_size:
+                continue
+            largest_size = size
+            largest = {"type": type(obj).__name__, "size_bytes": int(size)}
+            try:
+                if hasattr(obj, "__len__"):
+                    largest["len"] = len(obj)
+            except Exception:
+                pass
+    except Exception:
+        return None
+    return largest
+
+
+def _phase_memory_snapshot() -> dict[str, Any]:
+    return {
+        "rss_bytes": _rss_bytes(),
+        "largest_gc_object": _largest_gc_object_summary(),
+        "largest_list": _largest_gc_container_summary(list),
+        "largest_dict": _largest_gc_container_summary(dict),
+    }
+
+
 def _extract_count_candidates(text: str | None) -> dict[str, int]:
     if not isinstance(text, str) or not text:
         return {}
@@ -194,15 +229,69 @@ def _extract_count_candidates(text: str | None) -> dict[str, int]:
     return counts
 
 
+def _rows_loaded_total(row_counts: dict[str, Any] | None) -> int | None:
+    if not isinstance(row_counts, dict):
+        return None
+    total = 0
+    found = False
+    for value in row_counts.values():
+        try:
+            total += int(value)
+            found = True
+        except Exception:
+            continue
+    return total if found else None
+
+
+def _step_rows_loaded(step_result: dict[str, Any] | None) -> int | None:
+    if not isinstance(step_result, dict):
+        return None
+    row_counts = step_result.get("row_counts")
+    return _rows_loaded_total(row_counts if isinstance(row_counts, dict) else None)
+
+
+def _sport_rows_loaded(sport_result: dict[str, Any]) -> int | None:
+    refresh_steps = sport_result.get("refresh_steps")
+    if not isinstance(refresh_steps, list):
+        return None
+    total = 0
+    found = False
+    for step_result in refresh_steps:
+        rows = _step_rows_loaded(step_result if isinstance(step_result, dict) else None)
+        if rows is None:
+            continue
+        total += int(rows)
+        found = True
+    return total if found else None
+
+
 def _log_memory(stage: str, **extra: Any) -> None:
     if not _memory_trace_enabled():
         return
+    global _MEMORY_TRACE_LAST_RSS_BYTES
+    before = extra.pop("before", None)
+    after = extra.pop("after", None)
+    snapshot = after if isinstance(after, dict) else before if isinstance(before, dict) else _phase_memory_snapshot()
     payload: dict[str, Any] = {
         "stage": stage,
-        "rss_bytes": _rss_bytes(),
-        "largest_gc_object": _largest_gc_object_summary(),
         **extra,
     }
+    payload.update({key: value for key, value in snapshot.items() if value is not None})
+    if isinstance(before, dict):
+        payload["memory_before"] = before
+    if isinstance(after, dict):
+        payload["memory_after"] = after
+    current_rss = snapshot.get("rss_bytes") if isinstance(snapshot, dict) else None
+    if isinstance(before, dict) and isinstance(after, dict):
+        before_rss = before.get("rss_bytes")
+        after_rss = after.get("rss_bytes")
+        if isinstance(before_rss, int) and isinstance(after_rss, int):
+            payload["rss_delta_bytes"] = int(after_rss - before_rss)
+            payload["rss_growth_ratio"] = round(after_rss / before_rss, 4) if before_rss > 0 else None
+    elif isinstance(current_rss, int) and isinstance(_MEMORY_TRACE_LAST_RSS_BYTES, int):
+        payload["rss_delta_from_previous_bytes"] = int(current_rss - _MEMORY_TRACE_LAST_RSS_BYTES)
+    if isinstance(current_rss, int):
+        _MEMORY_TRACE_LAST_RSS_BYTES = current_rss
     print(f"LIVE_ODDS_WORKER_MEMORY {json.dumps(payload, default=str, sort_keys=True)}", file=sys.stderr, flush=True)
 
 
@@ -972,6 +1061,7 @@ def _run_command(step: RefreshStep, *, dry_run: bool = False) -> dict[str, Any]:
         stdout=_object_summary(stdout_text, name="stdout"),
         stderr=_object_summary(stderr_text, name="stderr"),
         row_counts=row_counts or None,
+        rows_loaded=_rows_loaded_total(row_counts),
     )
     _dump_child_runtime_state(label=f"step_end:{step.name}:rc={result.returncode}")
     return {
@@ -1305,7 +1395,19 @@ def _run_sport_refresh(args: argparse.Namespace, sport: str, execution_mode: str
         "mirror": None,
         "ok": True,
     }
-    _log_memory("sport_start", sport=sport, execution_mode=execution_mode, generation_mode=generation_mode)
+    sport_start_memory = _phase_memory_snapshot()
+    _log_memory(
+        "sport_start",
+        sport=sport,
+        execution_mode=execution_mode,
+        generation_mode=generation_mode,
+        rows_loaded=0,
+        refresh_steps=_object_summary(sport_result["refresh_steps"], name="refresh_steps"),
+        generation_steps=_object_summary(sport_result["generation"]["steps"], name="generation_steps"),
+        same_object=bool(sport_result["refresh_steps"] is sport_result["generation"]["steps"]),
+        before=sport_start_memory,
+        after=sport_start_memory,
+    )
 
     refresh_steps = [] if execution_mode == "ingest" else _filter_steps(spec.step_builder(args), args.phase)
     if refresh_steps and any(_step_requires_source_root(step) for step in refresh_steps):
@@ -1313,6 +1415,17 @@ def _run_sport_refresh(args: argparse.Namespace, sport: str, execution_mode: str
         if source_error is not None:
             sport_result["ok"] = False
             sport_result["error"] = source_error
+            _log_memory(
+                f"{sport}_refresh",
+                sport=sport,
+                rows_loaded=_sport_rows_loaded(sport_result),
+                refresh_steps=_object_summary(sport_result["refresh_steps"], name="refresh_steps"),
+                generation_steps=_object_summary(sport_result["generation"]["steps"], name="generation_steps"),
+                same_object=bool(sport_result["refresh_steps"] is sport_result["generation"]["steps"]),
+                error=source_error,
+                before=sport_start_memory,
+                after=_phase_memory_snapshot(),
+            )
             return sport_result
 
     for step in refresh_steps:
@@ -1341,11 +1454,23 @@ def _run_sport_refresh(args: argparse.Namespace, sport: str, execution_mode: str
             generation_steps_len=len(sport_result["generation"]["steps"]),
             same_object=bool(sport_result["refresh_steps"][-1] is sport_result["generation"]["steps"][-1]),
             step_payload=_object_summary(step_result, name="step_result"),
+            rows_loaded=_step_rows_loaded(step_result),
         )
         _compact_step_result(step_result)
         if not step_result["ok"]:
             sport_result["ok"] = False
             if not args.continue_on_error:
+                _log_memory(
+                    f"{sport}_refresh",
+                    sport=sport,
+                    rows_loaded=_sport_rows_loaded(sport_result),
+                    refresh_steps=_object_summary(sport_result["refresh_steps"], name="refresh_steps"),
+                    generation_steps=_object_summary(sport_result["generation"]["steps"], name="generation_steps"),
+                    same_object=bool(sport_result["refresh_steps"] is sport_result["generation"]["steps"]),
+                    failed_step=step.name,
+                    before=sport_start_memory,
+                    after=_phase_memory_snapshot(),
+                )
                 return sport_result
 
     if refresh_mode == "fast":
@@ -1362,6 +1487,16 @@ def _run_sport_refresh(args: argparse.Namespace, sport: str, execution_mode: str
         )
         sport_result["sport_manifest"] = published_manifest
         _log_memory("sport_fast_publish", sport=sport, manifest=_object_summary(published_manifest, name="sport_manifest"))
+        _log_memory(
+            f"{sport}_refresh",
+            sport=sport,
+            rows_loaded=_sport_rows_loaded(sport_result),
+            refresh_steps=_object_summary(sport_result["refresh_steps"], name="refresh_steps"),
+            generation_steps=_object_summary(sport_result["generation"]["steps"], name="generation_steps"),
+            same_object=bool(sport_result["refresh_steps"] is sport_result["generation"]["steps"]),
+            before=sport_start_memory,
+            after=_phase_memory_snapshot(),
+        )
         return sport_result
 
     if execution_mode == "source" and spec.slug in {"mlb", "nba", "wnba", "nhl", "nfl", "ncaab", "ncaaf"} and sport_result["ok"]:
@@ -1377,6 +1512,17 @@ def _run_sport_refresh(args: argparse.Namespace, sport: str, execution_mode: str
         if not tracking_result["ok"]:
             sport_result["ok"] = False
             if not args.continue_on_error:
+                _log_memory(
+                    f"{sport}_refresh",
+                    sport=sport,
+                    rows_loaded=_sport_rows_loaded(sport_result),
+                    refresh_steps=_object_summary(sport_result["refresh_steps"], name="refresh_steps"),
+                    generation_steps=_object_summary(sport_result["generation"]["steps"], name="generation_steps"),
+                    same_object=bool(sport_result["refresh_steps"] is sport_result["generation"]["steps"]),
+                    failed_stage="post_refresh",
+                    before=sport_start_memory,
+                    after=_phase_memory_snapshot(),
+                )
                 return sport_result
 
     if not args.skip_mirror and (execution_mode == "ingest" or sport_result["ok"]):
@@ -1414,6 +1560,17 @@ def _run_sport_refresh(args: argparse.Namespace, sport: str, execution_mode: str
         if not mirror_result["ok"]:
             sport_result["ok"] = False
             if not args.continue_on_error:
+                _log_memory(
+                    f"{sport}_refresh",
+                    sport=sport,
+                    rows_loaded=_sport_rows_loaded(sport_result),
+                    refresh_steps=_object_summary(sport_result["refresh_steps"], name="refresh_steps"),
+                    generation_steps=_object_summary(sport_result["generation"]["steps"], name="generation_steps"),
+                    same_object=bool(sport_result["refresh_steps"] is sport_result["generation"]["steps"]),
+                    failed_stage="mirror",
+                    before=sport_start_memory,
+                    after=_phase_memory_snapshot(),
+                )
                 return sport_result
 
     published_manifest = _publish_sport_manifest_threadsafe(
@@ -1429,12 +1586,24 @@ def _run_sport_refresh(args: argparse.Namespace, sport: str, execution_mode: str
     )
     sport_result["sport_manifest"] = published_manifest
     _log_memory("sport_end", sport=sport, result=_object_summary(sport_result, name="sport_result"))
+    _log_memory(
+        f"{sport}_refresh",
+        sport=sport,
+        rows_loaded=_sport_rows_loaded(sport_result),
+        refresh_steps=_object_summary(sport_result["refresh_steps"], name="refresh_steps"),
+        generation_steps=_object_summary(sport_result["generation"]["steps"], name="generation_steps"),
+        same_object=bool(sport_result["refresh_steps"] is sport_result["generation"]["steps"]),
+        artifact_paths_len=len(_sport_artifact_paths(sport_result)),
+        before=sport_start_memory,
+        after=_phase_memory_snapshot(),
+    )
     return sport_result
 
 
 def _build_summary(args: argparse.Namespace) -> dict[str, Any]:
     selected = _parse_sports(args.sports)
     execution_mode = _resolve_execution_mode(getattr(args, "execution_mode", None), mirror_only=bool(args.mirror_only))
+    summary_start_memory = _phase_memory_snapshot()
     summary: dict[str, Any] = {
         "date": args.date,
         "phase": args.phase,
@@ -1446,7 +1615,16 @@ def _build_summary(args: argparse.Namespace) -> dict[str, Any]:
         "results": [],
         "started_at": _utc_now(),
     }
-    _log_memory("summary_start", sports=selected, execution_mode=execution_mode, summary=_object_summary(summary, name="summary"))
+    _log_memory(
+        "summary_start",
+        sports=selected,
+        execution_mode=execution_mode,
+        summary=_object_summary(summary, name="summary"),
+        results=_object_summary(summary["results"], name="results"),
+        rows_loaded=0,
+        before=summary_start_memory,
+        after=summary_start_memory,
+    )
 
     any_failure = False
     max_workers = min(len(selected), 4)
@@ -1478,7 +1656,13 @@ def _build_summary(args: argparse.Namespace) -> dict[str, Any]:
                 results_by_sport[sport] = sport_result
                 if not sport_result.get("ok"):
                     any_failure = True
-                _log_memory("summary_future_complete", sport=sport, results_by_sport_len=len(results_by_sport), result=_object_summary(sport_result, name="sport_result"))
+                _log_memory(
+                    "summary_future_complete",
+                    sport=sport,
+                    results_by_sport_len=len(results_by_sport),
+                    result=_object_summary(sport_result, name="sport_result"),
+                    rows_loaded=_sport_rows_loaded(sport_result) if isinstance(sport_result, dict) else None,
+                )
                 if not args.continue_on_error and not sport_result.get("ok"):
                     break
 
@@ -1488,15 +1672,38 @@ def _build_summary(args: argparse.Namespace) -> dict[str, Any]:
                 sport_result = {"sport": sport, "ok": False, "error": "Refresh did not complete."}
                 any_failure = True
             summary["results"].append(sport_result)
-            _log_memory("summary_append_parallel", sport=sport, results_len=len(summary["results"]), result=_object_summary(sport_result, name="sport_result"))
+            _log_memory(
+                "summary_append_parallel",
+                sport=sport,
+                results_len=len(summary["results"]),
+                result=_object_summary(sport_result, name="sport_result"),
+                rows_loaded=_sport_rows_loaded(sport_result) if isinstance(sport_result, dict) else None,
+            )
             if not args.continue_on_error and not sport_result.get("ok"):
                 summary["finished_at"] = _utc_now()
                 summary["ok"] = False
+                _log_memory(
+                    "summary_end",
+                    summary=_object_summary(summary, name="summary"),
+                    results=_object_summary(summary["results"], name="results"),
+                    results_by_sport=_object_summary(results_by_sport, name="results_by_sport"),
+                    rows_loaded=sum((_sport_rows_loaded(item) or 0) for item in summary["results"] if isinstance(item, dict)),
+                    before=summary_start_memory,
+                    after=_phase_memory_snapshot(),
+                )
                 return summary
 
     summary["finished_at"] = _utc_now()
     summary["ok"] = not any_failure
-    _log_memory("summary_before_parity", summary=_object_summary(summary, name="summary"))
+    summary_rows_loaded = sum((_sport_rows_loaded(item) or 0) for item in summary.get("results", []) if isinstance(item, dict))
+    _log_memory(
+        "summary_before_parity",
+        summary=_object_summary(summary, name="summary"),
+        results=_object_summary(summary.get("results", []), name="results"),
+        rows_loaded=summary_rows_loaded,
+        before=summary_start_memory,
+        after=_phase_memory_snapshot(),
+    )
     publish_parity_paths: list[str] = []
     for sport_result in summary.get("results", []) if isinstance(summary.get("results"), list) else []:
         if not isinstance(sport_result, dict):
@@ -1508,12 +1715,21 @@ def _build_summary(args: argparse.Namespace) -> dict[str, Any]:
         intelligence_paths=[],
     )
     summary["coverage_audit"] = _build_odds_coverage_audit(requested_date=str(summary.get("date") or "").strip())
-    _log_memory("summary_end", summary=_object_summary(summary, name="summary"), publish_parity_paths_count=len(publish_parity_paths))
+    _log_memory(
+        "summary_end",
+        summary=_object_summary(summary, name="summary"),
+        results=_object_summary(summary.get("results", []), name="results"),
+        publish_parity_paths_count=len(publish_parity_paths),
+        rows_loaded=summary_rows_loaded,
+        before=summary_start_memory,
+        after=_phase_memory_snapshot(),
+    )
     return summary
 
 
 def main() -> int:
     child_pid = os.getpid()
+    startup_memory = _phase_memory_snapshot()
 
     def _emit_child_exit() -> None:
         print(f"CHILD_PROCESS_EXIT ts={_utc_now()} pid={child_pid} ppid={os.getppid()}", file=sys.stderr, flush=True)
@@ -1571,6 +1787,7 @@ def main() -> int:
         return 0
 
     try:
+        _log_memory("startup", child_pid=child_pid, argv=list(sys.argv), before=startup_memory, after=_phase_memory_snapshot())
         summary = _build_summary(args)
     except Exception as exc:
         payload = {"ok": False, "error": f"{type(exc).__name__}: {exc}"}
@@ -1586,6 +1803,13 @@ def main() -> int:
         return 1
 
     summary["odds_control_plane"] = write_odds_control_plane_snapshot(summary)
+    _log_memory(
+        "artifact_write",
+        summary=_object_summary(summary, name="summary"),
+        rows_loaded=sum((_sport_rows_loaded(item) or 0) for item in summary.get("results", []) if isinstance(item, dict)),
+        before=_phase_memory_snapshot(),
+        after=_phase_memory_snapshot(),
+    )
 
     print(f"CHILD_PROCESS_STARTED argv={json.dumps(sys.argv)} cwd={os.getcwd()} pid={os.getpid()}", file=sys.stderr, flush=True)
     if args.json:
@@ -1622,6 +1846,7 @@ def main() -> int:
         _dump_child_runtime_state(label="non_json_after_write")
         _dump_main_thread_stack(label="non_json_after_write")
 
+    _log_memory("finalization", child_pid=child_pid, before=_phase_memory_snapshot(), after=_phase_memory_snapshot())
     print(f"MAIN_RETURN ts={_utc_now()} pid={os.getpid()} ppid={os.getppid()}", file=sys.stderr, flush=True)
     _dump_main_thread_stack(label="main_return")
     return 0 if summary.get("ok") else 1
