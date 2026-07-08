@@ -5,6 +5,7 @@ import gc
 import signal
 import sys
 import time
+import json
 from pathlib import Path
 
 import os
@@ -95,16 +96,22 @@ def _largest_gc_object_summary() -> dict[str, object] | None:
     return payload
 
 
+def _phase_memory_snapshot() -> dict[str, object]:
+    return {
+        "rss_bytes": _rss_bytes(),
+        "largest_gc_object": _largest_gc_object_summary(),
+    }
+
+
 def _log_worker_memory(stage: str, **extra: object) -> None:
     if not _memory_trace_enabled():
         return
     payload: dict[str, object] = {
         "stage": stage,
-        "rss_bytes": _rss_bytes(),
-        "largest_gc_object": _largest_gc_object_summary(),
         **extra,
     }
-    print(f"LIVE_ODDS_WORKER_MEMORY {payload}")
+    payload.update(_phase_memory_snapshot())
+    print(f"LIVE_ODDS_WORKER_MEMORY {json.dumps(payload, default=str, sort_keys=True)}", flush=True)
 
 
 def _handle_stop(_signum: int, _frame: object) -> None:
@@ -133,6 +140,7 @@ def _start_live_lens_reports() -> None:
 
 
 def main() -> int:
+    _log_worker_memory("startup", argv=list(sys.argv), pid=os.getpid())
     assert_refresh_state_backend_ready(process_name="live-odds-worker")
     parser = argparse.ArgumentParser(description="Run the Syndicate live odds refresh worker loop.")
     parser.add_argument("--run-once", action="store_true")
@@ -145,6 +153,7 @@ def main() -> int:
         pass
 
     if not _acquire_process_lock():
+        _log_worker_memory("lock_unavailable")
         print("LIVE ODDS REFRESH WORKER SKIPPED: lock_unavailable")
         return 0
 
@@ -157,6 +166,7 @@ def main() -> int:
 
     if args.run_once:
         try:
+            _log_worker_memory("run_once_start", interval_seconds=interval_seconds)
             _run_tick()
             return 0
         finally:
@@ -166,6 +176,7 @@ def main() -> int:
     try:
         _log_worker_memory("loop_start", interval_seconds=interval_seconds)
         while not _LIVE_REFRESH_LOOP_STOP.is_set():
+            _log_worker_memory("loop_tick_begin", interval_seconds=interval_seconds)
             _run_tick()
             _log_worker_memory("loop_sleep", interval_seconds=interval_seconds)
             time.sleep(interval_seconds)
