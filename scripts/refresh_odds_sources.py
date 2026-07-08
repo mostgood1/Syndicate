@@ -1033,10 +1033,12 @@ def _run_command(step: RefreshStep, *, dry_run: bool = False) -> dict[str, Any]:
             timeout_seconds = max(1, int(timeout_value))
         except ValueError:
             timeout_seconds = None
+    print(f"STEP_START name={step.name} cwd={step.cwd} command={json.dumps(list(step.command))}", file=sys.stderr, flush=True)
     print(f"[refresh_odds_sources] START step={step.name} cwd={step.cwd}", flush=True)
     _log_memory("step_start", step=step.name, dry_run=bool(dry_run), cwd=str(step.cwd))
     _dump_child_runtime_state(label=f"step_start:{step.name}")
     if dry_run:
+        print(f"STEP_END name={step.name} status=dry_run runtime_seconds=0", file=sys.stderr, flush=True)
         print(f"[refresh_odds_sources] END step={step.name} dry_run=true", flush=True)
         _dump_child_runtime_state(label=f"step_end:{step.name}:dry_run")
         _log_memory("step_end_dry_run", step=step.name)
@@ -1053,14 +1055,25 @@ def _run_command(step: RefreshStep, *, dry_run: bool = False) -> dict[str, Any]:
             "ok": True,
             "dry_run": True,
         }
-    result = subprocess.run(
-        list(step.command),
-        cwd=str(step.cwd),
-        env=env,
-        capture_output=True,
-        text=True,
-        timeout=timeout_seconds,
-    )
+    try:
+        result = subprocess.run(
+            list(step.command),
+            cwd=str(step.cwd),
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=timeout_seconds,
+        )
+    except subprocess.TimeoutExpired:
+        finished = _utc_now()
+        runtime_seconds = _elapsed_seconds(started, finished)
+        print(
+            f"STEP_END name={step.name} status=timeout runtime_seconds={runtime_seconds if runtime_seconds is not None else 'unknown'} timeout_seconds={timeout_seconds if timeout_seconds is not None else 'none'}",
+            file=sys.stderr,
+            flush=True,
+        )
+        raise
+
     finished = _utc_now()
     stdout_text = str(result.stdout or "")
     stderr_text = str(result.stderr or "")
@@ -1068,6 +1081,12 @@ def _run_command(step: RefreshStep, *, dry_run: bool = False) -> dict[str, Any]:
         **_extract_count_candidates(stdout_text),
         **_extract_count_candidates(stderr_text),
     }
+    runtime_seconds = _elapsed_seconds(started, finished)
+    print(
+        f"STEP_END name={step.name} status=ok runtime_seconds={runtime_seconds if runtime_seconds is not None else 'unknown'} return_code={result.returncode} timeout_seconds={timeout_seconds if timeout_seconds is not None else 'none'}",
+        file=sys.stderr,
+        flush=True,
+    )
     print(
         f"[refresh_odds_sources] END step={step.name} return_code={result.returncode} timeout_seconds={timeout_seconds if timeout_seconds is not None else 'none'}",
         flush=True,

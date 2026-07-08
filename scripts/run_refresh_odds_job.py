@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import threading
 import subprocess
 import sys
 import traceback
@@ -15,6 +16,22 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 
 def _memory_trace_enabled() -> bool:
     return str(os.environ.get("SYNDICATE_LIVE_ODDS_REFRESH_MEMORY_TRACE") or "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _stream_child_output(pipe, *, chunks: list[str], target_stream) -> None:
+    try:
+        while True:
+            line = pipe.readline()
+            if line == "":
+                break
+            chunks.append(line)
+            target_stream.write(line)
+            target_stream.flush()
+    finally:
+        try:
+            pipe.close()
+        except Exception:
+            pass
 
 
 def _refresh_state_store():
@@ -159,6 +176,24 @@ def _wait_for_child_process(
     stdout_chunks: list[str] = []
     stderr_chunks: list[str] = []
     wait_started_at = _utc_now()
+    live_streaming = _memory_trace_enabled()
+    stdout_thread: threading.Thread | None = None
+    stderr_thread: threading.Thread | None = None
+    if live_streaming and process.stdout is not None and process.stderr is not None:
+        stdout_thread = threading.Thread(
+            target=_stream_child_output,
+            kwargs={"pipe": process.stdout, "chunks": stdout_chunks, "target_stream": sys.stdout},
+            daemon=True,
+            name="refresh-job-stdout-stream",
+        )
+        stderr_thread = threading.Thread(
+            target=_stream_child_output,
+            kwargs={"pipe": process.stderr, "chunks": stderr_chunks, "target_stream": sys.stderr},
+            daemon=True,
+            name="refresh-job-stderr-stream",
+        )
+        stdout_thread.start()
+        stderr_thread.start()
     print(
         f"WRAPPER_WAIT_BEGIN pid={int(process.pid)} poll={process.poll()} returncode={process.returncode} stdout_len=0 stderr_len=0",
         flush=True,
@@ -186,9 +221,16 @@ def _wait_for_child_process(
                 f"WRAPPER_WAIT_POLL pid={int(process.pid)} poll={process.poll()} returncode={process.returncode} stdout_len={sum(len(chunk) for chunk in stdout_chunks)} stderr_len={sum(len(chunk) for chunk in stderr_chunks)}",
                 flush=True,
             )
-            stdout_text, stderr_text = process.communicate(timeout=timeout_seconds)
-            stdout_chunks.append(str(stdout_text or ""))
-            stderr_chunks.append(str(stderr_text or ""))
+            if live_streaming:
+                process.wait(timeout=timeout_seconds)
+                if stdout_thread is not None:
+                    stdout_thread.join()
+                if stderr_thread is not None:
+                    stderr_thread.join()
+            else:
+                stdout_text, stderr_text = process.communicate(timeout=timeout_seconds)
+                stdout_chunks.append(str(stdout_text or ""))
+                stderr_chunks.append(str(stderr_text or ""))
             print(
                 f"WRAPPER_WAIT_END pid={int(process.pid)} poll={process.poll()} returncode={process.returncode} stdout_len={sum(len(chunk) for chunk in stdout_chunks)} stderr_len={sum(len(chunk) for chunk in stderr_chunks)}",
                 flush=True,
@@ -278,14 +320,7 @@ def _queue_intelligence_snapshot_refresh(*, run_summary_path: Path) -> tuple[str
 
 
 def _echo_captured_output(*, stdout_text: str, stderr_text: str) -> None:
-    if not _memory_trace_enabled():
-        return
-    if stdout_text.strip():
-        print("[refresh_job_child_stdout]", flush=True)
-        print(stdout_text, flush=True)
-    if stderr_text.strip():
-        print("[refresh_job_child_stderr]", flush=True)
-        print(stderr_text, flush=True)
+    return
 
 
 def main() -> int:
@@ -329,7 +364,7 @@ def main() -> int:
             command=command,
         )
         print(f"LAUNCH_COMMAND command={json.dumps(command)}", flush=True)
-        process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, bufsize=1)
         print(f"LAUNCH_PID pid={int(process.pid)}", flush=True)
         stdout_text, stderr_text, return_code = _wait_for_child_process(
             process,

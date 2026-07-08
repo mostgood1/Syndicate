@@ -1,3 +1,10 @@
+# 2026-07-08 - Refresh wrapper now streams child logs live in memory-trace mode
+- Symptom: `STEP_START` and `STEP_END` never appeared in the worker log stream even though the refresh child was running and `WRAPPER_WAIT_TIMEOUT` kept repeating.
+- Root cause: `scripts/run_refresh_odds_job.py` launched `refresh_odds_sources.py` with `stdout=PIPE` and `stderr=PIPE`, then buffered both pipes until the child exited, so the worker never saw live child output.
+- Fix: In memory-trace mode, start live reader threads for the child stdout/stderr pipes, write each emitted line directly to the worker log stream, and skip the post-exit echo replay to avoid duplicates.
+- Validation: `scripts/run_refresh_odds_job.py` passed an error check after the patch.
+- Follow-up: Re-run the worker and confirm the first `STEP_START`/`STEP_END` pair is visible in the live log stream.
+
 # 2026-07-08 - Intelligence background worker now bypasses the nested guard and computes fresh state
 - Symptom: The persisted intelligence snapshot stayed empty/null even though the live recommendation pipeline was producing candidates.
 - Root cause: `IntelligenceStateService._background_loop()` called `run_routed_intelligence_pipeline()` while already holding the execution guard, so the routed wrapper could short-circuit into cached fallback behavior instead of computing fresh state.
