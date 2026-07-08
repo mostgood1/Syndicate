@@ -69,12 +69,6 @@
     },
     "bullpen": [
       {
-        "id": 687941,
-        "name": "Alec Gamboa",
-        "role": "MR",
-        "lev": 0.5
-      },
-      {
         "id": 547973,
         "name": "Aroldis Chapman",
         "role": "CL",
@@ -446,59 +440,30 @@
         "vs_pitcher_history": {}
       },
       {
-        "id": 681987,
-        "name": "Nate Eaton",
-        "pos": "OF",
-        "bat": "R",
-        "throw": "R",
-        "k_rate": 0.15,
-        "bb_rate": 0.2,
-        "hbp_rate": 0.0,
-        "hr_rate": 0.05,
-        "inplay_hit_rate": 0.23076923076923078,
-        "xb_hit_share": 0.45,
-        "vs_pitch_type": {},
-        "vs_pitch_type_hr": {},
-        "platoon_mult_vs_lhp": {
-          "k": 0.8075,
-          "bb": 1.1375,
-          "hr": 0.78,
-          "inplay": 1.1925000000000001
-        },
-        "platoon_mult_vs_rhp": {
-          "k": 1.1925000000000001,
-          "bb": 0.9083333333333333,
-          "hr": 1.275,
-          "inplay": 0.8075
-        },
-        "statcast_quality_mult": {},
-        "vs_pitcher_history": {}
-      },
-      {
         "id": 663853,
         "name": "Romy Gonzalez",
         "pos": "1B",
         "bat": "R",
         "throw": "R",
-        "k_rate": 0.25,
-        "bb_rate": 0.0,
+        "k_rate": 0.28,
+        "bb_rate": 0.04,
         "hbp_rate": 0.0,
-        "hr_rate": 0.05,
-        "inplay_hit_rate": 0.3333333333333333,
-        "xb_hit_share": 0.16666666666666666,
+        "hr_rate": 0.04,
+        "inplay_hit_rate": 0.3529411764705882,
+        "xb_hit_share": 0.2857142857142857,
         "vs_pitch_type": {},
         "vs_pitch_type_hr": {},
         "platoon_mult_vs_lhp": {
-          "k": 1.0,
-          "bb": 1.0,
+          "k": 1.0638392857142855,
+          "bb": 1.1925000000000001,
           "hr": 1.275,
-          "inplay": 1.0
+          "inplay": 1.0733333333333335
         },
         "platoon_mult_vs_rhp": {
-          "k": 1.0,
-          "bb": 1.0,
+          "k": 0.8865079365079365,
+          "bb": 0.8075,
           "hr": 0.78,
-          "inplay": 1.0
+          "inplay": 0.8952380952380953
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -580,48 +545,6 @@
     },
     "bullpen_profiles": [
       {
-        "id": 687941,
-        "name": "Alec Gamboa",
-        "throw": "L",
-        "role": "MR",
-        "leverage_skill": 0.5,
-        "stamina_pitches": 25,
-        "availability_mult": 1.0,
-        "platoon_mult_vs_lhb": {
-          "k": 1.1925000000000001,
-          "bb": 1.0,
-          "hr": 1.0,
-          "inplay": 1.0
-        },
-        "platoon_mult_vs_rhb": {
-          "k": 0.8625,
-          "bb": 1.0,
-          "hr": 1.0,
-          "inplay": 1.0
-        },
-        "statcast_quality_mult": {},
-        "arsenal_source": "statsapi_pitchArsenal",
-        "arsenal_sample_size": 14,
-        "statcast_splits_found": false,
-        "statcast_splits_source": "",
-        "statcast_splits_n_pitches": 0,
-        "statcast_splits_start_date": "",
-        "statcast_splits_end_date": "",
-        "k_rate": 0.6666666666666666,
-        "bb_rate": 0.0,
-        "hbp_rate": 0.0,
-        "hr_rate": 0.0,
-        "inplay_hit_rate": 0.0,
-        "arsenal": {
-          "FF": 0.7142857121428573,
-          "SI": 0.07142857321428567,
-          "SL": 0.21428571464285717
-        },
-        "pitch_type_whiff_mult": {},
-        "pitch_type_inplay_mult": {},
-        "pitch_type_hr_mult": {}
-      },
-      {
         "id": 547973,
         "name": "Aroldis Chapman",
         "throw": "L",
@@ -671,7 +594,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.8833333333333333,
         "platoon_mult_vs_lhb": {
           "k": 1.0563947078280045,
           "bb": 1.1190997566909977,
@@ -715,7 +638,7 @@
         "role": "SU",
         "leverage_skill": 0.7,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.9,
         "platoon_mult_vs_lhb": {
           "k": 1.1469418795111328,
           "bb": 1.1925000000000001,
@@ -802,7 +725,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.9166666666666666,
         "platoon_mult_vs_lhb": {
           "k": 1.0902116402116404,
           "bb": 0.8075,
@@ -846,7 +769,7 @@
         "role": "SU",
         "leverage_skill": 0.7,
         "stamina_pitches": 27,
-        "availability_mult": 1.0,
+        "availability_mult": 0.875,
         "platoon_mult_vs_lhb": {
           "k": 0.9288048077010563,
           "bb": 1.1925000000000001,
@@ -1534,7 +1457,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.8833333333333333,
         "platoon_mult_vs_lhb": {
           "k": 1.1422320550639136,
           "bb": 1.0383476599808978,
@@ -1622,7 +1545,7 @@
         "role": "CL",
         "leverage_skill": 0.85,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.8416666666666667,
         "platoon_mult_vs_lhb": {
           "k": 1.055289439338862,
           "bb": 0.9270298248559118,
@@ -1666,7 +1589,7 @@
         "role": "SU",
         "leverage_skill": 0.7,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.8833333333333333,
         "platoon_mult_vs_lhb": {
           "k": 0.8075,
           "bb": 1.1048340108797952,

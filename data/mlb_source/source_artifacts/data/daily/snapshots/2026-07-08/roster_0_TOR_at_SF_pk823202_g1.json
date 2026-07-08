@@ -75,6 +75,12 @@
         "lev": 0.5
       },
       {
+        "id": 689149,
+        "name": "Chad Dallas",
+        "role": "MR",
+        "lev": 0.5
+      },
+      {
         "id": 656546,
         "name": "Jeff Hoffman",
         "role": "SU",
@@ -433,12 +439,12 @@
         "pos": "LF",
         "bat": "S",
         "throw": "R",
-        "k_rate": 1.0,
+        "k_rate": 0.4,
         "bb_rate": 0.0,
         "hbp_rate": 0.0,
-        "hr_rate": 0.0,
-        "inplay_hit_rate": 0.0,
-        "xb_hit_share": 0.22,
+        "hr_rate": 0.2,
+        "inplay_hit_rate": 0.3333333333333333,
+        "xb_hit_share": 0.05,
         "vs_pitch_type": {},
         "vs_pitch_type_hr": {},
         "platoon_mult_vs_lhp": {},
@@ -486,12 +492,12 @@
         "pos": "3B",
         "bat": "L",
         "throw": "R",
-        "k_rate": 0.4,
+        "k_rate": 0.3793103448275862,
         "bb_rate": 0.0,
         "hbp_rate": 0.0,
-        "hr_rate": 0.04,
-        "inplay_hit_rate": 0.2,
-        "xb_hit_share": 0.25,
+        "hr_rate": 0.034482758620689655,
+        "inplay_hit_rate": 0.2777777777777778,
+        "xb_hit_share": 0.16666666666666666,
         "vs_pitch_type": {},
         "vs_pitch_type_hr": {},
         "platoon_mult_vs_lhp": {
@@ -501,39 +507,10 @@
           "inplay": 0.8075
         },
         "platoon_mult_vs_rhp": {
-          "k": 0.965625,
+          "k": 0.9678571428571429,
           "bb": 1.0,
-          "hr": 1.0229166666666667,
+          "hr": 1.019642857142857,
           "inplay": 1.0
-        },
-        "statcast_quality_mult": {},
-        "vs_pitcher_history": {}
-      },
-      {
-        "id": 682818,
-        "name": "Yohendrick Pi\u00f1ango",
-        "pos": "LF",
-        "bat": "L",
-        "throw": "L",
-        "k_rate": 0.221875,
-        "bb_rate": 0.06875,
-        "hbp_rate": 0.0,
-        "hr_rate": 0.031249999999999997,
-        "inplay_hit_rate": 0.3304123711340206,
-        "xb_hit_share": 0.19444444444444445,
-        "vs_pitch_type": {},
-        "vs_pitch_type_hr": {},
-        "platoon_mult_vs_lhp": {
-          "k": 1.1925000000000001,
-          "bb": 0.8075,
-          "hr": 0.78,
-          "inplay": 0.8075
-        },
-        "platoon_mult_vs_rhp": {
-          "k": 0.8781690140845071,
-          "bb": 1.1045454545454545,
-          "hr": 1.09,
-          "inplay": 1.0386952551272783
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -592,7 +569,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.9400000000000001,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 1.0953978731206453,
           "bb": 0.8985219164118247,
@@ -629,13 +606,56 @@
         "pitch_type_hr_mult": {}
       },
       {
+        "id": 689149,
+        "name": "Chad Dallas",
+        "throw": "R",
+        "role": "MR",
+        "leverage_skill": 0.5,
+        "stamina_pitches": 27,
+        "availability_mult": 1.0,
+        "platoon_mult_vs_lhb": {
+          "k": 0.9083333333333333,
+          "bb": 1.1925000000000001,
+          "hr": 1.0,
+          "inplay": 0.8075
+        },
+        "platoon_mult_vs_rhb": {
+          "k": 1.1375,
+          "bb": 0.8075,
+          "hr": 1.0,
+          "inplay": 1.1925000000000001
+        },
+        "statcast_quality_mult": {},
+        "arsenal_source": "statsapi_pitchArsenal",
+        "arsenal_sample_size": 68,
+        "statcast_splits_found": false,
+        "statcast_splits_source": "",
+        "statcast_splits_n_pitches": 0,
+        "statcast_splits_start_date": "",
+        "statcast_splits_end_date": "",
+        "k_rate": 0.13333333333333333,
+        "bb_rate": 0.13333333333333333,
+        "hbp_rate": 0.0,
+        "hr_rate": 0.0,
+        "inplay_hit_rate": 0.18181818181818182,
+        "arsenal": {
+          "FF": 0.07352941242647057,
+          "OTHER": 0.27941175022058873,
+          "CU": 0.2941176497058823,
+          "FC": 0.35294118764705845
+        },
+        "pitch_type_whiff_mult": {},
+        "pitch_type_inplay_mult": {},
+        "pitch_type_hr_mult": {}
+      },
+      {
         "id": 656546,
         "name": "Jeff Hoffman",
         "throw": "R",
         "role": "SU",
         "leverage_skill": 0.7,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.9333333333333333,
         "platoon_mult_vs_lhb": {
           "k": 1.023725910524897,
           "bb": 1.1835991301196085,
@@ -678,7 +698,7 @@
         "role": "CL",
         "leverage_skill": 0.85,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.8416666666666667,
         "platoon_mult_vs_lhb": {
           "k": 0.9256795468602493,
           "bb": 0.8913395672501904,
@@ -722,7 +742,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.91,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 1.027105161039969,
           "bb": 1.1925000000000001,
@@ -805,7 +825,7 @@
         "role": "LR",
         "leverage_skill": 0.35,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.9,
         "platoon_mult_vs_lhb": {
           "k": 1.146093254996832,
           "bb": 0.8589895720963683,
@@ -1168,25 +1188,25 @@
         "pos": "C",
         "bat": "L",
         "throw": "R",
-        "k_rate": 0.22727272727272727,
-        "bb_rate": 0.045454545454545456,
+        "k_rate": 0.24,
+        "bb_rate": 0.04,
         "hbp_rate": 0.0,
         "hr_rate": 0.0,
-        "inplay_hit_rate": 0.25,
+        "inplay_hit_rate": 0.2222222222222222,
         "xb_hit_share": 0.05,
         "vs_pitch_type": {},
         "vs_pitch_type_hr": {},
         "platoon_mult_vs_lhp": {
-          "k": 0.8075,
+          "k": 1.1925000000000001,
           "bb": 0.8075,
           "hr": 1.0,
           "inplay": 0.8075
         },
         "platoon_mult_vs_rhp": {
-          "k": 1.0261904761904763,
-          "bb": 1.026190476190476,
+          "k": 0.9481884057971015,
+          "bb": 1.0478260869565217,
           "hr": 1.0,
-          "inplay": 1.0366666666666666
+          "inplay": 1.0323529411764707
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -1257,25 +1277,25 @@
         "pos": "LF",
         "bat": "R",
         "throw": "R",
-        "k_rate": 0.2370238095238095,
-        "bb_rate": 0.05857142857142857,
+        "k_rate": 0.24034805027392842,
+        "bb_rate": 0.05800837898807605,
         "hbp_rate": 0.0,
-        "hr_rate": 0.04488095238095238,
-        "inplay_hit_rate": 0.30476155539251654,
-        "xb_hit_share": 0.2962962962962963,
+        "hr_rate": 0.042120528520786335,
+        "inplay_hit_rate": 0.3165847665847666,
+        "xb_hit_share": 0.2857142857142857,
         "vs_pitch_type": {},
         "vs_pitch_type_hr": {},
         "platoon_mult_vs_lhp": {
-          "k": 1.0629469404774317,
-          "bb": 0.9815232397606994,
-          "hr": 0.9124393173514839,
-          "inplay": 1.1016934554140552
+          "k": 1.0432754288211517,
+          "bb": 0.9767438271604938,
+          "hr": 0.9336209583722973,
+          "inplay": 1.1073535118354676
         },
         "platoon_mult_vs_rhp": {
-          "k": 1.0264155259175847,
-          "bb": 0.9882942364455491,
-          "hr": 0.9183302640693372,
-          "inplay": 0.9963739061622425
+          "k": 1.0220870206489676,
+          "bb": 0.9833281250000001,
+          "hr": 0.939666220351951,
+          "inplay": 0.9821433191049024
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -1536,7 +1556,7 @@
         "role": "SU",
         "leverage_skill": 0.7,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.85,
         "platoon_mult_vs_lhb": {
           "k": 1.1033036377134373,
           "bb": 1.1925000000000001,
@@ -1620,8 +1640,8 @@
         "throw": "R",
         "role": "SU",
         "leverage_skill": 0.7,
-        "stamina_pitches": 25,
-        "availability_mult": 0.9299999999999999,
+        "stamina_pitches": 24,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 1.1925000000000001,
           "bb": 1.0,

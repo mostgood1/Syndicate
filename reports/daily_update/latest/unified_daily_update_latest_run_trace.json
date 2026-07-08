@@ -1,15 +1,15 @@
 {
   "scope": "daily_update",
-  "date": "2026-07-07",
+  "date": "2026-07-08",
   "runMode": "standard",
   "overallStatus": "ok",
-  "generatedAt": "2026-07-07T17:21:57.8972598+00:00",
-  "updatedAt": "2026-07-07T17:30:21.7524387+00:00",
-  "runManifestPath": "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-07\\20260707_172156\\unified_daily_update_run.json",
+  "generatedAt": "2026-07-08T06:50:30.3836131+00:00",
+  "updatedAt": "2026-07-08T07:17:34.9124050+00:00",
+  "runManifestPath": "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-08\\20260708_065029\\unified_daily_update_run.json",
   "latestManifestPath": "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest.json",
-  "runCheckpointPath": "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-07\\20260707_172156\\unified_daily_update_checkpoint.json",
+  "runCheckpointPath": "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-08\\20260708_065029\\unified_daily_update_checkpoint.json",
   "latestCheckpointPath": "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest_checkpoint.json",
-  "runStatePath": "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-07\\20260707_172156\\unified_daily_update_run_state.json",
+  "runStatePath": "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-08\\20260708_065029\\unified_daily_update_run_state.json",
   "latestRunStatePath": "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest_run_state.json",
   "trace": {
     "eventSimExecutionCount": 21,
@@ -17,8 +17,8 @@
     "inputFingerprintCount": 3,
     "artifactPathCount": 21,
     "inputFingerprints": [
-      "54beae5532ee18935b21c053715c20ce76588f6b6917f1073841b68d2470a424",
-      "1221d0c4df506d2a669494e71458677dd61fd31bbba8d01826283ba6c121f1fd",
+      "72e41d2b19c75a4a73a6606c12517c118319cf65403ef024fbc576e7625d3968",
+      "eefe4849e98e1c96cca947b326145e93d8c049c6543b58fedd7e8625ea9c95bc",
       "563a06b8e8830bba5d1cdcf73bb91ad105470d2e01ba859ebaa44c2126a6045d"
     ],
     "artifactPaths": [
@@ -47,52 +47,330 @@
     "simExecutionDecision": true
   },
   "simulationContractPath": "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest_simulation_contract.json",
-  "simulationContractRunPath": "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-07\\20260707_172156\\unified_daily_update_simulation_contract.json",
-  "simulationContractSportCount": 1,
+  "simulationContractRunPath": "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-08\\20260708_065029\\unified_daily_update_simulation_contract.json",
+  "simulationContractSportCount": 2,
   "simulationContractAdvancedBySport": {
-    "wnba": {
+    "mlb": {
       "page": {
+        "hr_targets_shelf": {
+          "label": "Home run targets",
+          "title": "HR Targets",
+          "kicker": "Best 1+ HR looks",
+          "body": "30 targets surfaced for the slate.",
+          "href": "/mlb/hr-targets?date=2026-07-08",
+          "cta": "Open board",
+          "source_path": "daily_summary_2026_07_08_hr_targets.json",
+          "row_count": 30,
+          "game_count": 15,
+          "rows": [
+            {
+              "rank": "#1",
+              "player_name": "Randal Grichuk",
+              "team": "CWS",
+              "opponent": "BOS",
+              "matchup": "BOS @ CWS",
+              "probability": "16.3%",
+              "support": "80",
+              "summary": "Expected opportunity is strong at about 4.7 PA. He is tracking toward a premium lineup slot (2).",
+              "p_hr_1plus": 0.163,
+              "support_score": 80.0,
+              "support_label": "strong",
+              "pa_mean": 4.715,
+              "lineup_order": 2,
+              "opponent_pitcher_name": "Jake Bennett",
+              "writeup": "Expected opportunity is strong at about 4.7 PA. He is tracking toward a premium lineup slot (2).",
+              "headshot_url": "https://img.mlbstatic.com/mlb-photos/image/upload/w_180,q_auto:best/v1/people/545341/headshot/67/current",
+              "team_logo_url": "https://www.mlbstatic.com/team-logos/145.svg",
+              "opponent_logo_url": "https://www.mlbstatic.com/team-logos/111.svg",
+              "drivers": [
+                "Expected opportunity is strong at about 4.7 PA.",
+                "He is tracking toward a premium lineup slot (2).",
+                "The handedness split is leaning toward extra damage in this matchup."
+              ]
+            },
+            {
+              "rank": "#2",
+              "player_name": "Juan Soto",
+              "team": "NYM",
+              "opponent": "KC",
+              "matchup": "KC @ NYM",
+              "probability": "15.4%",
+              "support": "77",
+              "summary": "Expected opportunity is strong at about 4.8 PA. He is tracking toward a premium lineup slot (3).",
+              "p_hr_1plus": 0.154,
+              "support_score": 77.0,
+              "support_label": "strong",
+              "pa_mean": 4.791,
+              "lineup_order": 3,
+              "opponent_pitcher_name": "Steven Cruz",
+              "writeup": "Expected opportunity is strong at about 4.8 PA. He is tracking toward a premium lineup slot (3).",
+              "headshot_url": "https://img.mlbstatic.com/mlb-photos/image/upload/w_180,q_auto:best/v1/people/665742/headshot/67/current",
+              "team_logo_url": "https://www.mlbstatic.com/team-logos/121.svg",
+              "opponent_logo_url": "https://www.mlbstatic.com/team-logos/118.svg",
+              "drivers": [
+                "Expected opportunity is strong at about 4.8 PA.",
+                "He is tracking toward a premium lineup slot (3).",
+                "The handedness split is leaning toward extra damage in this matchup."
+              ]
+            },
+            {
+              "rank": "#3",
+              "player_name": "Mickey Moniak",
+              "team": "COL",
+              "opponent": "LAD",
+              "matchup": "COL @ LAD",
+              "probability": "13.7%",
+              "support": "77",
+              "summary": "Expected opportunity is strong at about 5.1 PA. He is tracking toward a premium lineup slot (2).",
+              "p_hr_1plus": 0.137,
+              "support_score": 77.0,
+              "support_label": "strong",
+              "pa_mean": 5.08,
+              "lineup_order": 2,
+              "opponent_pitcher_name": "Roki Sasaki",
+              "writeup": "Expected opportunity is strong at about 5.1 PA. He is tracking toward a premium lineup slot (2).",
+              "headshot_url": "https://img.mlbstatic.com/mlb-photos/image/upload/w_180,q_auto:best/v1/people/666160/headshot/67/current",
+              "team_logo_url": "https://www.mlbstatic.com/team-logos/115.svg",
+              "opponent_logo_url": "https://www.mlbstatic.com/team-logos/119.svg",
+              "drivers": [
+                "Expected opportunity is strong at about 5.1 PA.",
+                "He is tracking toward a premium lineup slot (2).",
+                "The handedness split is leaning toward extra damage in this matchup."
+              ]
+            },
+            {
+              "rank": "#4",
+              "player_name": "Matt Olson",
+              "team": "ATL",
+              "opponent": "PIT",
+              "matchup": "ATL @ PIT",
+              "probability": "13.2%",
+              "support": "80",
+              "summary": "Expected opportunity is strong at about 4.9 PA. He is tracking toward a premium lineup slot (3).",
+              "p_hr_1plus": 0.132,
+              "support_score": 80.0,
+              "support_label": "strong",
+              "pa_mean": 4.939,
+              "lineup_order": 3,
+              "opponent_pitcher_name": "Jared Jones",
+              "writeup": "Expected opportunity is strong at about 4.9 PA. He is tracking toward a premium lineup slot (3).",
+              "headshot_url": "https://img.mlbstatic.com/mlb-photos/image/upload/w_180,q_auto:best/v1/people/621566/headshot/67/current",
+              "team_logo_url": "https://www.mlbstatic.com/team-logos/144.svg",
+              "opponent_logo_url": "https://www.mlbstatic.com/team-logos/134.svg",
+              "drivers": [
+                "Expected opportunity is strong at about 4.9 PA.",
+                "He is tracking toward a premium lineup slot (3).",
+                "The handedness split is leaning toward extra damage in this matchup."
+              ]
+            }
+          ]
+        },
         "scoreboard_items": [
           {
-            "target_id": "game-401857046",
-            "label": "DAL @ NYL",
-            "status": "2026-07-07"
+            "target_id": "game-823202",
+            "label": "TOR @ SF",
+            "status": "2:45 PM"
           },
           {
-            "target_id": "game-401857047",
-            "label": "CHI @ PHX",
-            "status": "2026-07-07"
+            "target_id": "game-824815",
+            "label": "CHC @ BAL",
+            "status": "5:35 PM"
+          },
+          {
+            "target_id": "game-824253",
+            "label": "ATH @ DET",
+            "status": "5:40 PM"
+          },
+          {
+            "target_id": "game-823360",
+            "label": "ATL @ PIT",
+            "status": "5:40 PM"
+          },
+          {
+            "target_id": "game-823848",
+            "label": "SEA @ MIA",
+            "status": "5:40 PM"
+          },
+          {
+            "target_id": "game-822957",
+            "label": "NYY @ TB",
+            "status": "5:40 PM"
+          },
+          {
+            "target_id": "game-822710",
+            "label": "HOU @ WSH",
+            "status": "5:45 PM"
+          },
+          {
+            "target_id": "game-823605",
+            "label": "KC @ NYM",
+            "status": "6:10 PM"
+          },
+          {
+            "target_id": "game-824496",
+            "label": "PHI @ CIN",
+            "status": "6:10 PM"
+          },
+          {
+            "target_id": "game-823684",
+            "label": "CLE @ MIN",
+            "status": "6:40 PM"
+          },
+          {
+            "target_id": "game-824578",
+            "label": "BOS @ CWS",
+            "status": "6:40 PM"
+          },
+          {
+            "target_id": "game-823032",
+            "label": "MIL @ STL",
+            "status": "6:45 PM"
+          },
+          {
+            "target_id": "game-822880",
+            "label": "LAA @ TEX",
+            "status": "7:05 PM"
+          },
+          {
+            "target_id": "game-823928",
+            "label": "COL @ LAD",
+            "status": "9:10 PM"
+          },
+          {
+            "target_id": "game-823279",
+            "label": "AZ @ SD",
+            "status": "9:10 PM"
           }
         ],
         "module_links": [
           {
             "label": "Cards",
-            "href": "/wnba/cards?date=2026-07-07",
+            "href": "/mlb/cards?date=2026-07-08",
             "active": true
           },
           {
             "label": "Betting Card",
-            "href": "/wnba/season/2026/betting-card?date=2026-07-07",
-            "active": false
-          },
-          {
-            "label": "Picks",
-            "href": "/wnba/picks?date=2026-07-07",
-            "active": false
-          },
-          {
-            "label": "Props",
-            "href": "/wnba/props?date=2026-07-07",
+            "href": "/mlb/season/2026/betting-card?date=2026-07-08",
             "active": false
           },
           {
             "label": "Live Lens",
-            "href": "/wnba/live-lens?date=2026-07-07",
+            "href": "/mlb/live-lens?date=2026-07-08",
+            "active": false
+          },
+          {
+            "label": "Market Accuracy",
+            "href": "/mlb/market-accuracy?date=2026-07-08",
             "active": false
           },
           {
             "label": "Daily Archive",
-            "href": "/wnba/archive?date=2026-07-07",
+            "href": "/mlb/archive?date=2026-07-08",
+            "active": false
+          },
+          {
+            "label": "Season Review",
+            "href": "/mlb/season/2026?date=2026-07-08",
+            "active": false
+          },
+          {
+            "label": "Pitcher top props",
+            "href": "/mlb/pitcher-top-props?date=2026-07-08",
+            "active": false
+          },
+          {
+            "label": "Hitter top props",
+            "href": "/mlb/hitter-top-props?date=2026-07-08",
+            "active": false
+          },
+          {
+            "label": "Top props",
+            "href": "/mlb/top-props?date=2026-07-08",
+            "active": false
+          },
+          {
+            "label": "HR targets",
+            "href": "/mlb/hr-targets?date=2026-07-08",
+            "active": false
+          },
+          {
+            "label": "RFI targets",
+            "href": "/mlb/rfi-targets?date=2026-07-08",
+            "active": false
+          },
+          {
+            "label": "Pitcher ladders",
+            "href": "/mlb/pitcher-ladders?date=2026-07-08",
+            "active": false
+          },
+          {
+            "label": "Hitter ladders",
+            "href": "/mlb/hitter-ladders?date=2026-07-08",
+            "active": false
+          },
+          {
+            "label": "Hub",
+            "href": "/mlb/hub",
+            "active": false
+          }
+        ],
+        "cards_control_links": [],
+        "cards_header_meta": "Artifact-backed slate | 2026-07-08",
+        "cards_header_title": "MLB Game Cards",
+        "source_path": "daily_summary_2026_07_08.json",
+        "source_title": "MLB daily summary artifact"
+      },
+      "game": {},
+      "available": true
+    },
+    "wnba": {
+      "page": {
+        "scoreboard_items": [
+          {
+            "target_id": "game-401857048",
+            "label": "GSV @ TOR",
+            "status": "2026-07-08"
+          },
+          {
+            "target_id": "game-401857049",
+            "label": "MIN @ CON",
+            "status": "2026-07-08"
+          },
+          {
+            "target_id": "game-401857050",
+            "label": "IND @ LAS",
+            "status": "2026-07-08"
+          }
+        ],
+        "module_links": [
+          {
+            "label": "Cards",
+            "href": "/wnba/cards?date=2026-07-08",
+            "active": true
+          },
+          {
+            "label": "Betting Card",
+            "href": "/wnba/season/2026/betting-card?date=2026-07-08",
+            "active": false
+          },
+          {
+            "label": "Picks",
+            "href": "/wnba/picks?date=2026-07-08",
+            "active": false
+          },
+          {
+            "label": "Props",
+            "href": "/wnba/props?date=2026-07-08",
+            "active": false
+          },
+          {
+            "label": "Live Lens",
+            "href": "/wnba/live-lens?date=2026-07-08",
+            "active": false
+          },
+          {
+            "label": "Daily Archive",
+            "href": "/wnba/archive?date=2026-07-08",
             "active": false
           },
           {
@@ -104,15 +382,15 @@
         "cards_control_links": [
           {
             "label": "Betting Card",
-            "href": "/wnba/season/2026/betting-card?date=2026-07-07"
+            "href": "/wnba/season/2026/betting-card?date=2026-07-08"
           },
           {
             "label": "Props",
-            "href": "/wnba/props?date=2026-07-07"
+            "href": "/wnba/props?date=2026-07-08"
           },
           {
             "label": "Live Lens",
-            "href": "/wnba/live-lens?date=2026-07-07"
+            "href": "/wnba/live-lens?date=2026-07-08"
           }
         ],
         "source_path": "espn_scoreboard_fallback",
@@ -122,8 +400,8 @@
           "sport": "wnba",
           "selection": {
             "kind": "date",
-            "requested": "2026-07-07",
-            "resolved": "2026-07-07"
+            "requested": "2026-07-08",
+            "resolved": "2026-07-08"
           },
           "source": {
             "title": "WNBA live scoreboard fallback",
@@ -131,39 +409,39 @@
             "mode": "live"
           },
           "freshness": {
-            "requested": "2026-07-07",
-            "resolved": "2026-07-07",
+            "requested": "2026-07-08",
+            "resolved": "2026-07-08",
             "selection_kind": "date",
             "is_current_day": true,
             "is_stale": false,
             "lookahead_applied": false
           },
           "coverage": {
-            "games_with_sim": 2,
+            "games_with_sim": 3,
             "games_with_periods": 0,
-            "games_with_intervals": 2,
-            "games_with_players": 2,
-            "games_with_injuries": 2,
+            "games_with_intervals": 3,
+            "games_with_players": 3,
+            "games_with_injuries": 3,
             "games_with_props": 0
           },
-          "game_count": 2,
+          "game_count": 3,
           "games": [
             {
-              "game_id": "401857046",
-              "event_id": "401857046",
+              "game_id": "401857048",
+              "event_id": "401857048",
               "matchup": {
                 "away": {
-                  "tri": "DAL",
-                  "name": "DAL"
+                  "tri": "GSV",
+                  "name": "GSV"
                 },
                 "home": {
-                  "tri": "NYL",
-                  "name": "NYL"
+                  "tri": "TOR",
+                  "name": "TOR"
                 }
               },
               "status": {
                 "status": "Scheduled",
-                "detail": "2026-07-07",
+                "detail": "2026-07-08",
                 "live": false,
                 "final": false
               },
@@ -229,21 +507,101 @@
               }
             },
             {
-              "game_id": "401857047",
-              "event_id": "401857047",
+              "game_id": "401857049",
+              "event_id": "401857049",
               "matchup": {
                 "away": {
-                  "tri": "CHI",
-                  "name": "CHI"
+                  "tri": "MIN",
+                  "name": "MIN"
                 },
                 "home": {
-                  "tri": "PHX",
-                  "name": "PHX"
+                  "tri": "CON",
+                  "name": "CON"
                 }
               },
               "status": {
                 "status": "Scheduled",
-                "detail": "2026-07-07",
+                "detail": "2026-07-08",
+                "live": false,
+                "final": false
+              },
+              "market": {
+                "home_ml": null,
+                "away_ml": null,
+                "home_spread": null,
+                "total": null,
+                "p_home_win": null,
+                "p_away_win": null,
+                "p_home_cover": null,
+                "p_total_over": null
+              },
+              "simulation": {
+                "score": {
+                  "away_mean": null,
+                  "home_mean": null,
+                  "total_mean": null,
+                  "margin_mean": null
+                },
+                "periods": {},
+                "intervals": {
+                  "quarters": "",
+                  "halves": ""
+                },
+                "quarters": [],
+                "players_summary": {
+                  "away": 0,
+                  "home": 0,
+                  "missing_away": 0,
+                  "missing_home": 0,
+                  "injured_away": 0,
+                  "injured_home": 0
+                },
+                "players": {
+                  "away": "",
+                  "home": ""
+                },
+                "missing_prop_players": {
+                  "away": "",
+                  "home": ""
+                },
+                "injuries": {
+                  "away": "",
+                  "home": ""
+                },
+                "pregame_context": {}
+              },
+              "props": {
+                "prop_recommendations": {
+                  "away": "",
+                  "home": ""
+                },
+                "game_market_recommendations": []
+              },
+              "coverage": {
+                "has_simulation": true,
+                "has_periods": false,
+                "has_intervals": true,
+                "has_players": true,
+                "has_injuries": true,
+                "has_pregame_context": false
+              }
+            },
+            {
+              "game_id": "401857050",
+              "event_id": "401857050",
+              "matchup": {
+                "away": {
+                  "tri": "IND",
+                  "name": "IND"
+                },
+                "home": {
+                  "tri": "LAS",
+                  "name": "LAS"
+                }
+              },
+              "status": {
+                "status": "Scheduled",
+                "detail": "2026-07-08",
                 "live": false,
                 "final": false
               },

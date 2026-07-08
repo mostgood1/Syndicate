@@ -2,7 +2,7 @@
   "date": "2026-07-08",
   "season": 2026,
   "spring_mode": false,
-  "generated_at": "2026-07-07T07:26:21.100262",
+  "generated_at": "2026-07-08T06:54:35.907376",
   "games": [
     {
       "idx": 0,
@@ -271,49 +271,57 @@
         "team_id": 146,
         "abbr": "MIA"
       },
-      "away_probable_id": null,
-      "home_probable_id": null,
-      "away_source": "none",
-      "home_source": "none",
-      "away_confidence": 0.0,
-      "home_confidence": 0.0,
+      "away_probable_id": 669923,
+      "home_probable_id": 663969,
+      "away_source": "feed_gameData_probablePitchers",
+      "home_source": "feed_gameData_probablePitchers",
+      "away_confidence": 0.75,
+      "home_confidence": 0.75,
       "away_validation": {
-        "status": "none",
-        "selected_id": null,
-        "selected_name": "",
-        "selected_source": "none",
+        "status": "ok",
+        "selected_id": 669923,
+        "selected_name": "George Kirby",
+        "selected_source": "feed_gameData_probablePitchers",
         "override_reason": "",
-        "roster_team_ids": [],
-        "registry_team_ids": [],
-        "on_expected_team": false,
+        "roster_team_ids": [
+          136
+        ],
+        "registry_team_ids": [
+          136
+        ],
+        "on_expected_team": true,
         "on_opponent_team": false,
-        "on_expected_registry_team": false,
+        "on_expected_registry_team": true,
         "on_opponent_registry_team": false,
         "rejected_candidates": []
       },
       "home_validation": {
-        "status": "none",
-        "selected_id": null,
-        "selected_name": "",
-        "selected_source": "none",
+        "status": "ok",
+        "selected_id": 663969,
+        "selected_name": "Tyler Phillips",
+        "selected_source": "feed_gameData_probablePitchers",
         "override_reason": "",
-        "roster_team_ids": [],
-        "registry_team_ids": [],
-        "on_expected_team": false,
+        "roster_team_ids": [
+          146
+        ],
+        "registry_team_ids": [
+          146
+        ],
+        "on_expected_team": true,
         "on_opponent_team": false,
-        "on_expected_registry_team": false,
+        "on_expected_registry_team": true,
         "on_opponent_registry_team": false,
         "rejected_candidates": []
       },
       "raw": {
-        "away_schedule_id": null,
-        "home_schedule_id": null,
-        "away_schedule_name": "",
-        "home_schedule_name": "",
-        "away_feed_id": null,
-        "home_feed_id": null,
-        "away_feed_name": "",
-        "home_feed_name": ""
+        "away_schedule_id": 669923,
+        "home_schedule_id": 663969,
+        "away_schedule_name": "George Kirby",
+        "home_schedule_name": "Tyler Phillips",
+        "away_feed_id": 669923,
+        "home_feed_id": 663969,
+        "away_feed_name": "George Kirby",
+        "home_feed_name": "Tyler Phillips"
       }
     },
     {
@@ -455,23 +463,27 @@
         "team_id": 121,
         "abbr": "NYM"
       },
-      "away_probable_id": null,
+      "away_probable_id": 674444,
       "home_probable_id": 681035,
-      "away_source": "none",
+      "away_source": "feed_gameData_probablePitchers",
       "home_source": "feed_gameData_probablePitchers",
-      "away_confidence": 0.0,
+      "away_confidence": 0.75,
       "home_confidence": 0.75,
       "away_validation": {
-        "status": "none",
-        "selected_id": null,
-        "selected_name": "",
-        "selected_source": "none",
+        "status": "ok",
+        "selected_id": 674444,
+        "selected_name": "Steven Cruz",
+        "selected_source": "feed_gameData_probablePitchers",
         "override_reason": "",
-        "roster_team_ids": [],
-        "registry_team_ids": [],
-        "on_expected_team": false,
+        "roster_team_ids": [
+          118
+        ],
+        "registry_team_ids": [
+          118
+        ],
+        "on_expected_team": true,
         "on_opponent_team": false,
-        "on_expected_registry_team": false,
+        "on_expected_registry_team": true,
         "on_opponent_registry_team": false,
         "rejected_candidates": []
       },
@@ -494,13 +506,13 @@
         "rejected_candidates": []
       },
       "raw": {
-        "away_schedule_id": null,
+        "away_schedule_id": 674444,
         "home_schedule_id": 681035,
-        "away_schedule_name": "",
+        "away_schedule_name": "Steven Cruz",
         "home_schedule_name": "Christian Scott",
-        "away_feed_id": null,
+        "away_feed_id": 674444,
         "home_feed_id": 681035,
-        "away_feed_name": "",
+        "away_feed_name": "Steven Cruz",
         "home_feed_name": "Christian Scott"
       }
     },
@@ -704,11 +716,11 @@
         "abbr": "STL"
       },
       "away_probable_id": 690986,
-      "home_probable_id": null,
+      "home_probable_id": 700241,
       "away_source": "feed_gameData_probablePitchers",
-      "home_source": "none",
+      "home_source": "feed_gameData_probablePitchers",
       "away_confidence": 0.75,
-      "home_confidence": 0.0,
+      "home_confidence": 0.75,
       "away_validation": {
         "status": "ok",
         "selected_id": 690986,
@@ -728,28 +740,32 @@
         "rejected_candidates": []
       },
       "home_validation": {
-        "status": "none",
-        "selected_id": null,
-        "selected_name": "",
-        "selected_source": "none",
+        "status": "ok",
+        "selected_id": 700241,
+        "selected_name": "Michael McGreevy",
+        "selected_source": "feed_gameData_probablePitchers",
         "override_reason": "",
-        "roster_team_ids": [],
-        "registry_team_ids": [],
-        "on_expected_team": false,
+        "roster_team_ids": [
+          138
+        ],
+        "registry_team_ids": [
+          138
+        ],
+        "on_expected_team": true,
         "on_opponent_team": false,
-        "on_expected_registry_team": false,
+        "on_expected_registry_team": true,
         "on_opponent_registry_team": false,
         "rejected_candidates": []
       },
       "raw": {
         "away_schedule_id": 690986,
-        "home_schedule_id": null,
+        "home_schedule_id": 700241,
         "away_schedule_name": "Kyle Harrison",
-        "home_schedule_name": "",
+        "home_schedule_name": "Michael McGreevy",
         "away_feed_id": 690986,
-        "home_feed_id": null,
+        "home_feed_id": 700241,
         "away_feed_name": "Kyle Harrison",
-        "home_feed_name": ""
+        "home_feed_name": "Michael McGreevy"
       }
     },
     {
@@ -827,7 +843,7 @@
         "team_id": 119,
         "abbr": "LAD"
       },
-      "away_probable_id": 663372,
+      "away_probable_id": 687312,
       "home_probable_id": 808963,
       "away_source": "feed_gameData_probablePitchers",
       "home_source": "feed_gameData_probablePitchers",
@@ -835,8 +851,8 @@
       "home_confidence": 0.75,
       "away_validation": {
         "status": "ok",
-        "selected_id": 663372,
-        "selected_name": "Ryan Feltner",
+        "selected_id": 687312,
+        "selected_name": "Gabriel Hughes",
         "selected_source": "feed_gameData_probablePitchers",
         "override_reason": "",
         "roster_team_ids": [
@@ -870,13 +886,13 @@
         "rejected_candidates": []
       },
       "raw": {
-        "away_schedule_id": 663372,
+        "away_schedule_id": 687312,
         "home_schedule_id": 808963,
-        "away_schedule_name": "Ryan Feltner",
+        "away_schedule_name": "Gabriel Hughes",
         "home_schedule_name": "Roki Sasaki",
-        "away_feed_id": 663372,
+        "away_feed_id": 687312,
         "home_feed_id": 808963,
-        "away_feed_name": "Ryan Feltner",
+        "away_feed_name": "Gabriel Hughes",
         "home_feed_name": "Roki Sasaki"
       }
     },
