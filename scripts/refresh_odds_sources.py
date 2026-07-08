@@ -126,11 +126,29 @@ def _rss_bytes() -> int | None:
             if ctypes.windll.psapi.GetProcessMemoryInfo(process, ctypes.byref(counters), counters.cb):
                 return int(counters.WorkingSetSize)
         except Exception:
+            try:
+                with open("/proc/self/status", encoding="utf-8", errors="ignore") as handle:
+                    for line in handle:
+                        if line.startswith("VmRSS:"):
+                            parts = line.split()
+                            if len(parts) >= 2:
+                                return int(parts[1]) * 1024
+            except Exception:
+                pass
             return None
         return None
     try:
         return int(psutil.Process().memory_info().rss)
     except Exception:
+        try:
+            with open("/proc/self/status", encoding="utf-8", errors="ignore") as handle:
+                for line in handle:
+                    if line.startswith("VmRSS:"):
+                        parts = line.split()
+                        if len(parts) >= 2:
+                            return int(parts[1]) * 1024
+        except Exception:
+            pass
         return None
 
 

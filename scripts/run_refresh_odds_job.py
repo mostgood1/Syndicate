@@ -8,8 +8,13 @@ import traceback
 from datetime import datetime
 from pathlib import Path
 from typing import Any
+import os
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+
+
+def _memory_trace_enabled() -> bool:
+    return str(os.environ.get("SYNDICATE_LIVE_ODDS_REFRESH_MEMORY_TRACE") or "").strip().lower() in {"1", "true", "yes", "on"}
 
 
 def _refresh_state_store():
@@ -272,6 +277,17 @@ def _queue_intelligence_snapshot_refresh(*, run_summary_path: Path) -> tuple[str
     return queued_key, payload
 
 
+def _echo_captured_output(*, stdout_text: str, stderr_text: str) -> None:
+    if not _memory_trace_enabled():
+        return
+    if stdout_text.strip():
+        print("[refresh_job_child_stdout]", flush=True)
+        print(stdout_text, flush=True)
+    if stderr_text.strip():
+        print("[refresh_job_child_stderr]", flush=True)
+        print(stderr_text, flush=True)
+
+
 def main() -> int:
     print("[refresh_job] script entry reached", flush=True)
     store = _refresh_state_store()
@@ -390,12 +406,9 @@ def main() -> int:
     if failure_error:
         failure_payload["error"] = failure_error
     if return_code != 0:
-        if stdout_text.strip():
-            print("[refresh_job_child_stdout]", flush=True)
-            print(stdout_text, flush=True)
-        if stderr_text.strip():
-            print("[refresh_job_child_stderr]", flush=True)
-            print(stderr_text, flush=True)
+        _echo_captured_output(stdout_text=stdout_text, stderr_text=stderr_text)
+    else:
+        _echo_captured_output(stdout_text=stdout_text, stderr_text=stderr_text)
     if return_code == 0 and stdout_payload:
         print(f"RESULT_FILE_WRITE_BEGIN path={stdout_path}", flush=True)
         _safe_write_json(stdout_path, stdout_payload)
