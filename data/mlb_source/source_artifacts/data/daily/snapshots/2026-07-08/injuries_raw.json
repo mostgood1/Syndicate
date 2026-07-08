@@ -213,7 +213,6 @@
         "abbreviation": "AZ"
       },
       "injured_ids": [
-        543510,
         640462,
         647336,
         669194,
@@ -297,21 +296,6 @@
             "name": "Pitcher",
             "type": "Pitcher",
             "abbreviation": "P"
-          },
-          "roster_type_source": "40Man"
-        },
-        {
-          "player_id": 543510,
-          "full_name": "James McCann",
-          "status": {
-            "code": "D10",
-            "description": "Injured 10-Day"
-          },
-          "position": {
-            "code": "2",
-            "name": "Catcher",
-            "type": "Catcher",
-            "abbreviation": "C"
           },
           "roster_type_source": "40Man"
         },
@@ -542,7 +526,6 @@
         596115,
         643396,
         656557,
-        663776,
         670912,
         671213,
         676710,
@@ -655,21 +638,6 @@
             "name": "Third Base",
             "type": "Infielder",
             "abbreviation": "3B"
-          },
-          "roster_type_source": "40Man"
-        },
-        {
-          "player_id": 663776,
-          "full_name": "Patrick Sandoval",
-          "status": {
-            "code": "D60",
-            "description": "Injured 60-Day"
-          },
-          "position": {
-            "code": "1",
-            "name": "Pitcher",
-            "type": "Pitcher",
-            "abbreviation": "P"
           },
           "roster_type_source": "40Man"
         },
@@ -1537,7 +1505,6 @@
         621121,
         656986,
         665161,
-        669699,
         669713,
         669854,
         678906,
@@ -1556,21 +1523,6 @@
             "name": "Pitcher",
             "type": "Pitcher",
             "abbreviation": "P"
-          },
-          "roster_type_source": "40Man"
-        },
-        {
-          "player_id": 669699,
-          "full_name": "Braden Shewmake",
-          "status": {
-            "code": "D10",
-            "description": "Injured 10-Day"
-          },
-          "position": {
-            "code": "6",
-            "name": "Shortstop",
-            "type": "Infielder",
-            "abbreviation": "SS"
           },
           "roster_type_source": "40Man"
         },
@@ -2218,7 +2170,6 @@
       },
       "injured_ids": [
         543760,
-        593871,
         605280,
         656731,
         657585,
@@ -2254,21 +2205,6 @@
             "name": "Pitcher",
             "type": "Pitcher",
             "abbreviation": "P"
-          },
-          "roster_type_source": "40Man"
-        },
-        {
-          "player_id": 593871,
-          "full_name": "Jorge Polanco",
-          "status": {
-            "code": "D60",
-            "description": "Injured 60-Day"
-          },
-          "position": {
-            "code": "3",
-            "name": "First Base",
-            "type": "Infielder",
-            "abbreviation": "1B"
           },
           "roster_type_source": "40Man"
         },
@@ -2361,8 +2297,7 @@
         667670,
         672016,
         680684,
-        691016,
-        805779
+        691016
       ],
       "injured": [
         {
@@ -2426,21 +2361,6 @@
           "roster_type_source": "40Man"
         },
         {
-          "player_id": 805779,
-          "full_name": "Jacob Wilson",
-          "status": {
-            "code": "D10",
-            "description": "Injured 10-Day"
-          },
-          "position": {
-            "code": "6",
-            "name": "Shortstop",
-            "type": "Infielder",
-            "abbreviation": "SS"
-          },
-          "roster_type_source": "40Man"
-        },
-        {
           "player_id": 622663,
           "full_name": "Luis Severino",
           "status": {
@@ -2483,7 +2403,8 @@
         665833,
         681895,
         687462,
-        696062
+        696062,
+        804606
       ],
       "injured": [
         {
@@ -2513,6 +2434,21 @@
             "name": "Pitcher",
             "type": "Pitcher",
             "abbreviation": "P"
+          },
+          "roster_type_source": "40Man"
+        },
+        {
+          "player_id": 804606,
+          "full_name": "Konnor Griffin",
+          "status": {
+            "code": "D10",
+            "description": "Injured 10-Day"
+          },
+          "position": {
+            "code": "6",
+            "name": "Shortstop",
+            "type": "Infielder",
+            "abbreviation": "SS"
           },
           "roster_type_source": "40Man"
         },
@@ -3083,9 +3019,25 @@
         "abbreviation": "STL"
       },
       "injured_ids": [
-        602104
+        602104,
+        691008
       ],
       "injured": [
+        {
+          "player_id": 691008,
+          "full_name": "Max Rajcic",
+          "status": {
+            "code": "D60",
+            "description": "Injured 60-Day"
+          },
+          "position": {
+            "code": "1",
+            "name": "Pitcher",
+            "type": "Pitcher",
+            "abbreviation": "P"
+          },
+          "roster_type_source": "40Man"
+        },
         {
           "player_id": 602104,
           "full_name": "Ram\u00f3n Ur\u00edas",
@@ -3640,6 +3592,7 @@
       },
       "injured_ids": [
         607455,
+        621439,
         641154,
         641927,
         663485,
@@ -3676,6 +3629,21 @@
             "name": "Pitcher",
             "type": "Pitcher",
             "abbreviation": "P"
+          },
+          "roster_type_source": "40Man"
+        },
+        {
+          "player_id": 621439,
+          "full_name": "Byron Buxton",
+          "status": {
+            "code": "D10",
+            "description": "Injured 10-Day"
+          },
+          "position": {
+            "code": "8",
+            "name": "Outfielder",
+            "type": "Outfielder",
+            "abbreviation": "CF"
           },
           "roster_type_source": "40Man"
         },
@@ -4412,6 +4380,7 @@
         605540,
         642239,
         663604,
+        666152,
         669084,
         669270,
         672582,
@@ -4441,8 +4410,8 @@
           "player_id": 663604,
           "full_name": "Brandon Lockridge",
           "status": {
-            "code": "D10",
-            "description": "Injured 10-Day"
+            "code": "D60",
+            "description": "Injured 60-Day"
           },
           "position": {
             "code": "7",
@@ -4524,6 +4493,21 @@
             "name": "Pitcher",
             "type": "Pitcher",
             "abbreviation": "P"
+          },
+          "roster_type_source": "40Man"
+        },
+        {
+          "player_id": 666152,
+          "full_name": "David Hamilton",
+          "status": {
+            "code": "D10",
+            "description": "Injured 10-Day"
+          },
+          "position": {
+            "code": "5",
+            "name": "Third Base",
+            "type": "Infielder",
+            "abbreviation": "3B"
           },
           "roster_type_source": "40Man"
         },
@@ -4865,22 +4849,6 @@
     },
     {
       "team_id": 109,
-      "player_id": 543510,
-      "full_name": "James McCann",
-      "status": {
-        "code": "D10",
-        "description": "Injured 10-Day"
-      },
-      "position": {
-        "code": "2",
-        "name": "Catcher",
-        "type": "Catcher",
-        "abbreviation": "C"
-      },
-      "roster_type_source": "40Man"
-    },
-    {
-      "team_id": 109,
       "player_id": 691783,
       "full_name": "Jordan Lawlar",
       "status": {
@@ -5196,22 +5164,6 @@
         "name": "Third Base",
         "type": "Infielder",
         "abbreviation": "3B"
-      },
-      "roster_type_source": "40Man"
-    },
-    {
-      "team_id": 111,
-      "player_id": 663776,
-      "full_name": "Patrick Sandoval",
-      "status": {
-        "code": "D60",
-        "description": "Injured 60-Day"
-      },
-      "position": {
-        "code": "1",
-        "name": "Pitcher",
-        "type": "Pitcher",
-        "abbreviation": "P"
       },
       "roster_type_source": "40Man"
     },
@@ -6033,22 +5985,6 @@
     },
     {
       "team_id": 117,
-      "player_id": 669699,
-      "full_name": "Braden Shewmake",
-      "status": {
-        "code": "D10",
-        "description": "Injured 10-Day"
-      },
-      "position": {
-        "code": "6",
-        "name": "Shortstop",
-        "type": "Infielder",
-        "abbreviation": "SS"
-      },
-      "roster_type_source": "40Man"
-    },
-    {
-      "team_id": 117,
       "player_id": 687888,
       "full_name": "Brandon Walter",
       "status": {
@@ -6689,22 +6625,6 @@
     },
     {
       "team_id": 121,
-      "player_id": 593871,
-      "full_name": "Jorge Polanco",
-      "status": {
-        "code": "D60",
-        "description": "Injured 60-Day"
-      },
-      "position": {
-        "code": "3",
-        "name": "First Base",
-        "type": "Infielder",
-        "abbreviation": "1B"
-      },
-      "roster_type_source": "40Man"
-    },
-    {
-      "team_id": 121,
       "player_id": 663795,
       "full_name": "Justin Hagenman",
       "status": {
@@ -6849,22 +6769,6 @@
     },
     {
       "team_id": 133,
-      "player_id": 805779,
-      "full_name": "Jacob Wilson",
-      "status": {
-        "code": "D10",
-        "description": "Injured 10-Day"
-      },
-      "position": {
-        "code": "6",
-        "name": "Shortstop",
-        "type": "Infielder",
-        "abbreviation": "SS"
-      },
-      "roster_type_source": "40Man"
-    },
-    {
-      "team_id": 133,
       "player_id": 622663,
       "full_name": "Luis Severino",
       "status": {
@@ -6924,6 +6828,22 @@
         "name": "Pitcher",
         "type": "Pitcher",
         "abbreviation": "P"
+      },
+      "roster_type_source": "40Man"
+    },
+    {
+      "team_id": 134,
+      "player_id": 804606,
+      "full_name": "Konnor Griffin",
+      "status": {
+        "code": "D10",
+        "description": "Injured 10-Day"
+      },
+      "position": {
+        "code": "6",
+        "name": "Shortstop",
+        "type": "Infielder",
+        "abbreviation": "SS"
       },
       "roster_type_source": "40Man"
     },
@@ -7443,6 +7363,22 @@
       "team_id": 137,
       "player_id": 592858,
       "full_name": "Rowan Wick",
+      "status": {
+        "code": "D60",
+        "description": "Injured 60-Day"
+      },
+      "position": {
+        "code": "1",
+        "name": "Pitcher",
+        "type": "Pitcher",
+        "abbreviation": "P"
+      },
+      "roster_type_source": "40Man"
+    },
+    {
+      "team_id": 138,
+      "player_id": 691008,
+      "full_name": "Max Rajcic",
       "status": {
         "code": "D60",
         "description": "Injured 60-Day"
@@ -7996,6 +7932,22 @@
         "name": "Pitcher",
         "type": "Pitcher",
         "abbreviation": "P"
+      },
+      "roster_type_source": "40Man"
+    },
+    {
+      "team_id": 142,
+      "player_id": 621439,
+      "full_name": "Byron Buxton",
+      "status": {
+        "code": "D10",
+        "description": "Injured 10-Day"
+      },
+      "position": {
+        "code": "8",
+        "name": "Outfielder",
+        "type": "Outfielder",
+        "abbreviation": "CF"
       },
       "roster_type_source": "40Man"
     },
@@ -8692,8 +8644,8 @@
       "player_id": 663604,
       "full_name": "Brandon Lockridge",
       "status": {
-        "code": "D10",
-        "description": "Injured 10-Day"
+        "code": "D60",
+        "description": "Injured 60-Day"
       },
       "position": {
         "code": "7",
@@ -8780,6 +8732,22 @@
         "name": "Pitcher",
         "type": "Pitcher",
         "abbreviation": "P"
+      },
+      "roster_type_source": "40Man"
+    },
+    {
+      "team_id": 158,
+      "player_id": 666152,
+      "full_name": "David Hamilton",
+      "status": {
+        "code": "D10",
+        "description": "Injured 10-Day"
+      },
+      "position": {
+        "code": "5",
+        "name": "Third Base",
+        "type": "Infielder",
+        "abbreviation": "3B"
       },
       "roster_type_source": "40Man"
     },

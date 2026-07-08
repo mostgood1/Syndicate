@@ -378,35 +378,6 @@
     ],
     "bench": [
       {
-        "id": 680728,
-        "name": "Adrian Del Castillo",
-        "pos": "DH",
-        "bat": "L",
-        "throw": "R",
-        "k_rate": 0.27849999999999997,
-        "bb_rate": 0.08466666666666667,
-        "hbp_rate": 0.0,
-        "hr_rate": 0.026833333333333334,
-        "inplay_hit_rate": 0.23493617021276597,
-        "xb_hit_share": 0.15384615384615385,
-        "vs_pitch_type": {},
-        "vs_pitch_type_hr": {},
-        "platoon_mult_vs_lhp": {
-          "k": 1.1925000000000001,
-          "bb": 0.8075,
-          "hr": 0.78,
-          "inplay": 0.8401769003199903
-        },
-        "platoon_mult_vs_rhp": {
-          "k": 0.9858161802569134,
-          "bb": 1.0542849295000916,
-          "hr": 1.085562617362415,
-          "inplay": 1.0209905858341322
-        },
-        "statcast_quality_mult": {},
-        "vs_pitcher_history": {}
-      },
-      {
         "id": 545121,
         "name": "Ildemaro Vargas",
         "pos": "1B",
@@ -431,6 +402,35 @@
           "bb": 0.913799737583111,
           "hr": 0.78,
           "inplay": 1.0319006234649537
+        },
+        "statcast_quality_mult": {},
+        "vs_pitcher_history": {}
+      },
+      {
+        "id": 543510,
+        "name": "James McCann",
+        "pos": "C",
+        "bat": "R",
+        "throw": "R",
+        "k_rate": 0.2537030411449016,
+        "bb_rate": 0.013076923076923078,
+        "hbp_rate": 0.0,
+        "hr_rate": 0.0,
+        "inplay_hit_rate": 0.2748122653316646,
+        "xb_hit_share": 0.23076923076923078,
+        "vs_pitch_type": {},
+        "vs_pitch_type_hr": {},
+        "platoon_mult_vs_lhp": {
+          "k": 0.8237739436585473,
+          "bb": 0.8075,
+          "hr": 1.0,
+          "inplay": 0.9503415689399977
+        },
+        "platoon_mult_vs_rhp": {
+          "k": 1.1726296244065246,
+          "bb": 1.1925000000000001,
+          "hr": 1.0,
+          "inplay": 1.0591114752313016
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -589,7 +589,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 26,
-        "availability_mult": 0.865,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 0.8906832298136645,
           "bb": 1.1925000000000001,
@@ -633,7 +633,7 @@
         "role": "SU",
         "leverage_skill": 0.7,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.8666666666666667,
         "platoon_mult_vs_lhb": {
           "k": 1.1380064456721914,
           "bb": 1.1925000000000001,
@@ -720,7 +720,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.9416666666666667,
         "platoon_mult_vs_lhb": {
           "k": 1.072061520579361,
           "bb": 1.1711732429597355,
@@ -803,7 +803,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.86,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 0.8075,
           "bb": 1.1925000000000001,
@@ -889,7 +889,7 @@
         "role": "LR",
         "leverage_skill": 0.35,
         "stamina_pitches": 34,
-        "availability_mult": 0.64,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 0.9656759548226472,
           "bb": 1.01655215461151,
@@ -980,8 +980,8 @@
         "lev": 0.5
       },
       {
-        "id": 689690,
-        "name": "Alek Jacob",
+        "id": 666745,
+        "name": "Jhony Brito",
         "role": "SU",
         "lev": 0.7
       },
@@ -1250,25 +1250,25 @@
         "pos": "2B",
         "bat": "L",
         "throw": "R",
-        "k_rate": 0.23340976089092696,
-        "bb_rate": 0.09676547658041271,
-        "hbp_rate": 0.02112676056338028,
-        "hr_rate": 0.015460203078938748,
-        "inplay_hit_rate": 0.22616191904047975,
-        "xb_hit_share": 0.09090909090909091,
+        "k_rate": 0.22671664167916042,
+        "bb_rate": 0.0944527736131934,
+        "hbp_rate": 0.020689655172413793,
+        "hr_rate": 0.024107946026986505,
+        "inplay_hit_rate": 0.2164473684210526,
+        "xb_hit_share": 0.08695652173913043,
         "vs_pitch_type": {},
         "vs_pitch_type_hr": {},
         "platoon_mult_vs_lhp": {
-          "k": 0.8075,
+          "k": 0.8093978848574801,
           "bb": 0.8075,
           "hr": 0.78,
-          "inplay": 0.8921610871726882
+          "inplay": 0.9120060790273556
         },
         "platoon_mult_vs_rhp": {
-          "k": 1.0237251217220467,
-          "bb": 1.191371127079263,
-          "hr": 1.068699336772292,
-          "inplay": 1.005859652445665
+          "k": 1.0256457647293538,
+          "bb": 1.1902138821630346,
+          "hr": 1.0300183405008856,
+          "inplay": 1.0069388349918809
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -1310,25 +1310,25 @@
         "pos": "C",
         "bat": "R",
         "throw": "R",
-        "k_rate": 0.25741407528641574,
-        "bb_rate": 0.1106873977086743,
-        "hbp_rate": 0.015384615384615385,
-        "hr_rate": 0.045613747954173486,
-        "inplay_hit_rate": 0.31625,
-        "xb_hit_share": 0.4375,
+        "k_rate": 0.2451086956521739,
+        "bb_rate": 0.10706521739130434,
+        "hbp_rate": 0.014705882352941176,
+        "hr_rate": 0.04402173913043478,
+        "inplay_hit_rate": 0.34151162790697676,
+        "xb_hit_share": 0.3888888888888889,
         "vs_pitch_type": {},
         "vs_pitch_type_hr": {},
         "platoon_mult_vs_lhp": {
           "k": 1.1925000000000001,
           "bb": 0.8075,
           "hr": 0.78,
-          "inplay": 1.1456521739130436
+          "inplay": 1.094194756554307
         },
         "platoon_mult_vs_rhp": {
-          "k": 0.9460046232379015,
-          "bb": 1.0711185864261423,
-          "hr": 1.0959518683684453,
-          "inplay": 0.9965838509316771
+          "k": 0.9444191814799504,
+          "bb": 1.0594812010668504,
+          "hr": 1.085279347143754,
+          "inplay": 1.000956041789868
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -1510,43 +1510,44 @@
         "pitch_type_hr_mult": {}
       },
       {
-        "id": 689690,
-        "name": "Alek Jacob",
+        "id": 666745,
+        "name": "Jhony Brito",
         "throw": "R",
         "role": "SU",
         "leverage_skill": 0.7,
-        "stamina_pitches": 25,
-        "availability_mult": 0.79,
+        "stamina_pitches": 24,
+        "availability_mult": 0.8583333333333334,
         "platoon_mult_vs_lhb": {
-          "k": 1.1925000000000001,
-          "bb": 0.9017857142857143,
-          "hr": 0.78,
-          "inplay": 0.8075
+          "k": 0.8075,
+          "bb": 1.0,
+          "hr": 1.0,
+          "inplay": 1.0
         },
         "platoon_mult_vs_rhb": {
-          "k": 0.8075,
-          "bb": 1.152777777777778,
-          "hr": 1.275,
-          "inplay": 1.1925000000000001
+          "k": 1.1833333333333333,
+          "bb": 1.0,
+          "hr": 1.0,
+          "inplay": 1.0
         },
         "statcast_quality_mult": {},
         "arsenal_source": "statsapi_pitchArsenal",
-        "arsenal_sample_size": 87,
+        "arsenal_sample_size": 17,
         "statcast_splits_found": false,
         "statcast_splits_source": "",
         "statcast_splits_n_pitches": 0,
         "statcast_splits_start_date": "",
         "statcast_splits_end_date": "",
-        "k_rate": 0.2608695652173913,
-        "bb_rate": 0.08695652173913042,
-        "hbp_rate": 0.043478260869565216,
-        "hr_rate": 0.04347826086956521,
-        "inplay_hit_rate": 0.35357142857142854,
+        "k_rate": 0.25,
+        "bb_rate": 0.0,
+        "hbp_rate": 0.0,
+        "hr_rate": 0.0,
+        "inplay_hit_rate": 0.0,
         "arsenal": {
-          "FF": 0.4252873572413793,
-          "OTHER": 0.03448275896551723,
-          "CH": 0.3448275896551723,
-          "SI": 0.19540229413793117
+          "FF": 0.11764705882352941,
+          "OTHER": 0.058823529411764705,
+          "CH": 0.47058823529411764,
+          "SI": 0.23529411764705882,
+          "KC": 0.11764705882352941
         },
         "pitch_type_whiff_mult": {},
         "pitch_type_inplay_mult": {},
@@ -1603,7 +1604,7 @@
         "role": "CL",
         "leverage_skill": 0.85,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.8833333333333333,
         "platoon_mult_vs_lhb": {
           "k": 0.9336235983776967,
           "bb": 1.1925000000000001,
@@ -1646,7 +1647,7 @@
         "role": "SU",
         "leverage_skill": 0.7,
         "stamina_pitches": 25,
-        "availability_mult": 0.885,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 0.9908238887985106,
           "bb": 1.1925000000000001,
@@ -1689,7 +1690,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.875,
         "platoon_mult_vs_lhb": {
           "k": 0.9901231235307547,
           "bb": 0.9144996156889129,
@@ -1733,7 +1734,7 @@
         "role": "LR",
         "leverage_skill": 0.35,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.8916666666666666,
         "platoon_mult_vs_lhb": {
           "k": 1.1523648648648648,
           "bb": 0.8747104247104247,

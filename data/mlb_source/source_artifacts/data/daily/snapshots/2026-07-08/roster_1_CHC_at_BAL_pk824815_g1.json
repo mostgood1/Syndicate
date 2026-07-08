@@ -674,7 +674,7 @@
         "role": "SU",
         "leverage_skill": 0.7,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.9416666666666667,
         "platoon_mult_vs_lhb": {
           "k": 1.0897217654372626,
           "bb": 1.050380178043777,
@@ -763,7 +763,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.775,
         "platoon_mult_vs_lhb": {
           "k": 1.1150061065758181,
           "bb": 0.901175037205423,
@@ -808,7 +808,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.8833333333333333,
         "platoon_mult_vs_lhb": {
           "k": 1.0804813203508046,
           "bb": 1.1107682425953067,
@@ -852,7 +852,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.9333333333333333,
         "platoon_mult_vs_lhb": {
           "k": 0.8075,
           "bb": 1.0,
@@ -955,14 +955,14 @@
         "lev": 0.7
       },
       {
-        "id": 687721,
-        "name": "Cameron Weston",
+        "id": 664991,
+        "name": "Grant Wolfram",
         "role": "MR",
         "lev": 0.5
       },
       {
-        "id": 664991,
-        "name": "Grant Wolfram",
+        "id": 675919,
+        "name": "Nick Raquet",
         "role": "MR",
         "lev": 0.5
       },
@@ -1313,25 +1313,25 @@
         "pos": "RF",
         "bat": "L",
         "throw": "R",
-        "k_rate": 0.24777777777777776,
-        "bb_rate": 0.12407407407407407,
+        "k_rate": 0.25185799601857994,
+        "bb_rate": 0.12313370935633709,
         "hbp_rate": 0.0,
-        "hr_rate": 0.012592592592592593,
-        "inplay_hit_rate": 0.28336314847942756,
+        "hr_rate": 0.012408759124087591,
+        "inplay_hit_rate": 0.28248275862068967,
         "xb_hit_share": 0.3076923076923077,
         "vs_pitch_type": {},
         "vs_pitch_type_hr": {},
         "platoon_mult_vs_lhp": {
-          "k": 0.9544843049327355,
+          "k": 0.9959425635621131,
           "bb": 0.8075,
           "hr": 0.78,
-          "inplay": 0.9352430555555555
+          "inplay": 0.9081227022058823
         },
         "platoon_mult_vs_rhp": {
-          "k": 1.000021826262947,
-          "bb": 1.0384295337471934,
-          "hr": 1.2230348776678812,
-          "inplay": 1.004563492063492
+          "k": 0.9911112134420943,
+          "bb": 1.0429233346348852,
+          "hr": 1.234487246225924,
+          "inplay": 1.0062918526785714
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -1372,7 +1372,7 @@
       "throw": "R",
       "role": "SP",
       "leverage_skill": 0.5,
-      "stamina_pitches": 94,
+      "stamina_pitches": 90,
       "availability_mult": 1.0,
       "platoon_mult_vs_lhb": {
         "k": 1.0,
@@ -1505,7 +1505,7 @@
         "role": "SU",
         "leverage_skill": 0.7,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.6916666666666667,
         "platoon_mult_vs_lhb": {
           "k": 0.8725212613873748,
           "bb": 0.8885976969963554,
@@ -1537,48 +1537,6 @@
           "CH": 0.24089068674493921,
           "SI": 0.1619433245344131,
           "FC": 0.03036437285020244
-        },
-        "pitch_type_whiff_mult": {},
-        "pitch_type_inplay_mult": {},
-        "pitch_type_hr_mult": {}
-      },
-      {
-        "id": 687721,
-        "name": "Cameron Weston",
-        "throw": "R",
-        "role": "MR",
-        "leverage_skill": 0.5,
-        "stamina_pitches": 25,
-        "availability_mult": 1.0,
-        "platoon_mult_vs_lhb": {
-          "k": 1.1925000000000001,
-          "bb": 1.1925000000000001,
-          "hr": 1.0,
-          "inplay": 1.0
-        },
-        "platoon_mult_vs_rhb": {
-          "k": 0.8075,
-          "bb": 0.8075,
-          "hr": 1.0,
-          "inplay": 1.0
-        },
-        "statcast_quality_mult": {},
-        "arsenal_source": "statsapi_pitchArsenal",
-        "arsenal_sample_size": 17,
-        "statcast_splits_found": false,
-        "statcast_splits_source": "",
-        "statcast_splits_n_pitches": 0,
-        "statcast_splits_start_date": "",
-        "statcast_splits_end_date": "",
-        "k_rate": 0.3333333333333333,
-        "bb_rate": 0.3333333333333333,
-        "hbp_rate": 0.0,
-        "hr_rate": 0.0,
-        "inplay_hit_rate": 0.0,
-        "arsenal": {
-          "OTHER": 0.470588250588235,
-          "SI": 0.4117646917647062,
-          "SL": 0.11764705764705886
         },
         "pitch_type_whiff_mult": {},
         "pitch_type_inplay_mult": {},
@@ -1623,6 +1581,49 @@
           "CU": 0.13535912270718245,
           "SI": 0.4254143585082872,
           "SL": 0.08839779176795584
+        },
+        "pitch_type_whiff_mult": {},
+        "pitch_type_inplay_mult": {},
+        "pitch_type_hr_mult": {}
+      },
+      {
+        "id": 675919,
+        "name": "Nick Raquet",
+        "throw": "L",
+        "role": "MR",
+        "leverage_skill": 0.5,
+        "stamina_pitches": 25,
+        "availability_mult": 0.9083333333333333,
+        "platoon_mult_vs_lhb": {
+          "k": 0.8075,
+          "bb": 1.1925000000000001,
+          "hr": 1.275,
+          "inplay": 0.9146697388632873
+        },
+        "platoon_mult_vs_rhb": {
+          "k": 1.1925000000000001,
+          "bb": 0.8777777777777778,
+          "hr": 0.78,
+          "inplay": 1.0695596518177162
+        },
+        "statcast_quality_mult": {},
+        "arsenal_source": "statsapi_pitchArsenal",
+        "arsenal_sample_size": 64,
+        "statcast_splits_found": false,
+        "statcast_splits_source": "",
+        "statcast_splits_n_pitches": 0,
+        "statcast_splits_start_date": "",
+        "statcast_splits_end_date": "",
+        "k_rate": 0.07142857142857142,
+        "bb_rate": 0.14285714285714285,
+        "hbp_rate": 0.07142857142857142,
+        "hr_rate": 0.07142857142857142,
+        "inplay_hit_rate": 0.2959090909090909,
+        "arsenal": {
+          "OTHER": 0.421875,
+          "SI": 0.265625,
+          "SL": 0.28125,
+          "FC": 0.03125
         },
         "pitch_type_whiff_mult": {},
         "pitch_type_inplay_mult": {},

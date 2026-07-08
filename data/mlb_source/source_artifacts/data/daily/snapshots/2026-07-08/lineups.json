@@ -2,11 +2,11 @@
   "date": "2026-07-08",
   "season": 2026,
   "spring_mode": false,
-  "generated_at": "2026-07-07T07:26:21.096241",
+  "generated_at": "2026-07-08T06:54:35.903595",
   "summary": {
     "games": 15,
     "projected_teams": 30,
-    "adjusted_teams": 9,
+    "adjusted_teams": 10,
     "partial_teams": 0,
     "fallback_pool_teams": 0,
     "confirmed_teams": 0,
@@ -371,7 +371,7 @@
         691777,
         643446,
         675961,
-        661531
+        666126
       ],
       "home_projected_ids": [
         805808,
@@ -405,14 +405,14 @@
           691777,
           643446,
           675961,
-          661531
+          666126
         ],
         "missing_ids": [],
         "backfilled_ids": [
-          661531
+          666126
         ],
         "pool_source": "active+40Man",
-        "pool_size": 15,
+        "pool_size": 16,
         "raw_names": [
           "Henry Bolte",
           "Nick Kurtz",
@@ -630,7 +630,7 @@
         "missing_ids": [],
         "backfilled_ids": [],
         "pool_source": "active+40Man",
-        "pool_size": 17,
+        "pool_size": 16,
         "raw_names": [
           "Jake Mangum",
           "Brandon Lowe",
@@ -825,7 +825,7 @@
       "away_source": "projected_rotowire_today_lineup",
       "home_source": "projected_rotowire_default_vs_rhp",
       "away_confidence": 0.48000000000000004,
-      "home_confidence": 0.58,
+      "home_confidence": 0.66,
       "away_comparison": {
         "status": "projected_only",
         "is_true_mismatch": false,
@@ -1031,7 +1031,7 @@
         701358,
         676694,
         694728,
-        543877
+        669699
       ],
       "home_projected_ids": [
         695578,
@@ -1065,14 +1065,14 @@
           701358,
           676694,
           694728,
-          543877
+          669699
         ],
         "missing_ids": [],
         "backfilled_ids": [
-          543877
+          669699
         ],
         "pool_source": "active+40Man",
-        "pool_size": 18,
+        "pool_size": 19,
         "raw_names": [
           "Jeremy Pena",
           "Yordan Alvarez",
@@ -1290,7 +1290,7 @@
         "missing_ids": [],
         "backfilled_ids": [],
         "pool_source": "active+40Man",
-        "pool_size": 17,
+        "pool_size": 18,
         "raw_names": [
           "Francisco Lindor",
           "Bo Bichette",
@@ -1319,7 +1319,7 @@
       "away_source": "projected_rotowire_today_lineup",
       "home_source": "projected_rotowire_default_vs_rhp",
       "away_confidence": 0.72,
-      "home_confidence": 0.58,
+      "home_confidence": 0.66,
       "away_comparison": {
         "status": "projected_only",
         "is_true_mismatch": false,
@@ -1531,14 +1531,14 @@
       ],
       "home_projected_ids": [
         663616,
-        621439,
         665019,
         605137,
         668904,
         686797,
         605170,
         807712,
-        668952
+        668952,
+        702176
       ],
       "away_projected_validation": {
         "status": "ok",
@@ -1594,10 +1594,9 @@
         "mapping_source": "projected_rotowire_default_vs_rhp"
       },
       "home_projected_validation": {
-        "status": "ok",
+        "status": "adjusted",
         "raw_ids": [
           663616,
-          621439,
           665019,
           605137,
           668904,
@@ -1608,19 +1607,21 @@
         ],
         "ids": [
           663616,
-          621439,
           665019,
           605137,
           668904,
           686797,
           605170,
           807712,
-          668952
+          668952,
+          702176
         ],
         "missing_ids": [],
-        "backfilled_ids": [],
+        "backfilled_ids": [
+          702176
+        ],
         "pool_source": "active+40Man",
-        "pool_size": 18,
+        "pool_size": 17,
         "raw_names": [
           "Trevor Larnach",
           "Byron Buxton",
@@ -1634,7 +1635,6 @@
         ],
         "matched_names": [
           "Trevor Larnach",
-          "Byron Buxton",
           "Kody Clemens",
           "Josh Bell",
           "Royce Lewis",
@@ -1643,13 +1643,15 @@
           "Luke Keaschall",
           "Ryan Kreidler"
         ],
-        "missing_name_labels": [],
+        "missing_name_labels": [
+          "Byron Buxton"
+        ],
         "mapping_source": "projected_rotowire_default_vs_rhp"
       },
       "away_source": "projected_rotowire_default_vs_rhp",
       "home_source": "projected_rotowire_default_vs_rhp",
       "away_confidence": 0.56,
-      "home_confidence": 0.66,
+      "home_confidence": 0.48000000000000004,
       "away_comparison": {
         "status": "projected_only",
         "is_true_mismatch": false,
@@ -1853,11 +1855,11 @@
         694192,
         668930,
         661388,
-        641343,
+        683734,
+        663368,
         669003,
-        686217,
         806198,
-        666152
+        687401
       ],
       "home_projected_ids": [
         802139,
@@ -1877,22 +1879,22 @@
           694192,
           668930,
           661388,
-          641343,
+          683734,
+          663368,
           669003,
-          686217,
           806198,
-          666152
+          687401
         ],
         "ids": [
           592885,
           694192,
           668930,
           661388,
-          641343,
+          683734,
+          663368,
           669003,
-          686217,
           806198,
-          666152
+          687401
         ],
         "missing_ids": [],
         "backfilled_ids": [],
@@ -1903,25 +1905,25 @@
           "Jackson Chourio",
           "Brice Turang",
           "William Contreras",
-          "Jake Bauers",
+          "Andrew Vaughn",
+          "Blake Perkins",
           "Garrett Mitchell",
-          "Sal Frelick",
           "Cooper Pratt",
-          "David Hamilton"
+          "Joey Ortiz"
         ],
         "matched_names": [
           "Christian Yelich",
           "Jackson Chourio",
           "Brice Turang",
           "William Contreras",
-          "Jake Bauers",
+          "Andrew Vaughn",
+          "Blake Perkins",
           "Garrett Mitchell",
-          "Sal Frelick",
           "Cooper Pratt",
-          "David Hamilton"
+          "Joey Ortiz"
         ],
         "missing_name_labels": [],
-        "mapping_source": "projected_rotowire_default_vs_rhp"
+        "mapping_source": "projected_rotowire_default_vs_lhp"
       },
       "home_projected_validation": {
         "status": "ok",
@@ -1976,9 +1978,9 @@
         "missing_name_labels": [],
         "mapping_source": "projected_rotowire_default_vs_lhp"
       },
-      "away_source": "projected_rotowire_default_vs_rhp",
+      "away_source": "projected_rotowire_default_vs_lhp",
       "home_source": "projected_rotowire_default_vs_lhp",
-      "away_confidence": 0.58,
+      "away_confidence": 0.56,
       "home_confidence": 0.66,
       "away_comparison": {
         "status": "projected_only",
@@ -2391,7 +2393,7 @@
         "missing_ids": [],
         "backfilled_ids": [],
         "pool_source": "active+40Man",
-        "pool_size": 17,
+        "pool_size": 18,
         "raw_names": [
           "Ketel Marte",
           "Geraldo Perdomo",

@@ -555,7 +555,7 @@
         "throw": "R",
         "role": "MR",
         "leverage_skill": 0.5,
-        "stamina_pitches": 25,
+        "stamina_pitches": 24,
         "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 1.1925000000000001,
@@ -598,7 +598,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.9083333333333333,
         "platoon_mult_vs_lhb": {
           "k": 1.049964851938792,
           "bb": 1.0531485629554846,
@@ -684,7 +684,7 @@
         "role": "CL",
         "leverage_skill": 0.85,
         "stamina_pitches": 25,
-        "availability_mult": 0.945,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 0.9535188294122046,
           "bb": 1.1008705259348153,
@@ -812,7 +812,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.8333333333333334,
         "platoon_mult_vs_lhb": {
           "k": 0.9912460615916252,
           "bb": 1.149982912242158,
@@ -902,7 +902,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.8666666666666667,
         "platoon_mult_vs_lhb": {
           "k": 1.078626561951799,
           "bb": 0.8075,
@@ -996,6 +996,12 @@
         "lev": 0.5
       },
       {
+        "id": 688297,
+        "name": "Chris Roycroft",
+        "role": "MR",
+        "lev": 0.5
+      },
+      {
         "id": 642121,
         "name": "Cole Sulser",
         "role": "SU",
@@ -1018,12 +1024,6 @@
         "name": "Kevin Kelly",
         "role": "SU",
         "lev": 0.7
-      },
-      {
-        "id": 669438,
-        "name": "Mason Englert",
-        "role": "MR",
-        "lev": 0.5
       },
       {
         "id": 693855,
@@ -1464,7 +1464,7 @@
         "role": "CL",
         "leverage_skill": 0.85,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.8833333333333333,
         "platoon_mult_vs_lhb": {
           "k": 0.8792609966687063,
           "bb": 1.0242296918767506,
@@ -1506,7 +1506,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.9416666666666667,
         "platoon_mult_vs_lhb": {
           "k": 1.1925000000000001,
           "bb": 1.1925000000000001,
@@ -1543,13 +1543,56 @@
         "pitch_type_hr_mult": {}
       },
       {
+        "id": 688297,
+        "name": "Chris Roycroft",
+        "throw": "R",
+        "role": "MR",
+        "leverage_skill": 0.5,
+        "stamina_pitches": 25,
+        "availability_mult": 1.0,
+        "platoon_mult_vs_lhb": {
+          "k": 1.1925000000000001,
+          "bb": 0.9222898903775884,
+          "hr": 1.064639945652174,
+          "inplay": 0.8560913705583756
+        },
+        "platoon_mult_vs_rhb": {
+          "k": 0.8075,
+          "bb": 1.0330739387377634,
+          "hr": 0.9052888486312399,
+          "inplay": 1.0965402083889928
+        },
+        "statcast_quality_mult": {},
+        "arsenal_source": "statsapi_pitchArsenal",
+        "arsenal_sample_size": 190,
+        "statcast_splits_found": false,
+        "statcast_splits_source": "",
+        "statcast_splits_n_pitches": 0,
+        "statcast_splits_start_date": "",
+        "statcast_splits_end_date": "",
+        "k_rate": 0.17896656534954405,
+        "bb_rate": 0.17468085106382977,
+        "hbp_rate": 0.02127659574468085,
+        "hr_rate": 0.08948328267477203,
+        "inplay_hit_rate": 0.4925,
+        "arsenal": {
+          "FF": 0.22105263442105272,
+          "OTHER": 0.06842105136842103,
+          "SI": 0.44736840894736823,
+          "FC": 0.26315790526315813
+        },
+        "pitch_type_whiff_mult": {},
+        "pitch_type_inplay_mult": {},
+        "pitch_type_hr_mult": {}
+      },
+      {
         "id": 642121,
         "name": "Cole Sulser",
         "throw": "R",
         "role": "SU",
         "leverage_skill": 0.7,
         "stamina_pitches": 25,
-        "availability_mult": 0.9299999999999999,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 1.0059950457469335,
           "bb": 1.0258157100834329,
@@ -1636,7 +1679,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.8583333333333334,
         "platoon_mult_vs_lhb": {
           "k": 0.9189746343881682,
           "bb": 1.1925000000000001,
@@ -1679,7 +1722,7 @@
         "role": "SU",
         "leverage_skill": 0.7,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.8833333333333333,
         "platoon_mult_vs_lhb": {
           "k": 0.8075,
           "bb": 1.1925000000000001,
@@ -1717,59 +1760,13 @@
         "pitch_type_hr_mult": {}
       },
       {
-        "id": 669438,
-        "name": "Mason Englert",
-        "throw": "R",
-        "role": "MR",
-        "leverage_skill": 0.5,
-        "stamina_pitches": 27,
-        "availability_mult": 1.0,
-        "platoon_mult_vs_lhb": {
-          "k": 0.9373108265424913,
-          "bb": 1.1925000000000001,
-          "hr": 1.077492130115425,
-          "inplay": 0.9990135996178768
-        },
-        "platoon_mult_vs_rhb": {
-          "k": 1.0243306169965076,
-          "bb": 0.8075,
-          "hr": 1.0252011192724728,
-          "inplay": 1.0385821473380843
-        },
-        "statcast_quality_mult": {},
-        "arsenal_source": "statsapi_pitchArsenal",
-        "arsenal_sample_size": 342,
-        "statcast_splits_found": false,
-        "statcast_splits_source": "",
-        "statcast_splits_n_pitches": 0,
-        "statcast_splits_start_date": "",
-        "statcast_splits_end_date": "",
-        "k_rate": 0.17955685618729095,
-        "bb_rate": 0.0427257525083612,
-        "hbp_rate": 0.010869565217391304,
-        "hr_rate": 0.03984113712374582,
-        "inplay_hit_rate": 0.35357529794149517,
-        "arsenal": {
-          "FF": 0.17836257678947362,
-          "OTHER": 0.008771929842105263,
-          "CU": 0.1725146168947369,
-          "CH": 0.3099415244210526,
-          "SI": 0.2105263162105263,
-          "SL": 0.0409356722631579,
-          "FC": 0.07894736357894747
-        },
-        "pitch_type_whiff_mult": {},
-        "pitch_type_inplay_mult": {},
-        "pitch_type_hr_mult": {}
-      },
-      {
         "id": 693855,
         "name": "Ian Seymour",
         "throw": "L",
         "role": "LR",
         "leverage_skill": 0.35,
         "stamina_pitches": 26,
-        "availability_mult": 1.0,
+        "availability_mult": 0.35,
         "platoon_mult_vs_lhb": {
           "k": 1.1169800235017626,
           "bb": 0.8075,
