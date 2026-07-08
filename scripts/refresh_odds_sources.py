@@ -14,8 +14,10 @@ from __future__ import annotations
 
 import atexit
 import argparse
+import gc
 import json
 import os
+import re
 import subprocess
 import sys
 import shutil
@@ -89,6 +91,119 @@ class SportSpec:
 
 def _utc_now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+
+def _memory_trace_enabled() -> bool:
+    return str(os.environ.get("SYNDICATE_LIVE_ODDS_REFRESH_MEMORY_TRACE") or "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _rss_bytes() -> int | None:
+    if psutil is None:
+        try:
+            import ctypes
+            from ctypes import wintypes
+
+            class PROCESS_MEMORY_COUNTERS(ctypes.Structure):
+                _fields_ = [
+                    ("cb", wintypes.DWORD),
+                    ("PageFaultCount", wintypes.DWORD),
+                    ("PeakWorkingSetSize", ctypes.c_size_t),
+                    ("WorkingSetSize", ctypes.c_size_t),
+                    ("QuotaPeakPagedPoolUsage", ctypes.c_size_t),
+                    ("QuotaPagedPoolUsage", ctypes.c_size_t),
+                    ("QuotaPeakNonPagedPoolUsage", ctypes.c_size_t),
+                    ("QuotaNonPagedPoolUsage", ctypes.c_size_t),
+                    ("PagefileUsage", ctypes.c_size_t),
+                    ("PeakPagefileUsage", ctypes.c_size_t),
+                ]
+
+            process = ctypes.windll.kernel32.OpenProcess(0x1000 | 0x0400, False, os.getpid())
+            if not process:
+                return None
+            counters = PROCESS_MEMORY_COUNTERS()
+            counters.cb = ctypes.sizeof(PROCESS_MEMORY_COUNTERS)
+            if ctypes.windll.psapi.GetProcessMemoryInfo(process, ctypes.byref(counters), counters.cb):
+                return int(counters.WorkingSetSize)
+        except Exception:
+            return None
+        return None
+    try:
+        return int(psutil.Process().memory_info().rss)
+    except Exception:
+        return None
+
+
+def _object_summary(value: Any, *, name: str) -> dict[str, Any]:
+    summary: dict[str, Any] = {"name": name, "type": type(value).__name__}
+    try:
+        summary["shallow_size_bytes"] = int(sys.getsizeof(value))
+    except Exception:
+        summary["shallow_size_bytes"] = None
+    try:
+        summary["len"] = len(value) if hasattr(value, "__len__") else None
+    except Exception:
+        summary["len"] = None
+    return summary
+
+
+def _largest_gc_object_summary() -> dict[str, Any] | None:
+    largest: dict[str, Any] | None = None
+    largest_size = -1
+    try:
+        for obj in gc.get_objects():
+            try:
+                size = sys.getsizeof(obj)
+            except Exception:
+                continue
+            if size <= largest_size:
+                continue
+            largest_size = size
+            largest = {
+                "type": type(obj).__name__,
+                "size_bytes": int(size),
+            }
+            try:
+                if hasattr(obj, "__len__"):
+                    largest["len"] = len(obj)
+            except Exception:
+                pass
+    except Exception:
+        return None
+    return largest
+
+
+def _extract_count_candidates(text: str | None) -> dict[str, int]:
+    if not isinstance(text, str) or not text:
+        return {}
+    patterns = {
+        "rows_loaded": r'"rows_loaded"\s*:\s*(\d+)',
+        "loaded_rows": r'"loaded_rows"\s*:\s*(\d+)',
+        "row_count": r'"row_count"\s*:\s*(\d+)',
+        "games_loaded": r'"games_loaded"\s*:\s*(\d+)',
+        "odds_history_rows": r'"odds_history_rows"\s*:\s*(\d+)',
+        "payload_rows": r'"payload_rows"\s*:\s*(\d+)',
+    }
+    counts: dict[str, int] = {}
+    for key, pattern in patterns.items():
+        match = re.search(pattern, text)
+        if match:
+            try:
+                counts[key] = int(match.group(1))
+            except Exception:
+                continue
+    return counts
+
+
+def _log_memory(stage: str, **extra: Any) -> None:
+    if not _memory_trace_enabled():
+        return
+    payload: dict[str, Any] = {
+        "stage": stage,
+        "rss_bytes": _rss_bytes(),
+        "largest_gc_object": _largest_gc_object_summary(),
+        **extra,
+    }
+    print(f"LIVE_ODDS_WORKER_MEMORY {json.dumps(payload, default=str, sort_keys=True)}", file=sys.stderr, flush=True)
 
 
 def _dump_child_runtime_state(*, label: str) -> None:
@@ -812,10 +927,12 @@ def _run_command(step: RefreshStep, *, dry_run: bool = False) -> dict[str, Any]:
         except ValueError:
             timeout_seconds = None
     print(f"[refresh_odds_sources] START step={step.name} cwd={step.cwd}", flush=True)
+    _log_memory("step_start", step=step.name, dry_run=bool(dry_run), cwd=str(step.cwd))
     _dump_child_runtime_state(label=f"step_start:{step.name}")
     if dry_run:
         print(f"[refresh_odds_sources] END step={step.name} dry_run=true", flush=True)
         _dump_child_runtime_state(label=f"step_end:{step.name}:dry_run")
+        _log_memory("step_end_dry_run", step=step.name)
         return {
             "name": step.name,
             "description": step.description,
@@ -838,9 +955,23 @@ def _run_command(step: RefreshStep, *, dry_run: bool = False) -> dict[str, Any]:
         timeout=timeout_seconds,
     )
     finished = _utc_now()
+    stdout_text = str(result.stdout or "")
+    stderr_text = str(result.stderr or "")
+    row_counts = {
+        **_extract_count_candidates(stdout_text),
+        **_extract_count_candidates(stderr_text),
+    }
     print(
         f"[refresh_odds_sources] END step={step.name} return_code={result.returncode} timeout_seconds={timeout_seconds if timeout_seconds is not None else 'none'}",
         flush=True,
+    )
+    _log_memory(
+        "step_end",
+        step=step.name,
+        return_code=int(result.returncode),
+        stdout=_object_summary(stdout_text, name="stdout"),
+        stderr=_object_summary(stderr_text, name="stderr"),
+        row_counts=row_counts or None,
     )
     _dump_child_runtime_state(label=f"step_end:{step.name}:rc={result.returncode}")
     return {
@@ -851,11 +982,21 @@ def _run_command(step: RefreshStep, *, dry_run: bool = False) -> dict[str, Any]:
         "return_code": int(result.returncode),
         "started_at": started,
         "finished_at": finished,
-        "stdout": result.stdout,
-        "stderr": result.stderr,
+        "row_counts": row_counts or None,
+        "stdout": stdout_text,
+        "stderr": stderr_text,
         "ok": result.returncode == 0,
         "dry_run": False,
     }
+
+
+def _compact_step_result(step_result: dict[str, Any]) -> None:
+    if not isinstance(step_result, dict):
+        return
+    if isinstance(step_result.get("stdout"), str):
+        step_result["stdout"] = ""
+    if isinstance(step_result.get("stderr"), str):
+        step_result["stderr"] = ""
     
 
 
@@ -1159,10 +1300,12 @@ def _run_sport_refresh(args: argparse.Namespace, sport: str, execution_mode: str
         "ingestion_mode": None if args.skip_mirror else "mirror_script",
         "generation": _generation_payload(spec, execution_mode=execution_mode, source_root=source_root),
         "ingestion": _ingestion_payload(spec, skip_mirror=bool(args.skip_mirror), execution_mode=execution_mode),
+        "artifact_paths": [],
         "refresh_steps": [],
         "mirror": None,
         "ok": True,
     }
+    _log_memory("sport_start", sport=sport, execution_mode=execution_mode, generation_mode=generation_mode)
 
     refresh_steps = [] if execution_mode == "ingest" else _filter_steps(spec.step_builder(args), args.phase)
     if refresh_steps and any(_step_requires_source_root(step) for step in refresh_steps):
@@ -1186,6 +1329,20 @@ def _run_sport_refresh(args: argparse.Namespace, sport: str, execution_mode: str
         )
         sport_result["refresh_steps"].append(step_result)
         sport_result["generation"]["steps"].append(step_result)
+        for artifact_path in _sport_artifact_paths(step_result):
+            if artifact_path not in sport_result["artifact_paths"]:
+                sport_result["artifact_paths"].append(artifact_path)
+        _log_memory(
+            "sport_step_appended",
+            sport=sport,
+            step=step.name,
+            step_result_id=id(step_result),
+            refresh_steps_len=len(sport_result["refresh_steps"]),
+            generation_steps_len=len(sport_result["generation"]["steps"]),
+            same_object=bool(sport_result["refresh_steps"][-1] is sport_result["generation"]["steps"][-1]),
+            step_payload=_object_summary(step_result, name="step_result"),
+        )
+        _compact_step_result(step_result)
         if not step_result["ok"]:
             sport_result["ok"] = False
             if not args.continue_on_error:
@@ -1204,6 +1361,7 @@ def _run_sport_refresh(args: argparse.Namespace, sport: str, execution_mode: str
             ),
         )
         sport_result["sport_manifest"] = published_manifest
+        _log_memory("sport_fast_publish", sport=sport, manifest=_object_summary(published_manifest, name="sport_manifest"))
         return sport_result
 
     if execution_mode == "source" and spec.slug in {"mlb", "nba", "wnba", "nhl", "nfl", "ncaab", "ncaaf"} and sport_result["ok"]:
@@ -1215,6 +1373,7 @@ def _run_sport_refresh(args: argparse.Namespace, sport: str, execution_mode: str
         )
         sport_result["post_refresh"] = tracking_result
         sport_result["generation"]["post_refresh"] = tracking_result
+        _log_memory("sport_post_refresh", sport=sport, tracking=_object_summary(tracking_result, name="post_refresh"))
         if not tracking_result["ok"]:
             sport_result["ok"] = False
             if not args.continue_on_error:
@@ -1250,6 +1409,8 @@ def _run_sport_refresh(args: argparse.Namespace, sport: str, execution_mode: str
         sport_result["mirror"] = mirror_result
         if isinstance(sport_result.get("ingestion"), dict):
             sport_result["ingestion"]["step"] = mirror_result
+        _log_memory("sport_mirror", sport=sport, mirror=_object_summary(mirror_result, name="mirror"))
+        _compact_step_result(mirror_result)
         if not mirror_result["ok"]:
             sport_result["ok"] = False
             if not args.continue_on_error:
@@ -1267,6 +1428,7 @@ def _run_sport_refresh(args: argparse.Namespace, sport: str, execution_mode: str
         ),
     )
     sport_result["sport_manifest"] = published_manifest
+    _log_memory("sport_end", sport=sport, result=_object_summary(sport_result, name="sport_result"))
     return sport_result
 
 
@@ -1284,6 +1446,7 @@ def _build_summary(args: argparse.Namespace) -> dict[str, Any]:
         "results": [],
         "started_at": _utc_now(),
     }
+    _log_memory("summary_start", sports=selected, execution_mode=execution_mode, summary=_object_summary(summary, name="summary"))
 
     any_failure = False
     max_workers = min(len(selected), 4)
@@ -1293,6 +1456,7 @@ def _build_summary(args: argparse.Namespace) -> dict[str, Any]:
             if not sport_result.get("ok"):
                 any_failure = True
             summary["results"].append(sport_result)
+            _log_memory("summary_append_sequential", sport=sport, results_len=len(summary["results"]), result=_object_summary(sport_result, name="sport_result"))
             if not args.continue_on_error and not sport_result.get("ok"):
                 summary["finished_at"] = _utc_now()
                 summary["ok"] = False
@@ -1314,6 +1478,7 @@ def _build_summary(args: argparse.Namespace) -> dict[str, Any]:
                 results_by_sport[sport] = sport_result
                 if not sport_result.get("ok"):
                     any_failure = True
+                _log_memory("summary_future_complete", sport=sport, results_by_sport_len=len(results_by_sport), result=_object_summary(sport_result, name="sport_result"))
                 if not args.continue_on_error and not sport_result.get("ok"):
                     break
 
@@ -1323,6 +1488,7 @@ def _build_summary(args: argparse.Namespace) -> dict[str, Any]:
                 sport_result = {"sport": sport, "ok": False, "error": "Refresh did not complete."}
                 any_failure = True
             summary["results"].append(sport_result)
+            _log_memory("summary_append_parallel", sport=sport, results_len=len(summary["results"]), result=_object_summary(sport_result, name="sport_result"))
             if not args.continue_on_error and not sport_result.get("ok"):
                 summary["finished_at"] = _utc_now()
                 summary["ok"] = False
@@ -1330,6 +1496,7 @@ def _build_summary(args: argparse.Namespace) -> dict[str, Any]:
 
     summary["finished_at"] = _utc_now()
     summary["ok"] = not any_failure
+    _log_memory("summary_before_parity", summary=_object_summary(summary, name="summary"))
     publish_parity_paths: list[str] = []
     for sport_result in summary.get("results", []) if isinstance(summary.get("results"), list) else []:
         if not isinstance(sport_result, dict):
@@ -1341,6 +1508,7 @@ def _build_summary(args: argparse.Namespace) -> dict[str, Any]:
         intelligence_paths=[],
     )
     summary["coverage_audit"] = _build_odds_coverage_audit(requested_date=str(summary.get("date") or "").strip())
+    _log_memory("summary_end", summary=_object_summary(summary, name="summary"), publish_parity_paths_count=len(publish_parity_paths))
     return summary
 
 

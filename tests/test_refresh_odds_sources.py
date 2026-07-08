@@ -92,6 +92,55 @@ class RefreshOddsSourcesTests(unittest.TestCase):
         self.assertIn("artifact_paths", kwargs)
         self.assertEqual(kwargs["metadata"]["execution_mode"], "source")
 
+    def test_build_summary_compacts_step_stdout_after_artifact_paths_are_extracted(self) -> None:
+        module = self._load_module()
+        args = argparse.Namespace(
+            date="2026-06-07",
+            sports="wnba",
+            phase="live",
+            regions="us",
+            bookmakers="",
+            markets="",
+            season=None,
+            week=None,
+            skip_mirror=True,
+            execution_mode="source",
+            mirror_only=False,
+            continue_on_error=True,
+            dry_run=False,
+            json=False,
+            list=False,
+        )
+
+        artifact_path = r"C:\render\data\wnba_source\source_artifacts\data\processed\wnba_player_props.csv"
+        step_result = {
+            "name": "wnba_oddsapi_props_job",
+            "description": "Refresh WNBA OddsAPI props snapshot, edges, and recommendations.",
+            "cwd": r"C:\Users\tempadmin\OneDrive\Coding\Syndicate",
+            "command": ["python", "scripts/refresh_wnba_oddsapi_props.py"],
+            "return_code": 0,
+            "started_at": "2026-06-07T00:00:00+00:00",
+            "finished_at": "2026-06-07T00:00:01+00:00",
+            "row_counts": None,
+            "stdout": json.dumps({"artifact_bundle_files": {"files": [artifact_path]}}),
+            "stderr": "",
+            "ok": True,
+            "dry_run": False,
+        }
+
+        with patch.object(module, "_run_command", return_value=step_result), patch.object(
+            module,
+            "_sync_post_refresh_tracking_step",
+            return_value={"ok": True, "name": "wnba_post_refresh_tracking_sync", "dry_run": False, "meta": {"signals_rows": 3}},
+        ), patch.object(module, "publish_sport_manifest", return_value={"path": "reports/manifests/wnba.json", "payload": {"sport": "wnba"}}):
+            summary = module._build_summary(args)
+
+        sport_result = summary["results"][0]
+        self.assertIn(artifact_path, sport_result["artifact_paths"])
+        self.assertEqual(sport_result["refresh_steps"][0]["stdout"], "")
+        self.assertEqual(sport_result["refresh_steps"][0]["stderr"], "")
+        self.assertEqual(sport_result["refresh_steps"][0]["row_counts"], None)
+
     def test_build_summary_emits_publish_parity_on_success(self) -> None:
         module = self._load_module()
         args = argparse.Namespace(
