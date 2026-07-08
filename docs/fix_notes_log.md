@@ -1,3 +1,10 @@
+# 2026-07-08 - Date-only live statuses now stay pregame in the intelligence board UI
+- Symptom: WNBA recommendations with `is_live=true` and `status_display` like `2026-07-07` were being classified as stale in the betting board UI and dropped from the visible lanes.
+- Root cause: `recommendationState()` treated any live row with a non-empty status as stale unless it had a stronger live signal, so date-only live labels fell through the stale branch.
+- Fix: Added a date-only guard in `syndicate/templates/intelligence.html` so live rows whose status is just `YYYY-MM-DD` resolve to `pregame` instead of `stale`.
+- Validation: Local template grep confirmed the new date-only branch is present; live browser validation was blocked because `/api/intelligence/query` returned 502 during refresh.
+- Follow-up: Recheck the deployed query route after the 502 clears and confirm the visible board repaints with the WNBA lane restored.
+
 # 2026-07-07
 - Symptom: `/api/intelligence/status?date=2026-07-07&sport=wnba` could return MLB recommendations from a fallback snapshot.
 - Root cause: `read_latest_response()` fell through from an exact payload-key miss to the latest snapshot without enforcing sport match, and the status route did not queue a sport-specific refresh on miss.
