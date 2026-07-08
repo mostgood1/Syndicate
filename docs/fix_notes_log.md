@@ -1,3 +1,10 @@
+# 2026-07-08 - WNBA candidate classification collapses because every game row lacks projection or odds
+- Symptom: The 2026-07-08 WNBA slate built 15 raw game candidates, but `collect_candidates()` reduced them to 0 before the board snapshot was written.
+- Root cause: `classify_candidate()` rejects every normalized WNBA game row because each row has a `selection` and `type` but no usable `projection` or `odds`, so the classifier returns `None` with `missing_projection_or_odds`.
+- Fix: None yet; the exact failure boundary is now isolated in `syndicate/features/intelligence.py` and the next change must either supply usable projection/odds fields or relax the classifier gate for valid game rows.
+- Validation: Traced all 15 WNBA rows through the classifier on 2026-07-08 and confirmed the rejection reason was `missing_projection_or_odds` for every row.
+- Follow-up: Restore a non-empty WNBA candidate set before the board writer runs, then recheck the persisted intelligence snapshot and visible board count.
+
 # 2026-07-08 - Date-only live statuses now stay pregame in the intelligence board UI
 - Symptom: WNBA recommendations with `is_live=true` and `status_display` like `2026-07-07` were being classified as stale in the betting board UI and dropped from the visible lanes.
 - Root cause: `recommendationState()` treated any live row with a non-empty status as stale unless it had a stronger live signal, so date-only live labels fell through the stale branch.
