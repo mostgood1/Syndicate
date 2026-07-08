@@ -1337,12 +1337,22 @@ def _build_local_recommendations_slate_artifact(*, processed_root: Path, date_st
         display_pick = f"{player_name} {selection}".strip()
         summary = f"{stat_label} projection {_format_plain_line(_float_or_none(top_play.get('proj')))}"
         recent_form_fields = _basketball_recent_form_fields(row, line_value=line_value)
+        projection_value = _float_or_none(top_play.get("proj"))
+        if projection_value is None:
+            projection_value = _float_or_none(row.get("top_play_baseline"))
+        if projection_value is None:
+            model = row.get("model") if isinstance(row.get("model"), dict) else {}
+            if stat:
+                projection_value = _float_or_none(model.get(stat))
 
         grouped_pick = {
             "market": "PROPS",
             "team": team_tri,
             "display_pick": display_pick,
             "selection": selection,
+            "projection": projection_value,
+            "projected": projection_value,
+            "odds": _float_or_none(top_play.get("price")),
             "price": _float_or_none(top_play.get("price")),
             "score": ev_pct,
             "ev_pct": ev_pct,

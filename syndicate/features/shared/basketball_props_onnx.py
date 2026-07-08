@@ -228,16 +228,61 @@ def compute_player_priors_local(*, processed_root: Path, date_str: str, cfg: Pla
         return PlayerPriors(config=cfg, rates={}, games={})
     if "GAME_DATE" not in df.columns or "TEAM_ABBREVIATION" not in df.columns or "PLAYER_KEY" not in df.columns:
         return PlayerPriors(config=cfg, rates={}, games={})
-    use = df[(df["GAME_DATE"].notna()) & (df["GAME_DATE"] >= start) & (df["GAME_DATE"] <= cutoff)].copy()
-    if use.empty:
+    def _season_year(value) -> int | None:
+        try:
+            ts = pd.to_datetime(value, errors="coerce")
+            if pd.isna(ts):
+                return None
+            return int(ts.year) if int(ts.month) >= 5 else int(ts.year) - 1
+        except Exception:
+            return None
+
+    current_season_year = _season_year(cutoff)
+    current_use = df[(df["GAME_DATE"].notna()) & (df["GAME_DATE"] >= start) & (df["GAME_DATE"] <= cutoff)].copy()
+    prior_use = df[(df["GAME_DATE"].notna()) & (df["GAME_DATE"] < start)].copy()
+    if "MIN" in current_use.columns:
+        current_use = current_use[pd.to_numeric(current_use["MIN"], errors="coerce").fillna(0.0) > 0.0].copy()
+    if "MIN" in prior_use.columns:
+        prior_use = prior_use[pd.to_numeric(prior_use["MIN"], errors="coerce").fillna(0.0) > 0.0].copy()
+    if current_use.empty and prior_use.empty:
         return PlayerPriors(config=cfg, rates={}, games={})
-    if "MIN" in use.columns:
-        use = use[use["MIN"].fillna(0.0) > 0.0]
-    if use.empty:
-        return PlayerPriors(config=cfg, rates={}, games={})
+    if current_season_year is not None:
+        if not current_use.empty:
+            current_use["__season_year"] = current_use["GAME_DATE"].map(_season_year)
+        if not prior_use.empty:
+            prior_use["__season_year"] = prior_use["GAME_DATE"].map(_season_year)
     stat_cols = {
         "min": "MIN", "pts": "PTS", "reb": "REB", "ast": "AST", "stl": "STL", "blk": "BLK", "tov": "TOV", "threes": "FG3M", "threes_att": "FG3A", "fga": "FGA", "fgm": "FGM", "fta": "FTA", "ftm": "FTM", "pf": "PF",
     }
+    frames: list[pd.DataFrame] = []
+    current_keys = set()
+    if not current_use.empty:
+        current_keys = {
+            (str(row.get("TEAM_ABBREVIATION") or "").strip().upper(), str(row.get("PLAYER_KEY") or "").strip().upper())
+            for _, row in current_use[["TEAM_ABBREVIATION", "PLAYER_KEY"]].drop_duplicates().iterrows()
+        }
+    prior_keys = set()
+    if not prior_use.empty:
+        prior_keys = {
+            (str(row.get("TEAM_ABBREVIATION") or "").strip().upper(), str(row.get("PLAYER_KEY") or "").strip().upper())
+            for _, row in prior_use[["TEAM_ABBREVIATION", "PLAYER_KEY"]].drop_duplicates().iterrows()
+        }
+    all_keys = current_keys | prior_keys
+    for team, player_key in all_keys:
+        player_current = current_use[(current_use["TEAM_ABBREVIATION"].astype(str).str.upper().str.strip() == team) & (current_use["PLAYER_KEY"].astype(str).str.upper().str.strip() == player_key)].copy()
+        if not player_current.empty:
+            frames.append(player_current)
+            continue
+        player_prior = prior_use[(prior_use["TEAM_ABBREVIATION"].astype(str).str.upper().str.strip() == team) & (prior_use["PLAYER_KEY"].astype(str).str.upper().str.strip() == player_key)].copy()
+        if player_prior.empty:
+            continue
+        if "__season_year" in player_prior.columns and current_season_year is not None:
+            fallback_season_year = int(player_prior["__season_year"].max())
+            player_prior = player_prior[player_prior["__season_year"] == fallback_season_year].copy()
+        frames.append(player_prior)
+    use = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
+    if use.empty:
+        return PlayerPriors(config=cfg, rates={}, games={})
     keep = ["TEAM_ABBREVIATION", "PLAYER_KEY"] + [column for column in stat_cols.values() if column in use.columns]
     use = use[keep].copy()
     grouped = use.groupby(["TEAM_ABBREVIATION", "PLAYER_KEY"], as_index=False)

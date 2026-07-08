@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from datetime import date as _date
 
 
 NUM_COL_MAP = {
@@ -244,6 +245,42 @@ def build_features_for_date_local(*, processed_root: Path, date: str, windows: l
     hist = logs[logs[dcol] < target_date].copy()
     if players is not None:
         hist = hist[hist[pid].isin(players)].copy()
+    if minc is not None and minc in hist.columns:
+        hist[minc] = pd.to_numeric(hist[minc], errors="coerce")
+        hist = hist[hist[minc].fillna(0.0) > 0.0].copy()
+
+    def _season_year(value) -> int | None:
+        try:
+            ts = pd.to_datetime(value, errors="coerce")
+            if pd.isna(ts):
+                return None
+            return int(ts.year) if int(ts.month) >= 5 else int(ts.year) - 1
+        except Exception:
+            return None
+
+    current_season_year = _season_year(target_date)
+    if current_season_year is not None and pid is not None and pid in logs.columns and minc is not None and minc in logs.columns:
+        logs["__season_year"] = logs[dcol].map(_season_year)
+        played = logs[pd.to_numeric(logs[minc], errors="coerce").fillna(0.0) > 0.0].copy()
+        if not played.empty:
+            player_frames: list[pd.DataFrame] = []
+            player_ids = hist[pid].dropna().unique().tolist() if not hist.empty else []
+            if not player_ids:
+                player_ids = played[pid].dropna().unique().tolist()
+            for player_id in player_ids:
+                player_current = played[(played[pid] == player_id) & (played["__season_year"] == current_season_year)].copy()
+                if not player_current.empty:
+                    player_frames.append(player_current)
+                    continue
+                player_prior = played[(played[pid] == player_id) & (played["__season_year"].notna()) & (played["__season_year"] < current_season_year)].copy()
+                if player_prior.empty:
+                    continue
+                fallback_season_year = int(player_prior["__season_year"].max())
+                player_prior = player_prior[player_prior["__season_year"] == fallback_season_year].copy()
+                if not player_prior.empty:
+                    player_frames.append(player_prior)
+            if player_frames:
+                hist = pd.concat(player_frames, ignore_index=True)
 
     stat_cols = [pts, reb, ast, fg3m, fg3a, stl, blk, tov, fgm, fga, fg_pct, ftm, fta, ft_pct, oreb, dreb, pf, plus_minus]
     for column in stat_cols:

@@ -518,6 +518,71 @@ class BasketballPropsPredictionsTests(unittest.TestCase):
             self.assertEqual(len(smart_sim_calls), 1)
             self.assertEqual(smart_sim_calls[0]["date_str"], "2026-05-22")
 
+    def test_build_features_for_date_local_skips_dnp_rows_from_history(self) -> None:
+        from syndicate.features.shared import basketball_props_features as features_module
+
+        with TemporaryDirectory() as tmp_dir:
+            processed_root = Path(tmp_dir)
+            (processed_root / "player_logs.csv").write_text(
+                "GAME_DATE,PLAYER_ID,PLAYER_NAME,TEAM_ABBREVIATION,MIN,PTS,REB,AST,FG3M,FG3A,STL,BLK,TOV,FGM,FGA,FTA,FTM,OREB,DREB,PF,PLUS_MINUS\n"
+                "2026-05-01,981,Courtney Vandersloot,CHI,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\n"
+                "2026-05-03,981,Courtney Vandersloot,CHI,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\n"
+                "2026-05-05,981,Courtney Vandersloot,CHI,18,11,2,6,1,0,1,0,2,4,9,2,2,1,2,0,5\n"
+                "2026-05-07,981,Courtney Vandersloot,CHI,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\n",
+                encoding="utf-8",
+            )
+
+            features = features_module.build_features_for_date_local(processed_root=processed_root, date="2026-05-10")
+            row = features[features["player_name"].astype(str).str.strip().eq("Courtney Vandersloot")].copy()
+
+            self.assertEqual(len(row), 1)
+            values = row.iloc[0]
+            self.assertEqual(float(values["lag1_min"]), 18.0)
+            self.assertEqual(float(values["roll3_min"]), 18.0)
+            self.assertEqual(float(values["roll5_min"]), 18.0)
+            self.assertEqual(float(values["roll10_min"]), 18.0)
+            self.assertEqual(float(values["lag1_pts"]), 11.0)
+            self.assertEqual(float(values["roll3_pts"]), 11.0)
+
+    def test_build_features_and_priors_fallback_to_prior_season_when_current_season_is_dnp_only(self) -> None:
+        from syndicate.features.shared import basketball_props_features as features_module
+        from syndicate.features.shared import basketball_props_onnx as onnx_module
+
+        with TemporaryDirectory() as tmp_dir:
+            processed_root = Path(tmp_dir)
+            (processed_root / "player_logs.csv").write_text(
+                "GAME_DATE,PLAYER_ID,PLAYER_NAME,TEAM_ABBREVIATION,MIN,PTS,REB,AST,FG3M,FG3A,STL,BLK,TOV,FGM,FGA,FTA,FTM,OREB,DREB,PF,PLUS_MINUS\n"
+                "2026-05-01,981,Courtney Vandersloot,CHI,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\n"
+                "2026-05-03,981,Courtney Vandersloot,CHI,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\n"
+                "2025-06-01,981,Courtney Vandersloot,CHI,30,14,4,8,2,5,1,0,3,5,11,2,2,2,2,0,7\n"
+                "2025-06-04,981,Courtney Vandersloot,CHI,28,10,3,7,1,4,2,0,2,4,10,1,1,1,3,0,4\n"
+                "2025-06-08,981,Courtney Vandersloot,CHI,32,18,5,9,3,6,1,1,4,7,15,4,4,2,3,1,6\n",
+                encoding="utf-8",
+            )
+
+            features = features_module.build_features_for_date_local(processed_root=processed_root, date="2026-05-10")
+            row = features[features["player_name"].astype(str).str.strip().eq("Courtney Vandersloot")].copy()
+
+            self.assertEqual(len(row), 1)
+            values = row.iloc[0]
+            self.assertGreater(float(values["lag1_min"]), 0.0)
+            self.assertGreater(float(values["roll3_min"]), 0.0)
+            self.assertGreater(float(values["roll5_min"]), 0.0)
+            self.assertGreater(float(values["roll10_min"]), 0.0)
+            self.assertGreater(float(values["lag1_pts"]), 0.0)
+
+            priors = onnx_module.compute_player_priors_local(processed_root=processed_root, date_str="2026-05-10")
+            key = next((k for k in priors.rates.keys() if k[1] == "COURTNEY VANDERSLOOT"), None)
+            self.assertIsNotNone(key)
+            self.assertGreater(priors.games.get(key, 0), 0)
+            self.assertGreater(priors.rates.get(key, {}).get("pts_pm", 0.0), 0.0)
+
+            preds = onnx_module._predict_props_without_models_local(features_df=row, processed_root=processed_root)
+            pred_row = preds.iloc[0]
+            self.assertGreater(float(pred_row["pred_pts"]), 0.0)
+            self.assertGreater(float(pred_row["pred_reb"]), 0.0)
+            self.assertGreater(float(pred_row["pred_ast"]), 0.0)
+
     def test_smart_sim_worker_uses_local_small_helpers(self) -> None:
         with TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
