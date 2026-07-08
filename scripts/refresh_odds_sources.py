@@ -1033,7 +1033,9 @@ def _run_command(step: RefreshStep, *, dry_run: bool = False) -> dict[str, Any]:
             timeout_seconds = max(1, int(timeout_value))
         except ValueError:
             timeout_seconds = None
+    print(f"PRE_STEP_LOG name={step.name}", file=sys.stderr, flush=True)
     print(f"STEP_START name={step.name} cwd={step.cwd} command={json.dumps(list(step.command))}", file=sys.stderr, flush=True)
+    print(f"POST_STEP_LOG name={step.name}", file=sys.stderr, flush=True)
     print(f"[refresh_odds_sources] START step={step.name} cwd={step.cwd}", flush=True)
     _log_memory("step_start", step=step.name, dry_run=bool(dry_run), cwd=str(step.cwd))
     _dump_child_runtime_state(label=f"step_start:{step.name}")
