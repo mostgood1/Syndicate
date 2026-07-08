@@ -1,0 +1,221 @@
+{
+  "date": "2026-07-08",
+  "counts": {
+    "games": 3,
+    "picks": 9
+  },
+  "per_game": [
+    {
+      "home": "CON",
+      "away": "MIN",
+      "matchup": "MIN @ CON",
+      "picks": [
+        {
+          "market": "PROPS",
+          "team": "MIN",
+          "display_pick": "Kayla McBride UNDER 2.5",
+          "selection": "UNDER 2.5",
+          "projection": 1.415471624266145,
+          "projected": 1.415471624266145,
+          "odds": -118.0,
+          "price": -118.0,
+          "score": 59.054036844207126,
+          "ev_pct": 59.054036844207126,
+          "win_prob": 0.5412844036697247,
+          "p_win": 0.5412844036697247,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 59.1%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "MIN @ CON"
+        },
+        {
+          "market": "PROPS",
+          "team": "MIN",
+          "display_pick": "Courtney Williams UNDER 24.5",
+          "selection": "UNDER 24.5",
+          "projection": 18.734488826025455,
+          "projected": 18.734488826025455,
+          "odds": -117.0,
+          "price": -117.0,
+          "score": 16.09897426059983,
+          "ev_pct": 16.09897426059983,
+          "win_prob": 0.5391705069124424,
+          "p_win": 0.5391705069124424,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 16.1%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "MIN @ CON"
+        },
+        {
+          "market": "PROPS",
+          "team": "MIN",
+          "display_pick": "Natasha Howard OVER 10.5",
+          "selection": "OVER 10.5",
+          "projection": 12.72976408839779,
+          "projected": 12.72976408839779,
+          "odds": -112.0,
+          "price": -112.0,
+          "score": 12.333641584696565,
+          "ev_pct": 12.333641584696565,
+          "win_prob": 0.5283018867924528,
+          "p_win": 0.5283018867924528,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.3%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "MIN @ CON"
+        }
+      ]
+    },
+    {
+      "home": "TOR",
+      "away": "GSV",
+      "matchup": "GSV @ TOR",
+      "picks": [
+        {
+          "market": "PROPS",
+          "team": "GSV",
+          "display_pick": "Gabby Williams OVER 1.5",
+          "selection": "OVER 1.5",
+          "projection": 2.146253099236641,
+          "projected": 2.146253099236641,
+          "odds": -114.0,
+          "price": -114.0,
+          "score": 39.089167120680365,
+          "ev_pct": 39.089167120680365,
+          "win_prob": 0.5327102803738317,
+          "p_win": 0.5327102803738317,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 39.1%",
+            "Regular price range (-150 to +150)",
+            "Consensus: 4 books aligned",
+            "Best line available"
+          ],
+          "matchup": "GSV @ TOR"
+        },
+        {
+          "market": "PROPS",
+          "team": "GSV",
+          "display_pick": "Veronica Burton OVER 16.5",
+          "selection": "OVER 16.5",
+          "projection": 20.409100387096778,
+          "projected": 20.409100387096778,
+          "odds": -107.0,
+          "price": -107.0,
+          "score": 13.746028397348775,
+          "ev_pct": 13.746028397348775,
+          "win_prob": 0.5169082125603864,
+          "p_win": 0.5169082125603864,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 13.7%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "GSV @ TOR"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Marina Mabrey UNDER 24.5",
+          "selection": "UNDER 24.5",
+          "projection": 20.882938378378377,
+          "projected": 20.882938378378377,
+          "odds": -114.0,
+          "price": -114.0,
+          "score": 10.649075170200895,
+          "ev_pct": 10.649075170200895,
+          "win_prob": 0.5327102803738317,
+          "p_win": 0.5327102803738317,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 10.6%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "GSV @ TOR"
+        }
+      ]
+    },
+    {
+      "home": "LAS",
+      "away": "IND",
+      "matchup": "IND @ LAS",
+      "picks": [
+        {
+          "market": "PROPS",
+          "team": "IND",
+          "display_pick": "Caitlin Clark OVER 1.5",
+          "selection": "OVER 1.5",
+          "projection": 3.3545535714285712,
+          "projected": 3.3545535714285712,
+          "odds": -143.0,
+          "price": -143.0,
+          "score": 64.52119591839674,
+          "ev_pct": 64.52119591839674,
+          "win_prob": 0.588477366255144,
+          "p_win": 0.588477366255144,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 64.5%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "IND @ LAS"
+        },
+        {
+          "market": "PROPS",
+          "team": "LAS",
+          "display_pick": "Rae Burrell UNDER 15.5",
+          "selection": "UNDER 15.5",
+          "projection": 8.226144000000001,
+          "projected": 8.226144000000001,
+          "odds": -120.0,
+          "price": -120.0,
+          "score": 32.89996936651634,
+          "ev_pct": 32.89996936651634,
+          "win_prob": 0.5454545454545454,
+          "p_win": 0.5454545454545454,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 32.9%",
+            "Regular price range (-150 to +150)",
+            "Consensus: 4 books aligned",
+            "Best line available"
+          ],
+          "matchup": "IND @ LAS"
+        },
+        {
+          "market": "PROPS",
+          "team": "IND",
+          "display_pick": "Aliyah Boston UNDER 26.5",
+          "selection": "UNDER 26.5",
+          "projection": 23.721533333333333,
+          "projected": 23.721533333333333,
+          "odds": -130.0,
+          "price": -130.0,
+          "score": 6.635846306805693,
+          "ev_pct": 6.635846306805693,
+          "win_prob": 0.5652173913043478,
+          "p_win": 0.5652173913043478,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 6.6%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "IND @ LAS"
+        }
+      ]
+    }
+  ]
+}

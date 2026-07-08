@@ -1,0 +1,70 @@
+{
+  "date": "2026-07-09",
+  "season": 2026,
+  "generated_at": "2026-07-08T07:06:06.885898",
+  "tool": "tools/daily_update_multi_profile.py",
+  "locked": true,
+  "source_profile": "game_recos",
+  "source_sim_dir": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-07-09",
+  "thresholds": {
+    "nrfi_min_prob": 0.55,
+    "nrfi_max_mean_runs": 0.8,
+    "yrfi_max_nrfi_prob": 0.5,
+    "yrfi_min_mean_runs": 0.95,
+    "yrfi_min_side_lead_prob": 0.24
+  },
+  "counts": {
+    "rows": 2,
+    "games": 2
+  },
+  "signals": [
+    {
+      "game_pk": 822954,
+      "date": "2026-07-09",
+      "away": "New York Yankees",
+      "home": "Tampa Bay Rays",
+      "away_abbr": "NYY",
+      "home_abbr": "TB",
+      "away_team_id": 147,
+      "home_team_id": 139,
+      "starter_names": {
+        "away": "Cam Schlittler",
+        "home": "Drew Rasmussen"
+      },
+      "signal": {
+        "label": "F1 NRFI",
+        "tone": "nrfi",
+        "summary": "0-run sim 61.0% | F1 mean 0.77",
+        "detail": "Season filter qualified: simulated scoreless first inning 61.0% with only 0.77 expected runs in the opening frame.",
+        "nrfiProb": 0.61,
+        "yrfiProb": 0.39,
+        "meanTotalRuns": 0.769,
+        "maxSideLeadProb": 0.196
+      }
+    },
+    {
+      "game_pk": 823846,
+      "date": "2026-07-09",
+      "away": "Seattle Mariners",
+      "home": "Miami Marlins",
+      "away_abbr": "SEA",
+      "home_abbr": "MIA",
+      "away_team_id": 136,
+      "home_team_id": 146,
+      "starter_names": {
+        "away": "Bryce Miller",
+        "home": "Sandy Alcantara"
+      },
+      "signal": {
+        "label": "F1 NRFI",
+        "tone": "nrfi",
+        "summary": "0-run sim 59.9% | F1 mean 0.80",
+        "detail": "Season filter qualified: simulated scoreless first inning 59.9% with only 0.80 expected runs in the opening frame.",
+        "nrfiProb": 0.599,
+        "yrfiProb": 0.401,
+        "meanTotalRuns": 0.796,
+        "maxSideLeadProb": 0.222
+      }
+    }
+  ]
+}

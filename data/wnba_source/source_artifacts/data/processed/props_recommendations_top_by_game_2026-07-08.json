@@ -1,0 +1,387 @@
+{
+  "date": "2026-07-08",
+  "data": [
+    {
+      "game_key": "IND@LAS",
+      "game_id": "0b0cfbd10dffa5258c1e9dd6aca005a5a",
+      "player": "Caitlin Clark",
+      "team": "IND",
+      "team_tricode": "IND",
+      "opponent": "LAS",
+      "score": 64.52119591839674,
+      "score_adj": 64.52119591839674,
+      "tier": "High",
+      "model": {
+        "pts": 23.274139880952383,
+        "reb": 4.118071428571428,
+        "ast": 8.803395833333333,
+        "threes": 3.3545535714285712,
+        "stl": 1.0591964285714284,
+        "blk": 0.8826636904761905,
+        "tov": 4.766383928571429,
+        "pra": 36.19560714285714,
+        "pr": 27.39221130952381,
+        "pa": 32.077535714285716,
+        "ra": 12.92146726190476
+      },
+      "top_play": {
+        "market": "threes",
+        "side": "OVER",
+        "line": 1.5,
+        "price": -143.0,
+        "edge": 0.3796926344169027,
+        "ev": 0.6452119591839675,
+        "ev_pct": 64.52119591839674,
+        "book": "williamhill_us",
+        "p_win": 1.0,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 64.5%",
+        "Regular price range (-150 to +150)",
+        "Best line available"
+      ],
+      "basketball_summary": "model 3.4 vs line 1.5 (+1.9)"
+    },
+    {
+      "game_key": "IND@LAS",
+      "game_id": "0b0cfbd10dffa5258c1e9dd6aca005a5a",
+      "player": "Kelsey Mitchell",
+      "team": "IND",
+      "team_tricode": "IND",
+      "opponent": "LAS",
+      "score": 60.22556557451657,
+      "score_adj": 60.22556557451657,
+      "tier": "High",
+      "model": {
+        "pts": 21.35475271428572,
+        "reb": 0.8324189999999998,
+        "ast": 2.284326428571428,
+        "threes": 1.8923264285714283,
+        "stl": 0.7338321428571427,
+        "blk": 0.0,
+        "tov": 1.614430714285714,
+        "pra": 24.47149814285714,
+        "pr": 22.187171714285718,
+        "pa": 23.63907914285715,
+        "ra": 3.116745428571428
+      },
+      "top_play": {
+        "market": "threes",
+        "side": "UNDER",
+        "line": 2.5,
+        "price": 120.0,
+        "edge": 0.27375257079325716,
+        "ev": 0.6022556557451657,
+        "ev_pct": 60.22556557451657,
+        "book": "fanduel",
+        "p_win": 1.0,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 60.2%",
+        "Regular price range (-150 to +150)",
+        "Consensus: 4 books aligned",
+        "Best line available"
+      ],
+      "basketball_summary": "model 1.9 vs line 2.5 (-0.6)"
+    },
+    {
+      "game_key": "MIN@CON",
+      "game_id": "00fc4abb4edf30887b57b4f686db8179a",
+      "player": "Kayla McBride",
+      "team": "MIN",
+      "team_tricode": "MIN",
+      "opponent": "CON",
+      "score": 59.054036844207126,
+      "score_adj": 59.054036844207126,
+      "tier": "High",
+      "model": {
+        "pts": 15.001894324853229,
+        "reb": 4.99412133072407,
+        "ast": 2.227178082191781,
+        "threes": 1.415471624266145,
+        "stl": 1.475212002609263,
+        "blk": 0.2950424005218525,
+        "tov": 1.475212002609263,
+        "pra": 22.22319373776908,
+        "pr": 19.9960156555773,
+        "pa": 17.22907240704501,
+        "ra": 7.221299412915851
+      },
+      "top_play": {
+        "market": "threes",
+        "side": "UNDER",
+        "line": 2.5,
+        "price": -118.0,
+        "edge": 0.31965029117506616,
+        "ev": 0.5905403684420713,
+        "ev_pct": 59.054036844207126,
+        "book": "fanduel",
+        "p_win": 1.0,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 59.1%",
+        "Regular price range (-150 to +150)",
+        "Best line available"
+      ],
+      "basketball_summary": "model 1.4 vs line 2.5 (-1.1)"
+    },
+    {
+      "game_key": "GSV@TOR",
+      "game_id": "082635798d7e0a24dc54a2138a1d94653",
+      "player": "Gabby Williams",
+      "team": "GSV",
+      "team_tricode": "GSV",
+      "opponent": "TOR",
+      "score": 39.089167120680365,
+      "score_adj": 39.089167120680365,
+      "tier": "High",
+      "model": {
+        "pts": 12.211792045801523,
+        "reb": 3.083579648854962,
+        "ast": 2.438274190839694,
+        "threes": 2.146253099236641,
+        "stl": 1.892351526717557,
+        "blk": 0.3784703053435114,
+        "tov": 2.081586679389313,
+        "pra": 17.73364588549618,
+        "pr": 15.295371694656485,
+        "pa": 14.650066236641218,
+        "ra": 5.521853839694656
+      },
+      "top_play": {
+        "market": "threes",
+        "side": "OVER",
+        "line": 1.5,
+        "price": -114.0,
+        "edge": 0.20823201176437212,
+        "ev": 0.3908916712068037,
+        "ev_pct": 39.089167120680365,
+        "book": "fanduel",
+        "p_win": 0.9236019515806354,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 39.1%",
+        "Regular price range (-150 to +150)",
+        "Consensus: 4 books aligned",
+        "Best line available"
+      ],
+      "basketball_summary": "model 2.1 vs line 1.5 (+0.6)"
+    },
+    {
+      "game_key": "IND@LAS",
+      "game_id": "0b0cfbd10dffa5258c1e9dd6aca005a5a",
+      "player": "Rae Burrell",
+      "team": "LAS",
+      "team_tricode": "LAS",
+      "opponent": "IND",
+      "score": 32.89996936651634,
+      "score_adj": 32.89996936651634,
+      "tier": "High",
+      "model": {
+        "pts": 8.226144000000001,
+        "reb": 2.320150857142857,
+        "ast": 1.5673828571428572,
+        "threes": 1.116768,
+        "stl": 0.8410971428571429,
+        "blk": 0.1401828571428571,
+        "tov": 1.8223771428571431,
+        "pra": 12.113677714285714,
+        "pr": 10.546294857142858,
+        "pa": 9.793526857142858,
+        "ra": 3.8875337142857145
+      },
+      "top_play": {
+        "market": "pts",
+        "side": "UNDER",
+        "line": 15.5,
+        "price": -120.0,
+        "edge": 0.1794543783628164,
+        "ev": 0.32899969366516335,
+        "ev_pct": 32.89996936651634,
+        "book": "williamhill_us",
+        "p_win": 0.8744542391197088,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 32.9%",
+        "Regular price range (-150 to +150)",
+        "Consensus: 4 books aligned",
+        "Best line available"
+      ],
+      "basketball_summary": "model 8.2 vs line 15.5 (-7.3)"
+    },
+    {
+      "game_key": "MIN@CON",
+      "game_id": "00fc4abb4edf30887b57b4f686db8179a",
+      "player": "Olivia Nelson-Ododa",
+      "team": "CON",
+      "team_tricode": "CON",
+      "opponent": "MIN",
+      "score": 31.98329565393886,
+      "score_adj": 31.98329565393886,
+      "tier": "High",
+      "model": {
+        "pts": 7.784720238095236,
+        "reb": 3.474529761904761,
+        "ast": 1.943208333333333,
+        "threes": 0.0,
+        "stl": 0.7844345238095236,
+        "blk": 0.522956349206349,
+        "tov": 1.5688690476190472,
+        "pra": 13.20245833333333,
+        "pr": 11.259249999999998,
+        "pa": 9.727928571428569,
+        "ra": 5.417738095238094
+      },
+      "top_play": {
+        "market": "pts",
+        "side": "UNDER",
+        "line": 10.5,
+        "price": -109.0,
+        "edge": 0.16680283379326966,
+        "ev": 0.3198329565393886,
+        "ev_pct": 31.98329565393886,
+        "book": "draftkings",
+        "p_win": 0.8413640570178574,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 32.0%",
+        "Regular price range (-150 to +150)",
+        "Best line available"
+      ],
+      "basketball_summary": "model 7.8 vs line 10.5 (-2.7)"
+    },
+    {
+      "game_key": "GSV@TOR",
+      "game_id": "082635798d7e0a24dc54a2138a1d94653",
+      "player": "Nyara Sabally",
+      "team": "TOR",
+      "team_tricode": "TOR",
+      "opponent": "GSV",
+      "score": 30.624366729547937,
+      "score_adj": 30.624366729547937,
+      "tier": "High",
+      "model": {
+        "pts": 9.208156097560977,
+        "reb": 5.203482926829269,
+        "ast": 1.9035121951219511,
+        "threes": 0.2623512195121951,
+        "stl": 1.3807642276422762,
+        "blk": 1.3807642276422762,
+        "tov": 0.986260162601626,
+        "pra": 16.315151219512195,
+        "pr": 14.411639024390245,
+        "pa": 11.111668292682928,
+        "ra": 7.10699512195122
+      },
+      "top_play": {
+        "market": "pts",
+        "side": "UNDER",
+        "line": 11.5,
+        "price": 100.0,
+        "edge": 0.15312183364773968,
+        "ev": 0.30624366729547936,
+        "ev_pct": 30.624366729547937,
+        "book": "betonlineag",
+        "p_win": 0.8062436672954794,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 30.6%",
+        "Regular price range (-150 to +150)",
+        "Best line available"
+      ],
+      "basketball_summary": "model 9.2 vs line 11.5 (-2.3)"
+    },
+    {
+      "game_key": "GSV@TOR",
+      "game_id": "082635798d7e0a24dc54a2138a1d94653",
+      "player": "Maria Conde",
+      "team": "TOR",
+      "team_tricode": "TOR",
+      "opponent": "GSV",
+      "score": 30.491825525221284,
+      "score_adj": 30.491825525221284,
+      "tier": "High",
+      "model": {
+        "pts": 5.827511656441718,
+        "reb": 3.5655188431200697,
+        "ast": 1.1085852760736197,
+        "threes": 1.1704667835232252,
+        "stl": 0.2917072743207712,
+        "blk": 0.1458536371603856,
+        "tov": 1.166829097283085,
+        "pra": 10.501615775635408,
+        "pr": 9.393030499561789,
+        "pa": 6.936096932515338,
+        "ra": 4.674104119193689
+      },
+      "top_play": {
+        "market": "pts",
+        "side": "UNDER",
+        "line": 9.5,
+        "price": -124.0,
+        "edge": 0.16879403415747496,
+        "ev": 0.30491825525221283,
+        "ev_pct": 30.491825525221284,
+        "book": "williamhill_us",
+        "p_win": 0.8584896838236414,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 30.5%",
+        "Regular price range (-150 to +150)",
+        "Consensus: 4 books aligned",
+        "Best line available"
+      ],
+      "basketball_summary": "model 5.8 vs line 9.5 (-3.7)"
+    },
+    {
+      "game_key": "MIN@CON",
+      "game_id": "00fc4abb4edf30887b57b4f686db8179a",
+      "player": "Courtney Williams",
+      "team": "MIN",
+      "team_tricode": "MIN",
+      "opponent": "CON",
+      "score": 16.09897426059983,
+      "score_adj": 16.09897426059983,
+      "tier": "High",
+      "model": {
+        "pts": 14.80200353606789,
+        "reb": 6.154738330975954,
+        "ast": 3.932485289957567,
+        "threes": 1.5256845827439889,
+        "stl": 1.6342312588401695,
+        "blk": 0.5942659123055163,
+        "tov": 1.7827977369165486,
+        "pra": 24.88922715700141,
+        "pr": 20.956741867043846,
+        "pa": 18.734488826025455,
+        "ra": 10.087223620933521
+      },
+      "top_play": {
+        "market": "pa",
+        "side": "UNDER",
+        "line": 24.5,
+        "price": -117.0,
+        "edge": 0.08680092112857973,
+        "ev": 0.1609897426059983,
+        "ev_pct": 16.09897426059983,
+        "book": "draftkings",
+        "p_win": 0.7001602495184407,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 16.1%",
+        "Regular price range (-150 to +150)",
+        "Best line available"
+      ],
+      "basketball_summary": "model 18.7 vs line 24.5 (-5.8)"
+    }
+  ]
+}

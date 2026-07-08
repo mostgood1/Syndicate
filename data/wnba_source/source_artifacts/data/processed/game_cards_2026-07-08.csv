@@ -1,0 +1,4 @@
+date,game_id,home_team,visitor_team,commence_time,home_ml,away_ml,home_spread,away_spread,total,bookmaker,home_tri,away_tri
+2026-07-08,00fc4abb4edf30887b57b4f686db8179a,Connecticut Sun,Minnesota Lynx,2026-07-08T23:30:00Z,,,,,,oddsapi_consensus,CON,MIN
+2026-07-08,082635798d7e0a24dc54a2138a1d94653,Toronto Tempo,Golden State Valkyries,2026-07-08T23:00:00Z,,,,,,oddsapi_consensus,TOR,GSV
+2026-07-08,0b0cfbd10dffa5258c1e9dd6aca005a5a,Los Angeles Sparks,Indiana Fever,2026-07-09T02:00:00Z,,,,,,oddsapi_consensus,LAS,IND
