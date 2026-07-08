@@ -188,7 +188,7 @@ def _wait_for_child_process(
         )
         stderr_thread = threading.Thread(
             target=_stream_child_output,
-            kwargs={"pipe": process.stderr, "chunks": stderr_chunks, "target_stream": sys.stderr},
+            kwargs={"pipe": process.stderr, "chunks": stderr_chunks, "target_stream": sys.stdout},
             daemon=True,
             name="refresh-job-stderr-stream",
         )
