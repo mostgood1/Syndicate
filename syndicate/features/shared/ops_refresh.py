@@ -42,6 +42,10 @@ REPO_ROOT = repo_root_from(__file__)
 REPORTS_ROOT = REPO_ROOT / "reports"
 
 
+def _memory_trace_enabled() -> bool:
+    return str(os.environ.get("SYNDICATE_LIVE_ODDS_REFRESH_MEMORY_TRACE") or "").strip().lower() in {"1", "true", "yes", "on"}
+
+
 def _today_date() -> str:
     return central_today_iso()
 
@@ -880,16 +884,24 @@ def launch_refresh_run(
             "state": "pending_external",
         }
 
-    popen_kwargs: dict[str, Any] = {
-        "cwd": str(REPO_ROOT),
-        "stdout": subprocess.DEVNULL,
-        "stderr": subprocess.DEVNULL,
-    }
-    if os.name == "nt":
-        popen_kwargs["creationflags"] = getattr(subprocess, "DETACHED_PROCESS", 0) | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+    if _memory_trace_enabled():
+        popen_kwargs: dict[str, Any] = {
+            "cwd": str(REPO_ROOT),
+        }
     else:
-        popen_kwargs["start_new_session"] = True
+        popen_kwargs = {
+            "cwd": str(REPO_ROOT),
+            "stdout": subprocess.DEVNULL,
+            "stderr": subprocess.DEVNULL,
+        }
+        if os.name == "nt":
+            popen_kwargs["creationflags"] = getattr(subprocess, "DETACHED_PROCESS", 0) | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+        else:
+            popen_kwargs["start_new_session"] = True
     process = subprocess.Popen(command, **popen_kwargs)
+
+    if _memory_trace_enabled():
+        process.wait()
 
     refresh_status_manifest["pid"] = int(process.pid)
     write_json_file(refresh_status_manifest_path, refresh_status_manifest)
