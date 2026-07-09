@@ -1,0 +1,387 @@
+{
+  "date": "2026-07-09",
+  "data": [
+    {
+      "game_key": "SEA@ATL",
+      "game_id": "0bbda183d9dc2a8ed43f79f82ef0ac320",
+      "player": "Awa Fam",
+      "team": "SEA",
+      "team_tricode": "SEA",
+      "opponent": "ATL",
+      "score": 67.9747036473684,
+      "score_adj": 67.9747036473684,
+      "tier": "High",
+      "model": {
+        "pts": 10.0,
+        "reb": 2.0,
+        "ast": 0.0,
+        "threes": 0.0,
+        "stl": 0.4399999999999999,
+        "blk": 0.36,
+        "tov": 1.2,
+        "pra": 12.0,
+        "pr": 12.0,
+        "pa": 10.0,
+        "ra": 2.0
+      },
+      "top_play": {
+        "market": "threes",
+        "side": "UNDER",
+        "line": 1.5,
+        "price": -125.0,
+        "edge": 0.37763724248538,
+        "ev": 0.6797470364736841,
+        "ev_pct": 67.9747036473684,
+        "book": "fanduel",
+        "p_win": 1.0,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 68.0%",
+        "Regular price range (-150 to +150)",
+        "Consensus: 4 books aligned",
+        "Best line available"
+      ],
+      "basketball_summary": "model 0.0 vs line 1.5 (-1.5)"
+    },
+    {
+      "game_key": "IND@PHX",
+      "game_id": "080aa9418f4995bd78f131b2ede793c1c",
+      "player": "Kelsey Mitchell",
+      "team": "IND",
+      "team_tricode": "IND",
+      "opponent": "PHX",
+      "score": 60.22556557451657,
+      "score_adj": 60.22556557451657,
+      "tier": "High",
+      "model": {
+        "pts": 21.35475271428572,
+        "reb": 0.8324189999999998,
+        "ast": 2.284326428571428,
+        "threes": 1.8923264285714283,
+        "stl": 0.7338321428571427,
+        "blk": 0.0,
+        "tov": 1.614430714285714,
+        "pra": 24.47149814285714,
+        "pr": 22.187171714285718,
+        "pa": 23.63907914285715,
+        "ra": 3.116745428571428
+      },
+      "top_play": {
+        "market": "threes",
+        "side": "UNDER",
+        "line": 2.5,
+        "price": 120.0,
+        "edge": 0.27375257079325716,
+        "ev": 0.6022556557451657,
+        "ev_pct": 60.22556557451657,
+        "book": "fanduel",
+        "p_win": 1.0,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 60.2%",
+        "Regular price range (-150 to +150)",
+        "Best line available"
+      ],
+      "basketball_summary": "model 1.9 vs line 2.5 (-0.6)"
+    },
+    {
+      "game_key": "IND@PHX",
+      "game_id": "080aa9418f4995bd78f131b2ede793c1c",
+      "player": "Kahleah Copper",
+      "team": "PHX",
+      "team_tricode": "PHX",
+      "opponent": "IND",
+      "score": 55.14262182090497,
+      "score_adj": 55.14262182090497,
+      "tier": "High",
+      "model": {
+        "pts": 19.268690476190475,
+        "reb": 2.837285714285714,
+        "ast": 2.167809523809524,
+        "threes": 0.8604285714285713,
+        "stl": 0.8530952380952379,
+        "blk": 0.0,
+        "tov": 3.128015873015873,
+        "pra": 24.27378571428571,
+        "pr": 22.105976190476188,
+        "pa": 21.4365,
+        "ra": 5.0050952380952385
+      },
+      "top_play": {
+        "market": "threes",
+        "side": "UNDER",
+        "line": 1.5,
+        "price": 110.0,
+        "edge": 0.2625839134328808,
+        "ev": 0.5514262182090497,
+        "ev_pct": 55.14262182090497,
+        "book": "fanduel",
+        "p_win": 1.0,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 55.1%",
+        "Regular price range (-150 to +150)",
+        "Best line available"
+      ],
+      "basketball_summary": "model 0.9 vs line 1.5 (-0.6)"
+    },
+    {
+      "game_key": "IND@PHX",
+      "game_id": "080aa9418f4995bd78f131b2ede793c1c",
+      "player": "Valeriane Ayayi",
+      "team": "PHX",
+      "team_tricode": "PHX",
+      "opponent": "IND",
+      "score": 43.578431371978056,
+      "score_adj": 43.578431371978056,
+      "tier": "High",
+      "model": {
+        "pts": 3.729273936170213,
+        "reb": 2.528353723404256,
+        "ast": 1.0474335106382977,
+        "threes": 0.3869734042553191,
+        "stl": 0.6924335106382978,
+        "blk": 0.0,
+        "tov": 0.6924335106382978,
+        "pra": 7.305061170212767,
+        "pr": 6.257627659574469,
+        "pa": 4.77670744680851,
+        "ra": 3.575787234042554
+      },
+      "top_play": {
+        "market": "pts",
+        "side": "UNDER",
+        "line": 10.5,
+        "price": -102.0,
+        "edge": 0.220049504947612,
+        "ev": 0.43578431371978055,
+        "ev_pct": 43.578431371978056,
+        "book": "fanduel",
+        "p_win": 0.9407348087692855,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 43.6%",
+        "Regular price range (-150 to +150)",
+        "Best line available"
+      ],
+      "basketball_summary": "model 3.7 vs line 10.5 (-6.8)"
+    },
+    {
+      "game_key": "LVA@POR",
+      "game_id": "0803d077d9e5f6f5b156f4a2be5ad2ec5",
+      "player": "Jackie Young",
+      "team": "LVA",
+      "team_tricode": "LVA",
+      "opponent": "POR",
+      "score": 43.57663318124695,
+      "score_adj": 43.57663318124695,
+      "tier": "High",
+      "model": {
+        "pts": 8.636180357142859,
+        "reb": 4.11318125,
+        "ast": 5.002090178571429,
+        "threes": 0.5340680803571429,
+        "stl": 0.7015420386904763,
+        "blk": 0.5612336309523809,
+        "tov": 1.9643177083333327,
+        "pra": 17.751451785714288,
+        "pr": 12.749361607142859,
+        "pa": 13.638270535714287,
+        "ra": 9.115271428571429
+      },
+      "top_play": {
+        "market": "pts",
+        "side": "UNDER",
+        "line": 17.5,
+        "price": -102.0,
+        "edge": 0.2200404249746133,
+        "ev": 0.4357663318124695,
+        "ev_pct": 43.57663318124695,
+        "book": "betonlineag",
+        "p_win": 0.9407168268619744,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 43.6%",
+        "Regular price range (-150 to +150)",
+        "Consensus: 4 books aligned",
+        "Best line available"
+      ],
+      "basketball_summary": "model 8.6 vs line 17.5 (-8.9)"
+    },
+    {
+      "game_key": "LVA@POR",
+      "game_id": "0803d077d9e5f6f5b156f4a2be5ad2ec5",
+      "player": "Bridget Carleton",
+      "team": "POR",
+      "team_tricode": "POR",
+      "opponent": "LVA",
+      "score": 33.477347615946925,
+      "score_adj": 33.477347615946925,
+      "tier": "High",
+      "model": {
+        "pts": 15.788455994257,
+        "reb": 2.721409332376167,
+        "ast": 1.9103511844938983,
+        "threes": 2.830820961952621,
+        "stl": 2.149576453697057,
+        "blk": 0.2866101938262742,
+        "tov": 0.8598305814788227,
+        "pra": 20.420216511127062,
+        "pr": 18.509865326633168,
+        "pa": 17.698807178750897,
+        "ra": 4.631760516870065
+      },
+      "top_play": {
+        "market": "threes",
+        "side": "OVER",
+        "line": 2.5,
+        "price": 112.0,
+        "edge": 0.15791201705635338,
+        "ev": 0.3347734761594693,
+        "ev_pct": 33.477347615946925,
+        "book": "betonlineag",
+        "p_win": 0.8064715893670165,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 33.5%",
+        "Regular price range (-150 to +150)",
+        "Consensus: 4 books aligned",
+        "Best line available"
+      ],
+      "basketball_summary": "model 2.8 vs line 2.5 (+0.3)"
+    },
+    {
+      "game_key": "LVA@POR",
+      "game_id": "0803d077d9e5f6f5b156f4a2be5ad2ec5",
+      "player": "Megan Gustafson",
+      "team": "POR",
+      "team_tricode": "POR",
+      "opponent": "LVA",
+      "score": 30.454566183386923,
+      "score_adj": 30.454566183386923,
+      "tier": "High",
+      "model": {
+        "pts": 8.827758426966291,
+        "reb": 3.167919475655431,
+        "ast": 0.3032846441947565,
+        "threes": 0.7265692883895131,
+        "stl": 0.1738483146067415,
+        "blk": 0.5215449438202248,
+        "tov": 0.5215449438202248,
+        "pra": 12.298962546816478,
+        "pr": 11.995677902621722,
+        "pa": 9.131043071161047,
+        "ra": 3.4712041198501873
+      },
+      "top_play": {
+        "market": "pts",
+        "side": "UNDER",
+        "line": 12.5,
+        "price": -117.0,
+        "edge": 0.16420203886895257,
+        "ev": 0.3045456618338692,
+        "ev_pct": 30.454566183386923,
+        "book": "draftkings",
+        "p_win": 0.8437161687463116,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 30.5%",
+        "Regular price range (-150 to +150)",
+        "Consensus: 3 books aligned",
+        "Best line available"
+      ],
+      "basketball_summary": "model 8.8 vs line 12.5 (-3.7)"
+    },
+    {
+      "game_key": "SEA@ATL",
+      "game_id": "0bbda183d9dc2a8ed43f79f82ef0ac320",
+      "player": "Jordin Canada",
+      "team": "ATL",
+      "team_tricode": "ATL",
+      "opponent": "SEA",
+      "score": 14.353580397824018,
+      "score_adj": 14.353580397824018,
+      "tier": "High",
+      "model": {
+        "pts": 11.510191511387164,
+        "reb": 4.599393788819876,
+        "ast": 7.330232091097308,
+        "threes": 0.9068484472049688,
+        "stl": 2.515521739130435,
+        "blk": 0.1796801242236024,
+        "tov": 1.796801242236025,
+        "pra": 23.43981739130435,
+        "pr": 16.10958530020704,
+        "pa": 18.84042360248447,
+        "ra": 11.929625879917184
+      },
+      "top_play": {
+        "market": "ra",
+        "side": "OVER",
+        "line": 9.5,
+        "price": -111.0,
+        "edge": 0.07550935659518798,
+        "ev": 0.14353580397824017,
+        "ev_pct": 14.353580397824018,
+        "book": "draftkings",
+        "p_win": 0.6696021546891406,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 14.4%",
+        "Regular price range (-150 to +150)",
+        "Best line available"
+      ],
+      "basketball_summary": "model 11.9 vs line 9.5 (+2.4)"
+    },
+    {
+      "game_key": "SEA@ATL",
+      "game_id": "0bbda183d9dc2a8ed43f79f82ef0ac320",
+      "player": "Allisha Gray",
+      "team": "ATL",
+      "team_tricode": "ATL",
+      "opponent": "SEA",
+      "score": 13.032333407921847,
+      "score_adj": 13.032333407921847,
+      "tier": "High",
+      "model": {
+        "pts": 20.07475942028985,
+        "reb": 4.622415217391303,
+        "ast": 0.826373188405797,
+        "threes": 1.4341971014492754,
+        "stl": 0.8995108695652173,
+        "blk": 0.7196086956521738,
+        "tov": 2.158826086956521,
+        "pra": 25.52354782608696,
+        "pr": 24.697174637681155,
+        "pa": 20.901132608695647,
+        "ra": 5.4487884057971
+      },
+      "top_play": {
+        "market": "reb",
+        "side": "OVER",
+        "line": 3.5,
+        "price": 124.0,
+        "edge": 0.05818005985679392,
+        "ev": 0.13032333407921848,
+        "ev_pct": 13.032333407921847,
+        "book": "draftkings",
+        "p_win": 0.5767519055077899,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 13.0%",
+        "Regular price range (-150 to +150)",
+        "Best line available"
+      ],
+      "basketball_summary": "model 4.6 vs line 3.5 (+1.1)"
+    }
+  ]
+}

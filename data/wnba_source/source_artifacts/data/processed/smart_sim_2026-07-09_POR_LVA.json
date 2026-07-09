@@ -1,0 +1,1352 @@
+{
+  "date": "2026-07-09",
+  "home": "POR",
+  "away": "LVA",
+  "market_total": null,
+  "market_home_spread": null,
+  "quarters": [
+    {
+      "q": 1,
+      "home_pts_mu": 19.567931249999997,
+      "home_pts_sigma": 5.0,
+      "away_pts_mu": 19.567931249999997,
+      "away_pts_sigma": 5.0,
+      "corr": 0.25
+    },
+    {
+      "q": 2,
+      "home_pts_mu": 19.971393749999997,
+      "home_pts_sigma": 5.0,
+      "away_pts_mu": 19.971393749999997,
+      "away_pts_sigma": 5.0,
+      "corr": 0.25
+    },
+    {
+      "q": 3,
+      "home_pts_mu": 20.37485625,
+      "home_pts_sigma": 5.0,
+      "away_pts_mu": 20.37485625,
+      "away_pts_sigma": 5.0,
+      "corr": 0.25
+    },
+    {
+      "q": 4,
+      "home_pts_mu": 20.77831875,
+      "home_pts_sigma": 5.0,
+      "away_pts_mu": 20.77831875,
+      "away_pts_sigma": 5.0,
+      "corr": 0.25
+    }
+  ],
+  "players": {
+    "home": [
+      {
+        "team": "POR",
+        "opponent": "LVA",
+        "player_name": "Carla Leite",
+        "player_id": 5208982,
+        "pts_mean": 14.0598203539823,
+        "reb_mean": 2.440251327433628,
+        "ast_mean": 4.737127433628318,
+        "threes_mean": 0.3233752212389381,
+        "pra_mean": 21.23719911504425,
+        "stl_mean": 0.5884380530973451,
+        "blk_mean": 0.0,
+        "tov_mean": 2.9421902654867256,
+        "pts_sd": 3.514955088495575,
+        "reb_sd": 1.0,
+        "ast_sd": 1.1842818584070796,
+        "threes_sd": 1.0,
+        "pra_sd": 5.309299778761062,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "position": "G",
+        "minutes": 22.1645
+      },
+      {
+        "team": "POR",
+        "opponent": "LVA",
+        "player_name": "Bridget Carleton",
+        "player_id": 3906972,
+        "pts_mean": 15.788455994257,
+        "reb_mean": 2.721409332376167,
+        "ast_mean": 1.9103511844938983,
+        "threes_mean": 2.830820961952621,
+        "pra_mean": 20.420216511127062,
+        "stl_mean": 2.149576453697057,
+        "blk_mean": 0.2866101938262742,
+        "tov_mean": 0.8598305814788227,
+        "pts_sd": 3.94711399856425,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 5.105054127781766,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "position": "F",
+        "minutes": 28.517714285714288
+      },
+      {
+        "team": "POR",
+        "opponent": "LVA",
+        "player_name": "Sug Sutton",
+        "player_id": 4068159,
+        "pts_mean": 11.522159420289857,
+        "reb_mean": 1.6309057971014491,
+        "ast_mean": 5.581079710144928,
+        "threes_mean": 0.6283623188405796,
+        "pra_mean": 18.73414492753623,
+        "stl_mean": 0.6694927536231883,
+        "blk_mean": 0.0,
+        "tov_mean": 2.008478260869565,
+        "pts_sd": 2.880539855072464,
+        "reb_sd": 1.0,
+        "ast_sd": 1.395269927536232,
+        "threes_sd": 1.0,
+        "pra_sd": 4.683536231884058,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "minutes": 23.0975
+      },
+      {
+        "team": "POR",
+        "opponent": "LVA",
+        "player_name": "Sarah Ashlee Barker",
+        "player_id": 4703794,
+        "pts_mean": 10.464033333333331,
+        "reb_mean": 3.635366666666666,
+        "ast_mean": 1.6451666666666669,
+        "threes_mean": 1.1216166666666667,
+        "pra_mean": 15.744566666666666,
+        "stl_mean": 0.8098611111111113,
+        "blk_mean": 0.1619722222222222,
+        "tov_mean": 1.2957777777777777,
+        "pts_sd": 2.616008333333333,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 3.9361416666666664,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "position": "G",
+        "minutes": 20.4085
+      },
+      {
+        "team": "POR",
+        "opponent": "LVA",
+        "player_name": "Emily Engstler",
+        "player_id": 4398729,
+        "pts_mean": 10.362389781021896,
+        "reb_mean": 3.818775182481752,
+        "ast_mean": 0.732279805352798,
+        "threes_mean": 1.3532476885644766,
+        "pra_mean": 14.913444768856444,
+        "stl_mean": 1.1704306569343066,
+        "blk_mean": 2.0064525547445253,
+        "tov_mean": 2.173656934306569,
+        "pts_sd": 2.590597445255474,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 3.728361192214111,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "position": "F",
+        "minutes": 22.907
+      },
+      {
+        "team": "POR",
+        "opponent": "LVA",
+        "player_name": "Teja Oblak",
+        "player_id": 5346554,
+        "pts_mean": 3.0,
+        "reb_mean": 1.0,
+        "ast_mean": 9.0,
+        "threes_mean": 1.0,
+        "pra_mean": 13.0,
+        "stl_mean": 0.374,
+        "blk_mean": 0.306,
+        "tov_mean": 1.02,
+        "pts_sd": 1.0,
+        "reb_sd": 1.0,
+        "ast_sd": 2.25,
+        "threes_sd": 1.0,
+        "pra_sd": 3.25,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "position": "G",
+        "minutes": 17.0
+      },
+      {
+        "team": "POR",
+        "opponent": "LVA",
+        "player_name": "Megan Gustafson",
+        "player_id": 3934218,
+        "pts_mean": 8.827758426966291,
+        "reb_mean": 3.167919475655431,
+        "ast_mean": 0.3032846441947565,
+        "threes_mean": 0.7265692883895131,
+        "pra_mean": 12.298962546816478,
+        "stl_mean": 0.1738483146067415,
+        "blk_mean": 0.5215449438202248,
+        "tov_mean": 0.5215449438202248,
+        "pts_sd": 2.2069396067415727,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 3.0747406367041195,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "position": "C",
+        "minutes": 15.4725
+      },
+      {
+        "team": "POR",
+        "opponent": "LVA",
+        "player_name": "Luisa Geiselsoder",
+        "player_id": 4682797,
+        "pts_mean": 6.108655714285714,
+        "reb_mean": 4.089659285714285,
+        "ast_mean": 1.476330714285714,
+        "threes_mean": 0.4666657142857142,
+        "pra_mean": 11.674645714285711,
+        "stl_mean": 0.2807928571428571,
+        "blk_mean": 0.7019821428571429,
+        "tov_mean": 1.544360714285714,
+        "pts_sd": 1.5271639285714285,
+        "reb_sd": 1.0224148214285713,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 2.918661428571428,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "position": "C",
+        "minutes": 22.46342857142857
+      },
+      {
+        "team": "POR",
+        "opponent": "LVA",
+        "player_name": "Jordan Harrison",
+        "player_id": 5108051,
+        "pts_mean": 6.124999999999999,
+        "reb_mean": 1.275,
+        "ast_mean": 4.0,
+        "threes_mean": 0.0,
+        "pra_mean": 11.4,
+        "stl_mean": 0.3114924999999999,
+        "blk_mean": 0.2548574999999999,
+        "tov_mean": 0.849525,
+        "pts_sd": 1.5312499999999998,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 2.85,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "position": "G",
+        "minutes": 14.15875
+      },
+      {
+        "team": "POR",
+        "opponent": "LVA",
+        "player_name": "Kamiah Smalls",
+        "player_id": 4068346,
+        "pts_mean": 6.675,
+        "reb_mean": 0.0,
+        "ast_mean": 3.15,
+        "threes_mean": 1.6999999999999995,
+        "pra_mean": 9.825,
+        "stl_mean": 0.3321449999999999,
+        "blk_mean": 0.2717549999999999,
+        "tov_mean": 0.90585,
+        "pts_sd": 1.66875,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 2.45625,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "minutes": 15.0975
+      },
+      {
+        "team": "POR",
+        "opponent": "LVA",
+        "player_name": "Nyadiew Puoch",
+        "player_id": 5209202,
+        "pts_mean": 6.089068716094033,
+        "reb_mean": 2.332356238698011,
+        "ast_mean": 0.8692329113924051,
+        "threes_mean": 0.7713424954792043,
+        "pra_mean": 9.29065786618445,
+        "stl_mean": 1.1528245931283905,
+        "blk_mean": 0.1441030741410488,
+        "tov_mean": 0.8646184448462929,
+        "pts_sd": 1.5222671790235083,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 2.3226644665461125,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "position": "F",
+        "minutes": 22.76828571428572
+      },
+      {
+        "team": "POR",
+        "opponent": "LVA",
+        "player_name": "Serah Williams",
+        "player_id": 5108550,
+        "pts_mean": 5.124608108108108,
+        "reb_mean": 3.5097792792792792,
+        "ast_mean": 0.4020608108108108,
+        "threes_mean": 0.0,
+        "pra_mean": 9.036448198198196,
+        "stl_mean": 1.0202027027027023,
+        "blk_mean": 0.680135135135135,
+        "tov_mean": 0.5101013513513513,
+        "pts_sd": 1.281152027027027,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 2.259112049549549,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "position": "C",
+        "minutes": 12.5825
+      },
+      {
+        "team": "POR",
+        "opponent": "LVA",
+        "player_name": "Haley Jones",
+        "player_id": 4595910,
+        "pts_mean": 5.49349282700422,
+        "reb_mean": 2.278497046413502,
+        "ast_mean": 1.135248523206751,
+        "threes_mean": 0.0,
+        "pra_mean": 8.907238396624473,
+        "stl_mean": 0.6494430379746835,
+        "blk_mean": 0.0,
+        "tov_mean": 1.6236075949367088,
+        "pts_sd": 1.373373206751055,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 2.2268095991561183,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "minutes": 12.8265
+      },
+      {
+        "team": "POR",
+        "opponent": "LVA",
+        "player_name": "Frieda Buhner",
+        "player_id": 5105406,
+        "pts_mean": 3.135269565217391,
+        "reb_mean": 1.5576347826086956,
+        "ast_mean": 0.2597043478260869,
+        "threes_mean": 0.2597043478260869,
+        "pra_mean": 4.952608695652174,
+        "stl_mean": 0.0,
+        "blk_mean": 0.0,
+        "tov_mean": 0.5785217391304347,
+        "pts_sd": 1.0,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 1.2381521739130434,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "position": "F",
+        "minutes": 13.306
+      },
+      {
+        "team": "POR",
+        "opponent": "LVA",
+        "player_name": "Chloe Bibby",
+        "player_id": 4280877,
+        "pts_mean": 0.0,
+        "reb_mean": 1.0,
+        "ast_mean": 0.0,
+        "threes_mean": 0.0,
+        "pra_mean": 1.0,
+        "stl_mean": 0.352,
+        "blk_mean": 0.288,
+        "tov_mean": 0.96,
+        "pts_sd": 1.0,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 1.0,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "minutes": 16.0
+      }
+    ],
+    "away": [
+      {
+        "team": "LVA",
+        "opponent": "POR",
+        "player_name": "A'ja Wilson",
+        "player_id": 3149391,
+        "pts_mean": 25.88632857142857,
+        "reb_mean": 7.909028571428571,
+        "ast_mean": 2.651614285714285,
+        "threes_mean": 1.3541714285714286,
+        "pra_mean": 36.44697142857143,
+        "stl_mean": 1.0714999999999997,
+        "blk_mean": 2.296071428571428,
+        "tov_mean": 3.061428571428571,
+        "pts_sd": 6.471582142857143,
+        "reb_sd": 1.9772571428571428,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 9.111742857142858,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "position": "C",
+        "minutes": 30.001999999999995
+      },
+      {
+        "team": "LVA",
+        "opponent": "POR",
+        "player_name": "Chennedy Carter",
+        "player_id": 4280892,
+        "pts_mean": 19.61589165867689,
+        "reb_mean": 2.5693612655800573,
+        "ast_mean": 2.293906999041228,
+        "threes_mean": 1.3480899328859062,
+        "pra_mean": 24.479159923298177,
+        "stl_mean": 1.3544784276126558,
+        "blk_mean": 0.6019904122722913,
+        "tov_mean": 2.257464046021093,
+        "pts_sd": 4.903972914669223,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 6.119789980824544,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "minutes": 22.42414285714285
+      },
+      {
+        "team": "LVA",
+        "opponent": "POR",
+        "player_name": "Chelsea Gray",
+        "player_id": 2529122,
+        "pts_mean": 12.953696551724136,
+        "reb_mean": 4.028537931034483,
+        "ast_mean": 6.972931034482758,
+        "threes_mean": 2.244310344827586,
+        "pra_mean": 23.95516551724138,
+        "stl_mean": 0.7716009852216749,
+        "blk_mean": 0.9259211822660096,
+        "tov_mean": 3.703684729064039,
+        "pts_sd": 3.238424137931034,
+        "reb_sd": 1.0071344827586208,
+        "ast_sd": 1.7432327586206895,
+        "threes_sd": 1.0,
+        "pra_sd": 5.988791379310345,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "position": "G",
+        "minutes": 31.327
+      },
+      {
+        "team": "LVA",
+        "opponent": "POR",
+        "player_name": "NaLyssa Smith",
+        "player_id": 4398776,
+        "pts_mean": 12.175233793103448,
+        "reb_mean": 6.1396019704433495,
+        "ast_mean": 1.007930344827586,
+        "threes_mean": 0.2279900492610837,
+        "pra_mean": 19.32276610837438,
+        "stl_mean": 0.5904098522167487,
+        "blk_mean": 0.8856147783251229,
+        "tov_mean": 1.0332172413793104,
+        "pts_sd": 3.043808448275862,
+        "reb_sd": 1.5349004926108374,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 4.830691527093595,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "position": "F",
+        "minutes": 21.40235714285714
+      },
+      {
+        "team": "LVA",
+        "opponent": "POR",
+        "player_name": "Jackie Young",
+        "player_id": 4065870,
+        "pts_mean": 8.636180357142859,
+        "reb_mean": 4.11318125,
+        "ast_mean": 5.002090178571429,
+        "threes_mean": 0.5340680803571429,
+        "pra_mean": 17.751451785714288,
+        "stl_mean": 0.7015420386904763,
+        "blk_mean": 0.5612336309523809,
+        "tov_mean": 1.9643177083333327,
+        "pts_sd": 2.1590450892857147,
+        "reb_sd": 1.0282953125,
+        "ast_sd": 1.2505225446428572,
+        "threes_sd": 1.0,
+        "pra_sd": 4.437862946428572,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "position": "G",
+        "minutes": 26.93921428571429
+      },
+      {
+        "team": "LVA",
+        "opponent": "POR",
+        "player_name": "Jewell Loyd",
+        "player_id": 2987869,
+        "pts_mean": 7.560536574420344,
+        "reb_mean": 2.950898130142109,
+        "ast_mean": 1.4907718773373224,
+        "threes_mean": 1.56009468960359,
+        "pra_mean": 12.002206581899776,
+        "stl_mean": 1.1633148840688108,
+        "blk_mean": 0.2908287210172027,
+        "tov_mean": 1.1633148840688108,
+        "pts_sd": 1.890134143605086,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 3.000551645474944,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "position": "G",
+        "minutes": 27.774142857142856
+      },
+      {
+        "team": "LVA",
+        "opponent": "POR",
+        "player_name": "Cheyenne Parker-Tyus",
+        "player_id": 2529458,
+        "pts_mean": 4.221002985074627,
+        "reb_mean": 2.6858771144278606,
+        "ast_mean": 0.6275004975124377,
+        "threes_mean": 0.0,
+        "pra_mean": 7.534380597014925,
+        "stl_mean": 0.3418059701492537,
+        "blk_mean": 1.0254179104477612,
+        "tov_mean": 1.0254179104477612,
+        "pts_sd": 1.0552507462686567,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 1.8835951492537313,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "position": "F",
+        "minutes": 11.450499999999998
+      },
+      {
+        "team": "LVA",
+        "opponent": "POR",
+        "player_name": "Stephanie Talbot",
+        "player_id": 3099736,
+        "pts_mean": 3.0675644028103046,
+        "reb_mean": 2.4448412177985954,
+        "ast_mean": 1.3507231850117098,
+        "threes_mean": 0.0963025761124121,
+        "pra_mean": 6.86312880562061,
+        "stl_mean": 0.8487400468384075,
+        "blk_mean": 0.2829133489461358,
+        "tov_mean": 0.8487400468384075,
+        "pts_sd": 1.0,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 1.7157822014051525,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "position": "F",
+        "minutes": 17.257714285714286
+      },
+      {
+        "team": "LVA",
+        "opponent": "POR",
+        "player_name": "Kierstan Bell",
+        "player_id": 4433633,
+        "pts_mean": 0.984375,
+        "reb_mean": 1.718125,
+        "ast_mean": 0.670625,
+        "threes_mean": 0.196875,
+        "pra_mean": 3.373125,
+        "stl_mean": 0.4729166666666666,
+        "blk_mean": 0.2364583333333333,
+        "tov_mean": 0.4729166666666666,
+        "pts_sd": 1.0,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 1.0,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "position": "F",
+        "minutes": 12.76875
+      },
+      {
+        "team": "LVA",
+        "opponent": "POR",
+        "player_name": "Brianna Turner",
+        "player_id": 3142086,
+        "pts_mean": 0.8800493506493505,
+        "reb_mean": 1.954806493506493,
+        "ast_mean": 0.3266831168831168,
+        "threes_mean": 0.0,
+        "pra_mean": 3.1615389610389606,
+        "stl_mean": 0.369564935064935,
+        "blk_mean": 0.4927532467532466,
+        "tov_mean": 0.369564935064935,
+        "pts_sd": 1.0,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 1.0,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "position": "F",
+        "minutes": 9.485499999999998
+      },
+      {
+        "team": "LVA",
+        "opponent": "POR",
+        "player_name": "Janiah Barker",
+        "player_id": 4565501,
+        "pts_mean": 1.0,
+        "reb_mean": 2.0,
+        "ast_mean": 0.0,
+        "threes_mean": 0.0,
+        "pra_mean": 3.0,
+        "stl_mean": 0.1683,
+        "blk_mean": 0.1377,
+        "tov_mean": 0.459,
+        "pts_sd": 1.0,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 1.0,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "position": "F",
+        "minutes": 7.65
+      },
+      {
+        "team": "LVA",
+        "opponent": "POR",
+        "player_name": "Jordan Obi",
+        "player_id": 4705226,
+        "pts_mean": 0.0,
+        "reb_mean": 1.0,
+        "ast_mean": 0.0,
+        "threes_mean": 0.0,
+        "pra_mean": 1.0,
+        "stl_mean": 0.1374999999999999,
+        "blk_mean": 0.1124999999999999,
+        "tov_mean": 0.375,
+        "pts_sd": 1.0,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 1.0,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "minutes": 6.25
+      }
+    ]
+  },
+  "home_team_total_pts_mean": 112.77571224056013,
+  "away_team_total_pts_mean": 96.98085924503053,
+  "excluded_player_keys_by_team": {
+    "POR": [],
+    "LVA": []
+  },
+  "pregame_context": {
+    "home_injuries_out": 0,
+    "away_injuries_out": 0,
+    "home_pace": 79.5,
+    "away_pace": 79.5,
+    "home_b2b": false,
+    "away_b2b": false
+  },
+  "n_sims": 1000
+}
