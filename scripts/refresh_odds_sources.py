@@ -69,6 +69,29 @@ _WNBA_PLAYER_PROP_MARKETS = "player_points,player_rebounds,player_assists,player
 _MEMORY_TRACE_LAST_RSS_BYTES: int | None = None
 
 
+def _parse_utc_timestamp(value: str | None) -> datetime | None:
+    raw = str(value or "").strip()
+    if not raw:
+        return None
+    candidate = raw[:-1] + "+00:00" if raw.endswith("Z") else raw
+    try:
+        parsed = datetime.fromisoformat(candidate)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+def _elapsed_seconds(started_at: str, finished_at: str | None = None) -> int | None:
+    started = _parse_utc_timestamp(started_at)
+    if started is None:
+        return None
+    finished = _parse_utc_timestamp(finished_at) or datetime.now(timezone.utc)
+    elapsed = int((finished - started).total_seconds())
+    return elapsed if elapsed >= 0 else 0
+
+
 @dataclass(frozen=True)
 class RefreshStep:
     name: str

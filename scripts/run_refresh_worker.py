@@ -397,7 +397,8 @@ def main() -> int:
     read_json_file = store["read_json_file"]
     print("[refresh_worker] BOOTED", flush=True)
     assert_refresh_state_backend_ready(process_name="refresh-worker")
-    start_intelligence_state_background_loop()
+    if str(os.environ.get("SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP") or "").strip().lower() in {"1", "true", "yes", "on"}:
+        start_intelligence_state_background_loop()
     parser = argparse.ArgumentParser(description="Poll Syndicate refresh state and execute queued external-runner jobs.")
     parser.add_argument("--latest-manifest", default=str(_default_latest_manifest_path()))
     parser.add_argument("--worker-status", default=str(_default_worker_status_path()))
