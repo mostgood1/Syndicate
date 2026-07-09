@@ -1598,6 +1598,49 @@ class IntelligenceStateTests(unittest.TestCase):
         self.assertEqual((payload.get("status") or {}).get("top_opportunities", [])[0]["name"], "Play 1")
         mocked_snapshot.assert_called_once()
 
+    def test_status_endpoint_prefers_board_snapshot_when_state_is_empty(self) -> None:
+        app = Flask(__name__)
+        app.register_blueprint(intelligence_bp)
+
+        empty_state = {
+            "ok": True,
+            "candidate_count": 0,
+            "top_opportunities": [],
+            "analysis": {
+                "recommendations": [],
+                "top_live_opportunities": [],
+                "portfolio": {},
+                "parlays": [],
+                "movement": {},
+            },
+            "board_contract": {"schema": "intelligence_board_v1", "top_overall": [], "by_sport": {}, "live": [], "pregame": [], "portfolio": {}, "parlays": []},
+        }
+        board_snapshot = {
+            "ok": True,
+            "candidate_count": 19,
+            "top_opportunities": [{"name": f"Play {index}"} for index in range(1, 20)],
+            "recommendations": [{"name": f"Play {index}"} for index in range(1, 20)],
+            "analysis": {
+                "recommendations": [{"name": f"Play {index}"} for index in range(1, 20)],
+                "top_live_opportunities": [{"name": f"Play {index}"} for index in range(1, 20)],
+                "portfolio": {},
+                "parlays": [],
+            },
+            "board_contract": {"schema": "intelligence_board_v1", "top_overall": [{"name": "Play 1"}], "by_sport": {}, "live": [], "pregame": [], "portfolio": {}, "parlays": []},
+        }
+
+        with app.test_request_context("/api/intelligence/status?date=2026-06-10", method="GET"):
+            with patch("syndicate.blueprints.intelligence.read_latest_intelligence_state", side_effect=[dict(empty_state), dict(empty_state)]):
+                with patch("syndicate.blueprints.intelligence.read_latest_intelligence_board_snapshot_response", return_value=dict(board_snapshot)):
+                    response = intelligence_status_api()
+
+        payload = response.get_json()
+        self.assertIsNotNone(payload)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(payload["candidate_count"], 19)
+        self.assertEqual(len((payload.get("status") or {}).get("top_opportunities", [])), 19)
+        self.assertEqual((payload.get("status") or {}).get("top_opportunities", [])[0]["name"], "Play 1")
+
     def test_status_endpoint_includes_state_debug_fields(self) -> None:
         app = Flask(__name__)
         app.register_blueprint(intelligence_bp)

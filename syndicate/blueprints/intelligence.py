@@ -1267,7 +1267,8 @@ def intelligence_status_api():
         _LOGGER.info("BETTING_BOARD_REFRESH_START", extra={"selected_date": selected_date, "source": "status_api", "refresh_requested": True})
     status_payload = _intelligence_page_payload(selected_date, sport=selected_sport, force_refresh=False)
     stale_snapshot = False
-    current_snapshot = read_latest_intelligence_state_response(dict(status_payload), force_refresh=False, allow_latest_fallback=False)
+    current_snapshot = read_latest_intelligence_state(dict(status_payload))
+    state_candidate_count = _response_candidate_count(current_snapshot) if isinstance(current_snapshot, dict) else 0
     has_snapshot = isinstance(current_snapshot, dict) and _response_has_board_content(current_snapshot)
     if not refresh_requested:
         stale_snapshot = bool(_response_selected_date(current_snapshot) and _response_selected_date(current_snapshot) != selected_date)
@@ -1277,14 +1278,18 @@ def intelligence_status_api():
         _safe_queue_intelligence_state_refresh(_intelligence_page_payload(selected_date, sport=selected_sport, force_refresh=True))
     elif stale_snapshot:
         _safe_queue_intelligence_state_refresh(_intelligence_page_payload(selected_date, sport=selected_sport, force_refresh=True))
-    status = read_latest_intelligence_state_response(dict(status_payload), force_refresh=False, allow_latest_fallback=False)
+    status = read_latest_intelligence_state(dict(status_payload))
     board_snapshot = read_latest_intelligence_board_snapshot_response(status_payload, force_refresh=False)
-    if not _response_has_board_content(status):
-        if _response_has_board_content(board_snapshot):
+    if state_candidate_count <= 0 and _response_candidate_count(board_snapshot) > 0 and _response_has_board_content(board_snapshot):
+        status = board_snapshot
+    elif not isinstance(status, dict) or not _response_has_board_content(status):
+        if _response_candidate_count(current_snapshot) > 0 and _response_has_board_content(current_snapshot):
+            status = current_snapshot
+        elif _response_candidate_count(board_snapshot) > 0 and _response_has_board_content(board_snapshot):
             status = board_snapshot
         else:
-            queued_state = read_latest_intelligence_state_response(dict(status_payload), force_refresh=False, allow_latest_fallback=False)
-            if _response_has_board_content(queued_state):
+            queued_state = read_latest_intelligence_state(dict(status_payload))
+            if _response_candidate_count(queued_state) > 0 and _response_has_board_content(queued_state):
                 status = queued_state
             else:
                 status = _empty_default_intelligence_response()
