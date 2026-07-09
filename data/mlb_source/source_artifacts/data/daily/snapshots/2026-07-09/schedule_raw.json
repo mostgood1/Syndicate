@@ -65,10 +65,10 @@
           "active": true
         },
         "leagueRecord": {
-          "wins": 52,
+          "wins": 53,
           "losses": 38,
           "ties": 0,
-          "pct": ".578"
+          "pct": ".582"
         },
         "probablePitcher": {
           "id": 693821,
@@ -134,9 +134,9 @@
         },
         "leagueRecord": {
           "wins": 47,
-          "losses": 45,
+          "losses": 46,
           "ties": 0,
-          "pct": ".511"
+          "pct": ".505"
         },
         "probablePitcher": {
           "id": 656605,
@@ -246,9 +246,9 @@
         },
         "leagueRecord": {
           "wins": 38,
-          "losses": 54,
+          "losses": 55,
           "ties": 0,
-          "pct": ".413"
+          "pct": ".409"
         },
         "probablePitcher": {
           "id": 608379,
@@ -313,10 +313,10 @@
           "active": true
         },
         "leagueRecord": {
-          "wins": 38,
+          "wins": 39,
           "losses": 54,
           "ties": 0,
-          "pct": ".413"
+          "pct": ".419"
         },
         "probablePitcher": {
           "id": 640455,
@@ -426,9 +426,9 @@
         },
         "leagueRecord": {
           "wins": 50,
-          "losses": 41,
+          "losses": 42,
           "ties": 0,
-          "pct": ".549"
+          "pct": ".543"
         },
         "splitSquad": false,
         "seriesNumber": 30,
@@ -488,10 +488,10 @@
           "active": true
         },
         "leagueRecord": {
-          "wins": 53,
+          "wins": 54,
           "losses": 36,
           "ties": 0,
-          "pct": ".596"
+          "pct": ".600"
         },
         "probablePitcher": {
           "id": 656876,
@@ -529,6 +529,186 @@
     "inningBreakLength": 120,
     "gamesInSeries": 4,
     "seriesGameNumber": 4,
+    "seriesDescription": "Regular Season",
+    "recordSource": "S",
+    "ifNecessary": "N",
+    "ifNecessaryDescription": "Normal Game"
+  },
+  {
+    "gamePk": 824816,
+    "gameGuid": "ae45787c-f7a1-47b6-a9f7-4537892e8c92",
+    "link": "/api/v1.1/game/824816/feed/live",
+    "gameType": "R",
+    "season": "2026",
+    "gameDate": "2026-07-09T17:35:00Z",
+    "officialDate": "2026-07-09",
+    "status": {
+      "abstractGameState": "Preview",
+      "codedGameState": "S",
+      "detailedState": "Scheduled",
+      "statusCode": "S",
+      "startTimeTBD": false,
+      "abstractGameCode": "P"
+    },
+    "teams": {
+      "away": {
+        "team": {
+          "springLeague": {
+            "id": 114,
+            "name": "Cactus League",
+            "link": "/api/v1/league/114",
+            "abbreviation": "CL"
+          },
+          "allStarStatus": "N",
+          "id": 112,
+          "name": "Chicago Cubs",
+          "link": "/api/v1/teams/112",
+          "season": 2026,
+          "venue": {
+            "id": 17,
+            "name": "Wrigley Field",
+            "link": "/api/v1/venues/17"
+          },
+          "springVenue": {
+            "id": 4629,
+            "link": "/api/v1/venues/4629"
+          },
+          "teamCode": "chn",
+          "fileCode": "chc",
+          "abbreviation": "CHC",
+          "teamName": "Cubs",
+          "locationName": "Chicago",
+          "firstYearOfPlay": "1874",
+          "league": {
+            "id": 104,
+            "name": "National League",
+            "link": "/api/v1/league/104"
+          },
+          "division": {
+            "id": 205,
+            "name": "National League Central",
+            "link": "/api/v1/divisions/205"
+          },
+          "sport": {
+            "id": 1,
+            "link": "/api/v1/sports/1",
+            "name": "Major League Baseball"
+          },
+          "shortName": "Chi Cubs",
+          "franchiseName": "Chicago",
+          "clubName": "Cubs",
+          "active": true
+        },
+        "leagueRecord": {
+          "wins": 52,
+          "losses": 40,
+          "ties": 0,
+          "pct": ".565"
+        },
+        "probablePitcher": {
+          "id": 656849,
+          "fullName": "David Peterson",
+          "link": "/api/v1/people/656849"
+        },
+        "splitSquad": false,
+        "seriesNumber": 30,
+        "springLeague": {
+          "id": 114,
+          "name": "Cactus League",
+          "link": "/api/v1/league/114",
+          "abbreviation": "CL"
+        }
+      },
+      "home": {
+        "team": {
+          "springLeague": {
+            "id": 115,
+            "name": "Grapefruit League",
+            "link": "/api/v1/league/115",
+            "abbreviation": "GL"
+          },
+          "allStarStatus": "N",
+          "id": 110,
+          "name": "Baltimore Orioles",
+          "link": "/api/v1/teams/110",
+          "season": 2026,
+          "venue": {
+            "id": 2,
+            "name": "Oriole Park at Camden Yards",
+            "link": "/api/v1/venues/2"
+          },
+          "springVenue": {
+            "id": 2508,
+            "link": "/api/v1/venues/2508"
+          },
+          "teamCode": "bal",
+          "fileCode": "bal",
+          "abbreviation": "BAL",
+          "teamName": "Orioles",
+          "locationName": "Baltimore",
+          "firstYearOfPlay": "1901",
+          "league": {
+            "id": 103,
+            "name": "American League",
+            "link": "/api/v1/league/103"
+          },
+          "division": {
+            "id": 201,
+            "name": "American League East",
+            "link": "/api/v1/divisions/201"
+          },
+          "sport": {
+            "id": 1,
+            "link": "/api/v1/sports/1",
+            "name": "Major League Baseball"
+          },
+          "shortName": "Baltimore",
+          "franchiseName": "Baltimore",
+          "clubName": "Orioles",
+          "active": true
+        },
+        "leagueRecord": {
+          "wins": 42,
+          "losses": 51,
+          "ties": 0,
+          "pct": ".452"
+        },
+        "probablePitcher": {
+          "id": 669432,
+          "fullName": "Trevor Rogers",
+          "link": "/api/v1/people/669432"
+        },
+        "splitSquad": false,
+        "seriesNumber": 30,
+        "springLeague": {
+          "id": 115,
+          "name": "Grapefruit League",
+          "link": "/api/v1/league/115",
+          "abbreviation": "GL"
+        }
+      }
+    },
+    "venue": {
+      "id": 2,
+      "name": "Oriole Park at Camden Yards",
+      "link": "/api/v1/venues/2"
+    },
+    "content": {
+      "link": "/api/v1/game/824816/content"
+    },
+    "gameNumber": 1,
+    "publicFacing": true,
+    "doubleHeader": "N",
+    "gamedayType": "P",
+    "tiebreaker": "N",
+    "calendarEventID": "14-824816-2026-07-09",
+    "seasonDisplay": "2026",
+    "dayNight": "day",
+    "scheduledInnings": 9,
+    "reverseHomeAwayStatus": false,
+    "inningBreakLength": 120,
+    "gamesInSeries": 3,
+    "seriesGameNumber": 3,
     "seriesDescription": "Regular Season",
     "recordSource": "S",
     "ifNecessary": "N",
@@ -601,9 +781,9 @@
         },
         "leagueRecord": {
           "wins": 47,
-          "losses": 45,
+          "losses": 46,
           "ties": 0,
-          "pct": ".511"
+          "pct": ".505"
         },
         "probablePitcher": {
           "id": 668909,
@@ -668,15 +848,15 @@
           "active": true
         },
         "leagueRecord": {
-          "wins": 45,
+          "wins": 46,
           "losses": 47,
           "ties": 0,
-          "pct": ".489"
+          "pct": ".495"
         },
         "probablePitcher": {
-          "id": 702474,
-          "fullName": "Mike Paredes",
-          "link": "/api/v1/people/702474"
+          "id": 641927,
+          "fullName": "Bailey Ober",
+          "link": "/api/v1/people/641927"
         },
         "splitSquad": false,
         "seriesNumber": 30,
@@ -780,10 +960,10 @@
           "active": true
         },
         "leagueRecord": {
-          "wins": 41,
+          "wins": 42,
           "losses": 48,
           "ties": 0,
-          "pct": ".461"
+          "pct": ".467"
         },
         "probablePitcher": {
           "id": 663776,
@@ -849,9 +1029,9 @@
         },
         "leagueRecord": {
           "wins": 47,
-          "losses": 43,
+          "losses": 44,
           "ties": 0,
-          "pct": ".522"
+          "pct": ".516"
         },
         "probablePitcher": {
           "id": 641743,
@@ -884,186 +1064,6 @@
     "calendarEventID": "14-824577-2026-07-09",
     "seasonDisplay": "2026",
     "dayNight": "day",
-    "scheduledInnings": 9,
-    "reverseHomeAwayStatus": false,
-    "inningBreakLength": 120,
-    "gamesInSeries": 3,
-    "seriesGameNumber": 3,
-    "seriesDescription": "Regular Season",
-    "recordSource": "S",
-    "ifNecessary": "N",
-    "ifNecessaryDescription": "Normal Game"
-  },
-  {
-    "gamePk": 824816,
-    "gameGuid": "ae45787c-f7a1-47b6-a9f7-4537892e8c92",
-    "link": "/api/v1.1/game/824816/feed/live",
-    "gameType": "R",
-    "season": "2026",
-    "gameDate": "2026-07-09T22:35:00Z",
-    "officialDate": "2026-07-09",
-    "status": {
-      "abstractGameState": "Preview",
-      "codedGameState": "S",
-      "detailedState": "Scheduled",
-      "statusCode": "S",
-      "startTimeTBD": false,
-      "abstractGameCode": "P"
-    },
-    "teams": {
-      "away": {
-        "team": {
-          "springLeague": {
-            "id": 114,
-            "name": "Cactus League",
-            "link": "/api/v1/league/114",
-            "abbreviation": "CL"
-          },
-          "allStarStatus": "N",
-          "id": 112,
-          "name": "Chicago Cubs",
-          "link": "/api/v1/teams/112",
-          "season": 2026,
-          "venue": {
-            "id": 17,
-            "name": "Wrigley Field",
-            "link": "/api/v1/venues/17"
-          },
-          "springVenue": {
-            "id": 4629,
-            "link": "/api/v1/venues/4629"
-          },
-          "teamCode": "chn",
-          "fileCode": "chc",
-          "abbreviation": "CHC",
-          "teamName": "Cubs",
-          "locationName": "Chicago",
-          "firstYearOfPlay": "1874",
-          "league": {
-            "id": 104,
-            "name": "National League",
-            "link": "/api/v1/league/104"
-          },
-          "division": {
-            "id": 205,
-            "name": "National League Central",
-            "link": "/api/v1/divisions/205"
-          },
-          "sport": {
-            "id": 1,
-            "link": "/api/v1/sports/1",
-            "name": "Major League Baseball"
-          },
-          "shortName": "Chi Cubs",
-          "franchiseName": "Chicago",
-          "clubName": "Cubs",
-          "active": true
-        },
-        "leagueRecord": {
-          "wins": 51,
-          "losses": 40,
-          "ties": 0,
-          "pct": ".560"
-        },
-        "probablePitcher": {
-          "id": 656849,
-          "fullName": "David Peterson",
-          "link": "/api/v1/people/656849"
-        },
-        "splitSquad": false,
-        "seriesNumber": 30,
-        "springLeague": {
-          "id": 114,
-          "name": "Cactus League",
-          "link": "/api/v1/league/114",
-          "abbreviation": "CL"
-        }
-      },
-      "home": {
-        "team": {
-          "springLeague": {
-            "id": 115,
-            "name": "Grapefruit League",
-            "link": "/api/v1/league/115",
-            "abbreviation": "GL"
-          },
-          "allStarStatus": "N",
-          "id": 110,
-          "name": "Baltimore Orioles",
-          "link": "/api/v1/teams/110",
-          "season": 2026,
-          "venue": {
-            "id": 2,
-            "name": "Oriole Park at Camden Yards",
-            "link": "/api/v1/venues/2"
-          },
-          "springVenue": {
-            "id": 2508,
-            "link": "/api/v1/venues/2508"
-          },
-          "teamCode": "bal",
-          "fileCode": "bal",
-          "abbreviation": "BAL",
-          "teamName": "Orioles",
-          "locationName": "Baltimore",
-          "firstYearOfPlay": "1901",
-          "league": {
-            "id": 103,
-            "name": "American League",
-            "link": "/api/v1/league/103"
-          },
-          "division": {
-            "id": 201,
-            "name": "American League East",
-            "link": "/api/v1/divisions/201"
-          },
-          "sport": {
-            "id": 1,
-            "link": "/api/v1/sports/1",
-            "name": "Major League Baseball"
-          },
-          "shortName": "Baltimore",
-          "franchiseName": "Baltimore",
-          "clubName": "Orioles",
-          "active": true
-        },
-        "leagueRecord": {
-          "wins": 42,
-          "losses": 50,
-          "ties": 0,
-          "pct": ".457"
-        },
-        "probablePitcher": {
-          "id": 669432,
-          "fullName": "Trevor Rogers",
-          "link": "/api/v1/people/669432"
-        },
-        "splitSquad": false,
-        "seriesNumber": 30,
-        "springLeague": {
-          "id": 115,
-          "name": "Grapefruit League",
-          "link": "/api/v1/league/115",
-          "abbreviation": "GL"
-        }
-      }
-    },
-    "venue": {
-      "id": 2,
-      "name": "Oriole Park at Camden Yards",
-      "link": "/api/v1/venues/2"
-    },
-    "content": {
-      "link": "/api/v1/game/824816/content"
-    },
-    "gameNumber": 1,
-    "publicFacing": true,
-    "doubleHeader": "N",
-    "gamedayType": "P",
-    "tiebreaker": "N",
-    "calendarEventID": "14-824816-2026-07-09",
-    "seasonDisplay": "2026",
-    "dayNight": "night",
     "scheduledInnings": 9,
     "reverseHomeAwayStatus": false,
     "inningBreakLength": 120,
@@ -1141,9 +1141,9 @@
         },
         "leagueRecord": {
           "wins": 41,
-          "losses": 50,
+          "losses": 51,
           "ties": 0,
-          "pct": ".451"
+          "pct": ".446"
         },
         "probablePitcher": {
           "id": 678022,
@@ -1208,10 +1208,10 @@
           "active": true
         },
         "leagueRecord": {
-          "wins": 41,
+          "wins": 42,
           "losses": 50,
           "ties": 0,
-          "pct": ".451"
+          "pct": ".457"
         },
         "probablePitcher": {
           "id": 664285,
@@ -1321,9 +1321,9 @@
         },
         "leagueRecord": {
           "wins": 47,
-          "losses": 45,
+          "losses": 46,
           "ties": 0,
-          "pct": ".511"
+          "pct": ".505"
         },
         "probablePitcher": {
           "id": 682243,
@@ -1388,10 +1388,15 @@
           "active": true
         },
         "leagueRecord": {
-          "wins": 50,
+          "wins": 51,
           "losses": 42,
           "ties": 0,
-          "pct": ".543"
+          "pct": ".548"
+        },
+        "probablePitcher": {
+          "id": 676083,
+          "fullName": "Janson Junk",
+          "link": "/api/v1/people/676083"
         },
         "splitSquad": false,
         "seriesNumber": 30,
@@ -1496,9 +1501,9 @@
         },
         "leagueRecord": {
           "wins": 51,
-          "losses": 41,
+          "losses": 42,
           "ties": 0,
-          "pct": ".554"
+          "pct": ".548"
         },
         "probablePitcher": {
           "id": 666200,
@@ -1563,10 +1568,10 @@
           "active": true
         },
         "leagueRecord": {
-          "wins": 41,
+          "wins": 42,
           "losses": 49,
           "ties": 0,
-          "pct": ".456"
+          "pct": ".462"
         },
         "probablePitcher": {
           "id": 663903,
@@ -1676,9 +1681,14 @@
         },
         "leagueRecord": {
           "wins": 58,
-          "losses": 33,
+          "losses": 34,
           "ties": 0,
-          "pct": ".637"
+          "pct": ".630"
+        },
+        "probablePitcher": {
+          "id": 701656,
+          "fullName": "Logan Henderson",
+          "link": "/api/v1/people/701656"
         },
         "splitSquad": false,
         "seriesNumber": 30,
@@ -1738,10 +1748,10 @@
           "active": true
         },
         "leagueRecord": {
-          "wins": 47,
+          "wins": 48,
           "losses": 43,
           "ties": 0,
-          "pct": ".522"
+          "pct": ".527"
         },
         "probablePitcher": {
           "id": 669467,
@@ -1850,10 +1860,10 @@
           "active": true
         },
         "leagueRecord": {
-          "wins": 36,
+          "wins": 37,
           "losses": 56,
           "ties": 0,
-          "pct": ".391"
+          "pct": ".398"
         },
         "probablePitcher": {
           "id": 672282,
@@ -1919,9 +1929,9 @@
         },
         "leagueRecord": {
           "wins": 46,
-          "losses": 45,
+          "losses": 46,
           "ties": 0,
-          "pct": ".505"
+          "pct": ".500"
         },
         "probablePitcher": {
           "id": 543135,
@@ -2031,9 +2041,9 @@
         },
         "leagueRecord": {
           "wins": 45,
-          "losses": 46,
+          "losses": 47,
           "ties": 0,
-          "pct": ".495"
+          "pct": ".489"
         },
         "probablePitcher": {
           "id": 518876,
@@ -2098,10 +2108,10 @@
           "active": true
         },
         "leagueRecord": {
-          "wins": 45,
+          "wins": 46,
           "losses": 46,
           "ties": 0,
-          "pct": ".495"
+          "pct": ".500"
         },
         "probablePitcher": {
           "id": 656288,
@@ -2211,9 +2221,9 @@
         },
         "leagueRecord": {
           "wins": 38,
-          "losses": 55,
+          "losses": 56,
           "ties": 0,
-          "pct": ".409"
+          "pct": ".404"
         },
         "probablePitcher": {
           "id": 663372,
@@ -2279,9 +2289,9 @@
         },
         "leagueRecord": {
           "wins": 38,
-          "losses": 53,
+          "losses": 54,
           "ties": 0,
-          "pct": ".418"
+          "pct": ".413"
         },
         "splitSquad": false,
         "seriesNumber": 31,

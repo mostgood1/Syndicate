@@ -553,7 +553,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.925,
         "platoon_mult_vs_lhb": {
           "k": 1.0033428673578835,
           "bb": 0.8820770519262982,
@@ -639,7 +639,7 @@
         "role": "SU",
         "leverage_skill": 0.7,
         "stamina_pitches": 25,
-        "availability_mult": 0.92,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 1.1380064456721914,
           "bb": 1.1925000000000001,
@@ -683,7 +683,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 27,
-        "availability_mult": 1.0,
+        "availability_mult": 0.3833333333333333,
         "platoon_mult_vs_lhb": {
           "k": 1.0,
           "bb": 1.0,
@@ -728,7 +728,7 @@
         "role": "SU",
         "leverage_skill": 0.7,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.8833333333333333,
         "platoon_mult_vs_lhb": {
           "k": 1.0703326357528362,
           "bb": 1.0808243727598565,
@@ -771,7 +771,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.965,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 1.072061520579361,
           "bb": 1.1711732429597355,
@@ -854,7 +854,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.875,
         "platoon_mult_vs_lhb": {
           "k": 0.8075,
           "bb": 1.1925000000000001,
@@ -896,7 +896,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.775,
         "platoon_mult_vs_lhb": {
           "k": 0.9909528359838919,
           "bb": 0.8075,
@@ -998,17 +998,17 @@
     "confirmed_lineup_ids": [],
     "projected_lineup_ids": [
       665487,
-      669392,
       701538,
       592518,
       657757,
       593428,
       695238,
       664034,
-      630105
+      630105,
+      687749
     ],
     "lineup_source": "projected_rotowire_default_vs_rhp",
-    "lineup_confidence": 0.48000000000000004,
+    "lineup_confidence": 0.44,
     "probable_pitcher": {
       "id": 656288,
       "source": "feed_gameData_probablePitchers",
@@ -1093,35 +1093,6 @@
           "bb": 1.003458309268285,
           "hr": 0.7822871071598045,
           "inplay": 0.9649331680225547
-        },
-        "statcast_quality_mult": {},
-        "vs_pitcher_history": {}
-      },
-      {
-        "id": 669392,
-        "name": "Samad Taylor",
-        "pos": "LF",
-        "bat": "R",
-        "throw": "R",
-        "k_rate": 0.2743181818181818,
-        "bb_rate": 0.08727272727272727,
-        "hbp_rate": 0.0,
-        "hr_rate": 0.015378787878787879,
-        "inplay_hit_rate": 0.5019230769230769,
-        "xb_hit_share": 0.05,
-        "vs_pitch_type": {},
-        "vs_pitch_type_hr": {},
-        "platoon_mult_vs_lhp": {
-          "k": 1.0765534382767192,
-          "bb": 0.8438802083333333,
-          "hr": 0.78,
-          "inplay": 1.107471264367816
-        },
-        "platoon_mult_vs_rhp": {
-          "k": 0.9712924606462304,
-          "bb": 1.0802083333333334,
-          "hr": 1.165270935960591,
-          "inplay": 0.9636494252873563
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -1301,31 +1272,29 @@
         "pos": "2B",
         "bat": "L",
         "throw": "R",
-        "k_rate": 0.22671664167916042,
-        "bb_rate": 0.0944527736131934,
-        "hbp_rate": 0.020689655172413793,
-        "hr_rate": 0.024107946026986505,
-        "inplay_hit_rate": 0.2164473684210526,
-        "xb_hit_share": 0.08695652173913043,
+        "k_rate": 0.227625,
+        "bb_rate": 0.09125000000000001,
+        "hbp_rate": 0.02,
+        "hr_rate": 0.02325,
+        "inplay_hit_rate": 0.2212121212121212,
+        "xb_hit_share": 0.125,
         "vs_pitch_type": {},
         "vs_pitch_type_hr": {},
         "platoon_mult_vs_lhp": {
-          "k": 0.8093978848574801,
+          "k": 0.8814740723307445,
           "bb": 0.8075,
           "hr": 0.78,
-          "inplay": 0.9120060790273556
+          "inplay": 0.9020547945205479
         },
         "platoon_mult_vs_rhp": {
-          "k": 1.0256457647293538,
-          "bb": 1.1902138821630346,
-          "hr": 1.0300183405008856,
-          "inplay": 1.0069388349918809
+          "k": 1.0045502831267272,
+          "bb": 1.1910734336402424,
+          "hr": 1.0317028027498678,
+          "inplay": 0.9989236790606654
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
-      }
-    ],
-    "bench": [
+      },
       {
         "id": 687749,
         "name": "Jase Bowen",
@@ -1354,32 +1323,63 @@
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
-      },
+      }
+    ],
+    "bench": [
       {
         "id": 669134,
         "name": "Luis Campusano",
         "pos": "C",
         "bat": "R",
         "throw": "R",
-        "k_rate": 0.2451086956521739,
-        "bb_rate": 0.10706521739130434,
-        "hbp_rate": 0.014705882352941176,
-        "hr_rate": 0.04402173913043478,
-        "inplay_hit_rate": 0.34151162790697676,
-        "xb_hit_share": 0.3888888888888889,
+        "k_rate": 0.23330314009661834,
+        "bb_rate": 0.11727053140096619,
+        "hbp_rate": 0.013888888888888888,
+        "hr_rate": 0.057004830917874394,
+        "inplay_hit_rate": 0.34220389805097445,
+        "xb_hit_share": 0.35,
         "vs_pitch_type": {},
         "vs_pitch_type_hr": {},
         "platoon_mult_vs_lhp": {
           "k": 1.1925000000000001,
           "bb": 0.8075,
           "hr": 0.78,
-          "inplay": 1.094194756554307
+          "inplay": 1.0928915662650605
         },
         "platoon_mult_vs_rhp": {
-          "k": 0.9444191814799504,
-          "bb": 1.0594812010668504,
-          "hr": 1.085279347143754,
-          "inplay": 1.000956041789868
+          "k": 0.9364575052228734,
+          "bb": 1.0455568633220538,
+          "hr": 1.0625907990314771,
+          "inplay": 0.9988098736409052
+        },
+        "statcast_quality_mult": {},
+        "vs_pitcher_history": {}
+      },
+      {
+        "id": 650859,
+        "name": "Luis Rengifo",
+        "pos": "3B",
+        "bat": "S",
+        "throw": "R",
+        "k_rate": 0.09567005321722302,
+        "bb_rate": 0.09108369617803579,
+        "hbp_rate": 0.005128205128205128,
+        "hr_rate": 0.0,
+        "inplay_hit_rate": 0.2201722640416908,
+        "xb_hit_share": 0.2571428571428571,
+        "vs_pitch_type": {},
+        "vs_pitch_type_hr": {},
+        "platoon_mult_vs_lhp": {
+          "k": 1.1925000000000001,
+          "bb": 0.9330721835661551,
+          "hr": 1.0,
+          "inplay": 0.8882533308187461
+        },
+        "platoon_mult_vs_rhp": {
+          "k": 0.8332616940581542,
+          "bb": 1.0035202103362193,
+          "hr": 1.0,
+          "inplay": 1.0745109964167132
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -1568,8 +1568,8 @@
         "throw": "R",
         "role": "SU",
         "leverage_skill": 0.7,
-        "stamina_pitches": 25,
-        "availability_mult": 0.915,
+        "stamina_pitches": 24,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 0.8075,
           "bb": 1.0,
@@ -1596,11 +1596,10 @@
         "hr_rate": 0.0,
         "inplay_hit_rate": 0.0,
         "arsenal": {
-          "FF": 0.11764705882352941,
-          "OTHER": 0.058823529411764705,
-          "CH": 0.47058823529411764,
-          "SI": 0.23529411764705882,
-          "KC": 0.11764705882352941
+          "FF": 0.11764705764705884,
+          "OTHER": 0.17647059647058805,
+          "CH": 0.47058823058823535,
+          "SI": 0.23529411529411767
         },
         "pitch_type_whiff_mult": {},
         "pitch_type_inplay_mult": {},
@@ -1613,7 +1612,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.6916666666666667,
         "platoon_mult_vs_lhb": {
           "k": 0.9200000000000002,
           "bb": 0.8130901287553649,
@@ -1657,7 +1656,7 @@
         "role": "CL",
         "leverage_skill": 0.85,
         "stamina_pitches": 25,
-        "availability_mult": 0.9299999999999999,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 0.9336235983776967,
           "bb": 1.1925000000000001,
@@ -1700,7 +1699,7 @@
         "role": "SU",
         "leverage_skill": 0.7,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.8083333333333333,
         "platoon_mult_vs_lhb": {
           "k": 0.9908238887985106,
           "bb": 1.1925000000000001,
@@ -1743,7 +1742,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.925,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 0.9901231235307547,
           "bb": 0.9144996156889129,
@@ -1787,7 +1786,7 @@
         "role": "LR",
         "leverage_skill": 0.35,
         "stamina_pitches": 25,
-        "availability_mult": 0.935,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 1.1523648648648648,
           "bb": 0.8747104247104247,

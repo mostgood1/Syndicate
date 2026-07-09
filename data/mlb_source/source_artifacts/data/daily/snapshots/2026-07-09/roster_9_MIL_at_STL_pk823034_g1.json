@@ -54,18 +54,18 @@
     "lineup_source": "projected_rotowire_default_vs_lhp",
     "lineup_confidence": 0.56,
     "probable_pitcher": {
-      "id": null,
-      "source": "none",
-      "confidence": 0.0,
-      "raw_schedule_id": null,
-      "raw_feed_id": null
+      "id": 701656,
+      "source": "feed_gameData_probablePitchers",
+      "confidence": 0.75,
+      "raw_schedule_id": 701656,
+      "raw_feed_id": 701656
     },
     "starter": {
-      "id": 694819,
-      "name": "Jacob Misiorowski",
+      "id": 701656,
+      "name": "Logan Henderson",
       "role": "SP",
-      "selection_source": "heuristic",
-      "requested_id": null
+      "selection_source": "probable",
+      "requested_id": 701656
     },
     "bullpen": [
       {
@@ -417,6 +417,35 @@
         "vs_pitcher_history": {}
       },
       {
+        "id": 675659,
+        "name": "Greg Jones",
+        "pos": "LF",
+        "bat": "S",
+        "throw": "R",
+        "k_rate": 0.4166666666666667,
+        "bb_rate": 0.0,
+        "hbp_rate": 0.0,
+        "hr_rate": 0.0,
+        "inplay_hit_rate": 0.14285714285714285,
+        "xb_hit_share": 0.05,
+        "vs_pitch_type": {},
+        "vs_pitch_type_hr": {},
+        "platoon_mult_vs_lhp": {
+          "k": 1.0157142857142856,
+          "bb": 1.0,
+          "hr": 1.0,
+          "inplay": 1.1925000000000001
+        },
+        "platoon_mult_vs_rhp": {
+          "k": 0.9935294117647059,
+          "bb": 1.0,
+          "hr": 1.0,
+          "inplay": 0.835
+        },
+        "statcast_quality_mult": {},
+        "vs_pitcher_history": {}
+      },
+      {
         "id": 641343,
         "name": "Jake Bauers",
         "pos": "1B",
@@ -441,6 +470,35 @@
           "bb": 1.0009401976818602,
           "hr": 1.077612625169529,
           "inplay": 1.0019100199392643
+        },
+        "statcast_quality_mult": {},
+        "vs_pitcher_history": {}
+      },
+      {
+        "id": 800325,
+        "name": "Luis Lara",
+        "pos": "CF",
+        "bat": "S",
+        "throw": "R",
+        "k_rate": 0.1111111111111111,
+        "bb_rate": 0.1111111111111111,
+        "hbp_rate": 0.0,
+        "hr_rate": 0.0,
+        "inplay_hit_rate": 0.2857142857142857,
+        "xb_hit_share": 0.05,
+        "vs_pitch_type": {},
+        "vs_pitch_type_hr": {},
+        "platoon_mult_vs_lhp": {
+          "k": 0.8075,
+          "bb": 1.1925000000000001,
+          "hr": 1.0,
+          "inplay": 0.8075
+        },
+        "platoon_mult_vs_rhp": {
+          "k": 1.06875,
+          "bb": 0.8075,
+          "hr": 1.0,
+          "inplay": 1.0
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -476,44 +534,43 @@
       }
     ],
     "starter_profile": {
-      "id": 694819,
-      "name": "Jacob Misiorowski",
+      "id": 701656,
+      "name": "Logan Henderson",
       "throw": "R",
       "role": "SP",
       "leverage_skill": 0.5,
       "stamina_pitches": 94,
-      "availability_mult": 0.485,
+      "availability_mult": 1.0,
       "platoon_mult_vs_lhb": {
-        "k": 1.1220564771109363,
-        "bb": 1.154137842967164,
-        "hr": 1.0479365568216816,
-        "inplay": 0.9788880608278933
+        "k": 0.99140625,
+        "bb": 0.965625,
+        "hr": 0.83671875,
+        "inplay": 0.9153846153846154
       },
       "platoon_mult_vs_rhb": {
-        "k": 0.8592423684048891,
-        "bb": 0.8927665119563073,
-        "hr": 1.1549745824255628,
-        "inplay": 1.0438392261927223
+        "k": 1.0211538461538463,
+        "bb": 1.0846153846153848,
+        "hr": 1.275,
+        "inplay": 1.1925000000000001
       },
       "statcast_quality_mult": {},
       "arsenal_source": "statsapi_pitchArsenal",
-      "arsenal_sample_size": 1368,
+      "arsenal_sample_size": 354,
       "statcast_splits_found": false,
       "statcast_splits_source": "",
       "statcast_splits_n_pitches": 0,
       "statcast_splits_start_date": "",
       "statcast_splits_end_date": "",
-      "k_rate": 0.3899105116034745,
-      "bb_rate": 0.06134270116128548,
-      "hbp_rate": 0.019830028328611898,
-      "hr_rate": 0.009631728045325779,
-      "inplay_hit_rate": 0.24698042870456666,
+      "k_rate": 0.3333333333333333,
+      "bb_rate": 0.06666666666666667,
+      "hbp_rate": 0.0,
+      "hr_rate": 0.022222222222222223,
+      "inplay_hit_rate": 0.3333333333333333,
       "arsenal": {
-        "FF": 0.6374268961754386,
-        "CU": 0.10453216937280697,
-        "CH": 0.02046783587719298,
-        "SL": 0.1308479492149123,
-        "FC": 0.10672514935964911
+        "FF": 0.44915254347457634,
+        "CH": 0.3107344593220338,
+        "SL": 0.04519774135593224,
+        "FC": 0.1949152558474577
       },
       "pitch_type_whiff_mult": {},
       "pitch_type_inplay_mult": {},
@@ -527,7 +584,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.91,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 1.0122391143499323,
           "bb": 0.8882850470239222,
@@ -571,7 +628,7 @@
         "role": "SU",
         "leverage_skill": 0.7,
         "stamina_pitches": 25,
-        "availability_mult": 0.905,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 0.8075,
           "bb": 0.8075,
@@ -612,7 +669,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.95,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 0.8330357142857143,
           "bb": 1.1925000000000001,
@@ -698,7 +755,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.8083333333333333,
         "platoon_mult_vs_lhb": {
           "k": 0.8075,
           "bb": 0.8075,
@@ -706,30 +763,31 @@
           "inplay": 1.1925000000000001
         },
         "platoon_mult_vs_rhb": {
-          "k": 1.1375,
-          "bb": 1.1375,
+          "k": 1.1925000000000001,
+          "bb": 1.1925000000000001,
           "hr": 1.0,
           "inplay": 0.8075
         },
         "statcast_quality_mult": {},
         "arsenal_source": "statsapi_pitchArsenal",
-        "arsenal_sample_size": 19,
+        "arsenal_sample_size": 42,
         "statcast_splits_found": false,
         "statcast_splits_source": "",
         "statcast_splits_n_pitches": 0,
         "statcast_splits_start_date": "",
         "statcast_splits_end_date": "",
-        "k_rate": 0.2,
-        "bb_rate": 0.2,
+        "k_rate": 0.36363636363636365,
+        "bb_rate": 0.09090909090909091,
         "hbp_rate": 0.0,
         "hr_rate": 0.0,
-        "inplay_hit_rate": 0.3333333333333333,
+        "inplay_hit_rate": 0.16666666666666666,
         "arsenal": {
-          "FF": 0.05263158,
-          "OTHER": 0.10526316,
-          "CH": 0.36842105,
-          "SI": 0.36842105,
-          "FC": 0.10526316
+          "FF": 0.04761904790476189,
+          "OTHER": 0.04761904790476189,
+          "CU": 0.023809522952380986,
+          "CH": 0.3809523832380951,
+          "SI": 0.26190476847619015,
+          "FC": 0.2380952295238099
         },
         "pitch_type_whiff_mult": {},
         "pitch_type_inplay_mult": {},
@@ -742,7 +800,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.7833333333333333,
         "platoon_mult_vs_lhb": {
           "k": 0.9647556881760537,
           "bb": 1.1925000000000001,
@@ -785,7 +843,7 @@
         "role": "SU",
         "leverage_skill": 0.7,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.8666666666666667,
         "platoon_mult_vs_lhb": {
           "k": 1.1925000000000001,
           "bb": 0.8075,
@@ -938,7 +996,7 @@
       701675
     ],
     "lineup_source": "projected_rotowire_default_vs_rhp",
-    "lineup_confidence": 0.58,
+    "lineup_confidence": 0.66,
     "probable_pitcher": {
       "id": 669467,
       "source": "feed_gameData_probablePitchers",
@@ -954,12 +1012,6 @@
       "requested_id": 669467
     },
     "bullpen": [
-      {
-        "id": 669145,
-        "name": "Bruce Zimmermann",
-        "role": "MR",
-        "lev": 0.5
-      },
       {
         "id": 666277,
         "name": "George Soriano",
@@ -981,6 +1033,12 @@
       {
         "id": 677865,
         "name": "Justin Bruihl",
+        "role": "MR",
+        "lev": 0.5
+      },
+      {
+        "id": 703725,
+        "name": "Luis Gastelum",
         "role": "MR",
         "lev": 0.5
       },
@@ -1430,51 +1488,6 @@
     },
     "bullpen_profiles": [
       {
-        "id": 669145,
-        "name": "Bruce Zimmermann",
-        "throw": "L",
-        "role": "MR",
-        "leverage_skill": 0.5,
-        "stamina_pitches": 30,
-        "availability_mult": 0.64,
-        "platoon_mult_vs_lhb": {
-          "k": 0.8942307692307693,
-          "bb": 0.8075,
-          "hr": 1.0,
-          "inplay": 1.1375000000000002
-        },
-        "platoon_mult_vs_rhb": {
-          "k": 1.171875,
-          "bb": 1.1925000000000001,
-          "hr": 1.0,
-          "inplay": 0.8075
-        },
-        "statcast_quality_mult": {},
-        "arsenal_source": "statsapi_pitchArsenal",
-        "arsenal_sample_size": 72,
-        "statcast_splits_found": false,
-        "statcast_splits_source": "",
-        "statcast_splits_n_pitches": 0,
-        "statcast_splits_start_date": "",
-        "statcast_splits_end_date": "",
-        "k_rate": 0.09523809523809523,
-        "bb_rate": 0.047619047619047616,
-        "hbp_rate": 0.0,
-        "hr_rate": 0.0,
-        "inplay_hit_rate": 0.3333333333333333,
-        "arsenal": {
-          "FF": 0.11111110888888892,
-          "CU": 0.12499999875000002,
-          "SI": 0.31944444680555556,
-          "SL": 0.16666666833333332,
-          "FC": 0.12499999875000002,
-          "FS": 0.15277777847222224
-        },
-        "pitch_type_whiff_mult": {},
-        "pitch_type_inplay_mult": {},
-        "pitch_type_hr_mult": {}
-      },
-      {
         "id": 666277,
         "name": "George Soriano",
         "throw": "R",
@@ -1525,7 +1538,7 @@
         "role": "SU",
         "leverage_skill": 0.7,
         "stamina_pitches": 25,
-        "availability_mult": 0.935,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 0.8075,
           "bb": 1.0491158267020337,
@@ -1569,7 +1582,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.92,
+        "availability_mult": 0.8333333333333334,
         "platoon_mult_vs_lhb": {
           "k": 1.1656538297990349,
           "bb": 0.8308966209434594,
@@ -1612,7 +1625,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.85,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 0.976460104195229,
           "bb": 0.8157142857142857,
@@ -1650,13 +1663,51 @@
         "pitch_type_hr_mult": {}
       },
       {
+        "id": 703725,
+        "name": "Luis Gastelum",
+        "throw": "R",
+        "role": "MR",
+        "leverage_skill": 0.5,
+        "stamina_pitches": 24,
+        "availability_mult": 0.9333333333333333,
+        "platoon_mult_vs_lhb": {},
+        "platoon_mult_vs_rhb": {
+          "k": 1.0,
+          "bb": 1.0,
+          "hr": 1.0,
+          "inplay": 1.0
+        },
+        "statcast_quality_mult": {},
+        "arsenal_source": "statsapi_pitchArsenal",
+        "arsenal_sample_size": 8,
+        "statcast_splits_found": false,
+        "statcast_splits_source": "",
+        "statcast_splits_n_pitches": 0,
+        "statcast_splits_start_date": "",
+        "statcast_splits_end_date": "",
+        "k_rate": 0.0,
+        "bb_rate": 0.0,
+        "hbp_rate": 0.0,
+        "hr_rate": 0.0,
+        "inplay_hit_rate": 0.3333333333333333,
+        "arsenal": {
+          "FF": 0.25,
+          "OTHER": 0.25,
+          "CH": 0.25,
+          "SI": 0.25
+        },
+        "pitch_type_whiff_mult": {},
+        "pitch_type_inplay_mult": {},
+        "pitch_type_hr_mult": {}
+      },
+      {
         "id": 694335,
         "name": "Matt Svanson",
         "throw": "R",
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.9299999999999999,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 0.8922776119702506,
           "bb": 1.064822481291266,
@@ -1698,7 +1749,7 @@
         "role": "CL",
         "leverage_skill": 0.85,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.875,
         "platoon_mult_vs_lhb": {
           "k": 0.9187207342198914,
           "bb": 0.9304031354983202,
@@ -1741,7 +1792,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.97,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 1.031100108376029,
           "bb": 1.0275206257366336,

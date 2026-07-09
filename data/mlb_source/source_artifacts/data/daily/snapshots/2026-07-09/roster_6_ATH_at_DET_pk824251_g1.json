@@ -44,15 +44,15 @@
       703607,
       701762,
       669127,
+      691016,
       641680,
       671732,
       691777,
       643446,
-      675961,
-      666126
+      675961
     ],
     "lineup_source": "projected_rotowire_today_lineup",
-    "lineup_confidence": 0.48000000000000004,
+    "lineup_confidence": 0.72,
     "probable_pitcher": {
       "id": 678022,
       "source": "feed_gameData_probablePitchers",
@@ -195,6 +195,35 @@
           "bb": 0.9975658123110749,
           "hr": 0.9358214613146859,
           "inplay": 0.9826336994078152
+        },
+        "statcast_quality_mult": {},
+        "vs_pitcher_history": {}
+      },
+      {
+        "id": 691016,
+        "name": "Tyler Soderstrom",
+        "pos": "LF",
+        "bat": "L",
+        "throw": "R",
+        "k_rate": 0.1749681697612732,
+        "bb_rate": 0.12792042440318302,
+        "hbp_rate": 0.006153846153846154,
+        "hr_rate": 0.041758620689655176,
+        "inplay_hit_rate": 0.24529072299651566,
+        "xb_hit_share": 0.3235294117647059,
+        "vs_pitch_type": {},
+        "vs_pitch_type_hr": {},
+        "platoon_mult_vs_lhp": {
+          "k": 1.1925000000000001,
+          "bb": 0.8321820410382597,
+          "hr": 1.275,
+          "inplay": 0.9139111583926159
+        },
+        "platoon_mult_vs_rhp": {
+          "k": 0.9047939673466202,
+          "bb": 1.0537663095125698,
+          "hr": 0.8423256671996064,
+          "inplay": 1.0308204965015986
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -343,7 +372,9 @@
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
-      },
+      }
+    ],
+    "bench": [
       {
         "id": 666126,
         "name": "Carlos Cortes",
@@ -372,9 +403,7 @@
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
-      }
-    ],
-    "bench": [
+      },
       {
         "id": 687515,
         "name": "Colby Thomas",
@@ -439,25 +468,25 @@
         "pos": "SS",
         "bat": "R",
         "throw": "R",
-        "k_rate": 0.07407407407407407,
+        "k_rate": 0.06451612903225806,
         "bb_rate": 0.0,
-        "hbp_rate": 0.037037037037037035,
+        "hbp_rate": 0.03225806451612903,
         "hr_rate": 0.0,
-        "inplay_hit_rate": 0.497,
-        "xb_hit_share": 0.25,
+        "inplay_hit_rate": 0.5329433497536946,
+        "xb_hit_share": 0.2,
         "vs_pitch_type": {},
         "vs_pitch_type_hr": {},
         "platoon_mult_vs_lhp": {
           "k": 0.8075,
           "bb": 1.0,
           "hr": 1.0,
-          "inplay": 1.0033199195171025
+          "inplay": 0.966002310803004
         },
         "platoon_mult_vs_rhp": {
           "k": 1.1925000000000001,
           "bb": 1.0,
           "hr": 1.0,
-          "inplay": 1.0033199195171025
+          "inplay": 1.0305025996533796
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -545,7 +574,7 @@
         "role": "SU",
         "leverage_skill": 0.7,
         "stamina_pitches": 25,
-        "availability_mult": 0.885,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 1.1572376357056695,
           "bb": 1.0996998799519808,
@@ -632,7 +661,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 28,
-        "availability_mult": 1.0,
+        "availability_mult": 0.8083333333333333,
         "platoon_mult_vs_lhb": {
           "k": 1.0424739264005907,
           "bb": 0.9255997066672715,
@@ -677,7 +706,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.9,
         "platoon_mult_vs_lhb": {
           "k": 1.0113433997825074,
           "bb": 0.954273962484438,
@@ -808,7 +837,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 27,
-        "availability_mult": 1.0,
+        "availability_mult": 0.7833333333333333,
         "platoon_mult_vs_lhb": {
           "k": 0.8075,
           "bb": 1.0155347508727388,
@@ -1361,7 +1390,7 @@
         "role": "SU",
         "leverage_skill": 0.7,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.8916666666666666,
         "platoon_mult_vs_lhb": {
           "k": 0.8075,
           "bb": 1.1925000000000001,
@@ -1447,7 +1476,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.885,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 0.8075,
           "bb": 1.1925000000000001,
@@ -1532,7 +1561,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.95,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 0.8952648322689395,
           "bb": 0.949063341529095,
@@ -1574,7 +1603,7 @@
         "role": "SU",
         "leverage_skill": 0.7,
         "stamina_pitches": 28,
-        "availability_mult": 0.855,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 0.9184085903083701,
           "bb": 0.8804807692307692,

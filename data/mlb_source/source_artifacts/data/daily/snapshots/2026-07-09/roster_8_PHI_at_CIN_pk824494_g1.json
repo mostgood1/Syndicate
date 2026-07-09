@@ -69,6 +69,18 @@
     },
     "bullpen": [
       {
+        "id": 660604,
+        "name": "Alan Rangel",
+        "role": "MR",
+        "lev": 0.5
+      },
+      {
+        "id": 641745,
+        "name": "Brad Keller",
+        "role": "SU",
+        "lev": 0.7
+      },
+      {
         "id": 661395,
         "name": "Jhoan Duran",
         "role": "CL",
@@ -87,12 +99,6 @@
         "lev": 0.5
       },
       {
-        "id": 642152,
-        "name": "Lou Trivino III",
-        "role": "MR",
-        "lev": 0.5
-      },
-      {
         "id": 676661,
         "name": "Max Lazar",
         "role": "SU",
@@ -101,12 +107,6 @@
       {
         "id": 689147,
         "name": "Orion Kerkering",
-        "role": "SU",
-        "lev": 0.7
-      },
-      {
-        "id": 686751,
-        "name": "Seth Johnson",
         "role": "MR",
         "lev": 0.5
       },
@@ -549,13 +549,100 @@
     },
     "bullpen_profiles": [
       {
+        "id": 660604,
+        "name": "Alan Rangel",
+        "throw": "R",
+        "role": "MR",
+        "leverage_skill": 0.5,
+        "stamina_pitches": 29,
+        "availability_mult": 0.42500000000000004,
+        "platoon_mult_vs_lhb": {
+          "k": 1.1558333333333335,
+          "bb": 1.0,
+          "hr": 1.275,
+          "inplay": 1.1129979035639415
+        },
+        "platoon_mult_vs_rhb": {
+          "k": 0.8075,
+          "bb": 1.0,
+          "hr": 0.78,
+          "inplay": 0.8839622641509435
+        },
+        "statcast_quality_mult": {},
+        "arsenal_source": "statsapi_pitchArsenal",
+        "arsenal_sample_size": 116,
+        "statcast_splits_found": false,
+        "statcast_splits_source": "",
+        "statcast_splits_n_pitches": 0,
+        "statcast_splits_start_date": "",
+        "statcast_splits_end_date": "",
+        "k_rate": 0.2727272727272727,
+        "bb_rate": 0.0,
+        "hbp_rate": 0.030303030303030304,
+        "hr_rate": 0.030303030303030304,
+        "inplay_hit_rate": 0.3456521739130434,
+        "arsenal": {
+          "FF": 0.3620689536206896,
+          "CU": 0.1465517314655173,
+          "CH": 0.37068966370689665,
+          "SL": 0.12068965120689651
+        },
+        "pitch_type_whiff_mult": {},
+        "pitch_type_inplay_mult": {},
+        "pitch_type_hr_mult": {}
+      },
+      {
+        "id": 641745,
+        "name": "Brad Keller",
+        "throw": "R",
+        "role": "SU",
+        "leverage_skill": 0.7,
+        "stamina_pitches": 25,
+        "availability_mult": 0.8833333333333333,
+        "platoon_mult_vs_lhb": {
+          "k": 1.0377862595419847,
+          "bb": 1.1684684684684683,
+          "hr": 0.78,
+          "inplay": 0.9598691505877135
+        },
+        "platoon_mult_vs_rhb": {
+          "k": 1.0377862595419847,
+          "bb": 0.8075,
+          "hr": 1.2432504440497336,
+          "inplay": 1.0340319361277444
+        },
+        "statcast_quality_mult": {},
+        "arsenal_source": "statsapi_pitchArsenal",
+        "arsenal_sample_size": 464,
+        "statcast_splits_found": false,
+        "statcast_splits_source": "",
+        "statcast_splits_n_pitches": 0,
+        "statcast_splits_start_date": "",
+        "statcast_splits_end_date": "",
+        "k_rate": 0.23392857142857143,
+        "bb_rate": 0.08201970443349754,
+        "hbp_rate": 0.017241379310344827,
+        "hr_rate": 0.03466748768472906,
+        "inplay_hit_rate": 0.32960526315789473,
+        "arsenal": {
+          "FF": 0.32112068000000005,
+          "OTHER": 0.13362070000000004,
+          "CH": 0.13577586000000003,
+          "SI": 0.19827586000000003,
+          "SL": 0.21120690000000003
+        },
+        "pitch_type_whiff_mult": {},
+        "pitch_type_inplay_mult": {},
+        "pitch_type_hr_mult": {}
+      },
+      {
         "id": 661395,
         "name": "Jhoan Duran",
         "throw": "R",
         "role": "CL",
         "leverage_skill": 0.85,
         "stamina_pitches": 25,
-        "availability_mult": 0.9,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 0.9272055026057561,
           "bb": 0.8974576271186441,
@@ -599,7 +686,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.97,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 0.925388588220162,
           "bb": 1.1925000000000001,
@@ -644,7 +731,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.7083333333333333,
         "platoon_mult_vs_lhb": {
           "k": 0.8822418136020151,
           "bb": 1.0239130434782608,
@@ -681,57 +768,13 @@
         "pitch_type_hr_mult": {}
       },
       {
-        "id": 642152,
-        "name": "Lou Trivino III",
-        "throw": "R",
-        "role": "MR",
-        "leverage_skill": 0.5,
-        "stamina_pitches": 26,
-        "availability_mult": 1.0,
-        "platoon_mult_vs_lhb": {
-          "k": 0.8540816326530611,
-          "bb": 1.1925000000000001,
-          "hr": 1.275,
-          "inplay": 1.1925000000000001
-        },
-        "platoon_mult_vs_rhb": {
-          "k": 1.1925000000000001,
-          "bb": 0.8075,
-          "hr": 0.78,
-          "inplay": 0.8075
-        },
-        "statcast_quality_mult": {},
-        "arsenal_source": "statsapi_pitchArsenal",
-        "arsenal_sample_size": 144,
-        "statcast_splits_found": false,
-        "statcast_splits_source": "",
-        "statcast_splits_n_pitches": 0,
-        "statcast_splits_start_date": "",
-        "statcast_splits_end_date": "",
-        "k_rate": 0.19444444444444445,
-        "bb_rate": 0.19444444444444445,
-        "hbp_rate": 0.027777777777777776,
-        "hr_rate": 0.027777777777777776,
-        "inplay_hit_rate": 0.4729437229437229,
-        "arsenal": {
-          "FF": 0.04861111287500003,
-          "OTHER": 0.1666666730000001,
-          "CH": 0.17361110312499986,
-          "SI": 0.2986111053749999,
-          "FC": 0.31250000562500013
-        },
-        "pitch_type_whiff_mult": {},
-        "pitch_type_inplay_mult": {},
-        "pitch_type_hr_mult": {}
-      },
-      {
         "id": 676661,
         "name": "Max Lazar",
         "throw": "R",
         "role": "SU",
         "leverage_skill": 0.7,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.8416666666666667,
         "platoon_mult_vs_lhb": {
           "k": 0.8777777777777778,
           "bb": 1.0,
@@ -771,10 +814,10 @@
         "id": 689147,
         "name": "Orion Kerkering",
         "throw": "R",
-        "role": "SU",
-        "leverage_skill": 0.7,
+        "role": "MR",
+        "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.835,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 1.0782736478142751,
           "bb": 0.9812662721893491,
@@ -811,57 +854,13 @@
         "pitch_type_hr_mult": {}
       },
       {
-        "id": 686751,
-        "name": "Seth Johnson",
-        "throw": "R",
-        "role": "MR",
-        "leverage_skill": 0.5,
-        "stamina_pitches": 25,
-        "availability_mult": 1.0,
-        "platoon_mult_vs_lhb": {
-          "k": 0.9541666666666666,
-          "bb": 0.8075,
-          "hr": 0.78,
-          "inplay": 1.1925000000000001
-        },
-        "platoon_mult_vs_rhb": {
-          "k": 1.026190476190476,
-          "bb": 1.1925000000000001,
-          "hr": 1.275,
-          "inplay": 0.8171988388969522
-        },
-        "statcast_quality_mult": {},
-        "arsenal_source": "statsapi_pitchArsenal",
-        "arsenal_sample_size": 134,
-        "statcast_splits_found": false,
-        "statcast_splits_source": "",
-        "statcast_splits_n_pitches": 0,
-        "statcast_splits_start_date": "",
-        "statcast_splits_end_date": "",
-        "k_rate": 0.18181818181818182,
-        "bb_rate": 0.09090909090909091,
-        "hbp_rate": 0.030303030303030304,
-        "hr_rate": 0.030303030303030304,
-        "inplay_hit_rate": 0.3456521739130434,
-        "arsenal": {
-          "FF": 0.44776119731343283,
-          "CU": 0.08955223946268656,
-          "SI": 0.11940297928358212,
-          "SL": 0.3134328381194029,
-          "FS": 0.029850745820895523
-        },
-        "pitch_type_whiff_mult": {},
-        "pitch_type_inplay_mult": {},
-        "pitch_type_hr_mult": {}
-      },
-      {
         "id": 621383,
         "name": "Tanner Banks",
         "throw": "L",
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.8583333333333334,
         "platoon_mult_vs_lhb": {
           "k": 1.017370670714136,
           "bb": 0.9684765262754325,
@@ -905,7 +904,7 @@
         "role": "LR",
         "leverage_skill": 0.35,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.825,
         "platoon_mult_vs_lhb": {
           "k": 0.9214254253152012,
           "bb": 1.0256302521008402,
@@ -1463,7 +1462,7 @@
         "role": "SU",
         "leverage_skill": 0.7,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.7833333333333333,
         "platoon_mult_vs_lhb": {
           "k": 0.9975740325542146,
           "bb": 0.9046207521399884,
@@ -1506,7 +1505,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.925,
+        "availability_mult": 0.9,
         "platoon_mult_vs_lhb": {
           "k": 0.9321428571428572,
           "bb": 0.8075,
@@ -1548,7 +1547,7 @@
         "throw": "R",
         "role": "CL",
         "leverage_skill": 0.85,
-        "stamina_pitches": 25,
+        "stamina_pitches": 21,
         "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 1.1169160055904412,
@@ -1591,7 +1590,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.915,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 0.8075,
           "bb": 0.8075,
@@ -1633,7 +1632,7 @@
         "role": "SU",
         "leverage_skill": 0.7,
         "stamina_pitches": 25,
-        "availability_mult": 0.905,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 1.1026123524320912,
           "bb": 1.074104913715054,
@@ -1674,7 +1673,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.9,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 1.0870373657584096,
           "bb": 0.8465720013891957,
