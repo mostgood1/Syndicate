@@ -1012,6 +1012,39 @@ class IntelligenceStateTests(unittest.TestCase):
                 self.assertIn(queued_key, reloaded_service._watched_payloads)
                 self.assertIn(queued_key, reloaded_service._pending_keys)
 
+    def test_board_publication_response_skips_full_intelligence_pipeline(self) -> None:
+        service = IntelligenceStateService()
+
+        candidate_pool = {
+            "selected_date": "2026-06-15",
+            "source_fingerprint": "fingerprint-1",
+            "candidate_count": 2,
+            "candidate_pools": {},
+            "global_pool": [
+                {"name": "Play B", "sport_slug": "mlb", "market": "Hits", "score": 4.5, "confidence": 0.2, "updated_at": "2026-06-15T20:00:00Z"},
+                {"name": "Play A", "sport_slug": "mlb", "market": "Hits", "score": 6.2, "confidence": 0.9, "updated_at": "2026-06-15T18:00:00Z"},
+            ],
+            "candidates": [
+                {"name": "Play B", "sport_slug": "mlb", "market": "Hits", "score": 4.5, "confidence": 0.2, "updated_at": "2026-06-15T20:00:00Z"},
+                {"name": "Play A", "sport_slug": "mlb", "market": "Hits", "score": 6.2, "confidence": 0.9, "updated_at": "2026-06-15T18:00:00Z"},
+            ],
+        }
+
+        with patch.object(service, "_source_state_fingerprint", return_value="fingerprint-1"):
+            with patch.object(service, "_build_candidate_pool", return_value=dict(candidate_pool)):
+                response = service._compute_board_publication_response({"question": "top edges today", "date": "2026-06-15", "limit": 1})
+
+        self.assertTrue(response["ok"])
+        self.assertEqual(response["candidate_count"], 2)
+        self.assertEqual(len(response["top_opportunities"]), 1)
+        self.assertEqual(response["top_opportunities"][0]["name"], "Play A")
+        self.assertEqual(response["recommendations"][0]["name"], "Play A")
+        self.assertIsNone(response["analysis"])
+        self.assertIn("board_contract", response)
+        self.assertEqual(response["board_contract"]["schema"], "intelligence_board_v1")
+        self.assertTrue(response["state_last_updated"])
+        self.assertEqual(response["state_last_updated"], response["snapshot_generated_at"])
+
     def test_background_loop_consumes_persisted_queue_payloads(self) -> None:
         service = IntelligenceStateService()
         service._interval_seconds = 0
@@ -1034,16 +1067,36 @@ class IntelligenceStateTests(unittest.TestCase):
             refresh_state_store.write_json_file(state_path, persisted_state)
 
             with patch.object(intelligence_state_module, "STATE_PATH", state_path), patch.object(intelligence_state_module, "BOARD_SNAPSHOT_PATH", board_snapshot_path):
+                board_state = {
+                    "ok": True,
+                    "top_opportunities": [{"name": "Play 1"}],
+                    "recommendations": [{"name": "Play 1"}],
+                    "by_sport": {"mlb": [{"name": "Play 1"}]},
+                    "board_contract": {"schema": "intelligence_board_v1", "cards": [{"name": "Play 1"}]},
+                    "analysis": None,
+                    "portfolio": {},
+                    "parlays": [],
+                    "selected_date": "2026-06-15",
+                    "state_last_updated": "2026-06-15T20:00:00Z",
+                    "last_updated": "2026-06-15T20:00:00Z",
+                    "snapshot_generated_at": "2026-06-15T20:00:00Z",
+                    "candidate_count": 1,
+                }
+
                 def fake_write_latest_intelligence_state(state: dict[str, object]) -> dict[str, object]:
                     service._stop.set()
                     return dict(state)
 
-                with patch("pipeline.intelligence_state.run_intelligence_pipeline", return_value={"ok": True, "top_opportunities": [], "by_sport": {}, "analysis": {}}) as mocked_pipeline:
-                    with patch("pipeline.intelligence_state.write_latest_intelligence_state", side_effect=fake_write_latest_intelligence_state) as mocked_write:
-                        service._background_loop()
+                with patch.object(service, "_compute_board_publication_response", return_value=dict(board_state)) as mocked_board_publish:
+                    with patch("pipeline.intelligence_state.run_intelligence_pipeline", side_effect=AssertionError("full intelligence pipeline should not run during board-only publication")) as mocked_pipeline:
+                        with patch("pipeline.intelligence_state.write_latest_intelligence_state", side_effect=fake_write_latest_intelligence_state) as mocked_write:
+                            service._background_loop()
 
-        mocked_pipeline.assert_called_once_with(normalized)
+        mocked_board_publish.assert_called_once_with(normalized)
+        mocked_pipeline.assert_not_called()
         mocked_write.assert_called_once()
+        self.assertIn(queued_key, service._snapshots)
+        self.assertEqual(service._latest_key, queued_key)
 
     def test_state_compute_promotes_candidate_pool_when_ranking_returns_empty(self) -> None:
         service = IntelligenceStateService()

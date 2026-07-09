@@ -1462,11 +1462,9 @@ class IntelligenceStateService:
                         self._condition.wait(timeout=min(1.0, float(self._interval_seconds)))
                     continue
                 logger.info("WORKER RUN", extra={"payload_key": _payload_key(payload_to_process)})
-                logger.info("BACKGROUND_LOOP_PRE_QUERY", extra={"elapsed_ms": round((time.time() - iteration_started_at) * 1000.0, 3)})
-                state = run_intelligence_pipeline(payload_to_process)
-                logger.info("BACKGROUND_LOOP_POST_QUERY", extra={"elapsed_ms": round((time.time() - iteration_started_at) * 1000.0, 3)})
-                logger.info("BACKGROUND_LOOP_PRE_REASONING", extra={"elapsed_ms": round((time.time() - iteration_started_at) * 1000.0, 3)})
-                logger.info("BACKGROUND_LOOP_POST_REASONING", extra={"elapsed_ms": round((time.time() - iteration_started_at) * 1000.0, 3)})
+                logger.info("BACKGROUND_LOOP_PRE_BOARD_PUBLISH", extra={"elapsed_ms": round((time.time() - iteration_started_at) * 1000.0, 3)})
+                state = self._compute_board_publication_response(payload_to_process)
+                logger.info("BACKGROUND_LOOP_POST_BOARD_PUBLISH", extra={"elapsed_ms": round((time.time() - iteration_started_at) * 1000.0, 3)})
                 logger.info("BACKGROUND_LOOP_PRE_PERSIST", extra={"elapsed_ms": round((time.time() - iteration_started_at) * 1000.0, 3)})
                 written_state = write_latest_intelligence_state(state)
                 logger.info("BACKGROUND_LOOP_POST_PERSIST", extra={"elapsed_ms": round((time.time() - iteration_started_at) * 1000.0, 3)})
@@ -1510,6 +1508,74 @@ class IntelligenceStateService:
                 self._condition.wait(timeout=self._interval_seconds)
             if guard_acquired:
                 self._execution_guard.release()
+
+    def _compute_board_publication_response(self, payload: dict[str, Any]) -> dict[str, Any]:
+        request_started_at = time.perf_counter()
+        request_payload = dict(payload)
+        question = str(request_payload.get("question") or "").strip() or "top edges today"
+        selected_date = str(request_payload.get("date") or request_payload.get("selected_date") or "").strip() or None
+        limit = request_payload.get("limit")
+        try:
+            limit_value = int(limit) if limit is not None and str(limit).strip() else 10
+        except Exception:
+            limit_value = 10
+
+        source_fingerprint = self._source_state_fingerprint(selected_date)
+        cache_key = _payload_key(request_payload)
+        logger.info("BETTING_BOARD_PUBLISH_START", extra={"selected_date": selected_date, "question": question})
+
+        candidate_pool = self._build_candidate_pool(selected_date, source_fingerprint)
+        candidate_pool_count = int(candidate_pool.get("candidate_count") or 0)
+        if candidate_pool_count <= 0 and selected_date == central_today_iso():
+            rollover_date = _next_supported_intelligence_date(selected_date)
+            if rollover_date and rollover_date != selected_date:
+                logger.info("BETTING_BOARD_PUBLISH_DATE", extra={"requested_date": selected_date, "selected_date": rollover_date, "rollover": True})
+                selected_date = rollover_date
+                request_payload["date"] = rollover_date
+                source_fingerprint = self._source_state_fingerprint(selected_date)
+                cache_key = _payload_key(request_payload)
+                candidate_pool = self._build_candidate_pool(selected_date, source_fingerprint)
+                candidate_pool_count = int(candidate_pool.get("candidate_count") or 0)
+
+        logger.info("BETTING_BOARD_PUBLISH_DATE", extra={"requested_date": str(payload.get("date") or payload.get("selected_date") or "").strip() or None, "selected_date": selected_date, "candidate_count": candidate_pool_count})
+        candidates = [self._serialize_candidate(candidate) for candidate in candidate_pool.get("candidates") if isinstance(candidate, Mapping)]
+
+        ranked_candidates = _profile_stage("candidate_scoring", _balanced_recommendation_order, candidates)
+        if ranked_candidates:
+            top_candidates = [dict(candidate) for candidate in ranked_candidates if isinstance(candidate, Mapping)]
+        elif candidates:
+            top_candidates = self._rank_fallback_candidates(candidates)
+        else:
+            top_candidates = []
+
+        opportunity_limit = max(int(limit_value), 1) if top_candidates else max(int(limit_value), 0)
+        top_opportunities = top_candidates[:opportunity_limit]
+        by_sport: dict[str, list[dict[str, object]]] = {}
+        for recommendation in top_opportunities:
+            sport_key = str(recommendation.get("sport") or recommendation.get("sport_slug") or "unknown").strip().lower() or "unknown"
+            by_sport.setdefault(sport_key, []).append(dict(recommendation))
+
+        response_last_updated = _utc_now()
+        response_candidate_count = len(candidates)
+        response: dict[str, Any] = {
+            "ok": True,
+            "top_opportunities": top_opportunities,
+            "recommendations": [dict(item) for item in top_opportunities],
+            "by_sport": by_sport,
+            "analysis": None,
+            "portfolio": {},
+            "parlays": [],
+            "selected_date": selected_date,
+            "state_last_updated": response_last_updated,
+            "last_updated": response_last_updated,
+            "snapshot_generated_at": response_last_updated,
+            "candidate_count": response_candidate_count,
+        }
+        response["board_contract"] = build_intelligence_board_contract(response)
+        response = _decorate_response_with_state_meta(dict(response), None, source="worker", run_key=cache_key, sla_seconds=self._interval_seconds) or dict(response)
+        _log_stage_timing("board_publication", (time.perf_counter() - request_started_at) * 1000.0)
+        logger.info("BETTING_BOARD_PUBLISH_COMPLETE", extra={"selected_date": selected_date, "candidate_count": response_candidate_count, "snapshot_generated_at": response_last_updated})
+        return response
 
     def _compute_response(self, payload: dict[str, Any], *, force_refresh: bool = False) -> dict[str, Any]:
         request_started_at = time.perf_counter()
