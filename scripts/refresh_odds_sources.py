@@ -66,6 +66,7 @@ _PUBLISH_MANIFEST_LOCK = Lock()
 
 _DEFAULT_INTERVAL_MARKETS = "h2h,spreads,totals,spreads_h1,totals_h1,spreads_h2,totals_h2"
 _WNBA_PLAYER_PROP_MARKETS = "player_points,player_rebounds,player_assists,player_points_rebounds_assists,player_threes,player_steals,player_blocks,player_turnovers,player_points_rebounds,player_points_assists,player_rebounds_assists,player_double_double,player_triple_double"
+_DEFAULT_REFRESH_STEP_TIMEOUT_SECONDS = 1800
 _MEMORY_TRACE_LAST_RSS_BYTES: int | None = None
 
 
@@ -1044,18 +1045,22 @@ def _resolve_execution_mode(raw: str | None, *, mirror_only: bool = False) -> st
     raise ValueError("execution_mode must be 'source' or 'ingest'.")
 
 
+def _refresh_step_timeout_seconds() -> int:
+    timeout_value = str(os.environ.get("SYNDICATE_REFRESH_STEP_TIMEOUT_SECONDS") or "").strip()
+    if timeout_value:
+        try:
+            return max(1, int(timeout_value))
+        except ValueError:
+            pass
+    return _DEFAULT_REFRESH_STEP_TIMEOUT_SECONDS
+
+
 def _run_command(step: RefreshStep, *, dry_run: bool = False) -> dict[str, Any]:
     env = os.environ.copy()
     if step.env_updates:
         env.update({key: value for key, value in step.env_updates.items() if value is not None})
     started = _utc_now()
-    timeout_seconds: int | None = None
-    timeout_value = str(os.environ.get("SYNDICATE_REFRESH_STEP_TIMEOUT_SECONDS") or "").strip()
-    if timeout_value:
-        try:
-            timeout_seconds = max(1, int(timeout_value))
-        except ValueError:
-            timeout_seconds = None
+    timeout_seconds = _refresh_step_timeout_seconds()
     print(f"PRE_STEP_LOG name={step.name}", file=sys.stderr, flush=True)
     print(f"STEP_START name={step.name} cwd={step.cwd} command={json.dumps(list(step.command))}", file=sys.stderr, flush=True)
     print(f"POST_STEP_LOG name={step.name}", file=sys.stderr, flush=True)
@@ -1093,10 +1098,16 @@ def _run_command(step: RefreshStep, *, dry_run: bool = False) -> dict[str, Any]:
         finished = _utc_now()
         runtime_seconds = _elapsed_seconds(started, finished)
         print(
+            f"STEP_FAIL name={step.name} status=timeout runtime_seconds={runtime_seconds if runtime_seconds is not None else 'unknown'} timeout_seconds={timeout_seconds}",
+            file=sys.stderr,
+            flush=True,
+        )
+        print(
             f"STEP_END name={step.name} status=timeout runtime_seconds={runtime_seconds if runtime_seconds is not None else 'unknown'} timeout_seconds={timeout_seconds if timeout_seconds is not None else 'none'}",
             file=sys.stderr,
             flush=True,
         )
+        print(f"[refresh_odds_sources] FAIL step={step.name} reason=timeout timeout_seconds={timeout_seconds}", flush=True)
         raise
 
     finished = _utc_now()

@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import io
 import json
 import argparse
 import importlib.util
+import subprocess
 import sys
 import unittest
 from pathlib import Path
@@ -19,6 +21,67 @@ class RefreshOddsSourcesTests(unittest.TestCase):
         sys.modules[spec.name] = module
         spec.loader.exec_module(module)
         return module
+
+    def _make_step(self, module):
+        return module.RefreshStep(
+            name="mlb_test_step",
+            phases=("live",),
+            cwd=Path("."),
+            command=("python", "child.py"),
+            env_updates=None,
+            description="test step",
+        )
+
+    def test_run_command_uses_default_timeout_when_env_is_absent(self) -> None:
+        module = self._load_module()
+        step = self._make_step(module)
+        completed = subprocess.CompletedProcess(args=list(step.command), returncode=0, stdout="ok", stderr="")
+
+        with patch.dict(module.os.environ, {}, clear=True), patch.object(module.subprocess, "run", return_value=completed) as mocked_run, patch.object(
+            module,
+            "_log_memory",
+            return_value=None,
+        ), patch.object(module, "_dump_child_runtime_state", return_value=None):
+            result = module._run_command(step)
+
+        self.assertTrue(result["ok"])
+        self.assertEqual(mocked_run.call_args.kwargs["timeout"], module._DEFAULT_REFRESH_STEP_TIMEOUT_SECONDS)
+
+    def test_run_command_honors_explicit_timeout_override(self) -> None:
+        module = self._load_module()
+        step = self._make_step(module)
+        completed = subprocess.CompletedProcess(args=list(step.command), returncode=0, stdout="ok", stderr="")
+
+        with patch.dict(module.os.environ, {"SYNDICATE_REFRESH_STEP_TIMEOUT_SECONDS": "77"}, clear=True), patch.object(
+            module.subprocess,
+            "run",
+            return_value=completed,
+        ) as mocked_run, patch.object(module, "_log_memory", return_value=None), patch.object(module, "_dump_child_runtime_state", return_value=None):
+            result = module._run_command(step)
+
+        self.assertTrue(result["ok"])
+        self.assertEqual(mocked_run.call_args.kwargs["timeout"], 77)
+
+    def test_run_command_timeout_path_logs_failure_and_raises(self) -> None:
+        module = self._load_module()
+        step = self._make_step(module)
+        stderr_capture = io.StringIO()
+        timeout_exc = subprocess.TimeoutExpired(cmd=list(step.command), timeout=module._DEFAULT_REFRESH_STEP_TIMEOUT_SECONDS)
+
+        with patch.dict(module.os.environ, {}, clear=True), patch.object(module.subprocess, "run", side_effect=timeout_exc) as mocked_run, patch.object(
+            module,
+            "sys",
+            wraps=module.sys,
+        ) as mocked_sys, patch.object(module, "_log_memory", return_value=None), patch.object(module, "_dump_child_runtime_state", return_value=None):
+            mocked_sys.stderr = stderr_capture
+            with self.assertRaises(subprocess.TimeoutExpired):
+                module._run_command(step)
+
+        self.assertEqual(mocked_run.call_args.kwargs["timeout"], module._DEFAULT_REFRESH_STEP_TIMEOUT_SECONDS)
+        stderr_text = stderr_capture.getvalue()
+        self.assertIn("STEP_FAIL name=mlb_test_step status=timeout", stderr_text)
+        self.assertIn("STEP_END name=mlb_test_step status=timeout", stderr_text)
+        self.assertIn("timeout_seconds=1800", stderr_text)
 
     def test_build_summary_runs_post_refresh_tracking_for_supported_sport(self) -> None:
         module = self._load_module()
