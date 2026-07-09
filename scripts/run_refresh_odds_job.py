@@ -289,7 +289,16 @@ def _queue_intelligence_snapshot_refresh(*, run_summary_path: Path) -> tuple[str
     store = _refresh_state_store()
     read_json_file = store["read_json_file"]
     run_summary = read_json_file(run_summary_path) or {}
+    summary_keys = sorted(str(key) for key in run_summary.keys()) if isinstance(run_summary, dict) else []
+    print(
+        f"INTELLIGENCE_REFRESH_QUEUE_CONTEXT run_summary_path={run_summary_path} summary_keys={json.dumps(summary_keys)}",
+        flush=True,
+    )
     if not isinstance(run_summary, dict):
+        print(
+            f"INTELLIGENCE_REFRESH_SKIPPED reason=run_summary_not_dict run_summary_path={run_summary_path}",
+            flush=True,
+        )
         return None
 
     selected_date = str(
@@ -298,7 +307,15 @@ def _queue_intelligence_snapshot_refresh(*, run_summary_path: Path) -> tuple[str
         or run_summary.get("selected_date")
         or ""
     ).strip()
+    print(
+        f"INTELLIGENCE_REFRESH_QUEUE_CONTEXT selected_date={selected_date or 'null'} summary_keys={json.dumps(summary_keys)}",
+        flush=True,
+    )
     if not selected_date:
+        print(
+            f"INTELLIGENCE_REFRESH_SKIPPED reason=missing_selected_date run_summary_path={run_summary_path}",
+            flush=True,
+        )
         return None
 
     payload: dict[str, Any] = {
@@ -312,6 +329,10 @@ def _queue_intelligence_snapshot_refresh(*, run_summary_path: Path) -> tuple[str
         "include_games": True,
         "force_refresh": True,
     }
+    print(
+        f"INTELLIGENCE_REFRESH_QUEUE_CONTEXT resolved_payload={json.dumps(payload, sort_keys=True)}",
+        flush=True,
+    )
 
     from pipeline.intelligence_state import queue_intelligence_state_refresh
 
@@ -477,6 +498,18 @@ def main() -> int:
     if return_code == 0:
         print(f"ODDS_REFRESH_SUCCESS manifest={manifest_path} latest={latest_path}", flush=True)
         try:
+            run_summary = read_json_file(run_summary_path)
+            run_summary_present = isinstance(run_summary, dict)
+            selected_date = str(
+                (run_summary or {}).get("date")
+                or (run_summary or {}).get("selectedDate")
+                or (run_summary or {}).get("selected_date")
+                or ""
+            ).strip()
+            print(
+                f"INTELLIGENCE_REFRESH_HANDOFF run_stamp={manifest_path.parent.name} return_code={return_code} selected_date={selected_date or 'null'} run_summary_present={run_summary_present}",
+                flush=True,
+            )
             queued = _queue_intelligence_snapshot_refresh(run_summary_path=run_summary_path)
             if queued is not None:
                 queued_key, queued_payload = queued
@@ -484,7 +517,11 @@ def main() -> int:
                     f"INTELLIGENCE_REFRESH_ENQUEUED key={queued_key} date={queued_payload.get('date')}",
                     flush=True,
                 )
+            else:
+                reason = "run_summary_not_dict" if not run_summary_present else ("missing_selected_date" if not selected_date else "unknown")
+                print(f"INTELLIGENCE_REFRESH_SKIPPED reason={reason}", flush=True)
         except Exception:
+            print(f"refresh_job_intelligence_refresh_failed exception={traceback.format_exc().strip().splitlines()[-1] if traceback.format_exc().strip().splitlines() else 'unknown'}", flush=True)
             print("[refresh_job_intelligence_refresh_failed]", file=sys.stderr, flush=True)
             print(traceback.format_exc(), file=sys.stderr, flush=True)
     return int(return_code)
