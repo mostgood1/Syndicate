@@ -1,8 +1,0 @@
-﻿## main...origin/main
- M reports/intelligence/evaluation_ledger_chunks/manifest.json
- D tmp_git_status_after_push.txt
- D tmp_git_status_exit.txt
- D tmp_git_version.txt
- D tmp_git_write_probe.txt
- D tmp_head_sha_after_push.txt
- D tmp_last_commit_after_push.txt
