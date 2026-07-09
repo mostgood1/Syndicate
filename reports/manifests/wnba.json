@@ -1,38 +1,24 @@
 {
   "sport": "wnba",
-  "last_updated": "2026-07-06T21:27:08-05:00",
+  "last_updated": "2026-07-08T21:11:43-05:00",
   "artifact_paths": [
-    "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate",
-    "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\wnba_source\\data\\processed\\props_edges_2026-07-06.csv",
-    "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\wnba_source\\data\\processed\\props_predictions_2026-07-06.csv",
-    "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\wnba_source\\data\\processed\\props_recommendations_2026-07-06.csv",
-    "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\wnba_source\\data\\processed\\oddsapi_player_props_2026-07-06.csv",
-    "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\wnba_source\\data\\raw\\odds_wnba_player_props_2026-07-06.csv"
+    "c:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\raw\\odds_wnba_player_props_2026-07-08.csv",
+    "c:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\oddsapi_player_props_2026-07-08.csv",
+    "c:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\props_predictions_2026-07-08.csv",
+    "c:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\props_edges_2026-07-08.csv",
+    "c:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\props_recommendations_2026-07-08.csv",
+    "c:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\game_cards_2026-07-08.csv",
+    "c:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\cards_sim_detail_2026-07-08.json",
+    "c:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\cards_props_snapshot_2026-07-08.json",
+    "c:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\recommendations_slate_2026-07-08.json",
+    "c:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\props_recommendations_top_by_game_2026-07-08.json"
   ],
   "status": "complete",
   "metadata": {
-    "date": "2026-07-06",
+    "date": "2026-07-08",
     "phase": "all",
     "execution_mode": "source",
-    "refresh_mode": "fast",
-    "ok": true,
-    "post_refresh_ok": null,
-    "mirror_ok": null,
-    "odds_control_plane": {
-      "source_precedence": [
-        "shared_history",
-        "artifact_history",
-        "tracking_history"
-      ],
-      "artifact_paths": [
-        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate",
-        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\wnba_source\\data\\processed\\props_edges_2026-07-06.csv",
-        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\wnba_source\\data\\processed\\props_predictions_2026-07-06.csv",
-        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\wnba_source\\data\\processed\\props_recommendations_2026-07-06.csv",
-        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\wnba_source\\data\\processed\\oddsapi_player_props_2026-07-06.csv",
-        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\wnba_source\\data\\raw\\odds_wnba_player_props_2026-07-06.csv"
-      ],
-      "has_post_refresh": false
-    }
+    "refresh_mode": "full",
+    "post_refresh_ok": true
   }
 }

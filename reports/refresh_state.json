@@ -1091,6 +1091,16 @@
         "reused": false,
         "artifact_root": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts"
       }
+    },
+    "wnba_artifact_bundle:C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\wnba_source\\source_artifacts:2026-07-08:1:1": {
+      "inputHash": "1f46c0f3243480263340ca63a5b01d60a0404daa096f08a6e6068f9987d418e2",
+      "updatedAt": "2026-07-09T02:08:48-05:00",
+      "outputs": [],
+      "metadata": {
+        "date": "2026-07-08",
+        "reused": true,
+        "artifact_root": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\wnba_source\\source_artifacts"
+      }
     }
   }
 }

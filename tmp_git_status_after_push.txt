@@ -1,0 +1,27 @@
+﻿## main...origin/main
+ M data/mlb_source/source_artifacts/data/live_lens/live_lens_2026_07_08.jsonl
+ M data/mlb_source/source_artifacts/data/live_lens/live_lens_report_2026_07_08.json
+ M data/wnba_source/source_artifacts/data/live_lens/live_lens_projections_2026-07-08.jsonl
+ M data/wnba_source/source_artifacts/data/processed/boxscores_history.csv
+ M data/wnba_source/source_artifacts/data/processed/cards_props_snapshot_2026-07-08.json
+ M data/wnba_source/source_artifacts/data/processed/cards_sim_detail_2026-07-08.json
+ M data/wnba_source/source_artifacts/data/processed/live_lens_projections_2026-07-08.jsonl
+ M data/wnba_source/source_artifacts/data/processed/oddsapi_player_props_2026-07-08.csv
+ M data/wnba_source/source_artifacts/data/processed/props_edges_2026-07-08.csv
+ M data/wnba_source/source_artifacts/data/processed/props_predictions_2026-07-08.csv
+ M data/wnba_source/source_artifacts/data/processed/props_recommendations_2026-07-08.csv
+ M data/wnba_source/source_artifacts/data/processed/props_recommendations_top_by_game_2026-07-08.json
+ M data/wnba_source/source_artifacts/data/processed/recommendations_slate_2026-07-08.json
+ M data/wnba_source/source_artifacts/data/processed/smart_sim_2026-07-08_CON_MIN.json
+ M data/wnba_source/source_artifacts/data/processed/smart_sim_2026-07-08_LAS_IND.json
+ M data/wnba_source/source_artifacts/data/processed/smart_sim_2026-07-08_TOR_GSV.json
+ M reports/intelligence/evaluation_ledger_chunks/index.json
+ M reports/intelligence/evaluation_ledger_chunks/manifest.json
+ M reports/manifests/wnba.json
+ M reports/refresh_state.json
+?? tmp_git_status_after_push.txt
+?? tmp_git_status_exit.txt
+?? tmp_git_version.txt
+?? tmp_git_write_probe.txt
+?? tmp_head_sha_after_push.txt
+?? tmp_last_commit_after_push.txt
