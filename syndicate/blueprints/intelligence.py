@@ -18,7 +18,6 @@ from pipeline.intelligence_state import queue_intelligence_state_refresh
 from pipeline.intelligence_state import _INTELLIGENCE_STATE_SERVICE
 from syndicate.features.intelligence import _market_focus_labels
 from syndicate.features.intelligence import _parlay_request_summary
-from syndicate.features.intelligence import run_intelligence_query
 from syndicate.features.intelligence import _query_preferences
 from syndicate.features.intelligence import _attach_intelligence_response_aliases
 from syndicate.features.intelligence_board import build_intelligence_board_contract
@@ -1097,48 +1096,75 @@ def intelligence_query_api():
     force_refresh = _query_bool(payload.get("force_refresh"))
     _LOGGER.info("BETTING_BOARD_REFRESH_START", extra={"selected_date": str(payload.get("date") or payload.get("selected_date") or central_today_iso()).strip() or None, "force_refresh": force_refresh, "source": "query_api"})
     if force_refresh:
-        try:
-            computed_response = run_intelligence_query(
-                question,
-                selected_date=str(payload.get("date") or payload.get("selected_date") or central_today_iso()).strip() or central_today_iso(),
-                mode=str(payload.get("mode") or "").strip() or None,
-                sport=str(payload.get("sport") or "").strip() or None,
-                game_state=str(payload.get("game_state") or "").strip() or None,
-                limit=payload.get("limit"),
-                timing=str(payload.get("timing") or "").strip() or None,
-                include_props=payload.get("include_props"),
-                include_games=payload.get("include_games"),
-                policy=str(payload.get("policy") or "").strip() or None,
-                force_refresh=True,
-            )
-            if isinstance(computed_response, dict):
-                state_payload = dict(computed_response)
-                state_payload["candidate_count"] = len(state_payload.get("recommendations") or [])
-                response = dict(state_payload)
-                response.setdefault("ok", True)
-                response.setdefault("response", dict(response))
-                response.setdefault(
-                    "board_contract",
+        if _render_hosted_request():
+            queued = True
+            try:
+                _safe_queue_intelligence_state_refresh(dict(payload))
+            except Exception:
+                queued = False
+                _LOGGER.exception("BETTING_BOARD_REFRESH_FAILURE")
+
+            cached_response, execution_source = _cached_intelligence_response_with_source(payload, force_refresh=False)
+            response_payload = dict(cached_response or _empty_default_intelligence_response())
+            response_payload["queued_refresh"] = True
+            response_payload["execution_source"] = execution_source
+            response_payload.setdefault("queued", queued)
+            response_payload.setdefault("ok", True)
+            response_payload.setdefault("response", dict(response_payload))
+            _attach_intelligence_response_aliases(response_payload)
+            LAST_RESULT = dict(response_payload.get("response") or response_payload.get("analysis") or {})
+            versioned_response = _versioned_query_response(response_payload)
+            versioned_response.update(_debug_state_fields(response_payload, source="snapshot_read"))
+            versioned_response["selected_date"] = str(payload.get("date") or payload.get("selected_date") or central_today_iso()).strip() or central_today_iso()
+            _LOGGER.info("BETTING_BOARD_REFRESH_CANDIDATE_COUNT", extra={"selected_date": versioned_response.get("selected_date"), "candidate_count": _response_candidate_count(response_payload), "source": "query_api"})
+            _LOGGER.info("BETTING_BOARD_REFRESH_COMPLETE", extra={"selected_date": versioned_response.get("selected_date"), "candidate_count": _response_candidate_count(response_payload), "source": "query_api"})
+            return _no_cache_response(jsonify(versioned_response))
+        else:
+            try:
+                read_latest_intelligence_state_response(payload, force_refresh=False, allow_latest_fallback=False)
+                computed_response = _INTELLIGENCE_STATE_SERVICE._compute_response(
                     {
-                        "schema": "intelligence_board_v1",
-                        "top_overall": [],
-                        "by_sport": {},
-                        "live": [],
-                        "pregame": [],
-                        "portfolio": {},
-                        "parlays": [],
+                        "question": question,
+                        "date": str(payload.get("date") or payload.get("selected_date") or central_today_iso()).strip() or central_today_iso(),
+                        "mode": str(payload.get("mode") or "").strip() or None,
+                        "sport": str(payload.get("sport") or "").strip() or None,
+                        "game_state": str(payload.get("game_state") or "").strip() or None,
+                        "limit": payload.get("limit"),
+                        "timing": str(payload.get("timing") or "").strip() or None,
+                        "include_props": payload.get("include_props"),
+                        "include_games": payload.get("include_games"),
+                        "policy": str(payload.get("policy") or "").strip() or None,
                     },
+                    force_refresh=True,
                 )
-                _attach_intelligence_response_aliases(response)
-                LAST_RESULT = dict(response.get("response") or response.get("analysis") or {})
-                versioned_response = _versioned_query_response(response)
-                versioned_response.update(_debug_state_fields(response, source="snapshot_read"))
-                versioned_response["selected_date"] = str(payload.get("date") or payload.get("selected_date") or central_today_iso()).strip() or central_today_iso()
-                _LOGGER.info("BETTING_BOARD_REFRESH_CANDIDATE_COUNT", extra={"selected_date": versioned_response.get("selected_date"), "candidate_count": state_payload.get("candidate_count", 0), "source": "query_api"})
-                _LOGGER.info("BETTING_BOARD_REFRESH_COMPLETE", extra={"selected_date": versioned_response.get("selected_date"), "candidate_count": state_payload.get("candidate_count", 0), "source": "query_api"})
-                return _no_cache_response(jsonify(versioned_response))
-        except Exception:
-            _LOGGER.exception("BETTING_BOARD_REFRESH_FAILURE")
+                if isinstance(computed_response, dict):
+                    state_payload = dict(computed_response)
+                    state_payload["candidate_count"] = len(state_payload.get("recommendations") or [])
+                    response = dict(state_payload)
+                    response.setdefault("ok", True)
+                    response.setdefault("response", dict(response))
+                    response.setdefault(
+                        "board_contract",
+                        {
+                            "schema": "intelligence_board_v1",
+                            "top_overall": [],
+                            "by_sport": {},
+                            "live": [],
+                            "pregame": [],
+                            "portfolio": {},
+                            "parlays": [],
+                        },
+                    )
+                    _attach_intelligence_response_aliases(response)
+                    LAST_RESULT = dict(response.get("response") or response.get("analysis") or {})
+                    versioned_response = _versioned_query_response(response)
+                    versioned_response.update(_debug_state_fields(response, source="snapshot_read"))
+                    versioned_response["selected_date"] = str(payload.get("date") or payload.get("selected_date") or central_today_iso()).strip() or central_today_iso()
+                    _LOGGER.info("BETTING_BOARD_REFRESH_CANDIDATE_COUNT", extra={"selected_date": versioned_response.get("selected_date"), "candidate_count": state_payload.get("candidate_count", 0), "source": "query_api"})
+                    _LOGGER.info("BETTING_BOARD_REFRESH_COMPLETE", extra={"selected_date": versioned_response.get("selected_date"), "candidate_count": state_payload.get("candidate_count", 0), "source": "query_api"})
+                    return _no_cache_response(jsonify(versioned_response))
+            except Exception:
+                _LOGGER.exception("BETTING_BOARD_REFRESH_FAILURE")
     state_payload = read_latest_intelligence_state(dict(payload))
     if force_refresh:
         _safe_queue_intelligence_state_refresh(dict(payload))
