@@ -1536,6 +1536,7 @@ def _build_local_game_cards_artifact(*, source_root: Path, processed_root: Path,
 
     expected_matchups = _prediction_matchups()
     snapshot_matchups: set[tuple[str, str]] = set()
+    odds_by_matchup = _load_game_odds_rows_by_matchup(source_root=source_root, processed_root=processed_root, date_str=date_str)
 
     raw_candidates = [
         source_root / "data" / "raw" / f"odds_wnba_current_{date_str}.csv",
@@ -1567,6 +1568,9 @@ def _build_local_game_cards_artifact(*, source_root: Path, processed_root: Path,
                         if not home_name or not away_name:
                             continue
                         snapshot_matchups.add((home_name.casefold(), away_name.casefold()))
+                        home_tri = _canonical_wnba_tri(_to_tricode_local(home_name))
+                        away_tri = _canonical_wnba_tri(_to_tricode_local(away_name))
+                        odds_row = odds_by_matchup.get((home_tri, away_tri)) if home_tri and away_tri else None
                         rows_out.append(
                             {
                                 "date": date_str,
@@ -1574,14 +1578,14 @@ def _build_local_game_cards_artifact(*, source_root: Path, processed_root: Path,
                                 "home_team": home_name,
                                 "visitor_team": away_name,
                                 "commence_time": str(commence_time or "").strip(),
-                                "home_ml": None,
-                                "away_ml": None,
-                                "home_spread": None,
-                                "away_spread": None,
-                                "total": None,
-                                "bookmaker": "oddsapi_consensus",
-                                "home_tri": _to_tricode_local(home_name),
-                                "away_tri": _to_tricode_local(away_name),
+                                "home_ml": _float_or_none((odds_row or {}).get("home_ml")),
+                                "away_ml": _float_or_none((odds_row or {}).get("away_ml")),
+                                "home_spread": _float_or_none((odds_row or {}).get("home_spread")),
+                                "away_spread": _float_or_none((odds_row or {}).get("away_spread")),
+                                "total": _float_or_none((odds_row or {}).get("total")),
+                                "bookmaker": str((odds_row or {}).get("bookmaker") or "oddsapi_consensus").strip() or "oddsapi_consensus",
+                                "home_tri": home_tri,
+                                "away_tri": away_tri,
                             }
                         )
 
