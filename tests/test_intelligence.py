@@ -5064,8 +5064,10 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         with app.test_request_context("/api/intelligence/status?date=2026-06-10", method="GET"):
             with patch("syndicate.blueprints.intelligence.read_latest_intelligence_board_snapshot_response", return_value={}):
                 with patch("syndicate.blueprints.intelligence.read_latest_intelligence_state_response", return_value=dict(cached_status)):
-                    with patch("syndicate.blueprints.intelligence._response_has_content", side_effect=lambda payload: bool(payload)):
-                        response = intelligence_status_api()
+                    with patch("syndicate.blueprints.intelligence.read_latest_intelligence_state", return_value=dict(cached_status)):
+                        with patch("pipeline.intelligence_state.read_latest_intelligence_state_response", return_value=dict(cached_status)):
+                            with patch("syndicate.blueprints.intelligence._response_has_content", side_effect=lambda payload: bool(payload)):
+                                response = intelligence_status_api()
 
         payload = response.get_json()
         self.assertIsNotNone(payload)

@@ -307,6 +307,39 @@ def _response_has_content(payload: dict[str, object] | None) -> bool:
     return False
 
 
+def _response_has_board_content(payload: dict[str, object] | None) -> bool:
+    current = dict(payload or {})
+    if not current:
+        return False
+    if _response_candidate_count(current) <= 0:
+        return False
+    candidate_pool = current.get("candidate_pool") if isinstance(current.get("candidate_pool"), dict) else None
+    if isinstance(candidate_pool, dict):
+        candidates = candidate_pool.get("candidates")
+        if isinstance(candidates, list) and any(isinstance(item, dict) for item in candidates):
+            return True
+    candidates = current.get("candidates")
+    if isinstance(candidates, list) and any(isinstance(item, dict) for item in candidates):
+        return True
+    for key in ("top_opportunities", "recommendations"):
+        value = current.get(key)
+        if isinstance(value, list) and any(isinstance(item, dict) for item in value):
+            return True
+    analysis = current.get("analysis") if isinstance(current.get("analysis"), dict) else None
+    if isinstance(analysis, dict):
+        for key in ("recommendations", "top_live_opportunities"):
+            value = analysis.get(key)
+            if isinstance(value, list) and any(isinstance(item, dict) for item in value):
+                return True
+    board_contract = current.get("board_contract") if isinstance(current.get("board_contract"), dict) else None
+    if isinstance(board_contract, dict):
+        for key in ("top_overall", "live", "pregame"):
+            value = board_contract.get(key)
+            if isinstance(value, list) and any(isinstance(item, dict) for item in value):
+                return True
+    return False
+
+
 def _status_candidate_count_from_response(payload: dict[str, object] | None) -> int:
     current = dict(payload or {})
     board_candidate_count = current.get("candidate_count")
@@ -543,15 +576,15 @@ def _response_needs_refresh(request_payload: dict[str, object], response_payload
 
 def _cached_intelligence_response_with_source(payload: dict[str, object], *, force_refresh: bool = True) -> tuple[dict[str, object] | None, str]:
     cached_response = read_latest_intelligence_state_response(payload, force_refresh=force_refresh, allow_latest_fallback=False)
-    if _is_board_response(cached_response) and not _response_needs_refresh(payload, cached_response):
+    if _is_board_response(cached_response) and _response_has_board_content(cached_response) and not _response_needs_refresh(payload, cached_response):
         return _hydrate_board_response_payload(cached_response), "worker"
     board_snapshot_response = read_latest_intelligence_board_snapshot_response(payload, force_refresh=force_refresh)
-    if _is_board_response(board_snapshot_response) and not _response_needs_refresh(payload, board_snapshot_response):
+    if _is_board_response(board_snapshot_response) and _response_has_board_content(board_snapshot_response) and not _response_needs_refresh(payload, board_snapshot_response):
         return _hydrate_board_response_payload(board_snapshot_response), "board_snapshot"
     question_text = str(payload.get("question") or "").strip().lower()
     if question_text == DEFAULT_QUESTION.lower() and not str(payload.get("date") or payload.get("selected_date") or "").strip():
         latest_board_snapshot = read_latest_intelligence_board_snapshot_response(None, force_refresh=force_refresh)
-        if _is_board_response(latest_board_snapshot):
+        if _is_board_response(latest_board_snapshot) and _response_has_board_content(latest_board_snapshot):
             return _hydrate_board_response_payload(latest_board_snapshot), "board_snapshot_latest"
     return None, "fallback"
 
@@ -1033,7 +1066,7 @@ def intelligence_home():
             for response_candidate in (state_response, board_snapshot_response):
                 if not isinstance(response_candidate, dict):
                     continue
-                if not _response_has_content(response_candidate):
+                if not _response_has_board_content(response_candidate):
                     continue
                 if _response_needs_refresh(payload, response_candidate):
                     continue
@@ -1109,11 +1142,23 @@ def intelligence_query_api():
     state_payload = read_latest_intelligence_state(dict(payload))
     if force_refresh:
         _safe_queue_intelligence_state_refresh(dict(payload))
+    board_snapshot_payload = read_latest_intelligence_board_snapshot_response(payload, force_refresh=False)
+    if not _response_has_board_content(state_payload):
+        if _response_has_board_content(board_snapshot_payload):
+            state_payload = board_snapshot_payload
+        else:
+            _safe_queue_intelligence_state_refresh(dict(payload))
+            queued_state = read_latest_intelligence_state(dict(payload))
+            if _response_has_board_content(queued_state):
+                state_payload = queued_state
+            else:
+                state_payload = _empty_default_intelligence_response()
+                state_payload["queued"] = True
     candidate_count = _response_candidate_count(state_payload) if isinstance(state_payload, dict) else 0
-    if candidate_count <= 0 or not isinstance(state_payload, dict) or not _response_has_content(state_payload):
+    if candidate_count <= 0 or not isinstance(state_payload, dict) or not _response_has_board_content(state_payload):
         _safe_queue_intelligence_state_refresh(dict(payload))
         queued_state = read_latest_intelligence_state(dict(payload))
-        if isinstance(queued_state, dict) and _response_candidate_count(queued_state) > 0:
+        if _response_has_board_content(queued_state):
             state_payload = queued_state
         else:
             state_payload = _empty_default_intelligence_response()
@@ -1222,8 +1267,8 @@ def intelligence_status_api():
         _LOGGER.info("BETTING_BOARD_REFRESH_START", extra={"selected_date": selected_date, "source": "status_api", "refresh_requested": True})
     status_payload = _intelligence_page_payload(selected_date, sport=selected_sport, force_refresh=False)
     stale_snapshot = False
-    current_snapshot = read_latest_intelligence_state(dict(status_payload))
-    has_snapshot = isinstance(current_snapshot, dict) and _response_has_content(current_snapshot)
+    current_snapshot = read_latest_intelligence_state_response(dict(status_payload), force_refresh=False, allow_latest_fallback=False)
+    has_snapshot = isinstance(current_snapshot, dict) and _response_has_board_content(current_snapshot)
     if not refresh_requested:
         stale_snapshot = bool(_response_selected_date(current_snapshot) and _response_selected_date(current_snapshot) != selected_date)
     if refresh_requested:
@@ -1232,12 +1277,20 @@ def intelligence_status_api():
         _safe_queue_intelligence_state_refresh(_intelligence_page_payload(selected_date, sport=selected_sport, force_refresh=True))
     elif stale_snapshot:
         _safe_queue_intelligence_state_refresh(_intelligence_page_payload(selected_date, sport=selected_sport, force_refresh=True))
-    status = read_latest_intelligence_state(dict(status_payload))
-    if not (isinstance(status, dict) and _response_has_content(status)):
-        status = _empty_default_intelligence_response()
+    status = read_latest_intelligence_state_response(dict(status_payload), force_refresh=False, allow_latest_fallback=False)
+    board_snapshot = read_latest_intelligence_board_snapshot_response(status_payload, force_refresh=False)
+    if not _response_has_board_content(status):
+        if _response_has_board_content(board_snapshot):
+            status = board_snapshot
+        else:
+            queued_state = read_latest_intelligence_state_response(dict(status_payload), force_refresh=False, allow_latest_fallback=False)
+            if _response_has_board_content(queued_state):
+                status = queued_state
+            else:
+                status = _empty_default_intelligence_response()
     state_snapshot = dict(status)
     response_payload = {"ok": True, "status": state_snapshot}
-    if isinstance(status, dict) and _response_has_content(status):
+    if isinstance(status, dict) and _response_has_board_content(status):
         for key, value in status.items():
             if key == "ok":
                 continue

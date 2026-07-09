@@ -1535,7 +1535,8 @@ class IntelligenceStateTests(unittest.TestCase):
 
         with app.test_request_context("/api/intelligence/status?date=2026-06-10", method="GET"):
             with patch("syndicate.blueprints.intelligence.read_latest_intelligence_state", return_value={}) as mocked_read:
-                response = intelligence_status_api()
+                with patch("syndicate.blueprints.intelligence.read_latest_intelligence_board_snapshot_response", return_value=None):
+                    response = intelligence_status_api()
 
         payload = response.get_json()
         self.assertIsNotNone(payload)
@@ -1593,9 +1594,9 @@ class IntelligenceStateTests(unittest.TestCase):
         payload = response.get_json()
         self.assertIsNotNone(payload)
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(payload["candidate_count"], 0)
-        self.assertEqual((payload.get("status") or {}).get("top_opportunities"), [])
-        mocked_snapshot.assert_not_called()
+        self.assertEqual(payload["candidate_count"], 1)
+        self.assertEqual((payload.get("status") or {}).get("top_opportunities", [])[0]["name"], "Play 1")
+        mocked_snapshot.assert_called_once()
 
     def test_status_endpoint_includes_state_debug_fields(self) -> None:
         app = Flask(__name__)
@@ -1614,6 +1615,7 @@ class IntelligenceStateTests(unittest.TestCase):
 
         with app.test_request_context("/api/intelligence/status?date=2026-06-10", method="GET"):
             with patch("syndicate.blueprints.intelligence.read_latest_intelligence_state", return_value=dict(state_response)):
+                with patch("syndicate.blueprints.intelligence.read_latest_intelligence_board_snapshot_response", return_value=None):
                     response = intelligence_status_api()
 
         payload = response.get_json()
@@ -1684,7 +1686,8 @@ class IntelligenceStateTests(unittest.TestCase):
 
         with app.test_request_context("/api/intelligence/status?date=2026-06-10", method="GET"):
             with patch("syndicate.blueprints.intelligence.read_latest_intelligence_state", return_value={}):
-                response = intelligence_status_api()
+                with patch("syndicate.blueprints.intelligence.read_latest_intelligence_board_snapshot_response", return_value=None):
+                    response = intelligence_status_api()
 
         payload = response.get_json()
         self.assertIsNotNone(payload)
