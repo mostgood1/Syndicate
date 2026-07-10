@@ -149,6 +149,17 @@ class WnbaCardsEvidencePackTests(unittest.TestCase):
         self.assertIn("Show more lines", js_content)
         self.assertIn("cards-live-lens-grid cards-evidence-pack-grid", js_content)
 
+    def test_cards_parity_source_contains_prop_lens_promotion_markup(self) -> None:
+        js_path = Path(__file__).resolve().parents[1] / "syndicate" / "static" / "wnba" / "cards-parity.js"
+        js_content = js_path.read_text(encoding="utf-8")
+
+        self.assertIn("Why This Pick", js_content)
+        self.assertIn("Confidence", js_content)
+        self.assertIn("Projection", js_content)
+        self.assertIn("Win Probability", js_content)
+        self.assertIn("Edge ${fmtPercentValue(evPct)}", js_content)
+        self.assertIn("Confidence ${confidence}", js_content)
+
 
 if __name__ == "__main__":
     unittest.main()

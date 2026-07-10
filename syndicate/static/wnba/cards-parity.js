@@ -2648,8 +2648,10 @@
       book: row.book,
       evPct: Number(row.evPct),
       pWin: Number(row.pWin),
+      confidence: row.confidence || row.tier || row.klass || null,
       simMu: simValue,
       summary: row.summary,
+      why: row.why,
       reasons: row.reasons,
       matchup: row.matchup,
       rank: row.rank,
@@ -3059,6 +3061,8 @@
     item.photo = String(item.photo || '').trim();
     item.player_photo = String(item.player_photo || '').trim();
     item.book = String(item.book || '').trim();
+    item.confidence = String(item.confidence || item.tier || item.klass || '').trim();
+    item.why = String(item.why || item.why_explain || item.summary || item.basketball_summary || '').trim();
     return item;
   }
 
@@ -3091,6 +3095,7 @@
       const price = Number(safeItem.price);
       const evPct = Number(safeItem.ev_pct);
       const winProb = Number(safeItem.probability ?? safeItem.prob_calib);
+      const confidence = String(safeItem.confidence || safeItem.tier || safeItem.klass || '').trim() || '-';
       const isLiveStrip = String(state.propsStripPayload?.mode || '') === 'live' || isLivePropItem(safeItem);
       const liveEdge = finiteFirst(
         safeItem?.live_edge,
@@ -3107,6 +3112,7 @@
         ? 'cards-chip--accent'
         : (actionLabel === 'WATCH' || actionLabel === 'MEDIUM' ? 'cards-chip--warm' : '');
       const liveProjection = liveProjectionSummary(safeItem);
+      const whyText = String(safeItem.why || safeItem.summary || stripSecondaryText(safeItem) || '').trim();
       const movementLine = movementSummaryText(safeItem?.movement?.line, safeItem?.movement_history, 'line', safeItem?.last_updated);
       const movementPrice = movementSummaryText(safeItem?.movement?.price, safeItem?.movement_history, 'price', safeItem?.last_updated);
       return `
@@ -3128,13 +3134,13 @@
             </div>
             <div class="cards-props-strip-card__play">${escapeHtml(market)} ${escapeHtml(side)} ${Number.isFinite(line) ? fmtNumber(line, 1) : '--'}</div>
             ${liveProjection ? `<div class="cards-props-strip-card__projection">${escapeHtml(liveProjection)}</div>` : ''}
-            <div class="cards-props-strip-card__sub">${escapeHtml(stripSecondaryText(safeItem))}</div>
+            <div class="cards-props-strip-card__sub">${escapeHtml(whyText ? `Why this pick: ${whyText}` : stripSecondaryText(safeItem))}</div>
             ${(movementLine || movementPrice) ? `<div class="cards-props-strip-card__sub is-muted">${escapeHtml([movementLine, movementPrice].filter(Boolean).join(' · '))}</div>` : ''}
             <div class="cards-strip-pills">
               ${actionLabel ? `<span class="cards-chip ${actionClass}">${escapeHtml(actionLabel)}</span>` : ''}
+              ${confidence && confidence !== '-' ? `<span class="cards-chip cards-chip--accent">${escapeHtml(`Confidence ${confidence}`)}</span>` : ''}
+              ${Number.isFinite(evPct) ? `<span class="cards-chip cards-chip--accent">${escapeHtml(`Edge ${fmtPercentValue(evPct)}`)}</span>` : (Number.isFinite(liveEdge) ? `<span class="cards-chip ${liveEdge >= 0 ? 'cards-chip--accent' : ''}">${escapeHtml(`Edge ${fmtSigned(liveEdge, 1)}`)}</span>` : '')}
               ${Number.isFinite(price) ? `<span class="cards-chip">${escapeHtml(fmtAmerican(price))}</span>` : ''}
-              ${isLiveStrip && Number.isFinite(liveEdge) ? `<span class="cards-chip ${liveEdge >= 0 ? 'cards-chip--accent' : ''}">Live edge ${escapeHtml(fmtSigned(liveEdge, 1))}</span>` : ''}
-              ${Number.isFinite(evPct) ? `<span class="cards-chip cards-chip--accent">EV ${escapeHtml(fmtPercentValue(evPct))}</span>` : ''}
               ${Number.isFinite(winProb) ? `<span class="cards-chip">${escapeHtml(isLiveStrip ? fmtPercent(winProb, 0) : fmtPercentValue(winProb))}</span>` : ''}
               ${isLiveStrip && freshnessText ? `<span class="cards-chip">${escapeHtml(freshnessText)}</span>` : ''}
             </div>
@@ -3844,8 +3850,10 @@
       book: item?.book,
       evPct: Number(item?.ev_pct),
       pWin: Number(item?.probability ?? item?.prob_calib),
+      confidence: String(item?.confidence || item?.klass || '').trim(),
       simMu: finiteFirst(item?.sim_mu_adjusted, item?.sim_mu),
       summary: livePropNarrativeSummary(item) || [liveProjectionSummary(item), sourceSummary].filter(Boolean).join(' '),
+      why: sourceSummary,
       reasons: reasonTags,
       matchup: `${awayTri} @ ${homeTri}`,
       rank: index + 1,
@@ -5381,6 +5389,7 @@
             simMu: pick.sim_mu,
             simSd: pick.sim_sd,
             summary: pick.basketball_summary || (pickMatchesRow ? (row.basketball_summary || row.display_pick || '') : (row.display_pick || '')),
+            why: pick.why_explain || row.why_explain || row.basketball_summary || row.display_pick || '',
             reasons: safeArray(pick.reasons).length ? safeArray(pick.reasons) : (pickMatchesRow ? safeArray(row.top_play_reasons) : []),
             matchup: row.matchup,
             rank: index + 1,
@@ -5390,6 +5399,7 @@
             recommendationPriorityScore: row.recommendation_priority_score,
             score: row.score,
             tier: row.tier,
+            confidence: pick.confidence || row.confidence || row.tier || row.klass || null,
             stakeAmount: pickMatchesRow ? row.stake_amount : null,
             stakeUnits: pickMatchesRow ? row.stake_units : null,
             portfolioRank: pickMatchesRow ? row.portfolio_rank : null,
@@ -5716,19 +5726,20 @@
     const simLabel = Number.isFinite(simValue) ? `${fmtNumber(simValue, 1)} ${selected.marketLabel}` : '-';
     const modelLabel = Number.isFinite(simValue) ? `${fmtNumber(simValue, 1)} ${selected.marketLabel} mean` : '-';
     const liveProjLabel = Number.isFinite(projectedValue) ? `${fmtNumber(projectedValue, 1)} ${selected.marketLabel}` : '-';
+    const confidence = String(selected.confidence || selected.tier || selected.klass || '-').trim() || '-';
+    const whyText = String(selected.why || selected.summary || '').trim() || '-';
     return [
+      { label: 'Confidence', value: confidence },
+      { label: 'Why This Pick', value: whyText },
       { label: 'Tier', value: propTierLabel(selected) },
       { label: 'Actual', value: actualLabel },
-      { label: 'Sim row', value: simLabel },
-      { label: 'Model mean', value: modelLabel },
-      { label: 'Live proj', value: liveProjLabel },
+      { label: 'Projection', value: liveProjLabel !== '-' ? liveProjLabel : (simLabel !== '-' ? simLabel : modelLabel) },
       { label: 'Updated', value: matchedLiveRow?.lastSeenAt ? formatTimestampShort(matchedLiveRow.lastSeenAt) : '-' },
       { label: 'Active since', value: matchedLiveRow?.firstSeenAt ? formatTimestampShort(matchedLiveRow.firstSeenAt) : '-' },
-      { label: 'Opened at', value: matchedLiveRow && Number.isFinite(Number(matchedLiveRow.price)) ? fmtAmerican(matchedLiveRow.price) : `${fmtAmerican(selected.price)} ${selected.book || ''}`.trim() },
       { label: 'Line', value: `${selected.side} ${fmtNumber(selected.line, 1)}` },
-      { label: 'Live edge', value: Number.isFinite(Number(matchedLiveRow?.liveEdge)) ? fmtSigned(matchedLiveRow.liveEdge, 1) : '-' },
       { label: 'Odds', value: `${fmtAmerican(selected.price)} ${selected.book || ''}`.trim() },
-      { label: 'Edge', value: Number.isFinite(edgeValue) ? fmtSigned(edgeValue, 1) : '-' },
+      { label: 'Edge', value: Number.isFinite(edgeValue) ? fmtSigned(edgeValue, 1) : (Number.isFinite(Number(selected.evPct)) ? fmtPercentValue(selected.evPct) : '-') },
+      { label: 'Win Probability', value: Number.isFinite(Number(selected.pWin)) ? fmtPercent(Number(selected.pWin), 0) : '-' },
       { label: 'Model', value: modelLabel },
     ];
   }
