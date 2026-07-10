@@ -29,6 +29,7 @@ from syndicate.features.shared.basketball_live_artifacts import build_live_playe
 from syndicate.features.shared.basketball_props_predictions import export_props_predictions_local
 from syndicate.features.shared.basketball_props_recommendations import export_props_recommendations_local
 from syndicate.features.shared.basketball_props_smart_sim import _to_tricode_local
+from syndicate.features.shared.memory_observability import log_runtime_memory
 from syndicate.features.shared.refresh_state_store import build_input_hash
 from syndicate.features.shared.refresh_state_store import path_fingerprint
 from syndicate.features.shared.refresh_state_store import record_refresh_state
@@ -3010,6 +3011,10 @@ def _run_refresh_via_cli(
                 state["error"] = game_predictions_error or f"predictions missing before predict-props for {date_str}"
             else:
                 try:
+                    smart_sim_workers = max(1, _env_int("REFRESH_PREDICT_PROPS_SMART_SIM_WORKERS", 1))
+                    smart_sim_executor = "ProcessPoolExecutor" if smart_sim_workers > 1 else "sequential"
+                    log_runtime_memory("before_smart_sim", phase=state["phase"], worker_count=smart_sim_workers, executor_type=smart_sim_executor)
+                    print(f"SMART_SIM_WORKERS {json.dumps({'worker_count': smart_sim_workers, 'executor_type': smart_sim_executor}, sort_keys=True)}", file=sys.stderr, flush=True)
                     _touch_progress()
                     _, _ = export_props_predictions_local(
                         source_root=source_root,
@@ -3030,6 +3035,7 @@ def _run_refresh_via_cli(
                         heartbeat_every_s=5.0,
                     )
                     _touch_progress()
+                    log_runtime_memory("after_smart_sim", phase=state["phase"], worker_count=smart_sim_workers, executor_type=smart_sim_executor)
                     rc_pred = 0
                 except Exception:
                     _append_log(log_file, traceback.format_exc())
@@ -3099,6 +3105,7 @@ def _run_refresh_via_cli(
         state["phase"] = "export"
         state["phase_started_at"] = dt.datetime.utcnow().isoformat()
         state["rc_export"] = -1
+        log_runtime_memory("before_export", phase=state["phase"], pred_ready=bool(pred_ready))
         _append_log(log_file, f"Export stage starting for {date_str}: pred_ready={pred_ready}, snapshot_rows={int(state.get('snapshot_rows') or 0)}, edges_rows={int(state.get('edges_rows') or 0)}")
         game_cards_rows = 0
         local_game_cards_path = None
@@ -3144,6 +3151,7 @@ def _run_refresh_via_cli(
         state["game_cards_rows"] = int(game_cards_rows)
         state["rc_export"] = int(rc_export)
         state["recs_rows"] = int(_count_csv_rows_quick(rec_fp))
+        log_runtime_memory("after_export", phase=state["phase"], rc_export=state["rc_export"], game_cards_rows=game_cards_rows, recs_rows=state["recs_rows"])
         _append_log(log_file, f"Export stage finished for {date_str}: rc_export={state['rc_export']}, game_cards_rows={game_cards_rows}, recs_rows={state['recs_rows']}")
         source_game_cards_rows = int(_count_csv_rows_quick(source_root / 'data' / 'processed' / f'game_cards_{date_str}.csv'))
         if int(rc_export) != 0:

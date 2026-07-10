@@ -1,3 +1,10 @@
+# 2026-07-09 - Live odds worker RSS logs were parent-only while WNBA could exceed the container through child work
+- Symptom: Render restarted the live odds worker during MLB + WNBA refreshes even though the parent RSS logs stayed around 89-92 MB and no large Python object growth was visible in the parent.
+- Root cause: The launcher and worker memory probes only sampled the current process (`psutil.Process().memory_info().rss`), while `refresh_odds_sources.py` can run sports in parallel and `refresh_wnba_oddsapi_props.py` can fan out WNBA smart-sim work into a `ProcessPoolExecutor`; the container can OOM on child-process RSS that the parent never records.
+- Fix: None yet; the next change should log process-tree RSS (parent plus children) and correlate it with the WNBA smart-sim phase and concurrent MLB overlap.
+- Validation: Static code inspection of `scripts/refresh_odds_sources.py`, `scripts/refresh_wnba_oddsapi_props.py`, and `syndicate/features/shared/basketball_props_smart_sim.py` showed parent-only RSS probes plus parallel sports execution and a WNBA process pool.
+- Follow-up: Add process-tree memory tracing around the launcher, the WNBA smart-sim export, and the child subprocess boundaries before changing the refresh flow.
+
 # 2026-07-09 - Sports refresh now publishes an explicit required/optional contract
 - Symptom: The shared sports refresh manifest only exposed a flat list of artifact paths, so required artifacts and optional enrichments were not spelled out at the contract boundary.
 - Root cause: The refresh orchestrator published control-plane metadata without a first-class refresh contract, which made snapshot, board, manifest, and enrichment expectations implicit instead of machine-readable.

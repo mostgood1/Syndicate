@@ -23,6 +23,7 @@ from syndicate.features.shared.basketball_live_artifacts import build_live_playe
 from syndicate.features.shared.basketball_live_artifacts import _canonical_game_id
 from syndicate.features.shared.basketball_live_artifacts import resolve_event_ids_from_games
 from syndicate.features.shared.game_board_contract import _sim_payload
+from syndicate.features.shared.memory_observability import log_runtime_memory
 from syndicate.features.wnba.sources import available_dates
 from syndicate.features.wnba.sources import build_module_links
 from syndicate.features.wnba.sources import format_moneyline
@@ -892,6 +893,7 @@ def _source_game_market_recommendations(picks: list[dict[str, Any]]) -> list[dic
                 "ev_pct": _safe_float(pick.get("ev_pct")),
                 "basketball_summary": str(pick.get("basketball_summary") or "").strip() or None,
                 "why_explain": str(pick.get("basketball_summary") or pick.get("display_pick") or "").strip() or None,
+                "historical_context": pick.get("historical_context") if isinstance(pick.get("historical_context"), dict) else None,
                 "confidence": str(pick.get("confidence") or pick.get("tier") or "").strip() or None,
                 "line": line_value,
                 "market_line": line_value,
@@ -925,6 +927,29 @@ def _wnba_game_projection_text(score: dict[str, Any] | None) -> str:
     return " | ".join(parts) if parts else "-"
 
 
+def _wnba_historical_context_text(row: dict[str, Any]) -> str:
+    historical_context = row.get("historical_context") if isinstance(row.get("historical_context"), dict) else None
+    if not historical_context and isinstance(row.get("historical_profile"), dict):
+        historical_profile = row.get("historical_profile") if isinstance(row.get("historical_profile"), dict) else {}
+        market_profile = historical_profile.get("market") if isinstance(historical_profile.get("market"), dict) else {}
+        sport_profile = historical_profile.get("sport") if isinstance(historical_profile.get("sport"), dict) else {}
+        source_profile = market_profile if int(market_profile.get("sample_size") or 0) > 0 else sport_profile
+        metrics = source_profile.get("metrics") if isinstance(source_profile.get("metrics"), dict) else {}
+        historical_context = {
+            "roi_segment": metrics.get("roi"),
+            "sample_size": source_profile.get("sample_size") or metrics.get("sample_size") or metrics.get("settled_count"),
+        }
+    if not isinstance(historical_context, dict):
+        return ""
+    roi_segment = _safe_float(historical_context.get("roi_segment"))
+    sample_size = historical_context.get("sample_size")
+    if roi_segment is not None and sample_size is not None:
+        return f"Historical context: {roi_segment:+.3f} ROI across {int(sample_size)} settled bets"
+    if sample_size is not None:
+        return f"Historical context: {int(sample_size)} settled bets"
+    return ""
+
+
 def _wnba_evidence_pack_row(row: dict[str, Any], *, score: dict[str, Any] | None = None) -> dict[str, Any]:
     if not isinstance(row, dict):
         return {}
@@ -936,12 +961,15 @@ def _wnba_evidence_pack_row(row: dict[str, Any], *, score: dict[str, Any] | None
     market_line = _safe_float(row.get("market_line") or row.get("line"))
     model_projection = _wnba_game_projection_text(score)
     best_reason = str(row.get("why_explain") or row.get("basketball_summary") or row.get("display_pick") or plain_text).strip() or plain_text
+    historical_context = _wnba_historical_context_text(row)
 
     show_more_lines: list[str] = []
     if row.get("market_label"):
         selection = str(row.get("selection") or "").strip().upper()
         line_text = format_num(market_line) if market_line is not None else "-"
         show_more_lines.append(f"Market: {row.get('market_label')} {selection} {line_text}".strip())
+    if historical_context:
+        show_more_lines.append(historical_context)
     if model_projection and model_projection != "-":
         show_more_lines.append(f"Projection: {model_projection}")
     if edge_pct is not None:
@@ -961,6 +989,7 @@ def _wnba_evidence_pack_row(row: dict[str, Any], *, score: dict[str, Any] | None
         "model_projection": model_projection,
         "market_line": format_num(market_line) if market_line is not None else "-",
         "best_reason": best_reason,
+        "historical_context": historical_context or None,
         "show_more_lines": show_more_lines,
     }
 
@@ -1424,6 +1453,7 @@ def _hydrate_source_game_with_live_lines(
 def build_source_cards_payload(selected_date: str, *, allow_stored_date_fallback: bool = False) -> dict[str, Any]:
     requested_date = str(selected_date or "").strip() or parse_iso_date(selected_date).isoformat()
     resolved_date = _resolved_source_cards_date(selected_date, allow_stored_date_fallback=allow_stored_date_fallback)
+    log_runtime_memory("build_source_cards_payload_start", selected_date=selected_date, resolved_date=resolved_date)
     parsed_date = parse_iso_date(resolved_date)
     prev_date = (parsed_date - timedelta(days=1)).isoformat()
     next_date = (parsed_date + timedelta(days=1)).isoformat()
@@ -1480,6 +1510,7 @@ def build_source_cards_payload(selected_date: str, *, allow_stored_date_fallback
             if event_id and (not live_lines_by_event or event_id in live_lines_by_event):
                 game["odds_refreshed_at"] = odds_refreshed_at
     games = [_source_game_contract(game, default_start_time=resolved_date) for game in games if isinstance(game, dict)]
+    log_runtime_memory("build_source_cards_payload_end", selected_date=selected_date, resolved_date=resolved_date, games=len(games))
     return {
         "date": resolved_date,
         "requested_date": requested_date,
@@ -4001,10 +4032,12 @@ def _fallback_live_player_lens_game(game: dict[str, Any], *, event_id: str | Non
 
 def build_live_state_payload(selected_date: str, ttl: int = 12, *, allow_stored_date_fallback: bool = True) -> dict[str, Any]:
     is_today = str(selected_date).strip() == central_today_iso()
+    log_runtime_memory("build_live_state_payload_start", selected_date=selected_date, ttl=int(ttl))
 
     if _render_web_dyno():
         local_payload = _local_live_state_payload(selected_date)
         if isinstance(local_payload, dict) and isinstance(local_payload.get("games"), list) and bool(local_payload.get("games")):
+            log_runtime_memory("build_live_state_payload_local_return", selected_date=selected_date, ttl=int(ttl), game_count=len(local_payload.get("games") or []))
             return _attach_odds_refresh_timestamp(local_payload)
         context_for_event_ids = build_cards_page_context(selected_date, allow_stored_date_fallback=allow_stored_date_fallback)
         context_games = context_for_event_ids.get("games") if isinstance(context_for_event_ids.get("games"), list) else []
@@ -4032,6 +4065,7 @@ def build_live_state_payload(selected_date: str, ttl: int = 12, *, allow_stored_
                     "periods": [],
                 }
             )
+        log_runtime_memory("build_live_state_payload_render_return", selected_date=selected_date, ttl=int(ttl), game_count=len(out_games))
         return _maybe_persist_current_day_live_snapshot_artifact("live_state", selected_date, _attach_odds_refresh_timestamp({
             "date": selected_date,
             "ttl": int(ttl),
@@ -4154,6 +4188,7 @@ def build_live_state_payload(selected_date: str, ttl: int = 12, *, allow_stored_
             }
         )
 
+    log_runtime_memory("build_live_state_payload_fallback_return", selected_date=selected_date, ttl=int(ttl), game_count=len(out_games))
     return _maybe_persist_current_day_live_snapshot_artifact("live_state", selected_date, _attach_odds_refresh_timestamp({
         "date": selected_date,
         "ttl": int(ttl),
@@ -4171,6 +4206,7 @@ def build_live_player_boxscore_payload(
     allow_stored_date_fallback: bool = True,
 ) -> dict[str, Any]:
     normalized_event_ids = [str(event_id).strip() for event_id in event_ids if str(event_id).strip()]
+    log_runtime_memory("build_live_player_lens_payload_start", selected_date=selected_date, ttl=int(ttl), event_count=len(normalized_event_ids))
     if not normalized_event_ids:
         normalized_event_ids = _default_live_event_ids(
             selected_date,
@@ -4216,6 +4252,7 @@ def build_live_player_lens_payload(
     allow_stored_date_fallback: bool = True,
 ) -> dict[str, Any]:
     normalized_event_ids = [str(event_id).strip() for event_id in event_ids if str(event_id).strip()]
+    log_runtime_memory("build_live_lines_payload_start", selected_date=selected_date, ttl=int(ttl), event_count=len(normalized_event_ids), include_period_totals=bool(include_period_totals))
     if not normalized_event_ids:
         normalized_event_ids = _default_live_event_ids(
             selected_date,
@@ -4229,6 +4266,7 @@ def build_live_player_lens_payload(
     if is_today and local_timestamp and (datetime.now(timezone.utc) - local_timestamp) > timedelta(minutes=20):
         local_payload = None
     if _payload_has_live_lens_rows(local_payload):
+        log_runtime_memory("build_live_player_lens_payload_local_return", selected_date=selected_date, ttl=int(ttl), event_count=len(normalized_event_ids))
         return _maybe_persist_current_day_live_snapshot_artifact("live_player_lens", resolved_date, _hydrate_live_player_lens_payload(
             _attach_odds_refresh_timestamp(local_payload),
             resolved_date,
@@ -4242,6 +4280,7 @@ def build_live_player_lens_payload(
         allow_stored_date_fallback=allow_stored_date_fallback,
     )
     if _payload_has_live_lens_rows(artifact_payload):
+        log_runtime_memory("build_live_player_lens_payload_artifact_return", selected_date=selected_date, ttl=int(ttl), event_count=len(normalized_event_ids))
         return _maybe_persist_current_day_live_snapshot_artifact("live_player_lens", resolved_date, _hydrate_live_player_lens_payload(
             _attach_odds_refresh_timestamp(artifact_payload),
             resolved_date,
@@ -4257,6 +4296,7 @@ def build_live_player_lens_payload(
         if isinstance(game, dict)
     ]
     if fallback_games:
+        log_runtime_memory("build_live_player_lens_payload_fallback_return", selected_date=selected_date, ttl=int(ttl), event_count=len(normalized_event_ids))
         return _maybe_persist_current_day_live_snapshot_artifact("live_player_lens", resolved_date, _hydrate_live_player_lens_payload(_attach_odds_refresh_timestamp({
             "ok": True,
             "ttl": int(ttl),
@@ -4266,6 +4306,7 @@ def build_live_player_lens_payload(
             "games": fallback_games,
             "generated_at": _wnba_generated_at(),
         }), resolved_date, normalized_event_ids, allow_stored_date_fallback=allow_stored_date_fallback))
+    log_runtime_memory("build_live_player_lens_payload_empty_return", selected_date=selected_date, ttl=int(ttl), event_count=len(normalized_event_ids))
     return _maybe_persist_current_day_live_snapshot_artifact("live_player_lens", resolved_date, _attach_odds_refresh_timestamp({
         "ok": True,
         "ttl": int(ttl),
@@ -4314,6 +4355,7 @@ def build_live_lines_payload(
         normalized_event_ids,
         include_period_totals=bool(include_period_totals),
     ):
+        log_runtime_memory("build_live_lines_payload_local_return", selected_date=selected_date, ttl=int(ttl), event_count=len(normalized_event_ids), include_period_totals=bool(include_period_totals))
         return _maybe_persist_current_day_live_snapshot_artifact("live_lines", resolved_date, _attach_odds_refresh_timestamp(_finalize_live_lines_payload(merged_payload, include_period_totals=bool(include_period_totals))))
 
     artifact_payload = _artifact_live_lines_payload(
@@ -4329,6 +4371,7 @@ def build_live_lines_payload(
             normalized_event_ids,
             include_period_totals=bool(include_period_totals),
         ):
+            log_runtime_memory("build_live_lines_payload_artifact_return", selected_date=selected_date, ttl=int(ttl), event_count=len(normalized_event_ids), include_period_totals=bool(include_period_totals))
             return _maybe_persist_current_day_live_snapshot_artifact("live_lines", resolved_date, _attach_odds_refresh_timestamp(_finalize_live_lines_payload(merged_payload, include_period_totals=bool(include_period_totals))))
 
     game_index = _resolve_games_for_event_ids(resolved_date, normalized_event_ids)
@@ -4350,9 +4393,12 @@ def build_live_lines_payload(
             "generated_at": _wnba_generated_at(),
         }
         merged_payload = _merge_live_lines_payloads(merged_payload, fallback_payload)
+        log_runtime_memory("build_live_lines_payload_fallback_return", selected_date=selected_date, ttl=int(ttl), event_count=len(normalized_event_ids), include_period_totals=bool(include_period_totals))
         return _maybe_persist_current_day_live_snapshot_artifact("live_lines", resolved_date, _attach_odds_refresh_timestamp(_finalize_live_lines_payload(merged_payload or fallback_payload, include_period_totals=bool(include_period_totals))))
     if merged_payload:
+        log_runtime_memory("build_live_lines_payload_merged_return", selected_date=selected_date, ttl=int(ttl), event_count=len(normalized_event_ids), include_period_totals=bool(include_period_totals))
         return _maybe_persist_current_day_live_snapshot_artifact("live_lines", resolved_date, _attach_odds_refresh_timestamp(_finalize_live_lines_payload(merged_payload, include_period_totals=bool(include_period_totals))))
+    log_runtime_memory("build_live_lines_payload_empty_return", selected_date=selected_date, ttl=int(ttl), event_count=len(normalized_event_ids), include_period_totals=bool(include_period_totals))
     return _maybe_persist_current_day_live_snapshot_artifact("live_lines", resolved_date, _attach_odds_refresh_timestamp({
         "ok": True,
         "ttl": int(ttl),

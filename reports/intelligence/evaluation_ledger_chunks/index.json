@@ -65,6 +65,11 @@
       "path": "D:\\a\\Syndicate\\Syndicate\\reports\\intelligence\\evaluation_ledger_chunks\\2026-07-05.jsonl",
       "updated_at": "2026-07-05T07:06:10Z"
     },
+    "pred_eee2d226db2d": {
+      "chunk": "2026-06-04",
+      "path": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\intelligence\\evaluation_ledger_chunks\\2026-06-04.jsonl",
+      "updated_at": "2026-07-10T02:57:03Z"
+    },
     "pred_f0d1401e8bed": {
       "chunk": "2026-07-08",
       "path": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\intelligence\\evaluation_ledger_chunks\\2026-07-08.jsonl",
@@ -1580,6 +1585,11 @@
       "path": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\intelligence\\evaluation_ledger_chunks\\2026-07-08.jsonl",
       "updated_at": "2026-07-08T17:32:51Z"
     },
+    "rec_aea10d978a2c": {
+      "chunk": "2026-06-04",
+      "path": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\intelligence\\evaluation_ledger_chunks\\2026-06-04.jsonl",
+      "updated_at": "2026-07-10T02:57:04Z"
+    },
     "rec_aebec509195b": {
       "chunk": "2026-07-08",
       "path": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\intelligence\\evaluation_ledger_chunks\\2026-07-08.jsonl",
@@ -2321,5 +2331,5 @@
       "updated_at": "2026-07-08T17:18:48Z"
     }
   },
-  "updated_at": "2026-07-09T03:44:13Z"
+  "updated_at": "2026-07-10T02:57:04Z"
 }

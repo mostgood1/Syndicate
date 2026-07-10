@@ -31,6 +31,7 @@ class WnbaCardsEvidencePackTests(unittest.TestCase):
                 "basketball_summary": "Model projects the home side and a clean spread edge.",
                 "tier": "A",
                 "recommendation_priority_score": 8.4,
+                "historical_context": {"roi_segment": 0.142, "sample_size": 28},
             }
         ]
 
@@ -50,10 +51,11 @@ class WnbaCardsEvidencePackTests(unittest.TestCase):
         self.assertEqual(first.get("confidence"), "A")
         self.assertEqual(first.get("market_line"), "-2.5")
         self.assertEqual(first.get("best_reason"), "Model projects the home side and a clean spread edge.")
+        self.assertEqual(first.get("historical_context"), "Historical context: +0.142 ROI across 28 settled bets")
         self.assertEqual(first.get("edge_pct"), 4.8)
         self.assertEqual(first.get("win_probability"), 0.72)
         self.assertIn("Score", str(first.get("model_projection")))
-        self.assertGreaterEqual(len(first.get("show_more_lines") or []), 4)
+        self.assertGreaterEqual(len(first.get("show_more_lines") or []), 5)
 
     def test_source_cards_payload_propagates_evidence_pack(self) -> None:
         artifact_bundle = {
@@ -83,6 +85,7 @@ class WnbaCardsEvidencePackTests(unittest.TestCase):
                         "basketball_summary": "Model projects the home side and a clean spread edge.",
                         "tier": "A",
                         "recommendation_priority_score": 8.4,
+                        "historical_context": {"roi_segment": 0.142, "sample_size": 28},
                     }
                 ]
             },

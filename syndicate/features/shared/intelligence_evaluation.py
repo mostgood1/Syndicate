@@ -803,11 +803,12 @@ def _iter_record_payloads(records: Iterable[Mapping[str, Any]] | None = None, *,
 
 
 def _record_sport(record: Mapping[str, Any]) -> str | None:
+    recommendation = _copy_mapping(record.get("recommendation"))
     artifact_metadata = _copy_mapping(record.get("artifact_metadata"))
     response = _copy_mapping(record.get("response"))
     query = _copy_mapping(record.get("query"))
     return (
-        str(artifact_metadata.get("sport") or query.get("sport") or response.get("sport") or "").strip().lower()
+        str(recommendation.get("sport") or recommendation.get("sport_slug") or artifact_metadata.get("sport") or query.get("sport") or response.get("sport") or "").strip().lower()
         or None
     )
 
@@ -992,6 +993,281 @@ def build_evaluation_history_summary(*, records: Iterable[Mapping[str, Any]] | N
     return summary
 
 
+def _recommendation_source(record: Mapping[str, Any]) -> dict[str, Any]:
+    recommendation = _copy_mapping(record.get("recommendation"))
+    if recommendation:
+        return recommendation
+    return _copy_mapping(record)
+
+
+def _recommendation_publish_timestamp(record: Mapping[str, Any]) -> str | None:
+    for key in ("created_at", "published_at", "published_timestamp", "publish_timestamp", "settled_at"):
+        value = str(record.get(key) or "").strip()
+        if value:
+            return value
+    recommendation = _recommendation_source(record)
+    for key in ("created_at", "published_at", "published_timestamp", "publish_timestamp"):
+        value = str(recommendation.get(key) or "").strip()
+        if value:
+            return value
+    return None
+
+
+def _recommendation_side(record: Mapping[str, Any]) -> str | None:
+    recommendation = _recommendation_source(record)
+    value = (
+        recommendation.get("side")
+        or recommendation.get("selection_side")
+        or recommendation.get("lean")
+        or recommendation.get("ev_side")
+        or record.get("side")
+    )
+    text = str(value or "").strip().upper()
+    return text or None
+
+
+def _recommendation_market(record: Mapping[str, Any]) -> str | None:
+    recommendation = _recommendation_source(record)
+    value = (
+        recommendation.get("market")
+        or recommendation.get("market_key")
+        or recommendation.get("market_label")
+        or recommendation.get("market_family")
+        or record.get("market")
+        or record.get("market_key")
+    )
+    text = str(value or "").strip().lower()
+    return text or None
+
+
+def _recommendation_type(record: Mapping[str, Any]) -> str:
+    recommendation = _recommendation_source(record)
+    value = (
+        recommendation.get("recommendation_type")
+        or recommendation.get("type")
+        or recommendation.get("candidate_type")
+        or recommendation.get("kind")
+        or recommendation.get("surface")
+        or _record_market_family(record)
+        or "unknown"
+    )
+    return str(value or "unknown").strip().lower() or "unknown"
+
+
+def _confidence_tier(value: Any) -> str:
+    confidence = _coerce_probability(value)
+    if confidence is None:
+        text = str(value or "").strip().lower()
+        if not text:
+            return "unrated"
+        if text in {"a", "a+", "top", "high", "elite"}:
+            return "elite"
+        if text in {"b", "mid", "medium"}:
+            return "medium"
+        if text in {"c", "low"}:
+            return "low"
+        return text
+    if confidence < 0.55:
+        return "low"
+    if confidence < 0.65:
+        return "medium-low"
+    if confidence < 0.75:
+        return "medium-high"
+    if confidence < 0.85:
+        return "high"
+    return "elite"
+
+
+def _edge_bucket(value: Any) -> str:
+    edge = _coerce_float(value)
+    if edge is None:
+        return "unrated"
+    if edge < 0:
+        return "negative"
+    if edge < 2:
+        return "0-2"
+    if edge < 5:
+        return "2-5"
+    if edge < 8:
+        return "5-8"
+    return "8+"
+
+
+def _record_stake(record: Mapping[str, Any]) -> float:
+    recommendation = _recommendation_source(record)
+    stake = _coerce_float(record.get("stake"))
+    if stake is None:
+        stake = _coerce_float(recommendation.get("stake"))
+    return float(stake) if stake is not None and stake > 0 else 1.0
+
+
+def _record_clv(record: Mapping[str, Any]) -> float | None:
+    recommendation = _recommendation_source(record)
+    open_line = _coerce_float(recommendation.get("line") or recommendation.get("projected") or record.get("line"))
+    closing_line = _coerce_float(record.get("closing_line"))
+    if open_line is None or closing_line is None:
+        return None
+    direction = _direction_from_recommendation(recommendation) or 1.0
+    return round((open_line - closing_line) * direction, 4)
+
+
+def _normalized_performance_record(record: Mapping[str, Any]) -> dict[str, Any]:
+    recommendation = _recommendation_source(record)
+    result = _result_label(record.get("result") or recommendation.get("result"))
+    pnl = _coerce_float(record.get("pnl"))
+    stake = _record_stake(record)
+    roi = round(pnl / stake, 4) if pnl is not None else None
+    edge_pct = _coerce_float(
+        recommendation.get("edge_pct")
+        or recommendation.get("adjusted_edge")
+        or record.get("edge_pct")
+        or record.get("expected_value")
+    )
+    if edge_pct is None:
+        edge_value = _coerce_float(recommendation.get("edge") or record.get("edge"))
+        if edge_value is not None:
+            edge_pct = round(edge_value * 100.0, 2) if abs(edge_value) <= 1.0 else round(edge_value, 2)
+    edge_bucket = _edge_bucket(edge_pct)
+    model_probability = _coerce_probability(recommendation.get("model_probability") or record.get("model_probability") or recommendation.get("confidence") or record.get("confidence"))
+    implied_probability = _coerce_probability(record.get("implied_probability") or recommendation.get("implied_probability"))
+    confidence_value = recommendation.get("confidence") or record.get("confidence") or recommendation.get("tier") or recommendation.get("klass")
+    normalized = {
+        "prediction_id": str(record.get("prediction_id") or "").strip() or None,
+        "recommendation_id": str(record.get("recommendation_id") or "").strip() or None,
+        "sport": _record_sport(record),
+        "market": _recommendation_market(record),
+        "side": _recommendation_side(record),
+        "line": _coerce_float(recommendation.get("line") or recommendation.get("market_line") or record.get("line")),
+        "odds": _coerce_float(recommendation.get("odds") or record.get("odds")),
+        "model_probability": model_probability,
+        "implied_probability": implied_probability,
+        "edge_pct": edge_pct,
+        "edge_bucket": edge_bucket,
+        "confidence": confidence_value,
+        "confidence_tier": _confidence_tier(confidence_value),
+        "publish_timestamp": _recommendation_publish_timestamp(record),
+        "result": result,
+        "pnl": pnl,
+        "stake": stake,
+        "roi": roi,
+        "clv": _record_clv(record),
+        "recommendation_type": _recommendation_type(record),
+        "selection": str(recommendation.get("selection") or recommendation.get("pick") or recommendation.get("name") or record.get("selection") or record.get("pick") or record.get("name") or "").strip() or None,
+        "name": str(recommendation.get("name") or recommendation.get("player") or recommendation.get("team") or record.get("name") or record.get("player") or record.get("team") or "").strip() or None,
+    }
+    return {key: value for key, value in normalized.items() if value is not None}
+
+
+def _aggregate_performance_rows(rows: list[dict[str, Any]], *, bucket_key: str, label_key: str | None = None) -> list[dict[str, Any]]:
+    grouped: dict[str, dict[str, Any]] = {}
+    for row in rows:
+        bucket = str(row.get(bucket_key) or "unrated").strip().lower() or "unrated"
+        label = str(row.get(label_key) or bucket).strip() if label_key else bucket
+        bucket_row = grouped.setdefault(
+            bucket,
+            {
+                "bucket": bucket,
+                "label": label,
+                "publish_count": 0,
+                "settled_count": 0,
+                "wins": 0,
+                "losses": 0,
+                "pushes": 0,
+                "stake_total": 0.0,
+                "pnl_total": 0.0,
+                "clv_values": [],
+                "edge_values": [],
+                "model_prob_values": [],
+                "implied_prob_values": [],
+            },
+        )
+        bucket_row["publish_count"] += 1
+        result = str(row.get("result") or "pending").strip().lower() or "pending"
+        if result in {"win", "loss", "push", "void"}:
+            bucket_row["settled_count"] += 1
+            bucket_row["stake_total"] += float(row.get("stake") or 1.0)
+            bucket_row["pnl_total"] += float(row.get("pnl") or 0.0)
+        if result == "win":
+            bucket_row["wins"] += 1
+        elif result == "loss":
+            bucket_row["losses"] += 1
+        elif result in {"push", "void"}:
+            bucket_row["pushes"] += 1
+        clv_value = _coerce_float(row.get("clv"))
+        if clv_value is not None:
+            bucket_row["clv_values"].append(clv_value)
+        edge_value = _coerce_float(row.get("edge_pct"))
+        if edge_value is not None:
+            bucket_row["edge_values"].append(edge_value)
+        model_probability = _coerce_probability(row.get("model_probability"))
+        if model_probability is not None:
+            bucket_row["model_prob_values"].append(model_probability)
+        implied_probability = _coerce_probability(row.get("implied_probability"))
+        if implied_probability is not None:
+            bucket_row["implied_prob_values"].append(implied_probability)
+
+    summaries: list[dict[str, Any]] = []
+    for bucket_row in grouped.values():
+        decisive = bucket_row["wins"] + bucket_row["losses"]
+        roi = round(bucket_row["pnl_total"] / bucket_row["stake_total"], 4) if bucket_row["stake_total"] > 0 else None
+        summaries.append(
+            {
+                "bucket": bucket_row["bucket"],
+                "label": bucket_row["label"],
+                "publish_count": bucket_row["publish_count"],
+                "settled_count": bucket_row["settled_count"],
+                "wins": bucket_row["wins"],
+                "losses": bucket_row["losses"],
+                "pushes": bucket_row["pushes"],
+                "win_rate": (bucket_row["wins"] / float(decisive)) if decisive else None,
+                "roi": roi,
+                "clv": mean(bucket_row["clv_values"]) if bucket_row["clv_values"] else None,
+                "avg_edge": mean(bucket_row["edge_values"]) if bucket_row["edge_values"] else None,
+                "avg_model_probability": mean(bucket_row["model_prob_values"]) if bucket_row["model_prob_values"] else None,
+                "avg_implied_probability": mean(bucket_row["implied_prob_values"]) if bucket_row["implied_prob_values"] else None,
+            }
+        )
+
+    def _sort_key(item: Mapping[str, Any]) -> tuple[int, float, str]:
+        return (
+            int(item.get("publish_count") or 0),
+            float(item.get("roi") or -9999.0),
+            str(item.get("label") or item.get("bucket") or ""),
+        )
+
+    return sorted(summaries, key=_sort_key, reverse=True)
+
+
+def build_recommendation_performance_analytics(*, records: Iterable[Mapping[str, Any]] | None = None, ledger_path: Path | str | None = None) -> dict[str, Any]:
+    raw_records = _latest_by_recommendation_id(_iter_record_payloads(records, ledger_path=ledger_path))
+    normalized_records = [_normalized_performance_record(record) for record in raw_records]
+    settled_records = [record for record in normalized_records if str(record.get("result") or "").strip().lower() in {"win", "loss", "push", "void"}]
+    total_stake = sum(float(record.get("stake") or 1.0) for record in settled_records)
+    total_pnl = sum(float(record.get("pnl") or 0.0) for record in settled_records)
+    summary = {
+        "publish_count": len(normalized_records),
+        "settled_count": len(settled_records),
+        "win_rate": None,
+        "roi": round(total_pnl / total_stake, 4) if total_stake > 0 else None,
+        "clv": mean([float(record.get("clv")) for record in settled_records if record.get("clv") is not None]) if any(record.get("clv") is not None for record in settled_records) else None,
+        "total_pnl": round(total_pnl, 4),
+    }
+    decisive_records = [record for record in settled_records if str(record.get("result") or "").strip().lower() in {"win", "loss"}]
+    if decisive_records:
+        wins = sum(1 for record in decisive_records if str(record.get("result") or "").strip().lower() == "win")
+        summary["win_rate"] = wins / float(len(decisive_records))
+
+    return {
+        "summary": summary,
+        "records": normalized_records,
+        "by_sport": _aggregate_performance_rows(normalized_records, bucket_key="sport"),
+        "by_market": _aggregate_performance_rows(normalized_records, bucket_key="market"),
+        "by_confidence_tier": _aggregate_performance_rows(normalized_records, bucket_key="confidence_tier"),
+        "by_edge_bucket": _aggregate_performance_rows(normalized_records, bucket_key="edge_bucket"),
+        "by_recommendation_type": _aggregate_performance_rows(normalized_records, bucket_key="recommendation_type"),
+    }
+
+
 def adjust_confidence(base_confidence: float, *, records: Iterable[Mapping[str, Any]] | None = None, ledger_path: Path | str | None = None, sport: str | None = None) -> tuple[float, dict[str, Any]]:
     profile = build_reliability_profile(records=records, ledger_path=ledger_path, sport=sport)
     adjusted = float(base_confidence)
@@ -1044,6 +1320,7 @@ def build_intelligence_evaluation_bundle(*, query: Any, response: Any, persist: 
         sport=artifact_metadata.get("sport"),
         market_family=_record_market_family(recommendation_records[0]) if recommendation_records else None,
     )
+    performance_analytics = build_recommendation_performance_analytics(records=None, ledger_path=ledger_path)
     _intel_trace(
         "evaluation_bundle",
         recommendation_count=len(recommendation_rows),
@@ -1051,6 +1328,7 @@ def build_intelligence_evaluation_bundle(*, query: Any, response: Any, persist: 
         portfolio_event_records=len(portfolio_event_records),
         market_features=len(market_features),
         history_status=history_summary.get("history_status") if isinstance(history_summary, dict) else None,
+        performance_publish_count=performance_analytics.get("summary", {}).get("publish_count") if isinstance(performance_analytics, dict) else None,
     )
     _intel_trace_timed(
         "evaluation_bundle",
@@ -1060,6 +1338,7 @@ def build_intelligence_evaluation_bundle(*, query: Any, response: Any, persist: 
         portfolio_event_records=len(portfolio_event_records),
         market_features=len(market_features),
         history_status=history_summary.get("history_status") if isinstance(history_summary, dict) else None,
+        performance_publish_count=performance_analytics.get("summary", {}).get("publish_count") if isinstance(performance_analytics, dict) else None,
     )
     return {
         "schema_version": SCHEMA_VERSION,
@@ -1073,6 +1352,7 @@ def build_intelligence_evaluation_bundle(*, query: Any, response: Any, persist: 
         "metrics": compute_metrics(records=recommendation_records),
         "market_summary": market_feature_summary(market_features),
         "history": history_summary,
+        "performance_analytics": performance_analytics,
     }
 
 
@@ -1084,6 +1364,7 @@ __all__ = [
     "build_reliability_profile",
     "build_intelligence_evaluation_bundle",
     "build_evaluation_history_summary",
+    "build_recommendation_performance_analytics",
     "adjust_confidence",
     "compute_metrics",
     "record_prediction",

@@ -179,6 +179,11 @@ def _attach_intelligence_response_aliases(response: dict[str, Any]) -> dict[str,
 
     response["boardContract"] = dict(response.get("board_contract") or {})
     response["evaluationBundle"] = dict(response.get("evaluation_bundle") or {})
+    performance_analytics = response.get("performance_analytics")
+    if not isinstance(performance_analytics, dict) and isinstance(response.get("evaluation_bundle"), dict):
+        performance_analytics = response.get("evaluation_bundle", {}).get("performance_analytics")
+    response["performance_analytics"] = dict(performance_analytics or {})
+    response["performanceAnalytics"] = dict(performance_analytics or {})
     response["policyControl"] = dict(response.get("policy_control") or {})
     response["recommendationHistory"] = dict(response.get("recommendation_history") or {})
     response["portfolioTracking"] = dict(response.get("portfolio_tracking") or {})

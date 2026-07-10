@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from syndicate.features.shared.memory_observability import log_dataframe_memory
 from syndicate.features.shared.request_path_guard import warn_if_compute_in_request_path
 
 
@@ -281,6 +282,7 @@ def compute_player_priors_local(*, processed_root: Path, date_str: str, cfg: Pla
             player_prior = player_prior[player_prior["__season_year"] == fallback_season_year].copy()
         frames.append(player_prior)
     use = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
+    log_dataframe_memory("basketball_props_onnx.player_history_concat", use)
     if use.empty:
         return PlayerPriors(config=cfg, rates={}, games={})
     keep = ["TEAM_ABBREVIATION", "PLAYER_KEY"] + [column for column in stat_cols.values() if column in use.columns]
@@ -291,6 +293,7 @@ def compute_player_priors_local(*, processed_root: Path, date_str: str, cfg: Pla
     games = use.groupby(["TEAM_ABBREVIATION", "PLAYER_KEY"]).size().reset_index()
     games = games.rename(columns={0: "games", "size": "games"})
     out = out.merge(games, on=["TEAM_ABBREVIATION", "PLAYER_KEY"], how="left")
+    log_dataframe_memory("basketball_props_onnx.player_priors_output", out)
     rates: dict[tuple[str, str], dict[str, float]] = {}
     games_map: dict[tuple[str, str], int] = {}
     for _, row in out.iterrows():

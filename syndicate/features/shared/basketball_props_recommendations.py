@@ -6,6 +6,10 @@ import math
 import unicodedata
 from pathlib import Path
 
+import pandas as pd
+
+from syndicate.features.shared.memory_observability import log_dataframe_memory
+
 
 OUTPUT_COLUMNS = [
     "player",
@@ -334,5 +338,7 @@ def export_props_recommendations_local(
         row["top_play_line_adv"] = line_adv
         rows.append(row)
 
+    df = pd.DataFrame(rows)
+    log_dataframe_memory("basketball_props_recommendations.output", df)
     _write_csv_rows(out_path, rows)
     return len(rows), out_path

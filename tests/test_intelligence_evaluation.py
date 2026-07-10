@@ -7,6 +7,7 @@ from unittest.mock import patch
 
 import syndicate.features.shared.intelligence_evaluation as intelligence_evaluation
 from syndicate.features.shared.intelligence_evaluation import build_intelligence_evaluation_bundle
+from syndicate.features.shared.intelligence_evaluation import build_recommendation_performance_analytics
 from syndicate.features.shared.intelligence_evaluation import adjust_confidence
 from syndicate.features.shared.intelligence_evaluation import compute_metrics
 from syndicate.features.shared.intelligence_evaluation import record_prediction
@@ -104,6 +105,68 @@ class IntelligenceEvaluationTests(unittest.TestCase):
         self.assertEqual(bundle["history"]["sport"], "nba")
         self.assertEqual(bundle["history"]["market_family"], "props")
         self.assertIn("history_status", bundle["history"])
+
+    def test_build_recommendation_performance_analytics_groups_roi_and_clv(self) -> None:
+        records = [
+            {
+                "prediction_id": "pred_1",
+                "recommendation_id": "rec_1",
+                "created_at": "2026-06-11T12:00:00Z",
+                "stake": 1.0,
+                "pnl": 0.8,
+                "result": "win",
+                "closing_line": 27.5,
+                "recommendation": {
+                    "sport": "nba",
+                    "market": "points",
+                    "selection": "Over 28.5",
+                    "name": "Jayson Tatum Over 28.5",
+                    "line": 28.5,
+                    "odds": -110,
+                    "model_probability": 0.64,
+                    "implied_probability": 0.55,
+                    "edge_pct": 7.0,
+                    "confidence": 0.78,
+                    "recommendation_type": "prop",
+                },
+            },
+            {
+                "prediction_id": "pred_2",
+                "recommendation_id": "rec_2",
+                "created_at": "2026-06-11T12:05:00Z",
+                "stake": 2.0,
+                "pnl": -2.0,
+                "result": "loss",
+                "closing_line": 10.5,
+                "recommendation": {
+                    "sport": "wnba",
+                    "market": "rebounds",
+                    "selection": "Under 8.5",
+                    "name": "A'ja Wilson Under 8.5 Rebounds",
+                    "line": 8.5,
+                    "odds": +102,
+                    "model_probability": 0.58,
+                    "implied_probability": 0.49,
+                    "edge_pct": 4.0,
+                    "confidence": 0.62,
+                    "recommendation_type": "prop",
+                },
+            },
+        ]
+
+        analytics = build_recommendation_performance_analytics(records=records)
+
+        self.assertEqual(analytics["summary"]["publish_count"], 2)
+        self.assertEqual(analytics["summary"]["settled_count"], 2)
+        self.assertAlmostEqual(analytics["summary"]["roi"], -0.4, places=2)
+        self.assertEqual(len(analytics["by_sport"]), 2)
+        self.assertEqual(analytics["by_sport"][0]["bucket"], "nba")
+        self.assertEqual(analytics["by_market"][0]["bucket"], "points")
+        self.assertIn("high", {row["bucket"] for row in analytics["by_confidence_tier"]})
+        self.assertIn("5-8", {row["bucket"] for row in analytics["by_edge_bucket"]})
+        self.assertEqual({row["bucket"] for row in analytics["by_recommendation_type"]}, {"prop"})
+        self.assertEqual(analytics["records"][0]["publish_timestamp"], "2026-06-11T12:00:00Z")
+        self.assertIn("clv", analytics["records"][0])
 
     def test_default_ledger_path_writes_chunked_records(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
