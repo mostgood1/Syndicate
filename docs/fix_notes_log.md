@@ -1,3 +1,10 @@
+# 2026-07-10 - WNBA refresh now logs DataFrame and phase memory at the likely RSS growth points
+- Symptom: The refresh worker was reaching about 1.6 GB RSS during `refresh_odds_sources.py`, but the existing logs only showed coarse step boundaries.
+- Root cause: The WNBA props path was doing the heavy `read_csv` -> copy -> filter -> merge -> export work without DataFrame-level or phase-level checkpoints, so the RSS spike could not be localized.
+- Fix: Added `_log_frame_memory(...)` plus runtime checkpoints around the WNBA props snapshot, game-cards build, prediction repair, edge export, recommendations export, and local game-card/recommendation builders.
+- Validation: `scripts/refresh_wnba_oddsapi_props.py` passed error checks after the instrumentation patch.
+- Follow-up: Re-run the refresh and use the new `DATAFRAME_MEMORY` / `LIVE_ODDS_WORKER_MEMORY` logs to identify which frame transition accounts for the ~1.6 GB peak.
+
 # 2026-07-09 - Refresh container memory accounting now logs all visible processes
 - Symptom: The latest Render odds-refresh run showed a ~450-470 MB gap between container memory and the observed refresh process tree while child_count stayed 0.
 - Root cause: The existing probes only sampled the refresh process tree, so they could not account for web-service peers, sidecars, or other visible container processes.

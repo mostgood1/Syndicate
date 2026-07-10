@@ -29,6 +29,7 @@ from syndicate.features.shared.basketball_live_artifacts import build_live_playe
 from syndicate.features.shared.basketball_props_predictions import export_props_predictions_local
 from syndicate.features.shared.basketball_props_recommendations import export_props_recommendations_local
 from syndicate.features.shared.basketball_props_smart_sim import _to_tricode_local
+from syndicate.features.shared.memory_observability import log_dataframe_memory
 from syndicate.features.shared.memory_observability import log_runtime_memory
 from syndicate.features.shared.refresh_state_store import build_input_hash
 from syndicate.features.shared.refresh_state_store import path_fingerprint
@@ -749,6 +750,11 @@ def _append_log(log_file: Path, line: str) -> None:
             out.write(f"[{dt.datetime.utcnow().isoformat(timespec='seconds')}] {line.rstrip()}\n")
     except Exception:
         pass
+
+
+def _log_frame_memory(stage: str, frame: object, **details: object) -> None:
+    log_runtime_memory(stage, **details)
+    log_dataframe_memory(stage, frame)
 
 
 def _refresh_step_input_hash(*, source_root: Path, processed_root: Path, date_str: str, do_edges: bool, do_export: bool, artifact_root: Path | None = None) -> str:
@@ -1551,6 +1557,7 @@ def _build_local_game_cards_artifact(*, source_root: Path, processed_root: Path,
                 import pandas as pd
 
                 props_frame = pd.read_csv(props_snapshot_path)
+                _log_frame_memory("wnba_props_snapshot_read", props_frame, path=str(props_snapshot_path))
             except Exception as exc:
                 _append_log(log_file, f"Failed to read raw player props snapshot {props_snapshot_path}: {exc}")
                 props_frame = pd.DataFrame()
@@ -1558,8 +1565,10 @@ def _build_local_game_cards_artifact(*, source_root: Path, processed_root: Path,
             required_columns = {"event_id", "commence_time", "home_team", "away_team"}
             if not props_frame.empty and required_columns.issubset(set(str(column) for column in props_frame.columns)):
                 working = props_frame.copy()
+                _log_frame_memory("wnba_props_snapshot_copied", working, path=str(props_snapshot_path))
                 working["commence_time"] = working["commence_time"].astype(str)
                 working = working[working["commence_time"].str.startswith(_game_card_date_prefixes())].copy()
+                _log_frame_memory("wnba_props_snapshot_filtered", working, path=str(props_snapshot_path))
                 if not working.empty:
                     rows_out: list[dict[str, object]] = []
                     grouped = working.groupby(["event_id", "commence_time", "home_team", "away_team"], dropna=False, sort=True)
@@ -1713,6 +1722,7 @@ def _build_local_game_cards_artifact(*, source_root: Path, processed_root: Path,
             raw_frame = pd.read_parquet(raw_path)
         else:
             raw_frame = pd.read_csv(raw_path)
+        _log_frame_memory("wnba_game_cards_raw_read", raw_frame, path=str(raw_path))
     except Exception as exc:
         _log(f"Failed to read raw team odds snapshot {raw_path}: {exc}")
         return 0, None
@@ -1726,8 +1736,10 @@ def _build_local_game_cards_artifact(*, source_root: Path, processed_root: Path,
         return 0, None
 
     working = raw_frame.copy()
+    _log_frame_memory("wnba_game_cards_copied", working, path=str(raw_path))
     working["commence_time"] = working["commence_time"].astype(str)
     working = working[working["commence_time"].str.startswith(_game_card_date_prefixes())].copy()
+    _log_frame_memory("wnba_game_cards_filtered", working, path=str(raw_path))
     if working.empty:
         return 0, None
 
@@ -2661,6 +2673,9 @@ def _repair_predictions_slate_from_game_odds_if_needed(*, processed_root: Path, 
         pred_df = pd.read_csv(pred_path) if pred_exists else pd.DataFrame()
         odds_df = pd.read_csv(game_odds_path) if (game_odds_path.exists() and game_odds_path.is_file() and _count_csv_rows_quick(game_odds_path) > 0) else pd.DataFrame()
         props_df = pd.read_csv(props_snapshot_path) if (props_snapshot_path.exists() and props_snapshot_path.is_file() and _count_csv_rows_quick(props_snapshot_path) > 0) else pd.DataFrame()
+        _log_frame_memory("wnba_repair_pred_read", pred_df, path=str(pred_path))
+        _log_frame_memory("wnba_repair_odds_read", odds_df, path=str(game_odds_path))
+        _log_frame_memory("wnba_repair_props_read", props_df, path=str(props_snapshot_path))
     except Exception:
         return bool(pred_exists)
 
@@ -2669,8 +2684,10 @@ def _repair_predictions_slate_from_game_odds_if_needed(*, processed_root: Path, 
 
     if "date" in odds_df.columns and not odds_df.empty:
         odds_df = odds_df.copy()
+        _log_frame_memory("wnba_repair_odds_copied", odds_df, path=str(game_odds_path))
         odds_df["date"] = pd.to_datetime(odds_df["date"], errors="coerce").dt.strftime("%Y-%m-%d")
         odds_df = odds_df[odds_df["date"] == str(date_str)].copy()
+        _log_frame_memory("wnba_repair_odds_filtered", odds_df, path=str(game_odds_path))
     odds_pairs = {
         _norm_pair(row.get("home_team"), row.get("visitor_team"))
         for _, row in odds_df.iterrows()
@@ -2688,9 +2705,11 @@ def _repair_predictions_slate_from_game_odds_if_needed(*, processed_root: Path, 
 
     if pred_df is not None and not pred_df.empty:
         pred_work = pred_df.copy()
+        _log_frame_memory("wnba_repair_pred_copied", pred_work, path=str(pred_path))
         if "date" in pred_work.columns:
             pred_work["date"] = pd.to_datetime(pred_work["date"], errors="coerce").dt.strftime("%Y-%m-%d")
             pred_work = pred_work[pred_work["date"] == str(date_str)].copy()
+            _log_frame_memory("wnba_repair_pred_filtered", pred_work, path=str(pred_path))
         pred_pairs = {
             _norm_pair(row.get("home_team"), row.get("visitor_team"))
             for _, row in pred_work.iterrows()
@@ -2704,6 +2723,7 @@ def _repair_predictions_slate_from_game_odds_if_needed(*, processed_root: Path, 
     if not props_df.empty:
         rebuild = props_df[[column for column in ["home_team", "away_team", "commence_time"]
                             if column in props_df.columns]].copy()
+        _log_frame_memory("wnba_repair_rebuild_from_props", rebuild, path=str(props_snapshot_path))
 
         rebuild = rebuild.rename(columns={"away_team": "visitor_team"})
         rebuild["date"] = str(date_str)
@@ -2720,6 +2740,7 @@ def _repair_predictions_slate_from_game_odds_if_needed(*, processed_root: Path, 
 # ✅ merge odds if available
     if not odds_df.empty:
         odds_merge = odds_df.copy()
+        _log_frame_memory("wnba_repair_odds_merge_copy", odds_merge, path=str(game_odds_path))
 
         if "visitor_team" not in odds_merge.columns:
             if "away_team" in odds_merge.columns:
@@ -2733,6 +2754,7 @@ def _repair_predictions_slate_from_game_odds_if_needed(*, processed_root: Path, 
             "home_spread", "away_spread",
             "total", "bookmaker"
         ] if column in odds_merge.columns]].copy()
+        _log_frame_memory("wnba_repair_odds_merge_trimmed", odds_merge, path=str(game_odds_path))
 
         odds_merge = odds_merge.drop_duplicates(
             subset=["home_team", "visitor_team"], keep="first"
@@ -2744,6 +2766,7 @@ def _repair_predictions_slate_from_game_odds_if_needed(*, processed_root: Path, 
                 on=["home_team", "visitor_team"],
                 how="left"
             )
+            _log_frame_memory("wnba_repair_rebuild_merged", rebuild, path=str(game_odds_path))
         
     if rebuild.empty:
         return False
@@ -2753,6 +2776,7 @@ def _repair_predictions_slate_from_game_odds_if_needed(*, processed_root: Path, 
         "date", "home_team", "visitor_team", "commence_time",
         "home_ml", "away_ml", "home_spread", "away_spread", "total", "bookmaker"
     ] if column in rebuild.columns]].copy()
+    _log_frame_memory("wnba_repair_rebuild_final_slice", rebuild, path=str(game_odds_path))
     
     if "date" not in rebuild.columns:
         rebuild["date"] = str(date_str)
@@ -2792,6 +2816,7 @@ def _repair_predictions_slate_from_game_odds_if_needed(*, processed_root: Path, 
         "commence_time", "home_ml", "away_ml", "home_spread", "away_spread", "total", "bookmaker",
     ]
     out_df = rebuild[[column for column in cols if column in rebuild.columns]].drop_duplicates(subset=["home_team", "visitor_team"], keep="first")
+    _log_frame_memory("wnba_repair_output_frame", out_df, path=str(pred_path))
     if out_df.empty:
         return False
     pred_path.parent.mkdir(parents=True, exist_ok=True)
@@ -3035,6 +3060,7 @@ def _run_refresh_via_cli(
                         heartbeat_every_s=5.0,
                     )
                     _touch_progress()
+                    log_runtime_memory("after_export_props_predictions_local", phase=state["phase"], worker_count=smart_sim_workers, executor_type=smart_sim_executor)
                     log_runtime_memory("after_smart_sim", phase=state["phase"], worker_count=smart_sim_workers, executor_type=smart_sim_executor)
                     rc_pred = 0
                 except Exception:
@@ -3081,6 +3107,7 @@ def _run_refresh_via_cli(
                 heartbeat_every_s=5.0,
             )
             _touch_progress()
+            log_runtime_memory("after_export_props_edges_local", phase=state["phase"], raw_rows=int(state.get("snapshot_rows") or 0), pred_rows=int(state.get("predictions_rows") or 0))
             rc_edges = 0
         except Exception:
             rc_edges = 1
@@ -3126,6 +3153,7 @@ def _run_refresh_via_cli(
             if pred_ready:
                 _, _ = export_props_recommendations_local(processed_root=processed_root, date_str=date_str)
                 _touch_progress()
+                log_runtime_memory("after_export_props_recommendations_local", phase=state["phase"], pred_ready=bool(pred_ready))
             else:
                 _append_log(log_file, f"Skipping local props recommendations export for {date_str}: props predictions were not refreshed")
             game_cards_rows, local_game_cards_path = _build_local_game_cards_artifact(
@@ -3137,6 +3165,7 @@ def _run_refresh_via_cli(
             rc_game_cards = 0 if local_game_cards_path is not None and int(game_cards_rows) > 0 else 1
             _, local_recommendations_path = _build_local_game_recommendations_artifact(processed_root=processed_root, date_str=date_str)
             rc_recommendations = 0 if local_recommendations_path is not None else 1
+            log_runtime_memory("after_local_game_cards_and_recommendations", phase=state["phase"], game_cards_rows=game_cards_rows, rc_recommendations=rc_recommendations)
             if any(int(value) != 0 for value in game_input_rcs.values()):
                 _append_log(log_file, f"WNBA source bootstrap returned non-zero input codes for {date_str}: {game_input_rcs}")
             rc_export = 0 if int(rc_local_props_export) == 0 and int(rc_game_cards) == 0 else 1
