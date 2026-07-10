@@ -793,7 +793,7 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
         self.assertEqual(Path(run_calls[0][1]).name, "fetch_basketball_oddsapi_props_local.py")
         self.assertEqual(len(predict_calls), 1)
         self.assertEqual(predict_calls[0]["date_str"], "2026-05-22")
-        self.assertTrue(predict_calls[0]["use_smart_sim"])
+        self.assertFalse(predict_calls[0]["use_smart_sim"])
         self.assertEqual(int(state["predictions_rows"]), 1)
 
     def test_run_refresh_via_cli_uses_inprocess_props_edges(self) -> None:
@@ -859,6 +859,7 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
             processed_root = source_root / "data" / "processed"
             raw_root.mkdir(parents=True, exist_ok=True)
             processed_root.mkdir(parents=True, exist_ok=True)
+            predict_calls = []
 
             def _fake_run(args, log_file, **kwargs):
                 if "--out" in args:
@@ -869,6 +870,7 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
                 return 0
 
             def _fake_predict_export(**kwargs):
+                predict_calls.append(dict(kwargs))
                 out_path = kwargs["out_path"]
                 out_path.parent.mkdir(parents=True, exist_ok=True)
                 out_path.write_text("player\nA\n", encoding="utf-8")
@@ -913,6 +915,8 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
         self.assertEqual(int(state["rc_export"]), 0)
         self.assertEqual(int(state["edges_rows"]), 0)
         self.assertIn("WNBA props-edges produced no rows", str(state.get("warning")))
+        self.assertEqual(len(predict_calls), 1)
+        self.assertFalse(predict_calls[0]["use_smart_sim"])
 
     def test_run_refresh_via_cli_allows_missing_edges_when_recs_and_game_cards_exist(self) -> None:
         module = self._load_module()
@@ -973,7 +977,7 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
         self.assertEqual(int(state["rc_export"]), 0)
         self.assertEqual(int(state["edges_rows"]), 0)
         self.assertGreater(int(state["recs_rows"]), 0)
-        self.assertIn("WNBA props-edges produced no rows", str(state.get("warning")))
+        self.assertIn("WNBA recommendation artifacts were unavailable", str(state.get("warning")))
 
     def test_run_refresh_via_cli_uses_inprocess_export_props_recommendations(self) -> None:
         module = self._load_module()
@@ -1060,6 +1064,7 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
         self.assertEqual(len(predict_calls), 1)
         self.assertEqual(len(edges_calls), 1)
         self.assertEqual(len(export_calls), 1)
+        self.assertFalse(predict_calls[0]["use_smart_sim"])
         self.assertEqual(int(state["rc_export"]), 0)
         self.assertEqual(int(state["recs_rows"]), 1)
 
