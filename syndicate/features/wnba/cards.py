@@ -882,6 +882,7 @@ def _source_game_market_recommendations(picks: list[dict[str, Any]]) -> list[dic
     for pick in picks:
         if not isinstance(pick, dict):
             continue
+        line_value = _safe_float(pick.get("line"))
         rows.append(
             {
                 "market_label": _source_market_label(pick.get("market")),
@@ -891,6 +892,10 @@ def _source_game_market_recommendations(picks: list[dict[str, Any]]) -> list[dic
                 "ev_pct": _safe_float(pick.get("ev_pct")),
                 "basketball_summary": str(pick.get("basketball_summary") or "").strip() or None,
                 "why_explain": str(pick.get("basketball_summary") or pick.get("display_pick") or "").strip() or None,
+                "confidence": str(pick.get("confidence") or pick.get("tier") or "").strip() or None,
+                "line": line_value,
+                "market_line": line_value,
+                "price": _safe_float(pick.get("price") or pick.get("odds")),
                 "card_bucket": "playable",
                 "recommendation_priority_score": _safe_float(pick.get("recommendation_priority_score") or pick.get("basketball_priority_score") or pick.get("score")),
                 "score": _safe_float(pick.get("score") or pick.get("ev_pct")),
@@ -901,6 +906,63 @@ def _source_game_market_recommendations(picks: list[dict[str, Any]]) -> list[dic
             }
         )
     return rows
+
+
+def _wnba_game_projection_text(score: dict[str, Any] | None) -> str:
+    if not isinstance(score, dict):
+        return "-"
+    away_mean = _safe_float(score.get("away_mean"))
+    home_mean = _safe_float(score.get("home_mean"))
+    total_mean = _safe_float(score.get("total_mean"))
+    margin_mean = _safe_float(score.get("margin_mean"))
+    parts: list[str] = []
+    if away_mean is not None and home_mean is not None:
+        parts.append(f"Score {format_num(away_mean)}-{format_num(home_mean)}")
+    if total_mean is not None:
+        parts.append(f"Total {format_num(total_mean)}")
+    if margin_mean is not None:
+        parts.append(f"Margin {format_signed_num(margin_mean)}")
+    return " | ".join(parts) if parts else "-"
+
+
+def _wnba_evidence_pack_row(row: dict[str, Any], *, score: dict[str, Any] | None = None) -> dict[str, Any]:
+    if not isinstance(row, dict):
+        return {}
+
+    plain_text = str(row.get("display_pick") or row.get("selection") or row.get("market_label") or "Recommended play").strip() or "Recommended play"
+    confidence = str(row.get("confidence") or row.get("tier") or "-").strip() or "-"
+    edge_pct = _safe_float(row.get("ev_pct") or row.get("score") or row.get("recommendation_priority_score"))
+    win_probability = _safe_float(row.get("p_win") or row.get("win_prob"))
+    market_line = _safe_float(row.get("market_line") or row.get("line"))
+    model_projection = _wnba_game_projection_text(score)
+    best_reason = str(row.get("why_explain") or row.get("basketball_summary") or row.get("display_pick") or plain_text).strip() or plain_text
+
+    show_more_lines: list[str] = []
+    if row.get("market_label"):
+        selection = str(row.get("selection") or "").strip().upper()
+        line_text = format_num(market_line) if market_line is not None else "-"
+        show_more_lines.append(f"Market: {row.get('market_label')} {selection} {line_text}".strip())
+    if model_projection and model_projection != "-":
+        show_more_lines.append(f"Projection: {model_projection}")
+    if edge_pct is not None:
+        show_more_lines.append(f"Edge: {edge_pct:.1f}%")
+    if win_probability is not None:
+        show_more_lines.append(f"Win probability: {win_probability * 100:.1f}%")
+    if row.get("price") is not None:
+        show_more_lines.append(f"Odds: {format_moneyline(row.get('price'))}")
+    if row.get("recommendation_priority_score") is not None:
+        show_more_lines.append(f"Priority score: {format_num(row.get('recommendation_priority_score'))}")
+
+    return {
+        "plain_text": plain_text,
+        "confidence": confidence,
+        "edge_pct": edge_pct,
+        "win_probability": win_probability,
+        "model_projection": model_projection,
+        "market_line": format_num(market_line) if market_line is not None else "-",
+        "best_reason": best_reason,
+        "show_more_lines": show_more_lines,
+    }
 
 
 def _source_betting(row: dict[str, str]) -> dict[str, Any]:
@@ -1296,6 +1358,10 @@ def _source_game_from_row(
             "total_mean": score.get("total_mean"),
         }
     )
+    game_market_recommendations = [dict(item) for item in _source_game_market_recommendations(picks)]
+    for recommendation in game_market_recommendations:
+        recommendation["evidence_pack"] = _wnba_evidence_pack_row(recommendation, score=score)
+    evidence_pack = [dict(item.get("evidence_pack") or {}) for item in game_market_recommendations if item.get("evidence_pack")]
     return {
         "game_id": game_id,
         "gamePk": game_id,
@@ -1311,10 +1377,10 @@ def _source_game_from_row(
         "odds": {"commence_time": str(row.get("commence_time") or "").strip() or None},
         "status": {"detailed": str(row.get("commence_time") or "Scheduled").strip() or "Scheduled"},
         "summary": f"{row.get('bookmaker') or 'Consensus'} market snapshot",
-        "betting": betting,
+        "game_market_recommendations": game_market_recommendations,
+        "evidence_pack": evidence_pack[:3],
         "sim": sim_payload,
         "prop_recommendations": dict((props_game or {}).get("prop_recommendations") or {"away": [], "home": []}),
-        "game_market_recommendations": _source_game_market_recommendations(picks),
         "live_state": None,
         "warnings": [],
     }
@@ -1538,7 +1604,10 @@ def _game_from_row(
         }
     )
     prop_recommendations = dict((props_game or {}).get("prop_recommendations") or {"away": [], "home": []})
-    game_market_recommendations = _source_game_market_recommendations(picks)
+    game_market_recommendations = [dict(item) for item in _source_game_market_recommendations(picks)]
+    for recommendation in game_market_recommendations:
+        recommendation["evidence_pack"] = _wnba_evidence_pack_row(recommendation, score=score)
+    evidence_pack = [dict(item.get("evidence_pack") or {}) for item in game_market_recommendations if item.get("evidence_pack")]
     normalized_status = _normalized_game_status(
         status_text=row.get("status"),
         detail_text=row.get("commence_time"),
@@ -1576,6 +1645,7 @@ def _game_from_row(
         "sim": sim_payload,
         "prop_recommendations": prop_recommendations,
         "game_market_recommendations": game_market_recommendations,
+        "evidence_pack": evidence_pack[:3],
         "live_state": {
             "in_progress": bool(normalized_status["in_progress"]),
             "final": bool(normalized_status["final"]),

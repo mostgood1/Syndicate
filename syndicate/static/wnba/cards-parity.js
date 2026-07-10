@@ -5862,6 +5862,77 @@
     `;
   }
 
+  function evidencePackRows(game) {
+    const directRows = safeArray(game?.evidence_pack).filter((row) => row && typeof row === 'object');
+    if (directRows.length) {
+      return directRows;
+    }
+    return safeArray(game?.game_market_recommendations)
+      .map((row) => (row && typeof row === 'object' ? row.evidence_pack : null))
+      .filter((row) => row && typeof row === 'object');
+  }
+
+  function renderEvidencePackItem(item, index, cardTarget) {
+    const moreLines = safeArray(item?.show_more_lines).filter(Boolean);
+    const edgeValue = Number(item?.edge_pct);
+    const winProbability = Number(item?.win_probability);
+    const marketLine = String(item?.market_line || '').trim() || '-';
+    const reason = String(item?.best_reason || '').trim() || 'No reason available.';
+    const confidence = String(item?.confidence || '').trim() || '-';
+    const projection = String(item?.model_projection || '').trim() || '-';
+    return `
+      <article class="cards-prop-overview-card cards-evidence-card" data-evidence-index="${index}" data-card-target="${escapeHtml(cardTarget)}">
+        <div class="cards-lens-head">
+          <div>
+            <div class="cards-lens-label">Plain Text</div>
+            <div class="cards-lens-main">${escapeHtml(String(item?.plain_text || 'Recommended play'))}</div>
+            <div class="cards-subcopy">Best Reason: ${escapeHtml(reason)}</div>
+          </div>
+          <span class="cards-lens-badge">${escapeHtml(confidence)}</span>
+        </div>
+
+        <div class="cards-prop-overview-metrics">
+          <div class="cards-data-pair"><span>Confidence</span><strong>${escapeHtml(confidence)}</strong></div>
+          <div class="cards-data-pair ${Number.isFinite(edgeValue) ? (edgeValue >= 0 ? 'is-positive' : 'is-negative') : ''}"><span>Edge %</span><strong>${escapeHtml(Number.isFinite(edgeValue) ? fmtPercentValue(edgeValue) : '-')}</strong></div>
+          <div class="cards-data-pair"><span>Win Probability</span><strong>${escapeHtml(Number.isFinite(winProbability) ? fmtPercent(winProbability, 0) : '-')}</strong></div>
+          <div class="cards-data-pair"><span>Model Projection</span><strong>${escapeHtml(projection)}</strong></div>
+          <div class="cards-data-pair"><span>Market Line</span><strong>${escapeHtml(marketLine)}</strong></div>
+        </div>
+
+        <div class="cards-callout-copy">Best Reason: ${escapeHtml(reason)}</div>
+
+        <details class="cards-evidence-more">
+          <summary class="cards-source-meta-pill">Show more lines</summary>
+          <div class="cards-source-meta">
+            ${moreLines.length ? moreLines.map((line) => `<span class="cards-source-meta-pill">${escapeHtml(String(line))}</span>`).join('') : '<span class="cards-source-meta-pill">No additional lines available.</span>'}
+          </div>
+        </details>
+      </article>
+    `;
+  }
+
+  function renderEvidencePack(game) {
+    const rows = evidencePackRows(game).slice(0, 3);
+    if (!rows.length) {
+      return '';
+    }
+    const cardTarget = String(cardId(game) || '').trim();
+    return `
+      <div class="cards-panel-card cards-panel-card--overview-main">
+        <div class="cards-box-head">
+          <div>
+            <div class="cards-table-kicker">Main board evidence pack</div>
+            <div class="cards-table-title"><strong>Why this play</strong></div>
+          </div>
+          <span class="cards-chip">Primary</span>
+        </div>
+        <div class="cards-live-lens-grid cards-evidence-pack-grid">
+          ${rows.map((row, index) => renderEvidencePackItem(row, index, cardTarget)).join('')}
+        </div>
+      </div>
+    `;
+  }
+
   function renderGameCard(game) {
     const id = cardId(game);
     const matchup = gameMatchupKey(game);
@@ -5921,6 +5992,8 @@
             <div class="cards-mini-copy">${escapeHtml(cardStatusDetail)}</div>
           </div>
         </div>
+
+        ${renderEvidencePack(game)}
 
         <div class="cards-market-row">
           ${renderMarketTile('Moneyline', bestMarketPick(game, 'moneyline'), `${game.home_tri} ${fmtAmerican(betting.home_ml)} / ${game.away_tri} ${fmtAmerican(betting.away_ml)}`, `Home win ${fmtPercent(betting.p_home_win, 0)} · Away win ${fmtPercent(betting.p_away_win, 0)}`, id)}
