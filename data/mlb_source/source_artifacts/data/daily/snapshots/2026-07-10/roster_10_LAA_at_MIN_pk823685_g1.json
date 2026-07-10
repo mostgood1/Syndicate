@@ -54,18 +54,18 @@
     "lineup_source": "projected_rotowire_default_vs_lhp",
     "lineup_confidence": 0.56,
     "probable_pitcher": {
-      "id": null,
-      "source": "none",
-      "confidence": 0.0,
-      "raw_schedule_id": null,
-      "raw_feed_id": null
+      "id": 680570,
+      "source": "feed_gameData_probablePitchers",
+      "confidence": 0.75,
+      "raw_schedule_id": 680570,
+      "raw_feed_id": 680570
     },
     "starter": {
-      "id": 667755,
-      "name": "Jos\u00e9 Soriano",
+      "id": 680570,
+      "name": "Grayson Rodriguez",
       "role": "SP",
-      "selection_source": "heuristic",
-      "requested_id": null
+      "selection_source": "probable",
+      "requested_id": 680570
     },
     "bullpen": [
       {
@@ -534,44 +534,43 @@
       }
     ],
     "starter_profile": {
-      "id": 667755,
-      "name": "Jos\u00e9 Soriano",
+      "id": 680570,
+      "name": "Grayson Rodriguez",
       "throw": "R",
       "role": "SP",
       "leverage_skill": 0.5,
-      "stamina_pitches": 95,
+      "stamina_pitches": 94,
       "availability_mult": 1.0,
       "platoon_mult_vs_lhb": {
-        "k": 0.9693750587490292,
-        "bb": 1.0161336747501502,
-        "hr": 1.0819143080984641,
-        "inplay": 1.030067570595141
+        "k": 0.9410034602076125,
+        "bb": 0.9558823529411764,
+        "hr": 1.1455882352941176,
+        "inplay": 1.066425120772947
       },
       "platoon_mult_vs_rhb": {
-        "k": 1.0768319674557247,
-        "bb": 0.9308159562054278,
-        "hr": 0.78,
-        "inplay": 0.8786054827175209
+        "k": 1.0859663865546219,
+        "bb": 1.0642857142857143,
+        "hr": 0.7878571428571428,
+        "inplay": 0.8913043478260869
       },
       "statcast_quality_mult": {},
       "arsenal_source": "statsapi_pitchArsenal",
-      "arsenal_sample_size": 1601,
+      "arsenal_sample_size": 355,
       "statcast_splits_found": false,
       "statcast_splits_source": "",
       "statcast_splits_n_pitches": 0,
       "statcast_splits_start_date": "",
       "statcast_splits_end_date": "",
-      "k_rate": 0.24709182925040338,
-      "bb_rate": 0.12490740061610679,
-      "hbp_rate": 0.007481296758104738,
-      "hr_rate": 0.033156997212850224,
-      "inplay_hit_rate": 0.3208078420467186,
+      "k_rate": 0.19767441860465115,
+      "bb_rate": 0.12790697674418605,
+      "hbp_rate": 0.0,
+      "hr_rate": 0.046511627906976744,
+      "inplay_hit_rate": 0.396551724137931,
       "arsenal": {
-        "FF": 0.23672704307745154,
-        "SI": 0.26171142340224846,
-        "KC": 0.24921924323985017,
-        "SL": 0.05309181769019363,
-        "FS": 0.19925047259025616
+        "FF": 0.5239436652394367,
+        "CU": 0.16901408169014084,
+        "CH": 0.16901408169014084,
+        "SL": 0.13802817138028173
       },
       "pitch_type_whiff_mult": {},
       "pitch_type_inplay_mult": {},
@@ -585,7 +584,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.9416666666666667,
         "platoon_mult_vs_lhb": {
           "k": 0.9507461008564829,
           "bb": 1.1925000000000001,
@@ -628,7 +627,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.89,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 0.8585183579398946,
           "bb": 1.1925000000000001,
@@ -671,7 +670,7 @@
         "role": "SU",
         "leverage_skill": 0.7,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.9333333333333333,
         "platoon_mult_vs_lhb": {
           "k": 0.9789410413751032,
           "bb": 0.9798346513299785,
@@ -713,7 +712,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 30,
-        "availability_mult": 0.9400000000000001,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 1.153259559486105,
           "bb": 0.9926383595432027,
@@ -756,7 +755,7 @@
         "role": "CL",
         "leverage_skill": 0.85,
         "stamina_pitches": 25,
-        "availability_mult": 0.915,
+        "availability_mult": 0.8583333333333334,
         "platoon_mult_vs_lhb": {
           "k": 0.9763347616528195,
           "bb": 1.0126491646778042,
@@ -799,7 +798,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.9333333333333333,
         "platoon_mult_vs_lhb": {
           "k": 1.1230856395446716,
           "bb": 1.1417465552419017,
@@ -842,7 +841,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.88,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 0.8969727752945957,
           "bb": 0.9945544554455447,
@@ -928,7 +927,7 @@
         "role": "SU",
         "leverage_skill": 0.7,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
+        "availability_mult": 0.8,
         "platoon_mult_vs_lhb": {
           "k": 0.9880942747319441,
           "bb": 1.0710713118199227,
@@ -1013,6 +1012,12 @@
       {
         "id": 679358,
         "name": "Eric Orze",
+        "role": "MR",
+        "lev": 0.5
+      },
+      {
+        "id": 696070,
+        "name": "Kendry Rojas",
         "role": "MR",
         "lev": 0.5
       },
@@ -1292,11 +1297,11 @@
         "pos": "LF",
         "bat": "L",
         "throw": "R",
-        "k_rate": 0.2,
-        "bb_rate": 0.0,
+        "k_rate": 0.25,
+        "bb_rate": 0.125,
         "hbp_rate": 0.0,
         "hr_rate": 0.0,
-        "inplay_hit_rate": 0.5,
+        "inplay_hit_rate": 0.4,
         "xb_hit_share": 0.05,
         "vs_pitch_type": {},
         "vs_pitch_type_hr": {},
@@ -1366,35 +1371,6 @@
           "bb": 0.8434426229508196,
           "hr": 1.0110859728506787,
           "inplay": 0.9955878921225456
-        },
-        "statcast_quality_mult": {},
-        "vs_pitcher_history": {}
-      },
-      {
-        "id": 693459,
-        "name": "Kyler Fedko",
-        "pos": "LF",
-        "bat": "R",
-        "throw": "R",
-        "k_rate": 0.3076923076923077,
-        "bb_rate": 0.15384615384615385,
-        "hbp_rate": 0.0,
-        "hr_rate": 0.0,
-        "inplay_hit_rate": 0.0,
-        "xb_hit_share": 0.22,
-        "vs_pitch_type": {},
-        "vs_pitch_type_hr": {},
-        "platoon_mult_vs_lhp": {
-          "k": 1.1925000000000001,
-          "bb": 1.1925000000000001,
-          "hr": 1.0,
-          "inplay": 1.0
-        },
-        "platoon_mult_vs_rhp": {
-          "k": 0.8075,
-          "bb": 0.8075,
-          "hr": 1.0,
-          "inplay": 1.0
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -1482,7 +1458,7 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.92,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 0.9620493541546173,
           "bb": 0.8075,
@@ -1519,13 +1495,56 @@
         "pitch_type_hr_mult": {}
       },
       {
+        "id": 696070,
+        "name": "Kendry Rojas",
+        "throw": "L",
+        "role": "MR",
+        "leverage_skill": 0.5,
+        "stamina_pitches": 29,
+        "availability_mult": 0.6083333333333334,
+        "platoon_mult_vs_lhb": {
+          "k": 1.1793478260869565,
+          "bb": 1.1925000000000001,
+          "hr": 1.0,
+          "inplay": 1.0524423337856172
+        },
+        "platoon_mult_vs_rhb": {
+          "k": 0.8914473684210527,
+          "bb": 0.8075,
+          "hr": 1.0,
+          "inplay": 0.9855042966983265
+        },
+        "statcast_quality_mult": {},
+        "arsenal_source": "statsapi_pitchArsenal",
+        "arsenal_sample_size": 227,
+        "statcast_splits_found": false,
+        "statcast_splits_source": "",
+        "statcast_splits_n_pitches": 0,
+        "statcast_splits_start_date": "",
+        "statcast_splits_end_date": "",
+        "k_rate": 0.22950819672131145,
+        "bb_rate": 0.16393442622950818,
+        "hbp_rate": 0.01639344262295082,
+        "hr_rate": 0.0,
+        "inplay_hit_rate": 0.3043168168168168,
+        "arsenal": {
+          "FF": 0.4140969241409692,
+          "CH": 0.18942732189427322,
+          "SI": 0.1145374511453745,
+          "SL": 0.281938302819383
+        },
+        "pitch_type_whiff_mult": {},
+        "pitch_type_inplay_mult": {},
+        "pitch_type_hr_mult": {}
+      },
+      {
         "id": 681892,
         "name": "Kody Funderburk",
         "throw": "L",
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 0.9,
+        "availability_mult": 0.9166666666666666,
         "platoon_mult_vs_lhb": {
           "k": 0.9377310233699943,
           "bb": 1.1486528856997682,
@@ -1569,7 +1588,7 @@
         "role": "SU",
         "leverage_skill": 0.7,
         "stamina_pitches": 25,
-        "availability_mult": 0.925,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 1.0666995864116022,
           "bb": 0.9013327343516023,
@@ -1611,7 +1630,7 @@
         "role": "SU",
         "leverage_skill": 0.7,
         "stamina_pitches": 25,
-        "availability_mult": 0.9,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 0.9425046431414168,
           "bb": 1.1925000000000001,
@@ -1655,28 +1674,31 @@
         "role": "MR",
         "leverage_skill": 0.5,
         "stamina_pitches": 25,
-        "availability_mult": 1.0,
-        "platoon_mult_vs_lhb": {},
+        "availability_mult": 0.85,
+        "platoon_mult_vs_lhb": {
+          "k": 1.0,
+          "bb": 1.0,
+          "hr": 1.0,
+          "inplay": 1.0
+        },
         "platoon_mult_vs_rhb": {},
         "statcast_quality_mult": {},
-        "arsenal_source": "default",
-        "arsenal_sample_size": 0,
+        "arsenal_source": "statsapi_pitchArsenal",
+        "arsenal_sample_size": 18,
         "statcast_splits_found": false,
         "statcast_splits_source": "",
         "statcast_splits_n_pitches": 0,
         "statcast_splits_start_date": "",
         "statcast_splits_end_date": "",
-        "k_rate": 0.24,
-        "bb_rate": 0.08,
-        "hbp_rate": 0.008,
-        "hr_rate": 0.03,
-        "inplay_hit_rate": 0.0,
+        "k_rate": 0.25,
+        "bb_rate": 0.0,
+        "hbp_rate": 0.0,
+        "hr_rate": 0.25,
+        "inplay_hit_rate": 0.3333333333333333,
         "arsenal": {
-          "FF": 0.45,
-          "SL": 0.22,
-          "CH": 0.12,
-          "SI": 0.13,
-          "CU": 0.08
+          "FF": 0.4999999950000001,
+          "SL": 0.16666666833333332,
+          "FS": 0.33333333666666665
         },
         "pitch_type_whiff_mult": {},
         "pitch_type_inplay_mult": {},
@@ -1689,7 +1711,7 @@
         "role": "CL",
         "leverage_skill": 0.85,
         "stamina_pitches": 25,
-        "availability_mult": 0.905,
+        "availability_mult": 1.0,
         "platoon_mult_vs_lhb": {
           "k": 1.0940090186815548,
           "bb": 0.9976149176062445,

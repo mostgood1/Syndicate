@@ -1,6 +1,2 @@
 To https://github.com/mostgood1/Syndicate
-   59ad31d9..dfe2403e  main -> main
-warning: in the working copy of 'data/wnba_source/data/live_lens/live_lens_tuning_override.json', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'data/wnba_source/data/processed/live_lens_tuning_override.json', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'data/wnba_source/source_artifacts/data/live_lens/live_lens_tuning_override.json', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'data/wnba_source/source_artifacts/data/processed/live_lens_tuning_override.json', LF will be replaced by CRLF the next time Git touches it
+   7035bce2..a5cd1f8c  main -> main
