@@ -1,0 +1,387 @@
+{
+  "date": "2026-07-10",
+  "data": [
+    {
+      "game_key": "CHI@LVA",
+      "game_id": "014c1ed8012d1c1a70778c1d1aa348e83",
+      "player": "Sydney Taylor",
+      "team": "CHI",
+      "team_tricode": "CHI",
+      "opponent": "LVA",
+      "score": 59.31241845312957,
+      "score_adj": 59.31241845312957,
+      "tier": "High",
+      "model": {
+        "pts": 6.2219908536585375,
+        "reb": 0.9145701219512196,
+        "ast": 0.8545701219512195,
+        "threes": 0.9145701219512196,
+        "stl": 0.283094512195122,
+        "blk": 0.283094512195122,
+        "tov": 0.566189024390244,
+        "pra": 7.991131097560976,
+        "pr": 7.136560975609757,
+        "pa": 7.076560975609757,
+        "ra": 1.769140243902439
+      },
+      "top_play": {
+        "market": "threes",
+        "side": "UNDER",
+        "line": 1.5,
+        "price": 121.0,
+        "edge": 0.26838198395081253,
+        "ev": 0.5931241845312957,
+        "ev_pct": 59.31241845312957,
+        "book": "draftkings",
+        "p_win": 1.0,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 59.3%",
+        "Regular price range (-150 to +150)",
+        "Best line available"
+      ],
+      "basketball_summary": "model 0.9 vs line 1.5 (-0.6)"
+    },
+    {
+      "game_key": "DAL@TOR",
+      "game_id": "07295f7e8db8d22124fdf261cda31a1f6",
+      "player": "Julie Allemand",
+      "team": "TOR",
+      "team_tricode": "TOR",
+      "opponent": "DAL",
+      "score": 45.716797374565886,
+      "score_adj": 45.716797374565886,
+      "tier": "High",
+      "model": {
+        "pts": 3.756360294117648,
+        "reb": 2.988845588235294,
+        "ast": 3.572602941176471,
+        "threes": 0.7512720588235294,
+        "stl": 1.487573529411765,
+        "blk": 0.0,
+        "tov": 0.9917156862745098,
+        "pra": 10.317808823529411,
+        "pr": 6.745205882352941,
+        "pa": 7.328963235294118,
+        "ra": 6.561448529411765
+      },
+      "top_play": {
+        "market": "pts",
+        "side": "UNDER",
+        "line": 7.5,
+        "price": 101.0,
+        "edge": 0.22744675310729295,
+        "ev": 0.4571679737456589,
+        "ev_pct": 45.716797374565886,
+        "book": "williamhill_us",
+        "p_win": 0.9546804115566041,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 45.7%",
+        "Regular price range (-150 to +150)",
+        "Consensus: 4 books aligned",
+        "Best line available"
+      ],
+      "basketball_summary": "model 3.8 vs line 7.5 (-3.7)"
+    },
+    {
+      "game_key": "DAL@TOR",
+      "game_id": "07295f7e8db8d22124fdf261cda31a1f6",
+      "player": "Arike Ogunbowale",
+      "team": "DAL",
+      "team_tricode": "DAL",
+      "opponent": "TOR",
+      "score": 45.32336382201626,
+      "score_adj": 45.32336382201626,
+      "tier": "High",
+      "model": {
+        "pts": 15.385674823830875,
+        "reb": 2.237454836643177,
+        "ast": 3.228436771300448,
+        "threes": 2.473454836643177,
+        "stl": 0.7255701473414478,
+        "blk": 0.1451140294682895,
+        "tov": 1.7413683536194746,
+        "pra": 20.851566431774504,
+        "pr": 17.623129660474053,
+        "pa": 18.614111595131323,
+        "ra": 5.465891607943625
+      },
+      "top_play": {
+        "market": "threes",
+        "side": "OVER",
+        "line": 1.5,
+        "price": -135.0,
+        "edge": 0.26036826025413595,
+        "ev": 0.4532336382201626,
+        "ev_pct": 45.32336382201626,
+        "book": "betonlineag",
+        "p_win": 1.0,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 45.3%",
+        "Regular price range (-150 to +150)",
+        "Consensus: 3 books aligned",
+        "Best line available"
+      ],
+      "basketball_summary": "model 2.5 vs line 1.5 (+1.0)"
+    },
+    {
+      "game_key": "GSV@CON",
+      "game_id": "01547b39904db439304af0dfdacaa469d",
+      "player": "Gabby Williams",
+      "team": "GSV",
+      "team_tricode": "GSV",
+      "opponent": "CON",
+      "score": 39.089167120680365,
+      "score_adj": 39.089167120680365,
+      "tier": "High",
+      "model": {
+        "pts": 12.211792045801523,
+        "reb": 3.083579648854962,
+        "ast": 2.438274190839694,
+        "threes": 2.146253099236641,
+        "stl": 1.892351526717557,
+        "blk": 0.3784703053435114,
+        "tov": 2.081586679389313,
+        "pra": 17.73364588549618,
+        "pr": 15.295371694656485,
+        "pa": 14.650066236641218,
+        "ra": 5.521853839694656
+      },
+      "top_play": {
+        "market": "threes",
+        "side": "OVER",
+        "line": 1.5,
+        "price": -114.0,
+        "edge": 0.20823201176437212,
+        "ev": 0.3908916712068037,
+        "ev_pct": 39.089167120680365,
+        "book": "fanduel",
+        "p_win": 0.9236019515806354,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 39.1%",
+        "Regular price range (-150 to +150)",
+        "Consensus: 3 books aligned",
+        "Best line available"
+      ],
+      "basketball_summary": "model 2.1 vs line 1.5 (+0.6)"
+    },
+    {
+      "game_key": "DAL@TOR",
+      "game_id": "07295f7e8db8d22124fdf261cda31a1f6",
+      "player": "Maria Conde",
+      "team": "TOR",
+      "team_tricode": "TOR",
+      "opponent": "DAL",
+      "score": 36.6024448661925,
+      "score_adj": 36.6024448661925,
+      "tier": "High",
+      "model": {
+        "pts": 5.827511656441718,
+        "reb": 3.5655188431200697,
+        "ast": 1.1085852760736197,
+        "threes": 1.1704667835232252,
+        "stl": 0.2917072743207712,
+        "blk": 0.1458536371603856,
+        "tov": 1.166829097283085,
+        "pra": 10.501615775635408,
+        "pr": 9.393030499561789,
+        "pa": 6.936096932515338,
+        "ra": 4.674104119193689
+      },
+      "top_play": {
+        "market": "pts",
+        "side": "UNDER",
+        "line": 10.5,
+        "price": -113.0,
+        "edge": 0.1941819845013968,
+        "ev": 0.36602444866192496,
+        "ev_pct": 36.6024448661925,
+        "book": "draftkings",
+        "p_win": 0.8965408805868076,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 36.6%",
+        "Regular price range (-150 to +150)",
+        "Consensus: 4 books aligned",
+        "Best line available"
+      ],
+      "basketball_summary": "model 5.8 vs line 10.5 (-4.7)"
+    },
+    {
+      "game_key": "GSV@CON",
+      "game_id": "01547b39904db439304af0dfdacaa469d",
+      "player": "Olivia Nelson-Ododa",
+      "team": "CON",
+      "team_tricode": "CON",
+      "opponent": "GSV",
+      "score": 27.76916438099909,
+      "score_adj": 27.76916438099909,
+      "tier": "High",
+      "model": {
+        "pts": 7.784720238095236,
+        "reb": 3.474529761904761,
+        "ast": 1.943208333333333,
+        "threes": 0.0,
+        "stl": 0.7844345238095236,
+        "blk": 0.522956349206349,
+        "tov": 1.5688690476190472,
+        "pra": 13.20245833333333,
+        "pr": 11.259249999999998,
+        "pa": 9.727928571428569,
+        "ra": 5.417738095238094
+      },
+      "top_play": {
+        "market": "pts",
+        "side": "UNDER",
+        "line": 11.5,
+        "price": -126.0,
+        "edge": 0.15481923504450823,
+        "ev": 0.2776916438099909,
+        "ev_pct": 27.76916438099909,
+        "book": "draftkings",
+        "p_win": 0.8352137677037962,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 27.8%",
+        "Regular price range (-150 to +150)",
+        "Best line available"
+      ],
+      "basketball_summary": "model 7.8 vs line 11.5 (-3.7)"
+    },
+    {
+      "game_key": "CHI@LVA",
+      "game_id": "014c1ed8012d1c1a70778c1d1aa348e83",
+      "player": "Natasha Cloud",
+      "team": "CHI",
+      "team_tricode": "CHI",
+      "opponent": "LVA",
+      "score": 12.006583528340908,
+      "score_adj": 12.006583528340908,
+      "tier": "High",
+      "model": {
+        "pts": 10.7122,
+        "reb": 4.66655,
+        "ast": 3.977,
+        "threes": 0.58955,
+        "stl": 0.8390000000000001,
+        "blk": 0.4195,
+        "tov": 3.14625,
+        "pra": 19.35575,
+        "pr": 15.37875,
+        "pa": 14.6892,
+        "ra": 8.64355
+      },
+      "top_play": {
+        "market": "reb",
+        "side": "OVER",
+        "line": 3.5,
+        "price": 114.0,
+        "edge": 0.05610553050626593,
+        "ev": 0.12006583528340908,
+        "ev_pct": 12.006583528340908,
+        "book": "fanduel",
+        "p_win": 0.5873555549095772,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 12.0%",
+        "Regular price range (-150 to +150)",
+        "Best line available"
+      ],
+      "basketball_summary": "model 4.7 vs line 3.5 (+1.2)"
+    },
+    {
+      "game_key": "GSV@CON",
+      "game_id": "01547b39904db439304af0dfdacaa469d",
+      "player": "Veronica Burton",
+      "team": "GSV",
+      "team_tricode": "GSV",
+      "opponent": "CON",
+      "score": 11.891437023073582,
+      "score_adj": 11.891437023073582,
+      "tier": "High",
+      "model": {
+        "pts": 14.631980645161292,
+        "reb": 2.9341561290322584,
+        "ast": 5.7771197419354845,
+        "threes": 1.9690374193548383,
+        "stl": 1.1542374193548388,
+        "blk": 0.3847458064516129,
+        "tov": 1.923729032258065,
+        "pra": 23.34325651612904,
+        "pr": 17.566136774193552,
+        "pa": 20.409100387096778,
+        "ra": 8.711275870967743
+      },
+      "top_play": {
+        "market": "pa",
+        "side": "OVER",
+        "line": 17.5,
+        "price": 100.0,
+        "edge": 0.059457185115367905,
+        "ev": 0.11891437023073581,
+        "ev_pct": 11.891437023073582,
+        "book": "fanduel",
+        "p_win": 0.6189143702307358,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 11.9%",
+        "Regular price range (-150 to +150)"
+      ],
+      "basketball_summary": "model 20.4 vs line 17.5 (+2.9)"
+    },
+    {
+      "game_key": "CHI@LVA",
+      "game_id": "014c1ed8012d1c1a70778c1d1aa348e83",
+      "player": "Kamilla Cardoso",
+      "team": "CHI",
+      "team_tricode": "CHI",
+      "opponent": "LVA",
+      "score": 5.945986311887608,
+      "score_adj": 5.945986311887608,
+      "tier": "Medium",
+      "model": {
+        "pts": 15.053086411889597,
+        "reb": 9.560315711252654,
+        "ast": 2.026708280254777,
+        "threes": 0.0,
+        "stl": 0.3329745222929936,
+        "blk": 1.3318980891719745,
+        "tov": 1.1654108280254778,
+        "pra": 26.640110403397028,
+        "pr": 24.61340212314225,
+        "pa": 17.079794692144375,
+        "ra": 11.587023991507431
+      },
+      "top_play": {
+        "market": "reb",
+        "side": "OVER",
+        "line": 8.5,
+        "price": 108.0,
+        "edge": 0.028586472653305772,
+        "ev": 0.05945986311887608,
+        "ev_pct": 5.945986311887608,
+        "book": "fanduel",
+        "p_win": 0.5402290938881069,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 5.9%",
+        "Regular price range (-150 to +150)",
+        "Consensus: 3 books aligned",
+        "Best line available"
+      ],
+      "basketball_summary": "model 9.6 vs line 8.5 (+1.1)"
+    }
+  ]
+}

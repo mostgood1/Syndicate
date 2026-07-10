@@ -1,0 +1,4 @@
+date,game_id,home_team,visitor_team,commence_time,home_ml,away_ml,home_spread,away_spread,total,bookmaker,home_tri,away_tri
+2026-07-10,014c1ed8012d1c1a70778c1d1aa348e83,Los Angeles Sparks,Chicago Sky,2026-07-11T02:10:00Z,,,,,,betus,LVA,CHI
+2026-07-10,01547b39904db439304af0dfdacaa469d,Connecticut Sun,Golden State Valkyries,2026-07-10T23:40:00Z,,,,,,betus,CON,GSV
+2026-07-10,07295f7e8db8d22124fdf261cda31a1f6,Toronto Tempo,Dallas Wings,2026-07-10T23:40:00Z,,,,,,betus,TOR,DAL

@@ -1,0 +1,223 @@
+{
+  "date": "2026-07-10",
+  "counts": {
+    "games": 3,
+    "picks": 9
+  },
+  "per_game": [
+    {
+      "home": "LVA",
+      "away": "CHI",
+      "matchup": "CHI @ LVA",
+      "picks": [
+        {
+          "market": "PROPS",
+          "team": "CHI",
+          "display_pick": "Sydney Taylor UNDER 1.5",
+          "selection": "UNDER 1.5",
+          "projection": 0.9145701219512196,
+          "projected": 0.9145701219512196,
+          "odds": 121.0,
+          "price": 121.0,
+          "score": 59.31241845312957,
+          "ev_pct": 59.31241845312957,
+          "win_prob": 0.45248868778280543,
+          "p_win": 0.45248868778280543,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 59.3%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "CHI @ LVA"
+        },
+        {
+          "market": "PROPS",
+          "team": "CHI",
+          "display_pick": "Natasha Cloud OVER 3.5",
+          "selection": "OVER 3.5",
+          "projection": 4.66655,
+          "projected": 4.66655,
+          "odds": 114.0,
+          "price": 114.0,
+          "score": 12.006583528340908,
+          "ev_pct": 12.006583528340908,
+          "win_prob": 0.4672897196261682,
+          "p_win": 0.4672897196261682,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.0%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "CHI @ LVA"
+        },
+        {
+          "market": "PROPS",
+          "team": "CHI",
+          "display_pick": "Kamilla Cardoso OVER 8.5",
+          "selection": "OVER 8.5",
+          "projection": 9.560315711252654,
+          "projected": 9.560315711252654,
+          "odds": 108.0,
+          "price": 108.0,
+          "score": 5.945986311887608,
+          "ev_pct": 5.945986311887608,
+          "win_prob": 0.4807692307692308,
+          "p_win": 0.4807692307692308,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 5.9%",
+            "Regular price range (-150 to +150)",
+            "Consensus: 3 books aligned",
+            "Best line available"
+          ],
+          "matchup": "CHI @ LVA"
+        }
+      ]
+    },
+    {
+      "home": "CON",
+      "away": "GSV",
+      "matchup": "GSV @ CON",
+      "picks": [
+        {
+          "market": "PROPS",
+          "team": "GSV",
+          "display_pick": "Gabby Williams OVER 1.5",
+          "selection": "OVER 1.5",
+          "projection": 2.146253099236641,
+          "projected": 2.146253099236641,
+          "odds": -114.0,
+          "price": -114.0,
+          "score": 39.089167120680365,
+          "ev_pct": 39.089167120680365,
+          "win_prob": 0.5327102803738317,
+          "p_win": 0.5327102803738317,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 39.1%",
+            "Regular price range (-150 to +150)",
+            "Consensus: 3 books aligned",
+            "Best line available"
+          ],
+          "matchup": "GSV @ CON"
+        },
+        {
+          "market": "PROPS",
+          "team": "CON",
+          "display_pick": "Olivia Nelson-Ododa UNDER 11.5",
+          "selection": "UNDER 11.5",
+          "projection": 7.784720238095236,
+          "projected": 7.784720238095236,
+          "odds": -126.0,
+          "price": -126.0,
+          "score": 27.76916438099909,
+          "ev_pct": 27.76916438099909,
+          "win_prob": 0.5575221238938053,
+          "p_win": 0.5575221238938053,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 27.8%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "GSV @ CON"
+        },
+        {
+          "market": "PROPS",
+          "team": "GSV",
+          "display_pick": "Veronica Burton OVER 17.5",
+          "selection": "OVER 17.5",
+          "projection": 20.409100387096778,
+          "projected": 20.409100387096778,
+          "odds": 100.0,
+          "price": 100.0,
+          "score": 11.891437023073582,
+          "ev_pct": 11.891437023073582,
+          "win_prob": 0.5,
+          "p_win": 0.5,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 11.9%",
+            "Regular price range (-150 to +150)"
+          ],
+          "matchup": "GSV @ CON"
+        }
+      ]
+    },
+    {
+      "home": "TOR",
+      "away": "DAL",
+      "matchup": "DAL @ TOR",
+      "picks": [
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Julie Allemand UNDER 7.5",
+          "selection": "UNDER 7.5",
+          "projection": 3.756360294117648,
+          "projected": 3.756360294117648,
+          "odds": 101.0,
+          "price": 101.0,
+          "score": 45.716797374565886,
+          "ev_pct": 45.716797374565886,
+          "win_prob": 0.4975124378109453,
+          "p_win": 0.4975124378109453,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 45.7%",
+            "Regular price range (-150 to +150)",
+            "Consensus: 4 books aligned",
+            "Best line available"
+          ],
+          "matchup": "DAL @ TOR"
+        },
+        {
+          "market": "PROPS",
+          "team": "DAL",
+          "display_pick": "Azzi Fudd OVER 1.5",
+          "selection": "OVER 1.5",
+          "projection": 2.116618031358885,
+          "projected": 2.116618031358885,
+          "odds": -135.0,
+          "price": -135.0,
+          "score": 27.29282827918472,
+          "ev_pct": 27.29282827918472,
+          "win_prob": 0.574468085106383,
+          "p_win": 0.574468085106383,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 27.3%",
+            "Regular price range (-150 to +150)",
+            "Consensus: 4 books aligned",
+            "Best line available"
+          ],
+          "matchup": "DAL @ TOR"
+        },
+        {
+          "market": "PROPS",
+          "team": "DAL",
+          "display_pick": "Paige Bueckers OVER 1.5",
+          "selection": "OVER 1.5",
+          "projection": 1.906992,
+          "projected": 1.906992,
+          "odds": -115.0,
+          "price": -115.0,
+          "score": 23.016097048049456,
+          "ev_pct": 23.016097048049456,
+          "win_prob": 0.5348837209302325,
+          "p_win": 0.5348837209302325,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 23.0%",
+            "Regular price range (-150 to +150)",
+            "Consensus: 4 books aligned",
+            "Best line available"
+          ],
+          "matchup": "DAL @ TOR"
+        }
+      ]
+    }
+  ]
+}
