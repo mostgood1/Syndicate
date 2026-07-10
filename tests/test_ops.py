@@ -1152,6 +1152,51 @@ class OpsRefreshApiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.get_data(as_text=True), "line1\nline2")
 
+    def test_logs_endpoint_can_return_wnba_source_log(self) -> None:
+        with TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            reports_root = root / "reports"
+            refresh_latest = reports_root / "refresh_status" / "latest"
+            source_root = root / "data" / "wnba_source"
+            source_logs = source_root / "logs"
+            refresh_latest.mkdir(parents=True, exist_ok=True)
+            source_logs.mkdir(parents=True, exist_ok=True)
+
+            log_path = source_logs / "syndicate_refresh_oddsapi_props_2026-07-10.log"
+            log_content = "before_smart_sim\nSMART_SIM_RETURNED date=2026-07-10 workers=1 n_sims=150\nSMART_SIM_RESULT_LOAD_COMPLETE date=2026-07-10 rows=105\nSMART_SIM_MERGE_COMPLETE date=2026-07-10 rows=105\nafter_smart_sim\nPredictions stage finished for 2026-07-10: rc_pred=0, rows=105\n"
+            log_path.write_text(log_content, encoding="utf-8")
+
+            (refresh_latest / "refresh_status_latest.json").write_text(
+                json.dumps(
+                    {
+                        "date": "2026-07-10",
+                        "runStamp": "20260710_165843",
+                        "artifactsDir": str(reports_root / "migration_runs" / "2026-07-10" / "odds_refresh_20260710_165843"),
+                        "results": [
+                            {
+                                "sport": "wnba",
+                                "source_repo": str(source_root),
+                            }
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            with patch.dict(
+                os.environ,
+                {"ADMIN_TOKEN": "secret-token", "SYNDICATE_REPORTS_ROOT": str(reports_root)},
+                clear=False,
+            ):
+                response = self.client.get(
+                    "/api/ops/odds-refresh/logs?stream=wnba&raw=1",
+                    headers={"X-Admin-Token": "secret-token"},
+                )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("SMART_SIM_RETURNED date=2026-07-10", response.get_data(as_text=True))
+        self.assertIn("Predictions stage finished for 2026-07-10", response.get_data(as_text=True))
+
     def test_launch_refresh_run_uses_wrapper_command(self) -> None:
         with TemporaryDirectory() as tmp_dir:
             repo_root = Path(tmp_dir)

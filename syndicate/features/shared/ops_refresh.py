@@ -402,6 +402,26 @@ def _latest_refresh_manifest_context() -> dict[str, Any]:
     }
 
 
+def _latest_sport_refresh_log_path(*, manifest: dict[str, Any], sport: str) -> Path | None:
+    sport_key = str(sport or "").strip().lower()
+    if not sport_key:
+        return None
+    date_value = str(manifest.get("date") or "").strip()
+    results = manifest.get("results") if isinstance(manifest.get("results"), list) else []
+    source_repo = None
+    for result in results:
+        if not isinstance(result, dict):
+            continue
+        if str(result.get("sport") or "").strip().lower() != sport_key:
+            continue
+        source_repo = str(result.get("source_repo") or "").strip()
+        if source_repo:
+            break
+    if not source_repo or not date_value:
+        return None
+    return Path(source_repo) / "logs" / f"syndicate_refresh_oddsapi_props_{date_value}.log"
+
+
 def _ensure_refresh_context_consistent(context: dict[str, Any]) -> None:
     consistency_error = str(context.get("consistency_error") or "").strip()
     if consistency_error:
@@ -550,15 +570,20 @@ def cancel_latest_refresh_run() -> dict[str, Any]:
 
 def load_latest_refresh_log(*, stream: str = "stderr") -> dict[str, Any]:
     stream_key = str(stream or "stderr").strip().lower()
-    if stream_key not in {"stdout", "stderr"}:
-        raise ValueError("stream must be 'stdout' or 'stderr'.")
     context = _latest_refresh_manifest_context()
     _ensure_refresh_context_consistent(context)
     manifest: dict[str, Any] = context["manifest"]
     artifacts_dir: Path | None = context["artifacts_dir"]
-    if artifacts_dir is None:
-        raise ValueError("No latest refresh artifacts directory is available.")
-    path = artifacts_dir / ("odds_refresh.json" if stream_key == "stdout" else "odds_refresh.stderr.txt")
+    if stream_key in {"stdout", "stderr"}:
+        if artifacts_dir is None:
+            raise ValueError("No latest refresh artifacts directory is available.")
+        path = artifacts_dir / ("odds_refresh.json" if stream_key == "stdout" else "odds_refresh.stderr.txt")
+    elif stream_key in {"wnba", "wnba_log", "wnba-log"}:
+        path = _latest_sport_refresh_log_path(manifest=manifest, sport="wnba")
+        if path is None:
+            raise ValueError("No latest WNBA refresh log is available.")
+    else:
+        raise ValueError("stream must be 'stdout', 'stderr', or 'wnba'.")
     content = read_text_file(path) or ""
     lines = content.splitlines()
     tail = "\n".join(lines[-80:]) if lines else ""
