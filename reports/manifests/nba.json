@@ -1,27 +1,72 @@
 {
   "sport": "nba",
-  "last_updated": "2026-06-25T19:56:15+00:00",
+  "last_updated": "2026-07-09T16:12:58-05:00",
   "artifact_paths": [
     "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate",
-    "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nba_source"
+    "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nba_source",
+    "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nba_source\\data\\processed\\props_edges_2026-07-09.csv",
+    "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nba_source\\tracking\\odds_history.json",
+    "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\odds_control_plane\\odds_history\\nba\\odds_history.json",
+    "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nba_source\\source_artifacts\\data\\processed\\boxscores_history.csv",
+    "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nba_source\\source_artifacts\\data\\processed\\team_advanced_stats_2025.csv",
+    "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nba_source\\source_artifacts\\data\\processed\\team_advanced_stats_2025_asof_2026-06-03.csv",
+    "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nba_source\\source_artifacts\\data\\processed\\team_advanced_stats_2026.csv",
+    "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nba_source\\source_artifacts\\data\\processed\\team_advanced_stats_2026_asof_20260530.csv",
+    "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nba_source\\data\\processed\\props_predictions_2026-07-09.csv",
+    "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nba_source\\data\\processed\\props_recommendations_2026-07-09.csv",
+    "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nba_source\\data\\processed\\oddsapi_player_props_2026-07-09.csv",
+    "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nba_source\\data\\raw\\odds_nba_player_props_2026-07-09.csv"
   ],
   "status": "complete",
   "metadata": {
-    "date": "2026-05-22",
+    "date": "2026-07-09",
     "phase": "all",
     "execution_mode": "source",
     "refresh_mode": "full",
+    "refresh_contract": {
+      "required": [
+        "snapshot",
+        "snapshot_alias",
+        "game_slate",
+        "predictions",
+        "board_contract",
+        "manifest"
+      ],
+      "optional": [
+        "smart_sim",
+        "recommendations",
+        "edges",
+        "live_lens",
+        "advanced_analytics",
+        "simulation_detail"
+      ]
+    },
+    "required_artifact_failures": [],
+    "optional_artifact_failures": [],
     "ok": true,
     "post_refresh_ok": true,
     "mirror_ok": true,
     "odds_control_plane": {
       "source_precedence": [
+        "shared_history",
         "artifact_history",
         "tracking_history"
       ],
       "artifact_paths": [
         "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate",
-        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nba_source"
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nba_source",
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nba_source\\data\\processed\\props_edges_2026-07-09.csv",
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nba_source\\tracking\\odds_history.json",
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\odds_control_plane\\odds_history\\nba\\odds_history.json",
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nba_source\\source_artifacts\\data\\processed\\boxscores_history.csv",
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nba_source\\source_artifacts\\data\\processed\\team_advanced_stats_2025.csv",
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nba_source\\source_artifacts\\data\\processed\\team_advanced_stats_2025_asof_2026-06-03.csv",
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nba_source\\source_artifacts\\data\\processed\\team_advanced_stats_2026.csv",
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nba_source\\source_artifacts\\data\\processed\\team_advanced_stats_2026_asof_20260530.csv",
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nba_source\\data\\processed\\props_predictions_2026-07-09.csv",
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nba_source\\data\\processed\\props_recommendations_2026-07-09.csv",
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nba_source\\data\\processed\\oddsapi_player_props_2026-07-09.csv",
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nba_source\\data\\raw\\odds_nba_player_props_2026-07-09.csv"
       ],
       "has_post_refresh": true
     }

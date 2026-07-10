@@ -4,6 +4,7 @@ import io
 import json
 import argparse
 import importlib.util
+import tempfile
 import subprocess
 import sys
 import unittest
@@ -154,6 +155,13 @@ class RefreshOddsSourcesTests(unittest.TestCase):
         self.assertEqual(kwargs["sport"], "wnba")
         self.assertIn("artifact_paths", kwargs)
         self.assertEqual(kwargs["metadata"]["execution_mode"], "source")
+        self.assertEqual(
+            kwargs["metadata"]["refresh_contract"],
+            {
+                "required": ["snapshot", "snapshot_alias", "game_slate", "predictions", "board_contract", "manifest"],
+                "optional": ["smart_sim", "recommendations", "edges", "live_lens", "advanced_analytics", "simulation_detail"],
+            },
+        )
 
     def test_build_summary_compacts_step_stdout_after_artifact_paths_are_extracted(self) -> None:
         module = self._load_module()
@@ -238,6 +246,67 @@ class RefreshOddsSourcesTests(unittest.TestCase):
         self.assertTrue(summary["ok"])
         self.assertEqual(summary["publish_parity"]["totalForcedPublishPaths"], 3)
         mocked_publish_parity.assert_called_once()
+
+    def test_sport_control_plane_metadata_uses_same_refresh_contract_for_mlb_and_wnba(self) -> None:
+        module = self._load_module()
+
+        mlb_metadata = module._sport_control_plane_metadata(
+            {"sport": "mlb", "ok": True, "post_refresh": {"ok": True}, "mirror": {"ok": True}},
+            date="2026-07-09",
+            phase="all",
+            execution_mode="source",
+            refresh_mode="full",
+        )
+        wnba_metadata = module._sport_control_plane_metadata(
+            {"sport": "wnba", "ok": True, "post_refresh": {"ok": True}, "mirror": {"ok": True}},
+            date="2026-07-09",
+            phase="all",
+            execution_mode="source",
+            refresh_mode="full",
+        )
+
+        self.assertEqual(mlb_metadata["refresh_contract"], wnba_metadata["refresh_contract"])
+        self.assertEqual(mlb_metadata["refresh_contract"]["required"], ["snapshot", "snapshot_alias", "game_slate", "predictions", "board_contract", "manifest"])
+        self.assertEqual(mlb_metadata["refresh_contract"]["optional"], ["smart_sim", "recommendations", "edges", "live_lens", "advanced_analytics", "simulation_detail"])
+        self.assertEqual(mlb_metadata["required_artifact_failures"], [])
+        self.assertEqual(wnba_metadata["optional_artifact_failures"], [])
+
+    def test_publish_sport_manifest_marks_required_failures_as_failed_but_optional_only_as_complete(self) -> None:
+        from syndicate.features.shared.manifest import publish_sport_manifest
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            reports_root = Path(tmp_dir) / "reports"
+            (reports_root / "manifests").mkdir(parents=True, exist_ok=True)
+
+            with patch("syndicate.features.shared.manifest.reports_root", return_value=reports_root):
+                required_result = publish_sport_manifest(
+                    "wnba",
+                    ["data/wnba_source/source_artifacts/data/processed/game_cards_2026-07-09.csv"],
+                    {
+                        "refresh_contract": {
+                            "required": ["snapshot", "snapshot_alias", "game_slate", "predictions", "board_contract", "manifest"],
+                            "optional": ["smart_sim", "recommendations", "edges", "live_lens", "advanced_analytics", "simulation_detail"],
+                        },
+                        "required_artifact_failures": ["predictions missing"],
+                        "optional_artifact_failures": ["SmartSim missing"],
+                    },
+                )
+                optional_result = publish_sport_manifest(
+                    "mlb",
+                    ["data/mlb_source/source_artifacts/data/processed/game_cards_2026-07-09.csv"],
+                    {
+                        "refresh_contract": {
+                            "required": ["snapshot", "snapshot_alias", "game_slate", "predictions", "board_contract", "manifest"],
+                            "optional": ["smart_sim", "recommendations", "edges", "live_lens", "advanced_analytics", "simulation_detail"],
+                        },
+                        "optional_artifact_failures": ["live lens missing"],
+                    },
+                )
+
+        self.assertEqual(required_result["payload"]["status"], "failed")
+        self.assertEqual(optional_result["payload"]["status"], "complete")
+        self.assertEqual(required_result["payload"]["metadata"]["required_artifact_failures"], ["predictions missing"])
+        self.assertEqual(optional_result["payload"]["metadata"]["optional_artifact_failures"], ["live lens missing"])
 
     def test_build_odds_coverage_audit_reports_date_and_week_spans(self) -> None:
         module = self._load_module()

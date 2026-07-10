@@ -272,6 +272,73 @@ def _derive_refresh_runtime_state(
     }
 
 
+def _normalize_failure_message(value: Any) -> str | None:
+    if value is None:
+        return None
+    if isinstance(value, str):
+        text = value.strip()
+        return text or None
+    if isinstance(value, dict):
+        for key in ("message", "error", "detail", "warning"):
+            text = _normalize_failure_message(value.get(key))
+            if text:
+                return text
+        try:
+            text = json.dumps(value, sort_keys=True, ensure_ascii=True)
+        except Exception:
+            text = str(value)
+        text = str(text).strip()
+        return text or None
+    if isinstance(value, (list, tuple, set)):
+        parts = [item for item in (_normalize_failure_message(item) for item in value) if item]
+        return "; ".join(parts) or None
+    text = str(value).strip()
+    return text or None
+
+
+def _extend_unique(target: list[str], values: Any) -> None:
+    if values is None:
+        return
+    items = values if isinstance(values, (list, tuple, set)) else [values]
+    for item in items:
+        text = _normalize_failure_message(item)
+        if text and text not in target:
+            target.append(text)
+
+
+def _refresh_artifact_failure_lists(refresh_payload: dict[str, Any] | None) -> tuple[list[str], list[str], dict[str, Any] | None]:
+    required_failures: list[str] = []
+    optional_failures: list[str] = []
+    refresh_contract: dict[str, Any] | None = None
+    if not isinstance(refresh_payload, dict):
+        return required_failures, optional_failures, refresh_contract
+
+    results = refresh_payload.get("results") if isinstance(refresh_payload.get("results"), list) else []
+    for result in results:
+        if not isinstance(result, dict):
+            continue
+        _extend_unique(required_failures, result.get("required_artifact_failures"))
+        _extend_unique(optional_failures, result.get("optional_artifact_failures"))
+
+        if not result.get("ok"):
+            fallback_failure = _normalize_failure_message(result.get("error")) or _normalize_failure_message(result.get("detail"))
+            if fallback_failure and fallback_failure not in required_failures:
+                required_failures.append(fallback_failure)
+            elif not fallback_failure:
+                sport_name = str(result.get("sport") or "sport").strip() or "sport"
+                required_failures.append(f"{sport_name} required artifact failure")
+
+        _extend_unique(optional_failures, result.get("warning"))
+        _extend_unique(optional_failures, result.get("warnings"))
+
+        sport_manifest = result.get("sport_manifest") if isinstance(result.get("sport_manifest"), dict) else None
+        metadata = (sport_manifest or {}).get("payload", {}).get("metadata") if isinstance((sport_manifest or {}).get("payload"), dict) else None
+        if refresh_contract is None and isinstance(metadata, dict) and isinstance(metadata.get("refresh_contract"), dict):
+            refresh_contract = dict(metadata.get("refresh_contract"))
+
+    return required_failures, optional_failures, refresh_contract
+
+
 def _load_recent_refresh_history(*, limit: int = 6) -> list[dict[str, Any]]:
     history: list[dict[str, Any]] = []
     for manifest_path in list_refresh_status_manifest_paths(limit=limit):
@@ -556,6 +623,8 @@ def load_latest_refresh_status() -> dict[str, Any]:
                 "exists": path_exists(path),
                 "payload": payload,
             }
+    odds_refresh_payload = (refresh_artifacts.get("odds_refresh") or {}).get("payload") if isinstance(refresh_artifacts.get("odds_refresh"), dict) else None
+    required_artifact_failures, optional_artifact_failures, refresh_contract = _refresh_artifact_failure_lists(odds_refresh_payload if isinstance(odds_refresh_payload, dict) else None)
     worker_status_path = refresh_latest_dir / "refresh_worker_status.json"
     refresh_artifacts["refresh_worker_status"] = {
         "path": str(worker_status_path),
@@ -617,6 +686,9 @@ def load_latest_refresh_status() -> dict[str, Any]:
             "manifest_exists": path_exists(refresh_manifest_path),
             "manifest": refresh_manifest,
             "artifacts": refresh_artifacts,
+            "required_artifact_failures": required_artifact_failures,
+            "optional_artifact_failures": optional_artifact_failures,
+            "refresh_contract": refresh_contract,
             "mirror_manifests": _load_mirror_manifest_summaries_from_current_data_root(),
             "runtime": runtime_state,
             "history": _load_recent_refresh_history(),

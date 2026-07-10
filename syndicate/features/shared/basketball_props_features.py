@@ -3,6 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 from datetime import date as _date
 
+from syndicate.features.shared.memory_observability import log_dataframe_memory
+
 
 NUM_COL_MAP = {
     "PTS": ["PTS", "pts"],
@@ -74,6 +76,7 @@ def _load_boxscores_as_player_logs(processed_root: Path):
         return pd.DataFrame()
 
     df = pd.concat(frames, ignore_index=True)
+    log_dataframe_memory("basketball_props_features.boxscores_as_player_logs", df)
     if df.empty:
         return df
 
@@ -281,6 +284,7 @@ def build_features_for_date_local(*, processed_root: Path, date: str, windows: l
                     player_frames.append(player_prior)
             if player_frames:
                 hist = pd.concat(player_frames, ignore_index=True)
+                log_dataframe_memory("basketball_props_features.player_history_concat", hist)
 
     stat_cols = [pts, reb, ast, fg3m, fg3a, stl, blk, tov, fgm, fga, fg_pct, ftm, fta, ft_pct, oreb, dreb, pf, plus_minus]
     for column in stat_cols:
@@ -391,4 +395,6 @@ def build_features_for_date_local(*, processed_root: Path, date: str, windows: l
                     rec[f"roll{window}_{feat_name}"] = np.nan
                     rec[f"roll{window}_{feat_name}_std"] = np.nan
         rows.append(rec)
-    return pd.DataFrame(rows)
+    out = pd.DataFrame(rows)
+    log_dataframe_memory("basketball_props_features.output", out)
+    return out

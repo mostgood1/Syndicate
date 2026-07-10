@@ -1063,6 +1063,109 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
         self.assertEqual(int(state["rc_export"]), 0)
         self.assertEqual(int(state["recs_rows"]), 1)
 
+    def test_core_outputs_are_enough_for_reuse_without_recommendation_artifacts(self) -> None:
+        module = self._load_module()
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_root = Path(tmp_dir)
+            source_root = tmp_root / "source"
+            artifact_root = tmp_root / "bundle"
+            source_raw = source_root / "data" / "raw"
+            source_processed = source_root / "data" / "processed"
+            bundle_raw = artifact_root / "data" / "raw"
+            bundle_processed = artifact_root / "data" / "processed"
+            for path in (source_raw, source_processed, bundle_raw, bundle_processed):
+                path.mkdir(parents=True, exist_ok=True)
+
+            date_str = "2026-05-22"
+            snapshot_name = f"odds_wnba_player_props_{date_str}.csv"
+            predictions_name = f"props_predictions_{date_str}.csv"
+            core_csv = "snapshot_ts,event_id\n2026-05-22T12:00:00Z,evt-1\n"
+            (source_raw / snapshot_name).write_text(core_csv, encoding="utf-8")
+            (source_processed / predictions_name).write_text("player\nA\n", encoding="utf-8")
+            (bundle_raw / snapshot_name).write_text(core_csv, encoding="utf-8")
+            (bundle_processed / predictions_name).write_text("player\nA\n", encoding="utf-8")
+
+            refresh_state = module._existing_refresh_state(
+                source_root=source_root,
+                date_str=date_str,
+                do_edges=False,
+                do_export=True,
+            )
+            artifact_state = module._existing_artifact_bundle_state(
+                artifact_root=artifact_root,
+                date_str=date_str,
+                do_edges=False,
+                do_export=True,
+            )
+
+        self.assertIsNotNone(refresh_state)
+        self.assertIsNotNone(artifact_state)
+        assert refresh_state is not None
+        assert artifact_state is not None
+        self.assertTrue(refresh_state.get("reused_existing_outputs"))
+        self.assertTrue(artifact_state.get("reused_existing_artifact_bundle"))
+        self.assertEqual(refresh_state.get("snapshot_bundle_path"), str(source_raw / snapshot_name))
+        self.assertEqual(artifact_state.get("snapshot_bundle_path"), str(bundle_raw / snapshot_name))
+        self.assertEqual(int(refresh_state["recs_rows"]), 0)
+        self.assertEqual(int(artifact_state["recs_rows"]), 0)
+
+    def test_run_refresh_via_cli_allows_missing_recommendation_artifacts_when_core_outputs_exist(self) -> None:
+        module = self._load_module()
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_root = Path(tmp_dir)
+            source_root = tmp_root / "source"
+            raw_root = source_root / "data" / "raw"
+            processed_root = source_root / "data" / "processed"
+            raw_root.mkdir(parents=True, exist_ok=True)
+            processed_root.mkdir(parents=True, exist_ok=True)
+
+            def _fake_run(args, log_file, **kwargs):
+                if "--out" in args:
+                    out_idx = args.index("--out") + 1
+                    out_path = Path(args[out_idx])
+                    out_path.parent.mkdir(parents=True, exist_ok=True)
+                    out_path.write_text("snapshot_ts,event_id\n2026-05-22T12:00:00Z,evt-1\n", encoding="utf-8")
+                return 0
+
+            def _fake_predict_export(**kwargs):
+                out_path = kwargs["out_path"]
+                out_path.parent.mkdir(parents=True, exist_ok=True)
+                out_path.write_text("player\nA\n", encoding="utf-8")
+                return 1, out_path
+
+            def _fake_game_cards_artifact(*, source_root, processed_root, date_str, log_file):
+                game_cards_path = processed_root / f"game_cards_{date_str}.csv"
+                game_cards_path.write_text(
+                    "date,game_id,home_team,visitor_team,commence_time,home_ml,away_ml,home_spread,away_spread,total,bookmaker,home_tri,away_tri\n"
+                    "2026-05-22,401,Chicago Sky,Minnesota Lynx,2026-05-22T23:00:00Z,-140,120,-4.5,4.5,164.5,oddsapi_consensus,CHI,MIN\n",
+                    encoding="utf-8",
+                )
+                return 1, game_cards_path
+
+            with patch.object(module, "_run_to_file", side_effect=_fake_run), patch.object(module, "export_props_predictions_local", side_effect=_fake_predict_export), patch.object(module, "export_props_recommendations_local", return_value=(0, None)), patch.object(module, "_build_local_game_cards_artifact", side_effect=_fake_game_cards_artifact), patch.object(module, "_build_local_game_recommendations_artifact", return_value=(0, None)), patch.object(module, "_ensure_player_logs_for_props_refresh", return_value=(True, None)), patch.object(module, "_ensure_game_predictions_for_props_refresh", return_value=(True, None)), patch.object(module, "_ensure_source_game_inputs", return_value={"schedule": 1, "fetch": 0, "build_features": 0, "predict_date": 0}):
+                state = module._run_refresh_via_cli(
+                    source_root=source_root,
+                    date_str="2026-05-22",
+                    regions="us",
+                    bookmakers="",
+                    markets="",
+                    do_edges=False,
+                    do_export=True,
+                    do_push=False,
+                    log_file=tmp_root / "refresh.log",
+                )
+
+        self.assertIsNone(state["error"])
+        self.assertEqual(int(state["rc_export"]), 0)
+        self.assertEqual(int(state["recs_rows"]), 0)
+        self.assertGreater(int(state["game_cards_rows"]), 0)
+        self.assertEqual(state.get("snapshot_bundle_path"), state.get("snapshot_path"))
+        self.assertEqual(state.get("snapshot_bundle_rows"), state.get("snapshot_rows"))
+        self.assertEqual(state.get("prediction_bundle_path"), state.get("predictions_path"))
+        self.assertEqual(state.get("prediction_bundle_rows"), state.get("predictions_rows"))
+
     def test_run_refresh_via_cli_treats_written_export_artifacts_as_success(self) -> None:
         module = self._load_module()
 

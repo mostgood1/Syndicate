@@ -1,29 +1,50 @@
 {
   "sport": "ncaaf",
-  "last_updated": "2026-06-25T19:56:16+00:00",
+  "last_updated": "2026-07-09T16:12:58-05:00",
   "artifact_paths": [
-    "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate",
-    "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\ncaaf_source"
+    "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate"
   ],
-  "status": "complete",
+  "status": "failed",
   "metadata": {
-    "date": "2026-10-01",
+    "date": "2026-07-09",
     "phase": "all",
     "execution_mode": "source",
     "refresh_mode": "full",
-    "ok": true,
-    "post_refresh_ok": true,
-    "mirror_ok": true,
+    "refresh_contract": {
+      "required": [
+        "snapshot",
+        "snapshot_alias",
+        "game_slate",
+        "predictions",
+        "board_contract",
+        "manifest"
+      ],
+      "optional": [
+        "smart_sim",
+        "recommendations",
+        "edges",
+        "live_lens",
+        "advanced_analytics",
+        "simulation_detail"
+      ]
+    },
+    "required_artifact_failures": [
+      "ncaaf required artifact failure"
+    ],
+    "optional_artifact_failures": [],
+    "ok": false,
+    "post_refresh_ok": null,
+    "mirror_ok": null,
     "odds_control_plane": {
       "source_precedence": [
+        "shared_history",
         "artifact_history",
         "tracking_history"
       ],
       "artifact_paths": [
-        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate",
-        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\ncaaf_source"
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate"
       ],
-      "has_post_refresh": true
+      "has_post_refresh": false
     }
   }
 }

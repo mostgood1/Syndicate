@@ -51,6 +51,7 @@ from syndicate.features.shared.publish_parity import build_publish_parity_summar
 from syndicate.features.shared.odds_refresh_tracking import sync_sport_post_refresh_tracking
 from syndicate.features.shared.manifest import publish_sport_manifest
 from syndicate.features.shared.refresh_state_store import data_root
+from syndicate.features.shared.memory_observability import log_runtime_memory
 from syndicate.features.mlb.sources import available_daily_summary_dates as mlb_available_daily_summary_dates
 from syndicate.features.nba.sources import available_dates as nba_available_dates
 from syndicate.features.ncaab.sources import available_dates as ncaab_available_dates
@@ -68,6 +69,8 @@ _DEFAULT_INTERVAL_MARKETS = "h2h,spreads,totals,spreads_h1,totals_h1,spreads_h2,
 _WNBA_PLAYER_PROP_MARKETS = "player_points,player_rebounds,player_assists,player_points_rebounds_assists,player_threes,player_steals,player_blocks,player_turnovers,player_points_rebounds,player_points_assists,player_rebounds_assists,player_double_double,player_triple_double"
 _DEFAULT_REFRESH_STEP_TIMEOUT_SECONDS = 1800
 _MEMORY_TRACE_LAST_RSS_BYTES: int | None = None
+_SPORT_REFRESH_REQUIRED_ARTIFACTS = ("snapshot", "snapshot_alias", "game_slate", "predictions", "board_contract", "manifest")
+_SPORT_REFRESH_OPTIONAL_ARTIFACTS = ("smart_sim", "recommendations", "edges", "live_lens", "advanced_analytics", "simulation_detail")
 
 
 def _parse_utc_timestamp(value: str | None) -> datetime | None:
@@ -1045,6 +1048,10 @@ def _resolve_execution_mode(raw: str | None, *, mirror_only: bool = False) -> st
     raise ValueError("execution_mode must be 'source' or 'ingest'.")
 
 
+def _serial_sport_refresh_enabled() -> bool:
+    return str(os.environ.get("SYNDICATE_SERIAL_SPORT_REFRESH") or "").strip().lower() in {"1", "true", "yes", "on"}
+
+
 def _refresh_step_timeout_seconds() -> int:
     timeout_value = str(os.environ.get("SYNDICATE_REFRESH_STEP_TIMEOUT_SECONDS") or "").strip()
     if timeout_value:
@@ -1085,7 +1092,9 @@ def _run_command(step: RefreshStep, *, dry_run: bool = False) -> dict[str, Any]:
             "ok": True,
             "dry_run": True,
         }
+    result = None
     try:
+        log_runtime_memory("before_sport_launch", step=step.name, cwd=str(step.cwd), dry_run=bool(dry_run))
         result = subprocess.run(
             list(step.command),
             cwd=str(step.cwd),
@@ -1095,6 +1104,7 @@ def _run_command(step: RefreshStep, *, dry_run: bool = False) -> dict[str, Any]:
             timeout=timeout_seconds,
         )
     except subprocess.TimeoutExpired:
+        log_runtime_memory("after_sport_launch", step=step.name, cwd=str(step.cwd), status="timeout")
         finished = _utc_now()
         runtime_seconds = _elapsed_seconds(started, finished)
         print(
@@ -1109,6 +1119,15 @@ def _run_command(step: RefreshStep, *, dry_run: bool = False) -> dict[str, Any]:
         )
         print(f"[refresh_odds_sources] FAIL step={step.name} reason=timeout timeout_seconds={timeout_seconds}", flush=True)
         raise
+    finally:
+        if result is not None:
+            log_runtime_memory(
+                "after_sport_launch",
+                step=step.name,
+                cwd=str(step.cwd),
+                return_code=int(result.returncode),
+                dry_run=bool(dry_run),
+            )
 
     finished = _utc_now()
     stdout_text = str(result.stdout or "")
@@ -1288,13 +1307,65 @@ def _sport_artifact_paths(sport_result: dict[str, Any]) -> list[str]:
     return paths
 
 
+def _sport_refresh_contract() -> dict[str, list[str]]:
+    return {
+        "required": list(_SPORT_REFRESH_REQUIRED_ARTIFACTS),
+        "optional": list(_SPORT_REFRESH_OPTIONAL_ARTIFACTS),
+    }
+
+
+def _sport_refresh_failure_lists(sport_result: dict[str, Any]) -> tuple[list[str], list[str]]:
+    required_failures: list[str] = []
+    optional_failures: list[str] = []
+
+    for field in ("required_artifact_failures", "requiredFailures"):
+        values = sport_result.get(field)
+        if isinstance(values, list):
+            for value in values:
+                text = str(value or "").strip()
+                if text and text not in required_failures:
+                    required_failures.append(text)
+
+    for field in ("optional_artifact_failures", "optionalFailures"):
+        values = sport_result.get(field)
+        if isinstance(values, list):
+            for value in values:
+                text = str(value or "").strip()
+                if text and text not in optional_failures:
+                    optional_failures.append(text)
+
+    warning = str(sport_result.get("warning") or "").strip()
+    if warning and warning not in optional_failures:
+        optional_failures.append(warning)
+
+    warnings = sport_result.get("warnings") if isinstance(sport_result.get("warnings"), list) else []
+    for value in warnings:
+        text = str(value or "").strip()
+        if text and text not in optional_failures:
+            optional_failures.append(text)
+
+    error = str(sport_result.get("error") or "").strip()
+    if not required_failures:
+        if error:
+            required_failures.append(error)
+        elif not bool(sport_result.get("ok")):
+            sport_name = str(sport_result.get("sport") or "sport").strip() or "sport"
+            required_failures.append(f"{sport_name} required artifact failure")
+
+    return required_failures, optional_failures
+
+
 def _sport_control_plane_metadata(sport_result: dict[str, Any], *, date: str, phase: str, execution_mode: str, refresh_mode: str) -> dict[str, Any]:
     artifact_paths = _sport_artifact_paths(sport_result)
+    required_artifact_failures, optional_artifact_failures = _sport_refresh_failure_lists(sport_result)
     return {
         "date": date,
         "phase": phase,
         "execution_mode": execution_mode,
         "refresh_mode": refresh_mode,
+        "refresh_contract": _sport_refresh_contract(),
+        "required_artifact_failures": required_artifact_failures,
+        "optional_artifact_failures": optional_artifact_failures,
         "ok": bool(sport_result.get("ok")),
         "post_refresh_ok": bool((sport_result.get("post_refresh") or {}).get("ok")) if isinstance(sport_result.get("post_refresh"), dict) else None,
         "mirror_ok": bool((sport_result.get("mirror") or {}).get("ok")) if isinstance(sport_result.get("mirror"), dict) else None,
@@ -1700,10 +1771,18 @@ def _build_summary(args: argparse.Namespace) -> dict[str, Any]:
     )
 
     any_failure = False
-    max_workers = min(len(selected), 4)
+    max_workers = 1 if _serial_sport_refresh_enabled() else min(len(selected), 4)
     if max_workers <= 1:
         for sport in selected:
+            log_runtime_memory("before_sport_launch", sport=sport, execution_mode=execution_mode, concurrency="sequential")
             sport_result = _run_sport_refresh(args, sport, execution_mode)
+            log_runtime_memory(
+                "after_sport_launch",
+                sport=sport,
+                execution_mode=execution_mode,
+                concurrency="sequential",
+                ok=bool(sport_result.get("ok")) if isinstance(sport_result, dict) else None,
+            )
             if not sport_result.get("ok"):
                 any_failure = True
             summary["results"].append(sport_result)
@@ -1715,7 +1794,10 @@ def _build_summary(args: argparse.Namespace) -> dict[str, Any]:
     else:
         results_by_sport: dict[str, dict[str, Any]] = {}
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            futures = {executor.submit(_run_sport_refresh, args, sport, execution_mode): sport for sport in selected}
+            futures = {}
+            for sport in selected:
+                log_runtime_memory("before_sport_launch", sport=sport, execution_mode=execution_mode, concurrency="parallel")
+                futures[executor.submit(_run_sport_refresh, args, sport, execution_mode)] = sport
             for future in as_completed(futures):
                 sport = futures[future]
                 try:
@@ -1727,6 +1809,13 @@ def _build_summary(args: argparse.Namespace) -> dict[str, Any]:
                         "error": f"{type(exc).__name__}: {exc}",
                     }
                 results_by_sport[sport] = sport_result
+                log_runtime_memory(
+                    "after_sport_launch",
+                    sport=sport,
+                    execution_mode=execution_mode,
+                    concurrency="parallel",
+                    ok=bool(sport_result.get("ok")) if isinstance(sport_result, dict) else None,
+                )
                 if not sport_result.get("ok"):
                     any_failure = True
                 _log_memory(
@@ -1809,7 +1898,11 @@ def main() -> int:
         _dump_main_thread_stack(label="child_exit")
         _dump_child_runtime_state(label="atexit")
 
+    def _emit_exit_memory() -> None:
+        log_runtime_memory("before_exit", script="refresh_odds_sources", pid=child_pid)
+
     atexit.register(_emit_child_exit)
+    atexit.register(_emit_exit_memory)
 
     parser = argparse.ArgumentParser(
         description="Refresh pregame/live odds in the source sport repos, then optionally mirror the refreshed artifacts into Syndicate.",
@@ -1861,6 +1954,7 @@ def main() -> int:
 
     try:
         _log_memory("startup", child_pid=child_pid, argv=list(sys.argv), before=startup_memory, after=_phase_memory_snapshot())
+        log_runtime_memory("startup", script="refresh_odds_sources", pid=child_pid, argv=list(sys.argv))
         summary = _build_summary(args)
     except Exception as exc:
         payload = {"ok": False, "error": f"{type(exc).__name__}: {exc}"}

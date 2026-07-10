@@ -1,19 +1,19 @@
 ﻿{
     "sport":  "nfl",
-    "date":  "2026-06-28",
-    "refreshedAtUtc":  "2026-06-28T07:40:06.5560463Z",
+    "date":  "2026-07-09",
+    "refreshedAtUtc":  "2026-07-09T21:12:56.2108926Z",
     "sourceRepo":  null,
-    "sourceArtifactRoot":  "D:\\a\\Syndicate\\Syndicate\\data\\nfl_source\\source_artifacts",
+    "sourceArtifactRoot":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nfl_source\\source_artifacts",
     "sourceRootEnvVar":  "SYNDICATE_SOURCE_ROOT_NFL",
     "sourceArtifactRootEnvVar":  "SYNDICATE_ARTIFACT_ROOT_NFL",
-    "sourceDataRoot":  "D:\\a\\Syndicate\\Syndicate\\data\\nfl_source\\source_artifacts",
-    "destinationRoot":  "D:\\a\\Syndicate\\Syndicate\\data\\nfl_source",
+    "sourceDataRoot":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nfl_source\\source_artifacts",
+    "destinationRoot":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nfl_source",
     "usedExistingMirrorArtifacts":  false,
     "usedArtifactBundle":  true,
-    "copiedArtifactCount":  9,
+    "copiedArtifactCount":  10,
     "artifactGroups":  {
                            "calibration":  1,
-                           "recommendations":  6,
+                           "recommendations":  7,
                            "props":  1,
                            "manifests":  0,
                            "other":  1
@@ -25,7 +25,8 @@
                             "real_betting_lines_2026_06_22.json",
                             "real_betting_lines_2026_06_23.json",
                             "real_betting_lines_2026_06_24.json",
-                            "real_betting_lines_2026_06_28.json",
+                            "real_betting_lines_2026_07_08.json",
+                            "real_betting_lines_2026_07_09.json",
                             "oddsapi_player_props_2026_wk1.csv",
                             "tracking"
                         ]

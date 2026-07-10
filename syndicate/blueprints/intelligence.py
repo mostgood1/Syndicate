@@ -1256,6 +1256,8 @@ def intelligence_portfolio_event_api():
             "portfolioEventRecords": list(bundle.get("portfolio_event_records") or []),
             "recommendation_history": dict(bundle.get("history") or {}),
             "recommendationHistory": dict(bundle.get("history") or {}),
+            "performance_analytics": dict(bundle.get("performance_analytics") or {}),
+            "performanceAnalytics": dict(bundle.get("performance_analytics") or {}),
         }
         return _no_cache_response(jsonify(response_payload))
     except Exception:

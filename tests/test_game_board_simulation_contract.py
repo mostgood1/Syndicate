@@ -103,6 +103,58 @@ class GameBoardSimulationContractTests(unittest.TestCase):
         self.assertNotIn("simulation_contract", context)
         self.assertEqual(context.get("board_contract", {}).get("sport"), "wnba")
 
+    def test_apply_game_board_contract_emits_shared_publication_adapter_fields(self) -> None:
+        context = apply_game_board_contract(
+            {
+                "date": "2026-07-09",
+                "requested_date": "2026-07-09",
+                "source_title": "NFL weekly recommendation snapshot",
+                "source_path": "/tmp/fake-nfl-source",
+                "games": [
+                    {
+                        "gamePk": "nfl-1",
+                        "event_id": "401000010",
+                        "away": {"abbr": "DAL", "name": "Dallas"},
+                        "home": {"abbr": "PHI", "name": "Philadelphia"},
+                        "detail": "Week 1",
+                        "summary": "Example weekly snapshot",
+                        "betting": {
+                            "home_ml": -145,
+                            "away_ml": 128,
+                            "home_spread": -3.5,
+                            "away_spread": 3.5,
+                            "total": 47.5,
+                            "p_home_win": 0.58,
+                            "p_away_win": 0.42,
+                        },
+                        "sim": {
+                            "score": {
+                                "away_mean": 22.1,
+                                "home_mean": 25.4,
+                                "total_mean": 47.5,
+                                "margin_mean": 3.3,
+                            }
+                        },
+                        "status": "Scheduled",
+                    }
+                ],
+            },
+            sport="nfl",
+            module="cards",
+        )
+
+        game = (context.get("games") or [{}])[0]
+        self.assertIsInstance(game.get("shared_game_state"), dict)
+        self.assertEqual(game.get("shared_game_state", {}).get("status"), "Scheduled")
+        self.assertIsInstance(game.get("shared_predictions"), dict)
+        self.assertEqual(game.get("shared_predictions", {}).get("away_mean"), 22.1)
+        self.assertEqual(game.get("shared_predictions", {}).get("home_mean"), 25.4)
+        self.assertIsInstance(game.get("shared_markets"), dict)
+        self.assertEqual((game.get("shared_markets") or {}).get("moneyline", {}).get("home"), -145)
+        self.assertEqual((game.get("shared_markets") or {}).get("total", {}).get("line"), 47.5)
+        self.assertEqual((game.get("predictions") or {}).get("away_mean"), 22.1)
+        self.assertEqual((game.get("markets") or {}).get("moneyline", {}).get("away"), 128)
+
 
 if __name__ == "__main__":
     unittest.main()

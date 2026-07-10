@@ -29,6 +29,7 @@ from syndicate.features.shared.basketball_live_artifacts import build_live_playe
 from syndicate.features.shared.basketball_props_predictions import export_props_predictions_local
 from syndicate.features.shared.basketball_props_recommendations import export_props_recommendations_local
 from syndicate.features.shared.basketball_props_smart_sim import _to_tricode_local
+from syndicate.features.shared.memory_observability import log_runtime_memory
 from syndicate.features.shared.refresh_state_store import build_input_hash
 from syndicate.features.shared.refresh_state_store import path_fingerprint
 from syndicate.features.shared.refresh_state_store import record_refresh_state
@@ -2933,11 +2934,15 @@ def _run_refresh_via_cli(
         "rc_edges": (-2 if do_edges else None),
         "rc_export": (-2 if do_export else None),
         "snapshot_rows": 0,
+        "snapshot_bundle_rows": 0,
         "predictions_rows": 0,
+        "prediction_bundle_rows": 0,
         "edges_rows": 0,
         "recs_rows": 0,
         "snapshot_path": str(raw_fp),
+        "snapshot_bundle_path": str(raw_fp),
         "predictions_path": str(pred_fp),
+        "prediction_bundle_path": str(pred_fp),
         "edges_path": str(edges_fp),
         "recs_path": str(rec_fp),
         "snapshot_alias_path": str(processed_root / f"oddsapi_player_props_{date_str}.csv"),
@@ -2969,6 +2974,7 @@ def _run_refresh_via_cli(
     )
     state["rc_snapshot"] = int(rc_snapshot)
     state["snapshot_rows"] = int(_count_csv_rows_quick(raw_fp))
+    state["snapshot_bundle_rows"] = int(state["snapshot_rows"] or 0)
     alias_path, alias_rows, alias_error = _materialize_processed_snapshot_alias(
         processed_root=processed_root,
         date_str=date_str,
@@ -3005,6 +3011,10 @@ def _run_refresh_via_cli(
                 state["error"] = game_predictions_error or f"predictions missing before predict-props for {date_str}"
             else:
                 try:
+                    smart_sim_workers = max(1, _env_int("REFRESH_PREDICT_PROPS_SMART_SIM_WORKERS", 1))
+                    smart_sim_executor = "ProcessPoolExecutor" if smart_sim_workers > 1 else "sequential"
+                    log_runtime_memory("before_smart_sim", phase=state["phase"], worker_count=smart_sim_workers, executor_type=smart_sim_executor)
+                    print(f"SMART_SIM_WORKERS {json.dumps({'worker_count': smart_sim_workers, 'executor_type': smart_sim_executor}, sort_keys=True)}", file=sys.stderr, flush=True)
                     _touch_progress()
                     _, _ = export_props_predictions_local(
                         source_root=source_root,
@@ -3025,11 +3035,13 @@ def _run_refresh_via_cli(
                         heartbeat_every_s=5.0,
                     )
                     _touch_progress()
+                    log_runtime_memory("after_smart_sim", phase=state["phase"], worker_count=smart_sim_workers, executor_type=smart_sim_executor)
                     rc_pred = 0
                 except Exception:
                     _append_log(log_file, traceback.format_exc())
                     rc_pred = 1
             state["predictions_rows"] = int(_count_csv_rows_quick(pred_fp))
+            state["prediction_bundle_rows"] = int(state["predictions_rows"] or 0)
             _append_log(log_file, f"Predictions stage finished for {date_str}: rc_pred={int(rc_pred)}, rows={state['predictions_rows']}")
             existing_edges_rows = int(_count_csv_rows_quick(edges_fp))
             existing_recs_rows = int(_count_csv_rows_quick(rec_fp))
@@ -3093,6 +3105,7 @@ def _run_refresh_via_cli(
         state["phase"] = "export"
         state["phase_started_at"] = dt.datetime.utcnow().isoformat()
         state["rc_export"] = -1
+        log_runtime_memory("before_export", phase=state["phase"], pred_ready=bool(pred_ready))
         _append_log(log_file, f"Export stage starting for {date_str}: pred_ready={pred_ready}, snapshot_rows={int(state.get('snapshot_rows') or 0)}, edges_rows={int(state.get('edges_rows') or 0)}")
         game_cards_rows = 0
         local_game_cards_path = None
@@ -3126,7 +3139,10 @@ def _run_refresh_via_cli(
             rc_recommendations = 0 if local_recommendations_path is not None else 1
             if any(int(value) != 0 for value in game_input_rcs.values()):
                 _append_log(log_file, f"WNBA source bootstrap returned non-zero input codes for {date_str}: {game_input_rcs}")
-            rc_export = 0 if int(rc_local_props_export) == 0 and int(rc_recommendations) == 0 and int(rc_game_cards) == 0 else 1
+            rc_export = 0 if int(rc_local_props_export) == 0 and int(rc_game_cards) == 0 else 1
+            if int(rc_export) == 0 and int(rc_recommendations) != 0:
+                _append_log(log_file, f"Export stage missing WNBA recommendation artifacts for {date_str}; continuing with warning because core WNBA outputs are present")
+                state["warning"] = f"WNBA recommendation artifacts were unavailable for {date_str}; continuing with core outputs"
         except Exception:
             _append_log(log_file, traceback.format_exc())
             rc_export = 1
@@ -3135,6 +3151,7 @@ def _run_refresh_via_cli(
         state["game_cards_rows"] = int(game_cards_rows)
         state["rc_export"] = int(rc_export)
         state["recs_rows"] = int(_count_csv_rows_quick(rec_fp))
+        log_runtime_memory("after_export", phase=state["phase"], rc_export=state["rc_export"], game_cards_rows=game_cards_rows, recs_rows=state["recs_rows"])
         _append_log(log_file, f"Export stage finished for {date_str}: rc_export={state['rc_export']}, game_cards_rows={game_cards_rows}, recs_rows={state['recs_rows']}")
         source_game_cards_rows = int(_count_csv_rows_quick(source_root / 'data' / 'processed' / f'game_cards_{date_str}.csv'))
         if int(rc_export) != 0:
@@ -3155,19 +3172,22 @@ def _run_refresh_via_cli(
                 export_artifacts_ready = (
                     int(state.get("snapshot_rows") or 0) > 0
                     and int(state.get("predictions_rows") or 0) > 0
-                    and int(state.get("recs_rows") or 0) > 0
                     and int(game_cards_rows or 0) > 0
                 )
                 if export_artifacts_ready:
                     if do_edges and int(state.get("edges_rows") or 0) <= 0:
-                        _append_log(log_file, f"Export stage missing WNBA edges rows for {date_str}; continuing with warning because recommendations and game cards are present")
+                        _append_log(log_file, f"Export stage missing WNBA edges rows for {date_str}; continuing with warning because core WNBA outputs are present")
+                    if int(state.get("recs_rows") or 0) <= 0:
+                        _append_log(log_file, f"Export stage missing WNBA recommendation rows for {date_str}; continuing with warning because core WNBA outputs are present")
                     _append_log(log_file, f"Export stage returned {rc_export} but required WNBA artifacts were present; treating as warning for {date_str}")
                     state["rc_export"] = 0
                     rc_export = 0
                 else:
                     state["error"] = f"export-props-recommendations failed with exit code {int(rc_export)}"
     state["snapshot_rows"] = int(_count_csv_rows_quick(raw_fp))
+    state["snapshot_bundle_rows"] = int(state.get("snapshot_rows") or 0)
     state["predictions_rows"] = int(_count_csv_rows_quick(pred_fp)) if refresh_mode == "full" else int(state.get("predictions_rows") or 0)
+    state["prediction_bundle_rows"] = int(state.get("predictions_rows") or 0)
     state["edges_rows"] = int(_count_csv_rows_quick(edges_fp)) if refresh_mode == "full" else int(state.get("edges_rows") or 0)
     state["recs_rows"] = int(_count_csv_rows_quick(rec_fp)) if refresh_mode == "full" else int(state.get("recs_rows") or 0)
     state["snapshot_alias_rows"] = int(_count_csv_rows_quick(Path(str(state.get("snapshot_alias_path") or ""))))
@@ -3191,22 +3211,12 @@ def _existing_refresh_state(*, source_root: Path, date_str: str, do_edges: bool,
     edges_path = processed_root / f"props_edges_{date_str}.csv"
     recs_path = processed_root / f"props_recommendations_{date_str}.csv"
 
-    required_paths = [snapshot_path, snapshot_alias_path]
+    required_paths = [snapshot_path]
     if do_edges or do_export:
         required_paths.append(predictions_path)
     if do_edges:
         required_paths.append(edges_path)
-    if do_export:
-        required_paths.append(recs_path)
     if any(not path.exists() or not path.is_file() for path in required_paths):
-        return None
-
-    game_cards_path = processed_root / f"game_cards_{date_str}.csv"
-    cards_sim_detail_path = processed_root / f"cards_sim_detail_{date_str}.json"
-    game_cards_rows = int(_count_csv_rows_quick(game_cards_path))
-    cards_sim_detail_games = int(_count_cards_sim_detail_games(cards_sim_detail_path))
-    smart_sim_files = int(_count_matching_files(processed_root, f"smart_sim_{date_str}_*.json"))
-    if bool(do_export) and int(_count_csv_rows_quick(snapshot_path)) > 0 and game_cards_rows > 0 and cards_sim_detail_games <= 0 and smart_sim_files <= 0:
         return None
 
     started = str(started_at or "") or str(dt.datetime.utcnow().isoformat())
@@ -3222,14 +3232,15 @@ def _existing_refresh_state(*, source_root: Path, date_str: str, do_edges: bool,
         "rc_edges": (0 if do_edges else None),
         "rc_export": (0 if do_export else None),
         "snapshot_rows": int(_count_csv_rows_quick(snapshot_path)),
+        "snapshot_bundle_rows": int(_count_csv_rows_quick(snapshot_path)),
         "predictions_rows": int(_count_csv_rows_quick(predictions_path)),
+        "prediction_bundle_rows": int(_count_csv_rows_quick(predictions_path)),
         "edges_rows": int(_count_csv_rows_quick(edges_path)),
         "recs_rows": int(_count_csv_rows_quick(recs_path)),
-        "game_cards_rows": game_cards_rows,
-        "cards_sim_detail_games": cards_sim_detail_games,
-        "smart_sim_files": smart_sim_files,
         "snapshot_path": str(snapshot_path),
+        "snapshot_bundle_path": str(snapshot_path),
         "predictions_path": str(predictions_path),
+        "prediction_bundle_path": str(predictions_path),
         "edges_path": str(edges_path),
         "recs_path": str(recs_path),
         "snapshot_alias_path": str(snapshot_alias_path),
@@ -3254,30 +3265,17 @@ def _existing_artifact_bundle_state(*, artifact_root: Path, date_str: str, do_ed
     cards_sim_detail_path = processed_root / f"cards_sim_detail_{date_str}.json"
     top_by_game_path = processed_root / f"props_recommendations_top_by_game_{date_str}.json"
 
-    required_paths = [snapshot_path, snapshot_alias_path]
+    required_paths = [snapshot_path]
     if do_edges or do_export:
         required_paths.append(predictions_path)
     if do_edges:
         required_paths.append(edges_path)
-    if do_export:
-        required_paths.append(recs_path)
-        required_paths.extend(
-            [
-                game_cards_path,
-                recommendations_slate_path,
-                cards_props_snapshot_path,
-                cards_sim_detail_path,
-                top_by_game_path,
-            ]
-        )
     if any(not path.exists() or not path.is_file() for path in required_paths):
         return None
 
     game_cards_rows = int(_count_csv_rows_quick(game_cards_path))
     cards_sim_detail_games = int(_count_cards_sim_detail_games(cards_sim_detail_path))
     smart_sim_files = int(_count_matching_files(processed_root, f"smart_sim_{date_str}_*.json"))
-    if bool(do_export) and int(_count_csv_rows_quick(snapshot_path)) > 0 and game_cards_rows > 0 and cards_sim_detail_games <= 0 and smart_sim_files <= 0:
-        return None
 
     started = str(started_at or "") or str(dt.datetime.utcnow().isoformat())
     ended = str(dt.datetime.utcnow().isoformat())
@@ -3292,14 +3290,18 @@ def _existing_artifact_bundle_state(*, artifact_root: Path, date_str: str, do_ed
         "rc_edges": (0 if do_edges else None),
         "rc_export": (0 if do_export else None),
         "snapshot_rows": int(_count_csv_rows_quick(snapshot_path)),
+        "snapshot_bundle_rows": int(_count_csv_rows_quick(snapshot_path)),
         "predictions_rows": int(_count_csv_rows_quick(predictions_path)),
+        "prediction_bundle_rows": int(_count_csv_rows_quick(predictions_path)),
         "edges_rows": int(_count_csv_rows_quick(edges_path)),
         "recs_rows": int(_count_csv_rows_quick(recs_path)),
         "game_cards_rows": game_cards_rows,
         "cards_sim_detail_games": cards_sim_detail_games,
         "smart_sim_files": smart_sim_files,
         "snapshot_path": str(snapshot_path),
+        "snapshot_bundle_path": str(snapshot_path),
         "predictions_path": str(predictions_path),
+        "prediction_bundle_path": str(predictions_path),
         "edges_path": str(edges_path),
         "recs_path": str(recs_path),
         "snapshot_alias_path": str(snapshot_alias_path),
@@ -3312,7 +3314,7 @@ def _existing_artifact_bundle_state(*, artifact_root: Path, date_str: str, do_ed
 
 
 def _processed_source_directory(state: dict[str, object]) -> Path | None:
-    for key in ("snapshot_alias_path", "predictions_path", "edges_path", "recs_path"):
+    for key in ("predictions_path", "edges_path", "recs_path", "snapshot_alias_path", "snapshot_bundle_path", "snapshot_path"):
         source_text = str(state.get(key) or "").strip()
         if not source_text:
             continue

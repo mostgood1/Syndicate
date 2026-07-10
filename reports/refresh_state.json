@@ -99,20 +99,21 @@
       }
     },
     "nfl_artifact_bundle": {
-      "inputHash": "da8f3194473f022c520a0a30969a6580b1d9108885f85ecb49c676af6b1c9566",
-      "updatedAt": "2026-06-25T18:37:58-05:00",
+      "inputHash": "3c9f588f1868594252cf1c354f7d296fcae388c73818eec08eef51bd6a08ebb1",
+      "updatedAt": "2026-07-09T21:12:55-05:00",
       "outputs": [
-        "data\\nfl_source\\source_artifacts\\current_week.json",
-        "data\\nfl_source\\source_artifacts\\real_betting_lines_2026_06_15.json",
-        "data\\nfl_source\\source_artifacts\\real_betting_lines_2026_06_16.json",
-        "data\\nfl_source\\source_artifacts\\real_betting_lines_2026_06_22.json",
-        "data\\nfl_source\\source_artifacts\\real_betting_lines_2026_06_23.json",
-        "data\\nfl_source\\source_artifacts\\real_betting_lines_2026_06_24.json",
-        "data\\nfl_source\\source_artifacts\\real_betting_lines_2026_06_25.json",
-        "data\\nfl_source\\source_artifacts\\oddsapi_player_props_2026_wk1.csv"
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nfl_source\\source_artifacts\\current_week.json",
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nfl_source\\source_artifacts\\real_betting_lines_2026_06_15.json",
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nfl_source\\source_artifacts\\real_betting_lines_2026_06_16.json",
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nfl_source\\source_artifacts\\real_betting_lines_2026_06_22.json",
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nfl_source\\source_artifacts\\real_betting_lines_2026_06_23.json",
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nfl_source\\source_artifacts\\real_betting_lines_2026_06_24.json",
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nfl_source\\source_artifacts\\real_betting_lines_2026_07_08.json",
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nfl_source\\source_artifacts\\real_betting_lines_2026_07_09.json",
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nfl_source\\source_artifacts\\oddsapi_player_props_2026_wk1.csv"
       ],
       "metadata": {
-        "artifact_root": "data\\nfl_source\\source_artifacts"
+        "artifact_root": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nfl_source\\source_artifacts"
       }
     },
     "mlb_live_lens:2026-06-12": {
@@ -333,8 +334,8 @@
       }
     },
     "wnba_artifact_bundle::2026-05-22:1:1": {
-      "inputHash": "21fb86eb7bb6617ae6d55369fdb701b837f6fe8135bd64fbae5064262cec0a67",
-      "updatedAt": "2026-07-07T01:26:38-05:00",
+      "inputHash": "6a3c533041f05a7c73ab18102c462b3fa633faedeae6ba2ef2eee28fc774afb4",
+      "updatedAt": "2026-07-09T18:24:25-05:00",
       "outputs": [],
       "metadata": {
         "date": "2026-05-22",
@@ -1103,17 +1104,17 @@
       }
     },
     "mlb_live_lens:2026-07-09": {
-      "inputHash": "6aa63d3ed5dbf0d0ddfc42768febac8f6481a87a992608b8440c6a453afe88db",
-      "updatedAt": "2026-07-09T07:28:15-05:00",
+      "inputHash": "881e9e8be72547cd2f8f8d97b70bce1981b76120ac29d6ce6ef060a315607c4d",
+      "updatedAt": "2026-07-09T21:12:57-05:00",
       "outputs": [
-        "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\live_lens\\live_lens_report_2026_07_09.json",
-        "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\live_lens\\live_lens_2026_07_09.jsonl",
-        "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\live_lens\\prop_registry\\live_prop_registry_2026_07_09.json"
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\data\\live_lens\\live_lens_report_2026_07_09.json",
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\data\\live_lens\\live_lens_2026_07_09.jsonl",
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\data\\live_lens\\prop_registry\\live_prop_registry_2026_07_09.json"
       ],
       "metadata": {
         "date": "2026-07-09",
         "trigger": "syndicate_refresh",
-        "source_root": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts"
+        "source_root": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source"
       }
     },
     "wnba_artifact_bundle:D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts:2026-07-09:1:1": {
@@ -1124,6 +1125,84 @@
         "date": "2026-07-09",
         "reused": false,
         "artifact_root": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts"
+      }
+    },
+    "wnba_artifact_bundle:C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpu0jqh0oz\\bundle:2026-05-22:1:1": {
+      "inputHash": "826f153cbc4b8c8383c245e61278292960114730ca767f8be1114b474851b2dd",
+      "updatedAt": "2026-07-09T18:24:35-05:00",
+      "outputs": [],
+      "metadata": {
+        "date": "2026-05-22",
+        "reused": false,
+        "artifact_root": "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpu0jqh0oz\\bundle"
+      }
+    },
+    "wnba_artifact_bundle:C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpsz4ta5l_\\bundle:2026-05-22:1:1": {
+      "inputHash": "4aa2d9c09399347257852574a64f24fb051f9bd5c360fbe316102d7f7fd134f1",
+      "updatedAt": "2026-07-09T18:24:35-05:00",
+      "outputs": [],
+      "metadata": {
+        "date": "2026-05-22",
+        "reused": true,
+        "artifact_root": "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpsz4ta5l_\\bundle"
+      }
+    },
+    "wnba_artifact_bundle:C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmp1peqreil\\bundle:2026-05-22:1:1": {
+      "inputHash": "891446ff72994cf8a3abd3beae2e0fbba3d0497a4adfa57ba6a75443b17a294d",
+      "updatedAt": "2026-07-09T18:24:35-05:00",
+      "outputs": [],
+      "metadata": {
+        "date": "2026-05-22",
+        "reused": true,
+        "artifact_root": "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmp1peqreil\\bundle"
+      }
+    },
+    "nba_artifact_bundle:C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nba_source\\source_artifacts:2026-07-09:1:1": {
+      "inputHash": "cf0856fa176ef9d18deabad774b7cb5c62cdfd2ebc74b08e47f671e6137b8c4d",
+      "updatedAt": "2026-07-09T21:12:57-05:00",
+      "outputs": [],
+      "metadata": {
+        "date": "2026-07-09",
+        "reused": false,
+        "artifact_root": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nba_source\\source_artifacts"
+      }
+    },
+    "wnba_artifact_bundle:C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\wnba_source\\source_artifacts:2026-07-09:1:1": {
+      "inputHash": "54e8d330c604ad48d564bce84109211ec20c1dec8256e09c6924c7d283a639ef",
+      "updatedAt": "2026-07-09T21:13:24-05:00",
+      "outputs": [],
+      "metadata": {
+        "date": "2026-07-09",
+        "reused": false,
+        "artifact_root": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\wnba_source\\source_artifacts"
+      }
+    },
+    "nhl_artifact_bundle:2026-07-09": {
+      "inputHash": "0615e4852dc35cc68fcf189995478113729499bade1da78639fa9cb68e80937c",
+      "updatedAt": "2026-07-09T21:14:55-05:00",
+      "outputs": [
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\odds\\team\\date=2026-07-09\\oddsapi.csv",
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\props\\player_props_lines\\date=2026-07-09\\oddsapi.csv",
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\predictions_2026-07-09.csv",
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\predictions_sim_2026-07-09.csv",
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\recommendations_sim_2026-07-09.csv",
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\props_projections_all_2026-07-09.csv",
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\props_boxscores_sim_2026-07-09.csv",
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\props_boxscores_sim_hist_2026-07-09.csv",
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\props_boxscores_sim_samples_2026-07-09.csv",
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\props_recommendations_2026-07-09.csv",
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\roster_snapshot_2026-07-09.csv",
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\injuries_2026-07-09.csv",
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\lineups_2026-07-09.csv",
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\lineups_co_toi_2026-07-09.csv",
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\shifts_2026-07-09.csv",
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\co_toi_shifts_2026-07-09.csv",
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\starting_goalies_2026-07-09.csv",
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\props_predictions_2026-07-09.csv"
+      ],
+      "metadata": {
+        "artifact_root": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nhl_source\\source_artifacts",
+        "date": "2026-07-09"
       }
     }
   }

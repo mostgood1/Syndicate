@@ -13,6 +13,8 @@ Use [simulation_engine_map.md](simulation_engine_map.md) for the current per-spo
 ## Adapter Design
 Use [simulation_adapter_design.md](simulation_adapter_design.md) for the unified adapter contract and rollout plan.
 
+For the Phase 3 planning slice that turns that design into a rollout blueprint, see [phase3_sports_adapter_standardization_blueprint.md](phase3_sports_adapter_standardization_blueprint.md).
+
 ## Implementation Surface
 The initial shared adapter implementation lives in [syndicate/features/shared/simulation_adapter.py](../../syndicate/features/shared/simulation_adapter.py).
 

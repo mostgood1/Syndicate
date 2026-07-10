@@ -141,6 +141,82 @@ class OpsRefreshApiTests(unittest.TestCase):
         self.assertEqual(payload["status"]["daily_update"]["runtime"]["elapsed_seconds"], 2700)
         self.assertEqual(payload["status"]["daily_update"]["runtime"]["remaining_budget_seconds"], 11700)
 
+    def test_status_separates_required_and_optional_artifact_failures(self) -> None:
+        with TemporaryDirectory() as tmp_dir:
+            repo_root = Path(tmp_dir)
+            reports_root = repo_root / "reports"
+            refresh_latest = reports_root / "refresh_status" / "latest"
+            artifacts_dir = reports_root / "migration_runs" / "2026-07-09" / "odds_refresh_20260709_120000"
+            refresh_latest.mkdir(parents=True, exist_ok=True)
+            artifacts_dir.mkdir(parents=True, exist_ok=True)
+
+            refresh_status_manifest = {
+                "date": "2026-07-09",
+                "runStamp": "20260709_120000",
+                "generatedAt": "2026-07-09T12:00:00Z",
+                "finishedAt": "2026-07-09T12:30:00Z",
+                "artifactsDir": str(artifacts_dir),
+                "state": "finished",
+            }
+            odds_refresh_payload = {
+                "ok": False,
+                "date": "2026-07-09",
+                "results": [
+                    {
+                        "sport": "mlb",
+                        "ok": False,
+                        "error": "required predictions missing for mlb",
+                        "sport_manifest": {
+                            "payload": {
+                                "metadata": {
+                                    "refresh_contract": {
+                                        "required": ["snapshot", "snapshot_alias", "game_slate", "predictions", "board_contract", "manifest"],
+                                        "optional": ["smart_sim", "recommendations", "edges", "live_lens", "advanced_analytics", "simulation_detail"],
+                                    }
+                                }
+                            }
+                        },
+                    },
+                    {
+                        "sport": "wnba",
+                        "ok": True,
+                        "warning": "optional SmartSim artifact missing for wnba",
+                        "optional_artifact_failures": ["optional SmartSim artifact missing for wnba"],
+                        "sport_manifest": {
+                            "payload": {
+                                "metadata": {
+                                    "refresh_contract": {
+                                        "required": ["snapshot", "snapshot_alias", "game_slate", "predictions", "board_contract", "manifest"],
+                                        "optional": ["smart_sim", "recommendations", "edges", "live_lens", "advanced_analytics", "simulation_detail"],
+                                    }
+                                }
+                            }
+                        },
+                    },
+                ],
+            }
+
+            (refresh_latest / "refresh_status_latest.json").write_text(json.dumps(refresh_status_manifest), encoding="utf-8")
+            (artifacts_dir / "odds_refresh.json").write_text(json.dumps(odds_refresh_payload), encoding="utf-8")
+            (artifacts_dir / "odds_refresh.stderr.txt").write_text("", encoding="utf-8")
+
+            with patch.dict(os.environ, {"ADMIN_TOKEN": "secret-token", "SYNDICATE_REPORTS_ROOT": str(reports_root)}, clear=False), patch(
+                "syndicate.features.shared.ops_refresh.REPO_ROOT",
+                repo_root,
+            ), patch("syndicate.features.shared.ops_refresh.REPORTS_ROOT", reports_root):
+                response = self.client.get(
+                    "/api/ops/odds-refresh/status",
+                    headers={"X-Admin-Token": "secret-token"},
+                )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json()
+        refresh_status = payload["status"]["refresh_status"]
+        self.assertIn("required predictions missing for mlb", refresh_status["required_artifact_failures"])
+        self.assertIn("optional SmartSim artifact missing for wnba", refresh_status["optional_artifact_failures"])
+        self.assertEqual(refresh_status["refresh_contract"]["required"], ["snapshot", "snapshot_alias", "game_slate", "predictions", "board_contract", "manifest"])
+        self.assertEqual(refresh_status["refresh_contract"]["optional"], ["smart_sim", "recommendations", "edges", "live_lens", "advanced_analytics", "simulation_detail"])
+
     def test_version_endpoint_returns_render_commit_metadata(self) -> None:
         with patch.dict(
             os.environ,

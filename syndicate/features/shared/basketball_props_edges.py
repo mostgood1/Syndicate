@@ -10,6 +10,8 @@ import unicodedata
 from dataclasses import dataclass
 from pathlib import Path
 
+from syndicate.features.shared.memory_observability import log_dataframe_memory
+
 
 _PLAYER_PROP_BOOKMAKER_ALIASES = {
     "fanduel": "fanduel",
@@ -255,6 +257,8 @@ def _compute_props_edges_file_only_local(
             alt_column = f"{column}_alt"
             if column in merged.columns and alt_column in merged.columns:
                 merged[column] = merged[column].fillna(merged[alt_column])
+
+    log_dataframe_memory("basketball_props_edges.merged_odds_predictions", merged)
 
     def _num_col(column_name: str | None) -> pd.Series:
         if not column_name or column_name not in merged.columns:

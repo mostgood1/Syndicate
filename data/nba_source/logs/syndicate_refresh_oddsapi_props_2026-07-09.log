@@ -1,0 +1,6 @@
+[2026-07-09T21:12:53] $ 'C:\Users\tempadmin\AppData\Local\Programs\Python\Python311-arm64\python.exe' 'C:\Users\tempadmin\OneDrive\Coding\Syndicate\scripts\fetch_basketball_oddsapi_props_local.py' --league nba --date 2026-07-09 --out 'C:\Users\tempadmin\OneDrive\Coding\Syndicate\data\nba_source\data\raw\odds_nba_player_props_2026-07-09.csv' --regions us --markets h2h,spreads,totals,spreads_h1,totals_h1,spreads_h2,totals_h2
+ERROR: No player props fetched for 2026-07-09 and no prior snapshot exists to preserve
+[2026-07-09T21:12:54] Skipping local props recommendations export for 2026-07-09: props predictions were not refreshed
+[2026-07-09T21:12:54] $ 'C:\Users\tempadmin\AppData\Local\Programs\Python\Python311-arm64\python.exe' -m nba_source.cli export-game-cards --date 2026-07-09
+C:\Users\tempadmin\AppData\Local\Programs\Python\Python311-arm64\python.exe: Error while finding module specification for 'nba_source.cli' (ModuleNotFoundError: No module named 'nba_source')
+[2026-07-09T21:12:54] Local game_cards build skipped for 2026-07-09: no raw team odds snapshot found
