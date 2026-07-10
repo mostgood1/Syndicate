@@ -1,0 +1,40 @@
+[2026-07-09T21:12:56] $ 'C:\Users\tempadmin\AppData\Local\Programs\Python\Python311-arm64\python.exe' 'C:\Users\tempadmin\OneDrive\Coding\Syndicate\scripts\fetch_basketball_oddsapi_props_local.py' --league wnba --date 2026-07-09 --out 'C:\Users\tempadmin\OneDrive\Coding\Syndicate\data\wnba_source\data\raw\odds_wnba_player_props_2026-07-09.csv' --regions us --markets player_points,player_rebounds,player_assists,player_points_rebounds_assists,player_threes,player_steals,player_blocks,player_turnovers,player_points_rebounds,player_points_assists,player_rebounds_assists,player_double_double,player_triple_double
+C:\Users\tempadmin\OneDrive\Coding\Syndicate\scripts\fetch_basketball_oddsapi_props_local.py:193: Pandas4Warning: Timestamp.utcnow is deprecated and will be removed in a future version. Use Timestamp.now('UTC') instead.
+  snapshot_ts = pd.Timestamp.utcnow().isoformat()
+Wrote C:\Users\tempadmin\OneDrive\Coding\Syndicate\data\wnba_source\data\raw\odds_wnba_player_props_2026-07-09.csv with 1132 rows.
+[2026-07-09T21:12:58] Materialized processed OddsAPI props snapshot alias: C:\Users\tempadmin\OneDrive\Coding\Syndicate\data\wnba_source\data\processed\oddsapi_player_props_2026-07-09.csv (rows=1132)
+[2026-07-09T21:12:58] Snapshot stage finished for 2026-07-09: rc_snapshot=0, rows=1132, alias_rows=1132
+[2026-07-09T21:12:58] Generating required game predictions artifact via source bootstrap: C:\Users\tempadmin\OneDrive\Coding\Syndicate\data\wnba_source\data\processed\predictions_2026-07-09.csv
+[2026-07-09T21:12:58] $ 'C:\Users\tempadmin\AppData\Local\Programs\Python\Python311-arm64\python.exe' -m wnba_betting.cli fetch-schedule
+C:\Users\tempadmin\AppData\Local\Programs\Python\Python311-arm64\python.exe: Error while finding module specification for 'wnba_betting.cli' (ModuleNotFoundError: No module named 'wnba_betting')
+[2026-07-09T21:12:58] $ 'C:\Users\tempadmin\AppData\Local\Programs\Python\Python311-arm64\python.exe' -m wnba_betting.cli fetch --years 10
+C:\Users\tempadmin\AppData\Local\Programs\Python\Python311-arm64\python.exe: Error while finding module specification for 'wnba_betting.cli' (ModuleNotFoundError: No module named 'wnba_betting')
+[2026-07-09T21:12:58] $ 'C:\Users\tempadmin\AppData\Local\Programs\Python\Python311-arm64\python.exe' -m wnba_betting.cli build-features
+C:\Users\tempadmin\AppData\Local\Programs\Python\Python311-arm64\python.exe: Error while finding module specification for 'wnba_betting.cli' (ModuleNotFoundError: No module named 'wnba_betting')
+[2026-07-09T21:12:59] Seeded fallback game odds slate from props snapshot: C:\Users\tempadmin\OneDrive\Coding\Syndicate\data\wnba_source\data\processed\game_odds_2026-07-09.csv (rows=3)
+[2026-07-09T21:12:59] $ 'C:\Users\tempadmin\AppData\Local\Programs\Python\Python311-arm64\python.exe' -m wnba_betting.cli predict-date --date 2026-07-09
+C:\Users\tempadmin\AppData\Local\Programs\Python\Python311-arm64\python.exe: Error while finding module specification for 'wnba_betting.cli' (ModuleNotFoundError: No module named 'wnba_betting')
+[2026-07-09T21:12:59] predict-date failed with exit code 1; retrying via CPU daily-update fallback
+[2026-07-09T21:12:59] $ 'C:\Users\tempadmin\AppData\Local\Programs\Python\Python311-arm64\python.exe' -m wnba_betting.cli daily-update --date 2026-07-09 --no-npu --no-git-push
+C:\Users\tempadmin\AppData\Local\Programs\Python\Python311-arm64\python.exe: Error while finding module specification for 'wnba_betting.cli' (ModuleNotFoundError: No module named 'wnba_betting')
+[2026-07-09T21:12:59] Rebuilt predictions slate from local game odds for 2026-07-09: C:\Users\tempadmin\OneDrive\Coding\Syndicate\data\wnba_source\data\processed\predictions_2026-07-09.csv (rows=3)
+[2026-07-09T21:12:59] Generated game predictions at C:\Users\tempadmin\OneDrive\Coding\Syndicate\data\wnba_source\data\processed\predictions_2026-07-09.csv (rows=3)
+[WARN] Props model artifacts missing; using priors + rolling-stat fallback predictions
+[2026-07-09T21:13:07] Predictions stage finished for 2026-07-09: rc_pred=0, rows=105
+[2026-07-09T21:13:07] Edges stage finished for 2026-07-09: rc_edges=0, rows=457
+[2026-07-09T21:13:07] Export stage starting for 2026-07-09: pred_ready=True, snapshot_rows=1132, edges_rows=457
+[2026-07-09T21:13:07] $ 'C:\Users\tempadmin\AppData\Local\Programs\Python\Python311-arm64\python.exe' -m wnba_betting.cli fetch-schedule
+C:\Users\tempadmin\AppData\Local\Programs\Python\Python311-arm64\python.exe: Error while finding module specification for 'wnba_betting.cli' (ModuleNotFoundError: No module named 'wnba_betting')
+[2026-07-09T21:13:07] $ 'C:\Users\tempadmin\AppData\Local\Programs\Python\Python311-arm64\python.exe' -m wnba_betting.cli fetch --years 10
+C:\Users\tempadmin\AppData\Local\Programs\Python\Python311-arm64\python.exe: Error while finding module specification for 'wnba_betting.cli' (ModuleNotFoundError: No module named 'wnba_betting')
+[2026-07-09T21:13:07] $ 'C:\Users\tempadmin\AppData\Local\Programs\Python\Python311-arm64\python.exe' -m wnba_betting.cli build-features
+C:\Users\tempadmin\AppData\Local\Programs\Python\Python311-arm64\python.exe: Error while finding module specification for 'wnba_betting.cli' (ModuleNotFoundError: No module named 'wnba_betting')
+[2026-07-09T21:13:07] $ 'C:\Users\tempadmin\AppData\Local\Programs\Python\Python311-arm64\python.exe' -m wnba_betting.cli predict-date --date 2026-07-09
+C:\Users\tempadmin\AppData\Local\Programs\Python\Python311-arm64\python.exe: Error while finding module specification for 'wnba_betting.cli' (ModuleNotFoundError: No module named 'wnba_betting')
+[2026-07-09T21:13:07] predict-date failed with exit code 1; retrying via CPU daily-update fallback
+[2026-07-09T21:13:07] $ 'C:\Users\tempadmin\AppData\Local\Programs\Python\Python311-arm64\python.exe' -m wnba_betting.cli daily-update --date 2026-07-09 --no-npu --no-git-push
+C:\Users\tempadmin\AppData\Local\Programs\Python\Python311-arm64\python.exe: Error while finding module specification for 'wnba_betting.cli' (ModuleNotFoundError: No module named 'wnba_betting')
+[2026-07-09T21:13:07] Built local game_cards from raw player props snapshot fallback: C:\Users\tempadmin\OneDrive\Coding\Syndicate\data\wnba_source\data\processed\game_cards_2026-07-09.csv (rows=3)
+[2026-07-09T21:13:07] WNBA source bootstrap returned non-zero input codes for 2026-07-09: {'schedule': 1, 'fetch': 1, 'build_features': 1, 'predict_date': 1}
+[2026-07-09T21:13:07] Export stage missing WNBA recommendation artifacts for 2026-07-09; continuing with warning because core WNBA outputs are present
+[2026-07-09T21:13:07] Export stage finished for 2026-07-09: rc_export=0, game_cards_rows=3, recs_rows=27

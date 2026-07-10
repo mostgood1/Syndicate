@@ -1,0 +1,376 @@
+event_key,market,selection,line,price,snapshot_ts
+Arizona Cardinals @ Los Angeles Chargers,moneyline,away,,440,2026-07-09T21:12:54Z
+Arizona Cardinals @ Los Angeles Chargers,moneyline,home,,-600,2026-07-09T21:12:54Z
+Arizona Cardinals @ Los Angeles Chargers,spread,home,-11.5,,2026-07-09T21:12:54Z
+Arizona Cardinals @ Los Angeles Chargers,total,over,45.5,-110,2026-07-09T21:12:54Z
+Arizona Cardinals @ Los Angeles Chargers,total,under,45.5,-110,2026-07-09T21:12:54Z
+Arizona Cardinals @ New York Giants,moneyline,away,,260,2026-07-09T21:12:54Z
+Arizona Cardinals @ New York Giants,moneyline,home,,-325,2026-07-09T21:12:54Z
+Arizona Cardinals @ New York Giants,spread,home,-7.0,,2026-07-09T21:12:54Z
+Arizona Cardinals @ New York Giants,total,over,45.5,-110,2026-07-09T21:12:54Z
+Arizona Cardinals @ New York Giants,total,under,45.5,-110,2026-07-09T21:12:54Z
+Arizona Cardinals @ San Francisco 49ers,moneyline,away,,455,2026-07-09T21:12:54Z
+Arizona Cardinals @ San Francisco 49ers,moneyline,home,,-625,2026-07-09T21:12:54Z
+Arizona Cardinals @ San Francisco 49ers,spread,home,-11.5,,2026-07-09T21:12:54Z
+Arizona Cardinals @ San Francisco 49ers,total,over,46.5,-110,2026-07-09T21:12:54Z
+Arizona Cardinals @ San Francisco 49ers,total,under,46.5,-110,2026-07-09T21:12:54Z
+Atlanta Falcons @ Green Bay Packers,moneyline,away,,275,2026-07-09T21:12:54Z
+Atlanta Falcons @ Green Bay Packers,moneyline,home,,-345,2026-07-09T21:12:54Z
+Atlanta Falcons @ Green Bay Packers,spread,home,-7.5,,2026-07-09T21:12:54Z
+Atlanta Falcons @ Green Bay Packers,total,over,46.5,-110,2026-07-09T21:12:54Z
+Atlanta Falcons @ Green Bay Packers,total,under,46.5,-110,2026-07-09T21:12:54Z
+Atlanta Falcons @ New Orleans Saints,moneyline,away,,114,2026-07-09T21:12:54Z
+Atlanta Falcons @ New Orleans Saints,moneyline,home,,-135,2026-07-09T21:12:54Z
+Atlanta Falcons @ New Orleans Saints,spread,home,-2.5,,2026-07-09T21:12:54Z
+Atlanta Falcons @ New Orleans Saints,total,over,45.5,-110,2026-07-09T21:12:54Z
+Atlanta Falcons @ New Orleans Saints,total,under,45.5,-110,2026-07-09T21:12:54Z
+Atlanta Falcons @ Pittsburgh Steelers,moneyline,away,,142,2026-07-09T21:12:54Z
+Atlanta Falcons @ Pittsburgh Steelers,moneyline,home,,-170,2026-07-09T21:12:54Z
+Atlanta Falcons @ Pittsburgh Steelers,spread,home,-3.0,,2026-07-09T21:12:54Z
+Atlanta Falcons @ Pittsburgh Steelers,total,over,42.5,-110,2026-07-09T21:12:54Z
+Atlanta Falcons @ Pittsburgh Steelers,total,under,42.5,-110,2026-07-09T21:12:54Z
+Baltimore Ravens @ Atlanta Falcons,moneyline,away,,-225,2026-07-09T21:12:54Z
+Baltimore Ravens @ Atlanta Falcons,moneyline,home,,185,2026-07-09T21:12:54Z
+Baltimore Ravens @ Atlanta Falcons,spread,home,4.5,,2026-07-09T21:12:54Z
+Baltimore Ravens @ Atlanta Falcons,total,over,48.5,-110,2026-07-09T21:12:54Z
+Baltimore Ravens @ Atlanta Falcons,total,under,48.5,-110,2026-07-09T21:12:54Z
+Baltimore Ravens @ Dallas Cowboys,moneyline,away,,-135,2026-07-09T21:12:54Z
+Baltimore Ravens @ Dallas Cowboys,moneyline,home,,114,2026-07-09T21:12:54Z
+Baltimore Ravens @ Dallas Cowboys,spread,home,2.5,,2026-07-09T21:12:54Z
+Baltimore Ravens @ Dallas Cowboys,total,over,51.5,-110,2026-07-09T21:12:54Z
+Baltimore Ravens @ Dallas Cowboys,total,under,51.5,-110,2026-07-09T21:12:54Z
+Baltimore Ravens @ Indianapolis Colts,moneyline,away,,-192,2026-07-09T21:12:54Z
+Baltimore Ravens @ Indianapolis Colts,moneyline,home,,160,2026-07-09T21:12:54Z
+Baltimore Ravens @ Indianapolis Colts,spread,home,3.5,,2026-07-09T21:12:54Z
+Baltimore Ravens @ Indianapolis Colts,total,over,49.5,-110,2026-07-09T21:12:54Z
+Baltimore Ravens @ Indianapolis Colts,total,under,49.5,-110,2026-07-09T21:12:54Z
+Buffalo Bills @ Houston Texans,moneyline,away,,-115,2026-07-09T21:12:54Z
+Buffalo Bills @ Houston Texans,moneyline,home,,-105,2026-07-09T21:12:54Z
+Buffalo Bills @ Houston Texans,spread,home,1.5,,2026-07-09T21:12:54Z
+Buffalo Bills @ Houston Texans,total,over,45.5,-105,2026-07-09T21:12:54Z
+Buffalo Bills @ Houston Texans,total,under,45.5,-115,2026-07-09T21:12:54Z
+Buffalo Bills @ Los Angeles Rams,moneyline,away,,154,2026-07-09T21:12:54Z
+Buffalo Bills @ Los Angeles Rams,moneyline,home,,-185,2026-07-09T21:12:54Z
+Buffalo Bills @ Los Angeles Rams,spread,home,-3.5,,2026-07-09T21:12:54Z
+Buffalo Bills @ Los Angeles Rams,total,over,53.5,-110,2026-07-09T21:12:54Z
+Buffalo Bills @ Los Angeles Rams,total,under,53.5,-110,2026-07-09T21:12:54Z
+Carolina Panthers @ Cleveland Browns,moneyline,away,,-135,2026-07-09T21:12:54Z
+Carolina Panthers @ Cleveland Browns,moneyline,home,,114,2026-07-09T21:12:54Z
+Carolina Panthers @ Cleveland Browns,spread,home,2.5,,2026-07-09T21:12:54Z
+Carolina Panthers @ Cleveland Browns,total,over,40.5,-110,2026-07-09T21:12:54Z
+Carolina Panthers @ Cleveland Browns,total,under,40.5,-110,2026-07-09T21:12:54Z
+Chicago Bears @ Atlanta Falcons,moneyline,away,,-166,2026-07-09T21:12:54Z
+Chicago Bears @ Atlanta Falcons,moneyline,home,,140,2026-07-09T21:12:54Z
+Chicago Bears @ Atlanta Falcons,spread,home,3.0,,2026-07-09T21:12:54Z
+Chicago Bears @ Atlanta Falcons,total,over,47.5,-110,2026-07-09T21:12:54Z
+Chicago Bears @ Atlanta Falcons,total,under,47.5,-110,2026-07-09T21:12:54Z
+Chicago Bears @ Carolina Panthers,moneyline,away,,-135,2026-07-09T21:12:54Z
+Chicago Bears @ Carolina Panthers,moneyline,home,,114,2026-07-09T21:12:54Z
+Chicago Bears @ Carolina Panthers,spread,home,2.5,,2026-07-09T21:12:54Z
+Chicago Bears @ Carolina Panthers,total,over,44.5,-110,2026-07-09T21:12:54Z
+Chicago Bears @ Carolina Panthers,total,under,44.5,-110,2026-07-09T21:12:54Z
+Cincinnati Bengals @ Houston Texans,moneyline,away,,114,2026-07-09T21:12:54Z
+Cincinnati Bengals @ Houston Texans,moneyline,home,,-135,2026-07-09T21:12:54Z
+Cincinnati Bengals @ Houston Texans,spread,home,-2.5,,2026-07-09T21:12:54Z
+Cincinnati Bengals @ Houston Texans,total,over,46.5,-110,2026-07-09T21:12:54Z
+Cincinnati Bengals @ Houston Texans,total,under,46.5,-110,2026-07-09T21:12:54Z
+Cincinnati Bengals @ Miami Dolphins,moneyline,away,,-250,2026-07-09T21:12:54Z
+Cincinnati Bengals @ Miami Dolphins,moneyline,home,,205,2026-07-09T21:12:54Z
+Cincinnati Bengals @ Miami Dolphins,spread,home,5.5,,2026-07-09T21:12:54Z
+Cincinnati Bengals @ Miami Dolphins,total,over,49.5,-110,2026-07-09T21:12:54Z
+Cincinnati Bengals @ Miami Dolphins,total,under,49.5,-110,2026-07-09T21:12:54Z
+Cincinnati Bengals @ Pittsburgh Steelers,moneyline,away,,-115,2026-07-09T21:12:54Z
+Cincinnati Bengals @ Pittsburgh Steelers,moneyline,home,,-105,2026-07-09T21:12:54Z
+Cincinnati Bengals @ Pittsburgh Steelers,spread,home,1.5,,2026-07-09T21:12:54Z
+Cincinnati Bengals @ Pittsburgh Steelers,total,over,47.5,-110,2026-07-09T21:12:54Z
+Cincinnati Bengals @ Pittsburgh Steelers,total,under,47.5,-110,2026-07-09T21:12:54Z
+Cleveland Browns @ Jacksonville Jaguars,moneyline,away,,270,2026-07-09T21:12:54Z
+Cleveland Browns @ Jacksonville Jaguars,moneyline,home,,-340,2026-07-09T21:12:54Z
+Cleveland Browns @ Jacksonville Jaguars,spread,home,-7.5,,2026-07-09T21:12:54Z
+Cleveland Browns @ Jacksonville Jaguars,total,over,40.5,-115,2026-07-09T21:12:54Z
+Cleveland Browns @ Jacksonville Jaguars,total,under,40.5,-105,2026-07-09T21:12:54Z
+Cleveland Browns @ New York Jets,moneyline,away,,120,2026-07-09T21:12:54Z
+Cleveland Browns @ New York Jets,moneyline,home,,-142,2026-07-09T21:12:54Z
+Cleveland Browns @ New York Jets,spread,home,-2.5,,2026-07-09T21:12:54Z
+Cleveland Browns @ New York Jets,total,over,40.5,-110,2026-07-09T21:12:54Z
+Cleveland Browns @ New York Jets,total,under,40.5,-110,2026-07-09T21:12:54Z
+Cleveland Browns @ Tampa Bay Buccaneers,moneyline,away,,230,2026-07-09T21:12:54Z
+Cleveland Browns @ Tampa Bay Buccaneers,moneyline,home,,-285,2026-07-09T21:12:54Z
+Cleveland Browns @ Tampa Bay Buccaneers,spread,home,-6.5,,2026-07-09T21:12:54Z
+Cleveland Browns @ Tampa Bay Buccaneers,total,over,42.5,-110,2026-07-09T21:12:54Z
+Cleveland Browns @ Tampa Bay Buccaneers,total,under,42.5,-110,2026-07-09T21:12:54Z
+Dallas Cowboys @ Houston Texans,moneyline,away,,114,2026-07-09T21:12:54Z
+Dallas Cowboys @ Houston Texans,moneyline,home,,-135,2026-07-09T21:12:54Z
+Dallas Cowboys @ Houston Texans,spread,home,-2.5,,2026-07-09T21:12:54Z
+Dallas Cowboys @ Houston Texans,total,over,47.5,-110,2026-07-09T21:12:54Z
+Dallas Cowboys @ Houston Texans,total,under,47.5,-110,2026-07-09T21:12:54Z
+Dallas Cowboys @ New York Giants,moneyline,away,,-135,2026-07-09T21:12:54Z
+Dallas Cowboys @ New York Giants,moneyline,home,,114,2026-07-09T21:12:54Z
+Dallas Cowboys @ New York Giants,spread,home,2.5,,2026-07-09T21:12:54Z
+Dallas Cowboys @ New York Giants,total,over,48.5,-110,2026-07-09T21:12:54Z
+Dallas Cowboys @ New York Giants,total,under,48.5,-110,2026-07-09T21:12:54Z
+Denver Broncos @ Kansas City Chiefs,moneyline,away,,124,2026-07-09T21:12:54Z
+Denver Broncos @ Kansas City Chiefs,moneyline,home,,-148,2026-07-09T21:12:54Z
+Denver Broncos @ Kansas City Chiefs,spread,home,-2.5,,2026-07-09T21:12:54Z
+Denver Broncos @ Kansas City Chiefs,total,over,42.5,-110,2026-07-09T21:12:54Z
+Denver Broncos @ Kansas City Chiefs,total,under,42.5,-110,2026-07-09T21:12:54Z
+Denver Broncos @ Los Angeles Chargers,moneyline,away,,120,2026-07-09T21:12:54Z
+Denver Broncos @ Los Angeles Chargers,moneyline,home,,-142,2026-07-09T21:12:54Z
+Denver Broncos @ Los Angeles Chargers,spread,home,-2.5,,2026-07-09T21:12:54Z
+Denver Broncos @ Los Angeles Chargers,total,over,44.5,-110,2026-07-09T21:12:54Z
+Denver Broncos @ Los Angeles Chargers,total,under,44.5,-110,2026-07-09T21:12:54Z
+Denver Broncos @ San Francisco 49ers,moneyline,away,,124,2026-07-09T21:12:54Z
+Denver Broncos @ San Francisco 49ers,moneyline,home,,-148,2026-07-09T21:12:54Z
+Denver Broncos @ San Francisco 49ers,spread,home,-2.5,,2026-07-09T21:12:54Z
+Denver Broncos @ San Francisco 49ers,total,over,46.5,-110,2026-07-09T21:12:54Z
+Denver Broncos @ San Francisco 49ers,total,under,46.5,-110,2026-07-09T21:12:54Z
+Detroit Lions @ Arizona Cardinals,moneyline,away,,-375,2026-07-09T21:12:54Z
+Detroit Lions @ Arizona Cardinals,moneyline,home,,295,2026-07-09T21:12:54Z
+Detroit Lions @ Arizona Cardinals,spread,home,8.5,,2026-07-09T21:12:54Z
+Detroit Lions @ Arizona Cardinals,total,over,49.5,-110,2026-07-09T21:12:54Z
+Detroit Lions @ Arizona Cardinals,total,under,49.5,-110,2026-07-09T21:12:54Z
+Detroit Lions @ Buffalo Bills,moneyline,away,,136,2026-07-09T21:12:54Z
+Detroit Lions @ Buffalo Bills,moneyline,home,,-162,2026-07-09T21:12:54Z
+Detroit Lions @ Buffalo Bills,spread,home,-3.0,,2026-07-09T21:12:54Z
+Detroit Lions @ Buffalo Bills,total,over,52.5,-110,2026-07-09T21:12:54Z
+Detroit Lions @ Buffalo Bills,total,under,52.5,-110,2026-07-09T21:12:54Z
+Detroit Lions @ Carolina Panthers,moneyline,away,,-162,2026-07-09T21:12:54Z
+Detroit Lions @ Carolina Panthers,moneyline,home,,136,2026-07-09T21:12:54Z
+Detroit Lions @ Carolina Panthers,spread,home,3.0,,2026-07-09T21:12:54Z
+Detroit Lions @ Carolina Panthers,total,over,47.5,-110,2026-07-09T21:12:54Z
+Detroit Lions @ Carolina Panthers,total,under,47.5,-110,2026-07-09T21:12:54Z
+Green Bay Packers @ Minnesota Vikings,moneyline,away,,-112,2026-07-09T21:12:54Z
+Green Bay Packers @ Minnesota Vikings,moneyline,home,,-108,2026-07-09T21:12:54Z
+Green Bay Packers @ Minnesota Vikings,spread,home,1.5,,2026-07-09T21:12:54Z
+Green Bay Packers @ Minnesota Vikings,total,over,44.5,-115,2026-07-09T21:12:54Z
+Green Bay Packers @ Minnesota Vikings,total,under,44.5,-105,2026-07-09T21:12:54Z
+Green Bay Packers @ New York Jets,moneyline,away,,-270,2026-07-09T21:12:54Z
+Green Bay Packers @ New York Jets,moneyline,home,,220,2026-07-09T21:12:54Z
+Green Bay Packers @ New York Jets,spread,home,6.0,,2026-07-09T21:12:54Z
+Green Bay Packers @ New York Jets,total,over,42.5,-110,2026-07-09T21:12:54Z
+Green Bay Packers @ New York Jets,total,under,42.5,-110,2026-07-09T21:12:54Z
+Houston Texans @ Indianapolis Colts,moneyline,away,,-130,2026-07-09T21:12:54Z
+Houston Texans @ Indianapolis Colts,moneyline,home,,110,2026-07-09T21:12:54Z
+Houston Texans @ Indianapolis Colts,spread,home,2.5,,2026-07-09T21:12:54Z
+Houston Texans @ Indianapolis Colts,total,over,45.5,-110,2026-07-09T21:12:54Z
+Houston Texans @ Indianapolis Colts,total,under,45.5,-110,2026-07-09T21:12:54Z
+Houston Texans @ Jacksonville Jaguars,moneyline,away,,-115,2026-07-09T21:12:54Z
+Houston Texans @ Jacksonville Jaguars,moneyline,home,,-105,2026-07-09T21:12:54Z
+Houston Texans @ Jacksonville Jaguars,spread,home,1.5,,2026-07-09T21:12:54Z
+Houston Texans @ Jacksonville Jaguars,total,over,41.5,-110,2026-07-09T21:12:54Z
+Houston Texans @ Jacksonville Jaguars,total,under,41.5,-110,2026-07-09T21:12:54Z
+Houston Texans @ Tennessee Titans,moneyline,away,,-192,2026-07-09T21:12:54Z
+Houston Texans @ Tennessee Titans,moneyline,home,,160,2026-07-09T21:12:54Z
+Houston Texans @ Tennessee Titans,spread,home,3.5,,2026-07-09T21:12:54Z
+Houston Texans @ Tennessee Titans,total,over,43.5,-110,2026-07-09T21:12:54Z
+Houston Texans @ Tennessee Titans,total,under,43.5,-110,2026-07-09T21:12:54Z
+Indianapolis Colts @ Kansas City Chiefs,moneyline,away,,215,2026-07-09T21:12:54Z
+Indianapolis Colts @ Kansas City Chiefs,moneyline,home,,-265,2026-07-09T21:12:54Z
+Indianapolis Colts @ Kansas City Chiefs,spread,home,-6.0,,2026-07-09T21:12:54Z
+Indianapolis Colts @ Kansas City Chiefs,total,over,47.5,-110,2026-07-09T21:12:54Z
+Indianapolis Colts @ Kansas City Chiefs,total,under,47.5,-110,2026-07-09T21:12:54Z
+Indianapolis Colts @ Pittsburgh Steelers,moneyline,away,,120,2026-07-09T21:12:54Z
+Indianapolis Colts @ Pittsburgh Steelers,moneyline,home,,-142,2026-07-09T21:12:54Z
+Indianapolis Colts @ Pittsburgh Steelers,spread,home,-2.5,,2026-07-09T21:12:54Z
+Indianapolis Colts @ Pittsburgh Steelers,total,over,47.5,-110,2026-07-09T21:12:54Z
+Indianapolis Colts @ Pittsburgh Steelers,total,under,47.5,-110,2026-07-09T21:12:54Z
+Indianapolis Colts @ Washington Commanders,moneyline,away,,-108,2026-07-09T21:12:54Z
+Indianapolis Colts @ Washington Commanders,moneyline,home,,-112,2026-07-09T21:12:54Z
+Indianapolis Colts @ Washington Commanders,spread,home,-1.5,,2026-07-09T21:12:54Z
+Indianapolis Colts @ Washington Commanders,total,over,48.5,-110,2026-07-09T21:12:54Z
+Indianapolis Colts @ Washington Commanders,total,under,48.5,-110,2026-07-09T21:12:54Z
+Jacksonville Jaguars @ Cincinnati Bengals,moneyline,away,,114,2026-07-09T21:12:54Z
+Jacksonville Jaguars @ Cincinnati Bengals,moneyline,home,,-135,2026-07-09T21:12:54Z
+Jacksonville Jaguars @ Cincinnati Bengals,spread,home,-2.5,,2026-07-09T21:12:54Z
+Jacksonville Jaguars @ Cincinnati Bengals,total,over,51.5,-110,2026-07-09T21:12:54Z
+Jacksonville Jaguars @ Cincinnati Bengals,total,under,51.5,-110,2026-07-09T21:12:54Z
+Kansas City Chiefs @ Las Vegas Raiders,moneyline,away,,-245,2026-07-09T21:12:54Z
+Kansas City Chiefs @ Las Vegas Raiders,moneyline,home,,200,2026-07-09T21:12:54Z
+Kansas City Chiefs @ Las Vegas Raiders,spread,home,5.5,,2026-07-09T21:12:54Z
+Kansas City Chiefs @ Las Vegas Raiders,total,over,43.5,-110,2026-07-09T21:12:54Z
+Kansas City Chiefs @ Las Vegas Raiders,total,under,43.5,-110,2026-07-09T21:12:54Z
+Kansas City Chiefs @ Miami Dolphins,moneyline,away,,-340,2026-07-09T21:12:54Z
+Kansas City Chiefs @ Miami Dolphins,moneyline,home,,270,2026-07-09T21:12:54Z
+Kansas City Chiefs @ Miami Dolphins,spread,home,7.0,,2026-07-09T21:12:54Z
+Kansas City Chiefs @ Miami Dolphins,total,over,44.5,-110,2026-07-09T21:12:54Z
+Kansas City Chiefs @ Miami Dolphins,total,under,44.5,-110,2026-07-09T21:12:54Z
+Las Vegas Raiders @ Los Angeles Chargers,moneyline,away,,330,2026-07-09T21:12:54Z
+Las Vegas Raiders @ Los Angeles Chargers,moneyline,home,,-425,2026-07-09T21:12:54Z
+Las Vegas Raiders @ Los Angeles Chargers,spread,home,-8.5,,2026-07-09T21:12:54Z
+Las Vegas Raiders @ Los Angeles Chargers,total,over,42.5,-110,2026-07-09T21:12:54Z
+Las Vegas Raiders @ Los Angeles Chargers,total,under,42.5,-110,2026-07-09T21:12:54Z
+Las Vegas Raiders @ New England Patriots,moneyline,away,,320,2026-07-09T21:12:54Z
+Las Vegas Raiders @ New England Patriots,moneyline,home,,-410,2026-07-09T21:12:54Z
+Las Vegas Raiders @ New England Patriots,spread,home,-8.5,,2026-07-09T21:12:54Z
+Las Vegas Raiders @ New England Patriots,total,over,44.5,-110,2026-07-09T21:12:54Z
+Las Vegas Raiders @ New England Patriots,total,under,44.5,-110,2026-07-09T21:12:54Z
+Las Vegas Raiders @ New Orleans Saints,moneyline,away,,136,2026-07-09T21:12:54Z
+Las Vegas Raiders @ New Orleans Saints,moneyline,home,,-162,2026-07-09T21:12:54Z
+Las Vegas Raiders @ New Orleans Saints,spread,home,-3.0,,2026-07-09T21:12:54Z
+Las Vegas Raiders @ New Orleans Saints,total,over,42.5,-110,2026-07-09T21:12:54Z
+Las Vegas Raiders @ New Orleans Saints,total,under,42.5,-110,2026-07-09T21:12:54Z
+Los Angeles Chargers @ Buffalo Bills,moneyline,away,,120,2026-07-09T21:12:54Z
+Los Angeles Chargers @ Buffalo Bills,moneyline,home,,-142,2026-07-09T21:12:54Z
+Los Angeles Chargers @ Buffalo Bills,spread,home,-2.5,,2026-07-09T21:12:54Z
+Los Angeles Chargers @ Buffalo Bills,total,over,48.5,-110,2026-07-09T21:12:54Z
+Los Angeles Chargers @ Buffalo Bills,total,under,48.5,-110,2026-07-09T21:12:54Z
+Los Angeles Chargers @ Seattle Seahawks,moneyline,away,,136,2026-07-09T21:12:54Z
+Los Angeles Chargers @ Seattle Seahawks,moneyline,home,,-162,2026-07-09T21:12:54Z
+Los Angeles Chargers @ Seattle Seahawks,spread,home,-3.0,,2026-07-09T21:12:54Z
+Los Angeles Chargers @ Seattle Seahawks,total,over,45.5,-110,2026-07-09T21:12:54Z
+Los Angeles Chargers @ Seattle Seahawks,total,under,45.5,-110,2026-07-09T21:12:54Z
+Los Angeles Rams @ Denver Broncos,moneyline,away,,-155,2026-07-09T21:12:54Z
+Los Angeles Rams @ Denver Broncos,moneyline,home,,130,2026-07-09T21:12:54Z
+Los Angeles Rams @ Denver Broncos,spread,home,3.0,,2026-07-09T21:12:54Z
+Los Angeles Rams @ Denver Broncos,total,over,45.5,-110,2026-07-09T21:12:54Z
+Los Angeles Rams @ Denver Broncos,total,under,45.5,-110,2026-07-09T21:12:54Z
+Los Angeles Rams @ Philadelphia Eagles,moneyline,away,,-142,2026-07-09T21:12:54Z
+Los Angeles Rams @ Philadelphia Eagles,moneyline,home,,120,2026-07-09T21:12:54Z
+Los Angeles Rams @ Philadelphia Eagles,spread,home,2.5,,2026-07-09T21:12:54Z
+Los Angeles Rams @ Philadelphia Eagles,total,over,47.5,-110,2026-07-09T21:12:54Z
+Los Angeles Rams @ Philadelphia Eagles,total,under,47.5,-110,2026-07-09T21:12:54Z
+Miami Dolphins @ Las Vegas Raiders,moneyline,away,,145,2026-07-09T21:12:54Z
+Miami Dolphins @ Las Vegas Raiders,moneyline,home,,-175,2026-07-09T21:12:54Z
+Miami Dolphins @ Las Vegas Raiders,spread,home,-3.0,,2026-07-09T21:12:54Z
+Miami Dolphins @ Las Vegas Raiders,total,over,41.5,-110,2026-07-09T21:12:54Z
+Miami Dolphins @ Las Vegas Raiders,total,under,41.5,-110,2026-07-09T21:12:54Z
+Miami Dolphins @ Minnesota Vikings,moneyline,away,,300,2026-07-09T21:12:54Z
+Miami Dolphins @ Minnesota Vikings,moneyline,home,,-380,2026-07-09T21:12:54Z
+Miami Dolphins @ Minnesota Vikings,spread,home,-7.5,,2026-07-09T21:12:54Z
+Miami Dolphins @ Minnesota Vikings,total,over,43.5,-110,2026-07-09T21:12:54Z
+Miami Dolphins @ Minnesota Vikings,total,under,43.5,-110,2026-07-09T21:12:54Z
+Miami Dolphins @ San Francisco 49ers,moneyline,away,,440,2026-07-09T21:12:54Z
+Miami Dolphins @ San Francisco 49ers,moneyline,home,,-600,2026-07-09T21:12:54Z
+Miami Dolphins @ San Francisco 49ers,spread,home,-10.5,,2026-07-09T21:12:54Z
+Miami Dolphins @ San Francisco 49ers,total,over,46.5,-110,2026-07-09T21:12:54Z
+Miami Dolphins @ San Francisco 49ers,total,under,46.5,-110,2026-07-09T21:12:54Z
+Minnesota Vikings @ Chicago Bears,moneyline,away,,150,2026-07-09T21:12:54Z
+Minnesota Vikings @ Chicago Bears,moneyline,home,,-180,2026-07-09T21:12:54Z
+Minnesota Vikings @ Chicago Bears,spread,home,-3.5,,2026-07-09T21:12:54Z
+Minnesota Vikings @ Chicago Bears,total,over,45.5,-110,2026-07-09T21:12:54Z
+Minnesota Vikings @ Chicago Bears,total,under,45.5,-110,2026-07-09T21:12:54Z
+Minnesota Vikings @ New Orleans Saints,moneyline,away,,-120,2026-07-09T21:12:54Z
+Minnesota Vikings @ New Orleans Saints,moneyline,home,,100,2026-07-09T21:12:54Z
+Minnesota Vikings @ New Orleans Saints,spread,home,1.5,,2026-07-09T21:12:54Z
+Minnesota Vikings @ New Orleans Saints,total,over,44.5,-110,2026-07-09T21:12:54Z
+Minnesota Vikings @ New Orleans Saints,total,under,44.5,-110,2026-07-09T21:12:54Z
+Minnesota Vikings @ Tampa Bay Buccaneers,moneyline,away,,105,2026-07-09T21:12:54Z
+Minnesota Vikings @ Tampa Bay Buccaneers,moneyline,home,,-125,2026-07-09T21:12:54Z
+Minnesota Vikings @ Tampa Bay Buccaneers,spread,home,-1.5,,2026-07-09T21:12:54Z
+Minnesota Vikings @ Tampa Bay Buccaneers,total,over,44.5,-110,2026-07-09T21:12:54Z
+Minnesota Vikings @ Tampa Bay Buccaneers,total,under,44.5,-110,2026-07-09T21:12:54Z
+New England Patriots @ Buffalo Bills,moneyline,away,,136,2026-07-09T21:12:54Z
+New England Patriots @ Buffalo Bills,moneyline,home,,-162,2026-07-09T21:12:54Z
+New England Patriots @ Buffalo Bills,spread,home,-3.0,,2026-07-09T21:12:54Z
+New England Patriots @ Buffalo Bills,total,over,49.5,-110,2026-07-09T21:12:54Z
+New England Patriots @ Buffalo Bills,total,under,49.5,-110,2026-07-09T21:12:54Z
+New England Patriots @ Seattle Seahawks,moneyline,away,,160,2026-07-09T21:12:54Z
+New England Patriots @ Seattle Seahawks,moneyline,home,,-192,2026-07-09T21:12:54Z
+New England Patriots @ Seattle Seahawks,spread,home,-3.5,,2026-07-09T21:12:54Z
+New England Patriots @ Seattle Seahawks,total,over,44.5,-110,2026-07-09T21:12:54Z
+New England Patriots @ Seattle Seahawks,total,under,44.5,-110,2026-07-09T21:12:54Z
+New Orleans Saints @ Baltimore Ravens,moneyline,away,,310,2026-07-09T21:12:54Z
+New Orleans Saints @ Baltimore Ravens,moneyline,home,,-395,2026-07-09T21:12:54Z
+New Orleans Saints @ Baltimore Ravens,spread,home,-7.5,,2026-07-09T21:12:54Z
+New Orleans Saints @ Baltimore Ravens,total,over,46.5,-110,2026-07-09T21:12:54Z
+New Orleans Saints @ Baltimore Ravens,total,under,46.5,-110,2026-07-09T21:12:54Z
+New Orleans Saints @ Detroit Lions,moneyline,away,,260,2026-07-09T21:12:54Z
+New Orleans Saints @ Detroit Lions,moneyline,home,,-325,2026-07-09T21:12:54Z
+New Orleans Saints @ Detroit Lions,spread,home,-7.0,,2026-07-09T21:12:54Z
+New Orleans Saints @ Detroit Lions,total,over,48.5,-115,2026-07-09T21:12:54Z
+New Orleans Saints @ Detroit Lions,total,under,48.5,-105,2026-07-09T21:12:54Z
+New York Giants @ Los Angeles Rams,moneyline,away,,320,2026-07-09T21:12:54Z
+New York Giants @ Los Angeles Rams,moneyline,home,,-410,2026-07-09T21:12:54Z
+New York Giants @ Los Angeles Rams,spread,home,-9.5,,2026-07-09T21:12:54Z
+New York Giants @ Los Angeles Rams,total,over,47.5,-110,2026-07-09T21:12:54Z
+New York Giants @ Los Angeles Rams,total,under,47.5,-110,2026-07-09T21:12:54Z
+New York Giants @ Washington Commanders,moneyline,away,,114,2026-07-09T21:12:54Z
+New York Giants @ Washington Commanders,moneyline,home,,-135,2026-07-09T21:12:54Z
+New York Giants @ Washington Commanders,spread,home,-2.5,,2026-07-09T21:12:54Z
+New York Giants @ Washington Commanders,total,over,48.5,-110,2026-07-09T21:12:54Z
+New York Giants @ Washington Commanders,total,under,48.5,-110,2026-07-09T21:12:54Z
+New York Jets @ Chicago Bears,moneyline,away,,310,2026-07-09T21:12:54Z
+New York Jets @ Chicago Bears,moneyline,home,,-395,2026-07-09T21:12:54Z
+New York Jets @ Chicago Bears,spread,home,-8.5,,2026-07-09T21:12:54Z
+New York Jets @ Chicago Bears,total,over,45.5,-110,2026-07-09T21:12:54Z
+New York Jets @ Chicago Bears,total,under,45.5,-110,2026-07-09T21:12:54Z
+New York Jets @ Tennessee Titans,moneyline,away,,136,2026-07-09T21:12:54Z
+New York Jets @ Tennessee Titans,moneyline,home,,-162,2026-07-09T21:12:54Z
+New York Jets @ Tennessee Titans,spread,home,-3.0,,2026-07-09T21:12:54Z
+New York Jets @ Tennessee Titans,total,over,39.5,-110,2026-07-09T21:12:54Z
+New York Jets @ Tennessee Titans,total,under,39.5,-110,2026-07-09T21:12:54Z
+Philadelphia Eagles @ Jacksonville Jaguars,moneyline,away,,-130,2026-07-09T21:12:54Z
+Philadelphia Eagles @ Jacksonville Jaguars,moneyline,home,,110,2026-07-09T21:12:54Z
+Philadelphia Eagles @ Jacksonville Jaguars,spread,home,1.5,,2026-07-09T21:12:54Z
+Philadelphia Eagles @ Jacksonville Jaguars,total,over,43.5,-118,2026-07-09T21:12:54Z
+Philadelphia Eagles @ Jacksonville Jaguars,total,under,43.5,-102,2026-07-09T21:12:54Z
+Philadelphia Eagles @ Tennessee Titans,moneyline,away,,-218,2026-07-09T21:12:54Z
+Philadelphia Eagles @ Tennessee Titans,moneyline,home,,180,2026-07-09T21:12:54Z
+Philadelphia Eagles @ Tennessee Titans,spread,home,4.5,,2026-07-09T21:12:54Z
+Philadelphia Eagles @ Tennessee Titans,total,over,42.5,-110,2026-07-09T21:12:54Z
+Philadelphia Eagles @ Tennessee Titans,total,under,42.5,-110,2026-07-09T21:12:54Z
+Pittsburgh Steelers @ Cleveland Browns,moneyline,away,,-162,2026-07-09T21:12:54Z
+Pittsburgh Steelers @ Cleveland Browns,moneyline,home,,136,2026-07-09T21:12:54Z
+Pittsburgh Steelers @ Cleveland Browns,spread,home,3.0,,2026-07-09T21:12:54Z
+Pittsburgh Steelers @ Cleveland Browns,total,over,41.5,-110,2026-07-09T21:12:54Z
+Pittsburgh Steelers @ Cleveland Browns,total,under,41.5,-110,2026-07-09T21:12:54Z
+Pittsburgh Steelers @ New England Patriots,moneyline,away,,185,2026-07-09T21:12:54Z
+Pittsburgh Steelers @ New England Patriots,moneyline,home,,-225,2026-07-09T21:12:54Z
+Pittsburgh Steelers @ New England Patriots,spread,home,-4.5,,2026-07-09T21:12:54Z
+Pittsburgh Steelers @ New England Patriots,total,over,43.5,-110,2026-07-09T21:12:54Z
+Pittsburgh Steelers @ New England Patriots,total,under,43.5,-110,2026-07-09T21:12:54Z
+San Francisco 49ers @ Los Angeles Rams,moneyline,away,,145,2026-07-09T21:12:54Z
+San Francisco 49ers @ Los Angeles Rams,moneyline,home,,-175,2026-07-09T21:12:54Z
+San Francisco 49ers @ Los Angeles Rams,spread,home,-3.0,,2026-07-09T21:12:54Z
+San Francisco 49ers @ Los Angeles Rams,total,over,48.5,-110,2026-07-09T21:12:54Z
+San Francisco 49ers @ Los Angeles Rams,total,under,48.5,-110,2026-07-09T21:12:54Z
+San Francisco 49ers @ Seattle Seahawks,moneyline,away,,164,2026-07-09T21:12:54Z
+San Francisco 49ers @ Seattle Seahawks,moneyline,home,,-198,2026-07-09T21:12:54Z
+San Francisco 49ers @ Seattle Seahawks,spread,home,-3.5,,2026-07-09T21:12:54Z
+San Francisco 49ers @ Seattle Seahawks,total,over,48.5,-110,2026-07-09T21:12:54Z
+San Francisco 49ers @ Seattle Seahawks,total,under,48.5,-110,2026-07-09T21:12:54Z
+Seattle Seahawks @ Arizona Cardinals,moneyline,away,,-485,2026-07-09T21:12:54Z
+Seattle Seahawks @ Arizona Cardinals,moneyline,home,,370,2026-07-09T21:12:54Z
+Seattle Seahawks @ Arizona Cardinals,spread,home,10.0,,2026-07-09T21:12:54Z
+Seattle Seahawks @ Arizona Cardinals,total,over,44.5,-110,2026-07-09T21:12:54Z
+Seattle Seahawks @ Arizona Cardinals,total,under,44.5,-110,2026-07-09T21:12:54Z
+Seattle Seahawks @ Denver Broncos,moneyline,away,,-130,2026-07-09T21:12:54Z
+Seattle Seahawks @ Denver Broncos,moneyline,home,,110,2026-07-09T21:12:54Z
+Seattle Seahawks @ Denver Broncos,spread,home,1.5,,2026-07-09T21:12:54Z
+Seattle Seahawks @ Denver Broncos,total,over,43.5,-110,2026-07-09T21:12:54Z
+Seattle Seahawks @ Denver Broncos,total,under,43.5,-110,2026-07-09T21:12:54Z
+Seattle Seahawks @ Washington Commanders,moneyline,away,,-198,2026-07-09T21:12:54Z
+Seattle Seahawks @ Washington Commanders,moneyline,home,,164,2026-07-09T21:12:54Z
+Seattle Seahawks @ Washington Commanders,spread,home,3.5,,2026-07-09T21:12:54Z
+Seattle Seahawks @ Washington Commanders,total,over,46.5,-110,2026-07-09T21:12:54Z
+Seattle Seahawks @ Washington Commanders,total,under,46.5,-110,2026-07-09T21:12:54Z
+Tampa Bay Buccaneers @ Cincinnati Bengals,moneyline,away,,164,2026-07-09T21:12:54Z
+Tampa Bay Buccaneers @ Cincinnati Bengals,moneyline,home,,-198,2026-07-09T21:12:54Z
+Tampa Bay Buccaneers @ Cincinnati Bengals,spread,home,-3.5,,2026-07-09T21:12:54Z
+Tampa Bay Buccaneers @ Cincinnati Bengals,total,over,50.5,-115,2026-07-09T21:12:54Z
+Tampa Bay Buccaneers @ Cincinnati Bengals,total,under,50.5,-105,2026-07-09T21:12:54Z
+Tampa Bay Buccaneers @ Dallas Cowboys,moneyline,away,,170,2026-07-09T21:12:54Z
+Tampa Bay Buccaneers @ Dallas Cowboys,moneyline,home,,-205,2026-07-09T21:12:54Z
+Tampa Bay Buccaneers @ Dallas Cowboys,spread,home,-3.5,,2026-07-09T21:12:54Z
+Tampa Bay Buccaneers @ Dallas Cowboys,total,over,52.5,-110,2026-07-09T21:12:54Z
+Tampa Bay Buccaneers @ Dallas Cowboys,total,under,52.5,-110,2026-07-09T21:12:54Z
+Tennessee Titans @ Baltimore Ravens,moneyline,away,,310,2026-07-09T21:12:54Z
+Tennessee Titans @ Baltimore Ravens,moneyline,home,,-395,2026-07-09T21:12:54Z
+Tennessee Titans @ Baltimore Ravens,spread,home,-8.5,,2026-07-09T21:12:54Z
+Tennessee Titans @ Baltimore Ravens,total,over,47.5,-110,2026-07-09T21:12:54Z
+Tennessee Titans @ Baltimore Ravens,total,under,47.5,-110,2026-07-09T21:12:54Z
+Tennessee Titans @ New York Giants,moneyline,away,,150,2026-07-09T21:12:54Z
+Tennessee Titans @ New York Giants,moneyline,home,,-180,2026-07-09T21:12:54Z
+Tennessee Titans @ New York Giants,spread,home,-3.0,,2026-07-09T21:12:54Z
+Tennessee Titans @ New York Giants,total,over,45.5,-110,2026-07-09T21:12:54Z
+Tennessee Titans @ New York Giants,total,under,45.5,-110,2026-07-09T21:12:54Z
+Washington Commanders @ Dallas Cowboys,moneyline,away,,170,2026-07-09T21:12:54Z
+Washington Commanders @ Dallas Cowboys,moneyline,home,,-205,2026-07-09T21:12:54Z
+Washington Commanders @ Dallas Cowboys,spread,home,-4.5,,2026-07-09T21:12:54Z
+Washington Commanders @ Dallas Cowboys,total,over,51.5,-110,2026-07-09T21:12:54Z
+Washington Commanders @ Dallas Cowboys,total,under,51.5,-110,2026-07-09T21:12:54Z
+Washington Commanders @ Philadelphia Eagles,moneyline,away,,195,2026-07-09T21:12:54Z
+Washington Commanders @ Philadelphia Eagles,moneyline,home,,-238,2026-07-09T21:12:54Z
+Washington Commanders @ Philadelphia Eagles,spread,home,-5.5,,2026-07-09T21:12:54Z
+Washington Commanders @ Philadelphia Eagles,total,over,46.5,-110,2026-07-09T21:12:54Z
+Washington Commanders @ Philadelphia Eagles,total,under,46.5,-110,2026-07-09T21:12:54Z

@@ -68,6 +68,8 @@ _DEFAULT_INTERVAL_MARKETS = "h2h,spreads,totals,spreads_h1,totals_h1,spreads_h2,
 _WNBA_PLAYER_PROP_MARKETS = "player_points,player_rebounds,player_assists,player_points_rebounds_assists,player_threes,player_steals,player_blocks,player_turnovers,player_points_rebounds,player_points_assists,player_rebounds_assists,player_double_double,player_triple_double"
 _DEFAULT_REFRESH_STEP_TIMEOUT_SECONDS = 1800
 _MEMORY_TRACE_LAST_RSS_BYTES: int | None = None
+_SPORT_REFRESH_REQUIRED_ARTIFACTS = ("snapshot", "snapshot_alias", "game_slate", "predictions", "board_contract", "manifest")
+_SPORT_REFRESH_OPTIONAL_ARTIFACTS = ("smart_sim", "recommendations", "edges", "live_lens", "advanced_analytics", "simulation_detail")
 
 
 def _parse_utc_timestamp(value: str | None) -> datetime | None:
@@ -1288,13 +1290,65 @@ def _sport_artifact_paths(sport_result: dict[str, Any]) -> list[str]:
     return paths
 
 
+def _sport_refresh_contract() -> dict[str, list[str]]:
+    return {
+        "required": list(_SPORT_REFRESH_REQUIRED_ARTIFACTS),
+        "optional": list(_SPORT_REFRESH_OPTIONAL_ARTIFACTS),
+    }
+
+
+def _sport_refresh_failure_lists(sport_result: dict[str, Any]) -> tuple[list[str], list[str]]:
+    required_failures: list[str] = []
+    optional_failures: list[str] = []
+
+    for field in ("required_artifact_failures", "requiredFailures"):
+        values = sport_result.get(field)
+        if isinstance(values, list):
+            for value in values:
+                text = str(value or "").strip()
+                if text and text not in required_failures:
+                    required_failures.append(text)
+
+    for field in ("optional_artifact_failures", "optionalFailures"):
+        values = sport_result.get(field)
+        if isinstance(values, list):
+            for value in values:
+                text = str(value or "").strip()
+                if text and text not in optional_failures:
+                    optional_failures.append(text)
+
+    warning = str(sport_result.get("warning") or "").strip()
+    if warning and warning not in optional_failures:
+        optional_failures.append(warning)
+
+    warnings = sport_result.get("warnings") if isinstance(sport_result.get("warnings"), list) else []
+    for value in warnings:
+        text = str(value or "").strip()
+        if text and text not in optional_failures:
+            optional_failures.append(text)
+
+    error = str(sport_result.get("error") or "").strip()
+    if not required_failures:
+        if error:
+            required_failures.append(error)
+        elif not bool(sport_result.get("ok")):
+            sport_name = str(sport_result.get("sport") or "sport").strip() or "sport"
+            required_failures.append(f"{sport_name} required artifact failure")
+
+    return required_failures, optional_failures
+
+
 def _sport_control_plane_metadata(sport_result: dict[str, Any], *, date: str, phase: str, execution_mode: str, refresh_mode: str) -> dict[str, Any]:
     artifact_paths = _sport_artifact_paths(sport_result)
+    required_artifact_failures, optional_artifact_failures = _sport_refresh_failure_lists(sport_result)
     return {
         "date": date,
         "phase": phase,
         "execution_mode": execution_mode,
         "refresh_mode": refresh_mode,
+        "refresh_contract": _sport_refresh_contract(),
+        "required_artifact_failures": required_artifact_failures,
+        "optional_artifact_failures": optional_artifact_failures,
         "ok": bool(sport_result.get("ok")),
         "post_refresh_ok": bool((sport_result.get("post_refresh") or {}).get("ok")) if isinstance(sport_result.get("post_refresh"), dict) else None,
         "mirror_ok": bool((sport_result.get("mirror") or {}).get("ok")) if isinstance(sport_result.get("mirror"), dict) else None,

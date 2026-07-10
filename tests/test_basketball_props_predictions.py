@@ -444,6 +444,56 @@ class BasketballPropsPredictionsTests(unittest.TestCase):
             self.assertEqual(len(predictor_calls), 1)
             self.assertEqual(finalize_mock.call_count, 1)
 
+    def test_export_props_predictions_local_writes_canonical_prediction_bundle_path(self) -> None:
+        with TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            source_root = root / "source"
+            (source_root / "src").mkdir(parents=True, exist_ok=True)
+            out_path = root / "bundle" / "data" / "processed" / "props_predictions_2026-05-22.csv"
+            fake_frame = self._BranchFakeFrame([
+                {"player_id": 1, "pred_pts": 20.0}
+            ])
+            fake_pandas = self._FakePandasModule(fake_frame)
+            feature_calls: list[str] = []
+            predictor_calls: list[object] = []
+
+            with patch.dict(sys.modules, {"pandas": fake_pandas}), patch.object(
+                predictions_module.importlib,
+                "import_module",
+                side_effect=lambda name: (_ for _ in ()).throw(AssertionError(f"unexpected import: {name}")),
+            ), patch.object(
+                predictions_module.basketball_props_features,
+                "build_features_for_date_local",
+                side_effect=lambda **kwargs: feature_calls.append(kwargs["date"]) or fake_frame,
+            ), patch.object(
+                predictions_module.basketball_props_onnx,
+                "predict_props_pure_onnx_local",
+                side_effect=lambda **kwargs: predictor_calls.append(kwargs["features_df"]) or fake_frame,
+            ), patch.object(
+                predictions_module,
+                "finalize_props_predictions_local",
+                return_value=(1, out_path),
+            ):
+                rows, written_path = export_props_predictions_local(
+                    source_root=source_root,
+                    date_str="2026-05-22",
+                    out_path=out_path,
+                    calib_window=7,
+                    calibrate_player=True,
+                    player_calib_window=30,
+                    player_min_pairs=6,
+                    player_shrink_k=8,
+                    use_smart_sim=False,
+                    smart_sim_n_sims=150,
+                    smart_sim_pbp=True,
+                    smart_sim_workers=1,
+                )
+
+            self.assertEqual(rows, 1)
+            self.assertEqual(written_path, out_path)
+            self.assertEqual(feature_calls, ["2026-05-22"])
+            self.assertEqual(len(predictor_calls), 1)
+
     def test_smart_sim_helper_does_not_import_source_cli(self) -> None:
         with TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)

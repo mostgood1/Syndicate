@@ -1402,7 +1402,7 @@ def build_source_cards_payload(selected_date: str, *, allow_stored_date_fallback
     if not games and resolved_date == central_today_iso():
         public_games, _ = _games_from_public_scoreboard(resolved_date)
         if public_games:
-            games = public_games
+            games = [_source_game_contract(game, default_start_time=resolved_date) for game in public_games]
             used_public_scoreboard_fallback = True
     if resolved_date == central_today_iso() and not used_public_scoreboard_fallback:
         games, _, _, _ = _supplement_games_with_live_state(games, resolved_date)
@@ -1413,6 +1413,7 @@ def build_source_cards_payload(selected_date: str, *, allow_stored_date_fallback
             event_id = str(game.get("event_id") or "").strip()
             if event_id and (not live_lines_by_event or event_id in live_lines_by_event):
                 game["odds_refreshed_at"] = odds_refreshed_at
+    games = [_source_game_contract(game, default_start_time=resolved_date) for game in games if isinstance(game, dict)]
     return {
         "date": resolved_date,
         "requested_date": requested_date,
@@ -1430,7 +1431,7 @@ def build_source_cards_payload(selected_date: str, *, allow_stored_date_fallback
         "next_date": next_date,
         "board_contract": {
             "schema": "game_board_v1",
-            "surface": "wnba_dense_board_v1",
+            "surface": "mlb_dense_board_v1",
             "sport": "wnba",
             "module": "cards",
             "source_kind": "artifact_backed",
@@ -1557,10 +1558,19 @@ def _game_from_row(
         "home_logo": _source_logo_url(home_tri),
         "away": {"abbr": away_tri, "name": away_name, "logo": _source_logo_url(away_tri)},
         "home": {"abbr": home_tri, "name": home_name, "logo": _source_logo_url(home_tri)},
-        "status": normalized_status["status"],
+        "status": _source_status_contract(
+            status_text=normalized_status["status"],
+            detail_text=normalized_status["detail"],
+            start_time_utc=row.get("commence_time"),
+            in_progress=normalized_status["in_progress"],
+            final=normalized_status["final"],
+            period=normalized_status.get("period"),
+            clock=normalized_status.get("clock"),
+        ),
         "detail": normalized_status["detail"],
         "summary": f"{row.get('bookmaker') or 'Consensus'} market snapshot",
         "start_time": str(row.get("commence_time") or "").strip() or None,
+        "startTime": str(row.get("commence_time") or "").strip() or None,
         "odds": {"commence_time": str(row.get("commence_time") or "").strip() or None},
         "betting": betting,
         "sim": sim_payload,
@@ -1755,7 +1765,7 @@ def _public_scoreboard_source_cards_payload(selected_date: str) -> dict[str, Any
         "next_date": next_date,
         "board_contract": {
             "schema": "game_board_v1",
-            "surface": "wnba_dense_board_v1",
+            "surface": "mlb_dense_board_v1",
             "sport": "wnba",
             "module": "cards",
             "source_kind": "live_scoreboard_fallback",
@@ -1940,8 +1950,20 @@ def _supplement_games_with_live_state(games: list[dict[str, Any]], selected_date
         live_status = str(live_game.get("status") or "").strip()
         live_detail = str(live_game.get("detail") or live_status).strip()
         if live_status:
-            merged["status"] = live_status
+            merged["status"] = _source_status_contract(
+                status_text=live_status,
+                detail_text=live_detail,
+                start_time_utc=merged.get("startTime") or merged.get("start_time") or live_game.get("startTime") or live_game.get("start_time") or live_game.get("commence_time"),
+                in_progress=live_game.get("in_progress"),
+                final=live_game.get("final"),
+                period=live_game.get("period"),
+                clock=live_game.get("clock"),
+            )
             merged["detail"] = live_detail
+            start_time = str(merged.get("startTime") or merged.get("start_time") or live_game.get("startTime") or live_game.get("start_time") or live_game.get("commence_time") or "").strip() or None
+            if start_time:
+                merged["startTime"] = start_time
+                merged.setdefault("start_time", start_time)
 
         updated_count += 1
         merged_games.append(merged)
@@ -3268,6 +3290,138 @@ def _merge_live_status(existing_status: dict[str, Any] | None, incoming_status: 
     return incoming
 
 
+def _source_status_contract(
+    *,
+    status_text: object,
+    detail_text: object,
+    start_time_utc: object = None,
+    in_progress: object = None,
+    final: object = None,
+    period: object = None,
+    clock: object = None,
+) -> dict[str, Any]:
+    status_value = str(status_text or "").strip() or str(detail_text or "").strip() or "Scheduled"
+    detail_value = str(detail_text or "").strip() or status_value
+    start_time_value = str(start_time_utc or "").strip() or None
+    return {
+        "status": status_value,
+        "detail": detail_value,
+        "startTime": start_time_value,
+        "in_progress": bool(in_progress),
+        "final": bool(final),
+        "period": period,
+        "clock": str(clock or "").strip(),
+    }
+
+
+def _source_predictions_contract(game: dict[str, Any]) -> dict[str, Any]:
+    sim = game.get("sim") if isinstance(game.get("sim"), dict) else {}
+    score = sim.get("score") if isinstance(sim.get("score"), dict) else {}
+    betting = game.get("betting") if isinstance(game.get("betting"), dict) else {}
+    betting_source = dict(game)
+    if betting:
+        betting_source.update(betting)
+    normalized_betting = _source_betting(betting_source)
+    return {
+        "away_mean": _safe_float(score.get("away_mean")),
+        "home_mean": _safe_float(score.get("home_mean")),
+        "total_mean": _safe_float(score.get("total_mean")),
+        "margin_mean": _safe_float(score.get("margin_mean")),
+        "probabilities": {
+            "home_win": _safe_float(normalized_betting.get("p_home_win")),
+            "away_win": _safe_float(normalized_betting.get("p_away_win")),
+        },
+    }
+
+
+def _source_markets_contract(game: dict[str, Any]) -> dict[str, Any]:
+    betting = game.get("betting") if isinstance(game.get("betting"), dict) else {}
+    betting_source = dict(game)
+    if betting:
+        betting_source.update(betting)
+    normalized_betting = _source_betting(betting_source)
+    home_ml = _safe_float(normalized_betting.get("home_ml"))
+    away_ml = _safe_float(normalized_betting.get("away_ml"))
+    home_spread = _safe_float(normalized_betting.get("home_spread"))
+    away_spread = _safe_float(game.get("away_spread"))
+    if away_spread is None and home_spread is not None:
+        away_spread = round(-home_spread, 3)
+    total = _safe_float(normalized_betting.get("total"))
+    return {
+        "moneyline": {
+            "home": home_ml,
+            "away": away_ml,
+        },
+        "spread": {
+            "home": home_spread,
+            "away": away_spread,
+        },
+        "total": {
+            "line": total,
+        },
+        "prices": {
+            "home_ml": home_ml,
+            "away_ml": away_ml,
+        },
+        "probabilities": {
+            "home_win": _safe_float(normalized_betting.get("p_home_win")),
+            "away_win": _safe_float(normalized_betting.get("p_away_win")),
+            "home_cover": _safe_float(normalized_betting.get("p_home_cover")),
+            "away_cover": _safe_float(normalized_betting.get("p_away_cover")),
+            "total_over": _safe_float(normalized_betting.get("p_total_over")),
+            "total_under": _safe_float(normalized_betting.get("p_total_under")),
+        },
+    }
+
+
+def _source_game_contract(game: dict[str, Any], *, default_start_time: str | None = None) -> dict[str, Any]:
+    if not isinstance(game, dict):
+        return {}
+    merged = dict(game)
+    status_value = game.get("status")
+    detail_value = game.get("detail") or status_value or "Scheduled"
+    start_time_value = (
+        game.get("startTime")
+        or game.get("start_time")
+        or (game.get("odds") or {}).get("commence_time") if isinstance(game.get("odds"), dict) else None
+        or game.get("commence_time")
+        or default_start_time
+    )
+    if not isinstance(status_value, dict):
+        merged["status"] = _source_status_contract(
+            status_text=status_value or "Scheduled",
+            detail_text=detail_value,
+            start_time_utc=start_time_value,
+            in_progress=game.get("in_progress"),
+            final=game.get("final"),
+            period=game.get("period"),
+            clock=game.get("clock"),
+        )
+    else:
+        status_detail = status_value.get("detail") or status_value.get("detailed") or detail_value
+        merged["status"] = _source_status_contract(
+            status_text=status_value.get("status") or status_value.get("abstract") or status_value.get("detailed") or "Scheduled",
+            detail_text=status_detail,
+            start_time_utc=status_value.get("startTime") or status_value.get("start_time") or start_time_value,
+            in_progress=status_value.get("in_progress") if status_value.get("in_progress") is not None else game.get("in_progress"),
+            final=status_value.get("final") if status_value.get("final") is not None else game.get("final"),
+            period=status_value.get("period") if status_value.get("period") is not None else game.get("period"),
+            clock=status_value.get("clock") if status_value.get("clock") is not None else game.get("clock"),
+        )
+        detail_value = status_detail
+    if start_time_value:
+        merged["startTime"] = str(start_time_value).strip() or None
+    elif default_start_time:
+        merged["startTime"] = default_start_time
+    if "start_time" in merged or default_start_time:
+        merged["start_time"] = merged.get("startTime") or default_start_time
+    merged["detail"] = str(merged.get("detail") or detail_value or merged.get("status", {}).get("detail") or merged.get("status", {}).get("status") or "Scheduled").strip() or "Scheduled"
+    merged["summary"] = str(merged.get("summary") or merged["detail"] or merged.get("status", {}).get("detail") or merged.get("status", {}).get("status") or "Scheduled").strip() or merged["detail"]
+    merged["predictions"] = _source_predictions_contract(merged)
+    merged["markets"] = _source_markets_contract(merged)
+    return merged
+
+
 def _live_player_row_rank(row: dict[str, Any]) -> tuple[int, int, int, float]:
     line_source = str(row.get("line_source") or "").strip().lower()
     has_price = any(_price_is_usable(row.get(price_key)) for price_key in ("price", "price_over", "price_under"))
@@ -3913,7 +4067,15 @@ def build_live_state_payload(selected_date: str, ttl: int = 12, *, allow_stored_
                 "home_pts": _safe_float(merged_public_row.get("home_pts")),
                 "away_pts": _safe_float(merged_public_row.get("away_pts")),
                 "status_id": None,
-                "status": str(merged_public_row.get("status") or "").strip() or "Scheduled",
+                "status": _source_status_contract(
+                    status_text=merged_public_row.get("status") or "Scheduled",
+                    detail_text=merged_public_row.get("detail") or merged_public_row.get("status") or "Scheduled",
+                    start_time_utc=merged_public_row.get("startTime") or merged_public_row.get("start_time") or merged_public_row.get("detail") or "Scheduled",
+                    in_progress=merged_public_row.get("in_progress"),
+                    final=merged_public_row.get("final"),
+                    period=merged_public_row.get("period"),
+                    clock=merged_public_row.get("clock"),
+                ),
                 "period": merged_public_row.get("period"),
                 "clock": str(merged_public_row.get("clock") or "").strip(),
                 "in_progress": bool(merged_public_row.get("in_progress")),

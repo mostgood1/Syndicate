@@ -251,6 +251,14 @@ class WnbaCardsMergeAliasTests(unittest.TestCase):
                         "home_ml": -240,
                         "away_ml": 196,
                     },
+                    "sim": {
+                        "score": {
+                            "away_mean": 81.25,
+                            "home_mean": 85.75,
+                            "total_mean": 167.0,
+                            "margin_mean": 4.5,
+                        }
+                    },
                 }
             ], None, 0, 0),
         ):
@@ -258,10 +266,24 @@ class WnbaCardsMergeAliasTests(unittest.TestCase):
 
         game = (payload.get("games") or [{}])[0]
         betting = game.get("betting") if isinstance(game, dict) else {}
+        predictions = game.get("predictions") if isinstance(game, dict) else {}
+        markets = game.get("markets") if isinstance(game, dict) else {}
+        self.assertEqual((payload.get("board_contract") or {}).get("surface"), "mlb_dense_board_v1")
         self.assertEqual(betting.get("total"), 167.5)
         self.assertEqual(betting.get("home_spread"), -6.5)
         self.assertEqual(betting.get("home_ml"), -240)
         self.assertEqual(betting.get("away_ml"), 196)
+        self.assertEqual(predictions.get("away_mean"), 81.25)
+        self.assertEqual(predictions.get("home_mean"), 85.75)
+        self.assertEqual(predictions.get("total_mean"), 167.0)
+        self.assertEqual(predictions.get("margin_mean"), 4.5)
+        self.assertIsNotNone((predictions.get("probabilities") or {}).get("home_win"))
+        self.assertIsNotNone((predictions.get("probabilities") or {}).get("away_win"))
+        self.assertEqual((markets.get("moneyline") or {}).get("home"), -240)
+        self.assertEqual((markets.get("moneyline") or {}).get("away"), 196)
+        self.assertEqual((markets.get("spread") or {}).get("home"), -6.5)
+        self.assertEqual((markets.get("spread") or {}).get("away"), 6.5)
+        self.assertEqual((markets.get("total") or {}).get("line"), 167.5)
 
     def test_source_cards_payload_uses_public_scoreboard_for_today_when_artifacts_are_missing(self) -> None:
         public_games = [
@@ -296,7 +318,13 @@ class WnbaCardsMergeAliasTests(unittest.TestCase):
         self.assertEqual(payload["date"], "2026-07-02")
         self.assertEqual(payload["requested_date"], "2026-07-02")
         self.assertEqual(len(payload.get("games") or []), 1)
-        self.assertEqual((payload.get("games") or [{}])[0].get("event_id"), "401857500")
+        first_game = (payload.get("games") or [{}])[0]
+        self.assertEqual(first_game.get("event_id"), "401857500")
+        self.assertIsInstance(first_game.get("status"), dict)
+        self.assertEqual(first_game.get("status", {}).get("status"), "Scheduled")
+        self.assertEqual(first_game.get("startTime"), "2026-07-02")
+        self.assertEqual(first_game.get("detail"), "Scheduled")
+        self.assertEqual(first_game.get("summary"), "Scheduled")
 
     def test_cards_page_context_keeps_today_pinned_for_public_scoreboard_fallback(self) -> None:
         public_games = [
@@ -459,6 +487,12 @@ class WnbaCardsMergeAliasTests(unittest.TestCase):
         self.assertEqual(payload["date"], "2026-06-22")
         self.assertEqual(len(payload["games"]), 4)
         self.assertEqual([game.get("event_id") for game in payload["games"]], ["401857012", "401857013", "401857014", "401857015"])
+        first_game = payload["games"][0]
+        self.assertIsInstance(first_game.get("status"), dict)
+        self.assertEqual(first_game.get("status", {}).get("status"), "Scheduled")
+        self.assertEqual(first_game.get("startTime"), "2026-06-22T18:00:00Z")
+        self.assertEqual(first_game.get("detail"), "Scheduled")
+        self.assertEqual(first_game.get("summary"), "Consensus market snapshot")
 
     def test_cards_page_context_prefers_today_public_scoreboard_over_stored_artifact_fallback(self) -> None:
         fallback_bundle = {

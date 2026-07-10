@@ -1,0 +1,209 @@
+event_key,segment,market,selection,line,price,snapshot_ts
+Arizona Diamondbacks @ San Diego Padres,first1,moneyline,away,,+275,2026-07-09T21:12:54Z
+Arizona Diamondbacks @ San Diego Padres,first1,moneyline,home,,+255,2026-07-09T21:12:54Z
+Arizona Diamondbacks @ San Diego Padres,first1,spread_away,away,0.5,-350,2026-07-09T21:12:54Z
+Arizona Diamondbacks @ San Diego Padres,first1,spread_home,home,-0.5,+245,2026-07-09T21:12:54Z
+Arizona Diamondbacks @ San Diego Padres,first1,total,over,0.5,-130,2026-07-09T21:12:54Z
+Arizona Diamondbacks @ San Diego Padres,first1,total,under,0.5,+100,2026-07-09T21:12:54Z
+Arizona Diamondbacks @ San Diego Padres,first3,moneyline,away,,-105,2026-07-09T21:12:54Z
+Arizona Diamondbacks @ San Diego Padres,first3,moneyline,home,,-125,2026-07-09T21:12:54Z
+Arizona Diamondbacks @ San Diego Padres,first3,spread_away,away,0.5,-166,2026-07-09T21:12:54Z
+Arizona Diamondbacks @ San Diego Padres,first3,spread_home,home,-0.5,+130,2026-07-09T21:12:54Z
+Arizona Diamondbacks @ San Diego Padres,first3,total,over,2.5,-140,2026-07-09T21:12:54Z
+Arizona Diamondbacks @ San Diego Padres,first3,total,under,2.5,+110,2026-07-09T21:12:54Z
+Arizona Diamondbacks @ San Diego Padres,first5,moneyline,away,,-110,2026-07-09T21:12:54Z
+Arizona Diamondbacks @ San Diego Padres,first5,moneyline,home,,-120,2026-07-09T21:12:54Z
+Arizona Diamondbacks @ San Diego Padres,first5,spread_away,away,0.5,-140,2026-07-09T21:12:54Z
+Arizona Diamondbacks @ San Diego Padres,first5,spread_home,home,-0.5,+110,2026-07-09T21:12:54Z
+Arizona Diamondbacks @ San Diego Padres,first5,total,over,4.5,-140,2026-07-09T21:12:54Z
+Arizona Diamondbacks @ San Diego Padres,first5,total,under,4.5,+110,2026-07-09T21:12:54Z
+Arizona Diamondbacks @ San Diego Padres,first7,moneyline,away,,+105,2026-07-09T21:12:54Z
+Arizona Diamondbacks @ San Diego Padres,first7,moneyline,home,,-135,2026-07-09T21:12:54Z
+Arizona Diamondbacks @ San Diego Padres,first7,spread_away,away,0.5,-125,2026-07-09T21:12:54Z
+Arizona Diamondbacks @ San Diego Padres,first7,spread_home,home,-0.5,-105,2026-07-09T21:12:54Z
+Arizona Diamondbacks @ San Diego Padres,first7,total,over,6.5,-135,2026-07-09T21:12:54Z
+Arizona Diamondbacks @ San Diego Padres,first7,total,under,6.5,+105,2026-07-09T21:12:54Z
+Arizona Diamondbacks @ San Diego Padres,full,moneyline,away,,+110,2026-07-09T21:12:54Z
+Arizona Diamondbacks @ San Diego Padres,full,moneyline,home,,-132,2026-07-09T21:12:54Z
+Arizona Diamondbacks @ San Diego Padres,full,spread_away,away,1.5,-185,2026-07-09T21:12:54Z
+Arizona Diamondbacks @ San Diego Padres,full,spread_home,home,-1.5,+152,2026-07-09T21:12:54Z
+Arizona Diamondbacks @ San Diego Padres,full,total,over,9.0,+101,2026-07-09T21:12:54Z
+Arizona Diamondbacks @ San Diego Padres,full,total,under,9.0,-122,2026-07-09T21:12:54Z
+Athletics @ Detroit Tigers,first1,moneyline,away,,+280,2026-07-09T21:12:54Z
+Athletics @ Detroit Tigers,first1,moneyline,home,,+260,2026-07-09T21:12:54Z
+Athletics @ Detroit Tigers,first1,spread_away,away,0.5,-360,2026-07-09T21:12:54Z
+Athletics @ Detroit Tigers,first1,spread_home,home,-0.5,+250,2026-07-09T21:12:54Z
+Athletics @ Detroit Tigers,first1,total,over,0.5,-120,2026-07-09T21:12:54Z
+Athletics @ Detroit Tigers,first1,total,under,0.5,-105,2026-07-09T21:12:54Z
+Athletics @ Detroit Tigers,first3,moneyline,away,,-105,2026-07-09T21:12:54Z
+Athletics @ Detroit Tigers,first3,moneyline,home,,-125,2026-07-09T21:12:54Z
+Athletics @ Detroit Tigers,first3,spread_away,away,0.5,-166,2026-07-09T21:12:54Z
+Athletics @ Detroit Tigers,first3,spread_home,home,-0.5,+130,2026-07-09T21:12:54Z
+Athletics @ Detroit Tigers,first3,total,over,2.5,-140,2026-07-09T21:12:54Z
+Athletics @ Detroit Tigers,first3,total,under,2.5,+110,2026-07-09T21:12:54Z
+Athletics @ Detroit Tigers,first5,moneyline,away,,-105,2026-07-09T21:12:54Z
+Athletics @ Detroit Tigers,first5,moneyline,home,,-125,2026-07-09T21:12:54Z
+Athletics @ Detroit Tigers,first5,spread_away,away,0.5,-135,2026-07-09T21:12:54Z
+Athletics @ Detroit Tigers,first5,spread_home,home,-0.5,+105,2026-07-09T21:12:54Z
+Athletics @ Detroit Tigers,first5,total,over,5.5,+110,2026-07-09T21:12:54Z
+Athletics @ Detroit Tigers,first5,total,under,5.5,-140,2026-07-09T21:12:54Z
+Athletics @ Detroit Tigers,first7,moneyline,away,,+100,2026-07-09T21:12:54Z
+Athletics @ Detroit Tigers,first7,moneyline,home,,-130,2026-07-09T21:12:54Z
+Athletics @ Detroit Tigers,first7,spread_away,away,0.5,-125,2026-07-09T21:12:54Z
+Athletics @ Detroit Tigers,first7,spread_home,home,-0.5,-105,2026-07-09T21:12:54Z
+Athletics @ Detroit Tigers,first7,total,over,6.5,-140,2026-07-09T21:12:54Z
+Athletics @ Detroit Tigers,first7,total,under,6.5,+110,2026-07-09T21:12:54Z
+Athletics @ Detroit Tigers,full,moneyline,away,,+109,2026-07-09T21:12:54Z
+Athletics @ Detroit Tigers,full,moneyline,home,,-132,2026-07-09T21:12:54Z
+Athletics @ Detroit Tigers,full,spread_away,away,1.5,-185,2026-07-09T21:12:54Z
+Athletics @ Detroit Tigers,full,spread_home,home,-1.5,+152,2026-07-09T21:12:54Z
+Athletics @ Detroit Tigers,full,total,over,9.0,-110,2026-07-09T21:12:54Z
+Athletics @ Detroit Tigers,full,total,under,9.0,-110,2026-07-09T21:12:54Z
+Colorado Rockies @ San Francisco Giants,first1,moneyline,away,,+310,2026-07-09T21:12:54Z
+Colorado Rockies @ San Francisco Giants,first1,moneyline,home,,+270,2026-07-09T21:12:54Z
+Colorado Rockies @ San Francisco Giants,first1,total,over,0.5,-110,2026-07-09T21:12:54Z
+Colorado Rockies @ San Francisco Giants,first1,total,under,0.5,-115,2026-07-09T21:12:54Z
+Colorado Rockies @ San Francisco Giants,first3,moneyline,away,,+105,2026-07-09T21:12:54Z
+Colorado Rockies @ San Francisco Giants,first3,moneyline,home,,-140,2026-07-09T21:12:54Z
+Colorado Rockies @ San Francisco Giants,first3,spread_away,away,1.5,-325,2026-07-09T21:12:54Z
+Colorado Rockies @ San Francisco Giants,first3,spread_home,home,-1.5,+230,2026-07-09T21:12:54Z
+Colorado Rockies @ San Francisco Giants,first3,total,over,2.5,-120,2026-07-09T21:12:54Z
+Colorado Rockies @ San Francisco Giants,first3,total,under,2.5,-110,2026-07-09T21:12:54Z
+Colorado Rockies @ San Francisco Giants,first5,moneyline,away,,+115,2026-07-09T21:12:54Z
+Colorado Rockies @ San Francisco Giants,first5,moneyline,home,,-145,2026-07-09T21:12:54Z
+Colorado Rockies @ San Francisco Giants,first5,spread_away,away,0.5,-125,2026-07-09T21:12:54Z
+Colorado Rockies @ San Francisco Giants,first5,spread_home,home,-0.5,-105,2026-07-09T21:12:54Z
+Colorado Rockies @ San Francisco Giants,first5,total,over,4.5,-125,2026-07-09T21:12:54Z
+Colorado Rockies @ San Francisco Giants,first5,total,under,4.5,-105,2026-07-09T21:12:54Z
+Colorado Rockies @ San Francisco Giants,first7,moneyline,away,,+105,2026-07-09T21:12:54Z
+Colorado Rockies @ San Francisco Giants,first7,moneyline,home,,-140,2026-07-09T21:12:54Z
+Colorado Rockies @ San Francisco Giants,first7,spread_away,away,0.5,-120,2026-07-09T21:12:54Z
+Colorado Rockies @ San Francisco Giants,first7,spread_home,home,-0.5,-110,2026-07-09T21:12:54Z
+Colorado Rockies @ San Francisco Giants,first7,total,over,6.5,-130,2026-07-09T21:12:54Z
+Colorado Rockies @ San Francisco Giants,first7,total,under,6.5,-102,2026-07-09T21:12:54Z
+Colorado Rockies @ San Francisco Giants,full,moneyline,away,,+110,2026-07-09T21:12:54Z
+Colorado Rockies @ San Francisco Giants,full,moneyline,home,,-130,2026-07-09T21:12:54Z
+Colorado Rockies @ San Francisco Giants,full,spread_away,away,1.5,-190,2026-07-09T21:12:54Z
+Colorado Rockies @ San Francisco Giants,full,spread_home,home,-1.5,+155,2026-07-09T21:12:54Z
+Colorado Rockies @ San Francisco Giants,full,total,over,8.5,-120,2026-07-09T21:12:54Z
+Colorado Rockies @ San Francisco Giants,full,total,under,8.5,+100,2026-07-09T21:12:54Z
+Los Angeles Angels @ Texas Rangers,first1,moneyline,away,,+340,2026-07-09T21:12:54Z
+Los Angeles Angels @ Texas Rangers,first1,moneyline,home,,+290,2026-07-09T21:12:54Z
+Los Angeles Angels @ Texas Rangers,first1,spread_away,away,0.5,-400,2026-07-09T21:12:54Z
+Los Angeles Angels @ Texas Rangers,first1,spread_home,home,-0.5,+275,2026-07-09T21:12:54Z
+Los Angeles Angels @ Texas Rangers,first1,total,over,0.5,+105,2026-07-09T21:12:54Z
+Los Angeles Angels @ Texas Rangers,first1,total,under,0.5,-135,2026-07-09T21:12:54Z
+Los Angeles Angels @ Texas Rangers,first3,moneyline,away,,+100,2026-07-09T21:12:54Z
+Los Angeles Angels @ Texas Rangers,first3,moneyline,home,,-130,2026-07-09T21:12:54Z
+Los Angeles Angels @ Texas Rangers,first3,spread_away,away,0.5,-188,2026-07-09T21:12:54Z
+Los Angeles Angels @ Texas Rangers,first3,spread_home,home,-0.5,+145,2026-07-09T21:12:54Z
+Los Angeles Angels @ Texas Rangers,first3,total,over,2.5,+120,2026-07-09T21:12:54Z
+Los Angeles Angels @ Texas Rangers,first3,total,under,2.5,-154,2026-07-09T21:12:54Z
+Los Angeles Angels @ Texas Rangers,first5,moneyline,away,,+100,2026-07-09T21:12:54Z
+Los Angeles Angels @ Texas Rangers,first5,moneyline,home,,-130,2026-07-09T21:12:54Z
+Los Angeles Angels @ Texas Rangers,first5,spread_away,away,0.5,-140,2026-07-09T21:12:54Z
+Los Angeles Angels @ Texas Rangers,first5,spread_home,home,-0.5,+110,2026-07-09T21:12:54Z
+Los Angeles Angels @ Texas Rangers,first5,total,over,3.5,-130,2026-07-09T21:12:54Z
+Los Angeles Angels @ Texas Rangers,first5,total,under,3.5,+100,2026-07-09T21:12:54Z
+Los Angeles Angels @ Texas Rangers,first7,moneyline,away,,+110,2026-07-09T21:12:54Z
+Los Angeles Angels @ Texas Rangers,first7,moneyline,home,,-140,2026-07-09T21:12:54Z
+Los Angeles Angels @ Texas Rangers,first7,spread_away,away,0.5,-125,2026-07-09T21:12:54Z
+Los Angeles Angels @ Texas Rangers,first7,spread_home,home,-0.5,-105,2026-07-09T21:12:54Z
+Los Angeles Angels @ Texas Rangers,first7,total,over,5.5,-110,2026-07-09T21:12:54Z
+Los Angeles Angels @ Texas Rangers,first7,total,under,5.5,-120,2026-07-09T21:12:54Z
+Los Angeles Angels @ Texas Rangers,full,moneyline,away,,+118,2026-07-09T21:12:54Z
+Los Angeles Angels @ Texas Rangers,full,moneyline,home,,-143,2026-07-09T21:12:54Z
+Los Angeles Angels @ Texas Rangers,full,spread_away,away,1.5,-187,2026-07-09T21:12:54Z
+Los Angeles Angels @ Texas Rangers,full,spread_home,home,-1.5,+154,2026-07-09T21:12:54Z
+Los Angeles Angels @ Texas Rangers,full,total,over,7.0,-123,2026-07-09T21:12:54Z
+Los Angeles Angels @ Texas Rangers,full,total,under,7.0,+102,2026-07-09T21:12:54Z
+Milwaukee Brewers @ St. Louis Cardinals,first1,moneyline,away,,+250,2026-07-09T21:12:54Z
+Milwaukee Brewers @ St. Louis Cardinals,first1,moneyline,home,,+320,2026-07-09T21:12:54Z
+Milwaukee Brewers @ St. Louis Cardinals,first1,spread_away,away,-0.5,+240,2026-07-09T21:12:54Z
+Milwaukee Brewers @ St. Louis Cardinals,first1,spread_home,home,0.5,-340,2026-07-09T21:12:54Z
+Milwaukee Brewers @ St. Louis Cardinals,first1,total,over,0.5,-110,2026-07-09T21:12:54Z
+Milwaukee Brewers @ St. Louis Cardinals,first1,total,under,0.5,-115,2026-07-09T21:12:54Z
+Milwaukee Brewers @ St. Louis Cardinals,first3,moneyline,away,,-135,2026-07-09T21:12:54Z
+Milwaukee Brewers @ St. Louis Cardinals,first3,moneyline,home,,+105,2026-07-09T21:12:54Z
+Milwaukee Brewers @ St. Louis Cardinals,first3,spread_away,away,-0.5,+124,2026-07-09T21:12:54Z
+Milwaukee Brewers @ St. Louis Cardinals,first3,spread_home,home,0.5,-160,2026-07-09T21:12:54Z
+Milwaukee Brewers @ St. Louis Cardinals,first3,total,over,2.5,-120,2026-07-09T21:12:54Z
+Milwaukee Brewers @ St. Louis Cardinals,first3,total,under,2.5,-110,2026-07-09T21:12:54Z
+Milwaukee Brewers @ St. Louis Cardinals,first5,moneyline,away,,-140,2026-07-09T21:12:54Z
+Milwaukee Brewers @ St. Louis Cardinals,first5,moneyline,home,,+110,2026-07-09T21:12:54Z
+Milwaukee Brewers @ St. Louis Cardinals,first5,spread_away,away,-0.5,+105,2026-07-09T21:12:54Z
+Milwaukee Brewers @ St. Louis Cardinals,first5,spread_home,home,0.5,-135,2026-07-09T21:12:54Z
+Milwaukee Brewers @ St. Louis Cardinals,first5,total,over,4.5,-120,2026-07-09T21:12:54Z
+Milwaukee Brewers @ St. Louis Cardinals,first5,total,under,4.5,-110,2026-07-09T21:12:54Z
+Milwaukee Brewers @ St. Louis Cardinals,first7,moneyline,away,,-140,2026-07-09T21:12:54Z
+Milwaukee Brewers @ St. Louis Cardinals,first7,moneyline,home,,+110,2026-07-09T21:12:54Z
+Milwaukee Brewers @ St. Louis Cardinals,first7,spread_away,away,-0.5,-110,2026-07-09T21:12:54Z
+Milwaukee Brewers @ St. Louis Cardinals,first7,spread_home,home,0.5,-120,2026-07-09T21:12:54Z
+Milwaukee Brewers @ St. Louis Cardinals,first7,total,over,6.5,-110,2026-07-09T21:12:54Z
+Milwaukee Brewers @ St. Louis Cardinals,first7,total,under,6.5,-120,2026-07-09T21:12:54Z
+Milwaukee Brewers @ St. Louis Cardinals,full,moneyline,away,,-136,2026-07-09T21:12:54Z
+Milwaukee Brewers @ St. Louis Cardinals,full,moneyline,home,,+113,2026-07-09T21:12:54Z
+Milwaukee Brewers @ St. Louis Cardinals,full,spread_away,away,-1.5,+128,2026-07-09T21:12:54Z
+Milwaukee Brewers @ St. Louis Cardinals,full,spread_home,home,1.5,-155,2026-07-09T21:12:54Z
+Milwaukee Brewers @ St. Louis Cardinals,full,total,over,8.0,-118,2026-07-09T21:12:54Z
+Milwaukee Brewers @ St. Louis Cardinals,full,total,under,8.0,-102,2026-07-09T21:12:54Z
+Philadelphia Phillies @ Cincinnati Reds,first1,moneyline,away,,+200,2026-07-09T21:12:54Z
+Philadelphia Phillies @ Cincinnati Reds,first1,moneyline,home,,+330,2026-07-09T21:12:54Z
+Philadelphia Phillies @ Cincinnati Reds,first1,spread_away,away,-0.5,+195,2026-07-09T21:12:54Z
+Philadelphia Phillies @ Cincinnati Reds,first1,spread_home,home,0.5,-265,2026-07-09T21:12:54Z
+Philadelphia Phillies @ Cincinnati Reds,first1,total,over,0.5,-140,2026-07-09T21:12:54Z
+Philadelphia Phillies @ Cincinnati Reds,first1,total,under,0.5,+105,2026-07-09T21:12:54Z
+Philadelphia Phillies @ Cincinnati Reds,first3,moneyline,away,,-166,2026-07-09T21:12:54Z
+Philadelphia Phillies @ Cincinnati Reds,first3,moneyline,home,,+130,2026-07-09T21:12:54Z
+Philadelphia Phillies @ Cincinnati Reds,first3,spread_away,away,-0.5,+100,2026-07-09T21:12:54Z
+Philadelphia Phillies @ Cincinnati Reds,first3,spread_home,home,0.5,-130,2026-07-09T21:12:54Z
+Philadelphia Phillies @ Cincinnati Reds,first3,total,over,2.5,-140,2026-07-09T21:12:54Z
+Philadelphia Phillies @ Cincinnati Reds,first3,total,under,2.5,+110,2026-07-09T21:12:54Z
+Philadelphia Phillies @ Cincinnati Reds,first5,moneyline,away,,-175,2026-07-09T21:12:54Z
+Philadelphia Phillies @ Cincinnati Reds,first5,moneyline,home,,+135,2026-07-09T21:12:54Z
+Philadelphia Phillies @ Cincinnati Reds,first5,spread_away,away,-0.5,-120,2026-07-09T21:12:54Z
+Philadelphia Phillies @ Cincinnati Reds,first5,spread_home,home,0.5,-110,2026-07-09T21:12:54Z
+Philadelphia Phillies @ Cincinnati Reds,first5,total,over,4.5,-140,2026-07-09T21:12:54Z
+Philadelphia Phillies @ Cincinnati Reds,first5,total,under,4.5,+110,2026-07-09T21:12:54Z
+Philadelphia Phillies @ Cincinnati Reds,first7,moneyline,away,,-180,2026-07-09T21:12:54Z
+Philadelphia Phillies @ Cincinnati Reds,first7,moneyline,home,,+140,2026-07-09T21:12:54Z
+Philadelphia Phillies @ Cincinnati Reds,first7,spread_away,away,-0.5,-140,2026-07-09T21:12:54Z
+Philadelphia Phillies @ Cincinnati Reds,first7,spread_home,home,0.5,+110,2026-07-09T21:12:54Z
+Philadelphia Phillies @ Cincinnati Reds,first7,total,over,7.5,+100,2026-07-09T21:12:54Z
+Philadelphia Phillies @ Cincinnati Reds,first7,total,under,7.5,-130,2026-07-09T21:12:54Z
+Philadelphia Phillies @ Cincinnati Reds,full,moneyline,away,,-168,2026-07-09T21:12:54Z
+Philadelphia Phillies @ Cincinnati Reds,full,moneyline,home,,+139,2026-07-09T21:12:54Z
+Philadelphia Phillies @ Cincinnati Reds,full,spread_away,away,-1.5,-105,2026-07-09T21:12:54Z
+Philadelphia Phillies @ Cincinnati Reds,full,spread_home,home,1.5,-114,2026-07-09T21:12:54Z
+Philadelphia Phillies @ Cincinnati Reds,full,total,over,9.5,-101,2026-07-09T21:12:54Z
+Philadelphia Phillies @ Cincinnati Reds,full,total,under,9.5,-119,2026-07-09T21:12:54Z
+Seattle Mariners @ Miami Marlins,first1,moneyline,away,,+260,2026-07-09T21:12:54Z
+Seattle Mariners @ Miami Marlins,first1,moneyline,home,,+340,2026-07-09T21:12:54Z
+Seattle Mariners @ Miami Marlins,first1,spread_away,away,-0.5,+250,2026-07-09T21:12:54Z
+Seattle Mariners @ Miami Marlins,first1,spread_home,home,0.5,-360,2026-07-09T21:12:54Z
+Seattle Mariners @ Miami Marlins,first1,total,over,0.5,-105,2026-07-09T21:12:54Z
+Seattle Mariners @ Miami Marlins,first1,total,under,0.5,-120,2026-07-09T21:12:54Z
+Seattle Mariners @ Miami Marlins,first3,moneyline,away,,-145,2026-07-09T21:12:54Z
+Seattle Mariners @ Miami Marlins,first3,moneyline,home,,+114,2026-07-09T21:12:54Z
+Seattle Mariners @ Miami Marlins,first3,spread_away,away,-0.5,+120,2026-07-09T21:12:54Z
+Seattle Mariners @ Miami Marlins,first3,spread_home,home,0.5,-154,2026-07-09T21:12:54Z
+Seattle Mariners @ Miami Marlins,first3,total,over,2.5,-110,2026-07-09T21:12:54Z
+Seattle Mariners @ Miami Marlins,first3,total,under,2.5,-120,2026-07-09T21:12:54Z
+Seattle Mariners @ Miami Marlins,first5,moneyline,away,,-154,2026-07-09T21:12:54Z
+Seattle Mariners @ Miami Marlins,first5,moneyline,home,,+120,2026-07-09T21:12:54Z
+Seattle Mariners @ Miami Marlins,first5,spread_away,away,-0.5,-105,2026-07-09T21:12:54Z
+Seattle Mariners @ Miami Marlins,first5,spread_home,home,0.5,-125,2026-07-09T21:12:54Z
+Seattle Mariners @ Miami Marlins,first5,total,over,4.5,-105,2026-07-09T21:12:54Z
+Seattle Mariners @ Miami Marlins,first5,total,under,4.5,-125,2026-07-09T21:12:54Z
+Seattle Mariners @ Miami Marlins,first7,moneyline,away,,-140,2026-07-09T21:12:54Z
+Seattle Mariners @ Miami Marlins,first7,moneyline,home,,+110,2026-07-09T21:12:54Z
+Seattle Mariners @ Miami Marlins,first7,spread_away,away,-0.5,-110,2026-07-09T21:12:54Z
+Seattle Mariners @ Miami Marlins,first7,spread_home,home,0.5,-120,2026-07-09T21:12:54Z
+Seattle Mariners @ Miami Marlins,first7,total,over,6.5,+100,2026-07-09T21:12:54Z
+Seattle Mariners @ Miami Marlins,first7,total,under,6.5,-130,2026-07-09T21:12:54Z
+Seattle Mariners @ Miami Marlins,full,moneyline,away,,-126,2026-07-09T21:12:54Z
+Seattle Mariners @ Miami Marlins,full,moneyline,home,,+105,2026-07-09T21:12:54Z
+Seattle Mariners @ Miami Marlins,full,spread_away,away,-1.5,+134,2026-07-09T21:12:54Z
+Seattle Mariners @ Miami Marlins,full,spread_home,home,1.5,-162,2026-07-09T21:12:54Z
+Seattle Mariners @ Miami Marlins,full,total,over,8.0,-109,2026-07-09T21:12:54Z
+Seattle Mariners @ Miami Marlins,full,total,under,8.0,-110,2026-07-09T21:12:54Z

@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 from typing import Any
 
+from syndicate.features.shared.publication_adapter import normalize_publication_game
 from syndicate.features.shared.simulation_adapter import build_simulation_contract_from_context
 
 
@@ -398,8 +399,8 @@ def _normalize_game(game: dict[str, Any]) -> dict[str, Any]:
     return normalized
 
 
-def _normalize_games(games: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    return [_normalize_game(game) for game in games if isinstance(game, dict)]
+def _normalize_games(games: list[dict[str, Any]], *, sport: str | None = None) -> list[dict[str, Any]]:
+    return [normalize_publication_game(_normalize_game(game), sport=sport) for game in games if isinstance(game, dict)]
 
 
 def apply_game_board_contract(
@@ -414,9 +415,9 @@ def apply_game_board_contract(
     include_simulation_contract: bool | None = None,
 ) -> dict[str, Any]:
     out = dict(context)
-    games = out.get("games") if isinstance(out.get("games"), list) else []
-    out["games"] = _normalize_games(games)
     normalized_sport = str(sport or "sport").strip().lower() or "sport"
+    games = out.get("games") if isinstance(out.get("games"), list) else []
+    out["games"] = _normalize_games(games, sport=normalized_sport)
     out.setdefault("show_app_header", False)
     out.setdefault("show_standalone_cards_header", str(module or "").strip().lower() == "cards")
     out.setdefault("active_sport_slug", normalized_sport)

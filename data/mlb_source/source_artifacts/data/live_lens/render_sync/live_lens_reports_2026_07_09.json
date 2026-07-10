@@ -12,17 +12,17 @@
     "recommendedUse": "post_retune_monitoring",
     "forwardTuningStartDate": "2026-04-14"
   },
-  "logPath": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/live_lens/live_lens_2026_07_09.jsonl",
-  "propObservationLogPath": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/live_lens/prop_registry/live_prop_observations_2026_07_09.jsonl",
-  "registryPath": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/live_lens/prop_registry/live_prop_registry_2026_07_09.json",
-  "registryLogPath": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/live_lens/prop_registry/live_prop_registry_2026_07_09.jsonl",
-  "reportPath": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/live_lens/live_lens_report_2026_07_09.json",
-  "dailyRecapPath": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/live_lens/recaps/live_lens_daily_recap_2026_07_09.json",
-  "entries": 1,
+  "logPath": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/live_lens/live_lens_2026_07_09.jsonl",
+  "propObservationLogPath": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/live_lens/prop_registry/live_prop_observations_2026_07_09.jsonl",
+  "registryPath": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/live_lens/prop_registry/live_prop_registry_2026_07_09.json",
+  "registryLogPath": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/live_lens/prop_registry/live_prop_registry_2026_07_09.jsonl",
+  "reportPath": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/live_lens/live_lens_report_2026_07_09.json",
+  "dailyRecapPath": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/live_lens/recaps/live_lens_daily_recap_2026_07_09.json",
+  "entries": 3,
   "latestEntry": {
-    "recordedAt": "2026-07-09T07:10:50+00:00",
+    "recordedAt": "2026-07-09T07:35:53+00:00",
     "date": "2026-07-09",
-    "generatedAt": "2026-07-09T02:10:50-05:00",
+    "generatedAt": "2026-07-09T02:35:53-05:00",
     "oddsRefreshedAt": null,
     "counts": {
       "games": 13,
@@ -35,11 +35,11 @@
     "performance": {
       "marketsRefreshed": false,
       "marketRefreshMs": 0.0,
-      "totalMs": 1256.7,
-      "snapshotLoadMs": 2.2,
-      "simContextLoadMs": 1.5,
+      "totalMs": 1275.9,
+      "snapshotLoadMs": 2.0,
+      "simContextLoadMs": 1.6,
       "propEvalMs": 0.2,
-      "gameLensMs": 2.0,
+      "gameLensMs": 1.8,
       "gameCount": 13,
       "liveGameCount": 0,
       "feedFetchCount": 13,
@@ -193,9 +193,9 @@
   },
   "latestReport": {
     "date": "2026-07-09",
-    "generatedAt": "2026-07-09T02:28:15-05:00",
-    "dataRoot": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data",
-    "liveLensDir": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/live_lens",
+    "generatedAt": "2026-07-09T16:12:57-05:00",
+    "dataRoot": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data",
+    "liveLensDir": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/live_lens",
     "optimizationRegime": {
       "date": "2026-07-09",
       "kind": "forward_tuned_live",
@@ -218,11 +218,11 @@
     "performance": {
       "marketsRefreshed": false,
       "marketRefreshMs": 0.0,
-      "totalMs": 1256.7,
-      "snapshotLoadMs": 2.2,
-      "simContextLoadMs": 1.5,
+      "totalMs": 1275.9,
+      "snapshotLoadMs": 2.0,
+      "simContextLoadMs": 1.6,
       "propEvalMs": 0.2,
-      "gameLensMs": 2.0,
+      "gameLensMs": 1.8,
       "gameCount": 13,
       "liveGameCount": 0,
       "feedFetchCount": 13,
@@ -3717,7 +3717,7 @@
   },
   "registrySummary": {
     "date": "2026-07-09",
-    "updatedAt": null,
+    "updatedAt": "2026-07-09T02:28:15-05:00",
     "totalEntries": 0,
     "uniqueGames": 0,
     "uniqueOwners": 0,
@@ -3745,11 +3745,11 @@
     "performance": {
       "marketsRefreshed": false,
       "marketRefreshMs": 0.0,
-      "totalMs": 1256.7,
-      "snapshotLoadMs": 2.2,
-      "simContextLoadMs": 1.5,
+      "totalMs": 1275.9,
+      "snapshotLoadMs": 2.0,
+      "simContextLoadMs": 1.6,
       "propEvalMs": 0.2,
-      "gameLensMs": 2.0,
+      "gameLensMs": 1.8,
       "gameCount": 13,
       "liveGameCount": 0,
       "feedFetchCount": 13,
@@ -3760,40 +3760,43 @@
   },
   "firstObservationArchive": [],
   "rawArtifacts": {
-    "total_bytes": 109123,
-    "total_bytes_text": "106.57 KB",
+    "total_bytes": 113378,
+    "total_bytes_text": "110.72 KB",
     "files": {
       "log": {
-        "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/live_lens/live_lens_2026_07_09.jsonl",
+        "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/live_lens/live_lens_2026_07_09.jsonl",
         "exists": true,
-        "bytes": 2082,
-        "bytes_text": "2.03 KB",
-        "modified_at": "2026-07-09T02:10:50-05:00"
+        "bytes": 6246,
+        "bytes_text": "6.10 KB",
+        "modified_at": "2026-07-09T12:22:57-05:00"
       },
       "observation_log": {
-        "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/live_lens/prop_registry/live_prop_observations_2026_07_09.jsonl",
-        "exists": false,
+        "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/live_lens/prop_registry/live_prop_observations_2026_07_09.jsonl",
+        "exists": true,
         "bytes": 0,
-        "bytes_text": "0 B"
+        "bytes_text": "0 B",
+        "modified_at": "2026-07-09T12:22:57-05:00"
       },
       "registry": {
-        "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/live_lens/prop_registry/live_prop_registry_2026_07_09.json",
-        "exists": false,
-        "bytes": 0,
-        "bytes_text": "0 B"
+        "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/live_lens/prop_registry/live_prop_registry_2026_07_09.json",
+        "exists": true,
+        "bytes": 91,
+        "bytes_text": "91 B",
+        "modified_at": "2026-07-09T12:22:57-05:00"
       },
       "registry_log": {
-        "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/live_lens/prop_registry/live_prop_registry_2026_07_09.jsonl",
-        "exists": false,
+        "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/live_lens/prop_registry/live_prop_registry_2026_07_09.jsonl",
+        "exists": true,
         "bytes": 0,
-        "bytes_text": "0 B"
+        "bytes_text": "0 B",
+        "modified_at": "2026-07-09T12:22:57-05:00"
       },
       "report": {
-        "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/live_lens/live_lens_report_2026_07_09.json",
+        "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/live_lens/live_lens_report_2026_07_09.json",
         "exists": true,
         "bytes": 107041,
         "bytes_text": "104.53 KB",
-        "modified_at": "2026-07-09T02:10:50-05:00"
+        "modified_at": "2026-07-09T12:22:57-05:00"
       }
     }
   }

@@ -1,27 +1,62 @@
 {
   "sport": "nfl",
-  "last_updated": "2026-06-25T19:56:16+00:00",
+  "last_updated": "2026-07-09T16:12:56-05:00",
   "artifact_paths": [
     "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate",
-    "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nfl_source"
+    "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nfl_source",
+    "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nfl_source\\tracking\\odds_nfl_player_props_opening_2026_wk1.csv",
+    "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nfl_source\\tracking\\odds_nfl_player_props_history_2026_wk1.csv",
+    "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nfl_source\\tracking\\odds_nfl_player_props_movement_signals_2026_wk1.csv",
+    "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nfl_source\\tracking\\odds_nfl_team_odds_opening_2026-07-09.csv",
+    "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nfl_source\\tracking\\odds_nfl_team_odds_history_2026-07-09.csv",
+    "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nfl_source\\tracking\\odds_nfl_team_odds_movement_signals_2026-07-09.csv",
+    "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nfl_source\\tracking\\odds_history.json"
   ],
   "status": "complete",
   "metadata": {
-    "date": "2026-10-01",
+    "date": "2026-07-09",
     "phase": "all",
     "execution_mode": "source",
     "refresh_mode": "full",
+    "refresh_contract": {
+      "required": [
+        "snapshot",
+        "snapshot_alias",
+        "game_slate",
+        "predictions",
+        "board_contract",
+        "manifest"
+      ],
+      "optional": [
+        "smart_sim",
+        "recommendations",
+        "edges",
+        "live_lens",
+        "advanced_analytics",
+        "simulation_detail"
+      ]
+    },
+    "required_artifact_failures": [],
+    "optional_artifact_failures": [],
     "ok": true,
     "post_refresh_ok": true,
     "mirror_ok": true,
     "odds_control_plane": {
       "source_precedence": [
+        "shared_history",
         "artifact_history",
         "tracking_history"
       ],
       "artifact_paths": [
         "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate",
-        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nfl_source"
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nfl_source",
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nfl_source\\tracking\\odds_nfl_player_props_opening_2026_wk1.csv",
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nfl_source\\tracking\\odds_nfl_player_props_history_2026_wk1.csv",
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nfl_source\\tracking\\odds_nfl_player_props_movement_signals_2026_wk1.csv",
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nfl_source\\tracking\\odds_nfl_team_odds_opening_2026-07-09.csv",
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nfl_source\\tracking\\odds_nfl_team_odds_history_2026-07-09.csv",
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nfl_source\\tracking\\odds_nfl_team_odds_movement_signals_2026-07-09.csv",
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nfl_source\\tracking\\odds_history.json"
       ],
       "has_post_refresh": true
     }

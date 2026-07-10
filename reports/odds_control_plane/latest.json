@@ -1,50 +1,50 @@
 {
-  "generated_at": "2026-07-08T22:00:48-05:00",
-  "date": "2026-07-08",
+  "generated_at": "2026-07-09T16:14:56-05:00",
+  "date": "2026-07-09",
   "phase": "all",
   "execution_mode": "source",
   "dry_run": false,
   "publish_parity": {
-    "generatedAt": "2026-07-08T22:00:48-05:00",
-    "date": "2026-07-08",
-    "totalForcedPublishPaths": 33,
+    "generatedAt": "2026-07-09T16:14:56-05:00",
+    "date": "2026-07-09",
+    "totalForcedPublishPaths": 84,
     "totalIntelligencePublishPaths": 0,
-    "totalPublishPaths": 33,
+    "totalPublishPaths": 84,
     "sports": [
       {
         "sport": "mlb",
         "rootPrefix": "data/mlb_source/",
-        "forcedPublishPathCount": 0,
+        "forcedPublishPathCount": 11,
         "intelligencePublishPathCount": 0,
-        "totalPublishPathCount": 0
+        "totalPublishPathCount": 11
       },
       {
         "sport": "nba",
         "rootPrefix": "data/nba_source/",
-        "forcedPublishPathCount": 0,
+        "forcedPublishPathCount": 11,
         "intelligencePublishPathCount": 0,
-        "totalPublishPathCount": 0
+        "totalPublishPathCount": 11
       },
       {
         "sport": "wnba",
         "rootPrefix": "data/wnba_source/",
-        "forcedPublishPathCount": 29,
+        "forcedPublishPathCount": 32,
         "intelligencePublishPathCount": 0,
-        "totalPublishPathCount": 29
+        "totalPublishPathCount": 32
       },
       {
         "sport": "nhl",
         "rootPrefix": "data/nhl_source/",
-        "forcedPublishPathCount": 0,
+        "forcedPublishPathCount": 7,
         "intelligencePublishPathCount": 0,
-        "totalPublishPathCount": 0
+        "totalPublishPathCount": 7
       },
       {
         "sport": "nfl",
         "rootPrefix": "data/nfl_source/",
-        "forcedPublishPathCount": 0,
+        "forcedPublishPathCount": 7,
         "intelligencePublishPathCount": 0,
-        "totalPublishPathCount": 0
+        "totalPublishPathCount": 7
       },
       {
         "sport": "ncaaf",
@@ -64,6 +64,128 @@
   },
   "sports": [
     {
+      "sport": "mlb",
+      "ok": true,
+      "generation_mode": "local_artifact_bundle",
+      "ingestion_mode": "mirror_script",
+      "source_repo": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source",
+      "source_root_env_var": "SYNDICATE_SOURCE_ROOT_MLB",
+      "artifact_paths": [
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate"
+      ],
+      "post_refresh_ok": true,
+      "mirror_ok": true,
+      "odds_history": {
+        "sport": "mlb",
+        "candidate_paths": [
+          "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\odds_control_plane\\odds_history\\mlb\\odds_history.json",
+          "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\artifacts\\mlb\\odds_history.json",
+          "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\tracking\\odds_history.json"
+        ],
+        "active_path": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\odds_control_plane\\odds_history\\mlb\\odds_history.json",
+        "has_payload": true,
+        "source_precedence": [
+          "shared_history",
+          "artifact_history",
+          "tracking_history"
+        ]
+      }
+    },
+    {
+      "sport": "nba",
+      "ok": true,
+      "generation_mode": "local_artifact_bundle",
+      "ingestion_mode": "mirror_script",
+      "source_repo": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nba_source",
+      "source_root_env_var": "SYNDICATE_SOURCE_ROOT_NBA",
+      "artifact_paths": [
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate",
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nba_source\\source_artifacts\\data\\processed\\boxscores_history.csv",
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nba_source\\source_artifacts\\data\\processed\\team_advanced_stats_2025.csv",
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nba_source\\source_artifacts\\data\\processed\\team_advanced_stats_2025_asof_2026-06-03.csv",
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nba_source\\source_artifacts\\data\\processed\\team_advanced_stats_2026.csv",
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nba_source\\source_artifacts\\data\\processed\\team_advanced_stats_2026_asof_20260530.csv",
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nba_source\\data\\processed\\props_edges_2026-07-09.csv",
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nba_source\\data\\processed\\props_predictions_2026-07-09.csv",
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nba_source\\data\\processed\\props_recommendations_2026-07-09.csv",
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nba_source\\data\\processed\\oddsapi_player_props_2026-07-09.csv",
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nba_source\\data\\raw\\odds_nba_player_props_2026-07-09.csv"
+      ],
+      "post_refresh_ok": true,
+      "mirror_ok": true,
+      "odds_history": {
+        "sport": "nba",
+        "candidate_paths": [
+          "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\odds_control_plane\\odds_history\\nba\\odds_history.json",
+          "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nba_source\\artifacts\\nba\\odds_history.json",
+          "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nba_source\\tracking\\odds_history.json"
+        ],
+        "active_path": null,
+        "has_payload": false,
+        "source_precedence": [
+          "shared_history",
+          "artifact_history",
+          "tracking_history"
+        ]
+      }
+    },
+    {
+      "sport": "nhl",
+      "ok": true,
+      "generation_mode": "local_artifact_bundle",
+      "ingestion_mode": "mirror_script",
+      "source_repo": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nhl_source",
+      "source_root_env_var": "SYNDICATE_SOURCE_ROOT_NHL",
+      "artifact_paths": [
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate"
+      ],
+      "post_refresh_ok": true,
+      "mirror_ok": true,
+      "odds_history": {
+        "sport": "nhl",
+        "candidate_paths": [
+          "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\odds_control_plane\\odds_history\\nhl\\odds_history.json",
+          "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nhl_source\\artifacts\\nhl\\odds_history.json",
+          "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nhl_source\\tracking\\odds_history.json"
+        ],
+        "active_path": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\odds_control_plane\\odds_history\\nhl\\odds_history.json",
+        "has_payload": true,
+        "source_precedence": [
+          "shared_history",
+          "artifact_history",
+          "tracking_history"
+        ]
+      }
+    },
+    {
+      "sport": "nfl",
+      "ok": true,
+      "generation_mode": "source_repo",
+      "ingestion_mode": "mirror_script",
+      "source_repo": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nfl_source",
+      "source_root_env_var": "SYNDICATE_SOURCE_ROOT_NFL",
+      "artifact_paths": [
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate"
+      ],
+      "post_refresh_ok": true,
+      "mirror_ok": true,
+      "odds_history": {
+        "sport": "nfl",
+        "candidate_paths": [
+          "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\odds_control_plane\\odds_history\\nfl\\odds_history.json",
+          "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nfl_source\\artifacts\\nfl\\odds_history.json",
+          "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nfl_source\\tracking\\odds_history.json"
+        ],
+        "active_path": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\odds_control_plane\\odds_history\\nfl\\odds_history.json",
+        "has_payload": true,
+        "source_precedence": [
+          "shared_history",
+          "artifact_history",
+          "tracking_history"
+        ]
+      }
+    },
+    {
       "sport": "wnba",
       "ok": true,
       "generation_mode": "local_artifact_bundle",
@@ -73,29 +195,32 @@
       "artifact_paths": [
         "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate",
         "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\boxscores_history.csv",
-        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\cards_props_snapshot_2026-07-08.json",
-        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\cards_sim_detail_2026-07-08.json",
-        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\props_edges_2026-07-08.csv",
-        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\game_cards_2026-07-08.csv",
-        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\live_lens_projections_2026-07-08.jsonl",
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\cards_props_snapshot_2026-07-09.json",
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\cards_sim_detail_2026-07-09.json",
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\props_edges_2026-07-09.csv",
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\game_cards_2026-07-09.csv",
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\live_lens_projections_2026-07-09.jsonl",
         "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\live_lens\\live_lens_tuning_override.json",
         "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\live_lens_tuning_override.json",
-        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\props_predictions_2026-07-08.csv",
-        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\recommendations_slate_2026-07-08.json",
-        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\props_recommendations_2026-07-08.csv",
-        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-07-08_CON_MIN.json",
-        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-07-08_LAS_IND.json",
-        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-07-08_TOR_GSV.json",
-        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\oddsapi_player_props_2026-07-08.csv",
-        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\raw\\odds_wnba_player_props_2026-07-08.csv",
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\live_snapshots\\live_pbp_stats_2026-07-09.jsonl",
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\live_snapshots\\live_player_lens_2026-07-09.jsonl",
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\live_snapshots\\live_state_2026-07-09.jsonl",
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\props_predictions_2026-07-09.csv",
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\recommendations_slate_2026-07-09.json",
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\props_recommendations_2026-07-09.csv",
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-07-09_ATL_SEA.json",
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-07-09_PHX_IND.json",
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-07-09_POR_LVA.json",
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\oddsapi_player_props_2026-07-09.csv",
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\raw\\odds_wnba_player_props_2026-07-09.csv",
         "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\team_advanced_stats_2026.csv",
         "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\team_advanced_stats_2026_asof_20260530.csv",
-        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\props_recommendations_top_by_game_2026-07-08.json",
-        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\wnba_source\\data\\processed\\props_edges_2026-07-08.csv",
-        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\wnba_source\\data\\processed\\props_predictions_2026-07-08.csv",
-        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\wnba_source\\data\\processed\\props_recommendations_2026-07-08.csv",
-        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\wnba_source\\data\\processed\\oddsapi_player_props_2026-07-08.csv",
-        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\wnba_source\\data\\raw\\odds_wnba_player_props_2026-07-08.csv"
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\props_recommendations_top_by_game_2026-07-09.json",
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\wnba_source\\data\\processed\\props_edges_2026-07-09.csv",
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\wnba_source\\data\\processed\\props_predictions_2026-07-09.csv",
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\wnba_source\\data\\processed\\props_recommendations_2026-07-09.csv",
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\wnba_source\\data\\processed\\oddsapi_player_props_2026-07-09.csv",
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\wnba_source\\data\\raw\\odds_wnba_player_props_2026-07-09.csv"
       ],
       "post_refresh_ok": true,
       "mirror_ok": true,
@@ -114,6 +239,62 @@
           "tracking_history"
         ]
       }
+    },
+    {
+      "sport": "ncaab",
+      "ok": false,
+      "generation_mode": "local_raw_outputs",
+      "ingestion_mode": "mirror_script",
+      "source_repo": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\ncaab_source",
+      "source_root_env_var": "SYNDICATE_SOURCE_ROOT_NCAAB",
+      "artifact_paths": [
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate"
+      ],
+      "post_refresh_ok": null,
+      "mirror_ok": null,
+      "odds_history": {
+        "sport": "ncaab",
+        "candidate_paths": [
+          "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\odds_control_plane\\odds_history\\ncaab\\odds_history.json",
+          "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\ncaab_source\\artifacts\\ncaab\\odds_history.json",
+          "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\ncaab_source\\tracking\\odds_history.json"
+        ],
+        "active_path": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\odds_control_plane\\odds_history\\ncaab\\odds_history.json",
+        "has_payload": true,
+        "source_precedence": [
+          "shared_history",
+          "artifact_history",
+          "tracking_history"
+        ]
+      }
+    },
+    {
+      "sport": "ncaaf",
+      "ok": false,
+      "generation_mode": "local_artifact_bundle",
+      "ingestion_mode": "mirror_script",
+      "source_repo": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\ncaaf_source",
+      "source_root_env_var": "SYNDICATE_SOURCE_ROOT_NCAAF",
+      "artifact_paths": [
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate"
+      ],
+      "post_refresh_ok": null,
+      "mirror_ok": null,
+      "odds_history": {
+        "sport": "ncaaf",
+        "candidate_paths": [
+          "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\odds_control_plane\\odds_history\\ncaaf\\odds_history.json",
+          "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\ncaaf_source\\artifacts\\ncaaf\\odds_history.json",
+          "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\ncaaf_source\\tracking\\odds_history.json"
+        ],
+        "active_path": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\odds_control_plane\\odds_history\\ncaaf\\odds_history.json",
+        "has_payload": true,
+        "source_precedence": [
+          "shared_history",
+          "artifact_history",
+          "tracking_history"
+        ]
+      }
     }
   ],
   "source_precedence": [
@@ -121,5 +302,5 @@
     "artifact_history",
     "tracking_history"
   ],
-  "summary_ok": true
+  "summary_ok": false
 }
