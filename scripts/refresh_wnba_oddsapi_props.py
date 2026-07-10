@@ -30,6 +30,7 @@ from syndicate.features.shared.basketball_props_predictions import export_props_
 from syndicate.features.shared.basketball_props_recommendations import export_props_recommendations_local
 from syndicate.features.shared.basketball_props_smart_sim import _to_tricode_local
 from syndicate.features.shared.memory_observability import log_dataframe_memory
+from syndicate.features.shared.memory_observability import log_list_memory
 from syndicate.features.shared.memory_observability import log_runtime_memory
 from syndicate.features.shared.refresh_state_store import build_input_hash
 from syndicate.features.shared.refresh_state_store import path_fingerprint
@@ -3440,6 +3441,8 @@ def _materialize_local_boxscore_cache_for_player_artifacts(*, processed_root: Pa
                     "nameI": player_name,
                 }
             )
+    log_list_memory("refresh_wnba_oddsapi_props.rows_by_game_keys", list(rows_by_game.keys()))
+    log_list_memory("refresh_wnba_oddsapi_props.rows_by_game_values", [row for group in rows_by_game.values() for row in group])
 
     if not rows_by_game:
         return 0
@@ -4386,6 +4389,7 @@ def main() -> int:
                 },
             )
         states.append(state)
+    log_list_memory("refresh_wnba_oddsapi_props.states", states)
     state = states[0] if states else {"date": str(args.date), "error": "no refresh states generated"}
     if len(states) > 1:
         state["lookahead_runs"] = states[1:]
