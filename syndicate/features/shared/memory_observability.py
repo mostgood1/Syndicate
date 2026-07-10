@@ -87,6 +87,15 @@ def _read_container_memory_current_bytes() -> int | None:
     return None
 
 
+def _process_cmdline(value: Any) -> list[str]:
+    if not value:
+        return []
+    try:
+        return [str(item) for item in value]
+    except Exception:
+        return []
+
+
 def get_process_tree_memory_snapshot() -> dict[str, Any]:
     self_rss_bytes = _current_process_rss_bytes()
     children: list[dict[str, Any]] = []
@@ -131,6 +140,56 @@ def get_process_tree_memory_snapshot() -> dict[str, Any]:
     }
 
 
+def get_all_process_memory_snapshot() -> dict[str, Any]:
+    processes: list[dict[str, Any]] = []
+    accounted_rss_bytes = 0
+
+    if psutil is not None:
+        try:
+            for process in psutil.process_iter(attrs=["pid", "ppid", "name", "cmdline", "memory_info"]):
+                info = process.info
+                memory_info = info.get("memory_info")
+                rss_bytes = None
+                try:
+                    rss_value = getattr(memory_info, "rss", None) if memory_info is not None else None
+                    if rss_value is not None:
+                        rss_bytes = int(rss_value)
+                except Exception:
+                    rss_bytes = None
+
+                if isinstance(rss_bytes, int):
+                    accounted_rss_bytes += rss_bytes
+
+                processes.append(
+                    {
+                        "pid": int(info.get("pid") or getattr(process, "pid", -1) or -1),
+                        "ppid": int(info.get("ppid") or -1),
+                        "name": str(info.get("name") or ""),
+                        "cmdline": _process_cmdline(info.get("cmdline")),
+                        "rss_mb": _bytes_to_mb(rss_bytes),
+                        "_rss_bytes": rss_bytes,
+                    }
+                )
+        except Exception as exc:
+            processes.append({"pid": None, "ppid": None, "name": None, "cmdline": [], "rss_mb": None, "error": f"{type(exc).__name__}: {exc}"})
+
+    processes.sort(key=lambda item: int(item.get("_rss_bytes") or 0), reverse=True)
+    for process in processes:
+        process.pop("_rss_bytes", None)
+
+    container_memory_bytes = _read_container_memory_current_bytes()
+    payload = {
+        "process_count": len(processes),
+        "accounted_rss_mb": _bytes_to_mb(accounted_rss_bytes),
+        "container_memory_mb": _bytes_to_mb(container_memory_bytes),
+        "unexplained_memory_mb": None,
+        "processes": processes,
+    }
+    if isinstance(container_memory_bytes, int):
+        payload["unexplained_memory_mb"] = _bytes_to_mb(container_memory_bytes - accounted_rss_bytes)
+    return payload
+
+
 def log_process_tree_memory(stage: str, **extra: Any) -> dict[str, Any]:
     payload = {"stage": str(stage or "").strip() or "unknown"}
     payload.update(extra)
@@ -147,6 +206,14 @@ def log_container_memory(stage: str, **extra: Any) -> dict[str, Any]:
     }
     payload.update(extra)
     print(f"CONTAINER_MEMORY {json.dumps(payload, default=str, sort_keys=True)}", file=sys.stderr, flush=True)
+    return payload
+
+
+def log_all_process_memory(stage: str, **extra: Any) -> dict[str, Any]:
+    payload = {"stage": str(stage or "").strip() or "unknown"}
+    payload.update(extra)
+    payload.update(get_all_process_memory_snapshot())
+    print(f"ALL_PROCESS_MEMORY {json.dumps(payload, default=str, sort_keys=True)}", file=sys.stderr, flush=True)
     return payload
 
 

@@ -1,3 +1,10 @@
+# 2026-07-09 - Refresh container memory accounting now logs all visible processes
+- Symptom: The latest Render odds-refresh run showed a ~450-470 MB gap between container memory and the observed refresh process tree while child_count stayed 0.
+- Root cause: The existing probes only sampled the refresh process tree, so they could not account for web-service peers, sidecars, or other visible container processes.
+- Fix: Add an ALL_PROCESS_MEMORY snapshot helper that enumerates every visible process with pid, ppid, name, cmdline, rss_mb, plus accounted_rss_mb, container_memory_mb, and unexplained_memory_mb; wire it into refresh startup, before MLB/WNBA launch, a 60-second heartbeat, and exit.
+- Validation: `syndicate/features/shared/memory_observability.py`, `scripts/refresh_odds_sources.py`, and `scripts/run_live_odds_refresh_worker.py` passed error checks after the patch.
+- Follow-up: Re-run the Render refresh and use the new ALL_PROCESS_MEMORY snapshots to identify the hidden RSS owner instead of inferring from the process tree alone.
+
 # 2026-07-09 - Live odds worker RSS logs were parent-only while WNBA could exceed the container through child work
 - Symptom: Render restarted the live odds worker during MLB + WNBA refreshes even though the parent RSS logs stayed around 89-92 MB and no large Python object growth was visible in the parent.
 - Root cause: The launcher and worker memory probes only sampled the current process (`psutil.Process().memory_info().rss`), while `refresh_odds_sources.py` can run sports in parallel and `refresh_wnba_oddsapi_props.py` can fan out WNBA smart-sim work into a `ProcessPoolExecutor`; the container can OOM on child-process RSS that the parent never records.

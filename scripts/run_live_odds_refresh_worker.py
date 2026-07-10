@@ -26,6 +26,7 @@ from syndicate.features.shared.live_refresh_loop import _acquire_process_lock
 from syndicate.features.shared.live_refresh_loop import _release_process_lock
 from syndicate.features.shared.live_refresh_loop import _LIVE_REFRESH_LOOP_STOP
 from syndicate.features.shared.refresh_state_store import assert_refresh_state_backend_ready
+from syndicate.features.shared.memory_observability import log_all_process_memory
 from syndicate.features.shared.memory_observability import log_runtime_memory
 from vendor.mlb_bettingv2.tools.web.flask_frontend import start_live_lens_background_loop
 
@@ -161,6 +162,7 @@ def _start_live_lens_reports() -> None:
 
 def main() -> int:
     _log_worker_memory("startup", argv=list(sys.argv), pid=os.getpid())
+    log_all_process_memory("startup", worker="run_live_odds_refresh_worker", pid=os.getpid(), argv=list(sys.argv))
     log_runtime_memory("startup", worker="run_live_odds_refresh_worker", pid=os.getpid(), argv=list(sys.argv))
     assert_refresh_state_backend_ready(process_name="live-odds-worker")
     parser = argparse.ArgumentParser(description="Run the Syndicate live odds refresh worker loop.")
@@ -168,6 +170,7 @@ def main() -> int:
     args = parser.parse_args()
 
     def _emit_exit_memory() -> None:
+        log_all_process_memory("before_exit", worker="run_live_odds_refresh_worker", pid=os.getpid())
         log_runtime_memory("before_exit", worker="run_live_odds_refresh_worker", pid=os.getpid())
 
     atexit.register(_emit_exit_memory)

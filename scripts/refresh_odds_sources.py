@@ -51,6 +51,7 @@ from syndicate.features.shared.publish_parity import build_publish_parity_summar
 from syndicate.features.shared.odds_refresh_tracking import sync_sport_post_refresh_tracking
 from syndicate.features.shared.manifest import publish_sport_manifest
 from syndicate.features.shared.refresh_state_store import data_root
+from syndicate.features.shared.memory_observability import log_all_process_memory
 from syndicate.features.shared.memory_observability import log_runtime_memory
 from syndicate.features.mlb.sources import available_daily_summary_dates as mlb_available_daily_summary_dates
 from syndicate.features.nba.sources import available_dates as nba_available_dates
@@ -68,9 +69,11 @@ _PUBLISH_MANIFEST_LOCK = Lock()
 _DEFAULT_INTERVAL_MARKETS = "h2h,spreads,totals,spreads_h1,totals_h1,spreads_h2,totals_h2"
 _WNBA_PLAYER_PROP_MARKETS = "player_points,player_rebounds,player_assists,player_points_rebounds_assists,player_threes,player_steals,player_blocks,player_turnovers,player_points_rebounds,player_points_assists,player_rebounds_assists,player_double_double,player_triple_double"
 _DEFAULT_REFRESH_STEP_TIMEOUT_SECONDS = 1800
+_ALL_PROCESS_MEMORY_HEARTBEAT_SECONDS = 60
 _MEMORY_TRACE_LAST_RSS_BYTES: int | None = None
 _SPORT_REFRESH_REQUIRED_ARTIFACTS = ("snapshot", "snapshot_alias", "game_slate", "predictions", "board_contract", "manifest")
 _SPORT_REFRESH_OPTIONAL_ARTIFACTS = ("smart_sim", "recommendations", "edges", "live_lens", "advanced_analytics", "simulation_detail")
+_ALL_PROCESS_MEMORY_HEARTBEAT_STOP = threading.Event()
 
 
 def _parse_utc_timestamp(value: str | None) -> datetime | None:
@@ -420,6 +423,31 @@ def _start_json_watchdog(*, label: str, delay_seconds: int = 10) -> None:
         faulthandler.dump_traceback(file=sys.stderr, all_threads=True)
 
     threading.Thread(target=_watchdog, name=f"json-watchdog:{label}", daemon=True).start()
+
+
+def _stop_all_process_memory_heartbeat() -> None:
+    _ALL_PROCESS_MEMORY_HEARTBEAT_STOP.set()
+
+
+def _start_all_process_memory_heartbeat(*, label: str, interval_seconds: int = _ALL_PROCESS_MEMORY_HEARTBEAT_SECONDS) -> None:
+    if interval_seconds <= 0:
+        return
+
+    started_at = _utc_now()
+
+    def _heartbeat() -> None:
+        next_tick = time.monotonic() + interval_seconds
+        while not _ALL_PROCESS_MEMORY_HEARTBEAT_STOP.wait(max(0.0, next_tick - time.monotonic())):
+            log_all_process_memory(
+                "heartbeat",
+                label=label,
+                pid=os.getpid(),
+                started_at=started_at,
+                interval_seconds=int(interval_seconds),
+            )
+            next_tick += interval_seconds
+
+    threading.Thread(target=_heartbeat, name=f"all-process-memory-heartbeat:{label}", daemon=True).start()
 
 
 def _source_root_env_var(slug: str) -> str:
@@ -1774,8 +1802,16 @@ def _build_summary(args: argparse.Namespace) -> dict[str, Any]:
     max_workers = 1 if _serial_sport_refresh_enabled() else min(len(selected), 4)
     if max_workers <= 1:
         for sport in selected:
+            log_all_process_memory("before_sport_launch", sport=sport, execution_mode=execution_mode, concurrency="sequential")
             log_runtime_memory("before_sport_launch", sport=sport, execution_mode=execution_mode, concurrency="sequential")
             sport_result = _run_sport_refresh(args, sport, execution_mode)
+            log_all_process_memory(
+                "after_sport_launch",
+                sport=sport,
+                execution_mode=execution_mode,
+                concurrency="sequential",
+                ok=bool(sport_result.get("ok")) if isinstance(sport_result, dict) else None,
+            )
             log_runtime_memory(
                 "after_sport_launch",
                 sport=sport,
@@ -1796,6 +1832,7 @@ def _build_summary(args: argparse.Namespace) -> dict[str, Any]:
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             futures = {}
             for sport in selected:
+                log_all_process_memory("before_sport_launch", sport=sport, execution_mode=execution_mode, concurrency="parallel")
                 log_runtime_memory("before_sport_launch", sport=sport, execution_mode=execution_mode, concurrency="parallel")
                 futures[executor.submit(_run_sport_refresh, args, sport, execution_mode)] = sport
             for future in as_completed(futures):
@@ -1809,6 +1846,13 @@ def _build_summary(args: argparse.Namespace) -> dict[str, Any]:
                         "error": f"{type(exc).__name__}: {exc}",
                     }
                 results_by_sport[sport] = sport_result
+                log_all_process_memory(
+                    "after_sport_launch",
+                    sport=sport,
+                    execution_mode=execution_mode,
+                    concurrency="parallel",
+                    ok=bool(sport_result.get("ok")) if isinstance(sport_result, dict) else None,
+                )
                 log_runtime_memory(
                     "after_sport_launch",
                     sport=sport,
@@ -1894,11 +1938,14 @@ def main() -> int:
     startup_memory = _phase_memory_snapshot()
 
     def _emit_child_exit() -> None:
+        _stop_all_process_memory_heartbeat()
         print(f"CHILD_PROCESS_EXIT ts={_utc_now()} pid={child_pid} ppid={os.getppid()}", file=sys.stderr, flush=True)
         _dump_main_thread_stack(label="child_exit")
         _dump_child_runtime_state(label="atexit")
 
     def _emit_exit_memory() -> None:
+        _stop_all_process_memory_heartbeat()
+        log_all_process_memory("before_exit", script="refresh_odds_sources", pid=child_pid)
         log_runtime_memory("before_exit", script="refresh_odds_sources", pid=child_pid)
 
     atexit.register(_emit_child_exit)
@@ -1954,7 +2001,9 @@ def main() -> int:
 
     try:
         _log_memory("startup", child_pid=child_pid, argv=list(sys.argv), before=startup_memory, after=_phase_memory_snapshot())
+        log_all_process_memory("startup", script="refresh_odds_sources", pid=child_pid, argv=list(sys.argv))
         log_runtime_memory("startup", script="refresh_odds_sources", pid=child_pid, argv=list(sys.argv))
+        _start_all_process_memory_heartbeat(label="refresh_odds_sources")
         summary = _build_summary(args)
     except Exception as exc:
         payload = {"ok": False, "error": f"{type(exc).__name__}: {exc}"}
