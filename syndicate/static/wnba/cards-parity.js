@@ -4145,7 +4145,9 @@
           { label: 'EV', value: fmtPercentValue(row.evPct), tone: Number(row.evPct) >= 0 ? 'is-positive' : 'is-negative' },
         ];
       const cardLabel = isLiveRow ? 'Live player prop' : `${row.teamTri} prop`;
-      const footLeft = row.summary || `${row.teamTri} · ${fmtAmerican(row.price)} ${row.book || ''}`.trim();
+      const confidence = String(row.confidence || row.tier || row.klass || '').trim();
+      const whyText = String(row.why || row.summary || '').trim();
+      const footLeft = whyText || row.summary || `${row.teamTri} · ${fmtAmerican(row.price)} ${row.book || ''}`.trim();
       const footRight = isLiveRow
         ? `${liveRowFreshnessText(row, row.statusLabel || 'Live')}`
         : `${row.teamTri} | ${row.marketLabel}`;
@@ -4167,6 +4169,7 @@
               </div>
             `).join('')}
           </div>
+          ${confidence ? `<div class="cards-callout-copy">Confidence ${escapeHtml(confidence)}</div>` : ''}
           <div class="cards-prop-overview-foot">
             <span>${escapeHtml(footLeft)}</span>
             <span>${escapeHtml(footRight)}</span>
@@ -5546,12 +5549,15 @@
       <div class="cards-prop-list">
         ${rows.map((row) => {
           const tierClass = row.bucket === 'official' ? 'is-official' : (row.bucket === 'live' ? 'is-live' : 'is-candidate');
+          const confidence = String(row.confidence || row.tier || row.klass || '').trim();
+          const whyText = String(row.why || row.summary || row.basketball_summary || '').trim();
           const supportingCopy = row.bucket === 'live'
             ? `${row.teamTri} | ${row.statusLabel || 'Live'}${Number.isFinite(row.liveEdge) ? ` | ${fmtSigned(row.liveEdge, 1)}` : ''}`
-            : `${row.teamTri} | ${fmtAmerican(row.price)} ${row.book || ''}`.trim();
+            : [row.teamTri, confidence ? `Confidence ${confidence}` : '', whyText || `${fmtAmerican(row.price)} ${row.book || ''}`.trim()].filter(Boolean).join(' | ');
           return `
             <button class="cards-prop-button ${tierClass} ${selectedKey === row.key ? 'is-active' : ''}" type="button" data-prop-select="${escapeHtml(row.key)}" data-card-target="${escapeHtml(cardId(game))}">
               <div class="cards-prop-button-main">${escapeHtml(row.player || 'Player')} ${escapeHtml(row.marketLabel)} ${escapeHtml(row.side)} ${fmtNumber(row.line, 1)}</div>
+              ${whyText ? `<div class="cards-callout-copy">${escapeHtml(`Why this pick: ${whyText}`)}</div>` : ''}
               <small>${escapeHtml(supportingCopy)}</small>
             </button>
           `;
