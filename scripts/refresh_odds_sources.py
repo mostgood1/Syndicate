@@ -1207,7 +1207,122 @@ def _compact_step_result(step_result: dict[str, Any]) -> None:
         step_result["stdout"] = ""
     if isinstance(step_result.get("stderr"), str):
         step_result["stderr"] = ""
-    
+
+
+def _compact_step_result_view(step_result: dict[str, Any] | None) -> dict[str, Any] | None:
+    if not isinstance(step_result, dict):
+        return None
+    compact = {
+        "name": step_result.get("name"),
+        "return_code": step_result.get("return_code"),
+        "ok": bool(step_result.get("ok")),
+        "dry_run": bool(step_result.get("dry_run")),
+        "started_at": step_result.get("started_at"),
+        "finished_at": step_result.get("finished_at"),
+    }
+    row_counts = step_result.get("row_counts")
+    if isinstance(row_counts, dict) and row_counts:
+        compact["row_counts"] = row_counts
+    rows_loaded = _step_rows_loaded(step_result)
+    if rows_loaded is not None:
+        compact["rows_loaded"] = rows_loaded
+    if step_result.get("description"):
+        compact["description"] = step_result.get("description")
+    return compact
+
+
+def _compact_artifact_paths(value: Any) -> list[str]:
+    compact: list[str] = []
+    seen: set[str] = set()
+    if isinstance(value, (list, tuple, set)):
+        for item in value:
+            path_text = str(item or "").strip()
+            if not path_text or path_text in seen:
+                continue
+            seen.add(path_text)
+            compact.append(path_text)
+    return compact
+
+
+def _compact_sport_result(sport_result: dict[str, Any]) -> dict[str, Any]:
+    artifact_paths = _compact_artifact_paths(sport_result.get("artifact_paths"))
+    refresh_steps = sport_result.get("refresh_steps") if isinstance(sport_result.get("refresh_steps"), list) else []
+    compact_refresh_steps = [item for item in (_compact_step_result_view(step) for step in refresh_steps) if isinstance(item, dict)]
+
+    compact_generation: dict[str, Any] = {}
+    generation = sport_result.get("generation") if isinstance(sport_result.get("generation"), dict) else {}
+    if isinstance(generation, dict):
+        for key in ("kind", "source_dependency", "hosted_safe", "source_repo"):
+            if key in generation:
+                compact_generation[key] = generation.get(key)
+    compact_generation["steps"] = compact_refresh_steps
+    post_refresh = sport_result.get("post_refresh")
+    if isinstance(post_refresh, dict):
+        compact_post_refresh = {
+            "name": post_refresh.get("name"),
+            "ok": bool(post_refresh.get("ok")),
+            "dry_run": bool(post_refresh.get("dry_run")),
+            "return_code": post_refresh.get("return_code"),
+        }
+        if post_refresh.get("meta"):
+            compact_post_refresh["meta"] = post_refresh.get("meta")
+        compact_generation["post_refresh"] = compact_post_refresh
+    ingestion = sport_result.get("ingestion") if isinstance(sport_result.get("ingestion"), dict) else None
+    compact_ingestion: dict[str, Any] | None = None
+    if isinstance(ingestion, dict):
+        compact_ingestion = {}
+        for key in ("kind", "source_dependency", "hosted_safe", "contract"):
+            if key in ingestion:
+                compact_ingestion[key] = ingestion.get(key)
+        if ingestion.get("step"):
+            compact_ingestion["step"] = _compact_step_result_view(ingestion.get("step"))
+
+    mirror = sport_result.get("mirror")
+    compact_mirror = _compact_step_result_view(mirror if isinstance(mirror, dict) else None)
+    sport_manifest = sport_result.get("sport_manifest") if isinstance(sport_result.get("sport_manifest"), dict) else None
+    compact_manifest = None
+    if isinstance(sport_manifest, dict):
+        compact_manifest = {
+            "path": sport_manifest.get("path"),
+            "artifact_count": len(artifact_paths),
+        }
+
+    compact_result: dict[str, Any] = {
+        "sport": sport_result.get("sport"),
+        "source_repo": sport_result.get("source_repo"),
+        "source_root_origin": sport_result.get("source_root_origin"),
+        "source_root_exists": bool(sport_result.get("source_root_exists")),
+        "source_root_env_var": sport_result.get("source_root_env_var"),
+        "notes": sport_result.get("notes"),
+        "generation_mode": sport_result.get("generation_mode"),
+        "ingestion_mode": sport_result.get("ingestion_mode"),
+        "ok": bool(sport_result.get("ok")),
+        "artifact_paths": artifact_paths,
+        "refresh_steps": compact_refresh_steps,
+        "generation": compact_generation,
+        "mirror": compact_mirror,
+    }
+    for key in ("error", "warning", "warnings", "required_artifact_failures", "optional_artifact_failures"):
+        if key in sport_result and sport_result.get(key) is not None:
+            compact_result[key] = sport_result.get(key)
+    if compact_ingestion is not None:
+        compact_result["ingestion"] = compact_ingestion
+    if compact_manifest is not None:
+        compact_result["sport_manifest"] = compact_manifest
+    if sport_result.get("post_refresh") is not None:
+        compact_result["post_refresh"] = _compact_step_result_view(sport_result.get("post_refresh"))
+    if sport_result.get("rows_loaded") is not None:
+        compact_result["rows_loaded"] = sport_result.get("rows_loaded")
+    return compact_result
+
+
+def _finalize_sport_result(sport_result: dict[str, Any]) -> dict[str, Any]:
+    compacted_sport_result = _compact_sport_result(sport_result)
+    sport_result.clear()
+    sport_result.update(compacted_sport_result)
+    del compacted_sport_result
+    gc.collect()
+    return sport_result
 
 
 def _sync_post_refresh_tracking_step(*, sport: str, source_root: Path, date_str: str, dry_run: bool = False) -> dict[str, Any]:
@@ -1269,6 +1384,12 @@ def _sync_post_refresh_tracking_step(*, sport: str, source_root: Path, date_str:
 
 
 def _sport_artifact_paths(sport_result: dict[str, Any]) -> list[str]:
+    explicit_paths = sport_result.get("artifact_paths") if isinstance(sport_result, dict) else None
+    if isinstance(explicit_paths, (list, tuple, set)):
+        compact_paths = _compact_artifact_paths(explicit_paths)
+        if compact_paths:
+            return compact_paths
+
     paths: list[str] = []
     seen: set[str] = set()
 
@@ -1598,7 +1719,7 @@ def _run_sport_refresh(args: argparse.Namespace, sport: str, execution_mode: str
                 before=sport_start_memory,
                 after=_phase_memory_snapshot(),
             )
-            return sport_result
+            return _finalize_sport_result(sport_result)
 
     for step in refresh_steps:
         step_result = _run_command(
@@ -1643,7 +1764,7 @@ def _run_sport_refresh(args: argparse.Namespace, sport: str, execution_mode: str
                     before=sport_start_memory,
                     after=_phase_memory_snapshot(),
                 )
-                return sport_result
+                return _finalize_sport_result(sport_result)
 
     if refresh_mode == "fast":
         published_manifest = _publish_sport_manifest_threadsafe(
@@ -1669,7 +1790,7 @@ def _run_sport_refresh(args: argparse.Namespace, sport: str, execution_mode: str
             before=sport_start_memory,
             after=_phase_memory_snapshot(),
         )
-        return sport_result
+        return _finalize_sport_result(sport_result)
 
     if execution_mode == "source" and spec.slug in {"mlb", "nba", "wnba", "nhl", "nfl", "ncaab", "ncaaf"} and sport_result["ok"]:
         tracking_result = _sync_post_refresh_tracking_step(
@@ -1695,7 +1816,7 @@ def _run_sport_refresh(args: argparse.Namespace, sport: str, execution_mode: str
                     before=sport_start_memory,
                     after=_phase_memory_snapshot(),
                 )
-                return sport_result
+                return _finalize_sport_result(sport_result)
 
     if not args.skip_mirror and (execution_mode == "ingest" or sport_result["ok"]):
         if _hosted_source_mode_writes_directly(spec=spec, execution_mode=execution_mode, mirror_only=execution_mode == "ingest"):
@@ -1743,7 +1864,7 @@ def _run_sport_refresh(args: argparse.Namespace, sport: str, execution_mode: str
                     before=sport_start_memory,
                     after=_phase_memory_snapshot(),
                 )
-                return sport_result
+                return _finalize_sport_result(sport_result)
 
     published_manifest = _publish_sport_manifest_threadsafe(
         sport=spec.slug,
@@ -1769,6 +1890,8 @@ def _run_sport_refresh(args: argparse.Namespace, sport: str, execution_mode: str
         before=sport_start_memory,
         after=_phase_memory_snapshot(),
     )
+    _finalize_sport_result(sport_result)
+    del published_manifest
     return sport_result
 
 
@@ -1823,7 +1946,10 @@ def _build_summary(args: argparse.Namespace) -> dict[str, Any]:
                 any_failure = True
             summary["results"].append(sport_result)
             _log_memory("summary_append_sequential", sport=sport, results_len=len(summary["results"]), result=_object_summary(sport_result, name="sport_result"))
-            if not args.continue_on_error and not sport_result.get("ok"):
+            sport_ok = bool(sport_result.get("ok"))
+            del sport_result
+            gc.collect()
+            if not args.continue_on_error and not sport_ok:
                 summary["finished_at"] = _utc_now()
                 summary["ok"] = False
                 return summary
@@ -1869,7 +1995,10 @@ def _build_summary(args: argparse.Namespace) -> dict[str, Any]:
                     result=_object_summary(sport_result, name="sport_result"),
                     rows_loaded=_sport_rows_loaded(sport_result) if isinstance(sport_result, dict) else None,
                 )
-                if not args.continue_on_error and not sport_result.get("ok"):
+                sport_ok = bool(sport_result.get("ok"))
+                del sport_result
+                gc.collect()
+                if not args.continue_on_error and not sport_ok:
                     break
 
         for sport in selected:
@@ -1885,7 +2014,10 @@ def _build_summary(args: argparse.Namespace) -> dict[str, Any]:
                 result=_object_summary(sport_result, name="sport_result"),
                 rows_loaded=_sport_rows_loaded(sport_result) if isinstance(sport_result, dict) else None,
             )
-            if not args.continue_on_error and not sport_result.get("ok"):
+            sport_ok = bool(sport_result.get("ok"))
+            del sport_result
+            gc.collect()
+            if not args.continue_on_error and not sport_ok:
                 summary["finished_at"] = _utc_now()
                 summary["ok"] = False
                 _log_memory(
@@ -1898,6 +2030,10 @@ def _build_summary(args: argparse.Namespace) -> dict[str, Any]:
                     after=_phase_memory_snapshot(),
                 )
                 return summary
+
+        results_by_sport.clear()
+        del results_by_sport
+        gc.collect()
 
     summary["finished_at"] = _utc_now()
     summary["ok"] = not any_failure
