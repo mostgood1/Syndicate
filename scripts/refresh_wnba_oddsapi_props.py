@@ -3014,6 +3014,7 @@ def _run_refresh_via_cli(
     )
     state["snapshot_alias_path"] = str(alias_path)
     state["snapshot_alias_rows"] = int(alias_rows)
+    if _env_bool("WNBA_ISOLATE_AFTER_SNAPSHOT", False): return state
     _append_log(log_file, f"Snapshot stage finished for {date_str}: rc_snapshot={state['rc_snapshot']}, rows={state['snapshot_rows']}, alias_rows={state['snapshot_alias_rows']}")
     if alias_error and int(state["snapshot_rows"] or 0) > 0:
         state["error"] = f"snapshot alias write failed: {alias_error}"
