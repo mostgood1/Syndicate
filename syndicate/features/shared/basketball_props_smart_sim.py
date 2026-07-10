@@ -4990,8 +4990,16 @@ def export_props_predictions_with_smart_sim_local(
         out_prefix="smart_sim",
         league_code=league_code,
     )
+    print(
+        f"SMART_SIM_RETURNED date={date_str} workers={int(smart_sim_workers)} n_sims={int(smart_sim_n_sims)}",
+        flush=True,
+    )
 
     sim_df = _load_sim_df(processed_root=processed_root, date_str=date_str, smart_sim_prefix="smart_sim")
+    print(
+        f"SMART_SIM_RESULT_LOAD_COMPLETE date={date_str} rows={0 if sim_df is None else len(sim_df.index)}",
+        flush=True,
+    )
     if sim_df is None or sim_df.empty:
         failures_path = processed_root / f"smart_sim_failures_{date_str}.csv"
         reason = f"SmartSim produced no player rows for {date_str}"
@@ -4999,5 +5007,9 @@ def export_props_predictions_with_smart_sim_local(
             reason = f"{reason}; see {failures_path.name}"
         raise RuntimeError(reason)
     preds = _merge_smart_sim_into_preds(preds=preds, sim_df=sim_df)
+    print(
+        f"SMART_SIM_MERGE_COMPLETE date={date_str} rows={len(preds.index)}",
+        flush=True,
+    )
     preds.to_csv(written_path, index=False)
     return int(len(preds.index)), written_path
