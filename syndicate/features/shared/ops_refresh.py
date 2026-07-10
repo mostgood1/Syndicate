@@ -378,18 +378,39 @@ def _latest_refresh_manifest_context() -> dict[str, Any]:
     artifacts_dir_raw = str(manifest.get("artifactsDir") or "").strip()
     artifacts_dir = Path(artifacts_dir_raw) if artifacts_dir_raw else None
     run_summary_path = Path(str(manifest.get("runSummaryPath") or "").strip()) if str(manifest.get("runSummaryPath") or "").strip() else None
+    run_summary = None
     if run_summary_path is None and artifacts_dir is not None:
         run_summary_path = artifacts_dir / "refresh_and_gate_run.json"
+    if run_summary_path is not None:
+        run_summary = read_json_file(run_summary_path) or {}
+    consistency_error = None
+    if isinstance(manifest, dict) and run_summary_path is not None:
+        manifest_stamp = str(manifest.get("runStamp") or "").strip()
+        run_summary_stamp = str(run_summary.get("runStamp") or "").strip() if isinstance(run_summary, dict) else ""
+        if manifest_stamp and run_summary_stamp and manifest_stamp != run_summary_stamp:
+            consistency_error = (
+                "Inconsistent latest refresh artifacts: "
+                f"manifest runStamp {manifest_stamp} does not match run summary runStamp {run_summary_stamp}."
+            )
     return {
         "manifest_path": refresh_manifest_path,
         "manifest": manifest,
         "artifacts_dir": artifacts_dir,
         "run_summary_path": run_summary_path,
+        "run_summary": run_summary,
+        "consistency_error": consistency_error,
     }
+
+
+def _ensure_refresh_context_consistent(context: dict[str, Any]) -> None:
+    consistency_error = str(context.get("consistency_error") or "").strip()
+    if consistency_error:
+        raise ValueError(consistency_error)
 
 
 def _assert_no_active_refresh_run() -> None:
     context = _latest_refresh_manifest_context()
+    _ensure_refresh_context_consistent(context)
     manifest: dict[str, Any] = context["manifest"] if isinstance(context.get("manifest"), dict) else {}
     state = str(manifest.get("state") or "").strip().lower()
     pid_raw = manifest.get("pid")
@@ -445,18 +466,10 @@ def _assert_no_active_refresh_run() -> None:
 
 def _update_latest_state(*, state: str, exit_code: int | None = None, canceled_at: str | None = None, finished_at: str | None = None) -> dict[str, Any]:
     context = _latest_refresh_manifest_context()
+    _ensure_refresh_context_consistent(context)
     manifest_path: Path = context["manifest_path"]
     manifest: dict[str, Any] = context["manifest"]
     run_summary_path: Path | None = context["run_summary_path"]
-    manifest["state"] = state
-    if exit_code is not None:
-        manifest["exitCode"] = int(exit_code)
-    if canceled_at:
-        manifest["canceledAt"] = canceled_at
-        manifest["finishedAt"] = canceled_at
-    elif finished_at:
-        manifest["finishedAt"] = finished_at
-    write_json_file(manifest_path, manifest)
     if run_summary_path is not None:
         run_summary = read_json_file(run_summary_path) or {}
         run_summary["state"] = state
@@ -468,11 +481,21 @@ def _update_latest_state(*, state: str, exit_code: int | None = None, canceled_a
         elif finished_at:
             run_summary["finishedAt"] = finished_at
         write_json_file(run_summary_path, run_summary)
+    manifest["state"] = state
+    if exit_code is not None:
+        manifest["exitCode"] = int(exit_code)
+    if canceled_at:
+        manifest["canceledAt"] = canceled_at
+        manifest["finishedAt"] = canceled_at
+    elif finished_at:
+        manifest["finishedAt"] = finished_at
+    write_json_file(manifest_path, manifest)
     return manifest
 
 
 def cancel_latest_refresh_run() -> dict[str, Any]:
     context = _latest_refresh_manifest_context()
+    _ensure_refresh_context_consistent(context)
     manifest: dict[str, Any] = context["manifest"]
     manifest_state = str(manifest.get("state") or "").strip().lower()
     pid_raw = manifest.get("pid")
@@ -530,6 +553,7 @@ def load_latest_refresh_log(*, stream: str = "stderr") -> dict[str, Any]:
     if stream_key not in {"stdout", "stderr"}:
         raise ValueError("stream must be 'stdout' or 'stderr'.")
     context = _latest_refresh_manifest_context()
+    _ensure_refresh_context_consistent(context)
     manifest: dict[str, Any] = context["manifest"]
     artifacts_dir: Path | None = context["artifacts_dir"]
     if artifacts_dir is None:
@@ -911,7 +935,6 @@ def launch_refresh_run(
         "oddsRefreshStderrPath": str(odds_refresh_stderr_path),
         "externalRunner": external_runner,
     }
-    write_json_file(refresh_and_gate_run_path, run_summary)
 
     refresh_status_manifest = {
         "date": selected_date,
@@ -935,6 +958,7 @@ def launch_refresh_run(
         "state": "pending_external" if _is_external_runner_mode(launch_mode) else "running",
         "externalRunner": external_runner,
     }
+    write_json_file(refresh_and_gate_run_path, run_summary)
     write_json_file(refresh_status_manifest_path, refresh_status_manifest)
     write_json_file(refresh_status_latest_path, refresh_status_manifest)
 
@@ -976,11 +1000,11 @@ def launch_refresh_run(
         process.wait()
 
     refresh_status_manifest["pid"] = int(process.pid)
-    write_json_file(refresh_status_manifest_path, refresh_status_manifest)
-    write_json_file(refresh_status_latest_path, refresh_status_manifest)
 
     run_summary["pid"] = int(process.pid)
     write_json_file(refresh_and_gate_run_path, run_summary)
+    write_json_file(refresh_status_manifest_path, refresh_status_manifest)
+    write_json_file(refresh_status_latest_path, refresh_status_manifest)
 
     return {
         "ok": True,

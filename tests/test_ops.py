@@ -1375,6 +1375,104 @@ class OpsRefreshApiTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     ops_refresh._assert_no_active_refresh_run()
 
+    def test_latest_refresh_context_rejects_mismatched_run_stamp(self) -> None:
+        with TemporaryDirectory() as tmp_dir:
+            repo_root = Path(tmp_dir)
+            reports_root = repo_root / "reports"
+            latest_dir = reports_root / "refresh_status" / "latest"
+            run_dir = reports_root / "migration_runs" / "2026-05-22" / "odds_refresh_20260522_120000"
+            latest_dir.mkdir(parents=True, exist_ok=True)
+            run_dir.mkdir(parents=True, exist_ok=True)
+            run_summary_path = run_dir / "refresh_and_gate_run.json"
+            run_summary_path.write_text(json.dumps({"state": "running", "runStamp": "20260522_120000"}), encoding="utf-8")
+            (latest_dir / "refresh_status_latest.json").write_text(
+                json.dumps(
+                    {
+                        "date": "2026-05-22",
+                        "runStamp": "20260522_130000",
+                        "artifactsDir": str(run_dir),
+                        "runSummaryPath": str(run_summary_path),
+                        "state": "running",
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            with patch.dict(os.environ, {"SYNDICATE_REPORTS_ROOT": str(reports_root)}, clear=False), patch(
+                "syndicate.features.shared.ops_refresh.REPO_ROOT", repo_root
+            ):
+                from syndicate.features.shared import ops_refresh
+
+                context = ops_refresh._latest_refresh_manifest_context()
+                self.assertIsNotNone(context.get("consistency_error"))
+                self.assertIn("does not match", str(context.get("consistency_error")))
+                with self.assertRaises(ValueError):
+                    ops_refresh._ensure_refresh_context_consistent(context)
+
+    def test_latest_refresh_context_accepts_legacy_missing_run_stamp(self) -> None:
+        with TemporaryDirectory() as tmp_dir:
+            repo_root = Path(tmp_dir)
+            reports_root = repo_root / "reports"
+            latest_dir = reports_root / "refresh_status" / "latest"
+            run_dir = reports_root / "migration_runs" / "2026-05-22" / "odds_refresh_20260522_120000"
+            latest_dir.mkdir(parents=True, exist_ok=True)
+            run_dir.mkdir(parents=True, exist_ok=True)
+            run_summary_path = run_dir / "refresh_and_gate_run.json"
+            run_summary_path.write_text(json.dumps({"state": "running"}), encoding="utf-8")
+            (latest_dir / "refresh_status_latest.json").write_text(
+                json.dumps(
+                    {
+                        "date": "2026-05-22",
+                        "artifactsDir": str(run_dir),
+                        "runSummaryPath": str(run_summary_path),
+                        "state": "running",
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            with patch.dict(os.environ, {"SYNDICATE_REPORTS_ROOT": str(reports_root)}, clear=False), patch(
+                "syndicate.features.shared.ops_refresh.REPO_ROOT", repo_root
+            ):
+                from syndicate.features.shared import ops_refresh
+
+                context = ops_refresh._latest_refresh_manifest_context()
+                self.assertIsNone(context.get("consistency_error"))
+                ops_refresh._ensure_refresh_context_consistent(context)
+
+    def test_launch_refresh_run_publishes_run_summary_before_latest_pointer(self) -> None:
+        with TemporaryDirectory() as tmp_dir:
+            repo_root = Path(tmp_dir)
+            reports_root = repo_root / "reports"
+            call_order: list[str] = []
+
+            def _record_write(path: Path, payload: dict[str, object]) -> None:
+                call_order.append(path.name)
+
+            with patch.dict(os.environ, {"SYNDICATE_REPORTS_ROOT": str(reports_root)}, clear=False), patch(
+                "syndicate.features.shared.ops_refresh.REPO_ROOT", repo_root
+            ), patch(
+                "syndicate.features.shared.ops_refresh._assert_no_active_refresh_run"
+            ), patch(
+                "syndicate.features.shared.ops_refresh.write_json_file",
+                side_effect=_record_write,
+            ):
+                from syndicate.features.shared import ops_refresh
+
+                result = ops_refresh.launch_refresh_run(
+                    sports="mlb",
+                    phase="live",
+                    launch_mode="manifest_only",
+                    dry_run=True,
+                )
+
+            self.assertTrue(result["ok"])
+            self.assertGreaterEqual(len(call_order), 3)
+            self.assertEqual(
+                call_order[:3],
+                ["refresh_and_gate_run.json", "refresh_status_manifest.json", "refresh_status_latest.json"],
+            )
+
     def test_assert_no_active_refresh_run_heals_terminal_pending_external_contract(self) -> None:
         with TemporaryDirectory() as tmp_dir:
             repo_root = Path(tmp_dir)

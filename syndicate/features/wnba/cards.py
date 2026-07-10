@@ -4036,7 +4036,7 @@ def build_live_state_payload(selected_date: str, ttl: int = 12, *, allow_stored_
 
     if _render_web_dyno():
         local_payload = _local_live_state_payload(selected_date)
-        if isinstance(local_payload, dict) and isinstance(local_payload.get("games"), list) and bool(local_payload.get("games")):
+        if _payload_has_meaningful_live_state(local_payload):
             log_runtime_memory("build_live_state_payload_local_return", selected_date=selected_date, ttl=int(ttl), game_count=len(local_payload.get("games") or []))
             return _attach_odds_refresh_timestamp(local_payload)
         context_for_event_ids = build_cards_page_context(selected_date, allow_stored_date_fallback=allow_stored_date_fallback)
@@ -4196,6 +4196,25 @@ def build_live_state_payload(selected_date: str, ttl: int = 12, *, allow_stored_
         "games": out_games,
         "generated_at": _wnba_generated_at(),
     }))
+
+
+def _payload_has_meaningful_live_state(payload: dict[str, Any] | None) -> bool:
+    if not isinstance(payload, dict):
+        return False
+    games = payload.get("games")
+    if not isinstance(games, list) or not games:
+        return False
+    for game in games:
+        if not isinstance(game, dict):
+            continue
+        if bool(game.get("in_progress")) or bool(game.get("final")):
+            return True
+        if _safe_float(game.get("home_pts")) is not None or _safe_float(game.get("away_pts")) is not None:
+            return True
+        status_text = str(game.get("status") or "").strip().lower()
+        if status_text and status_text not in {"scheduled", ""}:
+            return True
+    return False
 
 
 def build_live_player_boxscore_payload(

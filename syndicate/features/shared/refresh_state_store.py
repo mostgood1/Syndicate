@@ -16,6 +16,7 @@ from functools import lru_cache
 import hashlib
 import json
 import os
+import uuid
 from pathlib import Path
 from typing import Any
 
@@ -151,6 +152,20 @@ def _record_refresh_status_history(path: Path) -> None:
     _execute_keyvalue_operation(_write_history)
 
 
+def _atomic_write_text(path: Path, payload: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temp_path = path.parent / f"{path.name}.{os.getpid()}.{uuid.uuid4().hex}.tmp"
+    try:
+        temp_path.write_text(str(payload or ""), encoding="utf-8")
+        os.replace(temp_path, path)
+    finally:
+        try:
+            if temp_path.exists():
+                temp_path.unlink()
+        except Exception:
+            pass
+
+
 def reports_root() -> Path:
     override = str(os.environ.get("SYNDICATE_REPORTS_ROOT") or os.environ.get("SYNDICATE_STATE_ROOT") or "").strip()
     if override:
@@ -282,16 +297,14 @@ def write_json_file(path: Path, payload: dict[str, Any]) -> None:
 
         _execute_keyvalue_operation(_write_json)
         return
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(normalized_payload, indent=2), encoding="utf-8")
+    _atomic_write_text(path, json.dumps(normalized_payload, indent=2))
 
 
 def write_text_file(path: Path, payload: str) -> None:
     if _state_backend_kind() == "keyvalue":
         _execute_keyvalue_operation(lambda client: client.set(_state_key_for_path(path), str(payload or "")))
         return
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(str(payload or ""), encoding="utf-8")
+    _atomic_write_text(path, payload)
 
 
 def path_exists(path: Path) -> bool:
