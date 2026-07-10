@@ -9,6 +9,7 @@ from pathlib import Path
 import pandas as pd
 
 from syndicate.features.shared.memory_observability import log_dataframe_memory
+from syndicate.features.shared.memory_observability import log_list_memory
 
 
 OUTPUT_COLUMNS = [
@@ -79,6 +80,7 @@ def _write_csv_rows(path: Path, rows: list[dict[str, object]]) -> None:
 def _canonical_standard_plays(plays: object) -> list[dict]:
     if not isinstance(plays, list) or not plays:
         return []
+    log_list_memory("basketball_props_recommendations.canonical_plays_input", plays)
     out: list[dict] = []
     buckets: dict[tuple[str, str], list[dict]] = {}
     for play in plays:
@@ -111,8 +113,10 @@ def _canonical_standard_plays(plays: object) -> list[dict]:
         mode_lines = sorted(line for line, count in counts.items() if count == max_count)
         chosen_line = mode_lines[len(mode_lines) // 2]
         candidates = [play for play in bucket if _safe_float(play.get("line")) == chosen_line] or list(bucket)
+        log_list_memory("basketball_props_recommendations.canonical_candidates", candidates)
         candidates.sort(key=_score, reverse=True)
         out.append(dict(candidates[0]))
+    log_list_memory("basketball_props_recommendations.canonical_output", out)
     out.sort(key=_score, reverse=True)
     return out
 
@@ -249,6 +253,8 @@ def export_props_recommendations_local(
 
     edges_rows = _read_csv_rows(processed_root / f"props_edges_{date_str}.csv")
     predictions_rows = _read_csv_rows(processed_root / f"props_predictions_{date_str}.csv")
+    log_list_memory("basketball_props_recommendations.edges_rows", edges_rows)
+    log_list_memory("basketball_props_recommendations.predictions_rows", predictions_rows)
     out_path = processed_root / f"props_recommendations_{date_str}.csv"
     model_map = _build_model_map(predictions_rows)
 
@@ -271,6 +277,7 @@ def export_props_recommendations_local(
                     "model": model,
                 }
             )
+    log_list_memory("basketball_props_recommendations.cards_pre_rows", cards)
     else:
         groups: dict[tuple[str, str], list[dict[str, object]]] = {}
         for row in edges_rows:
@@ -317,11 +324,13 @@ def export_props_recommendations_local(
                         "model": model,
                     }
                 )
+    log_list_memory("basketball_props_recommendations.cards_post_grouping", cards)
 
     rows: list[dict[str, object]] = []
     for card in cards:
         row = dict(card)
         row["_plays_list"] = _canonical_standard_plays(list(row.get("plays") or []))
+        log_list_memory("basketball_props_recommendations.row_plays_list", row["_plays_list"])
         row["top_play"] = _pick_top_play(row["_plays_list"], max_plus_odds=max_plus_odds)
         row["top_play_explain"] = _top_play_explain(row, model_map)
         top_play = row.get("top_play")
@@ -337,6 +346,7 @@ def export_props_recommendations_local(
         row["top_play_consensus"] = consensus
         row["top_play_line_adv"] = line_adv
         rows.append(row)
+    log_list_memory("basketball_props_recommendations.rows", rows)
 
     df = pd.DataFrame(rows)
     log_dataframe_memory("basketball_props_recommendations.output", df)

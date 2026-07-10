@@ -434,3 +434,16 @@ def log_dataframe_memory(name: str, df: Any) -> None:
         "deep_memory_mb": _bytes_to_mb(deep_memory_bytes),
     }
     print(f"DATAFRAME_MEMORY {json.dumps(payload, default=str, sort_keys=True)}", file=sys.stderr, flush=True)
+
+
+def log_list_memory(name: str, list_obj: Any) -> None:
+    payload = {
+        "name": str(name or "").strip() or "unnamed",
+        "list_id": id(list_obj) if list_obj is not None else None,
+        "length": None,
+    }
+    try:
+        payload["length"] = int(len(list_obj)) if list_obj is not None else None
+    except Exception:
+        payload["length"] = None
+    print(f"LIST_MEMORY {json.dumps(payload, default=str, sort_keys=True)}", file=sys.stderr, flush=True)

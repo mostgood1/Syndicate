@@ -11,6 +11,8 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
+from syndicate.features.shared.memory_observability import log_list_memory
+
 
 _SMARTSIM_WORKER_STATE: dict[str, object] | None = None
 _QUARTERS_CALIBRATION_CACHE_LOCAL: dict[str, dict[str, Any] | None] = {}
@@ -530,7 +532,8 @@ class QuarterSummaryLocal:
 
 
 def _norm_name_key(value: object) -> str:
-    text = str(value or "").strip().upper()
+        player_name = str(row.get("player_name") or "").strip()
+        if not player_name or minutes <= 0:
     if "(" in text:
         text = text.split("(", 1)[0]
     text = text.replace("-", " ")
@@ -541,7 +544,7 @@ def _norm_name_key(value: object) -> str:
         text = text.encode("ascii", "ignore").decode("ascii")
     except Exception:
         pass
-    text = re.sub(r"[^A-Z0-9\s]", "", text)
+        minutes = _first_present_float_local(row, "pred_min", "minutes", "min", "mp", "min_played", "minutes_played", default=0.0)
     text = re.sub(r"\s+", " ", text).strip()
     for suffix in (" JR", " SR", " II", " III", " IV"):
         if text.endswith(suffix):
@@ -688,6 +691,7 @@ def _build_player_sim_rows_local(*, players_df, team_tri: str, opp_tri: str) -> 
         if minutes > 0:
             player_dict["minutes"] = minutes
         rows.append(player_dict)
+    log_list_memory("basketball_props_smart_sim.player_rows", rows)
     rows.sort(key=lambda item: (float(item.get("pra_mean") or 0.0), float(item.get("pts_mean") or 0.0)), reverse=True)
     return rows
 
@@ -1138,6 +1142,8 @@ def _simulate_quarters_local(*, processed_root: Path, inp: GameInputsLocal, leag
         quarters.append(QuarterResultLocal(q=quarter_idx, home_pts_mu=h_mu_q, home_pts_sigma=h_sig_q, away_pts_mu=a_mu_q, away_pts_sigma=a_sig_q, corr=corr_q))
     total_samples = []
     margin_samples = []
+    log_list_memory("basketball_props_smart_sim.total_samples_initial", total_samples)
+    log_list_memory("basketball_props_smart_sim.margin_samples_initial", margin_samples)
     for _ in range(min(5000, max(1000, n_samples))):
         h_sum = 0.0
         a_sum = 0.0
@@ -1159,6 +1165,8 @@ def _simulate_quarters_local(*, processed_root: Path, inp: GameInputsLocal, leag
             a_sum += a_val
         total_samples.append(h_sum + a_sum)
         margin_samples.append(h_sum - a_sum)
+    log_list_memory("basketball_props_smart_sim.total_samples_final", total_samples)
+    log_list_memory("basketball_props_smart_sim.margin_samples_final", margin_samples)
     total_samples_arr = np.array(total_samples)
     margin_samples_arr = np.array(margin_samples)
     final_total_mu = float(np.mean(total_samples_arr))
@@ -1537,7 +1545,9 @@ def _prune_pregame_rotation_pool_local(*, team_df, team_tri: str, min_keep: int 
     lag1 = pd.to_numeric(out.get("lag1_min"), errors="coerce") if "lag1_min" in out.columns else pd.Series([np.nan] * len(out), index=out.index, dtype=float)
     signal_mask = exp.fillna(0.0).gt(0.0) | starter_prob.fillna(0.0).gt(0.0) | roll5.fillna(0.0).gt(0.0) | roll10.fillna(0.0).gt(0.0) | roll3.fillna(0.0).gt(0.0) | lag1.fillna(0.0).gt(0.0)
     diag["signal_n"] = int(signal_mask.sum())
+    log_list_memory("basketball_props_smart_sim.signal_mask_index", list(signal_mask.index))
     cand = out.loc[signal_mask].copy() if int(signal_mask.sum()) >= int(min_keep) else out.copy()
+    log_list_memory("basketball_props_smart_sim.cand_index", cand.index.tolist())
     cand["_starter_prob"] = starter_prob.reindex(cand.index).fillna(0.0).astype(float)
     cand["_exp_min_mean"] = exp.reindex(cand.index).fillna(0.0).astype(float)
     cand["_roll5_min"] = roll5.reindex(cand.index).fillna(0.0).astype(float)
@@ -1548,6 +1558,7 @@ def _prune_pregame_rotation_pool_local(*, team_df, team_tri: str, min_keep: int 
     protected_keys = {_norm_name_key(name) for name in (protected_names or set()) if str(name or "").strip()}
     cand["_protected"] = cand["_name"].map(_norm_name_key).isin(protected_keys).astype(int)
     keep = cand.sort_values(["_protected", "_starter_prob", "_exp_min_mean", "_roll5_min", "_roll10_min", "_roll3_min", "_lag1_min", "_name"], ascending=[False, False, False, False, False, False, False, True], kind="stable").head(int(max_keep)).drop(columns=["_protected", "_starter_prob", "_exp_min_mean", "_roll5_min", "_roll10_min", "_roll3_min", "_lag1_min", "_name"], errors="ignore").reset_index(drop=True)
+    log_list_memory("basketball_props_smart_sim.keep_index", keep.index.tolist())
     if len(keep) < int(min_keep):
         diag["reason"] = "keep_below_minimum"
         return out, diag
