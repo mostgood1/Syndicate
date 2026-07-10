@@ -3031,6 +3031,7 @@ def _run_refresh_via_cli(
         if not player_logs_ok:
             state["error"] = player_logs_error or f"player_logs missing before predict-props for {date_str}"
         else:
+            if _env_bool("WNBA_ISOLATE_BEFORE_PREDICTIONS", False): return state
             game_predictions_ok, game_predictions_error = _ensure_game_predictions_for_props_refresh(
                 source_root=source_root,
                 date_str=date_str,
