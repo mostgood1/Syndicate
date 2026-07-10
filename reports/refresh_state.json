@@ -1205,6 +1205,7 @@
         "date": "2026-07-09"
       }
     },
+<<<<<<< Updated upstream
     "mlb_live_lens:2026-07-10": {
       "inputHash": "ddb3b8779d38c2bcfbf0c8120c4bf83ddac0fc3c865da81628050b85a0fa6114",
       "updatedAt": "2026-07-10T07:28:11-05:00",
@@ -1227,6 +1228,16 @@
         "date": "2026-07-10",
         "reused": false,
         "artifact_root": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts"
+=======
+    "wnba_artifact_bundle:C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\wnba_source:2026-07-09:1:1": {
+      "inputHash": "273a01ce0220fa29f14f35ccb84ccf5df09ffb46353ad17c5b16b9872fc2283e",
+      "updatedAt": "2026-07-10T04:39:23-05:00",
+      "outputs": [],
+      "metadata": {
+        "date": "2026-07-09",
+        "reused": true,
+        "artifact_root": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\wnba_source"
+>>>>>>> Stashed changes
       }
     }
   }

@@ -1,12 +1,12 @@
 {
   "sport": "ncaaf",
-  "last_updated": "2026-07-09T16:12:58-05:00",
+  "last_updated": "2026-07-10T10:07:10-05:00",
   "artifact_paths": [
     "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate"
   ],
-  "status": "failed",
+  "status": "complete",
   "metadata": {
-    "date": "2026-07-09",
+    "date": "2026-10-01",
     "phase": "all",
     "execution_mode": "source",
     "refresh_mode": "full",
@@ -28,13 +28,11 @@
         "simulation_detail"
       ]
     },
-    "required_artifact_failures": [
-      "ncaaf required artifact failure"
-    ],
+    "required_artifact_failures": [],
     "optional_artifact_failures": [],
-    "ok": false,
-    "post_refresh_ok": null,
-    "mirror_ok": null,
+    "ok": true,
+    "post_refresh_ok": true,
+    "mirror_ok": true,
     "odds_control_plane": {
       "source_precedence": [
         "shared_history",
@@ -44,7 +42,7 @@
       "artifact_paths": [
         "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate"
       ],
-      "has_post_refresh": false
+      "has_post_refresh": true
     }
   }
 }

@@ -2479,6 +2479,7 @@ def _run_to_file(
 ) -> int:
     cmd_text = " ".join(shlex.quote(str(a)) for a in args)
     _append_log(log_file, f"$ {cmd_text}")
+    log_runtime_memory("subprocess_before_launch", command=cmd_text, cwd=str(cwd), timeout_s=timeout_s)
     start = time.time()
     last_heartbeat = start
     log_file.parent.mkdir(parents=True, exist_ok=True)
@@ -2491,9 +2492,12 @@ def _run_to_file(
             stdout=out,
             stderr=subprocess.STDOUT,
         )
+        log_runtime_memory("subprocess_after_launch", command=cmd_text, cwd=str(cwd), child_pid=int(proc.pid), timeout_s=timeout_s)
         while True:
             try:
-                return int(proc.wait(timeout=1.0))
+                rc = int(proc.wait(timeout=1.0))
+                log_runtime_memory("subprocess_after_exit", command=cmd_text, cwd=str(cwd), child_pid=int(proc.pid), return_code=rc, timeout_s=timeout_s)
+                return rc
             except subprocess.TimeoutExpired:
                 now = time.time()
                 if heartbeat_cb and (now - last_heartbeat) >= max(1.0, float(heartbeat_every_s)):
@@ -2503,6 +2507,7 @@ def _run_to_file(
                         pass
                     last_heartbeat = now
                 if timeout_s is not None and (now - start) >= float(timeout_s):
+                    log_runtime_memory("subprocess_timeout", command=cmd_text, cwd=str(cwd), child_pid=int(proc.pid), timeout_s=timeout_s)
                     try:
                         proc.kill()
                     except Exception:

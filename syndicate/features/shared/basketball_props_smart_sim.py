@@ -12,6 +12,7 @@ from types import SimpleNamespace
 from typing import Any
 
 from syndicate.features.shared.memory_observability import log_list_memory
+from syndicate.features.shared.memory_observability import log_runtime_memory
 
 
 _SMARTSIM_WORKER_STATE: dict[str, object] | None = None
@@ -4081,6 +4082,14 @@ def _smart_sim_worker_init_local(
         "name_to_id": name_to_id or {},
         "team_name_to_id": team_name_to_id or {},
     }
+    log_runtime_memory(
+        "smart_sim_worker_init_local",
+        date_str=str(date_str),
+        league_code=str(league_code or "nba"),
+        n_sims=int(n_sims),
+        pbp=bool(pbp),
+        props_path=str(props_path),
+    )
 
 
 def _smart_sim_worker_run_local(job: dict) -> dict:
@@ -4101,6 +4110,13 @@ def _smart_sim_worker_run_local(job: dict) -> dict:
     out_path = Path(out_path_s)
 
     try:
+        log_runtime_memory(
+            "smart_sim_worker_run_local:before_simulation",
+            date_str=date_s,
+            home_tri=home_tri,
+            away_tri=away_tri,
+            out_path=out_path_s,
+        )
         market_total = job.get("market_total")
         home_spread = job.get("home_spread")
         market_total_for_quarters = market_total
@@ -4159,6 +4175,13 @@ def _smart_sim_worker_run_local(job: dict) -> dict:
                 "processed_root": out_path.parent,
             },
         )
+        log_runtime_memory(
+            "smart_sim_worker_run_local:after_simulation",
+            date_str=date_s,
+            home_tri=home_tri,
+            away_tri=away_tri,
+            out_path=out_path_s,
+        )
 
         try:
             name_to_id_local = state.get("name_to_id") or {}
@@ -4212,6 +4235,14 @@ def _smart_sim_worker_run_local(job: dict) -> dict:
 
         out_path.parent.mkdir(parents=True, exist_ok=True)
         tmp_path = out_path.with_suffix(out_path.suffix + ".tmp")
+        log_runtime_memory(
+            "smart_sim_worker_run_local:before_json_write",
+            date_str=date_s,
+            home_tri=home_tri,
+            away_tri=away_tri,
+            out_path=out_path_s,
+            players_count=int(len(home_players) + len(away_players)) if "home_players" in locals() and "away_players" in locals() else None,
+        )
         tmp_path.write_text(_json_dumps_safe_local(out), encoding="utf-8")
         try:
             tmp_path.replace(out_path)
@@ -4632,8 +4663,25 @@ def _smart_sim_run_date_local(*, processed_root: Path, raw_root: Path, date_str:
     if workers < 1:
         workers = 1
 
+    log_runtime_memory(
+        "smart_sim_run_date_local:prepared_jobs",
+        date_str=str(date_str),
+        league_code=str(league_code or "nba"),
+        job_count=int(len(jobs)),
+        n_sims=int(n_sims),
+        workers=int(workers),
+    )
+
     if jobs:
         if workers == 1 or len(jobs) == 1:
+            log_runtime_memory(
+                "smart_sim_run_date_local:sequential_before_init",
+                date_str=str(date_str),
+                league_code=str(league_code or "nba"),
+                job_count=int(len(jobs)),
+                n_sims=int(n_sims),
+                workers=int(workers),
+            )
             _smart_sim_worker_init_local(str(date_str), int(n_sims), seed, bool(pbp), str(props_path), str(roster_mode or "historical"), str(league_code or "nba"), excluded_map, adv_map, game_id_map, name_to_id, team_name_to_id)
             for job in jobs:
                 result = _smart_sim_worker_run_local(job)
@@ -4641,8 +4689,25 @@ def _smart_sim_run_date_local(*, processed_root: Path, raw_root: Path, date_str:
                     wrote += 1
                 else:
                     failures.append({"home": result.get("home"), "away": result.get("away"), "error": result.get("error")})
+            log_runtime_memory(
+                "smart_sim_run_date_local:sequential_after_jobs",
+                date_str=str(date_str),
+                league_code=str(league_code or "nba"),
+                job_count=int(len(jobs)),
+                wrote=int(wrote),
+                failures=int(len(failures)),
+                workers=int(workers),
+            )
         else:
             worker_count = min(int(workers), int(len(jobs)))
+            log_runtime_memory(
+                "smart_sim_run_date_local:pool_before_executor",
+                date_str=str(date_str),
+                league_code=str(league_code or "nba"),
+                job_count=int(len(jobs)),
+                worker_count=int(worker_count),
+                n_sims=int(n_sims),
+            )
             with ProcessPoolExecutor(max_workers=int(worker_count), initializer=_smart_sim_worker_init_local, initargs=(str(date_str), int(n_sims), seed, bool(pbp), str(props_path), str(roster_mode or "historical"), str(league_code or "nba"), excluded_map, adv_map, game_id_map, name_to_id, team_name_to_id)) as executor:
                 futures = [executor.submit(_smart_sim_worker_run_local, job) for job in jobs]
                 for future in as_completed(futures):
@@ -4655,6 +4720,15 @@ def _smart_sim_run_date_local(*, processed_root: Path, raw_root: Path, date_str:
                         wrote += 1
                     else:
                         failures.append({"home": result.get("home"), "away": result.get("away"), "error": result.get("error")})
+            log_runtime_memory(
+                "smart_sim_run_date_local:pool_after_executor",
+                date_str=str(date_str),
+                league_code=str(league_code or "nba"),
+                job_count=int(len(jobs)),
+                worker_count=int(worker_count),
+                wrote=int(wrote),
+                failures=int(len(failures)),
+            )
 
     if failures:
         try:
@@ -4797,7 +4871,7 @@ def _merge_smart_sim_into_preds(*, preds, sim_df):
     sim_df_pid = sim_df[sim_df["player_id"].notna()].drop_duplicates(subset=["player_id"], keep="last") if "player_id" in sim_df.columns else pd.DataFrame()
     sim_df_name = sim_df.drop_duplicates(subset=["team", "name_key"], keep="last")
 
-    merged = preds.copy()
+    merged = preds
     if "team" in merged.columns:
         merged["team"] = merged["team"].astype(str).str.upper().str.strip()
     if "player_name" not in merged.columns:

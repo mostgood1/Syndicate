@@ -1,25 +1,12 @@
 {
   "sport": "mlb",
-  "last_updated": "2026-07-09T16:12:58-05:00",
+  "last_updated": "2026-07-10T10:07:02-05:00",
   "artifact_paths": [
-    "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate",
-    "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source",
-    "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\tracking\\odds_mlb_game_lines_opening_2026-07-09.csv",
-    "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\tracking\\odds_mlb_game_lines_history_2026-07-09.csv",
-    "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\tracking\\odds_mlb_game_lines_movement_signals_2026-07-09.csv",
-    "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\tracking\\odds_mlb_hitter_props_opening_2026-07-09.csv",
-    "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\tracking\\odds_mlb_hitter_props_history_2026-07-09.csv",
-    "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\tracking\\odds_mlb_hitter_props_movement_signals_2026-07-09.csv",
-    "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\tracking\\odds_mlb_pitcher_props_opening_2026-07-09.csv",
-    "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\tracking\\odds_mlb_pitcher_props_history_2026-07-09.csv",
-    "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\tracking\\odds_mlb_pitcher_props_movement_signals_2026-07-09.csv",
-    "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\tracking\\odds_history.json",
-    "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\odds_control_plane\\odds_history\\mlb\\odds_history.json",
-    "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\artifacts\\mlb\\odds_history.json"
+    "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate"
   ],
   "status": "complete",
   "metadata": {
-    "date": "2026-07-09",
+    "date": "2026-05-22",
     "phase": "all",
     "execution_mode": "source",
     "refresh_mode": "full",
@@ -53,20 +40,7 @@
         "tracking_history"
       ],
       "artifact_paths": [
-        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate",
-        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source",
-        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\tracking\\odds_mlb_game_lines_opening_2026-07-09.csv",
-        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\tracking\\odds_mlb_game_lines_history_2026-07-09.csv",
-        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\tracking\\odds_mlb_game_lines_movement_signals_2026-07-09.csv",
-        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\tracking\\odds_mlb_hitter_props_opening_2026-07-09.csv",
-        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\tracking\\odds_mlb_hitter_props_history_2026-07-09.csv",
-        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\tracking\\odds_mlb_hitter_props_movement_signals_2026-07-09.csv",
-        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\tracking\\odds_mlb_pitcher_props_opening_2026-07-09.csv",
-        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\tracking\\odds_mlb_pitcher_props_history_2026-07-09.csv",
-        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\tracking\\odds_mlb_pitcher_props_movement_signals_2026-07-09.csv",
-        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\tracking\\odds_history.json",
-        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\odds_control_plane\\odds_history\\mlb\\odds_history.json",
-        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\artifacts\\mlb\\odds_history.json"
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate"
       ],
       "has_post_refresh": true
     }
