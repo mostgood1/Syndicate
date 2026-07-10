@@ -277,7 +277,6 @@ def export_props_recommendations_local(
                     "model": model,
                 }
             )
-    log_list_memory("basketball_props_recommendations.cards_pre_rows", cards)
     else:
         groups: dict[tuple[str, str], list[dict[str, object]]] = {}
         for row in edges_rows:
@@ -324,6 +323,7 @@ def export_props_recommendations_local(
                         "model": model,
                     }
                 )
+    log_list_memory("basketball_props_recommendations.cards_pre_rows", cards)
     log_list_memory("basketball_props_recommendations.cards_post_grouping", cards)
 
     rows: list[dict[str, object]] = []

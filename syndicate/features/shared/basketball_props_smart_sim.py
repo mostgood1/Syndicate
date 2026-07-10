@@ -532,8 +532,9 @@ class QuarterSummaryLocal:
 
 
 def _norm_name_key(value: object) -> str:
-        player_name = str(row.get("player_name") or "").strip()
-        if not player_name or minutes <= 0:
+    text = str(value or "").strip()
+    if not text:
+        return ""
     if "(" in text:
         text = text.split("(", 1)[0]
     text = text.replace("-", " ")
@@ -544,8 +545,7 @@ def _norm_name_key(value: object) -> str:
         text = text.encode("ascii", "ignore").decode("ascii")
     except Exception:
         pass
-        minutes = _first_present_float_local(row, "pred_min", "minutes", "min", "mp", "min_played", "minutes_played", default=0.0)
-    text = re.sub(r"\s+", " ", text).strip()
+    text = re.sub(r"\s+", " ", text).strip().upper()
     for suffix in (" JR", " SR", " II", " III", " IV"):
         if text.endswith(suffix):
             text = text[: -len(suffix)].strip()
