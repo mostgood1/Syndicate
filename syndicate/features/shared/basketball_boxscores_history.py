@@ -222,6 +222,7 @@ def bootstrap_boxscores_history_local(*, processed_root: Path, date_str: str, le
         current += pd.Timedelta(days=1)
 
     existing_history = _read_existing_history(processed_root)
+    if __import__("os").environ.get("WNBA_ISOLATE_AFTER_HISTORY_LOAD", "").strip().lower() in {"1", "true", "yes"}: return {"date": str(date_str), "rows": int(len(existing_history)) if existing_history is not None else 0, "history_rows": int(len(existing_history)) if existing_history is not None else 0, "wrote": str(processed_root / "boxscores_history.parquet") if (processed_root / "boxscores_history.parquet").exists() else (str(processed_root / "boxscores_history.csv") if (processed_root / "boxscores_history.csv").exists() else None), "error": None}
     current_history = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
     if existing_history is not None and not existing_history.empty and current_history is not None and not current_history.empty:
         combined = pd.concat([existing_history, current_history], ignore_index=True)
