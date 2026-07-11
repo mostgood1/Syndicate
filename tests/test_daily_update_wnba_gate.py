@@ -12,7 +12,8 @@ class WnbaDailyUpdateGateTests(unittest.TestCase):
         self.assertIn("$scheduledGameCount = if ($scheduleCheck.known -and $null -ne $scheduleCheck.count) { [int]$scheduleCheck.count } else { $null }", script_text)
         self.assertIn("$requireSmartSimArtifacts = ($null -eq $scheduledGameCount) -or ($scheduledGameCount -gt 0)", script_text)
         self.assertIn("if ($requireSmartSimArtifacts) {", script_text)
-        self.assertIn("throw \"WNBA advanced-data gate failed: missing smart_sim artifacts for $DateValue\"", script_text)
+        self.assertIn("Write-Host \"WNBA advanced-data gate warning: missing smart_sim artifacts for $DateValue; continuing with core WNBA outputs\" -ForegroundColor Yellow", script_text)
+        self.assertIn("return", script_text)
 
 
 if __name__ == "__main__":

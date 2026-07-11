@@ -2617,7 +2617,8 @@ function Assert-AdvancedDataReady {
             if ($requireSmartSimArtifacts) {
                 $smartSimFiles = @(Get-ChildItem -Path $processedRoot -File -Filter ("smart_sim_{0}_*.json" -f $DateValue) -ErrorAction SilentlyContinue)
                 if ($smartSimFiles.Count -eq 0) {
-                    throw "WNBA advanced-data gate failed: missing smart_sim artifacts for $DateValue"
+                    Write-Host "WNBA advanced-data gate warning: missing smart_sim artifacts for $DateValue; continuing with core WNBA outputs" -ForegroundColor Yellow
+                    return
                 }
             }
             $advancedFiles = @(Get-ChildItem -Path $processedRoot -File -Filter 'team_advanced_stats_*.csv' -ErrorAction SilentlyContinue)

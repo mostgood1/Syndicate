@@ -40,6 +40,13 @@
 - Validation: Focused pytest coverage passed for the new core-only reuse regression and the missing-recommendation refresh regression in `tests/test_wnba_refresh_runner.py`, plus the zero-recs slice in `tests/test_wnba_refresh_runner_zero_recs.py`.
 - Follow-up: Keep later contract work focused on standardizing the artifact schema rather than reintroducing SmartSim-derived files as publication blockers.
 
+# 2026-07-11 - WNBA daily update now warns on missing SmartSim artifacts
+- Symptom: `scripts/unified_daily_update.ps1` still threw `WNBA advanced-data gate failed: missing smart_sim artifacts` for WNBA slates even though the refresh path already treated SmartSim-derived outputs as optional.
+- Root cause: The daily-update gate had not been aligned with the earlier WNBA refresh optionality change, so missing `smart_sim_*.json` files still blocked completion.
+- Fix: Downgrade the missing-SmartSim branch to a warning and continue with the core WNBA outputs when snapshot, alias, prediction, and board artifacts are already present.
+- Validation: `pytest tests/test_daily_update_wnba_gate.py`.
+- Follow-up: Keep the SmartSim pace-quality check in place only when SmartSim artifacts exist; do not reintroduce missing-file blocking unless the contract changes again.
+
 # 2026-07-08 - Refresh wrapper now streams child logs live in memory-trace mode
 - Symptom: `STEP_START` and `STEP_END` never appeared in the worker log stream even though the refresh child was running and `WRAPPER_WAIT_TIMEOUT` kept repeating.
 - Root cause: `scripts/run_refresh_odds_job.py` launched `refresh_odds_sources.py` with `stdout=PIPE` and `stderr=PIPE`, then buffered both pipes until the child exited, so the worker never saw live child output.
