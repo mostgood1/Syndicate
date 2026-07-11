@@ -1,0 +1,224 @@
+{
+  "date": "2026-07-11",
+  "counts": {
+    "games": 3,
+    "picks": 9
+  },
+  "per_game": [
+    {
+      "home": "MIN",
+      "away": "NYL",
+      "matchup": "NYL @ MIN",
+      "picks": [
+        {
+          "market": "PROPS",
+          "team": "NYL",
+          "display_pick": "Marine Johannes OVER 1.5",
+          "selection": "OVER 1.5",
+          "projection": 2.0897891625615763,
+          "projected": 2.0897891625615763,
+          "odds": -125.0,
+          "price": -125.0,
+          "score": 21.49493556440959,
+          "ev_pct": 21.49493556440959,
+          "win_prob": 0.5555555555555556,
+          "p_win": 0.5555555555555556,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 21.5%",
+            "Regular price range (-150 to +150)",
+            "Consensus: 5 books aligned",
+            "Best line available"
+          ],
+          "matchup": "NYL @ MIN"
+        },
+        {
+          "market": "PROPS",
+          "team": "MIN",
+          "display_pick": "Natasha Howard OVER 7.5",
+          "selection": "OVER 7.5",
+          "projection": 8.65028224151539,
+          "projected": 8.65028224151539,
+          "odds": 112.0,
+          "price": 112.0,
+          "score": 5.647694345745213,
+          "ev_pct": 5.647694345745213,
+          "win_prob": 0.4716981132075472,
+          "p_win": 0.4716981132075472,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 5.6%",
+            "Regular price range (-150 to +150)",
+            "Consensus: 5 books aligned",
+            "Best line available"
+          ],
+          "matchup": "NYL @ MIN"
+        },
+        {
+          "market": "PROPS",
+          "team": "NYL",
+          "display_pick": "Pauline Astier UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "projection": 2.8435091362126244,
+          "projected": 2.8435091362126244,
+          "odds": 125.0,
+          "price": 125.0,
+          "score": 5.370457949828156,
+          "ev_pct": 5.370457949828156,
+          "win_prob": 0.4444444444444444,
+          "p_win": 0.4444444444444444,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 5.4%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "NYL @ MIN"
+        }
+      ]
+    },
+    {
+      "home": "ATL",
+      "away": "POR",
+      "matchup": "POR @ ATL",
+      "picks": [
+        {
+          "market": "PROPS",
+          "team": "ATL",
+          "display_pick": "Rhyne Howard UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "projection": 2.7348,
+          "projected": 2.7348,
+          "odds": -135.0,
+          "price": -135.0,
+          "score": 25.671101077047886,
+          "ev_pct": 25.671101077047886,
+          "win_prob": 0.574468085106383,
+          "p_win": 0.574468085106383,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 25.7%",
+            "Regular price range (-150 to +150)",
+            "Consensus: 3 books aligned",
+            "Best line available"
+          ],
+          "matchup": "POR @ ATL"
+        },
+        {
+          "market": "PROPS",
+          "team": "ATL",
+          "display_pick": "Allisha Gray OVER 3.5",
+          "selection": "OVER 3.5",
+          "projection": 4.622415217391303,
+          "projected": 4.622415217391303,
+          "odds": 117.0,
+          "price": 117.0,
+          "score": 6.022395668953029,
+          "ev_pct": 6.022395668953029,
+          "win_prob": 0.4608294930875576,
+          "p_win": 0.4608294930875576,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 6.0%",
+            "Regular price range (-150 to +150)",
+            "Consensus: 5 books aligned",
+            "Best line available"
+          ],
+          "matchup": "POR @ ATL"
+        },
+        {
+          "market": "PROPS",
+          "team": "POR",
+          "display_pick": "Carla Leite UNDER 7.5",
+          "selection": "UNDER 7.5",
+          "projection": 7.177378761061947,
+          "projected": 7.177378761061947,
+          "odds": 107.0,
+          "price": 107.0,
+          "score": 2.2692283724451756,
+          "ev_pct": 2.2692283724451756,
+          "win_prob": 0.4830917874396135,
+          "p_win": 0.4830917874396135,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 2.3%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "POR @ ATL"
+        }
+      ]
+    },
+    {
+      "home": "LVA",
+      "away": "PHX",
+      "matchup": "PHX @ LVA",
+      "picks": [
+        {
+          "market": "PROPS",
+          "team": "LVA",
+          "display_pick": "Jackie Young UNDER 16.5",
+          "selection": "UNDER 16.5",
+          "projection": 8.636180357142859,
+          "projected": 8.636180357142859,
+          "odds": -101.0,
+          "price": -101.0,
+          "score": 31.09958132459072,
+          "ev_pct": 31.09958132459072,
+          "win_prob": 0.5024875621890548,
+          "p_win": 0.5024875621890548,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 31.1%",
+            "Regular price range (-150 to +150)",
+            "Consensus: 3 books aligned",
+            "Best line available"
+          ],
+          "matchup": "PHX @ LVA"
+        },
+        {
+          "market": "PROPS",
+          "team": "PHX",
+          "display_pick": "Valeriane Ayayi UNDER 14.5",
+          "selection": "UNDER 14.5",
+          "projection": 6.257627659574469,
+          "projected": 6.257627659574469,
+          "odds": -113.0,
+          "price": -113.0,
+          "score": 13.092163199076701,
+          "ev_pct": 13.092163199076701,
+          "win_prob": 0.5305164319248826,
+          "p_win": 0.5305164319248826,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 13.1%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "PHX @ LVA"
+        },
+        {
+          "market": "PROPS",
+          "team": "LVA",
+          "display_pick": "A'ja Wilson UNDER 12.5",
+          "selection": "UNDER 12.5",
+          "projection": 10.560642857142856,
+          "projected": 10.560642857142856,
+          "odds": -101.0,
+          "price": -101.0,
+          "score": 8.221566210480379,
+          "ev_pct": 8.221566210480379,
+          "win_prob": 0.5024875621890548,
+          "p_win": 0.5024875621890548,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 8.2%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "PHX @ LVA"
+        }
+      ]
+    }
+  ]
+}

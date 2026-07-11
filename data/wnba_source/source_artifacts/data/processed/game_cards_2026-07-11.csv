@@ -1,0 +1,4 @@
+date,game_id,home_team,visitor_team,commence_time,home_ml,away_ml,home_spread,away_spread,total,bookmaker,home_tri,away_tri
+2026-07-11,093c27f5318a98fdd2a9bfbc42269f134,Minnesota Lynx,New York Liberty,2026-07-11T17:00:00Z,,,,,,betmgm,MIN,NYL
+2026-07-11,09f2c4d943190edd1073d4cd6760fcf8c,Atlanta Dream,Portland Fire,2026-07-11T20:00:00Z,,,,,,betmgm,ATL,POR
+2026-07-11,0dbbae9c1944a4874fe492f9fe23d8f62,Las Vegas Aces,Phoenix Mercury,2026-07-11T22:00:00Z,,,,,,betmgm,LVA,PHX
