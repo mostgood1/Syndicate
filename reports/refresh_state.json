@@ -23,6 +23,16 @@
         "reused": false,
         "artifact_root": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts"
       }
+    },
+    "wnba_artifact_bundle:C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpeey39urq\\bundle:2026-05-22:1:1": {
+      "inputHash": "0c6245c607f31063c62b0f6f71214a27f83b2395259bfea25a373acd9b6ce7dc",
+      "updatedAt": "2026-07-10T18:22:18-05:00",
+      "outputs": [],
+      "metadata": {
+        "date": "2026-05-22",
+        "reused": false,
+        "artifact_root": "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpeey39urq\\bundle"
+      }
     }
   }
 }

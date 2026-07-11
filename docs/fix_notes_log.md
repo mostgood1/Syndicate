@@ -1,3 +1,10 @@
+# 2026-07-11 - WNBA daily update restored SmartSim-required gating
+- Symptom: The WNBA daily update had been downgraded to warn-and-continue when `smart_sim_<date>_*.json` files were missing, which masked a broken SmartSim publication path.
+- Root cause: The earlier incident mitigation relaxed the WNBA advanced-data gate after SmartSim was treated as optional during the OOM investigation.
+- Fix: Restore the hard failure on missing WNBA SmartSim artifacts so the daily update once again requires `smart_sim_<date>_*.json` for nonzero slates.
+- Validation: Update the WNBA gate regression to assert the hard-failure branch and verify the script text no longer contains the warning/return path.
+- Follow-up: Keep serial refresh enabled, but do not relax the WNBA SmartSim contract again unless the artifact schema changes.
+
 # 2026-07-10 - WNBA/MLB refresh concurrency is now forced serial on the worker
 - Symptom: Live Render evidence showed MLB and WNBA refreshes overlapping inside `refresh_odds_sources.py` while the worker kept OOMing, even after SmartSim, history-size, export, and Player Logs hypotheses were weakened.
 - Root cause: The refresh orchestrator was still using `ThreadPoolExecutor` with up to 4 workers when multiple sports were selected, so MLB and WNBA could stay resident at the same time.
