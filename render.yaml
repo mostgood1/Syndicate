@@ -104,6 +104,8 @@ services:
         value: "source"
       - key: SYNDICATE_LIVE_ODDS_REFRESH_MODE
         value: "full"
+      - key: SYNDICATE_SERIAL_SPORT_REFRESH
+        value: "true"
       - key: SYNDICATE_LIVE_ODDS_REFRESH_REGIONS
         value: us
       - key: SYNDICATE_LIVE_ODDS_REFRESH_SKIP_MIRROR

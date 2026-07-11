@@ -1,3 +1,10 @@
+# 2026-07-10 - WNBA/MLB refresh concurrency is now forced serial on the worker
+- Symptom: Live Render evidence showed MLB and WNBA refreshes overlapping inside `refresh_odds_sources.py` while the worker kept OOMing, even after SmartSim, history-size, export, and Player Logs hypotheses were weakened.
+- Root cause: The refresh orchestrator was still using `ThreadPoolExecutor` with up to 4 workers when multiple sports were selected, so MLB and WNBA could stay resident at the same time.
+- Fix: Enabled `SYNDICATE_SERIAL_SPORT_REFRESH=true` in the Render worker env so the existing serial branch in `scripts/refresh_odds_sources.py` runs sports one at a time.
+- Validation: Confirmed the code already routes `max_workers=1` to the sequential branch and verified the Render diff contains only the env toggle.
+- Follow-up: Re-run the next MLB+WNBA refresh and compare OOM behavior; if it still fails, move the hypothesis back inside WNBA itself.
+
 # 2026-07-10 - WNBA refresh now logs DataFrame and phase memory at the likely RSS growth points
 - Symptom: The refresh worker was reaching about 1.6 GB RSS during `refresh_odds_sources.py`, but the existing logs only showed coarse step boundaries.
 - Root cause: The WNBA props path was doing the heavy `read_csv` -> copy -> filter -> merge -> export work without DataFrame-level or phase-level checkpoints, so the RSS spike could not be localized.
