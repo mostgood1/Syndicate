@@ -1922,7 +1922,17 @@ def _build_summary(args: argparse.Namespace) -> dict[str, Any]:
     )
 
     any_failure = False
-    max_workers = 1 if _serial_sport_refresh_enabled() else min(len(selected), 4)
+    serial_sport_refresh_raw = os.environ.get("SYNDICATE_SERIAL_SPORT_REFRESH")
+    serial_sport_refresh_enabled = _serial_sport_refresh_enabled()
+    max_workers = 1 if serial_sport_refresh_enabled else min(len(selected), 4)
+    print(
+        "[refresh_odds_sources] serial_gate "
+        f"raw={serial_sport_refresh_raw!r} "
+        f"enabled={serial_sport_refresh_enabled} "
+        f"selected={selected} "
+        f"max_workers={max_workers}",
+        flush=True,
+    )
     if max_workers <= 1:
         for sport in selected:
             log_all_process_memory("before_sport_launch", sport=sport, execution_mode=execution_mode, concurrency="sequential")
