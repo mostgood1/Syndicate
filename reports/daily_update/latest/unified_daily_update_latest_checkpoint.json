@@ -3,11 +3,11 @@
   "date": "2026-07-11",
   "runMode": "standard",
   "overallStatus": "started",
-  "generatedAt": "2026-07-11T06:45:42.5124237+00:00",
-  "updatedAt": "2026-07-11T06:45:42.7163020+00:00",
-  "runDir": "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-11\\20260711_064542",
+  "generatedAt": "2026-07-11T16:03:45.9998637+00:00",
+  "updatedAt": "2026-07-11T16:03:46.2507754+00:00",
+  "runDir": "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-11\\20260711_160345",
   "latestDir": "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest",
-  "lastUpdatedAt": "2026-07-11T06:45:42.6351299+00:00",
+  "lastUpdatedAt": "2026-07-11T16:03:46.1363588+00:00",
   "currentStage": "queued",
   "completedStages": [],
   "failedStage": null,
@@ -143,13 +143,10 @@
   "replayContext": {
     "latestCheckpointLoaded": true,
     "latestCheckpointPath": "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest_checkpoint.json",
-    "latestCheckpointStage": "completed",
+    "latestCheckpointStage": "queued",
     "latestCheckpointFailedStage": "",
-    "latestCheckpointCompletedStageCount": 2,
-    "latestCheckpointCompletedStages": [
-      "source_update",
-      "refresh_gate"
-    ],
+    "latestCheckpointCompletedStageCount": 0,
+    "latestCheckpointCompletedStages": null,
     "resumeEligible": false,
     "resumedFromCheckpoint": false,
     "forceRebuildToday": false
