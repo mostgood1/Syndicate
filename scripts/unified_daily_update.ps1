@@ -3424,6 +3424,9 @@ function Get-ForcedPublishArtifactPaths {
         Add-PathsUnderRoot -RelativeRoot 'data/ncaab_source/tracking'
     }
 
+    Add-PathsUnderRoot -RelativeRoot "reports/daily_update/$DateValue"
+    Add-PathsUnderRoot -RelativeRoot 'reports/daily_update/latest'
+
     return @($paths | Select-Object -Unique)
 }
 
@@ -3643,16 +3646,29 @@ function Invoke-GitPublish {
         if ($LASTEXITCODE -ne 0) {
             Write-Host "⚠️ Push rejected, attempting pull + rebase..." -ForegroundColor Yellow
 
-            
+            $dirtyRetryPaths = @(& git status --short --untracked-files=all)
+            if ($LASTEXITCODE -ne 0) {
+                throw "git status failed before retry for $RepoPath with exit code $LASTEXITCODE"
+            }
+            if ($dirtyRetryPaths.Count -gt 0) {
+                Write-Host '    dirty paths before retry:' -ForegroundColor Yellow
+                foreach ($dirtyPath in @($dirtyRetryPaths)) {
+                    if (-not [string]::IsNullOrWhiteSpace($dirtyPath)) {
+                        Write-Host ("      {0}" -f $dirtyPath) -ForegroundColor Yellow
+                    }
+                }
+            }
+
             & git pull --rebase $RemoteName $result.branch
             & git push $RemoteName $result.branch
 
 
             if ($LASTEXITCODE -ne 0) {
-                throw "git push failed after retry"
+                $dirtyRetrySummary = if ($dirtyRetryPaths.Count -gt 0) { ($dirtyRetryPaths | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | ForEach-Object { $_.Trim() }) -join '; ' } else { '<clean>' }
+                throw "git push failed after retry; dirty paths before retry: $dirtyRetrySummary"
             }
         }
- 
+
 
         $result.status = 'pushed'
         return [pscustomobject]$result

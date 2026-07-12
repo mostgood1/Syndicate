@@ -1,3 +1,10 @@
+# 2026-07-12 - Daily-update publish retry now includes the run-state bundle and dirty-path logging
+- Symptom: The daily update could reach the publish retry path, then fail again on `git pull --rebase` with an unstaged worktree.
+- Root cause: The forced publish path list did not include the `reports/daily_update/<date>` and `reports/daily_update/latest` run-state outputs that the manifest writers update during the run, so the retry rebase could still see dirty files.
+- Fix: Add the daily-update run bundle directories to `Get-ForcedPublishArtifactPaths` and print the dirty paths before the retry rebase so the next collision is visible immediately.
+- Validation: `PARSER_OK` from the PowerShell parser check on `scripts/unified_daily_update.ps1`.
+- Follow-up: If retry collisions still appear, capture the emitted dirty-path list and decide whether the remaining writers need to be folded into the publish set.
+
 # 2026-07-12 - MLB refresh no longer rebuilds the full tracking history after each step
 - Symptom: The live odds refresh worker would finish the MLB source step, log `sport_step_appended`, and then stall before WNBA ever started.
 - Root cause: MLB post-refresh tracking was rebuilding the entire history CSV on every run in `_persist_tracking_snapshot()`, which forced a full read/concat/dedup/sort/write cycle on the post-refresh path.
