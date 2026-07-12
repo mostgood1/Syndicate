@@ -1749,10 +1749,16 @@ def _run_sport_refresh(args: argparse.Namespace, sport: str, execution_mode: str
             step_payload=_object_summary(step_result, name="step_result"),
             rows_loaded=_step_rows_loaded(step_result),
         )
+        _log_memory("sport_step_post_append_before_compact", sport=sport, step=step.name)
         _compact_step_result(step_result)
+        _log_memory("sport_step_post_append_after_compact", sport=sport, step=step.name)
+        _log_memory("sport_step_post_append_before_step_ok_check", sport=sport, step=step.name, step_ok=bool(step_result.get("ok")))
         if not step_result["ok"]:
+            _log_memory("sport_step_post_append_enter_failed_step_branch", sport=sport, step=step.name)
             sport_result["ok"] = False
+            _log_memory("sport_step_post_append_after_mark_failed", sport=sport, step=step.name, sport_ok=bool(sport_result.get("ok")))
             if not args.continue_on_error:
+                _log_memory("sport_step_post_append_before_failed_finalize", sport=sport, step=step.name)
                 _log_memory(
                     f"{sport}_refresh",
                     sport=sport,
@@ -1765,8 +1771,12 @@ def _run_sport_refresh(args: argparse.Namespace, sport: str, execution_mode: str
                     after=_phase_memory_snapshot(),
                 )
                 return _finalize_sport_result(sport_result)
+            _log_memory("sport_step_post_append_after_failed_branch", sport=sport, step=step.name)
 
+    _log_memory("sport_step_post_append_before_fast_check", sport=sport, refresh_mode=refresh_mode)
     if refresh_mode == "fast":
+        _log_memory("sport_step_post_append_enter_fast_branch", sport=sport, refresh_mode=refresh_mode)
+        _log_memory("sport_step_post_append_before_publish_manifest", sport=sport, refresh_mode=refresh_mode)
         published_manifest = _publish_sport_manifest_threadsafe(
             sport=spec.slug,
             artifact_paths=_sport_artifact_paths(sport_result),
@@ -1778,7 +1788,9 @@ def _run_sport_refresh(args: argparse.Namespace, sport: str, execution_mode: str
                 refresh_mode=refresh_mode,
             ),
         )
+        _log_memory("sport_step_post_append_after_publish_manifest", sport=sport, refresh_mode=refresh_mode, manifest=_object_summary(published_manifest, name="sport_manifest"))
         sport_result["sport_manifest"] = published_manifest
+        _log_memory("sport_step_post_append_after_sport_manifest_set", sport=sport, refresh_mode=refresh_mode)
         _log_memory("sport_fast_publish", sport=sport, manifest=_object_summary(published_manifest, name="sport_manifest"))
         _log_memory(
             f"{sport}_refresh",
@@ -1790,24 +1802,34 @@ def _run_sport_refresh(args: argparse.Namespace, sport: str, execution_mode: str
             before=sport_start_memory,
             after=_phase_memory_snapshot(),
         )
+        _log_memory("sport_step_post_append_before_fast_finalize", sport=sport, refresh_mode=refresh_mode)
         return _finalize_sport_result(sport_result)
 
+    _log_memory("sport_step_post_append_before_post_refresh_check", sport=sport, execution_mode=execution_mode, sport_ok=bool(sport_result.get("ok")))
     if execution_mode == "source" and spec.slug in {"mlb", "nba", "wnba", "nhl", "nfl", "ncaab", "ncaaf"} and sport_result["ok"]:
+        _log_memory("sport_step_post_append_enter_post_refresh_branch", sport=sport, execution_mode=execution_mode)
+        _log_memory("sport_step_post_append_before_post_refresh_root", sport=sport, execution_mode=execution_mode)
+        post_refresh_root = _post_refresh_root(spec)
+        _log_memory("sport_step_post_append_after_post_refresh_root", sport=sport, execution_mode=execution_mode, source_root=str(post_refresh_root))
+        _log_memory("sport_step_post_append_before_tracking_call", sport=sport, execution_mode=execution_mode, source_root=str(post_refresh_root))
         _log_memory(
             "sport_post_refresh_start",
             sport=sport,
-            source_root=str(_post_refresh_root(spec)),
+            source_root=str(post_refresh_root),
             date=args.date,
             execution_mode=execution_mode,
         )
         tracking_result = _sync_post_refresh_tracking_step(
             sport=spec.slug,
-            source_root=_post_refresh_root(spec),
+            source_root=post_refresh_root,
             date_str=args.date,
             dry_run=bool(args.dry_run),
         )
+        _log_memory("sport_step_post_append_after_tracking_call", sport=sport, execution_mode=execution_mode, source_root=str(post_refresh_root), tracking=_object_summary(tracking_result, name="post_refresh"))
         sport_result["post_refresh"] = tracking_result
+        _log_memory("sport_step_post_append_after_post_refresh_set", sport=sport, execution_mode=execution_mode)
         sport_result["generation"]["post_refresh"] = tracking_result
+        _log_memory("sport_step_post_append_after_generation_post_refresh_set", sport=sport, execution_mode=execution_mode)
         _log_memory("sport_post_refresh", sport=sport, tracking=_object_summary(tracking_result, name="post_refresh"))
         _log_memory(
             "sport_post_refresh_end",
@@ -1817,9 +1839,13 @@ def _run_sport_refresh(args: argparse.Namespace, sport: str, execution_mode: str
             date=args.date,
             execution_mode=execution_mode,
         )
+        _log_memory("sport_step_post_append_after_post_refresh_end", sport=sport, execution_mode=execution_mode)
         if not tracking_result["ok"]:
+            _log_memory("sport_step_post_append_enter_failed_post_refresh_branch", sport=sport, execution_mode=execution_mode)
             sport_result["ok"] = False
+            _log_memory("sport_step_post_append_after_failed_post_refresh_mark", sport=sport, execution_mode=execution_mode, sport_ok=bool(sport_result.get("ok")))
             if not args.continue_on_error:
+                _log_memory("sport_step_post_append_before_failed_post_refresh_finalize", sport=sport, execution_mode=execution_mode)
                 _log_memory(
                     f"{sport}_refresh",
                     sport=sport,
@@ -1832,6 +1858,7 @@ def _run_sport_refresh(args: argparse.Namespace, sport: str, execution_mode: str
                     after=_phase_memory_snapshot(),
                 )
                 return _finalize_sport_result(sport_result)
+            _log_memory("sport_step_post_append_after_failed_post_refresh_branch", sport=sport, execution_mode=execution_mode)
 
     if not args.skip_mirror and (execution_mode == "ingest" or sport_result["ok"]):
         if _hosted_source_mode_writes_directly(spec=spec, execution_mode=execution_mode, mirror_only=execution_mode == "ingest"):

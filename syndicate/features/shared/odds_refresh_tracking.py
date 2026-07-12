@@ -18,31 +18,75 @@ from syndicate.features.shared.recommendation_engine import build_recommendation
 _ODDS_HISTORY_LIMIT = 50
 
 
+def _trace_now() -> str:
+    return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+
+def _trace_file_size(path: Path) -> int | None:
+    try:
+        return int(path.stat().st_size)
+    except Exception:
+        return None
+
+
+def _trace_log(stage: str, **payload: Any) -> None:
+    record = {"stage": stage, **payload}
+    print(f"[refresh_odds_tracking] TRACE {json.dumps(record, default=str, sort_keys=True)}", flush=True)
+
+
+def _trace_path_payload(path: Path, *, rows: int | None = None) -> dict[str, Any]:
+    return {
+        "path": str(path),
+        "exists": path.exists(),
+        "size_bytes": _trace_file_size(path),
+        "rows": rows,
+    }
+
+
 def _utc_now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
 def _read_csv(path: Path) -> pd.DataFrame:
+    started = time.perf_counter()
     try:
         if not path.exists():
+            _trace_log("after_read_csv", **_trace_path_payload(path, rows=0), elapsed_ms=round((time.perf_counter() - started) * 1000, 3), skipped=True)
             return pd.DataFrame()
-        return pd.read_csv(path)
+        frame = pd.read_csv(path)
+        _trace_log("after_read_csv", **_trace_path_payload(path, rows=int(len(frame))), elapsed_ms=round((time.perf_counter() - started) * 1000, 3), skipped=False)
+        return frame
     except Exception:
+        _trace_log("after_read_csv", **_trace_path_payload(path, rows=None), elapsed_ms=round((time.perf_counter() - started) * 1000, 3), error=True)
         return pd.DataFrame()
 
 
 def _read_json(path: Path) -> Any:
+    started = time.perf_counter()
     try:
         if not path.exists():
+            _trace_log("after_read_json", **_trace_path_payload(path), elapsed_ms=round((time.perf_counter() - started) * 1000, 3), skipped=True)
             return None
-        return json.loads(path.read_text(encoding="utf-8"))
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        rows = None
+        if isinstance(payload, list):
+            rows = len(payload)
+        elif isinstance(payload, dict):
+            maybe_rows = payload.get("rows") if isinstance(payload.get("rows"), list) else payload.get("games") if isinstance(payload.get("games"), list) else None
+            if isinstance(maybe_rows, list):
+                rows = len(maybe_rows)
+        _trace_log("after_read_json", **_trace_path_payload(path, rows=rows), elapsed_ms=round((time.perf_counter() - started) * 1000, 3), skipped=False)
+        return payload
     except Exception:
+        _trace_log("after_read_json", **_trace_path_payload(path), elapsed_ms=round((time.perf_counter() - started) * 1000, 3), error=True)
         return None
 
 
 def _write_json(path: Path, payload: Any) -> None:
+    started = time.perf_counter()
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+    _trace_log("after_write_json", **_trace_path_payload(path), elapsed_ms=round((time.perf_counter() - started) * 1000, 3))
 
 
 def _odds_history_path(tracking_root: Path) -> Path:
@@ -589,6 +633,7 @@ def _sync_odds_history_for_refresh(*, sport: str, source_root: Path, date_str: s
     artifact_history_path = _odds_history_artifact_path(source_root, slug)
     shared_history_path = _shared_odds_history_path(slug)
     candidates = _odds_history_snapshot_paths(sport=slug, source_root=source_root, date_str=date_str)
+    _trace_log("before_sync_odds_history", sport=slug, date=date_str, candidates=[str(path) for path in candidates], candidate_count=len(candidates))
     if not candidates:
         return {
             "ok": True,
@@ -604,13 +649,17 @@ def _sync_odds_history_for_refresh(*, sport: str, source_root: Path, date_str: s
 
     existing: dict[str, Any] = {}
     for candidate_path in (artifact_history_path, history_path):
+        _trace_log("before_odds_history_existing_read", sport=slug, **_trace_path_payload(candidate_path))
         try:
             if candidate_path.exists():
+                read_started = time.perf_counter()
                 payload = json.loads(candidate_path.read_text(encoding="utf-8"))
                 if isinstance(payload, dict):
                     existing = payload
+                    _trace_log("after_odds_history_existing_read", sport=slug, **_trace_path_payload(candidate_path, rows=int(len(payload) if hasattr(payload, "__len__") else 0)), elapsed_ms=round((time.perf_counter() - read_started) * 1000, 3), hit=True)
                     break
         except Exception:
+            _trace_log("after_odds_history_existing_read", sport=slug, **_trace_path_payload(candidate_path), elapsed_ms=round((time.perf_counter() - read_started) * 1000, 3) if 'read_started' in locals() else None, error=True)
             continue
 
     markets = _odds_history_market_states(existing)
@@ -629,12 +678,15 @@ def _sync_odds_history_for_refresh(*, sport: str, source_root: Path, date_str: s
         files_scanned += 1
         suffix = candidate.suffix.lower()
         candidate_snapshot_ts = _odds_history_candidate_snapshot_ts(candidate)
+        _trace_log("before_odds_history_candidate_read", sport=slug, path=str(candidate), suffix=suffix, size_bytes=_trace_file_size(candidate))
+        candidate_read_started = time.perf_counter()
         if suffix == ".csv":
             rows = _odds_history_rows_from_csv(candidate)
         elif suffix == ".jsonl":
             rows = _odds_history_rows_from_jsonl(candidate)
         else:
             rows = _odds_history_rows_from_json(candidate)
+        _trace_log("after_odds_history_candidate_read", sport=slug, path=str(candidate), suffix=suffix, size_bytes=_trace_file_size(candidate), rows=int(len(rows)), elapsed_ms=round((time.perf_counter() - candidate_read_started) * 1000, 3))
         if not rows:
             continue
 
@@ -810,7 +862,9 @@ def _sync_odds_history_for_refresh(*, sport: str, source_root: Path, date_str: s
         )
 
     if lifecycle_events:
+        _trace_log("before_append_odds_lifecycle_events", sport=slug, date=date_str, events=len(lifecycle_events), path=str(_odds_lifecycle_path(date_str)))
         append_odds_lifecycle_events(date_str, lifecycle_events)
+        _trace_log("after_append_odds_lifecycle_events", sport=slug, date=date_str, events=len(lifecycle_events), path=str(_odds_lifecycle_path(date_str)), size_bytes=_trace_file_size(_odds_lifecycle_path(date_str)))
 
     if not entries_appended and history_path.exists():
         return {
@@ -833,9 +887,11 @@ def _sync_odds_history_for_refresh(*, sport: str, source_root: Path, date_str: s
         "markets": markets,
     }
     payload.update(markets)
+    _trace_log("before_write_odds_history_json", sport=slug, history_path=str(history_path), shared_history_path=str(shared_history_path), artifact_history_path=str(artifact_history_path), markets=len(markets), entries_appended=int(entries_appended))
     _write_json(history_path, payload)
     _write_json(shared_history_path, payload)
     _write_json(artifact_history_path, payload)
+    _trace_log("after_write_odds_history_json", sport=slug, history_path=str(history_path), shared_history_path=str(shared_history_path), artifact_history_path=str(artifact_history_path), markets=len(markets), entries_appended=int(entries_appended))
     return {
         "ok": True,
         "skipped": False,
@@ -973,6 +1029,7 @@ def _recommendation_paths_for_refresh(*, source_root: Path, sport: str, date_str
 
 def refresh_impacted_recommendations_for_tracking(*, sport: str, source_root: Path, date_str: str, tracking_meta: Mapping[str, Any] | None = None) -> dict[str, Any]:
     signal_paths = _movement_signal_paths_from_meta(tracking_meta)
+    _trace_log("before_refresh_impacted_recommendations", sport=str(sport or "").strip().lower(), date=date_str, signal_paths=[str(path) for path in signal_paths], signal_count=len(signal_paths))
     if not signal_paths:
         return {
             "ok": True,
@@ -986,10 +1043,14 @@ def refresh_impacted_recommendations_for_tracking(*, sport: str, source_root: Pa
     signal_tokens: set[str] = set()
     signals_rows = 0
     for path in signal_paths:
+        _trace_log("before_read_movement_signals", sport=str(sport or "").strip().lower(), **_trace_path_payload(path))
+        read_started = time.perf_counter()
         try:
             frame = pd.read_csv(path)
         except Exception:
+            _trace_log("after_read_movement_signals", sport=str(sport or "").strip().lower(), **_trace_path_payload(path), elapsed_ms=round((time.perf_counter() - read_started) * 1000, 3), error=True)
             continue
+        _trace_log("after_read_movement_signals", sport=str(sport or "").strip().lower(), **_trace_path_payload(path, rows=int(len(frame))), elapsed_ms=round((time.perf_counter() - read_started) * 1000, 3))
         if frame.empty:
             continue
         if "movement_signals" not in path.name:
@@ -1024,7 +1085,10 @@ def refresh_impacted_recommendations_for_tracking(*, sport: str, source_root: Pa
     updated_files: list[str] = []
     recommendation_paths = _recommendation_paths_for_refresh(source_root=source_root, sport=sport, date_str=date_str)
     for recommendation_path in recommendation_paths:
+        _trace_log("before_read_recommendation_json", sport=sport, **_trace_path_payload(recommendation_path))
+        read_started = time.perf_counter()
         payload = _read_json_payload(recommendation_path)
+        _trace_log("after_read_recommendation_json", sport=sport, **_trace_path_payload(recommendation_path), elapsed_ms=round((time.perf_counter() - read_started) * 1000, 3), has_payload=bool(payload))
         rows, container_key = _payload_rows(payload)
         if not rows:
             continue
@@ -1050,7 +1114,9 @@ def refresh_impacted_recommendations_for_tracking(*, sport: str, source_root: Pa
                 "signals_rows": int(signals_rows),
                 "rows_updated": int(rows_updated),
             }
+        _trace_log("before_write_recommendation_json", sport=sport, **_trace_path_payload(recommendation_path, rows=int(len(rows))))
         _write_json(recommendation_path, updated_payload)
+        _trace_log("after_write_recommendation_json", sport=sport, **_trace_path_payload(recommendation_path, rows=int(len(rows))))
         files_updated += 1
         try:
             updated_files.append(str(recommendation_path.relative_to(source_root)))
@@ -1096,6 +1162,7 @@ def _persist_tracking_snapshot(
     price_cols: list[str],
     label_cols: list[str] | None = None,
 ) -> dict[str, Any]:
+    _trace_log("before_persist_tracking_snapshot", prefix=prefix, scope=scope, tracking_root=str(tracking_root))
     tracking_root.mkdir(parents=True, exist_ok=True)
     opening_path = tracking_root / f"{prefix}_opening_{scope}.csv"
     history_path = tracking_root / f"{prefix}_history_{scope}.csv"
@@ -1137,12 +1204,16 @@ def _persist_tracking_snapshot(
     normalized = normalized.sort_values(key_cols + ["snapshot_ts"], kind="mergesort").reset_index(drop=True)
     history_rows = normalized.copy()
     history_rows["snapshot_ts"] = history_rows["snapshot_ts"].dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+    _trace_log("before_write_history_csv", path=str(history_path), rows=int(len(history_rows)), size_bytes=_trace_file_size(history_path))
     if history_path.exists():
         history_rows.to_csv(history_path, mode="a", header=False, index=False)
     else:
         history_rows.to_csv(history_path, index=False)
+    _trace_log("after_write_history_csv", path=str(history_path), rows=int(len(history_rows)), size_bytes=_trace_file_size(history_path))
 
+    _trace_log("before_read_opening_csv", path=str(opening_path), size_bytes=_trace_file_size(opening_path))
     existing_open = _read_csv(opening_path)
+    _trace_log("after_read_opening_csv", path=str(opening_path), rows=int(len(existing_open)) if isinstance(existing_open, pd.DataFrame) else None, size_bytes=_trace_file_size(opening_path))
     if not existing_open.empty:
         for column in normalized.columns:
             if column not in existing_open.columns:
@@ -1151,13 +1222,19 @@ def _persist_tracking_snapshot(
         existing_open["snapshot_ts"] = pd.to_datetime(existing_open["snapshot_ts"], errors="coerce", utc=True)
 
     opening_source = pd.concat([existing_open, normalized], ignore_index=True, sort=False) if not existing_open.empty else normalized.copy()
+    _trace_log("before_opening_groupby", path=str(opening_path), rows=int(len(opening_source)))
     combined_open = opening_source.sort_values(key_cols + ["snapshot_ts"], kind="mergesort").groupby(key_cols, dropna=False, as_index=False).first()
+    _trace_log("after_opening_groupby", path=str(opening_path), rows=int(len(combined_open)))
 
     opening_to_write = combined_open.copy()
     opening_to_write["snapshot_ts"] = pd.to_datetime(opening_to_write["snapshot_ts"], errors="coerce", utc=True).dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+    _trace_log("before_write_opening_csv", path=str(opening_path), rows=int(len(opening_to_write)), size_bytes=_trace_file_size(opening_path))
     opening_to_write.to_csv(opening_path, index=False)
+    _trace_log("after_write_opening_csv", path=str(opening_path), rows=int(len(opening_to_write)), size_bytes=_trace_file_size(opening_path))
 
+    _trace_log("before_latest_groupby", path=str(movement_path), rows=int(len(normalized)))
     latest = normalized.sort_values(key_cols + ["snapshot_ts"], kind="mergesort").groupby(key_cols, dropna=False, as_index=False).last()
+    _trace_log("after_latest_groupby", path=str(movement_path), rows=int(len(latest)))
     movement = latest.merge(
         combined_open[key_cols + ([line_col] if line_col else []) + price_cols].rename(
             columns={
@@ -1177,7 +1254,9 @@ def _persist_tracking_snapshot(
         movement[f"{column}_move"] = pd.to_numeric(movement.get(f"current_{column}"), errors="coerce") - pd.to_numeric(movement.get(f"open_{column}"), errors="coerce")
     movement["latest_snapshot_ts"] = pd.to_datetime(movement["snapshot_ts"], errors="coerce", utc=True).dt.strftime("%Y-%m-%dT%H:%M:%SZ")
     movement = movement.drop(columns=["snapshot_ts"], errors="ignore")
+    _trace_log("before_write_movement_csv", path=str(movement_path), rows=int(len(movement)), size_bytes=_trace_file_size(movement_path))
     movement.to_csv(movement_path, index=False)
+    _trace_log("after_write_movement_csv", path=str(movement_path), rows=int(len(movement)), size_bytes=_trace_file_size(movement_path))
 
     return {
         "ok": True,
@@ -1413,9 +1492,13 @@ def _infer_nfl_week_scope(source_root: Path) -> tuple[str, Path | None]:
 
 def sync_sport_post_refresh_tracking(*, sport: str, source_root: Path, date_str: str) -> dict[str, Any]:
     slug = str(sport or "").strip().lower()
+    _trace_log("before_sync_sport_post_refresh_tracking", sport=slug, source_root=str(source_root), date=date_str)
     if slug in {"nba", "wnba"}:
+        _trace_log("before_sync_basketball_props_tracking", sport=slug, source_root=str(source_root), date=date_str)
         results = sync_basketball_props_tracking_for_source_root(sport=slug, source_root=source_root, date_str=date_str)
+        _trace_log("after_sync_basketball_props_tracking", sport=slug, source_root=str(source_root), date=date_str, ok=bool(results.get("ok")))
         if bool(results.get("ok")):
+            _trace_log("before_refresh_impacted_recommendations", sport=slug, source_root=str(source_root), date=date_str)
             results["artifacts"] = dict(results.get("artifacts") or {})
             results["artifacts"]["recommendations_refresh"] = refresh_impacted_recommendations_for_tracking(
                 sport=slug,
@@ -1423,7 +1506,11 @@ def sync_sport_post_refresh_tracking(*, sport: str, source_root: Path, date_str:
                 date_str=date_str,
                 tracking_meta=results,
             )
+            _trace_log("after_refresh_impacted_recommendations", sport=slug, source_root=str(source_root), date=date_str, ok=bool(results["artifacts"]["recommendations_refresh"].get("ok")))
+            _trace_log("before_sync_odds_history", sport=slug, source_root=str(source_root), date=date_str)
             results["artifacts"]["odds_history"] = _sync_odds_history_for_refresh(sport=slug, source_root=source_root, date_str=date_str)
+            _trace_log("after_sync_odds_history", sport=slug, source_root=str(source_root), date=date_str, ok=bool(results["artifacts"]["odds_history"].get("ok")))
+        _trace_log("after_sync_sport_post_refresh_tracking", sport=slug, source_root=str(source_root), date=date_str, ok=bool(results.get("ok")))
         return results
 
     tracking_root = source_root / "tracking"
