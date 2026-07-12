@@ -1,3 +1,10 @@
+# 2026-07-12 - WNBA advanced-data gate is checking the wrong processed root for SmartSim
+- Symptom: `scripts/unified_daily_update.ps1` failed the WNBA advanced-data gate with `missing smart_sim artifacts for 2026-07-12` even though the refresh log showed `after_smart_sim` and nonzero predictions/edges rows.
+- Root cause: The gate only checked `data/wnba_source/data/processed/smart_sim_2026-07-12_*.json`, while the vendored refresh path writes SmartSim to the active WNBA source root under `vendor/wnba_betting_repo/data/processed/smart_sim_2026-07-12_<HOME>_<AWAY>.json` and then copies matching files into `data/wnba_source/source_artifacts/data/processed/` during bundle materialization.
+- Fix: None in this pass; document the path mismatch so the gate expectation can be aligned with the producer root.
+- Validation: Read the gate block in `scripts/unified_daily_update.ps1` around line 2620, the refresh command at line 4111, and the SmartSim writer at `vendor/wnba_betting_repo/src/wnba_betting/cli.py:1007`; workspace search found no `smart_sim_2026-07-12_*.json` files under the checked gate root.
+- Follow-up: If the gate is meant to validate the published artifact bundle, it should also inspect `data/wnba_source/source_artifacts/data/processed/smart_sim_2026-07-12_*.json` or the wrapper should publish SmartSim into the primary mirror root before the gate runs.
+
 # 2026-07-12 - MLB slim-payload rollout verified locally but not through public Render telemetry
 - Symptom: The deployed MLB refresh run could be checked on the public board/status routes, but the exact refresh runtime fields needed for memory/restart verification were not exposed there, and the protected ops refresh-status route returned `401`.
 - Root cause: The child refresh process exits cleanly and the public intelligence routes only expose board contract/state, not the wrapper runtime payload with `WRAPPER_WAIT_*`, `rss_*`, or `before_exit` fields.
