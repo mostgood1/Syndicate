@@ -13,6 +13,7 @@ from syndicate.features.wnba.sources import format_num
 from syndicate.features.wnba.sources import format_pct
 from syndicate.features.wnba.sources import market_label
 from syndicate.features.wnba.sources import load_json
+from syndicate.features.wnba.sources import processed_root
 
 
 def _cards_from_summary(summary: dict[str, Any], limit: int = 12) -> list[dict[str, Any]]:
@@ -116,7 +117,7 @@ def _load_props_recommendations_summary(path):
 
 
 def build_props_page_context(selected_date: str) -> dict[str, Any]:
-    source_path = f"props_recommendations_top_by_game_{selected_date}.json"
+    source_path = str(processed_root() / f"props_recommendations_top_by_game_{selected_date}.json")
     return build_top_props_page_context(
         selected_date=selected_date,
         route_path="/wnba/props",

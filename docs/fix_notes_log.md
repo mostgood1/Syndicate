@@ -1,3 +1,10 @@
+# 2026-07-12 - WNBA props, live-lens, and MLB freshness display corrections
+- Symptom: WNBA props rendered 0 cards despite published artifacts, WNBA live-lens current-day pages rebuilt to an empty view, and MLB freshness timestamps displayed in the browser timezone instead of Central Time.
+- Root cause: The WNBA props loader passed a relative filename instead of the published artifact root; the WNBA live-lens page context omitted the `cards` alias even when `rank_cards` existed; and the MLB board-client timestamp formatter in `cards.js` did not pin `America/Chicago`.
+- Fix: Resolve WNBA props from `data/wnba_source/source_artifacts/data/processed`, expose `cards` alongside `rank_cards` in the WNBA live-lens context, and force the MLB board formatter to use `America/Chicago`.
+- Validation: Rechecked the published 2026-07-11 WNBA artifacts and the live worker trace; the WNBA cards path now resolves the published props file, the live-lens context exposes populated cards for the current published slate, and the MLB timestamp formatter now matches the source-client timezone.
+- Follow-up: Keep the current-day WNBA live-lens snapshot contract explicit so the page continues to hydrate from published artifacts instead of an empty rebuild.
+
 # 2026-07-12 - Daily-update publish retry now includes the run-state bundle and dirty-path logging
 - Symptom: The daily update could reach the publish retry path, then fail again on `git pull --rebase` with an unstaged worktree.
 - Root cause: The forced publish path list did not include the `reports/daily_update/<date>` and `reports/daily_update/latest` run-state outputs that the manifest writers update during the run, so the retry rebase could still see dirty files.

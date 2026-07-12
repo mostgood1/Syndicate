@@ -207,6 +207,7 @@
     const parsed = new Date(text);
     if (Number.isNaN(parsed.getTime())) return text;
     return new Intl.DateTimeFormat(undefined, {
+      timeZone: 'America/Chicago',
       month: 'numeric',
       day: 'numeric',
       hour: 'numeric',

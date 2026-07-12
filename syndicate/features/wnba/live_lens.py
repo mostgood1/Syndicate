@@ -448,6 +448,7 @@ def build_live_lens_page_context(selected_date: str) -> dict[str, Any]:
     if snapshot is None or not validate_live_lens_snapshot(snapshot) or not _snapshot_list(snapshot, "rank_cards"):
         snapshot = build_live_lens_snapshot(selected_date)
     context = _empty_live_lens_context(selected_date) if snapshot is None else _snapshot_context(selected_date, snapshot)
+    context["cards"] = [dict(card) for card in context.get("rank_cards") or [] if isinstance(card, dict)]
     return attach_live_lens_contract(context, sport="wnba", module="live_lens")
 
 
