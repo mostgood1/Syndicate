@@ -308,6 +308,46 @@ class RefreshOddsSourcesTests(unittest.TestCase):
         self.assertEqual(runtime["accounted_rss_mb"], 48.125)
         self.assertEqual(runtime["unexplained_memory_mb"], 15.875)
 
+    def test_build_summary_routes_progress_logs_to_stderr(self) -> None:
+        module = self._load_module()
+        args = argparse.Namespace(
+            date="2026-06-07",
+            sports="wnba",
+            phase="all",
+            regions="us",
+            bookmakers="",
+            markets="",
+            season=None,
+            week=None,
+            skip_mirror=True,
+            execution_mode="source",
+            mirror_only=False,
+            continue_on_error=True,
+            dry_run=False,
+            json=False,
+            list=False,
+        )
+
+        with patch.object(module, "_run_command", return_value={"ok": True, "name": "wnba_oddsapi_props_job", "dry_run": False}), patch.object(
+            module,
+            "_sync_post_refresh_tracking_step",
+            return_value={"ok": True, "name": "wnba_post_refresh_tracking_sync", "dry_run": False, "meta": {"signals_rows": 3}},
+        ), patch.object(module, "publish_sport_manifest", return_value={"path": "reports/manifests/wnba.json", "payload": {"sport": "wnba"}}), patch.object(
+            module,
+            "build_publish_parity_summary",
+            return_value={"date": "2026-06-07", "sports": [], "totalForcedPublishPaths": 3},
+        ), patch.object(module, "_log_memory", return_value=None), patch.object(module, "log_all_process_memory", return_value={}), patch.object(
+            module,
+            "log_runtime_memory",
+            return_value=None,
+        ), patch("builtins.print") as mocked_print:
+            summary = module._build_summary(args)
+
+        self.assertTrue(summary["ok"])
+        serial_gate_calls = [call for call in mocked_print.call_args_list if "[refresh_odds_sources] serial_gate" in str(call.args[0])]
+        self.assertEqual(len(serial_gate_calls), 1)
+        self.assertEqual(serial_gate_calls[0].kwargs.get("file"), module.sys.stderr)
+
     def test_sport_control_plane_metadata_uses_same_refresh_contract_for_mlb_and_wnba(self) -> None:
         module = self._load_module()
 

@@ -1,3 +1,10 @@
+# 2026-07-12 - MLB slim-payload rollout verified locally but not through public Render telemetry
+- Symptom: The deployed MLB refresh run could be checked on the public board/status routes, but the exact refresh runtime fields needed for memory/restart verification were not exposed there, and the protected ops refresh-status route returned `401`.
+- Root cause: The child refresh process exits cleanly and the public intelligence routes only expose board contract/state, not the wrapper runtime payload with `WRAPPER_WAIT_*`, `rss_*`, or `before_exit` fields.
+- Fix: None in this pass; verification used the local shutdown trace as the only source that exposed the full refresh runtime contract.
+- Validation: `tmp_shutdown_trace.log` shows `step_end:mlb_oddsapi_refresh:rc=0`, `sport_end`, `summary_end`, and `before_exit` with `accounted_rss_mb=90.012`, `container_memory_mb=null`, and `unexplained_memory_mb=null`; public Render routes did not expose `refresh_status`.
+- Follow-up: If production confirmation is still required, expose the refresh runtime contract through an authenticated status endpoint or mirrored artifact that the public deployment can read.
+
 # 2026-07-12 - MLB refresh now requests a slim live-lens payload
 - Symptom: The MLB-only refresh path was carrying a large live-lens report payload through the refresh worker, which added avoidable RSS pressure during the odds refresh.
 - Root cause: The shared live-lens builder always returned the full report shape, and the refresh workflow had no opt-in slim contract for the refresh-only fetch.

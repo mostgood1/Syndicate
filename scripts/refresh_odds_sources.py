@@ -1168,12 +1168,12 @@ def _run_command(step: RefreshStep, *, dry_run: bool = False) -> dict[str, Any]:
     print(f"PRE_STEP_LOG name={step.name}", file=sys.stderr, flush=True)
     print(f"STEP_START name={step.name} cwd={step.cwd} command={json.dumps(list(step.command))}", file=sys.stderr, flush=True)
     print(f"POST_STEP_LOG name={step.name}", file=sys.stderr, flush=True)
-    print(f"[refresh_odds_sources] START step={step.name} cwd={step.cwd}", flush=True)
+    print(f"[refresh_odds_sources] START step={step.name} cwd={step.cwd}", file=sys.stderr, flush=True)
     _log_memory("step_start", step=step.name, dry_run=bool(dry_run), cwd=str(step.cwd))
     _dump_child_runtime_state(label=f"step_start:{step.name}")
     if dry_run:
         print(f"STEP_END name={step.name} status=dry_run runtime_seconds=0", file=sys.stderr, flush=True)
-        print(f"[refresh_odds_sources] END step={step.name} dry_run=true", flush=True)
+        print(f"[refresh_odds_sources] END step={step.name} dry_run=true", file=sys.stderr, flush=True)
         _dump_child_runtime_state(label=f"step_end:{step.name}:dry_run")
         _log_memory("step_end_dry_run", step=step.name)
         return {
@@ -1214,7 +1214,7 @@ def _run_command(step: RefreshStep, *, dry_run: bool = False) -> dict[str, Any]:
             file=sys.stderr,
             flush=True,
         )
-        print(f"[refresh_odds_sources] FAIL step={step.name} reason=timeout timeout_seconds={timeout_seconds}", flush=True)
+        print(f"[refresh_odds_sources] FAIL step={step.name} reason=timeout timeout_seconds={timeout_seconds}", file=sys.stderr, flush=True)
         raise
     finally:
         if result is not None:
@@ -1241,6 +1241,7 @@ def _run_command(step: RefreshStep, *, dry_run: bool = False) -> dict[str, Any]:
     )
     print(
         f"[refresh_odds_sources] END step={step.name} return_code={result.returncode} timeout_seconds={timeout_seconds if timeout_seconds is not None else 'none'}",
+        file=sys.stderr,
         flush=True,
     )
     _log_memory(
@@ -2000,6 +2001,7 @@ def _build_summary(args: argparse.Namespace) -> dict[str, Any]:
         f"enabled={serial_sport_refresh_enabled} "
         f"selected={selected} "
         f"max_workers={max_workers}",
+        file=sys.stderr,
         flush=True,
     )
     if max_workers <= 1:
@@ -2277,20 +2279,20 @@ def main() -> int:
         for sport_result in summary.get("results", []):
             sport = sport_result["sport"]
             status = "ok" if sport_result.get("ok") else "failed"
-            print(f"[{sport}] {status}")
+            print(f"[{sport}] {status}", file=sys.stderr)
             if sport_result.get("error"):
-                print(f"  - error: {sport_result['error']}")
+                print(f"  - error: {sport_result['error']}", file=sys.stderr)
             for step_result in sport_result.get("refresh_steps", []):
                 marker = "dry-run" if step_result.get("dry_run") else ("ok" if step_result.get("ok") else "failed")
-                print(f"  - refresh {step_result['name']}: {marker}")
+                print(f"  - refresh {step_result['name']}: {marker}", file=sys.stderr)
             post_refresh = sport_result.get("post_refresh")
             if isinstance(post_refresh, dict):
                 marker = "dry-run" if post_refresh.get("dry_run") else ("ok" if post_refresh.get("ok") else "failed")
-                print(f"  - post-refresh {post_refresh['name']}: {marker}")
+                print(f"  - post-refresh {post_refresh['name']}: {marker}", file=sys.stderr)
             mirror = sport_result.get("mirror")
             if isinstance(mirror, dict):
                 marker = "dry-run" if mirror.get("dry_run") else ("ok" if mirror.get("ok") else "failed")
-                print(f"  - mirror: {marker}")
+                print(f"  - mirror: {marker}", file=sys.stderr)
 
         _dump_child_runtime_state(label="non_json_after_write")
         _dump_main_thread_stack(label="non_json_after_write")
