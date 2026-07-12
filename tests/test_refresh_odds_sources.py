@@ -247,6 +247,67 @@ class RefreshOddsSourcesTests(unittest.TestCase):
         self.assertEqual(summary["publish_parity"]["totalForcedPublishPaths"], 3)
         mocked_publish_parity.assert_called_once()
 
+    def test_build_summary_includes_structured_runtime_memory_snapshot(self) -> None:
+        module = self._load_module()
+        args = argparse.Namespace(
+            date="2026-06-07",
+            sports="wnba",
+            phase="all",
+            regions="us",
+            bookmakers="",
+            markets="",
+            season=None,
+            week=None,
+            skip_mirror=True,
+            execution_mode="source",
+            mirror_only=False,
+            continue_on_error=True,
+            dry_run=False,
+            json=False,
+            list=False,
+        )
+
+        phase_calls = {"count": 0}
+
+        def fake_phase_snapshot() -> dict[str, object]:
+            phase_calls["count"] += 1
+            return {"rss_bytes": 1000 if phase_calls["count"] == 1 else 1600}
+
+        final_process_memory = {
+            "process_count": 2,
+            "accounted_rss_mb": 48.125,
+            "container_memory_mb": 64.0,
+            "unexplained_memory_mb": 15.875,
+            "processes": [],
+        }
+
+        with patch.object(module, "_phase_memory_snapshot", side_effect=fake_phase_snapshot), patch.object(
+            module,
+            "get_all_process_memory_snapshot",
+            return_value=final_process_memory,
+        ), patch.object(module, "_log_memory", return_value=None), patch.object(module, "log_all_process_memory", return_value={}), patch.object(
+            module,
+            "log_runtime_memory",
+            return_value=None,
+        ), patch.object(module, "_run_command", return_value={"ok": True, "name": "wnba_oddsapi_props_job", "dry_run": False}), patch.object(
+            module,
+            "_sync_post_refresh_tracking_step",
+            return_value={"ok": True, "name": "wnba_post_refresh_tracking_sync", "dry_run": False, "meta": {"signals_rows": 3}},
+        ), patch.object(module, "publish_sport_manifest", return_value={"path": "reports/manifests/wnba.json", "payload": {"sport": "wnba"}}), patch.object(
+            module,
+            "build_publish_parity_summary",
+            return_value={"date": "2026-06-07", "sports": [], "totalForcedPublishPaths": 3},
+        ):
+            summary = module._build_summary(args)
+
+        runtime = summary["runtime"]
+        self.assertEqual(runtime["rss_bytes"], 1600)
+        self.assertEqual(runtime["rss_delta_bytes"], 600)
+        self.assertEqual(runtime["rss_growth_ratio"], 1.6)
+        self.assertEqual(runtime["container_memory_mb"], 64.0)
+        self.assertEqual(runtime["accounted_rss_mb"], 48.125)
+        self.assertEqual(runtime["unexplained_memory_mb"], 15.875)
+
     def test_sport_control_plane_metadata_uses_same_refresh_contract_for_mlb_and_wnba(self) -> None:
         module = self._load_module()
 

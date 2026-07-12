@@ -51,6 +51,7 @@ from syndicate.features.shared.odds_control_plane import write_odds_control_plan
 from syndicate.features.shared.publish_parity import build_publish_parity_summary
 from syndicate.features.shared.odds_refresh_tracking import sync_sport_post_refresh_tracking
 from syndicate.features.shared.manifest import publish_sport_manifest
+from syndicate.features.shared.memory_observability import get_all_process_memory_snapshot
 from syndicate.features.shared.refresh_state_store import data_root
 from syndicate.features.shared.memory_observability import log_all_process_memory
 from syndicate.features.shared.memory_observability import log_runtime_memory
@@ -2115,6 +2116,18 @@ def _build_summary(args: argparse.Namespace) -> dict[str, Any]:
 
     summary["finished_at"] = _utc_now()
     summary["ok"] = not any_failure
+    final_memory_snapshot = _phase_memory_snapshot()
+    final_process_memory = get_all_process_memory_snapshot()
+    start_rss_bytes = summary_start_memory.get("rss_bytes")
+    final_rss_bytes = final_memory_snapshot.get("rss_bytes")
+    summary["runtime"] = {
+        "rss_bytes": final_rss_bytes,
+        "rss_delta_bytes": int(final_rss_bytes - start_rss_bytes) if isinstance(final_rss_bytes, int) and isinstance(start_rss_bytes, int) else None,
+        "rss_growth_ratio": round(final_rss_bytes / start_rss_bytes, 4) if isinstance(final_rss_bytes, int) and isinstance(start_rss_bytes, int) and start_rss_bytes > 0 else None,
+        "container_memory_mb": final_process_memory.get("container_memory_mb"),
+        "accounted_rss_mb": final_process_memory.get("accounted_rss_mb"),
+        "unexplained_memory_mb": final_process_memory.get("unexplained_memory_mb"),
+    }
     summary_rows_loaded = sum((_sport_rows_loaded(item) or 0) for item in summary.get("results", []) if isinstance(item, dict))
     _log_memory(
         "summary_before_parity",
@@ -2122,7 +2135,7 @@ def _build_summary(args: argparse.Namespace) -> dict[str, Any]:
         results=_object_summary(summary.get("results", []), name="results"),
         rows_loaded=summary_rows_loaded,
         before=summary_start_memory,
-        after=_phase_memory_snapshot(),
+        after=final_memory_snapshot,
     )
     publish_parity_paths: list[str] = []
     for sport_result in summary.get("results", []) if isinstance(summary.get("results"), list) else []:
@@ -2142,7 +2155,7 @@ def _build_summary(args: argparse.Namespace) -> dict[str, Any]:
         publish_parity_paths_count=len(publish_parity_paths),
         rows_loaded=summary_rows_loaded,
         before=summary_start_memory,
-        after=_phase_memory_snapshot(),
+        after=final_memory_snapshot,
     )
     return summary
 
