@@ -1,3 +1,10 @@
+# 2026-07-12 - MLB refresh no longer rebuilds the full tracking history after each step
+- Symptom: The live odds refresh worker would finish the MLB source step, log `sport_step_appended`, and then stall before WNBA ever started.
+- Root cause: MLB post-refresh tracking was rebuilding the entire history CSV on every run in `_persist_tracking_snapshot()`, which forced a full read/concat/dedup/sort/write cycle on the post-refresh path.
+- Fix: Switch the MLB-style tracking write to append only the current snapshot rows, keep opening/movement derivation on the small current snapshot plus existing opening file, and add explicit post-refresh start/end markers in the refresh orchestrator.
+- Validation: `python -m py_compile scripts/refresh_odds_sources.py syndicate/features/shared/odds_refresh_tracking.py` passed.
+- Follow-up: If post-refresh still runs long on Render, time `_sync_post_refresh_tracking_step()` and the MLB odds-history rebuild separately so the next bottleneck is visible immediately.
+
 # 2026-07-11 - WNBA daily update restored SmartSim-required gating
 - Symptom: The WNBA daily update had been downgraded to warn-and-continue when `smart_sim_<date>_*.json` files were missing, which masked a broken SmartSim publication path.
 - Root cause: The earlier incident mitigation relaxed the WNBA advanced-data gate after SmartSim was treated as optional during the OOM investigation.

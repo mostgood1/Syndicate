@@ -1793,6 +1793,13 @@ def _run_sport_refresh(args: argparse.Namespace, sport: str, execution_mode: str
         return _finalize_sport_result(sport_result)
 
     if execution_mode == "source" and spec.slug in {"mlb", "nba", "wnba", "nhl", "nfl", "ncaab", "ncaaf"} and sport_result["ok"]:
+        _log_memory(
+            "sport_post_refresh_start",
+            sport=sport,
+            source_root=str(_post_refresh_root(spec)),
+            date=args.date,
+            execution_mode=execution_mode,
+        )
         tracking_result = _sync_post_refresh_tracking_step(
             sport=spec.slug,
             source_root=_post_refresh_root(spec),
@@ -1802,6 +1809,14 @@ def _run_sport_refresh(args: argparse.Namespace, sport: str, execution_mode: str
         sport_result["post_refresh"] = tracking_result
         sport_result["generation"]["post_refresh"] = tracking_result
         _log_memory("sport_post_refresh", sport=sport, tracking=_object_summary(tracking_result, name="post_refresh"))
+        _log_memory(
+            "sport_post_refresh_end",
+            sport=sport,
+            ok=bool(tracking_result.get("ok")) if isinstance(tracking_result, dict) else None,
+            source_root=str(_post_refresh_root(spec)),
+            date=args.date,
+            execution_mode=execution_mode,
+        )
         if not tracking_result["ok"]:
             sport_result["ok"] = False
             if not args.continue_on_error:

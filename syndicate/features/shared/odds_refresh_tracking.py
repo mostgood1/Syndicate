@@ -1135,31 +1135,31 @@ def _persist_tracking_snapshot(
         }
 
     normalized = normalized.sort_values(key_cols + ["snapshot_ts"], kind="mergesort").reset_index(drop=True)
-    existing_history = _read_csv(history_path)
-    if existing_history.empty:
-        combined_history = normalized.copy()
+    history_rows = normalized.copy()
+    history_rows["snapshot_ts"] = history_rows["snapshot_ts"].dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+    if history_path.exists():
+        history_rows.to_csv(history_path, mode="a", header=False, index=False)
     else:
-        for column in normalized.columns:
-            if column not in existing_history.columns:
-                existing_history[column] = pd.NA
-        existing_history = existing_history[normalized.columns].copy()
-        existing_history["snapshot_ts"] = pd.to_datetime(existing_history["snapshot_ts"], errors="coerce", utc=True)
-        combined_history = pd.concat([existing_history, normalized], ignore_index=True, sort=False)
-        dedupe_cols = [col for col in normalized.columns if col != "snapshot_ts"] + ["snapshot_ts"]
-        combined_history = combined_history.drop_duplicates(subset=dedupe_cols, keep="first")
-        combined_history = combined_history.sort_values(key_cols + ["snapshot_ts"], kind="mergesort").reset_index(drop=True)
-    combined_history_to_write = combined_history.copy()
-    combined_history_to_write["snapshot_ts"] = combined_history_to_write["snapshot_ts"].dt.strftime("%Y-%m-%dT%H:%M:%SZ")
-    combined_history_to_write.to_csv(history_path, index=False)
+        history_rows.to_csv(history_path, index=False)
 
-    opening = combined_history.sort_values(key_cols + ["snapshot_ts"], kind="mergesort").groupby(key_cols, dropna=False, as_index=False).first()
-    opening_to_write = opening.copy()
+    existing_open = _read_csv(opening_path)
+    if not existing_open.empty:
+        for column in normalized.columns:
+            if column not in existing_open.columns:
+                existing_open[column] = pd.NA
+        existing_open = existing_open[normalized.columns].copy()
+        existing_open["snapshot_ts"] = pd.to_datetime(existing_open["snapshot_ts"], errors="coerce", utc=True)
+
+    opening_source = pd.concat([existing_open, normalized], ignore_index=True, sort=False) if not existing_open.empty else normalized.copy()
+    combined_open = opening_source.sort_values(key_cols + ["snapshot_ts"], kind="mergesort").groupby(key_cols, dropna=False, as_index=False).first()
+
+    opening_to_write = combined_open.copy()
     opening_to_write["snapshot_ts"] = pd.to_datetime(opening_to_write["snapshot_ts"], errors="coerce", utc=True).dt.strftime("%Y-%m-%dT%H:%M:%SZ")
     opening_to_write.to_csv(opening_path, index=False)
 
-    latest = combined_history.sort_values(key_cols + ["snapshot_ts"], kind="mergesort").groupby(key_cols, dropna=False, as_index=False).last()
+    latest = normalized.sort_values(key_cols + ["snapshot_ts"], kind="mergesort").groupby(key_cols, dropna=False, as_index=False).last()
     movement = latest.merge(
-        opening[key_cols + ([line_col] if line_col else []) + price_cols].rename(
+        combined_open[key_cols + ([line_col] if line_col else []) + price_cols].rename(
             columns={
                 **({line_col: "open_line"} if line_col else {}),
                 **{column: f"open_{column}" for column in price_cols},
@@ -1185,8 +1185,8 @@ def _persist_tracking_snapshot(
         "opening_path": str(opening_path),
         "history_path": str(history_path),
         "movement_path": str(movement_path),
-        "opening_rows": int(len(opening)),
-        "history_rows": int(len(combined_history)),
+        "opening_rows": int(len(combined_open)),
+        "history_rows": int(len(history_rows)),
         "signals_rows": int(len(movement)),
     }
 
