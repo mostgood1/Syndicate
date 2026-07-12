@@ -1,0 +1,154 @@
+{
+  "date": "2026-07-12",
+  "counts": {
+    "games": 2,
+    "picks": 6
+  },
+  "per_game": [
+    {
+      "home": "DAL",
+      "away": "CHI",
+      "matchup": "CHI @ DAL",
+      "picks": [
+        {
+          "market": "PROPS",
+          "team": "DAL",
+          "display_pick": "Arike Ogunbowale OVER 1.5",
+          "selection": "OVER 1.5",
+          "projection": 2.473454836643177,
+          "projected": 2.473454836643177,
+          "odds": -135.0,
+          "price": -135.0,
+          "score": 45.32336382201626,
+          "ev_pct": 45.32336382201626,
+          "win_prob": 0.574468085106383,
+          "p_win": 0.574468085106383,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 45.3%",
+            "Regular price range (-150 to +150)",
+            "Consensus: 4 books aligned",
+            "Best line available"
+          ],
+          "matchup": "CHI @ DAL"
+        },
+        {
+          "market": "PROPS",
+          "team": "CHI",
+          "display_pick": "Azura Stevens UNDER 12.5",
+          "selection": "UNDER 12.5",
+          "projection": 5.999999999999999,
+          "projected": 5.999999999999999,
+          "odds": -130.0,
+          "price": -130.0,
+          "score": 28.268646119684483,
+          "ev_pct": 28.268646119684483,
+          "win_prob": 0.5652173913043478,
+          "p_win": 0.5652173913043478,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 28.3%",
+            "Regular price range (-150 to +150)",
+            "Consensus: 3 books aligned",
+            "Best line available"
+          ],
+          "matchup": "CHI @ DAL"
+        },
+        {
+          "market": "PROPS",
+          "team": "CHI",
+          "display_pick": "Natasha Cloud OVER 3.5",
+          "selection": "OVER 3.5",
+          "projection": 4.66655,
+          "projected": 4.66655,
+          "odds": -120.0,
+          "price": -120.0,
+          "score": 8.136481215868363,
+          "ev_pct": 8.136481215868363,
+          "win_prob": 0.5454545454545454,
+          "p_win": 0.5454545454545454,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 8.1%",
+            "Regular price range (-150 to +150)",
+            "Consensus: 5 books aligned",
+            "Best line available"
+          ],
+          "matchup": "CHI @ DAL"
+        }
+      ]
+    },
+    {
+      "home": "LVA",
+      "away": "IND",
+      "matchup": "IND @ LVA",
+      "picks": [
+        {
+          "market": "PROPS",
+          "team": "LVA",
+          "display_pick": "Jackie Young UNDER 1.5",
+          "selection": "UNDER 1.5",
+          "projection": 0.5340680803571429,
+          "projected": 0.5340680803571429,
+          "odds": 100.0,
+          "price": 100.0,
+          "score": 66.59217386953178,
+          "ev_pct": 66.59217386953178,
+          "win_prob": 0.5,
+          "p_win": 0.5,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 66.6%",
+            "Regular price range (-150 to +150)",
+            "Consensus: 4 books aligned",
+            "Best line available"
+          ],
+          "matchup": "IND @ LVA"
+        },
+        {
+          "market": "PROPS",
+          "team": "IND",
+          "display_pick": "Kelsey Mitchell UNDER 2.5",
+          "selection": "UNDER 2.5",
+          "projection": 1.8923264285714283,
+          "projected": 1.8923264285714283,
+          "odds": 100.0,
+          "price": 100.0,
+          "score": 45.65960506774233,
+          "ev_pct": 45.65960506774233,
+          "win_prob": 0.5,
+          "p_win": 0.5,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 45.7%",
+            "Regular price range (-150 to +150)",
+            "Consensus: 4 books aligned",
+            "Best line available"
+          ],
+          "matchup": "IND @ LVA"
+        },
+        {
+          "market": "PROPS",
+          "team": "IND",
+          "display_pick": "Caitlin Clark OVER 15.5",
+          "selection": "OVER 15.5",
+          "projection": 23.274139880952383,
+          "projected": 23.274139880952383,
+          "odds": 102.0,
+          "price": 102.0,
+          "score": 38.20005858708298,
+          "ev_pct": 38.20005858708298,
+          "win_prob": 0.49504950495049505,
+          "p_win": 0.49504950495049505,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 38.2%",
+            "Regular price range (-150 to +150)",
+            "Consensus: 3 books aligned"
+          ],
+          "matchup": "IND @ LVA"
+        }
+      ]
+    }
+  ]
+}

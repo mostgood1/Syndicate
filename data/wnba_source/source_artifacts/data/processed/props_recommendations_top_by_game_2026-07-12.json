@@ -1,0 +1,262 @@
+{
+  "date": "2026-07-12",
+  "data": [
+    {
+      "game_key": "IND@LVA",
+      "game_id": "07a7ba7018aa8c14997cbbcb0170fe203",
+      "player": "Jackie Young",
+      "team": "LVA",
+      "team_tricode": "LVA",
+      "opponent": "IND",
+      "score": 66.59217386953178,
+      "score_adj": 66.59217386953178,
+      "tier": "High",
+      "model": {
+        "pts": 8.636180357142859,
+        "reb": 4.11318125,
+        "ast": 5.002090178571429,
+        "threes": 0.5340680803571429,
+        "stl": 0.7015420386904763,
+        "blk": 0.5612336309523809,
+        "tov": 1.9643177083333327,
+        "pra": 17.751451785714288,
+        "pr": 12.749361607142859,
+        "pa": 13.638270535714287,
+        "ra": 9.115271428571429
+      },
+      "top_play": {
+        "market": "threes",
+        "side": "UNDER",
+        "line": 1.5,
+        "price": 100.0,
+        "edge": 0.3329608693476589,
+        "ev": 0.6659217386953178,
+        "ev_pct": 66.59217386953178,
+        "book": "fanduel",
+        "p_win": 1.0,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 66.6%",
+        "Regular price range (-150 to +150)",
+        "Consensus: 4 books aligned",
+        "Best line available"
+      ],
+      "basketball_summary": "model 0.5 vs line 1.5 (-1.0)"
+    },
+    {
+      "game_key": "CHI@DAL",
+      "game_id": "015504ed1a378321542911fbfb7a49591",
+      "player": "Sydney Taylor",
+      "team": "CHI",
+      "team_tricode": "CHI",
+      "opponent": "DAL",
+      "score": 60.75415979659681,
+      "score_adj": 60.75415979659681,
+      "tier": "High",
+      "model": {
+        "pts": 6.2219908536585375,
+        "reb": 0.9145701219512196,
+        "ast": 0.8545701219512195,
+        "threes": 0.9145701219512196,
+        "stl": 0.283094512195122,
+        "blk": 0.283094512195122,
+        "tov": 0.566189024390244,
+        "pra": 7.991131097560976,
+        "pr": 7.136560975609757,
+        "pa": 7.076560975609757,
+        "ra": 1.769140243902439
+      },
+      "top_play": {
+        "market": "threes",
+        "side": "UNDER",
+        "line": 1.5,
+        "price": 123.0,
+        "edge": 0.27244017846007534,
+        "ev": 0.6075415979659681,
+        "ev_pct": 60.75415979659681,
+        "book": "draftkings",
+        "p_win": 1.0,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 60.8%",
+        "Regular price range (-150 to +150)",
+        "Best line available"
+      ],
+      "basketball_summary": "model 0.9 vs line 1.5 (-0.6)"
+    },
+    {
+      "game_key": "IND@LVA",
+      "game_id": "07a7ba7018aa8c14997cbbcb0170fe203",
+      "player": "Kelsey Mitchell",
+      "team": "IND",
+      "team_tricode": "IND",
+      "opponent": "LVA",
+      "score": 45.65960506774233,
+      "score_adj": 45.65960506774233,
+      "tier": "High",
+      "model": {
+        "pts": 21.35475271428572,
+        "reb": 0.8324189999999998,
+        "ast": 2.284326428571428,
+        "threes": 1.8923264285714283,
+        "stl": 0.7338321428571427,
+        "blk": 0.0,
+        "tov": 1.614430714285714,
+        "pra": 24.47149814285714,
+        "pr": 22.187171714285718,
+        "pa": 23.63907914285715,
+        "ra": 3.116745428571428
+      },
+      "top_play": {
+        "market": "threes",
+        "side": "UNDER",
+        "line": 2.5,
+        "price": 100.0,
+        "edge": 0.22829802533871169,
+        "ev": 0.45659605067742337,
+        "ev_pct": 45.65960506774233,
+        "book": "fanduel",
+        "p_win": 0.9565960506774234,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 45.7%",
+        "Regular price range (-150 to +150)",
+        "Consensus: 4 books aligned",
+        "Best line available"
+      ],
+      "basketball_summary": "model 1.9 vs line 2.5 (-0.6)"
+    },
+    {
+      "game_key": "CHI@DAL",
+      "game_id": "015504ed1a378321542911fbfb7a49591",
+      "player": "Arike Ogunbowale",
+      "team": "DAL",
+      "team_tricode": "DAL",
+      "opponent": "CHI",
+      "score": 45.32336382201626,
+      "score_adj": 45.32336382201626,
+      "tier": "High",
+      "model": {
+        "pts": 15.385674823830875,
+        "reb": 2.237454836643177,
+        "ast": 3.228436771300448,
+        "threes": 2.473454836643177,
+        "stl": 0.7255701473414478,
+        "blk": 0.1451140294682895,
+        "tov": 1.7413683536194746,
+        "pra": 20.851566431774504,
+        "pr": 17.623129660474053,
+        "pa": 18.614111595131323,
+        "ra": 5.465891607943625
+      },
+      "top_play": {
+        "market": "threes",
+        "side": "OVER",
+        "line": 1.5,
+        "price": -135.0,
+        "edge": 0.26036826025413595,
+        "ev": 0.4532336382201626,
+        "ev_pct": 45.32336382201626,
+        "book": "betonlineag",
+        "p_win": 1.0,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 45.3%",
+        "Regular price range (-150 to +150)",
+        "Consensus: 4 books aligned",
+        "Best line available"
+      ],
+      "basketball_summary": "model 2.5 vs line 1.5 (+1.0)"
+    },
+    {
+      "game_key": "IND@LVA",
+      "game_id": "07a7ba7018aa8c14997cbbcb0170fe203",
+      "player": "Chelsea Gray",
+      "team": "LVA",
+      "team_tricode": "LVA",
+      "opponent": "IND",
+      "score": 43.68760175971382,
+      "score_adj": 43.68760175971382,
+      "tier": "High",
+      "model": {
+        "pts": 12.953696551724136,
+        "reb": 4.028537931034483,
+        "ast": 6.972931034482758,
+        "threes": 2.244310344827586,
+        "stl": 0.7716009852216749,
+        "blk": 0.9259211822660096,
+        "tov": 3.703684729064039,
+        "pra": 23.95516551724138,
+        "pr": 16.98223448275862,
+        "pa": 19.926627586206894,
+        "ra": 11.00146896551724
+      },
+      "top_play": {
+        "market": "threes",
+        "side": "OVER",
+        "line": 1.5,
+        "price": -116.0,
+        "edge": 0.23461860204290752,
+        "ev": 0.43687601759713823,
+        "ev_pct": 43.68760175971382,
+        "book": "betonlineag",
+        "p_win": 0.9739130546341753,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 43.7%",
+        "Regular price range (-150 to +150)",
+        "Consensus: 4 books aligned",
+        "Best line available"
+      ],
+      "basketball_summary": "model 2.2 vs line 1.5 (+0.7)"
+    },
+    {
+      "game_key": "CHI@DAL",
+      "game_id": "015504ed1a378321542911fbfb7a49591",
+      "player": "Jessica Shepard",
+      "team": "DAL",
+      "team_tricode": "DAL",
+      "opponent": "CHI",
+      "score": 37.80464946923705,
+      "score_adj": 37.80464946923705,
+      "tier": "High",
+      "model": {
+        "pts": 11.469970815450642,
+        "reb": 10.148611158798282,
+        "ast": 5.876985407725321,
+        "threes": 0.0,
+        "stl": 0.3905665236051501,
+        "blk": 0.0,
+        "tov": 1.1716995708154505,
+        "pra": 27.495567381974247,
+        "pr": 21.618581974248926,
+        "pa": 17.346956223175965,
+        "ra": 16.025596566523603
+      },
+      "top_play": {
+        "market": "pts",
+        "side": "UNDER",
+        "line": 15.5,
+        "price": 100.0,
+        "edge": 0.18902324734618525,
+        "ev": 0.3780464946923705,
+        "ev_pct": 37.80464946923705,
+        "book": "fanduel",
+        "p_win": 0.8780464946923705,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 37.8%",
+        "Regular price range (-150 to +150)",
+        "Consensus: 4 books aligned",
+        "Best line available"
+      ],
+      "basketball_summary": "model 11.5 vs line 15.5 (-4.0)"
+    }
+  ]
+}
