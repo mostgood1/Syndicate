@@ -17219,7 +17219,7 @@ def _refresh_oddsapi_markets(d: str, *, overwrite: bool = True) -> Dict[str, Any
     }
 
 
-def _live_lens_reports_payload(d: str, *, include_archive: bool = False) -> Dict[str, Any]:
+def _live_lens_reports_payload(d: str, *, include_archive: bool = False, slim: bool = False) -> Dict[str, Any]:
     log_path = _live_lens_log_path(d)
     observation_log_path = _live_prop_observation_log_path(d)
     registry_path = _live_prop_registry_path(d)
@@ -17261,6 +17261,25 @@ def _live_lens_reports_payload(d: str, *, include_archive: bool = False) -> Dict
         "report": _file_stat_summary(_live_lens_report_path(d)),
     }
     total_bytes = sum(int((item or {}).get("bytes") or 0) for item in files.values())
+    if slim and isinstance(latest_report, dict):
+        slim_games: List[Dict[str, Any]] = []
+        for game in latest_report.get("games") if isinstance(latest_report.get("games"), list) else []:
+            if not isinstance(game, dict):
+                continue
+            slim_games.append(
+                {
+                    "gamePk": game.get("gamePk"),
+                    "startTime": game.get("startTime"),
+                    "status": game.get("status"),
+                }
+            )
+        latest_report = {
+            "date": latest_report.get("date"),
+            "generatedAt": latest_report.get("generatedAt"),
+            "counts": summary_counts,
+            "performance": summary_performance,
+            "games": slim_games,
+        }
     return {
         "ok": True,
         "date": str(d),
@@ -17977,7 +17996,8 @@ def api_cron_live_lens_reports() -> Response:
         return auth_error
     d = str(request.args.get("date") or "").strip() or _today_iso()
     include_archive = str(request.args.get("includeArchive") or "off").strip().lower() == "on"
-    return jsonify(_live_lens_reports_payload(d, include_archive=include_archive))
+    slim = str(request.args.get("slim") or "off").strip().lower() == "on"
+    return jsonify(_live_lens_reports_payload(d, include_archive=include_archive, slim=slim))
 
 
 @app.get("/api/cron/live-prop-artifacts")

@@ -1,3 +1,10 @@
+# 2026-07-12 - MLB refresh now requests a slim live-lens payload
+- Symptom: The MLB-only refresh path was carrying a large live-lens report payload through the refresh worker, which added avoidable RSS pressure during the odds refresh.
+- Root cause: The shared live-lens builder always returned the full report shape, and the refresh workflow had no opt-in slim contract for the refresh-only fetch.
+- Fix: Add a `slim` mode to the MLB live-lens report builder and have `scripts/refresh_mlb_oddsapi.py` request the slim payload only from the refresh workflow while leaving default consumers on the full response.
+- Validation: Local refresh tracing showed `sport_start` at 88,760,320 bytes, `sport_step_appended` at 88,539,136 bytes, `sport_post_refresh` at 93,286,400 bytes, `sport_end` at 93,634,560 bytes, and `summary_append_sequential` at 93,671,424 bytes; a direct payload probe showed the slim report shrinking `latestReport` from 30,206 bytes to 1,814 bytes.
+- Follow-up: Keep slim mode opt-in only so UI, analysis, tuning, and smoke-test consumers continue to receive the full MLB payload.
+
 # 2026-07-11 - WNBA daily update restored SmartSim-required gating
 - Symptom: The WNBA daily update had been downgraded to warn-and-continue when `smart_sim_<date>_*.json` files were missing, which masked a broken SmartSim publication path.
 - Root cause: The earlier incident mitigation relaxed the WNBA advanced-data gate after SmartSim was treated as optional during the OOM investigation.

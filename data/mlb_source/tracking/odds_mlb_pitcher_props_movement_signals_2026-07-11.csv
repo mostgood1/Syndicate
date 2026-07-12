@@ -1,0 +1,17 @@
+player_name,market,selection,current_line,current_price,open_line,open_price,line_move,price_move,latest_snapshot_ts
+brandon pfaadt,earned_runs,over,1.5,-125,1.5,-125,0.0,0,2026-07-12T01:58:16Z
+brandon pfaadt,earned_runs,under,1.5,-110,1.5,-110,0.0,0,2026-07-12T01:58:16Z
+brandon pfaadt,hits_allowed,over,3.5,+110,3.5,+110,0.0,0,2026-07-12T01:58:16Z
+brandon pfaadt,hits_allowed,under,3.5,-150,3.5,-150,0.0,0,2026-07-12T01:58:16Z
+brandon pfaadt,outs,over,18.5,+117,18.5,+117,0.0,0,2026-07-12T01:58:16Z
+brandon pfaadt,outs,under,18.5,-157,18.5,-157,0.0,0,2026-07-12T01:58:16Z
+brandon pfaadt,strikeouts,over,3.5,+120,3.5,+120,0.0,0,2026-07-12T01:58:16Z
+brandon pfaadt,strikeouts,under,3.5,-165,3.5,-165,0.0,0,2026-07-12T01:58:16Z
+brandon pfaadt,walks_allowed,over,0.5,-245,0.5,-245,0.0,0,2026-07-12T01:58:16Z
+brandon pfaadt,walks_allowed,under,0.5,+175,0.5,+175,0.0,0,2026-07-12T01:58:16Z
+yoshinobu yamamoto,hits_allowed,over,3.5,-130,3.5,-130,0.0,0,2026-07-12T01:58:16Z
+yoshinobu yamamoto,hits_allowed,under,3.5,-120,3.5,-120,0.0,0,2026-07-12T01:58:16Z
+yoshinobu yamamoto,outs,over,19.5,-125,19.5,-125,0.0,0,2026-07-12T01:58:16Z
+yoshinobu yamamoto,outs,under,19.5,-125,19.5,-125,0.0,0,2026-07-12T01:58:16Z
+yoshinobu yamamoto,strikeouts,over,6.5,+105,6.5,+105,0.0,0,2026-07-12T01:58:16Z
+yoshinobu yamamoto,strikeouts,under,6.5,-140,6.5,-140,0.0,0,2026-07-12T01:58:16Z

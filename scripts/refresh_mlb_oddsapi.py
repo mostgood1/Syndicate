@@ -209,7 +209,7 @@ def _normalize_render_base_url(value: str) -> str:
 
 
 def _fetch_live_lens_reports_payload(*, base_url: str, token: str, date_str: str, timeout_seconds: int) -> dict[str, object]:
-    query = urllib_parse.urlencode({"date": str(date_str)})
+    query = urllib_parse.urlencode({"date": str(date_str), "slim": "on"})
     url = f"{str(base_url).rstrip('/')}/api/cron/live-lens-reports?{query}"
     request = urllib_request.Request(url, headers={"Authorization": f"Bearer {token}"})
     with urllib_request.urlopen(request, timeout=max(1, int(timeout_seconds))) as response:
@@ -235,7 +235,7 @@ def _build_local_live_lens_reports_payload(*, source_root: Path, date_str: str) 
         builder = getattr(source_app, "_live_lens_reports_payload", None)
         if not callable(builder):
             raise RuntimeError("Vendored MLB live-lens payload builder is unavailable")
-        payload = builder(str(date_str), include_archive=True)
+        payload = builder(str(date_str), include_archive=False, slim=True)
     if not isinstance(payload, dict):
         raise RuntimeError("Vendored MLB live-lens payload builder did not return a JSON object")
     return payload

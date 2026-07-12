@@ -1,0 +1,17 @@
+player_name,market,selection,line,price,snapshot_ts
+brandon pfaadt,earned_runs,over,1.5,-125,2026-07-12T01:58:16Z
+brandon pfaadt,earned_runs,under,1.5,-110,2026-07-12T01:58:16Z
+brandon pfaadt,hits_allowed,over,3.5,+110,2026-07-12T01:58:16Z
+brandon pfaadt,hits_allowed,under,3.5,-150,2026-07-12T01:58:16Z
+brandon pfaadt,outs,over,18.5,+117,2026-07-12T01:58:16Z
+brandon pfaadt,outs,under,18.5,-157,2026-07-12T01:58:16Z
+brandon pfaadt,strikeouts,over,3.5,+120,2026-07-12T01:58:16Z
+brandon pfaadt,strikeouts,under,3.5,-165,2026-07-12T01:58:16Z
+brandon pfaadt,walks_allowed,over,0.5,-245,2026-07-12T01:58:16Z
+brandon pfaadt,walks_allowed,under,0.5,+175,2026-07-12T01:58:16Z
+yoshinobu yamamoto,hits_allowed,over,3.5,-130,2026-07-12T01:58:16Z
+yoshinobu yamamoto,hits_allowed,under,3.5,-120,2026-07-12T01:58:16Z
+yoshinobu yamamoto,outs,over,19.5,-125,2026-07-12T01:58:16Z
+yoshinobu yamamoto,outs,under,19.5,-125,2026-07-12T01:58:16Z
+yoshinobu yamamoto,strikeouts,over,6.5,+105,2026-07-12T01:58:16Z
+yoshinobu yamamoto,strikeouts,under,6.5,-140,2026-07-12T01:58:16Z

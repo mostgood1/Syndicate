@@ -1084,11 +1084,14 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
 
             date_str = "2026-05-22"
             snapshot_name = f"odds_wnba_player_props_{date_str}.csv"
+            game_predictions_name = f"predictions_{date_str}.csv"
             predictions_name = f"props_predictions_{date_str}.csv"
             core_csv = "snapshot_ts,event_id\n2026-05-22T12:00:00Z,evt-1\n"
             (source_raw / snapshot_name).write_text(core_csv, encoding="utf-8")
+            (source_processed / game_predictions_name).write_text("home_team,visitor_team\nCHI,MIN\n", encoding="utf-8")
             (source_processed / predictions_name).write_text("player\nA\n", encoding="utf-8")
             (bundle_raw / snapshot_name).write_text(core_csv, encoding="utf-8")
+            (bundle_processed / game_predictions_name).write_text("home_team,visitor_team\nCHI,MIN\n", encoding="utf-8")
             (bundle_processed / predictions_name).write_text("player\nA\n", encoding="utf-8")
 
             refresh_state = module._existing_refresh_state(
@@ -1114,6 +1117,33 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
         self.assertEqual(artifact_state.get("snapshot_bundle_path"), str(bundle_raw / snapshot_name))
         self.assertEqual(int(refresh_state["recs_rows"]), 0)
         self.assertEqual(int(artifact_state["recs_rows"]), 0)
+
+    def test_existing_refresh_state_requires_game_predictions_for_reuse(self) -> None:
+        module = self._load_module()
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_root = Path(tmp_dir)
+            source_root = tmp_root / "source"
+            raw_root = source_root / "data" / "raw"
+            processed_root = source_root / "data" / "processed"
+            raw_root.mkdir(parents=True, exist_ok=True)
+            processed_root.mkdir(parents=True, exist_ok=True)
+
+            date_str = "2026-05-22"
+            snapshot_name = f"odds_wnba_player_props_{date_str}.csv"
+            predictions_name = f"props_predictions_{date_str}.csv"
+            core_csv = "snapshot_ts,event_id\n2026-05-22T12:00:00Z,evt-1\n"
+            (raw_root / snapshot_name).write_text(core_csv, encoding="utf-8")
+            (processed_root / predictions_name).write_text("player\nA\n", encoding="utf-8")
+
+            refresh_state = module._existing_refresh_state(
+                source_root=source_root,
+                date_str=date_str,
+                do_edges=False,
+                do_export=True,
+            )
+
+        self.assertIsNone(refresh_state)
 
     def test_run_refresh_via_cli_allows_missing_recommendation_artifacts_when_core_outputs_exist(self) -> None:
         module = self._load_module()
@@ -2491,6 +2521,7 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
             required_files = {
                 raw_root / f"odds_wnba_player_props_{date_str}.csv": "id\n1\n",
                 processed_root / f"oddsapi_player_props_{date_str}.csv": "id\n1\n",
+                processed_root / f"predictions_{date_str}.csv": "home_team,visitor_team\nCHI,MIN\n",
                 processed_root / f"props_predictions_{date_str}.csv": "player\nA\n",
                 processed_root / f"props_edges_{date_str}.csv": "player\nA\n",
                 processed_root / f"props_recommendations_{date_str}.csv": "player\nA\n",
@@ -2564,6 +2595,7 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
             required_files = {
                 raw_root / f"odds_wnba_player_props_{date_str}.csv": "id\n1\n",
                 processed_root / f"oddsapi_player_props_{date_str}.csv": "id\n1\n",
+                processed_root / f"predictions_{date_str}.csv": "home_team,visitor_team\nCHI,MIN\n",
                 processed_root / f"props_predictions_{date_str}.csv": "player\nA\n",
                 processed_root / f"props_edges_{date_str}.csv": "player\nA\n",
                 processed_root / f"props_recommendations_{date_str}.csv": "player\nA\n",
