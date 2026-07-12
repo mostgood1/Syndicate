@@ -379,6 +379,34 @@
     }).format(parsed);
   }
 
+  function statusLabelText(value, fallback = '') {
+    if (value == null) {
+      return String(fallback || '').trim();
+    }
+    if (typeof value === 'object') {
+      const candidates = [
+        value.status,
+        value.detail,
+        value.detailed,
+        value.shortDetail,
+        value.label,
+        value.text,
+      ];
+      for (const candidate of candidates) {
+        const text = String(candidate || '').trim();
+        if (text) {
+          return text;
+        }
+      }
+      return String(fallback || '').trim();
+    }
+    const text = String(value || '').trim(); 
+    return text || String(fallback || '').trim();
+  }
+  function renderableText(value, fallback = '') {
+    return statusLabelText(value, fallback);
+  }
+
   function liveRowFreshnessText(row, fallbackLabel) {
     const oddsRefreshedAt = row?.oddsRefreshedAt || row?.odds_refreshed_at || '';
     const refreshedAt = oddsRefreshedAt ? formatTimestampShort(oddsRefreshedAt) : '';
@@ -400,12 +428,13 @@
       const rawCandidates = [
         game?.matchup?.displayState,
         game?.status?.detailed,
+        game?.status,
         game?.live_status?.status,
         game?.live_state?.status,
         game?.start_time,
       ];
       for (const candidate of rawCandidates) {
-        const text = String(candidate || '').trim();
+        const text = statusLabelText(candidate);
         if (text && !/^scheduled$/i.test(text) && !/^time tbd$/i.test(text)) {
           return text;
         }
@@ -909,7 +938,7 @@
     signal.shapeScore = Number.isFinite(boost) ? boost : 0;
     signal.gameShape = gameShape && typeof gameShape === 'object' ? gameShape : null;
     if (cleanReasons.length) {
-      signal.detail = [signal.detail, cleanReasons.slice(0, 2).join(' · ')].filter(Boolean).join(' · ');
+      signal.detail = [renderableText(signal.detail, ''), cleanReasons.slice(0, 2).join(' · ')].filter(Boolean).join(' · ');
     }
     if (Number.isFinite(signal.shapeScore) && signal.shapeScore !== 0) {
       signal.score = (Number(signal.score) || 0) + signal.shapeScore;
@@ -1788,9 +1817,9 @@
     const scoreLabel = hasStartedGame(liveState) && Number.isFinite(awayPts) && Number.isFinite(homePts)
       ? `${game?.away_tri || 'AWY'} ${fmtInteger(awayPts)} - ${fmtInteger(homePts)} ${game?.home_tri || 'HME'}`
       : `${game?.away_tri || 'AWY'} at ${game?.home_tri || 'HME'}`;
-    const statusLabel = liveState.final
+    const statusLabel = liveState?.final
       ? 'Final'
-      : (liveState.in_progress ? String(liveState.status || `Q${liveState.period || ''} ${liveState.clock || ''}`).trim() : 'Scheduled');
+      : (liveState.in_progress ? statusLabelText(liveState.status, `Q${liveState.period || ''} ${liveState.clock || ''}`) : 'Scheduled');
     const awayPace = livePaceProjection(game?.away_tri, 'away', pregameContext.away_pace);
     const homePace = livePaceProjection(game?.home_tri, 'home', pregameContext.home_pace);
     const awayAttempts = bucketForTeam(pbpStats?.pbp_attempts, game?.away_tri, 'away');
@@ -2004,7 +2033,7 @@
     if (!hasStartedGame(liveState)) {
       return scheduledStatusText(game);
     }
-    const status = liveLens?.statusLabel || String(liveState?.status || 'Live');
+    const status = liveLens?.statusLabel || statusLabelText(liveState?.status, 'Live');
     const refreshedAt = liveLens?.oddsRefreshedAt;
     if (refreshedAt) {
       return `${status} · Odds ${formatTimestampShort(refreshedAt)}`;
@@ -2026,7 +2055,7 @@
     if (!signal) {
       return '';
     }
-    return `<span class="${liveSignalChipClass(signal)}" title="${escapeHtml(signal.detail || signal.compactLabel || '')}">${escapeHtml(signal.compactLabel || signal.label || 'Signal')}</span>`;
+    return `<span class="${liveSignalChipClass(signal)}" title="${escapeHtml(renderableText(signal.detail, signal.compactLabel || ''))}">${escapeHtml(signal.compactLabel || signal.label || 'Signal')}</span>`;
   }
 
   function renderLiveSignalTile(slot) {
@@ -2045,8 +2074,8 @@
     const edgeText = signal.key === 'ml'
       ? `${fmtSigned((Number(signal.edge) || 0) * 100, 1)}pp`
       : fmtSigned(signal.edge, 1);
-    const copyText = signal.shapeSummary || signal.detail || 'No live edge detail';
-    const copyTitle = signal.detail || copyText;
+    const copyText = signal.shapeSummary || renderableText(signal.detail, 'No live edge detail');
+    const copyTitle = renderableText(signal.detail, copyText);
     return `
       <div class="cards-live-lens-tile ${signal.klass === 'BET' ? 'is-bet' : (signal.klass === 'WATCH' ? 'is-watch' : '')}">
         <div class="cards-live-lens-tile__head">
@@ -2659,7 +2688,7 @@
       primary: row.primary,
       bucket: 'live',
       actionLabel: 'LIVE',
-      statusLabel: liveState?.final ? 'Final' : (liveState?.status || 'Live'),
+      statusLabel: liveState?.final ? 'Final' : statusLabelText(liveState?.status, 'Live'),
       lineSource: 'boxscore_sim_fallback',
       actual,
       liveProjection,
@@ -4246,8 +4275,8 @@
     if (!availableSlots.length) {
       return '';
     }
-    const detailText = availableSlots
-      .map((slot) => slot?.signal?.detail)
+    const segmentDetailText = availableSlots
+      .map((slot) => renderableText(slot?.signal?.detail))
       .find(Boolean) || 'Waiting for live segment detail.';
     return `
       <div class="cards-live-segment-card">
@@ -4258,7 +4287,7 @@
         <div class="cards-live-opportunity-list cards-live-opportunity-list--segment">
           ${availableSlots.map((slot) => renderLiveSignalTile(slot)).join('')}
         </div>
-        <div class="cards-mini-copy">${escapeHtml(detailText)}</div>
+        <div class="cards-mini-copy">${escapeHtml(segmentDetailText)}</div>
       </div>
     `;
   }
@@ -4468,7 +4497,7 @@
       : '-';
     const edgeClass = Number.isFinite(edge) ? (edge >= 0 ? 'is-positive' : 'is-negative') : '';
     let main = `${shortLabel} live`;
-    let sub = signal?.detail || 'Live market active.';
+    let sub = renderableText(signal?.detail, 'Live market active.');
     if (marketType === 'moneyline') {
       main = side ? `${side} ML` : 'Moneyline live';
       sub = Number.isFinite(projection)
@@ -4490,7 +4519,7 @@
       klass,
       main,
       sub,
-      note: String(signal?.detail || '').trim(),
+      note: renderableText(signal?.detail, ''),
       edgeValue,
       edgeText,
       edgeClass,
@@ -4956,7 +4985,7 @@
       ? tipoffText(game)
       : statusText(game);
     const compactDetailText = hasStarted
-      ? (hasStarted ? (liveState?.status || liveLens?.signals?.total?.detail || 'Monitoring live game lens') : marketCountSummary(game))
+      ? (hasStarted ? (statusLabelText(liveState?.status, liveLens?.signals?.total?.detail || 'Monitoring live game lens')) : marketCountSummary(game))
       : marketCountSummary(game);
     const awayScore = hasStarted && Number.isFinite(Number(liveState?.away_pts)) ? Number(liveState.away_pts) : score.away_mean;
     const homeScore = hasStarted && Number.isFinite(Number(liveState?.home_pts)) ? Number(liveState.home_pts) : score.home_mean;
@@ -6004,7 +6033,7 @@
     const liveDataPending = state.liveDataLoading && !liveState;
     const liveLensPending = state.liveDataLoading && !liveLens;
     const cardStatusDetail = hasStarted
-      ? (hasStarted ? (liveState?.status || 'Live game lens') : tipoffText(game))
+      ? (hasStarted ? (statusLabelText(liveState?.status, 'Live game lens')) : tipoffText(game))
       : tipoffText(game);
     const scoreMetaPrimary = liveDataPending ? 'Loading live box...' : liveScoreLabel;
     const scoreMetaSecondary = liveLensPending

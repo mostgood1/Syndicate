@@ -1,3 +1,10 @@
+# 2026-07-12 - WNBA cards stopped printing raw live-status objects
+- Symptom: The WNBA game cards and live-lens tiles were rendering Python-like status dictionaries directly into the UI text, which made the live page hard to read.
+- Root cause: The WNBA static renderer was stringifying object-valued live status and signal detail fields instead of collapsing them to a short label before interpolation.
+- Fix: Add a normalized text helper in `syndicate/static/wnba/cards-parity.js` and use it for live status labels, signal details, segment copy, and fallback live labels so object payloads never reach the DOM as raw dict text.
+- Validation: Focused syntax checks passed for `syndicate/static/wnba/cards-parity.js` after the patch.
+- Follow-up: Redeploy the WNBA static asset bundle so the live Render page picks up the normalized renderer.
+
 # 2026-07-12 - WNBA props, live-lens, and MLB freshness display corrections
 - Symptom: WNBA props rendered 0 cards despite published artifacts, WNBA live-lens current-day pages rebuilt to an empty view, and MLB freshness timestamps displayed in the browser timezone instead of Central Time.
 - Root cause: The WNBA props loader passed a relative filename instead of the published artifact root; the WNBA live-lens page context omitted the `cards` alias even when `rank_cards` existed; and the MLB board-client timestamp formatter in `cards.js` did not pin `America/Chicago`.
