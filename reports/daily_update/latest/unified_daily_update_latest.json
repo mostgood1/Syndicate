@@ -1,12 +1,12 @@
 {
-  "date": "2026-07-11",
-  "generatedAt": "2026-07-11T17:29:05.2526424+00:00",
-  "lastUpdatedAt": "2026-07-11T17:29:05.3956433+00:00",
+  "date": "2026-07-12",
+  "generatedAt": "2026-07-12T06:54:23.5810236+00:00",
+  "lastUpdatedAt": "2026-07-12T06:54:23.7170095+00:00",
   "completedAt": null,
   "runMode": "standard",
   "overallStatus": "started",
   "error": null,
-  "runDir": "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-11\\20260711_172903",
+  "runDir": "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-12\\20260712_065423",
   "latestDir": "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest",
   "runtimePolicy": {
     "MLB": {
@@ -855,9 +855,37 @@
     "oddsRegions": "us",
     "oddsHistoryTriggerPlan": [
       {
+        "sport": "mlb",
+        "workflow": "vendored_daily_update",
+        "date": "2026-07-12",
+        "oddsHistoryPath": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\tracking\\odds_history.json",
+        "hasLineMovement": true,
+        "maxDeltaDetected": 765.0,
+        "lastOddsUpdateTimestamp": "07/12/2026 02:47:30",
+        "runSimulation": true,
+        "priorityScoring": false,
+        "skipHeavyComputation": false,
+        "trigger": "simulation",
+        "reason": "delta_threshold"
+      },
+      {
+        "sport": "mlb",
+        "workflow": "syndicate_refresh",
+        "date": "2026-07-12",
+        "oddsHistoryPath": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\tracking\\odds_history.json",
+        "hasLineMovement": true,
+        "maxDeltaDetected": 765.0,
+        "lastOddsUpdateTimestamp": "07/12/2026 02:47:30",
+        "runSimulation": true,
+        "priorityScoring": false,
+        "skipHeavyComputation": false,
+        "trigger": "simulation",
+        "reason": "delta_threshold"
+      },
+      {
         "sport": "wnba",
         "workflow": "vendored_daily_update",
-        "date": "2026-07-11",
+        "date": "2026-07-12",
         "oddsHistoryPath": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\tracking\\odds_history.json",
         "hasLineMovement": true,
         "maxDeltaDetected": 21.0,
@@ -871,7 +899,7 @@
       {
         "sport": "wnba",
         "workflow": "syndicate_mirror",
-        "date": "2026-07-11",
+        "date": "2026-07-12",
         "oddsHistoryPath": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\tracking\\odds_history.json",
         "hasLineMovement": true,
         "maxDeltaDetected": 21.0,
@@ -885,7 +913,7 @@
     ]
   },
   "publishParity": {
-    "date": "2026-07-11",
+    "date": "2026-07-12",
     "skipped": true,
     "forcedPublishArtifactPathCount": 0,
     "intelligencePublishArtifactPathCount": 0,
@@ -894,8 +922,18 @@
     "status": "skipped"
   },
   "runProvenance": {
-    "sourceStepCount": 2,
+    "sourceStepCount": 4,
     "sourceSteps": [
+      {
+        "sport": "mlb",
+        "workflow": "vendored_daily_update",
+        "name": "MLB vendored daily update"
+      },
+      {
+        "sport": "mlb",
+        "workflow": "syndicate_refresh",
+        "name": "MLB current-day live-lens refresh"
+      },
       {
         "sport": "wnba",
         "workflow": "vendored_daily_update",
@@ -910,19 +948,16 @@
     "latestManifestLoaded": true,
     "latestEventSimExecutionPlanCount": 21,
     "latestArtifactUpdateCount": 21,
-    "oddsHistoryTriggerPlanCount": 2,
+    "oddsHistoryTriggerPlanCount": 4,
     "simExecutionDecision": true
   },
   "replayContext": {
     "latestCheckpointLoaded": true,
     "latestCheckpointPath": "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest_checkpoint.json",
-    "latestCheckpointStage": "completed",
+    "latestCheckpointStage": "queued",
     "latestCheckpointFailedStage": "",
-    "latestCheckpointCompletedStageCount": 2,
-    "latestCheckpointCompletedStages": [
-      "source_update",
-      "refresh_gate"
-    ],
+    "latestCheckpointCompletedStageCount": 0,
+    "latestCheckpointCompletedStages": null,
     "resumeEligible": false,
     "resumedFromCheckpoint": false,
     "forceRebuildToday": false
@@ -931,7 +966,7 @@
     "currentStage": "queued",
     "completedStages": [],
     "failedStage": null,
-    "lastUpdatedAt": "2026-07-11T17:29:05.3956433+00:00",
+    "lastUpdatedAt": "2026-07-12T06:54:23.7170095+00:00",
     "simulationContractPath": null,
     "simulationContractRunPath": null,
     "simulationContractSportCount": 0,
@@ -1752,17 +1787,79 @@
   ],
   "sourceSteps": [
     {
+      "sport": "mlb",
+      "workflow": "vendored_daily_update",
+      "name": "MLB vendored daily update",
+      "workingDirectory": "D:\\a\\Syndicate\\Syndicate\\vendor\\mlb_bettingv2",
+      "environmentOverrides": {
+        "ODDS_API_KEY": "77ae1c35140c82da1675af85dde36a44",
+        "MLB_LIVE_LENS_DIR": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\live_lens",
+        "MLB_BETTING_DATA_ROOT": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data"
+      },
+      "runtimePolicy": {
+        "simsPerGame": 1000,
+        "workers": 3
+      },
+      "command": [
+        "C:\\hostedtoolcache\\windows\\Python\\3.11.9\\x64\\python.exe",
+        "tools\\daily_update.py",
+        "--workflow",
+        "ui-daily",
+        "--date",
+        "2026-07-12",
+        "--season",
+        "2026",
+        "--sims",
+        "1000",
+        "--workers",
+        "3",
+        "--git-push",
+        "off",
+        "--validate-render-frontend",
+        "off",
+        "--build-next-day",
+        "on"
+      ]
+    },
+    {
+      "sport": "mlb",
+      "workflow": "syndicate_refresh",
+      "name": "MLB current-day live-lens refresh",
+      "workingDirectory": "D:\\a\\Syndicate\\Syndicate",
+      "environmentOverrides": {
+        "ODDS_API_KEY": "77ae1c35140c82da1675af85dde36a44",
+        "MLB_LIVE_LENS_DIR": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\live_lens",
+        "MLB_BETTING_DATA_ROOT": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data"
+      },
+      "runtimePolicy": {
+        "simsPerGame": 1000,
+        "workers": 3
+      },
+      "command": [
+        "C:\\hostedtoolcache\\windows\\Python\\3.11.9\\x64\\python.exe",
+        "scripts\\refresh_mlb_oddsapi.py",
+        "--date",
+        "2026-07-12",
+        "--source-root",
+        "data\\mlb_source\\source_artifacts",
+        "--artifact-root",
+        "data\\mlb_source",
+        "--overwrite",
+        "on"
+      ]
+    },
+    {
       "sport": "wnba",
       "workflow": "vendored_daily_update",
       "name": "WNBA vendored daily update",
       "workingDirectory": "D:\\a\\Syndicate\\Syndicate",
       "environmentOverrides": {
-        "SYNDICATE_WNBA_SOURCE_APP_FALLBACK": "1",
         "APP_TZ_OFFSET_HOURS": "-6",
         "APP_TZ": "America/Chicago",
-        "REFRESH_PLAYER_LOGS_FETCH_ON_MISS": "1",
-        "REFRESH_PREDICT_PROPS_SMART_SIM_N_SIMS": "1000",
         "REFRESH_PREDICT_PROPS_SMART_SIM_WORKERS": "3",
+        "REFRESH_PREDICT_PROPS_SMART_SIM_N_SIMS": "1000",
+        "REFRESH_PLAYER_LOGS_FETCH_ON_MISS": "1",
+        "SYNDICATE_WNBA_SOURCE_APP_FALLBACK": "1",
         "ODDS_API_KEY": "77ae1c35140c82da1675af85dde36a44"
       },
       "runtimePolicy": {
@@ -1773,13 +1870,13 @@
         "C:\\hostedtoolcache\\windows\\Python\\3.11.9\\x64\\python.exe",
         "scripts\\refresh_wnba_oddsapi_props.py",
         "--date",
-        "2026-07-11",
+        "2026-07-12",
         "--source-root",
         "vendor\\wnba_betting_repo",
         "--artifact-root",
         "data\\wnba_source\\source_artifacts",
         "--log-file",
-        "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-11\\20260711_172903\\wnba_props_refresh.log",
+        "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-12\\20260712_065423\\wnba_props_refresh.log",
         "--force-refresh",
         "--days-ahead",
         "0",
@@ -1805,11 +1902,27 @@
         "-File",
         "scripts\\refresh_wnba_source_mirror.ps1",
         "-Date",
-        "2026-07-11"
+        "2026-07-12"
       ]
     }
   ],
   "stageDecisions": [
+    {
+      "stage": "source_update",
+      "sport": "mlb",
+      "workflow": "vendored_daily_update",
+      "name": "MLB vendored daily update",
+      "decision": "planned",
+      "status": "pending"
+    },
+    {
+      "stage": "source_update",
+      "sport": "mlb",
+      "workflow": "syndicate_refresh",
+      "name": "MLB current-day live-lens refresh",
+      "decision": "planned",
+      "status": "pending"
+    },
     {
       "stage": "source_update",
       "sport": "wnba",
@@ -1859,6 +1972,32 @@
   ],
   "simTriggerPlan": [
     {
+      "sport": "mlb",
+      "workflow": "vendored_daily_update",
+      "trigger": "simulation",
+      "status": "pending",
+      "reason": "delta_threshold",
+      "hasLineMovement": true,
+      "maxDeltaDetected": 765.0,
+      "lastOddsUpdateTimestamp": "07/12/2026 02:47:30",
+      "priorityScoring": false,
+      "runSimulation": true,
+      "oddsHistoryPath": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\tracking\\odds_history.json"
+    },
+    {
+      "sport": "mlb",
+      "workflow": "syndicate_refresh",
+      "trigger": "simulation",
+      "status": "pending",
+      "reason": "delta_threshold",
+      "hasLineMovement": true,
+      "maxDeltaDetected": 765.0,
+      "lastOddsUpdateTimestamp": "07/12/2026 02:47:30",
+      "priorityScoring": false,
+      "runSimulation": true,
+      "oddsHistoryPath": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\tracking\\odds_history.json"
+    },
+    {
       "sport": "wnba",
       "workflow": "vendored_daily_update",
       "trigger": "simulation",
@@ -1888,9 +2027,9 @@
   "statusArtifact": {
     "format": "json",
     "scope": "daily_update",
-    "runManifestPath": "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-11\\20260711_172903\\unified_daily_update_run.json",
+    "runManifestPath": "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-12\\20260712_065423\\unified_daily_update_run.json",
     "latestManifestPath": "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest.json",
-    "runCheckpointPath": "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-11\\20260711_172903\\unified_daily_update_checkpoint.json",
+    "runCheckpointPath": "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-12\\20260712_065423\\unified_daily_update_checkpoint.json",
     "latestCheckpointPath": "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest_checkpoint.json",
     "state": {
       "runMode": "standard",
@@ -1975,19 +2114,16 @@
       "replayContext": {
         "latestCheckpointLoaded": true,
         "latestCheckpointPath": "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest_checkpoint.json",
-        "latestCheckpointStage": "completed",
+        "latestCheckpointStage": "queued",
         "latestCheckpointFailedStage": "",
-        "latestCheckpointCompletedStageCount": 2,
-        "latestCheckpointCompletedStages": [
-          "source_update",
-          "refresh_gate"
-        ],
+        "latestCheckpointCompletedStageCount": 0,
+        "latestCheckpointCompletedStages": null,
         "resumeEligible": false,
         "resumedFromCheckpoint": false,
         "forceRebuildToday": false
       },
       "publishParity": {
-        "date": "2026-07-11",
+        "date": "2026-07-12",
         "skipped": true,
         "forcedPublishArtifactPathCount": 0,
         "intelligencePublishArtifactPathCount": 0,
@@ -1995,7 +2131,7 @@
         "missingIntelligencePublishArtifactPaths": [],
         "status": "skipped"
       },
-      "lastUpdatedAt": "2026-07-11T17:29:05.3956433+00:00"
+      "lastUpdatedAt": "2026-07-12T06:54:23.7170095+00:00"
     }
   },
   "sportRuns": [],
@@ -2005,7 +2141,7 @@
   "skipped": {
     "sourceUpdates": false,
     "refreshGate": false,
-    "mlb": true,
+    "mlb": false,
     "nba": true,
     "nhl": true,
     "wnba": false,
@@ -2020,8 +2156,8 @@
     "oddsPhase": "all",
     "oddsSports": "all",
     "oddsRegions": "us",
-    "manifestPath": "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-11\\20260711_172903\\migration\\refresh_status_manifest.json",
-    "runSummaryPath": "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-11\\20260711_172903\\migration\\refresh_and_gate_run.json"
+    "manifestPath": "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-12\\20260712_065423\\migration\\refresh_status_manifest.json",
+    "runSummaryPath": "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-12\\20260712_065423\\migration\\refresh_and_gate_run.json"
   },
   "pushResults": [],
   "runTrace": {

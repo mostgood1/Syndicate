@@ -1,33 +1,46 @@
 {
   "scope": "daily_update",
-  "date": "2026-07-11",
+  "date": "2026-07-12",
   "runMode": "standard",
   "overallStatus": "started",
-  "generatedAt": "2026-07-11T17:29:05.2526424+00:00",
-  "updatedAt": "2026-07-11T17:29:05.4177163+00:00",
-  "runManifestPath": "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-11\\20260711_172903\\unified_daily_update_run.json",
+  "generatedAt": "2026-07-12T06:54:23.5810236+00:00",
+  "updatedAt": "2026-07-12T06:54:23.7390854+00:00",
+  "runManifestPath": "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-12\\20260712_065423\\unified_daily_update_run.json",
   "latestManifestPath": "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest.json",
-  "runCheckpointPath": "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-11\\20260711_172903\\unified_daily_update_checkpoint.json",
+  "runCheckpointPath": "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-12\\20260712_065423\\unified_daily_update_checkpoint.json",
   "latestCheckpointPath": "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest_checkpoint.json",
   "currentStage": "queued",
   "completedStages": [],
   "failedStage": null,
-  "lastUpdatedAt": "2026-07-11T17:29:05.3956433+00:00",
+  "lastUpdatedAt": "2026-07-12T06:54:23.7170095+00:00",
   "replayContext": {
     "latestCheckpointLoaded": true,
     "latestCheckpointPath": "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest_checkpoint.json",
-    "latestCheckpointStage": "completed",
+    "latestCheckpointStage": "queued",
     "latestCheckpointFailedStage": "",
-    "latestCheckpointCompletedStageCount": 2,
-    "latestCheckpointCompletedStages": [
-      "source_update",
-      "refresh_gate"
-    ],
+    "latestCheckpointCompletedStageCount": 0,
+    "latestCheckpointCompletedStages": null,
     "resumeEligible": false,
     "resumedFromCheckpoint": false,
     "forceRebuildToday": false
   },
   "stageDecisions": [
+    {
+      "stage": "source_update",
+      "sport": "mlb",
+      "workflow": "vendored_daily_update",
+      "name": "MLB vendored daily update",
+      "decision": "planned",
+      "status": "pending"
+    },
+    {
+      "stage": "source_update",
+      "sport": "mlb",
+      "workflow": "syndicate_refresh",
+      "name": "MLB current-day live-lens refresh",
+      "decision": "planned",
+      "status": "pending"
+    },
     {
       "stage": "source_update",
       "sport": "wnba",
