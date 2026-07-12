@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Mapping
@@ -12,6 +13,7 @@ from syndicate.features.shared.market_id import attach_market_id
 from syndicate.features.shared.odds_control_plane import shared_odds_history_root
 from syndicate.features.shared.odds_framework import normalize_odds_entry
 from syndicate.features.shared.odds_lifecycle import append_odds_lifecycle_events
+from syndicate.features.shared.odds_lifecycle import odds_lifecycle_path
 from syndicate.features.shared.recommendation_engine import build_recommendation_output
 
 
@@ -84,6 +86,7 @@ def _read_json(path: Path) -> Any:
 
 def _write_json(path: Path, payload: Any) -> None:
     started = time.perf_counter()
+    _trace_log("before_write_json_payload", **_trace_path_payload(path), rows=len(payload) if isinstance(payload, list) else len(payload.get("rows", [])) if isinstance(payload, dict) else None)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
     _trace_log("after_write_json", **_trace_path_payload(path), elapsed_ms=round((time.perf_counter() - started) * 1000, 3))
@@ -908,11 +911,26 @@ def _sync_odds_history_for_refresh(*, sport: str, source_root: Path, date_str: s
 
 
 def _read_json_payload(path: Path) -> Any:
+    started = time.perf_counter()
+    _trace_log("before_read_json_payload", **_trace_path_payload(path))
     try:
         if not path.exists():
+            _trace_log("after_read_json_payload", **_trace_path_payload(path, rows=0), elapsed_ms=round((time.perf_counter() - started) * 1000, 3), skipped=True)
             return None
-        return json.loads(path.read_text(encoding="utf-8"))
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        rows = None
+        if isinstance(payload, list):
+            rows = len(payload)
+        elif isinstance(payload, dict):
+            for key in ("rows", "recommendations", "items"):
+                maybe_rows = payload.get(key)
+                if isinstance(maybe_rows, list):
+                    rows = len(maybe_rows)
+                    break
+        _trace_log("after_read_json_payload", **_trace_path_payload(path, rows=rows), elapsed_ms=round((time.perf_counter() - started) * 1000, 3), skipped=False)
+        return payload
     except Exception:
+        _trace_log("after_read_json_payload", **_trace_path_payload(path), elapsed_ms=round((time.perf_counter() - started) * 1000, 3), error=True)
         return None
 
 
@@ -1593,6 +1611,7 @@ def sync_sport_post_refresh_tracking(*, sport: str, source_root: Path, date_str:
         game_df = _flatten_mlb_game_lines(snapshot_root / f"oddsapi_game_lines_{date_slug}.json")
         hitter_df = _flatten_mlb_props(snapshot_root / f"oddsapi_hitter_props_{date_slug}.json", "hitter_props")
         pitcher_df = _flatten_mlb_props(snapshot_root / f"oddsapi_pitcher_props_{date_slug}.json", "pitcher_props")
+        _trace_log("before_sync_csv_tracking_game_lines", sport=slug, tracking_root=str(tracking_root), prefix="odds_mlb_game_lines", scope=date_str, rows=int(len(game_df)), snapshot_root=str(snapshot_root))
         results["artifacts"]["game_lines"] = _sync_csv_tracking(
             tracking_root=tracking_root,
             prefix="odds_mlb_game_lines",
@@ -1602,6 +1621,8 @@ def sync_sport_post_refresh_tracking(*, sport: str, source_root: Path, date_str:
             line_col="line",
             price_cols=["price"],
         )
+        _trace_log("after_sync_csv_tracking_game_lines", sport=slug, tracking_root=str(tracking_root), prefix="odds_mlb_game_lines", scope=date_str, rows=int(len(game_df)), result_ok=bool(results["artifacts"]["game_lines"].get("ok")))
+        _trace_log("before_sync_csv_tracking_hitter_props", sport=slug, tracking_root=str(tracking_root), prefix="odds_mlb_hitter_props", scope=date_str, rows=int(len(hitter_df)), snapshot_root=str(snapshot_root))
         results["artifacts"]["hitter_props"] = _sync_csv_tracking(
             tracking_root=tracking_root,
             prefix="odds_mlb_hitter_props",
@@ -1611,6 +1632,8 @@ def sync_sport_post_refresh_tracking(*, sport: str, source_root: Path, date_str:
             line_col="line",
             price_cols=["price"],
         )
+        _trace_log("after_sync_csv_tracking_hitter_props", sport=slug, tracking_root=str(tracking_root), prefix="odds_mlb_hitter_props", scope=date_str, rows=int(len(hitter_df)), result_ok=bool(results["artifacts"]["hitter_props"].get("ok")))
+        _trace_log("before_sync_csv_tracking_pitcher_props", sport=slug, tracking_root=str(tracking_root), prefix="odds_mlb_pitcher_props", scope=date_str, rows=int(len(pitcher_df)), snapshot_root=str(snapshot_root))
         results["artifacts"]["pitcher_props"] = _sync_csv_tracking(
             tracking_root=tracking_root,
             prefix="odds_mlb_pitcher_props",
@@ -1620,13 +1643,18 @@ def sync_sport_post_refresh_tracking(*, sport: str, source_root: Path, date_str:
             line_col="line",
             price_cols=["price"],
         )
+        _trace_log("after_sync_csv_tracking_pitcher_props", sport=slug, tracking_root=str(tracking_root), prefix="odds_mlb_pitcher_props", scope=date_str, rows=int(len(pitcher_df)), result_ok=bool(results["artifacts"]["pitcher_props"].get("ok")))
+        _trace_log("before_refresh_impacted_recommendations", sport=slug, source_root=str(source_root), date=date_str)
         results["artifacts"]["recommendations_refresh"] = refresh_impacted_recommendations_for_tracking(
             sport=slug,
             source_root=source_root,
             date_str=date_str,
             tracking_meta=results,
         )
+        _trace_log("after_refresh_impacted_recommendations", sport=slug, source_root=str(source_root), date=date_str, ok=bool(results["artifacts"]["recommendations_refresh"].get("ok")))
+        _trace_log("before_sync_odds_history", sport=slug, source_root=str(source_root), date=date_str)
         results["artifacts"]["odds_history"] = _sync_odds_history_for_refresh(sport=slug, source_root=source_root, date_str=date_str)
+        _trace_log("after_sync_odds_history", sport=slug, source_root=str(source_root), date=date_str, ok=bool(results["artifacts"]["odds_history"].get("ok")))
         return results
 
     if slug == "ncaab":

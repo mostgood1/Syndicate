@@ -67,6 +67,18 @@ def _first_present(*values: Any) -> Any:
     return None
 
 
+def _trace_file_size(path: Path) -> int | None:
+    try:
+        return int(path.stat().st_size)
+    except Exception:
+        return None
+
+
+def _trace_log(stage: str, **payload: Any) -> None:
+    record = {"stage": stage, **payload}
+    print(f"[odds_lifecycle] TRACE {json.dumps(record, default=str, sort_keys=True)}", flush=True)
+
+
 def odds_lifecycle_root() -> Path:
     override = str(os.environ.get("SYNDICATE_ODDS_EVENTS_ROOT") or os.environ.get("SYNDICATE_ODDS_EVENT_ROOT") or "").strip()
     if override:
@@ -167,11 +179,15 @@ def append_odds_lifecycle_events(date_str: str, events: Sequence[Mapping[str, An
     if not records:
         return None
     path = odds_lifecycle_path(date_str)
+    started = datetime.now(timezone.utc)
+    _trace_log("before_append_odds_lifecycle_events", path=str(path), rows=len(records), size_bytes=_trace_file_size(path))
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a", encoding="utf-8") as handle:
         for record in records:
             handle.write(record)
             handle.write("\n")
+    elapsed_ms = round((datetime.now(timezone.utc) - started).total_seconds() * 1000, 3)
+    _trace_log("after_append_odds_lifecycle_events", path=str(path), rows=len(records), size_bytes=_trace_file_size(path), elapsed_ms=elapsed_ms)
     return path
 
 
