@@ -15,7 +15,6 @@ from __future__ import annotations
 import atexit
 import argparse
 import gc
-import multiprocessing
 import json
 import os
 import re
@@ -51,7 +50,6 @@ from syndicate.features.shared.odds_control_plane import write_odds_control_plan
 from syndicate.features.shared.publish_parity import build_publish_parity_summary
 from syndicate.features.shared.odds_refresh_tracking import sync_sport_post_refresh_tracking
 from syndicate.features.shared.manifest import publish_sport_manifest
-from syndicate.features.shared.memory_observability import get_all_process_memory_snapshot
 from syndicate.features.shared.refresh_state_store import data_root
 from syndicate.features.shared.memory_observability import log_all_process_memory
 from syndicate.features.shared.memory_observability import log_runtime_memory
@@ -408,73 +406,6 @@ def _dump_main_thread_stack(*, label: str) -> None:
         file=sys.stderr,
         flush=True,
     )
-
-
-def _shutdown_snapshot_payload() -> dict[str, object]:
-    thread_snapshot = []
-    for thread in enumerate_threads():
-        thread_snapshot.append(
-            {
-                "name": thread.name,
-                "daemon": thread.daemon,
-                "alive": thread.is_alive(),
-            }
-        )
-
-    active_children_snapshot = []
-    try:
-        for child in multiprocessing.active_children():
-            active_children_snapshot.append(
-                {
-                    "pid": getattr(child, "pid", None),
-                    "name": getattr(child, "name", None),
-                    "daemon": getattr(child, "daemon", None),
-                    "alive": bool(child.is_alive()),
-                }
-            )
-    except Exception as exc:
-        active_children_snapshot.append({"error": f"{type(exc).__name__}: {exc}"})
-
-    descendant_snapshot = []
-    if psutil is not None:
-        try:
-            current_process = psutil.Process()
-            for descendant in current_process.children(recursive=True):
-                try:
-                    descendant_snapshot.append(
-                        {
-                            "pid": descendant.pid,
-                            "ppid": descendant.ppid(),
-                            "name": descendant.name(),
-                            "status": descendant.status(),
-                            "daemon": None,
-                            "cmdline": descendant.cmdline(),
-                        }
-                    )
-                except Exception as child_exc:
-                    descendant_snapshot.append(
-                        {
-                            "pid": getattr(descendant, "pid", None),
-                            "error": f"{type(child_exc).__name__}: {child_exc}",
-                        }
-                    )
-        except Exception as exc:
-            descendant_snapshot.append({"error": f"{type(exc).__name__}: {exc}"})
-
-    return {
-        "timestamp": _utc_now(),
-        "pid": os.getpid(),
-        "ppid": os.getppid(),
-        "threads": thread_snapshot,
-        "multiprocessing_active_children": active_children_snapshot,
-        "subprocess_descendants": descendant_snapshot,
-    }
-
-
-def _log_shutdown_snapshot(*, stage: str) -> None:
-    payload = _shutdown_snapshot_payload()
-    payload["stage"] = stage
-    print(f"[refresh_odds_sources] SHUTDOWN_SNAPSHOT {json.dumps(payload, default=str, sort_keys=True)}", file=sys.stderr, flush=True)
 
 
 def _start_json_watchdog(*, label: str, delay_seconds: int = 10) -> None:
@@ -1168,12 +1099,12 @@ def _run_command(step: RefreshStep, *, dry_run: bool = False) -> dict[str, Any]:
     print(f"PRE_STEP_LOG name={step.name}", file=sys.stderr, flush=True)
     print(f"STEP_START name={step.name} cwd={step.cwd} command={json.dumps(list(step.command))}", file=sys.stderr, flush=True)
     print(f"POST_STEP_LOG name={step.name}", file=sys.stderr, flush=True)
-    print(f"[refresh_odds_sources] START step={step.name} cwd={step.cwd}", file=sys.stderr, flush=True)
+    print(f"[refresh_odds_sources] START step={step.name} cwd={step.cwd}", flush=True)
     _log_memory("step_start", step=step.name, dry_run=bool(dry_run), cwd=str(step.cwd))
     _dump_child_runtime_state(label=f"step_start:{step.name}")
     if dry_run:
         print(f"STEP_END name={step.name} status=dry_run runtime_seconds=0", file=sys.stderr, flush=True)
-        print(f"[refresh_odds_sources] END step={step.name} dry_run=true", file=sys.stderr, flush=True)
+        print(f"[refresh_odds_sources] END step={step.name} dry_run=true", flush=True)
         _dump_child_runtime_state(label=f"step_end:{step.name}:dry_run")
         _log_memory("step_end_dry_run", step=step.name)
         return {
@@ -1214,7 +1145,7 @@ def _run_command(step: RefreshStep, *, dry_run: bool = False) -> dict[str, Any]:
             file=sys.stderr,
             flush=True,
         )
-        print(f"[refresh_odds_sources] FAIL step={step.name} reason=timeout timeout_seconds={timeout_seconds}", file=sys.stderr, flush=True)
+        print(f"[refresh_odds_sources] FAIL step={step.name} reason=timeout timeout_seconds={timeout_seconds}", flush=True)
         raise
     finally:
         if result is not None:
@@ -1241,7 +1172,6 @@ def _run_command(step: RefreshStep, *, dry_run: bool = False) -> dict[str, Any]:
     )
     print(
         f"[refresh_odds_sources] END step={step.name} return_code={result.returncode} timeout_seconds={timeout_seconds if timeout_seconds is not None else 'none'}",
-        file=sys.stderr,
         flush=True,
     )
     _log_memory(
@@ -2001,7 +1931,6 @@ def _build_summary(args: argparse.Namespace) -> dict[str, Any]:
         f"enabled={serial_sport_refresh_enabled} "
         f"selected={selected} "
         f"max_workers={max_workers}",
-        file=sys.stderr,
         flush=True,
     )
     if max_workers <= 1:
@@ -2118,18 +2047,6 @@ def _build_summary(args: argparse.Namespace) -> dict[str, Any]:
 
     summary["finished_at"] = _utc_now()
     summary["ok"] = not any_failure
-    final_memory_snapshot = _phase_memory_snapshot()
-    final_process_memory = get_all_process_memory_snapshot()
-    start_rss_bytes = summary_start_memory.get("rss_bytes")
-    final_rss_bytes = final_memory_snapshot.get("rss_bytes")
-    summary["runtime"] = {
-        "rss_bytes": final_rss_bytes,
-        "rss_delta_bytes": int(final_rss_bytes - start_rss_bytes) if isinstance(final_rss_bytes, int) and isinstance(start_rss_bytes, int) else None,
-        "rss_growth_ratio": round(final_rss_bytes / start_rss_bytes, 4) if isinstance(final_rss_bytes, int) and isinstance(start_rss_bytes, int) and start_rss_bytes > 0 else None,
-        "container_memory_mb": final_process_memory.get("container_memory_mb"),
-        "accounted_rss_mb": final_process_memory.get("accounted_rss_mb"),
-        "unexplained_memory_mb": final_process_memory.get("unexplained_memory_mb"),
-    }
     summary_rows_loaded = sum((_sport_rows_loaded(item) or 0) for item in summary.get("results", []) if isinstance(item, dict))
     _log_memory(
         "summary_before_parity",
@@ -2137,7 +2054,7 @@ def _build_summary(args: argparse.Namespace) -> dict[str, Any]:
         results=_object_summary(summary.get("results", []), name="results"),
         rows_loaded=summary_rows_loaded,
         before=summary_start_memory,
-        after=final_memory_snapshot,
+        after=_phase_memory_snapshot(),
     )
     publish_parity_paths: list[str] = []
     for sport_result in summary.get("results", []) if isinstance(summary.get("results"), list) else []:
@@ -2157,7 +2074,7 @@ def _build_summary(args: argparse.Namespace) -> dict[str, Any]:
         publish_parity_paths_count=len(publish_parity_paths),
         rows_loaded=summary_rows_loaded,
         before=summary_start_memory,
-        after=final_memory_snapshot,
+        after=_phase_memory_snapshot(),
     )
     return summary
 
@@ -2179,8 +2096,6 @@ def main() -> int:
 
     atexit.register(_emit_child_exit)
     atexit.register(_emit_exit_memory)
-
-    _log_shutdown_snapshot(stage="main_start")
 
     parser = argparse.ArgumentParser(
         description="Refresh pregame/live odds in the source sport repos, then optionally mirror the refreshed artifacts into Syndicate.",
@@ -2235,9 +2150,7 @@ def main() -> int:
         log_all_process_memory("startup", script="refresh_odds_sources", pid=child_pid, argv=list(sys.argv))
         log_runtime_memory("startup", script="refresh_odds_sources", pid=child_pid, argv=list(sys.argv))
         _start_all_process_memory_heartbeat(label="refresh_odds_sources")
-        _log_shutdown_snapshot(stage="before_build_summary")
         summary = _build_summary(args)
-        _log_shutdown_snapshot(stage="after_build_summary")
     except Exception as exc:
         payload = {"ok": False, "error": f"{type(exc).__name__}: {exc}"}
         print(f"CHILD_PROCESS_STARTED argv={json.dumps(sys.argv)} cwd={os.getcwd()} pid={os.getpid()}", file=sys.stderr, flush=True)
@@ -2264,7 +2177,6 @@ def main() -> int:
     if args.json:
         _dump_child_runtime_state(label="json_before_write")
         _dump_main_thread_stack(label="json_before_write")
-        _log_shutdown_snapshot(stage="before_final_json_write")
         print("CHILD_JSON_WRITE_BEGIN", file=sys.stderr, flush=True)
         print(json.dumps(summary, indent=2))
         print(f"CHILD_JSON_WRITE_END ts={_utc_now()} pid={os.getpid()} ppid={os.getppid()}", file=sys.stderr, flush=True)
@@ -2272,36 +2184,33 @@ def main() -> int:
         _dump_child_runtime_state(label="json_after_write")
         _dump_main_thread_stack(label="json_after_write")
         _start_json_watchdog(label="json_after_write")
-        _log_shutdown_snapshot(stage="after_final_json_write")
     else:
         _dump_child_runtime_state(label="non_json_before_write")
         _dump_main_thread_stack(label="non_json_before_write")
         for sport_result in summary.get("results", []):
             sport = sport_result["sport"]
             status = "ok" if sport_result.get("ok") else "failed"
-            print(f"[{sport}] {status}", file=sys.stderr)
+            print(f"[{sport}] {status}")
             if sport_result.get("error"):
-                print(f"  - error: {sport_result['error']}", file=sys.stderr)
+                print(f"  - error: {sport_result['error']}")
             for step_result in sport_result.get("refresh_steps", []):
                 marker = "dry-run" if step_result.get("dry_run") else ("ok" if step_result.get("ok") else "failed")
-                print(f"  - refresh {step_result['name']}: {marker}", file=sys.stderr)
+                print(f"  - refresh {step_result['name']}: {marker}")
             post_refresh = sport_result.get("post_refresh")
             if isinstance(post_refresh, dict):
                 marker = "dry-run" if post_refresh.get("dry_run") else ("ok" if post_refresh.get("ok") else "failed")
-                print(f"  - post-refresh {post_refresh['name']}: {marker}", file=sys.stderr)
+                print(f"  - post-refresh {post_refresh['name']}: {marker}")
             mirror = sport_result.get("mirror")
             if isinstance(mirror, dict):
                 marker = "dry-run" if mirror.get("dry_run") else ("ok" if mirror.get("ok") else "failed")
-                print(f"  - mirror: {marker}", file=sys.stderr)
+                print(f"  - mirror: {marker}")
 
         _dump_child_runtime_state(label="non_json_after_write")
         _dump_main_thread_stack(label="non_json_after_write")
-        _log_shutdown_snapshot(stage="after_final_non_json_write")
 
     _log_memory("finalization", child_pid=child_pid, before=_phase_memory_snapshot(), after=_phase_memory_snapshot())
     print(f"MAIN_RETURN ts={_utc_now()} pid={os.getpid()} ppid={os.getppid()}", file=sys.stderr, flush=True)
     _dump_main_thread_stack(label="main_return")
-    _log_shutdown_snapshot(stage="before_process_exit")
     return 0 if summary.get("ok") else 1
 
 

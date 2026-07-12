@@ -90,6 +90,59 @@ class RefreshOddsJobTests(unittest.TestCase):
             self.assertIn("SNAPSHOT_WRITTEN", printed)
             self.assertIn("ODDS_REFRESH_SUCCESS", printed)
 
+    def test_main_persists_stderr_tail_into_job_status(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        module = self._load_module(repo_root)
+
+        with TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            manifest_path = root / "manifest.json"
+            latest_path = root / "latest.json"
+            run_summary_path = root / "summary.json"
+            status_path = root / "job_status.json"
+            stdout_path = root / "stdout.txt"
+            stderr_path = root / "stderr.txt"
+
+            manifest_path.write_text(json.dumps({"state": "running"}), encoding="utf-8")
+            latest_path.write_text(json.dumps({"state": "running"}), encoding="utf-8")
+            run_summary_path.write_text(json.dumps({"state": "running"}), encoding="utf-8")
+
+            stderr_text = "line-" + "x" * 2200 + "-tail"
+            with patch.object(
+                sys,
+                "argv",
+                [
+                    "run_refresh_odds_job.py",
+                    "--manifest-path",
+                    str(manifest_path),
+                    "--latest-path",
+                    str(latest_path),
+                    "--run-summary-path",
+                    str(run_summary_path),
+                    "--status-path",
+                    str(status_path),
+                    "--stdout-path",
+                    str(stdout_path),
+                    "--stderr-path",
+                    str(stderr_path),
+                    "--",
+                    sys.executable,
+                    "-c",
+                    "print('ok')",
+                ],
+            ), patch.object(
+                module.subprocess,
+                "Popen",
+                return_value=self._FakeProcess(stdout_text="ok\n", stderr_text=stderr_text, returncode=0),
+            ):
+                exit_code = module.main()
+
+            self.assertEqual(exit_code, 0)
+            status_payload = json.loads(status_path.read_text(encoding="utf-8"))
+            self.assertIn("stderrTail", status_payload)
+            self.assertEqual(status_payload["stderrBufferLen"], len(stderr_text))
+            self.assertEqual(status_payload["stderrTail"], stderr_text[-2000:])
+
     def test_main_queues_intelligence_refresh_after_success(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]
         module = self._load_module(repo_root)

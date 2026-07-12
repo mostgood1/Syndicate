@@ -3245,14 +3245,12 @@ def _existing_refresh_state(*, source_root: Path, date_str: str, do_edges: bool,
     processed_root = source_root / "data" / "processed"
     snapshot_path = raw_root / f"odds_wnba_player_props_{date_str}.csv"
     snapshot_alias_path = processed_root / f"oddsapi_player_props_{date_str}.csv"
-    game_predictions_path = processed_root / f"predictions_{date_str}.csv"
     predictions_path = processed_root / f"props_predictions_{date_str}.csv"
     edges_path = processed_root / f"props_edges_{date_str}.csv"
     recs_path = processed_root / f"props_recommendations_{date_str}.csv"
 
     required_paths = [snapshot_path]
     if do_edges or do_export:
-        required_paths.append(game_predictions_path)
         required_paths.append(predictions_path)
     if do_edges:
         required_paths.append(edges_path)
@@ -3273,14 +3271,12 @@ def _existing_refresh_state(*, source_root: Path, date_str: str, do_edges: bool,
         "rc_export": (0 if do_export else None),
         "snapshot_rows": int(_count_csv_rows_quick(snapshot_path)),
         "snapshot_bundle_rows": int(_count_csv_rows_quick(snapshot_path)),
-        "game_predictions_rows": int(_count_csv_rows_quick(game_predictions_path)),
         "predictions_rows": int(_count_csv_rows_quick(predictions_path)),
         "prediction_bundle_rows": int(_count_csv_rows_quick(predictions_path)),
         "edges_rows": int(_count_csv_rows_quick(edges_path)),
         "recs_rows": int(_count_csv_rows_quick(recs_path)),
         "snapshot_path": str(snapshot_path),
         "snapshot_bundle_path": str(snapshot_path),
-        "game_predictions_path": str(game_predictions_path),
         "predictions_path": str(predictions_path),
         "prediction_bundle_path": str(predictions_path),
         "edges_path": str(edges_path),
@@ -3298,7 +3294,6 @@ def _existing_artifact_bundle_state(*, artifact_root: Path, date_str: str, do_ed
     processed_root = artifact_root / "data" / "processed"
     snapshot_path = raw_root / f"odds_wnba_player_props_{date_str}.csv"
     snapshot_alias_path = processed_root / f"oddsapi_player_props_{date_str}.csv"
-    game_predictions_path = processed_root / f"predictions_{date_str}.csv"
     predictions_path = processed_root / f"props_predictions_{date_str}.csv"
     edges_path = processed_root / f"props_edges_{date_str}.csv"
     recs_path = processed_root / f"props_recommendations_{date_str}.csv"
@@ -3310,7 +3305,6 @@ def _existing_artifact_bundle_state(*, artifact_root: Path, date_str: str, do_ed
 
     required_paths = [snapshot_path]
     if do_edges or do_export:
-        required_paths.append(game_predictions_path)
         required_paths.append(predictions_path)
     if do_edges:
         required_paths.append(edges_path)
@@ -3335,7 +3329,6 @@ def _existing_artifact_bundle_state(*, artifact_root: Path, date_str: str, do_ed
         "rc_export": (0 if do_export else None),
         "snapshot_rows": int(_count_csv_rows_quick(snapshot_path)),
         "snapshot_bundle_rows": int(_count_csv_rows_quick(snapshot_path)),
-        "game_predictions_rows": int(_count_csv_rows_quick(game_predictions_path)),
         "predictions_rows": int(_count_csv_rows_quick(predictions_path)),
         "prediction_bundle_rows": int(_count_csv_rows_quick(predictions_path)),
         "edges_rows": int(_count_csv_rows_quick(edges_path)),
@@ -3345,7 +3338,6 @@ def _existing_artifact_bundle_state(*, artifact_root: Path, date_str: str, do_ed
         "smart_sim_files": smart_sim_files,
         "snapshot_path": str(snapshot_path),
         "snapshot_bundle_path": str(snapshot_path),
-        "game_predictions_path": str(game_predictions_path),
         "predictions_path": str(predictions_path),
         "prediction_bundle_path": str(predictions_path),
         "edges_path": str(edges_path),
@@ -4030,13 +4022,6 @@ def _materialize_artifact_bundle(*, state: dict[str, object], artifact_root: Pat
         except Exception:
             reuse_local_processed = source_directory == processed_root
     if date_text and source_directory is not None:
-        game_predictions_path = _copy_existing_processed_artifact(
-            source_root=source_root,
-            processed_root=processed_root,
-            file_name=f"predictions_{date_text}.csv",
-        )
-        if game_predictions_path:
-            copied["game_predictions_path"] = game_predictions_path
         smart_sim_files = _copy_matching_files(
             source_directory=source_directory,
             pattern=f"smart_sim_{date_text}_*.json",

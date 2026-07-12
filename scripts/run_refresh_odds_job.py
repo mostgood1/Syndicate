@@ -343,6 +343,9 @@ def _queue_intelligence_snapshot_refresh(*, run_summary_path: Path) -> tuple[str
 def _echo_captured_output(*, stdout_text: str, stderr_text: str) -> None:
     return
 
+def _stderr_tail(stderr_chunks: list[str], *, limit: int = 2000) -> str:
+    return "".join(stderr_chunks)[-limit:]
+
 
 def main() -> int:
     print("[refresh_job] script entry reached", flush=True)
@@ -403,8 +406,6 @@ def main() -> int:
         failure_error = None
     except Exception as exc:
         started_at = locals().get("started_at", _utc_now())
-        failure_error = f"{type(exc).__name__}: {exc}"
-        trace_text = traceback.format_exc()
         stdout_text = json.dumps(
             {
                 "ok": False,
@@ -494,6 +495,14 @@ def main() -> int:
         started_at=started_at,
         finished_at=finished_at,
         command=command,
+        extra={
+            "childPid": int(process.pid),
+            "childPoll": process.poll(),
+            "childReturnCode": process.returncode,
+            "stdoutBufferLen": len(stdout_text),
+            "stderrBufferLen": len(stderr_text),
+            "stderrTail": stderr_text[-2000:],
+        },
     )
     if return_code == 0:
         print(f"ODDS_REFRESH_SUCCESS manifest={manifest_path} latest={latest_path}", flush=True)
