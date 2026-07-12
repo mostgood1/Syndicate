@@ -1,47 +1,53 @@
 event_key,segment,market,selection,line,price,snapshot_ts
-Arizona Diamondbacks @ Los Angeles Dodgers,first5,moneyline,away,,+145,2026-07-12T01:58:16Z
+Arizona Diamondbacks @ Los Angeles Dodgers,first5,moneyline,away,,145,2026-07-12T01:58:16Z
 Arizona Diamondbacks @ Los Angeles Dodgers,first5,moneyline,home,,-200,2026-07-12T01:58:16Z
 Arizona Diamondbacks @ Los Angeles Dodgers,first5,spread_away,away,0.5,-160,2026-07-12T01:58:16Z
-Arizona Diamondbacks @ Los Angeles Dodgers,first5,spread_home,home,-0.5,+120,2026-07-12T01:58:16Z
+Arizona Diamondbacks @ Los Angeles Dodgers,first5,spread_home,home,-0.5,120,2026-07-12T01:58:16Z
 Arizona Diamondbacks @ Los Angeles Dodgers,first5,total,over,1.5,-118,2026-07-12T01:58:16Z
 Arizona Diamondbacks @ Los Angeles Dodgers,first5,total,under,1.5,-110,2026-07-12T01:58:16Z
-Arizona Diamondbacks @ Los Angeles Dodgers,first7,moneyline,away,,+185,2026-07-12T01:58:16Z
+Arizona Diamondbacks @ Los Angeles Dodgers,first7,moneyline,away,,185,2026-07-12T01:58:16Z
 Arizona Diamondbacks @ Los Angeles Dodgers,first7,moneyline,home,,-275,2026-07-12T01:58:16Z
-Arizona Diamondbacks @ Los Angeles Dodgers,first7,spread_away,away,0.5,+115,2026-07-12T01:58:16Z
+Arizona Diamondbacks @ Los Angeles Dodgers,first7,spread_away,away,0.5,115,2026-07-12T01:58:16Z
 Arizona Diamondbacks @ Los Angeles Dodgers,first7,spread_home,home,-0.5,-160,2026-07-12T01:58:16Z
 Arizona Diamondbacks @ Los Angeles Dodgers,first7,total,over,3.5,-135,2026-07-12T01:58:16Z
 Arizona Diamondbacks @ Los Angeles Dodgers,first7,total,under,3.5,-105,2026-07-12T01:58:16Z
-Arizona Diamondbacks @ Los Angeles Dodgers,full,moneyline,away,,+180,2026-07-12T01:58:16Z
+Arizona Diamondbacks @ Los Angeles Dodgers,full,moneyline,away,,180,2026-07-12T01:58:16Z
 Arizona Diamondbacks @ Los Angeles Dodgers,full,moneyline,home,,-225,2026-07-12T01:58:16Z
 Arizona Diamondbacks @ Los Angeles Dodgers,full,spread_away,away,1.5,-135,2026-07-12T01:58:16Z
-Arizona Diamondbacks @ Los Angeles Dodgers,full,spread_home,home,-1.5,+105,2026-07-12T01:58:16Z
+Arizona Diamondbacks @ Los Angeles Dodgers,full,spread_home,home,-1.5,105,2026-07-12T01:58:16Z
 Arizona Diamondbacks @ Los Angeles Dodgers,full,total,over,5.5,-105,2026-07-12T01:58:16Z
 Arizona Diamondbacks @ Los Angeles Dodgers,full,total,under,5.5,-120,2026-07-12T01:58:16Z
 Chicago Cubs @ Cincinnati Reds,full,moneyline,away,,-1200,2026-07-12T01:58:16Z
-Chicago Cubs @ Cincinnati Reds,full,moneyline,home,,+750,2026-07-12T01:58:16Z
+Chicago Cubs @ Cincinnati Reds,full,moneyline,home,,750,2026-07-12T01:58:16Z
 Chicago Cubs @ Cincinnati Reds,full,spread_away,away,-1.5,-360,2026-07-12T01:58:16Z
-Chicago Cubs @ Cincinnati Reds,full,spread_home,home,1.5,+260,2026-07-12T01:58:16Z
-Chicago Cubs @ Cincinnati Reds,full,total,over,8.5,+230,2026-07-12T01:58:16Z
+Chicago Cubs @ Cincinnati Reds,full,spread_home,home,1.5,260,2026-07-12T01:58:16Z
+Chicago Cubs @ Cincinnati Reds,full,total,over,8.5,230,2026-07-12T01:58:16Z
 Chicago Cubs @ Cincinnati Reds,full,total,under,8.5,-330,2026-07-12T01:58:16Z
 Houston Astros @ Texas Rangers,full,spread_away,away,-7.5,-440,2026-07-12T01:58:16Z
-Houston Astros @ Texas Rangers,full,spread_home,home,7.5,+290,2026-07-12T01:58:16Z
-Houston Astros @ Texas Rangers,full,total,over,10.5,+235,2026-07-12T01:58:16Z
+Houston Astros @ Texas Rangers,full,spread_home,home,7.5,290,2026-07-12T01:58:16Z
+Houston Astros @ Texas Rangers,full,total,over,10.5,235,2026-07-12T01:58:16Z
 Houston Astros @ Texas Rangers,full,total,under,10.5,-340,2026-07-12T01:58:16Z
-Toronto Blue Jays @ San Diego Padres,first3,moneyline,away,,+340,2026-07-12T01:58:16Z
+Toronto Blue Jays @ San Diego Padres,first3,moneyline,away,,340,2026-07-12T01:58:16Z
 Toronto Blue Jays @ San Diego Padres,first3,moneyline,home,,-550,2026-07-12T01:58:16Z
 Toronto Blue Jays @ San Diego Padres,first3,spread_away,away,0.5,-300,2026-07-12T01:58:16Z
-Toronto Blue Jays @ San Diego Padres,first3,spread_home,home,-0.5,+200,2026-07-12T01:58:16Z
-Toronto Blue Jays @ San Diego Padres,first3,total,over,8.5,+145,2026-07-12T01:58:16Z
+Toronto Blue Jays @ San Diego Padres,first3,spread_home,home,-0.5,200,2026-07-12T01:58:16Z
+Toronto Blue Jays @ San Diego Padres,first3,total,over,8.5,145,2026-07-12T01:58:16Z
 Toronto Blue Jays @ San Diego Padres,first3,total,under,8.5,-190,2026-07-12T01:58:16Z
-Toronto Blue Jays @ San Diego Padres,first5,moneyline,away,,+800,2026-07-12T01:58:16Z
+Toronto Blue Jays @ San Diego Padres,first5,moneyline,away,,800,2026-07-12T01:58:16Z
 Toronto Blue Jays @ San Diego Padres,first5,moneyline,home,,-1500,2026-07-12T01:58:16Z
 Toronto Blue Jays @ San Diego Padres,first5,spread_away,away,2.5,-160,2026-07-12T01:58:16Z
-Toronto Blue Jays @ San Diego Padres,first5,spread_home,home,-2.5,+120,2026-07-12T01:58:16Z
+Toronto Blue Jays @ San Diego Padres,first5,spread_home,home,-2.5,120,2026-07-12T01:58:16Z
 Toronto Blue Jays @ San Diego Padres,first5,total,over,11.5,-170,2026-07-12T01:58:16Z
-Toronto Blue Jays @ San Diego Padres,first5,total,under,11.5,+120,2026-07-12T01:58:16Z
-Toronto Blue Jays @ San Diego Padres,full,moneyline,away,,+175,2026-07-12T01:58:16Z
+Toronto Blue Jays @ San Diego Padres,first5,total,under,11.5,120,2026-07-12T01:58:16Z
+Toronto Blue Jays @ San Diego Padres,first7,moneyline,away,,+1900,2026-07-12T02:47:20Z
+Toronto Blue Jays @ San Diego Padres,first7,moneyline,home,,-8000,2026-07-12T02:47:20Z
+Toronto Blue Jays @ San Diego Padres,first7,spread_away,away,3.5,-200,2026-07-12T02:47:20Z
+Toronto Blue Jays @ San Diego Padres,first7,spread_home,home,-3.5,+140,2026-07-12T02:47:20Z
+Toronto Blue Jays @ San Diego Padres,first7,total,over,11.5,-220,2026-07-12T02:47:20Z
+Toronto Blue Jays @ San Diego Padres,first7,total,under,11.5,+165,2026-07-12T02:47:20Z
+Toronto Blue Jays @ San Diego Padres,full,moneyline,away,,175,2026-07-12T01:58:16Z
 Toronto Blue Jays @ San Diego Padres,full,moneyline,home,,-235,2026-07-12T01:58:16Z
 Toronto Blue Jays @ San Diego Padres,full,spread_away,away,1.5,-145,2026-07-12T01:58:16Z
-Toronto Blue Jays @ San Diego Padres,full,spread_home,home,-1.5,+110,2026-07-12T01:58:16Z
+Toronto Blue Jays @ San Diego Padres,full,spread_home,home,-1.5,110,2026-07-12T01:58:16Z
 Toronto Blue Jays @ San Diego Padres,full,total,over,13.5,-130,2026-07-12T01:58:16Z
-Toronto Blue Jays @ San Diego Padres,full,total,under,13.5,+100,2026-07-12T01:58:16Z
+Toronto Blue Jays @ San Diego Padres,full,total,under,13.5,100,2026-07-12T01:58:16Z

@@ -18,11 +18,11 @@
   "registryLogPath": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/live_lens/prop_registry/live_prop_registry_2026_07_11.jsonl",
   "reportPath": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/live_lens/live_lens_report_2026_07_11.json",
   "dailyRecapPath": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/live_lens/recaps/live_lens_daily_recap_2026_07_11.json",
-  "entries": 3,
+  "entries": 2,
   "latestEntry": {
-    "recordedAt": "2026-07-11T16:36:03+00:00",
+    "recordedAt": "2026-07-11T17:28:50+00:00",
     "date": "2026-07-11",
-    "generatedAt": "2026-07-11T11:36:03-05:00",
+    "generatedAt": "2026-07-11T12:28:50-05:00",
     "oddsRefreshedAt": null,
     "counts": {
       "games": 16,
@@ -35,11 +35,11 @@
     "performance": {
       "marketsRefreshed": false,
       "marketRefreshMs": 0.0,
-      "totalMs": 1710.4,
-      "snapshotLoadMs": 2.0,
-      "simContextLoadMs": 1.1,
+      "totalMs": 2051.7,
+      "snapshotLoadMs": 2.6,
+      "simContextLoadMs": 1.2,
       "propEvalMs": 0.2,
-      "gameLensMs": 1.6,
+      "gameLensMs": 1.8,
       "gameCount": 16,
       "liveGameCount": 1,
       "feedFetchCount": 16,
@@ -50,10 +50,10 @@
         "gamePk": 823357,
         "status": "Live",
         "score": {
-          "away": 0,
-          "home": 2
+          "away": 2,
+          "home": 3
         },
-        "liveText": "Top 2 | 2-2, 0 out | William Contreras vs Braxton Ashcraft",
+        "liveText": "Top 5 | 1-1, 0 out | Cooper Pratt vs Braxton Ashcraft",
         "propCount": 0,
         "topProps": []
       },
@@ -226,162 +226,161 @@
   },
   "latestReport": {
     "date": "2026-07-11",
-    "generatedAt": "2026-07-11T20:58:17-05:00",
+    "generatedAt": "2026-07-11T21:47:29-05:00",
     "counts": {
       "games": 16,
-      "live": 1,
-      "final": 0,
-      "pregame": 15,
-      "props": 0,
+      "live": 2,
+      "final": 14,
+      "pregame": 0,
+      "props": 15,
       "archivedLiveProps": 0
     },
     "performance": {
       "marketsRefreshed": false,
       "marketRefreshMs": 0.0,
-      "totalMs": 1710.4,
-      "snapshotLoadMs": 2.0,
-      "simContextLoadMs": 1.1,
-      "propEvalMs": 0.2,
-      "gameLensMs": 1.6,
+      "totalMs": 8894.6,
+      "snapshotLoadMs": 4.5,
+      "simContextLoadMs": 223.3,
+      "propEvalMs": 1077.1,
+      "gameLensMs": 1162.2,
       "gameCount": 16,
-      "liveGameCount": 1,
-      "feedFetchCount": 16,
-      "persistMs": 0.0
+      "liveGameCount": 2,
+      "feedFetchCount": 16
     },
     "games": [
       {
-        "gamePk": 823357,
-        "startTime": "11:05 AM",
+        "gamePk": 823276,
+        "startTime": "7:40 PM",
         "status": {
           "abstract": "Live",
           "detailed": "In Progress"
         }
       },
       {
+        "gamePk": 823926,
+        "startTime": "8:10 PM",
+        "status": {
+          "abstract": "Live",
+          "detailed": "In Progress"
+        }
+      },
+      {
+        "gamePk": 823357,
+        "startTime": "11:05 AM",
+        "status": {
+          "abstract": "Final",
+          "detailed": "Final"
+        }
+      },
+      {
         "gamePk": 823682,
         "startTime": "1:10 PM",
         "status": {
-          "abstract": "Preview",
-          "detailed": "Pre-Game"
+          "abstract": "Final",
+          "detailed": "Final"
         }
       },
       {
         "gamePk": 824576,
         "startTime": "1:10 PM",
         "status": {
-          "abstract": "Preview",
-          "detailed": "Pre-Game"
+          "abstract": "Final",
+          "detailed": "Final"
         }
       },
       {
         "gamePk": 822711,
         "startTime": "3:05 PM",
         "status": {
-          "abstract": "Preview",
-          "detailed": "Scheduled"
+          "abstract": "Final",
+          "detailed": "Final"
         }
       },
       {
         "gamePk": 823198,
         "startTime": "3:05 PM",
         "status": {
-          "abstract": "Preview",
-          "detailed": "Scheduled"
+          "abstract": "Final",
+          "detailed": "Final"
         }
       },
       {
         "gamePk": 823356,
         "startTime": "3:05 PM",
         "status": {
-          "abstract": "Preview",
-          "detailed": "Scheduled"
+          "abstract": "Final",
+          "detailed": "Final"
         }
       },
       {
         "gamePk": 822953,
         "startTime": "3:10 PM",
         "status": {
-          "abstract": "Preview",
-          "detailed": "Pre-Game"
+          "abstract": "Final",
+          "detailed": "Final"
         }
       },
       {
         "gamePk": 823603,
         "startTime": "3:10 PM",
         "status": {
-          "abstract": "Preview",
-          "detailed": "Scheduled"
+          "abstract": "Final",
+          "detailed": "Final"
         }
       },
       {
         "gamePk": 823844,
         "startTime": "3:10 PM",
         "status": {
-          "abstract": "Preview",
-          "detailed": "Scheduled"
+          "abstract": "Final",
+          "detailed": "Final"
         }
       },
       {
         "gamePk": 824249,
         "startTime": "5:10 PM",
         "status": {
-          "abstract": "Preview",
-          "detailed": "Scheduled"
+          "abstract": "Final",
+          "detailed": "Final"
         }
       },
       {
         "gamePk": 822875,
         "startTime": "6:05 PM",
         "status": {
-          "abstract": "Preview",
-          "detailed": "Scheduled"
+          "abstract": "Final",
+          "detailed": "Final"
         }
       },
       {
         "gamePk": 824813,
         "startTime": "6:05 PM",
         "status": {
-          "abstract": "Preview",
-          "detailed": "Scheduled"
+          "abstract": "Final",
+          "detailed": "Final"
         }
       },
       {
         "gamePk": 824492,
         "startTime": "6:10 PM",
         "status": {
-          "abstract": "Preview",
-          "detailed": "Scheduled"
+          "abstract": "Final",
+          "detailed": "Final"
         }
       },
       {
         "gamePk": 823030,
         "startTime": "6:15 PM",
         "status": {
-          "abstract": "Preview",
-          "detailed": "Scheduled"
-        }
-      },
-      {
-        "gamePk": 823276,
-        "startTime": "7:40 PM",
-        "status": {
-          "abstract": "Preview",
-          "detailed": "Scheduled"
-        }
-      },
-      {
-        "gamePk": 823926,
-        "startTime": "8:10 PM",
-        "status": {
-          "abstract": "Preview",
-          "detailed": "Scheduled"
+          "abstract": "Final",
+          "detailed": "Final"
         }
       }
     ]
   },
   "registrySummary": {
     "date": "2026-07-11",
-    "updatedAt": "2026-07-11T11:25:06-05:00",
+    "updatedAt": "2026-07-11T20:58:17-05:00",
     "totalEntries": 0,
     "uniqueGames": 0,
     "uniqueOwners": 0,
@@ -400,67 +399,66 @@
   "summary": {
     "counts": {
       "games": 16,
-      "live": 1,
-      "final": 0,
-      "pregame": 15,
-      "props": 0,
+      "live": 2,
+      "final": 14,
+      "pregame": 0,
+      "props": 15,
       "archivedLiveProps": 0
     },
     "performance": {
       "marketsRefreshed": false,
       "marketRefreshMs": 0.0,
-      "totalMs": 1710.4,
-      "snapshotLoadMs": 2.0,
-      "simContextLoadMs": 1.1,
-      "propEvalMs": 0.2,
-      "gameLensMs": 1.6,
+      "totalMs": 8894.6,
+      "snapshotLoadMs": 4.5,
+      "simContextLoadMs": 223.3,
+      "propEvalMs": 1077.1,
+      "gameLensMs": 1162.2,
       "gameCount": 16,
-      "liveGameCount": 1,
-      "feedFetchCount": 16,
-      "persistMs": 0.0
+      "liveGameCount": 2,
+      "feedFetchCount": 16
     },
     "topStable": [],
     "topEdges": []
   },
   "firstObservationArchive": [],
   "rawArtifacts": {
-    "total_bytes": 141987,
-    "total_bytes_text": "138.66 KB",
+    "total_bytes": 139159,
+    "total_bytes_text": "135.90 KB",
     "files": {
       "log": {
         "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/live_lens/live_lens_2026_07_11.jsonl",
         "exists": true,
-        "bytes": 7393,
-        "bytes_text": "7.22 KB",
-        "modified_at": "2026-07-11T11:53:36-05:00"
+        "bytes": 5001,
+        "bytes_text": "4.88 KB",
+        "modified_at": "2026-07-11T21:27:27-05:00"
       },
       "observation_log": {
         "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/live_lens/prop_registry/live_prop_observations_2026_07_11.jsonl",
         "exists": true,
         "bytes": 0,
         "bytes_text": "0 B",
-        "modified_at": "2026-07-11T11:53:36-05:00"
+        "modified_at": "2026-07-11T20:58:17-05:00"
       },
       "registry": {
         "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/live_lens/prop_registry/live_prop_registry_2026_07_11.json",
         "exists": true,
-        "bytes": 91,
-        "bytes_text": "91 B",
-        "modified_at": "2026-07-11T11:53:36-05:00"
+        "bytes": 60763,
+        "bytes_text": "59.34 KB",
+        "modified_at": "2026-07-11T21:47:26-05:00"
       },
       "registry_log": {
         "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/live_lens/prop_registry/live_prop_registry_2026_07_11.jsonl",
         "exists": true,
-        "bytes": 0,
-        "bytes_text": "0 B",
-        "modified_at": "2026-07-11T11:53:36-05:00"
+        "bytes": 26138,
+        "bytes_text": "25.53 KB",
+        "modified_at": "2026-07-11T21:47:26-05:00"
       },
       "report": {
         "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/live_lens/live_lens_report_2026_07_11.json",
         "exists": true,
-        "bytes": 134503,
-        "bytes_text": "131.35 KB",
-        "modified_at": "2026-07-11T11:53:36-05:00"
+        "bytes": 47257,
+        "bytes_text": "46.15 KB",
+        "modified_at": "2026-07-11T21:27:47-05:00"
       }
     }
   }
