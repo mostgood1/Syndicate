@@ -1,8 +1,26 @@
 {
   "date": "2026-07-12",
   "mode": "live",
-  "retrieved_at": "2026-07-11T16:20:23.269381",
-  "hitter_props": {},
+  "retrieved_at": "2026-07-12T22:59:01.335962",
+  "hitter_props": {
+    "nolan arenado": {
+      "batter_home_runs": {
+        "line": 0.5,
+        "over_odds": "+2000",
+        "under_odds": null,
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 0.5,
+            "over_odds": "+2000",
+            "under_odds": null,
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": []
+      }
+    }
+  },
   "meta": {
     "markets": [
       "batter_hits",
@@ -16,9 +34,11 @@
     "regions": "us",
     "bookmakers": null,
     "counts": {
-      "players": 0,
-      "markets": {},
-      "events_matched": 0
+      "players": 1,
+      "markets": {
+        "batter_home_runs": 1
+      },
+      "events_matched": 2
     }
   }
 }

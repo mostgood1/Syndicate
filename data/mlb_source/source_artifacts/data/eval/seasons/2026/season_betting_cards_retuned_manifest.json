@@ -1,7 +1,7 @@
 {
   "meta": {
     "season": 2026,
-    "generated_at": "2026-07-11T16:03:57.600053",
+    "generated_at": "2026-07-12T22:58:17.175416",
     "title": "MLB 2026 Betting Card Recap",
     "batch_dir": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/eval/batches/season_2026_ui_daily_live",
     "cards_dir": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/eval/seasons/2026/locked_cards_retuned",
@@ -505,11 +505,11 @@
         "median_u": 0.0,
         "std_u": 0.0,
         "best_day": {
-          "date": "2026-07-10",
+          "date": "2026-07-11",
           "profit_u": 0.0
         },
         "worst_day": {
-          "date": "2026-07-10",
+          "date": "2026-07-11",
           "profit_u": 0.0
         }
       }
@@ -1231,11 +1231,11 @@
       "roi": null
     },
     {
-      "date": "2026-07-10",
+      "date": "2026-07-11",
       "month": "2026-07",
-      "card_path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/eval/seasons/2026/locked_cards_retuned/daily_summary_2026_07_10_locked_policy.json",
-      "report_path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/eval/batches/season_2026_ui_daily_live/sim_vs_actual_2026-07-10.json",
-      "payload_path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/eval/seasons/2026/betting_day_payloads_retuned/season_betting_day_2026_07_10.json",
+      "card_path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/eval/seasons/2026/locked_cards_retuned/daily_summary_2026_07_11_locked_policy.json",
+      "report_path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/eval/batches/season_2026_ui_daily_live/sim_vs_actual_2026-07-11.json",
+      "payload_path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/eval/seasons/2026/betting_day_payloads_retuned/season_betting_day_2026_07_11.json",
       "cap_profile": "nototals_p1_tbheavy11_r1_nohr",
       "selected_counts": {
         "totals": 0,
@@ -1343,8 +1343,8 @@
       "settled_n": 0,
       "unresolved_n": 0,
       "warnings": [
-        "Missing game lines: data/market/oddsapi/oddsapi_game_lines_2026_07_10.json",
-        "Missing hitter lines: data/market/oddsapi/oddsapi_hitter_props_2026_07_10.json"
+        "Missing game lines: data/market/oddsapi/oddsapi_game_lines_2026_07_11.json",
+        "Missing hitter lines: data/market/oddsapi/oddsapi_hitter_props_2026_07_11.json"
       ],
       "profit_u": 0.0,
       "roi": null
