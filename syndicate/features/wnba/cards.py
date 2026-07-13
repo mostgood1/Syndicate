@@ -4331,6 +4331,8 @@ def _payload_has_meaningful_live_state(payload: dict[str, Any] | None) -> bool:
     games = payload.get("games")
     if not isinstance(games, list) or not games:
         return False
+    saw_final = False
+    saw_valid_live = False
     for game in games:
         if not isinstance(game, dict):
             continue
@@ -4344,22 +4346,27 @@ def _payload_has_meaningful_live_state(payload: dict[str, Any] | None) -> bool:
             clock=game.get("clock"),
         )
         if bool(status_fields.get("final")):
-            return True
+            saw_final = True
+            continue
         if bool(status_fields.get("in_progress")) and (
             status_fields.get("period") is not None
             or bool(status_fields.get("clock"))
             or _safe_float(game.get("home_pts")) is not None
             or _safe_float(game.get("away_pts")) is not None
         ):
-            return True
-        if _safe_float(game.get("home_pts")) is not None or _safe_float(game.get("away_pts")) is not None:
-            return True
+            saw_valid_live = True
+            continue
+        if bool(status_fields.get("in_progress")):
+            return False
         status_text = str(status_fields.get("status") or "").strip().lower()
         if status_text and status_text not in {"scheduled", ""} and (
             status_fields.get("period") is not None or bool(status_fields.get("clock"))
         ):
-            return True
-    return False
+            saw_valid_live = True
+            continue
+        if _safe_float(game.get("home_pts")) is not None or _safe_float(game.get("away_pts")) is not None:
+            saw_final = True
+    return saw_final or saw_valid_live
 
 
 def build_live_player_boxscore_payload(

@@ -439,6 +439,79 @@ class WnbaLiveSnapshotLocalTests(unittest.TestCase):
         self.assertEqual(game.get("clock"), "3:27")
         self.assertTrue(game.get("in_progress"))
 
+    def test_live_state_payload_render_rejects_mixed_stale_snapshot(self) -> None:
+        with patch.dict("os.environ", {"RENDER": "1"}, clear=False), patch(
+            "syndicate.features.wnba.cards.central_today_iso",
+            return_value="2026-05-21",
+        ), patch(
+            "syndicate.features.wnba.cards._local_live_state_payload",
+            return_value={
+                "ok": True,
+                "source": "local_snapshot",
+                "games": [
+                    {"event_id": "evt-final", "status": "Final", "final": True, "in_progress": False},
+                    {
+                        "event_id": "evt-live",
+                        "status": "{'status': 'Live', 'detail': '2026-05-21', 'startTime': '2026-05-21', 'in_progress': True, 'final': False, 'period': None, 'clock': ''}",
+                        "final": False,
+                        "in_progress": True,
+                        "period": None,
+                        "clock": "",
+                    },
+                ],
+            },
+        ), patch(
+            "syndicate.features.wnba.cards._remote_live_snapshot_payload",
+            return_value=None,
+        ), patch(
+            "syndicate.features.wnba.cards._public_scoreboard_live_state_payload",
+            return_value={
+                "ok": True,
+                "source": "espn_scoreboard_fallback",
+                "games": [
+                    {
+                        "event_id": "evt-live",
+                        "away": "NYL",
+                        "home": "LAS",
+                        "away_pts": 61,
+                        "home_pts": 58,
+                        "status": "3:27 - 4th",
+                        "clock": "3:27",
+                        "period": 4,
+                        "in_progress": True,
+                        "final": False,
+                        "periods": [],
+                    }
+                ],
+            },
+        ), patch(
+            "syndicate.features.wnba.cards.build_cards_page_context",
+            return_value={
+                "games": [
+                    {
+                        "gamePk": "evt-live",
+                        "event_id": "evt-live",
+                        "away_tri": "NYL",
+                        "home_tri": "LAS",
+                        "away": {"abbr": "NYL", "score": 61},
+                        "home": {"abbr": "LAS", "score": 58},
+                        "status": "Live",
+                        "detail": "3:27 - 4th",
+                        "live_state": {"in_progress": True, "final": False},
+                    }
+                ]
+            },
+        ):
+            _local_live_state_payload.cache_clear()
+            payload = build_live_state_payload("2026-05-21", ttl=12)
+            _local_live_state_payload.cache_clear()
+
+        game = (payload.get("games") or [{}])[0]
+        self.assertNotEqual(payload.get("source"), "local_snapshot")
+        self.assertEqual(game.get("status"), "Live")
+        self.assertEqual(game.get("period"), 4)
+        self.assertEqual(game.get("clock"), "3:27")
+
     def test_live_state_payload_repairs_stale_public_scoreboard_with_cards_context(self) -> None:
         with patch("syndicate.features.wnba.cards.central_today_iso", return_value="2026-05-21"), patch(
             "syndicate.features.wnba.cards._remote_live_snapshot_payload",
