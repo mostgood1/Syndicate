@@ -67,7 +67,14 @@ from syndicate.features.wnba.sources import available_dates as wnba_available_da
 _PUBLISH_MANIFEST_LOCK = Lock()
 
 _DEFAULT_INTERVAL_MARKETS = "h2h,spreads,totals,spreads_h1,totals_h1,spreads_h2,totals_h2"
+_WNBA_GAME_MARKETS = "h2h,spreads,totals"
 _WNBA_PLAYER_PROP_MARKETS = "player_points,player_rebounds,player_assists,player_points_rebounds_assists,player_threes,player_steals,player_blocks,player_turnovers,player_points_rebounds,player_points_assists,player_rebounds_assists,player_double_double,player_triple_double"
+# game_odds_{date}.csv / game_cards_{date}.csv are built to parse h2h/spreads/totals
+# rows out of the same per-event snapshot as player props (see
+# _build_local_game_cards_artifact in refresh_wnba_oddsapi_props.py) -- without
+# these markets in the fetch request, moneyline/spread/total stay permanently
+# empty even though the parsing logic is already there.
+_WNBA_DEFAULT_MARKETS = f"{_WNBA_GAME_MARKETS},{_WNBA_PLAYER_PROP_MARKETS}"
 _DEFAULT_REFRESH_STEP_TIMEOUT_SECONDS = 1800
 _ALL_PROCESS_MEMORY_HEARTBEAT_SECONDS = 60
 _MEMORY_TRACE_LAST_RSS_BYTES: int | None = None
@@ -784,7 +791,7 @@ def _build_wnba_steps(args: argparse.Namespace) -> list[RefreshStep]:
     payload = _build_nba_payload(args, env_key="WNBA_BETTING_ODDSAPI_PROPS_JOB")["WNBA_BETTING_ODDSAPI_PROPS_JOB"]
     payload_data = json.loads(payload)
     artifact_root = _local_source_artifact_root("wnba")
-    markets = str(args.markets or "").strip() or _WNBA_PLAYER_PROP_MARKETS
+    markets = str(args.markets or "").strip() or _WNBA_DEFAULT_MARKETS
     command = [
         python_exe,
         "scripts/refresh_wnba_oddsapi_props.py",
