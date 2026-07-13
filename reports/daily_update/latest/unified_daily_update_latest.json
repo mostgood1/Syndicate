@@ -1,10 +1,10 @@
 {
   "date": "2026-07-13",
   "generatedAt": "2026-07-13T07:07:07.3841151+00:00",
-  "lastUpdatedAt": "2026-07-13T07:15:17.9488174+00:00",
-  "completedAt": null,
+  "lastUpdatedAt": "2026-07-13T07:15:24.8726624+00:00",
+  "completedAt": "2026-07-13T07:15:23.3845091+00:00",
   "runMode": "standard",
-  "overallStatus": "started",
+  "overallStatus": "ok",
   "error": null,
   "runDir": "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-13\\20260713_070706",
   "latestDir": "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest",
@@ -910,12 +910,13 @@
     "forceRebuildToday": false
   },
   "runState": {
-    "currentStage": "refresh_gate",
+    "currentStage": "completed",
     "completedStages": [
-      "source_update"
+      "source_update",
+      "refresh_gate"
     ],
     "failedStage": null,
-    "lastUpdatedAt": "2026-07-13T07:15:17.9488174+00:00",
+    "lastUpdatedAt": "2026-07-13T07:15:24.8726624+00:00",
     "simulationContractPath": null,
     "simulationContractRunPath": null,
     "simulationContractSportCount": 0,
@@ -1860,10 +1861,11 @@
     "latestCheckpointPath": "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest_checkpoint.json",
     "state": {
       "runMode": "standard",
-      "overallStatus": "started",
-      "currentStage": "refresh_gate",
+      "overallStatus": "ok",
+      "currentStage": "completed",
       "completedStages": [
-        "source_update"
+        "source_update",
+        "refresh_gate"
       ],
       "failedStage": null,
       "policyPerformance": [
@@ -1945,7 +1947,7 @@
         "missingIntelligencePublishArtifactPaths": [],
         "status": "skipped"
       },
-      "lastUpdatedAt": "2026-07-13T07:15:17.9488174+00:00"
+      "lastUpdatedAt": "2026-07-13T07:15:24.8726624+00:00"
     }
   },
   "sportRuns": [
@@ -1989,7 +1991,7 @@
         "--do-export"
       ],
       "mirrorManifestPath": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\manifests\\mirror_refresh_2026-07-13.json",
-      "mirrorManifestExists": false
+      "mirrorManifestExists": true
     },
     {
       "sport": "wnba",
@@ -2016,7 +2018,7 @@
         "2026-07-13"
       ],
       "mirrorManifestPath": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\manifests\\mirror_refresh_2026-07-13.json",
-      "mirrorManifestExists": false
+      "mirrorManifestExists": true
     }
   ],
   "skipGitPush": true,
@@ -2053,6 +2055,15 @@
       "commitMessage": " 2026-07-13 (pre-source publish)",
       "status": "pushed",
       "commit": "135a692a32a03f1b5831185b2973281d1a5f2da7"
+    },
+    {
+      "name": "Syndicate",
+      "repoPath": "D:\\a\\Syndicate\\Syndicate",
+      "remote": "",
+      "branch": "main",
+      "commitMessage": " 2026-07-13 (Syndicate mirror + gate)",
+      "status": "pushed",
+      "commit": "88a55679f9c5e4029ae31bfefaf1ceb55a1b6181"
     }
   ],
   "runTrace": {
@@ -2089,5 +2100,274 @@
       "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_bundle.json"
     ],
     "simExecutionDecision": true
+  },
+  "simulationContractPath": "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest_simulation_contract.json",
+  "simulationContractRunPath": "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-13\\20260713_070706\\unified_daily_update_simulation_contract.json",
+  "simulationContractSportCount": 1,
+  "simulationContractAdvancedBySport": {
+    "wnba": {
+      "page": {
+        "scoreboard_items": [
+          {
+            "target_id": "game-401857064",
+            "label": "LAS @ ATL",
+            "status": "2026-07-13"
+          },
+          {
+            "target_id": "game-401857065",
+            "label": "PHX @ MIN",
+            "status": "2026-07-13"
+          }
+        ],
+        "module_links": [
+          {
+            "label": "Cards",
+            "href": "/wnba/cards?date=2026-07-13",
+            "active": true
+          },
+          {
+            "label": "Betting Card",
+            "href": "/wnba/season/2026/betting-card?date=2026-07-13",
+            "active": false
+          },
+          {
+            "label": "Picks",
+            "href": "/wnba/picks?date=2026-07-13",
+            "active": false
+          },
+          {
+            "label": "Props",
+            "href": "/wnba/props?date=2026-07-13",
+            "active": false
+          },
+          {
+            "label": "Live Lens",
+            "href": "/wnba/live-lens?date=2026-07-13",
+            "active": false
+          },
+          {
+            "label": "Daily Archive",
+            "href": "/wnba/archive?date=2026-07-13",
+            "active": false
+          },
+          {
+            "label": "Hub",
+            "href": "/wnba/hub",
+            "active": false
+          }
+        ],
+        "cards_control_links": [
+          {
+            "label": "Betting Card",
+            "href": "/wnba/season/2026/betting-card?date=2026-07-13"
+          },
+          {
+            "label": "Props",
+            "href": "/wnba/props?date=2026-07-13"
+          },
+          {
+            "label": "Live Lens",
+            "href": "/wnba/live-lens?date=2026-07-13"
+          }
+        ],
+        "source_path": "espn_scoreboard_fallback",
+        "source_title": "WNBA live scoreboard fallback",
+        "wnba_advanced_contract": {
+          "available": true,
+          "sport": "wnba",
+          "selection": {
+            "kind": "date",
+            "requested": "2026-07-13",
+            "resolved": "2026-07-13"
+          },
+          "source": {
+            "title": "WNBA live scoreboard fallback",
+            "path": "espn_scoreboard_fallback",
+            "mode": "live"
+          },
+          "freshness": {
+            "requested": "2026-07-13",
+            "resolved": "2026-07-13",
+            "selection_kind": "date",
+            "is_current_day": true,
+            "is_stale": false,
+            "lookahead_applied": false
+          },
+          "coverage": {
+            "games_with_sim": 2,
+            "games_with_periods": 0,
+            "games_with_intervals": 2,
+            "games_with_players": 2,
+            "games_with_injuries": 2,
+            "games_with_props": 0
+          },
+          "game_count": 2,
+          "games": [
+            {
+              "game_id": "401857064",
+              "event_id": "401857064",
+              "matchup": {
+                "away": {
+                  "tri": "LAS",
+                  "name": "LAS"
+                },
+                "home": {
+                  "tri": "ATL",
+                  "name": "ATL"
+                }
+              },
+              "status": {
+                "status": "{'status': 'Scheduled', 'detail': '2026-07-13', 'startTime': '2026-07-13', 'in_progress': False, 'final': False, 'period': None, 'clock': ''}",
+                "detail": "2026-07-13",
+                "live": false,
+                "final": false
+              },
+              "market": {
+                "home_ml": null,
+                "away_ml": null,
+                "home_spread": null,
+                "total": null,
+                "p_home_win": null,
+                "p_away_win": null,
+                "p_home_cover": null,
+                "p_total_over": null
+              },
+              "simulation": {
+                "score": {
+                  "away_mean": null,
+                  "home_mean": null,
+                  "total_mean": null,
+                  "margin_mean": null
+                },
+                "periods": {},
+                "intervals": {
+                  "quarters": "",
+                  "halves": ""
+                },
+                "quarters": [],
+                "players_summary": {
+                  "away": 0,
+                  "home": 0,
+                  "missing_away": 0,
+                  "missing_home": 0,
+                  "injured_away": 0,
+                  "injured_home": 0
+                },
+                "players": {
+                  "away": "",
+                  "home": ""
+                },
+                "missing_prop_players": {
+                  "away": "",
+                  "home": ""
+                },
+                "injuries": {
+                  "away": "",
+                  "home": ""
+                },
+                "pregame_context": {}
+              },
+              "props": {
+                "prop_recommendations": {
+                  "away": "",
+                  "home": ""
+                },
+                "game_market_recommendations": []
+              },
+              "coverage": {
+                "has_simulation": true,
+                "has_periods": false,
+                "has_intervals": true,
+                "has_players": true,
+                "has_injuries": true,
+                "has_pregame_context": false
+              }
+            },
+            {
+              "game_id": "401857065",
+              "event_id": "401857065",
+              "matchup": {
+                "away": {
+                  "tri": "PHX",
+                  "name": "PHX"
+                },
+                "home": {
+                  "tri": "MIN",
+                  "name": "MIN"
+                }
+              },
+              "status": {
+                "status": "{'status': 'Scheduled', 'detail': '2026-07-13', 'startTime': '2026-07-13', 'in_progress': False, 'final': False, 'period': None, 'clock': ''}",
+                "detail": "2026-07-13",
+                "live": false,
+                "final": false
+              },
+              "market": {
+                "home_ml": null,
+                "away_ml": null,
+                "home_spread": null,
+                "total": null,
+                "p_home_win": null,
+                "p_away_win": null,
+                "p_home_cover": null,
+                "p_total_over": null
+              },
+              "simulation": {
+                "score": {
+                  "away_mean": null,
+                  "home_mean": null,
+                  "total_mean": null,
+                  "margin_mean": null
+                },
+                "periods": {},
+                "intervals": {
+                  "quarters": "",
+                  "halves": ""
+                },
+                "quarters": [],
+                "players_summary": {
+                  "away": 0,
+                  "home": 0,
+                  "missing_away": 0,
+                  "missing_home": 0,
+                  "injured_away": 0,
+                  "injured_home": 0
+                },
+                "players": {
+                  "away": "",
+                  "home": ""
+                },
+                "missing_prop_players": {
+                  "away": "",
+                  "home": ""
+                },
+                "injuries": {
+                  "away": "",
+                  "home": ""
+                },
+                "pregame_context": {}
+              },
+              "props": {
+                "prop_recommendations": {
+                  "away": "",
+                  "home": ""
+                },
+                "game_market_recommendations": []
+              },
+              "coverage": {
+                "has_simulation": true,
+                "has_periods": false,
+                "has_intervals": true,
+                "has_players": true,
+                "has_injuries": true,
+                "has_pregame_context": false
+              }
+            }
+          ]
+        }
+      },
+      "game": {},
+      "available": true
+    }
   }
 }
