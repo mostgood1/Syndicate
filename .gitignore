@@ -65,3 +65,5 @@ data/*_source/manifests/mirror_refresh*.json
 reports/intelligence/evaluation_ledger.jsonl
 reports/intelligence/evaluation_ledger_chunks/
 reports/intelligence/archive/
+reports/intelligence/board_snapshot*.json
+reports/intelligence/query_state_cache.json
