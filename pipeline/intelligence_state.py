@@ -450,6 +450,20 @@ def _intelligence_state_daily_candidates() -> dict[str, list[Path]]:
     }
 
 
+def _intelligence_board_snapshot_payload(state: dict[str, Any], *, selected_date: str | None = None) -> dict[str, Any]:
+    normalized = dict(state or {})
+    response_selected_date = str(normalized.get("selected_date") or normalized.get("date") or selected_date or "").strip() or None
+    return {
+        "updated_at": _utc_now(),
+        "snapshot_generated_at": normalized.get("snapshot_generated_at") or normalized.get("state_last_updated") or normalized.get("last_updated") or _utc_now(),
+        "selected_date": response_selected_date,
+        "candidate_count": int(normalized.get("candidate_count") or 0),
+        "response": dict(normalized),
+        "state_meta": dict(normalized.get("state_meta") or {}),
+        "board_contract": normalized.get("board_contract") if isinstance(normalized.get("board_contract"), dict) else None,
+    }
+
+
 def _intelligence_state_read_path(artifact_name: str, fallback_path: Path) -> Path:
     daily_paths = _intelligence_state_daily_paths()
     daily_candidates = _intelligence_state_daily_candidates().get(artifact_name, [])
@@ -517,15 +531,7 @@ def write_latest_intelligence_state(state: Any) -> dict[str, Any] | None:
     logger.info("INTELLIGENCE STATE PERSIST BEFORE", extra={"candidate_count": candidate_count})
     daily_paths = _intelligence_state_daily_paths()
     state_meta = dict(normalized.get("state_meta") or {})
-    board_snapshot_payload = {
-        "updated_at": _utc_now(),
-        "snapshot_generated_at": normalized.get("snapshot_generated_at") or normalized.get("state_last_updated") or normalized.get("last_updated") or _utc_now(),
-        "selected_date": normalized.get("selected_date"),
-        "candidate_count": int(normalized.get("candidate_count") or 0),
-        "response": dict(normalized),
-        "state_meta": state_meta,
-        "board_contract": normalized.get("board_contract") if isinstance(normalized.get("board_contract"), dict) else None,
-    }
+    board_snapshot_payload = _intelligence_board_snapshot_payload(normalized)
     write_json_file(INTELLIGENCE_STATE_PATH, normalized)
     write_json_file(daily_paths["state"], normalized)
     history_entry = _intelligence_state_history_entry(normalized)
@@ -1831,14 +1837,24 @@ class IntelligenceStateService:
         }
         write_json_file(STATE_PATH, payload)
         if latest_snapshot is not None:
+            daily_paths = _intelligence_state_daily_paths()
+            latest_response = dict(latest_snapshot.response or {}) if isinstance(latest_snapshot.response, dict) else {}
+            board_snapshot_payload = _intelligence_board_snapshot_payload(
+                latest_response,
+                selected_date=str(latest_snapshot.payload.get("date") or latest_snapshot.payload.get("selected_date") or "").strip() or None,
+            )
             write_json_file(
                 BOARD_SNAPSHOT_PATH,
                 {
                     "latest_key": latest_snapshot.key,
-                    "updated_at": _utc_now(),
-                    "response": latest_snapshot.response,
-                    "state_meta": latest_snapshot.response.get("state_meta") if isinstance(latest_snapshot.response, dict) else None,
-                    "board_contract": latest_snapshot.response.get("board_contract") if isinstance(latest_snapshot.response, dict) else None,
+                    **board_snapshot_payload,
+                },
+            )
+            write_json_file(
+                daily_paths["board_snapshot"],
+                {
+                    "latest_key": latest_snapshot.key,
+                    **board_snapshot_payload,
                 },
             )
 

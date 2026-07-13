@@ -1,6 +1,6 @@
 {
   "date": "2026-07-12",
-  "generatedAt": "2026-07-12T18:07:16-05:00",
+  "generatedAt": "2026-07-12T20:22:17-05:00",
   "dataRoot": "data",
   "liveLensDir": "data/live_lens",
   "optimizationRegime": {
@@ -25,11 +25,11 @@
   "performance": {
     "marketsRefreshed": false,
     "marketRefreshMs": 0.0,
-    "totalMs": 2254.6,
-    "snapshotLoadMs": 6.7,
+    "totalMs": 4026.1,
+    "snapshotLoadMs": 4.1,
     "simContextLoadMs": 1.6,
-    "propEvalMs": 3.3,
-    "gameLensMs": 0.7,
+    "propEvalMs": 3.5,
+    "gameLensMs": 0.5,
     "gameCount": 15,
     "liveGameCount": 0,
     "feedFetchCount": 15,
@@ -586,7 +586,7 @@
       "gamePk": 823925,
       "status": {
         "abstract": "Final",
-        "detailed": "Game Over"
+        "detailed": "Final"
       },
       "startTime": "3:10 PM",
       "matchup": {

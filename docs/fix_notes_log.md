@@ -1,3 +1,10 @@
+# 2026-07-12 - Intelligence request-path persist now writes the dated board snapshot
+- Symptom: The live 2026-07-12 board state updated `query_state_cache.json` and `board_snapshot.json`, but `board_snapshot_2026_07_12.json` never appeared.
+- Root cause: The active request-side publication path stopped at `_persist_locked()`, which only wrote the generic state cache and generic board snapshot, while `write_latest_intelligence_state()` remained worker-only.
+- Fix: Teach `_persist_locked()` to also write the dated board snapshot from the latest in-memory response so the successful publication path now emits both generic and dated board artifacts without reintroducing request-time compute.
+- Validation: Added a regression test that persists a WNBA-only snapshot and asserts the generic and dated board files both exist with `selected_date=2026-07-12` and `candidate_count=6`.
+- Follow-up: Recheck the deployed Render revision so the live board path picks up the publication fix.
+
 # 2026-07-13 - Intelligence board query path stopped computing on request
 - Symptom: The hosted `/api/intelligence/query` path kept trying to compute a fresh board when the cached snapshot was empty, which was too expensive for the Render web dyno.
 - Root cause: The hosted refresh branch still had a compute fallback after the cache read, so an empty snapshot could trigger request-time intelligence computation.

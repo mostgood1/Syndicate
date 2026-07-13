@@ -2039,6 +2039,79 @@ class IntelligenceStateTests(unittest.TestCase):
         self.assertIn("request_total", logged_stages)
         self.assertEqual(mocked_pipeline.call_count, 2)
 
+    def test_persist_locked_writes_dated_board_snapshot_for_wnba_only_response(self) -> None:
+        service = IntelligenceStateService()
+
+        response = {
+            "ok": True,
+            "selected_date": "2026-07-12",
+            "state_last_updated": "2026-07-12T20:00:00Z",
+            "last_updated": "2026-07-12T20:00:00Z",
+            "snapshot_generated_at": "2026-07-12T20:00:00Z",
+            "candidate_count": 6,
+            "top_opportunities": [
+                {"name": f"WNBA Play {index}", "sport": "wnba", "sport_slug": "wnba"}
+                for index in range(1, 7)
+            ],
+            "recommendations": [
+                {"name": f"WNBA Play {index}", "sport": "wnba", "sport_slug": "wnba"}
+                for index in range(1, 7)
+            ],
+            "by_sport": {
+                "wnba": [
+                    {"name": f"WNBA Play {index}", "sport": "wnba", "sport_slug": "wnba"}
+                    for index in range(1, 7)
+                ]
+            },
+            "analysis": {
+                "recommendations": [
+                    {"name": f"WNBA Play {index}", "sport": "wnba", "sport_slug": "wnba"}
+                    for index in range(1, 7)
+                ],
+                "picks": [],
+                "top_live_opportunities": [],
+                "portfolio": {},
+                "parlays": [],
+            },
+            "board_contract": {
+                "schema": "intelligence_board_v1",
+                "cards": [
+                    {"name": f"WNBA Play {index}", "sport": "wnba", "sport_slug": "wnba"}
+                    for index in range(1, 7)
+                ],
+            },
+        }
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            reports_root = Path(tmp_dir) / "reports"
+            state_path = reports_root / "intelligence" / "query_state_cache.json"
+            board_snapshot_path = reports_root / "intelligence" / "board_snapshot.json"
+            daily_board_snapshot_path = reports_root / "intelligence" / "board_snapshot_2026_07_12.json"
+            service._snapshots["wnba-key"] = IntelligenceSnapshot(
+                key="wnba-key",
+                payload={"question": "top edges today", "date": "2026-07-12"},
+                response=dict(response),
+                computed_at="2026-07-12T20:00:00Z",
+                source_fingerprint="fingerprint-wnba-1",
+            )
+            service._latest_key = "wnba-key"
+
+            with patch("pipeline.intelligence_state.reports_root", return_value=reports_root):
+                with patch.object(intelligence_state_module, "STATE_PATH", state_path):
+                    with patch.object(intelligence_state_module, "BOARD_SNAPSHOT_PATH", board_snapshot_path):
+                        service._persist_locked()
+
+            self.assertTrue(state_path.exists())
+            self.assertTrue(board_snapshot_path.exists())
+            self.assertTrue(daily_board_snapshot_path.exists())
+
+            written_daily_snapshot = refresh_state_store.read_json_file(daily_board_snapshot_path)
+            self.assertIsInstance(written_daily_snapshot, dict)
+            self.assertEqual(written_daily_snapshot.get("selected_date"), "2026-07-12")
+            self.assertEqual(int(written_daily_snapshot.get("candidate_count") or 0), 6)
+            self.assertEqual(int((written_daily_snapshot.get("response") or {}).get("candidate_count") or 0), 6)
+            self.assertEqual(sorted((written_daily_snapshot.get("response") or {}).get("by_sport") or {}), ["wnba"])
+
     def test_available_sport_manifests_reads_shared_manifest_without_local_file(self) -> None:
         service = IntelligenceStateService()
         status = {
