@@ -398,7 +398,11 @@ def main() -> int:
     print("[refresh_worker] BOOTED", flush=True)
     assert_refresh_state_backend_ready(process_name="refresh-worker")
     if str(os.environ.get("SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP") or "").strip().lower() in {"1", "true", "yes", "on"}:
-        start_intelligence_state_background_loop()
+        print("[refresh_worker] INTELLIGENCE_LOOP_ENABLED calling start_intelligence_state_background_loop()", flush=True)
+        loop_started = start_intelligence_state_background_loop()
+        print(f"[refresh_worker] INTELLIGENCE_LOOP_START_RESULT started={loop_started}", flush=True)
+    else:
+        print("[refresh_worker] INTELLIGENCE_LOOP_DISABLED", flush=True)
     parser = argparse.ArgumentParser(description="Poll Syndicate refresh state and execute queued external-runner jobs.")
     parser.add_argument("--latest-manifest", default=str(_default_latest_manifest_path()))
     parser.add_argument("--worker-status", default=str(_default_worker_status_path()))

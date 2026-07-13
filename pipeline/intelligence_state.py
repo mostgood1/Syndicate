@@ -584,9 +584,11 @@ def write_latest_intelligence_state(state: Any) -> dict[str, Any] | None:
     normalized = normalize_timestamped_payload(_normalize_intelligence_state_payload(state if isinstance(state, dict) else None))
     if not _is_intelligence_state_payload_valid(normalized):
         logger.info("STATE WRITTEN", extra={"written": False, "candidate_count": 0})
+        print("[intelligence_state] STATE_WRITE_SKIPPED_INVALID_PAYLOAD", flush=True)
         return None
     candidate_count = int(normalized.get("candidate_count") or 0)
     logger.info("INTELLIGENCE STATE PERSIST BEFORE", extra={"candidate_count": candidate_count})
+    print(f"[intelligence_state] STATE_PERSIST_BEGIN candidate_count={candidate_count}", flush=True)
     daily_paths = _intelligence_state_daily_paths()
     state_meta = dict(normalized.get("state_meta") or {})
     live_pipeline = dict(normalized.get("live_pipeline") or {})
@@ -1599,6 +1601,7 @@ class IntelligenceStateService:
     def _background_loop(self) -> None:
         loop_started_at = time.time()
         logger.info("BACKGROUND_LOOP_START", extra={"elapsed_ms": 0.0})
+        print("[intelligence_state] BACKGROUND_LOOP_START", flush=True)
         while not self._stop.is_set():
             iteration_started_at = time.time()
             payload_to_process: dict[str, Any] | None = None
@@ -1997,6 +2000,7 @@ class IntelligenceStateService:
             self._trim_ordered_dict(self._pending_keys, self._max_snapshots)
 
     def _persist_locked(self) -> None:
+        print(f"[intelligence_state] PERSIST_LOCKED_BEGIN latest_key={self._latest_key} snapshot_count={len(self._snapshots)}", flush=True)
         latest_snapshot = self._snapshots.get(self._latest_key or "") if self._latest_key else None
         payload = {
             "latest_key": self._latest_key,

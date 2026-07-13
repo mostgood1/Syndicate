@@ -89,17 +89,19 @@ def publish_hot_artifact(path: Path, *, timeout_seconds: int = 10) -> bool:
     url = _publish_url()
     token = _admin_token()
     if not url or not token:
+        print(f"[artifact_publisher] SKIP_NOT_CONFIGURED path={path} url_set={bool(url)} token_set={bool(token)}", flush=True)
         return False
 
     relative_path = relative_to_data_root(Path(path))
     if not relative_path or not is_hot_artifact_relative_path(relative_path):
+        print(f"[artifact_publisher] SKIP_NOT_ALLOWLISTED path={path} relative_path={relative_path}", flush=True)
         return False
 
     file_path = Path(path)
     try:
         content = file_path.read_text(encoding="utf-8")
     except Exception as exc:
-        logger.debug("artifact_publisher: could not read %s: %s", file_path, exc)
+        print(f"[artifact_publisher] SKIP_READ_FAILED path={file_path} error={exc}", flush=True)
         return False
 
     checksum = hashlib.sha256(content.encode("utf-8")).hexdigest()
@@ -119,12 +121,13 @@ def publish_hot_artifact(path: Path, *, timeout_seconds: int = 10) -> bool:
     try:
         with urllib_request.urlopen(request_obj, timeout=timeout_seconds) as response:
             response.read()
+        print(f"[artifact_publisher] PUBLISH_OK path={relative_path} url={url}", flush=True)
         return True
     except (urllib_error.URLError, TimeoutError, OSError) as exc:
-        logger.warning("artifact_publisher: publish failed for %s: %s", relative_path, exc)
+        print(f"[artifact_publisher] PUBLISH_FAILED path={relative_path} url={url} error={exc}", flush=True)
         return False
     except Exception as exc:  # pragma: no cover - defensive, must never raise
-        logger.warning("artifact_publisher: unexpected publish error for %s: %s", relative_path, exc)
+        print(f"[artifact_publisher] PUBLISH_UNEXPECTED_ERROR path={relative_path} url={url} error={exc}", flush=True)
         return False
 
 
