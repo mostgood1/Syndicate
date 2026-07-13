@@ -1201,6 +1201,27 @@ class OpsRefreshApiTests(unittest.TestCase):
         mocked.assert_called_once()
         self.assertEqual(mocked.call_args.kwargs.get("mode"), "fast")
 
+    def test_run_page_route_accepts_admin_token_from_form_body_alone(self) -> None:
+        # Regression: a real browser submitting the HTML "Run Refresh Now" form
+        # only sends admin_token as a form field, with no X-Admin-Token header
+        # and no admin_token query string. This must still authenticate.
+        def _fake_launch_refresh_run(**_: object) -> dict[str, object]:
+            return {"ok": True, "pid": 5252, "run_stamp": "20260520_123100", "date": "2026-05-20", "state": "running"}
+
+        with patch.dict(os.environ, {"ADMIN_TOKEN": "secret-token"}, clear=False), patch(
+            "syndicate.blueprints.ops.launch_refresh_run",
+            side_effect=_fake_launch_refresh_run,
+        ) as mocked:
+            response = self.client.post(
+                "/ops/odds-refresh/run",
+                data={"sports": "wnba", "phase": "live", "force_refresh": "1", "mode": "full", "admin_token": "secret-token"},
+            )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("admin_token=secret-token", response.headers.get("Location") or "")
+        mocked.assert_called_once()
+        self.assertTrue(mocked.call_args.kwargs.get("force_refresh"))
+
     def test_cancel_endpoint_returns_cancel_payload(self) -> None:
         with patch.dict(os.environ, {"ADMIN_TOKEN": "secret-token"}, clear=False), patch(
             "syndicate.blueprints.ops.cancel_latest_refresh_run",

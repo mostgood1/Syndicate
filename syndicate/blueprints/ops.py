@@ -192,7 +192,10 @@ def _request_admin_token() -> str:
     auth_header = str(request.headers.get("Authorization") or "").strip()
     if auth_header.lower().startswith("bearer "):
         return auth_header[7:].strip()
-    return str(request.headers.get("X-Admin-Token") or request.args.get("admin_token") or "").strip()
+    header_or_query = str(request.headers.get("X-Admin-Token") or request.args.get("admin_token") or "").strip()
+    if header_or_query:
+        return header_or_query
+    return str(request.form.get("admin_token") or "").strip()
 
 
 def _coerce_bool(value: str | None, *, default: bool = False) -> bool:
