@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import json
 import os
 import unittest
+from pathlib import Path
+from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
 from syndicate.app import create_app
@@ -22,6 +25,7 @@ class LiveRefreshLoopTests(unittest.TestCase):
                 "SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP": "true",
                 "SYNDICATE_LIVE_ODDS_REFRESH_SKIP_MIRROR": "true",
                 "SYNDICATE_LIVE_ODDS_REFRESH_MODE": "full",
+                "SYNDICATE_LIVE_ODDS_REFRESH_ADAPTIVE": "false",
             },
             clear=False,
         ), patch.object(live_refresh_loop, "central_today_iso", return_value="2026-06-07"), patch.object(
@@ -53,6 +57,7 @@ class LiveRefreshLoopTests(unittest.TestCase):
                 "RENDER_SERVICE_ID": "svc-test",
                 "SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP": "true",
                 "SYNDICATE_LIVE_ODDS_REFRESH_MODE": "full",
+                "SYNDICATE_LIVE_ODDS_REFRESH_ADAPTIVE": "false",
             },
             clear=False,
         ), patch.object(live_refresh_loop, "central_today_iso", return_value="2026-06-07"), patch.object(
@@ -83,6 +88,7 @@ class LiveRefreshLoopTests(unittest.TestCase):
                 "SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP": "true",
                 "SYNDICATE_LIVE_ODDS_REFRESH_LAUNCH_MODE": "manifest_only",
                 "SYNDICATE_LIVE_ODDS_REFRESH_MODE": "full",
+                "SYNDICATE_LIVE_ODDS_REFRESH_ADAPTIVE": "false",
             },
             clear=False,
         ), patch.object(live_refresh_loop, "central_today_iso", return_value="2026-06-07"), patch.object(
@@ -107,7 +113,11 @@ class LiveRefreshLoopTests(unittest.TestCase):
         )
 
     def test_run_tick_marks_active_refresh_as_skipped(self) -> None:
-        with patch.dict(os.environ, {"SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP": "true"}, clear=False), patch.object(
+        with patch.dict(
+            os.environ,
+            {"SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP": "true", "SYNDICATE_LIVE_ODDS_REFRESH_ADAPTIVE": "false"},
+            clear=False,
+        ), patch.object(
             live_refresh_loop,
             "launch_refresh_run",
             side_effect=ValueError("A refresh run is already active (pid=123). Cancel it before starting a new run."),
@@ -123,6 +133,136 @@ class LiveRefreshLoopTests(unittest.TestCase):
             interval_seconds = live_refresh_loop._live_refresh_loop_interval_seconds()
 
         self.assertEqual(interval_seconds, 60)
+
+    def test_idle_interval_defaults_to_thirty_minutes(self) -> None:
+        with patch.dict(os.environ, {}, clear=True):
+            interval_seconds = live_refresh_loop._live_refresh_loop_idle_interval_seconds()
+
+        self.assertEqual(interval_seconds, 1800)
+
+    def test_mlb_has_live_game_reads_live_lens_counts(self) -> None:
+        with TemporaryDirectory() as tmp_dir:
+            data_root = Path(tmp_dir)
+            report_path = data_root / "mlb_source" / "source_artifacts" / "data" / "live_lens" / "live_lens_report_2026_07_13.json"
+            report_path.parent.mkdir(parents=True, exist_ok=True)
+            report_path.write_text(json.dumps({"counts": {"live": 2}}), encoding="utf-8")
+
+            with patch.dict(os.environ, {"SYNDICATE_DATA_ROOT": str(data_root)}, clear=False):
+                self.assertTrue(live_refresh_loop._mlb_has_live_game("2026-07-13"))
+
+            report_path.write_text(json.dumps({"counts": {"live": 0}}), encoding="utf-8")
+            with patch.dict(os.environ, {"SYNDICATE_DATA_ROOT": str(data_root)}, clear=False):
+                self.assertFalse(live_refresh_loop._mlb_has_live_game("2026-07-13"))
+
+    def test_mlb_has_live_game_false_when_report_missing(self) -> None:
+        with TemporaryDirectory() as tmp_dir:
+            with patch.dict(os.environ, {"SYNDICATE_DATA_ROOT": tmp_dir}, clear=False):
+                self.assertFalse(live_refresh_loop._mlb_has_live_game("2026-07-13"))
+
+    def test_wnba_has_live_game_reads_last_jsonl_line(self) -> None:
+        with TemporaryDirectory() as tmp_dir:
+            data_root = Path(tmp_dir)
+            state_path = (
+                data_root
+                / "wnba_source"
+                / "source_artifacts"
+                / "data"
+                / "processed"
+                / "live_snapshots"
+                / "live_state_2026-07-13.jsonl"
+            )
+            state_path.parent.mkdir(parents=True, exist_ok=True)
+            state_path.write_text(
+                json.dumps({"payload": {"games": [{"in_progress": False}]}}) + "\n"
+                + json.dumps({"payload": {"games": [{"in_progress": True}, {"in_progress": False}]}}) + "\n",
+                encoding="utf-8",
+            )
+
+            with patch.dict(os.environ, {"SYNDICATE_DATA_ROOT": str(data_root)}, clear=False):
+                self.assertTrue(live_refresh_loop._wnba_has_live_game("2026-07-13"))
+
+    def test_wnba_has_live_game_false_when_no_game_in_progress(self) -> None:
+        with TemporaryDirectory() as tmp_dir:
+            data_root = Path(tmp_dir)
+            state_path = (
+                data_root
+                / "wnba_source"
+                / "source_artifacts"
+                / "data"
+                / "processed"
+                / "live_snapshots"
+                / "live_state_2026-07-13.jsonl"
+            )
+            state_path.parent.mkdir(parents=True, exist_ok=True)
+            state_path.write_text(
+                json.dumps({"payload": {"games": [{"in_progress": False}]}}) + "\n",
+                encoding="utf-8",
+            )
+
+            with patch.dict(os.environ, {"SYNDICATE_DATA_ROOT": str(data_root)}, clear=False):
+                self.assertFalse(live_refresh_loop._wnba_has_live_game("2026-07-13"))
+
+    def test_run_tick_uses_pregame_phase_and_idle_interval_when_nothing_live(self) -> None:
+        with patch.dict(
+            os.environ,
+            {"SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP": "true"},
+            clear=False,
+        ), patch.object(live_refresh_loop, "central_today_iso", return_value="2026-07-13"), patch.object(
+            live_refresh_loop, "_any_tracked_sport_game_live", return_value=False
+        ), patch.object(
+            live_refresh_loop,
+            "launch_refresh_run",
+            return_value={"ok": True, "state": "running"},
+        ) as mocked_launch:
+            payload = live_refresh_loop._run_live_refresh_tick()
+            interval_seconds = live_refresh_loop._live_refresh_loop_interval_for_meta(payload)
+
+        self.assertEqual(payload["phase"], "pregame")
+        self.assertFalse(payload["anyLive"])
+        self.assertEqual(interval_seconds, 1800)
+        mocked_launch.assert_called_once_with(
+            date="2026-07-13",
+            sports=None,
+            phase="pregame",
+            regions="us",
+            mode="fast",
+            execution_mode="source",
+            launch_mode="detached_subprocess",
+            skip_mirror=True,
+            mirror_only=False,
+            dry_run=False,
+        )
+
+    def test_run_tick_uses_live_phase_and_short_interval_when_a_game_is_live(self) -> None:
+        with patch.dict(
+            os.environ,
+            {"SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP": "true"},
+            clear=False,
+        ), patch.object(live_refresh_loop, "central_today_iso", return_value="2026-07-13"), patch.object(
+            live_refresh_loop, "_any_tracked_sport_game_live", return_value=True
+        ), patch.object(
+            live_refresh_loop,
+            "launch_refresh_run",
+            return_value={"ok": True, "state": "running"},
+        ) as mocked_launch:
+            payload = live_refresh_loop._run_live_refresh_tick()
+            interval_seconds = live_refresh_loop._live_refresh_loop_interval_for_meta(payload)
+
+        self.assertEqual(payload["phase"], "live")
+        self.assertTrue(payload["anyLive"])
+        self.assertEqual(interval_seconds, 60)
+        mocked_launch.assert_called_once_with(
+            date="2026-07-13",
+            sports=None,
+            phase="live",
+            regions="us",
+            mode="fast",
+            execution_mode="source",
+            launch_mode="detached_subprocess",
+            skip_mirror=True,
+            mirror_only=False,
+            dry_run=False,
+        )
 
     def test_start_loop_returns_false_when_disabled(self) -> None:
         with patch.dict(os.environ, {}, clear=True):

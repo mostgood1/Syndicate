@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import atexit
+import json
 import os
 import threading
 from datetime import datetime, timezone
@@ -9,6 +10,7 @@ from typing import Any
 
 from syndicate.features.shared.artifact_publisher import publish_changed_hot_artifacts
 from syndicate.features.shared.ops_refresh import launch_refresh_run
+from syndicate.features.shared.refresh_state_store import data_root
 from syndicate.features.shared.refresh_state_store import read_json_file
 from syndicate.features.shared.refresh_state_store import reports_root
 from syndicate.features.shared.refresh_state_store import write_json_file
@@ -126,6 +128,71 @@ def _live_refresh_loop_interval_seconds() -> int:
 	return max(5, int(value))
 
 
+def _live_refresh_loop_idle_interval_seconds() -> int:
+	raw = str(os.environ.get("SYNDICATE_LIVE_ODDS_REFRESH_IDLE_INTERVAL_SECONDS") or "").strip()
+	try:
+		value = int(raw or 1800)
+	except Exception:
+		value = 1800
+	return max(60, int(value))
+
+
+def _live_refresh_loop_adaptive_enabled() -> bool:
+	return _env_bool("SYNDICATE_LIVE_ODDS_REFRESH_ADAPTIVE", default=True)
+
+
+def _mlb_has_live_game(date_str: str) -> bool:
+	path = data_root() / "mlb_source" / "source_artifacts" / "data" / "live_lens" / f"live_lens_report_{date_str.replace('-', '_')}.json"
+	payload = read_json_file(path)
+	counts = payload.get("counts") if isinstance(payload, dict) else None
+	if not isinstance(counts, dict):
+		return False
+	try:
+		return int(counts.get("live") or 0) > 0
+	except (TypeError, ValueError):
+		return False
+
+
+def _wnba_has_live_game(date_str: str) -> bool:
+	path = data_root() / "wnba_source" / "source_artifacts" / "data" / "processed" / "live_snapshots" / f"live_state_{date_str}.jsonl"
+	try:
+		if not path.exists():
+			return False
+		last_line: str | None = None
+		with path.open("r", encoding="utf-8") as handle:
+			for raw_line in handle:
+				stripped = raw_line.strip()
+				if stripped:
+					last_line = stripped
+		if not last_line:
+			return False
+		record = json.loads(last_line)
+	except Exception:
+		return False
+	payload = record.get("payload") if isinstance(record, dict) else None
+	games = payload.get("games") if isinstance(payload, dict) else None
+	if not isinstance(games, list):
+		return False
+	return any(bool(game.get("in_progress")) for game in games if isinstance(game, dict))
+
+
+_LIVE_STATUS_CHECKERS = {
+	"mlb": _mlb_has_live_game,
+	"wnba": _wnba_has_live_game,
+}
+
+
+def _any_tracked_sport_game_live() -> bool:
+	date_str = central_today_iso()
+	configured = _live_refresh_loop_sports()
+	sports = [item.strip().lower() for item in configured.split(",") if item.strip()] if configured else list(_LIVE_STATUS_CHECKERS.keys())
+	for sport in sports:
+		checker = _LIVE_STATUS_CHECKERS.get(sport)
+		if checker is not None and checker(date_str):
+			return True
+	return False
+
+
 def _live_refresh_loop_phase() -> str:
 	phase = str(os.environ.get("SYNDICATE_LIVE_ODDS_REFRESH_PHASE") or "live").strip().lower()
 	return phase if phase in {"live", "pregame", "all"} else "live"
@@ -187,10 +254,15 @@ def _status_payload() -> dict[str, Any]:
 
 def _run_live_refresh_tick() -> dict[str, Any]:
 	tick_started_epoch = datetime.now(timezone.utc).timestamp()
+	adaptive_enabled = _live_refresh_loop_adaptive_enabled()
+	any_live = _any_tracked_sport_game_live() if adaptive_enabled else None
+	effective_phase = ("live" if any_live else "pregame") if adaptive_enabled else _live_refresh_loop_phase()
 	meta = {
 		"startedAt": _utc_now(),
 		"date": central_today_iso(),
-		"phase": _live_refresh_loop_phase(),
+		"phase": effective_phase,
+		"adaptive": adaptive_enabled,
+		"anyLive": bool(any_live) if adaptive_enabled else None,
 		"regions": _live_refresh_loop_regions(),
 		"executionMode": _live_refresh_loop_execution_mode(),
 		"mode": _live_refresh_loop_mode(),
@@ -228,8 +300,13 @@ def _run_live_refresh_tick() -> dict[str, Any]:
 	return meta
 
 
+def _live_refresh_loop_interval_for_meta(meta: dict[str, Any]) -> int:
+	if bool(meta.get("adaptive")) and meta.get("anyLive") is not None:
+		return _live_refresh_loop_interval_seconds() if meta.get("anyLive") else _live_refresh_loop_idle_interval_seconds()
+	return _live_refresh_loop_interval_seconds()
+
+
 def _live_refresh_background_loop() -> None:
-	interval_seconds = _live_refresh_loop_interval_seconds()
 	status_path = _meta_dir() / "live_refresh_loop_status.json"
 	while not _LIVE_REFRESH_LOOP_STOP.is_set():
 		started_at = _utc_now()
@@ -238,11 +315,11 @@ def _live_refresh_background_loop() -> None:
 			{
 				"state": "running",
 				"startedAt": started_at,
-				"intervalSeconds": int(interval_seconds),
 				"threadAlive": True,
 			},
 		)
 		meta = _run_live_refresh_tick()
+		interval_seconds = _live_refresh_loop_interval_for_meta(meta)
 		write_json_file(
 			status_path,
 			{
@@ -254,8 +331,11 @@ def _live_refresh_background_loop() -> None:
 				"lastTickOk": bool(meta.get("ok")),
 				"lastTickSkipped": bool(meta.get("skipped")),
 				"lastError": meta.get("error"),
+				"anyLive": meta.get("anyLive"),
+				"phase": meta.get("phase"),
 			},
 		)
+		print(f"[live_refresh_loop] TICK_COMPLETE phase={meta.get('phase')} anyLive={meta.get('anyLive')} nextIntervalSeconds={interval_seconds} ok={meta.get('ok')}", flush=True)
 		_LIVE_REFRESH_LOOP_STOP.wait(interval_seconds)
 
 
