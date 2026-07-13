@@ -86,7 +86,8 @@ def _read_json(path: Path) -> Any:
 
 def _write_json(path: Path, payload: Any) -> None:
     started = time.perf_counter()
-    _trace_log("before_write_json_payload", **_trace_path_payload(path), rows=len(payload) if isinstance(payload, list) else len(payload.get("rows", [])) if isinstance(payload, dict) else None)
+    payload_rows = len(payload) if isinstance(payload, list) else len(payload.get("rows", [])) if isinstance(payload, dict) else None
+    _trace_log("before_write_json_payload", **_trace_path_payload(path, rows=payload_rows))
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
     _trace_log("after_write_json", **_trace_path_payload(path), elapsed_ms=round((time.perf_counter() - started) * 1000, 3))
@@ -865,9 +866,9 @@ def _sync_odds_history_for_refresh(*, sport: str, source_root: Path, date_str: s
         )
 
     if lifecycle_events:
-        _trace_log("before_append_odds_lifecycle_events", sport=slug, date=date_str, events=len(lifecycle_events), path=str(_odds_lifecycle_path(date_str)))
+        _trace_log("before_append_odds_lifecycle_events", sport=slug, date=date_str, events=len(lifecycle_events), path=str(odds_lifecycle_path(date_str)))
         append_odds_lifecycle_events(date_str, lifecycle_events)
-        _trace_log("after_append_odds_lifecycle_events", sport=slug, date=date_str, events=len(lifecycle_events), path=str(_odds_lifecycle_path(date_str)), size_bytes=_trace_file_size(_odds_lifecycle_path(date_str)))
+        _trace_log("after_append_odds_lifecycle_events", sport=slug, date=date_str, events=len(lifecycle_events), path=str(odds_lifecycle_path(date_str)), size_bytes=_trace_file_size(odds_lifecycle_path(date_str)))
 
     if not entries_appended and history_path.exists():
         return {
