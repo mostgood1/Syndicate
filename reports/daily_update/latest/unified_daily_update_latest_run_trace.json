@@ -4,7 +4,7 @@
   "runMode": "standard",
   "overallStatus": "started",
   "generatedAt": "2026-07-13T07:07:07.3841151+00:00",
-  "updatedAt": "2026-07-13T07:07:16.7151695+00:00",
+  "updatedAt": "2026-07-13T07:15:17.9596737+00:00",
   "runManifestPath": "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-13\\20260713_070706\\unified_daily_update_run.json",
   "latestManifestPath": "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest.json",
   "runCheckpointPath": "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-13\\20260713_070706\\unified_daily_update_checkpoint.json",
@@ -18,7 +18,7 @@
     "artifactPathCount": 21,
     "inputFingerprints": [
       "9be84bee22a0b06b81703d6aecdf1ed828acf60923679cd7186252dd2c6ff973",
-      "2c1c0a2fcba4d34fc9058f907739dff23c8ea4cf43ac2ba16a202ff8cc765771",
+      "32c6b306a207be8fa32029a96fc8f520e736120440163f70da1b810c08a303d2",
       "563a06b8e8830bba5d1cdcf73bb91ad105470d2e01ba859ebaa44c2126a6045d"
     ],
     "artifactPaths": [
