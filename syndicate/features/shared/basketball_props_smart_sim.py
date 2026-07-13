@@ -4356,19 +4356,24 @@ def _smart_sim_run_date_local(*, processed_root: Path, raw_root: Path, date_str:
         season_year = None
 
     def _load_adv_map(season_y: int) -> dict[str, dict[str, float]]:
+        # team_advanced_stats_{season}.csv (no as-of date) is a stale/empty
+        # placeholder in this pipeline -- the real, date-scoped data lives in
+        # team_advanced_stats_{season}_asof_{date}.csv. Reuse the loader that
+        # already knows to prefer the as-of file so pace/off_rtg/def_rtg don't
+        # silently fall back to the league baseline for every team.
         out: dict[str, dict[str, float]] = {}
         try:
-            file_path = processed_root / f"team_advanced_stats_{int(season_y)}.csv"
-            sdf = None
-            if file_path.exists():
-                try:
-                    sdf = pd.read_csv(file_path)
-                except Exception:
-                    sdf = None
+            # The as-of file is written with a compact YYYYMMDD suffix
+            # (team_advanced_stats_2026_asof_20260713.csv), not the ISO
+            # YYYY-MM-DD date_str used everywhere else in this pipeline.
+            compact_date_str = str(date_str).strip().replace("-", "")
+            sdf = _load_team_advanced_stats_asof_local(
+                processed_root=processed_root,
+                season=int(season_y),
+                as_of_date_str=compact_date_str,
+            )
             if sdf is None or sdf.empty:
                 return {}
-            sdf = sdf.copy()
-            sdf["team"] = sdf.get("team", "").astype(str).str.strip().str.upper()
             for _, row in sdf.iterrows():
                 team = str(row.get("team") or "").strip().upper()
                 if not team:
