@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from syndicate.features.shared.artifact_publisher import publish_changed_hot_artifacts
 from syndicate.features.shared.ops_refresh import launch_refresh_run
 from syndicate.features.shared.refresh_state_store import read_json_file
 from syndicate.features.shared.refresh_state_store import reports_root
@@ -185,6 +186,7 @@ def _status_payload() -> dict[str, Any]:
 
 
 def _run_live_refresh_tick() -> dict[str, Any]:
+	tick_started_epoch = datetime.now(timezone.utc).timestamp()
 	meta = {
 		"startedAt": _utc_now(),
 		"date": central_today_iso(),
@@ -219,6 +221,10 @@ def _run_live_refresh_tick() -> dict[str, Any]:
 		meta["error"] = f"{type(exc).__name__}: {exc}"
 	meta["finishedAt"] = _utc_now()
 	write_json_file(_meta_dir() / "latest_live_refresh_tick.json", meta)
+	try:
+		meta["publishedArtifacts"] = publish_changed_hot_artifacts(tick_started_epoch)
+	except Exception:
+		meta["publishedArtifacts"] = 0
 	return meta
 
 

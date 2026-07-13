@@ -48,7 +48,7 @@ services:
           type: keyvalue
           property: connectionString
       - key: SYNDICATE_BOOTSTRAP_ON_START
-        value: "0"
+        value: "1"
       - key: SYNDICATE_DATA_ROOT
         value: /opt/render/project/data
       - key: SYNDICATE_MLB_SOURCE_ROOT
@@ -194,6 +194,8 @@ services:
         value: /opt/render/project/data/wnba_source
       - key: SYNDICATE_REPORTS_ROOT
         value: /opt/render/project/data/reports
+      - key: SYNDICATE_WEB_PUBLISH_URL
+        value: https://syndicate-an21.onrender.com
       - key: SYNDICATE_BOOTSTRAP_ON_START
         value: "1"
       - key: SYNDICATE_BOOTSTRAP_WNBA_TODAY
@@ -316,6 +318,8 @@ services:
         value: /opt/render/project/data/wnba_source
       - key: SYNDICATE_REPORTS_ROOT
         value: /opt/render/project/data/reports
+      - key: SYNDICATE_WEB_PUBLISH_URL
+        value: https://syndicate-an21.onrender.com
       - key: SYNDICATE_NBA_SOURCE_APP_FALLBACK
         value: "false"
       - key: SYNDICATE_WNBA_SOURCE_APP_FALLBACK

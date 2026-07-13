@@ -285,6 +285,23 @@ jobs:
           Write-Host "Pushing commit to origin/$branch"
           git push origin "HEAD:$branch"
 
+      - name: Trigger Render web redeploy
+        shell: pwsh
+        run: |
+          $hookUrl = $env:RENDER_WEB_DEPLOY_HOOK_URL
+          if ([string]::IsNullOrWhiteSpace($hookUrl)) {
+            Write-Host 'RENDER_WEB_DEPLOY_HOOK_URL secret not set; skipping Render redeploy trigger.'
+            exit 0
+          }
+          try {
+            Invoke-RestMethod -Method Post -Uri $hookUrl -TimeoutSec 30 | Out-Null
+            Write-Host 'Render web deploy hook triggered.'
+          } catch {
+            Write-Warning "Render deploy hook call failed (non-fatal): $_"
+          }
+        env:
+          RENDER_WEB_DEPLOY_HOOK_URL: ${{ secrets.RENDER_WEB_DEPLOY_HOOK_URL }}
+
       - name: Upload daily update log
         if: always()
         uses: actions/upload-artifact@v4

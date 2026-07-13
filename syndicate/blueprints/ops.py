@@ -18,12 +18,14 @@ from flask import request
 from flask import Response
 from flask import url_for
 
+from syndicate.features.shared.artifact_publisher import is_hot_artifact_relative_path
 from syndicate.features.shared.ops_refresh import build_refresh_plan
 from syndicate.features.shared.ops_refresh import _assert_no_active_refresh_run
 from syndicate.features.shared.ops_refresh import cancel_latest_refresh_run
 from syndicate.features.shared.ops_refresh import launch_refresh_run
 from syndicate.features.shared.ops_refresh import load_latest_refresh_log
 from syndicate.features.shared.ops_refresh import load_latest_refresh_status
+from syndicate.features.shared.refresh_state_store import data_root
 from syndicate.features.shared.refresh_state_store import read_json_file
 from syndicate.features.shared.refresh_state_store import reports_root
 from syndicate.features.shared.refresh_state_store import write_json_file
@@ -252,6 +254,30 @@ def api_ops_bootstrap_run() -> Any:
         return jsonify({"ok": False, "error": f"bootstrap returned exit code {exit_code}"}), 500
     except Exception as exc:
         return jsonify({"ok": False, "error": f"{type(exc).__name__}: {exc}"}), 500
+
+
+@ops_bp.post("/api/ops/artifacts/publish")
+def api_ops_artifacts_publish() -> Any:
+    payload = _request_data()
+    relative_path = str(payload.get("relative_path") or "").strip().replace("\\", "/")
+    content = payload.get("content")
+    if not relative_path or content is None:
+        return jsonify({"ok": False, "error": "relative_path and content are required."}), 400
+    if relative_path.startswith("/") or ".." in relative_path.split("/"):
+        return jsonify({"ok": False, "error": "invalid relative_path."}), 400
+    if not is_hot_artifact_relative_path(relative_path):
+        return jsonify({"ok": False, "error": "relative_path is not an allowed hot artifact."}), 403
+
+    target_path = data_root() / Path(relative_path)
+    try:
+        target_path.parent.mkdir(parents=True, exist_ok=True)
+        temp_path = target_path.parent / f"{target_path.name}.{os.getpid()}.{uuid.uuid4().hex}.tmp"
+        temp_path.write_text(str(content), encoding="utf-8")
+        os.replace(temp_path, target_path)
+    except Exception as exc:
+        return jsonify({"ok": False, "error": f"{type(exc).__name__}: {exc}"}), 500
+
+    return jsonify({"ok": True, "relative_path": relative_path, "bytes": target_path.stat().st_size}), 200
 
 
 @ops_bp.get("/api/ops/mlb/sims-list")

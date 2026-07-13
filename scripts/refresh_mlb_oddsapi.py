@@ -21,6 +21,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
+from syndicate.features.shared.artifact_publisher import publish_hot_artifact
 from syndicate.features.shared.refresh_state_store import build_input_hash
 from syndicate.features.shared.refresh_state_store import path_fingerprint
 from syndicate.features.shared.refresh_state_store import record_refresh_state
@@ -256,7 +257,9 @@ def _write_live_lens_reports_payload(*, source_root: Path, date_str: str, payloa
     registry_log_path = _live_prop_registry_log_path(source_root=source_root, date_str=date_str)
     observation_path = _live_prop_observation_log_path(source_root=source_root, date_str=date_str)
     _write_json_file(report_path, report_payload)
+    publish_hot_artifact(report_path)
     _write_json_file(sync_path, payload)
+    publish_hot_artifact(sync_path)
 
     latest_entry = payload.get("latestEntry") if isinstance(payload.get("latestEntry"), dict) else {}
     if latest_entry:
