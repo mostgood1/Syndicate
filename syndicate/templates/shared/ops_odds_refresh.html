@@ -302,6 +302,7 @@
           <div class="ops-toggle-row">
             <label class="ops-toggle"><input type="checkbox" name="skip_mirror" value="1"{% if form_state.skip_mirror %} checked{% endif %} /> Skip mirror</label>
             <label class="ops-toggle"><input type="checkbox" name="mirror_only" value="1"{% if form_state.mirror_only %} checked{% endif %} /> Mirror only</label>
+            <label class="ops-toggle"><input type="checkbox" name="force_refresh" value="1"{% if form_state.force_refresh %} checked{% endif %} /> Force refresh (bypass cache, WNBA/NBA)</label>
           </div>
           <div class="action-row">
             <button class="cards-submit-button" type="submit">Refresh Plan View</button>

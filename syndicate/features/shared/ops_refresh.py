@@ -624,6 +624,7 @@ def build_refresh_plan(
     skip_mirror: bool = False,
     mirror_only: bool = False,
     execution_mode: str | None = None,
+    force_refresh: bool = False,
 ) -> dict[str, Any]:
     module = _refresh_script_module()
     effective_skip_mirror = _effective_skip_mirror(skip_mirror=bool(skip_mirror), mirror_only=bool(mirror_only))
@@ -643,6 +644,7 @@ def build_refresh_plan(
         dry_run=True,
         json=True,
         list=False,
+        force_refresh=bool(force_refresh),
     )
     summary = module._build_summary(args)
     return summary if isinstance(summary, dict) else {"ok": False, "error": "Unable to build refresh plan."}
@@ -846,6 +848,7 @@ def launch_refresh_run(
     execution_mode: str | None = None,
     dry_run: bool = False,
     launch_mode: str | None = None,
+    force_refresh: bool = False,
 ) -> dict[str, Any]:
     _assert_no_active_refresh_run()
     selected_date = date or _today_date()
@@ -896,6 +899,8 @@ def launch_refresh_run(
     if markets_text:
         refresh_command.extend(["--markets", markets_text])
     refresh_command.extend(["--mode", refresh_mode])
+    if bool(force_refresh):
+        refresh_command.append("--force-refresh")
     if season is not None:
         refresh_command.extend(["--season", str(season)])
     if week is not None:

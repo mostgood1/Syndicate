@@ -1562,7 +1562,13 @@ def _step_requires_source_root(step: RefreshStep) -> bool:
     return any(str(part) == "--source-root" for part in step.command)
 
 
-def _step_command_with_mode(step: RefreshStep, mode: str) -> tuple[str, ...]:
+_FORCE_REFRESH_CAPABLE_SCRIPT_NAMES = {
+    "refresh_nba_oddsapi_props.py",
+    "refresh_wnba_oddsapi_props.py",
+}
+
+
+def _step_command_with_mode(step: RefreshStep, mode: str, *, force_refresh: bool = False) -> tuple[str, ...]:
     normalized_mode = str(mode or "full").strip().lower() or "full"
     command = list(step.command)
     if normalized_mode != "full":
@@ -1576,6 +1582,10 @@ def _step_command_with_mode(step: RefreshStep, mode: str) -> tuple[str, ...]:
         }
         if any(str(part).endswith(tuple(refresh_script_names)) for part in command):
             command.extend(["--mode", normalized_mode])
+    # Only WNBA/NBA's refresh scripts accept --force-refresh today; other sports'
+    # scripts don't define the flag and would error on an unrecognized argument.
+    if force_refresh and any(str(part).endswith(tuple(_FORCE_REFRESH_CAPABLE_SCRIPT_NAMES)) for part in command):
+        command.append("--force-refresh")
     return tuple(command)
 
 
@@ -1734,7 +1744,7 @@ def _run_sport_refresh(args: argparse.Namespace, sport: str, execution_mode: str
                 name=step.name,
                 phases=step.phases,
                 cwd=step.cwd,
-                command=_step_command_with_mode(step, refresh_mode),
+                command=_step_command_with_mode(step, refresh_mode, force_refresh=bool(getattr(args, "force_refresh", False))),
                 env_updates=step.env_updates,
                 description=step.description,
             ),
@@ -2161,6 +2171,7 @@ def main() -> int:
     parser.add_argument("--skip-mirror", action="store_true", help="Refresh source repos only; do not run the Syndicate mirror scripts.")
     parser.add_argument("--execution-mode", choices=("source", "ingest"), default="source", help="Choose whether to run source-owned refresh generation or ingest-only mirror/import steps.")
     parser.add_argument("--mirror-only", action="store_true", help="Skip source refresh and only run the Syndicate mirror scripts.")
+    parser.add_argument("--force-refresh", action="store_true", help="Bypass cached-output reuse for sports that support it (WNBA/NBA) and force a fresh regenerate.")
     parser.add_argument("--continue-on-error", action="store_true", default=True, help="Continue across sports even when one refresh fails.")
     parser.add_argument("--no-continue-on-error", action="store_false", dest="continue_on_error")
     parser.add_argument("--dry-run", action="store_true", help="Resolve commands and source roots without executing refresh or mirror steps.")

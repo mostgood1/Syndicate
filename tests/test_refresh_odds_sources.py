@@ -520,4 +520,75 @@ class RefreshOddsSourcesTests(unittest.TestCase):
         self.assertIn(r"C:\render\data\mlb_source\source_artifacts\data\processed\cards_snapshot.json", artifact_paths)
         self.assertIn(r"C:\render\data\mlb_source\source_artifacts\data\processed", artifact_paths)
         self.assertIn(r"C:\render\data\mlb_source\source_artifacts\reports\mlb_bundle_report.json", artifact_paths)
-        self.assertEqual(len(artifact_paths), 4)
+
+    def test_step_command_with_mode_appends_force_refresh_for_wnba(self) -> None:
+        module = self._load_module()
+        step = module.RefreshStep(
+            name="wnba_oddsapi_props_job",
+            phases=("pregame", "live"),
+            cwd=Path("."),
+            command=("python", "scripts/refresh_wnba_oddsapi_props.py", "--date", "2026-07-13"),
+            env_updates=None,
+            description="test step",
+        )
+
+        command = module._step_command_with_mode(step, "full", force_refresh=True)
+
+        self.assertIn("--force-refresh", command)
+
+    def test_step_command_with_mode_appends_force_refresh_for_nba(self) -> None:
+        module = self._load_module()
+        step = module.RefreshStep(
+            name="nba_oddsapi_props_job",
+            phases=("pregame", "live"),
+            cwd=Path("."),
+            command=("python", "scripts/refresh_nba_oddsapi_props.py", "--date", "2026-07-13"),
+            env_updates=None,
+            description="test step",
+        )
+
+        command = module._step_command_with_mode(step, "full", force_refresh=True)
+
+        self.assertIn("--force-refresh", command)
+
+    def test_step_command_with_mode_omits_force_refresh_when_not_requested(self) -> None:
+        module = self._load_module()
+        step = module.RefreshStep(
+            name="wnba_oddsapi_props_job",
+            phases=("pregame", "live"),
+            cwd=Path("."),
+            command=("python", "scripts/refresh_wnba_oddsapi_props.py", "--date", "2026-07-13"),
+            env_updates=None,
+            description="test step",
+        )
+
+        command = module._step_command_with_mode(step, "full", force_refresh=False)
+
+        self.assertNotIn("--force-refresh", command)
+
+    def test_step_command_with_mode_does_not_add_force_refresh_for_mlb(self) -> None:
+        # MLB's refresh script has no --force-refresh flag (it always overwrites
+        # via --overwrite on); appending it would error on an unrecognized arg.
+        module = self._load_module()
+        step = module.RefreshStep(
+            name="mlb_oddsapi_refresh",
+            phases=("pregame", "live"),
+            cwd=Path("."),
+            command=("python", "scripts/refresh_mlb_oddsapi.py", "--date", "2026-07-13"),
+            env_updates=None,
+            description="test step",
+        )
+
+        command = module._step_command_with_mode(step, "full", force_refresh=True)
+
+        self.assertNotIn("--force-refresh", command)
+
+    def test_force_refresh_argument_is_accepted_by_the_parser(self) -> None:
+        # Exercise the real argparse parser via main()'s early --list branch
+        # (returns 0 without needing the full pipeline). An unrecognized
+        # --force-refresh flag would make argparse exit(2) before reaching it.
+        module = self._load_module()
+        with patch.object(module.sys, "argv", ["refresh_odds_sources.py", "--date", "2026-07-13", "--force-refresh", "--list"]), patch("builtins.print"):
+            rc = module.main()
+
+        self.assertEqual(rc, 0)

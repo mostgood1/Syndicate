@@ -98,6 +98,7 @@ def _start_refresh_job(payload: dict[str, Any], *, mode: str = "fast") -> tuple[
             mirror_only=_coerce_bool(_payload_value(launch_payload, "mirror_only")),
             dry_run=_coerce_bool(_payload_value(launch_payload, "dry_run")),
             mode=str(_payload_value(launch_payload, "mode", "fast") or "fast"),
+            force_refresh=_coerce_bool(_payload_value(launch_payload, "force_refresh")),
         )
     except Exception as exc:
         return job_id, _store_ops_job(
@@ -381,6 +382,7 @@ def api_ops_odds_refresh_plan() -> Any:
             week=_coerce_int(request.args.get("week")),
             skip_mirror=_coerce_bool(request.args.get("skip_mirror")),
             mirror_only=_coerce_bool(request.args.get("mirror_only")),
+            force_refresh=_coerce_bool(request.args.get("force_refresh")),
         )
     except ValueError as exc:
         return jsonify({"ok": False, "error": str(exc)}), 400
@@ -488,6 +490,7 @@ def page_ops_odds_refresh() -> Any:
             week=_coerce_int(request.args.get("week")),
             skip_mirror=_coerce_bool(request.args.get("skip_mirror")),
             mirror_only=_coerce_bool(request.args.get("mirror_only")),
+            force_refresh=_coerce_bool(request.args.get("force_refresh")),
         )
     except ValueError as exc:
         plan_error = str(exc)
@@ -506,6 +509,7 @@ def page_ops_odds_refresh() -> Any:
         "week": str(request.args.get("week") or "").strip(),
         "skip_mirror": _coerce_bool(request.args.get("skip_mirror")),
         "mirror_only": _coerce_bool(request.args.get("mirror_only")),
+        "force_refresh": _coerce_bool(request.args.get("force_refresh")),
     }
     return render_template(
         "shared/ops_odds_refresh.html",
@@ -544,6 +548,7 @@ def page_ops_odds_refresh_run() -> Any:
             mirror_only=_coerce_bool(_payload_value(payload, "mirror_only")),
             dry_run=_coerce_bool(_payload_value(payload, "dry_run")),
             mode=str(_payload_value(payload, "mode", "fast") or "fast"),
+            force_refresh=_coerce_bool(_payload_value(payload, "force_refresh")),
         )
     except ValueError as exc:
         return jsonify({"ok": False, "error": str(exc)}), 400
