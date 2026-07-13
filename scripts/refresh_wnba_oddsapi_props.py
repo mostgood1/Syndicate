@@ -4377,6 +4377,20 @@ def main() -> int:
                 }
         if source_root is not None:
             state["playoff_transition"] = _run_playoff_transition_if_needed(source_root=source_root, date_str=target_date)
+        if source_root is not None and artifact_root_path is not None:
+            # Live game state (score/period/clock, ESPN-sourced) is cheap and has nothing
+            # to do with whether odds/props inputs changed, so refresh it every tick
+            # regardless of fast/full mode or whether the rest of this run reused a
+            # cached bundle. Without this, live snapshots only ever get written once,
+            # since _materialize_artifact_bundle below is skipped entirely in fast mode.
+            try:
+                _export_live_snapshot_artifacts(
+                    source_root=source_root,
+                    date_str=str(target_date),
+                    processed_root=artifact_root_path / "data" / "processed",
+                )
+            except Exception as exc:
+                print(f"[refresh_wnba_oddsapi_props] LIVE_SNAPSHOT_REFRESH_FAILED date={target_date} error={type(exc).__name__}: {exc}", flush=True)
         if not fast_mode and artifact_root_path and source_root is not None and not state.get("reused_existing_artifact_bundle"):
             copied = _materialize_artifact_bundle(
                 state=state,

@@ -193,6 +193,48 @@ def _any_tracked_sport_game_live() -> bool:
 	return False
 
 
+def _live_refresh_loop_full_rerun_interval_seconds() -> int:
+	raw = str(os.environ.get("SYNDICATE_LIVE_ODDS_REFRESH_FULL_RERUN_INTERVAL_SECONDS") or "").strip()
+	try:
+		value = int(raw or 7200)
+	except Exception:
+		value = 7200
+	return max(300, int(value))
+
+
+def _last_full_mode_rerun_path() -> Path:
+	return _meta_dir() / "last_full_mode_rerun.json"
+
+
+def _last_full_mode_rerun_epoch() -> float:
+	payload = read_json_file(_last_full_mode_rerun_path())
+	if isinstance(payload, dict):
+		try:
+			return float(payload.get("epoch") or 0.0)
+		except (TypeError, ValueError):
+			return 0.0
+	return 0.0
+
+
+def _record_full_mode_rerun(epoch: float) -> None:
+	write_json_file(_last_full_mode_rerun_path(), {"epoch": epoch, "recordedAt": _utc_now()})
+
+
+def _should_run_full_mode(*, adaptive_enabled: bool, now_epoch: float) -> bool:
+	if not adaptive_enabled:
+		return False
+	last_epoch = _last_full_mode_rerun_epoch()
+	if last_epoch <= 0.0:
+		# No prior full-mode run recorded in this environment (e.g. a fresh worker
+		# restart). Establish a baseline now rather than immediately forcing a full
+		# rerun on the very first tick -- avoids a burst of full-mode reruns on
+		# every restart.
+		_record_full_mode_rerun(now_epoch)
+		return False
+	elapsed = now_epoch - last_epoch
+	return elapsed >= _live_refresh_loop_full_rerun_interval_seconds()
+
+
 def _live_refresh_loop_phase() -> str:
 	phase = str(os.environ.get("SYNDICATE_LIVE_ODDS_REFRESH_PHASE") or "live").strip().lower()
 	return phase if phase in {"live", "pregame", "all"} else "live"
@@ -257,6 +299,8 @@ def _run_live_refresh_tick() -> dict[str, Any]:
 	adaptive_enabled = _live_refresh_loop_adaptive_enabled()
 	any_live = _any_tracked_sport_game_live() if adaptive_enabled else None
 	effective_phase = ("live" if any_live else "pregame") if adaptive_enabled else _live_refresh_loop_phase()
+	run_full_mode = _should_run_full_mode(adaptive_enabled=adaptive_enabled, now_epoch=tick_started_epoch)
+	effective_mode = "full" if run_full_mode else _live_refresh_loop_mode()
 	meta = {
 		"startedAt": _utc_now(),
 		"date": central_today_iso(),
@@ -265,7 +309,8 @@ def _run_live_refresh_tick() -> dict[str, Any]:
 		"anyLive": bool(any_live) if adaptive_enabled else None,
 		"regions": _live_refresh_loop_regions(),
 		"executionMode": _live_refresh_loop_execution_mode(),
-		"mode": _live_refresh_loop_mode(),
+		"mode": effective_mode,
+		"fullModeRerun": run_full_mode,
 		"skipMirror": bool(_live_refresh_loop_skip_mirror()),
 		"sports": _live_refresh_loop_sports() or "active",
 	}
@@ -284,6 +329,9 @@ def _run_live_refresh_tick() -> dict[str, Any]:
 		)
 		meta["ok"] = True
 		meta["result"] = result
+		if run_full_mode:
+			_record_full_mode_rerun(tick_started_epoch)
+			print(f"[live_refresh_loop] FULL_MODE_RERUN_COMPLETE date={meta['date']} phase={meta['phase']}", flush=True)
 	except ValueError as exc:
 		meta["ok"] = False
 		meta["skipped"] = True

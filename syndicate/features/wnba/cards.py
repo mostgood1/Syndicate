@@ -3430,7 +3430,43 @@ def _actual_stat_value(player_row: dict[str, Any], market: str) -> float | None:
     return None
 
 
-def _estimated_live_projection(actual: Any, minutes_played: Any, sim_minutes: Any, sim_value: Any) -> float | None:
+_WNBA_REGULATION_MINUTES = 40.0
+_GARBAGE_TIME_MIN_PERIOD = 4
+_GARBAGE_TIME_SCORE_DIFFERENTIAL = 20.0
+_GARBAGE_TIME_STARTER_SIM_MINUTES_THRESHOLD = 28.0
+_GARBAGE_TIME_BENCH_SIM_MINUTES_THRESHOLD = 15.0
+_GARBAGE_TIME_STARTER_DAMPENING = 0.85
+_GARBAGE_TIME_BENCH_BOOST = 1.15
+
+
+def _garbage_time_minutes_factor(*, period: int | None, score_differential: float | None, sim_minutes: float | None) -> float:
+    """First-pass heuristic, tunable: once a game is in the 4th quarter or later
+    with a comfortable margin, presumed-starter minutes (high sim_minutes) trend
+    down (pulled early) and presumed-bench minutes (low sim_minutes) trend up
+    (extended garbage-time run). Not a precise model -- deliberately conservative.
+    """
+    if period is None or period < _GARBAGE_TIME_MIN_PERIOD:
+        return 1.0
+    if score_differential is None or score_differential < _GARBAGE_TIME_SCORE_DIFFERENTIAL:
+        return 1.0
+    if sim_minutes is None:
+        return 1.0
+    if sim_minutes >= _GARBAGE_TIME_STARTER_SIM_MINUTES_THRESHOLD:
+        return _GARBAGE_TIME_STARTER_DAMPENING
+    if sim_minutes <= _GARBAGE_TIME_BENCH_SIM_MINUTES_THRESHOLD:
+        return _GARBAGE_TIME_BENCH_BOOST
+    return 1.0
+
+
+def _estimated_live_projection(
+    actual: Any,
+    minutes_played: Any,
+    sim_minutes: Any,
+    sim_value: Any,
+    *,
+    period: int | None = None,
+    score_differential: float | None = None,
+) -> float | None:
     actual_value = _safe_float(actual)
     played = _safe_float(minutes_played)
     sim_min = _safe_float(sim_minutes)
@@ -3439,7 +3475,10 @@ def _estimated_live_projection(actual: Any, minutes_played: Any, sim_minutes: An
         return sim_mean
     if played is None or played <= 0:
         return sim_mean if sim_mean is not None else actual_value
-    target_minutes = max(played, min(48.0, sim_min)) if sim_min is not None and sim_min > 0 else 48.0
+    target_minutes = max(played, min(_WNBA_REGULATION_MINUTES, sim_min)) if sim_min is not None and sim_min > 0 else _WNBA_REGULATION_MINUTES
+    garbage_time_factor = _garbage_time_minutes_factor(period=period, score_differential=score_differential, sim_minutes=sim_min)
+    if garbage_time_factor != 1.0:
+        target_minutes = max(played, target_minutes * garbage_time_factor)
     raw_projection = (actual_value / played) * target_minutes
     if sim_mean is None:
         return round(raw_projection, 3)
@@ -3473,7 +3512,12 @@ def _live_state_status_from_row(game: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(game, dict):
         return {}
     if isinstance(game.get("status"), dict):
-        return dict(game.get("status") or {})
+        status = dict(game.get("status") or {})
+        if "home_pts" not in status and "home_pts" in game:
+            status["home_pts"] = game.get("home_pts")
+        if "away_pts" not in status and "away_pts" in game:
+            status["away_pts"] = game.get("away_pts")
+        return status
     event_status = str(game.get("status") or "").strip()
     return {
         "in_progress": bool(game.get("in_progress")),
@@ -3481,7 +3525,29 @@ def _live_state_status_from_row(game: dict[str, Any]) -> dict[str, Any]:
         "period": game.get("period"),
         "clock": game.get("clock"),
         "status": event_status,
+        "home_pts": game.get("home_pts"),
+        "away_pts": game.get("away_pts"),
     }
+
+
+def _score_differential_from_status(game_status: dict[str, Any] | None) -> float | None:
+    if not isinstance(game_status, dict):
+        return None
+    home_pts = _safe_float(game_status.get("home_pts"))
+    away_pts = _safe_float(game_status.get("away_pts"))
+    if home_pts is None or away_pts is None:
+        return None
+    return abs(home_pts - away_pts)
+
+
+def _period_from_status(game_status: dict[str, Any] | None) -> int | None:
+    if not isinstance(game_status, dict):
+        return None
+    period = game_status.get("period")
+    try:
+        return int(period) if period is not None else None
+    except (TypeError, ValueError):
+        return None
 
 
 def _merge_live_status(existing_status: dict[str, Any] | None, incoming_status: dict[str, Any] | None) -> dict[str, Any]:
@@ -3723,6 +3789,8 @@ def _hydrate_live_player_lens_payload(
         if game_status:
             hydrated_game["status"] = dict(game_status)
         game_explicitly_not_live = bool(source_game_status) and not bool(source_game_status.get("in_progress"))
+        game_period = _period_from_status(game_status)
+        game_score_differential = _score_differential_from_status(game_status)
         rows: list[dict[str, Any]] = []
         for row in game.get("rows") if isinstance(game.get("rows"), list) else []:
             if not isinstance(row, dict):
@@ -3747,7 +3815,14 @@ def _hydrate_live_player_lens_payload(
                 else:
                     live_projection = existing_live_projection
                 if live_projection is None:
-                    live_projection = _estimated_live_projection(actual_value, minutes_played, sim_minutes, sim_value)
+                    live_projection = _estimated_live_projection(
+                        actual_value,
+                        minutes_played,
+                        sim_minutes,
+                        sim_value,
+                        period=game_period,
+                        score_differential=game_score_differential,
+                    )
                     live_projection = _calibrate_live_projection(
                         live_projection,
                         actual_value,

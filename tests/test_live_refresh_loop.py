@@ -210,6 +210,8 @@ class LiveRefreshLoopTests(unittest.TestCase):
         ), patch.object(live_refresh_loop, "central_today_iso", return_value="2026-07-13"), patch.object(
             live_refresh_loop, "_any_tracked_sport_game_live", return_value=False
         ), patch.object(
+            live_refresh_loop, "_should_run_full_mode", return_value=False
+        ), patch.object(
             live_refresh_loop,
             "launch_refresh_run",
             return_value={"ok": True, "state": "running"},
@@ -241,6 +243,8 @@ class LiveRefreshLoopTests(unittest.TestCase):
         ), patch.object(live_refresh_loop, "central_today_iso", return_value="2026-07-13"), patch.object(
             live_refresh_loop, "_any_tracked_sport_game_live", return_value=True
         ), patch.object(
+            live_refresh_loop, "_should_run_full_mode", return_value=False
+        ), patch.object(
             live_refresh_loop,
             "launch_refresh_run",
             return_value={"ok": True, "state": "running"},
@@ -263,6 +267,102 @@ class LiveRefreshLoopTests(unittest.TestCase):
             mirror_only=False,
             dry_run=False,
         )
+
+    def test_full_rerun_interval_defaults_to_two_hours(self) -> None:
+        with patch.dict(os.environ, {}, clear=True):
+            interval_seconds = live_refresh_loop._live_refresh_loop_full_rerun_interval_seconds()
+
+        self.assertEqual(interval_seconds, 7200)
+
+    def test_should_run_full_mode_false_when_adaptive_disabled(self) -> None:
+        with patch.object(live_refresh_loop, "_last_full_mode_rerun_epoch", return_value=0.0), patch.object(
+            live_refresh_loop, "_record_full_mode_rerun"
+        ) as mocked_record:
+            result = live_refresh_loop._should_run_full_mode(adaptive_enabled=False, now_epoch=1000.0)
+
+        self.assertFalse(result)
+        mocked_record.assert_not_called()
+
+    def test_should_run_full_mode_establishes_baseline_on_first_call(self) -> None:
+        with patch.object(live_refresh_loop, "_last_full_mode_rerun_epoch", return_value=0.0), patch.object(
+            live_refresh_loop, "_record_full_mode_rerun"
+        ) as mocked_record:
+            result = live_refresh_loop._should_run_full_mode(adaptive_enabled=True, now_epoch=1000.0)
+
+        self.assertFalse(result)
+        mocked_record.assert_called_once_with(1000.0)
+
+    def test_should_run_full_mode_false_before_interval_elapses(self) -> None:
+        with patch.object(live_refresh_loop, "_last_full_mode_rerun_epoch", return_value=1000.0), patch.object(
+            live_refresh_loop, "_record_full_mode_rerun"
+        ) as mocked_record:
+            result = live_refresh_loop._should_run_full_mode(adaptive_enabled=True, now_epoch=1000.0 + 3600)
+
+        self.assertFalse(result)
+        mocked_record.assert_not_called()
+
+    def test_should_run_full_mode_true_after_interval_elapses(self) -> None:
+        with patch.object(live_refresh_loop, "_last_full_mode_rerun_epoch", return_value=1000.0), patch.object(
+            live_refresh_loop, "_record_full_mode_rerun"
+        ) as mocked_record:
+            result = live_refresh_loop._should_run_full_mode(adaptive_enabled=True, now_epoch=1000.0 + 7200)
+
+        self.assertTrue(result)
+        mocked_record.assert_not_called()
+
+    def test_run_tick_uses_full_mode_and_records_rerun_when_due(self) -> None:
+        with patch.dict(
+            os.environ,
+            {"SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP": "true"},
+            clear=False,
+        ), patch.object(live_refresh_loop, "central_today_iso", return_value="2026-07-13"), patch.object(
+            live_refresh_loop, "_any_tracked_sport_game_live", return_value=True
+        ), patch.object(
+            live_refresh_loop, "_should_run_full_mode", return_value=True
+        ), patch.object(
+            live_refresh_loop, "_record_full_mode_rerun"
+        ) as mocked_record, patch.object(
+            live_refresh_loop,
+            "launch_refresh_run",
+            return_value={"ok": True, "state": "running"},
+        ) as mocked_launch:
+            payload = live_refresh_loop._run_live_refresh_tick()
+
+        self.assertTrue(payload["fullModeRerun"])
+        mocked_launch.assert_called_once_with(
+            date="2026-07-13",
+            sports=None,
+            phase="live",
+            regions="us",
+            mode="full",
+            execution_mode="source",
+            launch_mode="detached_subprocess",
+            skip_mirror=True,
+            mirror_only=False,
+            dry_run=False,
+        )
+        mocked_record.assert_called_once()
+
+    def test_run_tick_does_not_record_full_rerun_when_launch_fails(self) -> None:
+        with patch.dict(
+            os.environ,
+            {"SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP": "true"},
+            clear=False,
+        ), patch.object(live_refresh_loop, "central_today_iso", return_value="2026-07-13"), patch.object(
+            live_refresh_loop, "_any_tracked_sport_game_live", return_value=True
+        ), patch.object(
+            live_refresh_loop, "_should_run_full_mode", return_value=True
+        ), patch.object(
+            live_refresh_loop, "_record_full_mode_rerun"
+        ) as mocked_record, patch.object(
+            live_refresh_loop,
+            "launch_refresh_run",
+            side_effect=RuntimeError("boom"),
+        ):
+            payload = live_refresh_loop._run_live_refresh_tick()
+
+        self.assertFalse(payload["ok"])
+        mocked_record.assert_not_called()
 
     def test_start_loop_returns_false_when_disabled(self) -> None:
         with patch.dict(os.environ, {}, clear=True):
