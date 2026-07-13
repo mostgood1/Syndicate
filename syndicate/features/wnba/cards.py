@@ -360,6 +360,58 @@ def _safe_float(value: Any) -> float | None:
 def _safe_text(value: Any, fallback: str = "") -> str:
     text = str(value or "").strip()
     return text or fallback
+
+
+def _coerce_status_mapping(value: Any) -> dict[str, Any]:
+    if isinstance(value, dict):
+        return value
+    text = str(value or "").strip()
+    if not text or not (text.startswith("{") and text.endswith("}")):
+        return {}
+    try:
+        parsed = ast.literal_eval(text)
+    except Exception:
+        return {}
+    return parsed if isinstance(parsed, dict) else {}
+
+
+def _status_fields_from_value(
+    *,
+    status_value: Any,
+    detail_value: Any = None,
+    start_time_value: Any = None,
+    in_progress: Any = None,
+    final: Any = None,
+    period: Any = None,
+    clock: Any = None,
+) -> dict[str, Any]:
+    mapping = _coerce_status_mapping(status_value)
+    if mapping:
+        status_value = mapping.get("status") or mapping.get("abstract") or mapping.get("detailed") or mapping.get("detail") or status_value
+        detail_value = mapping.get("detail") or mapping.get("detailed") or detail_value or status_value
+        start_time_value = mapping.get("startTime") or mapping.get("start_time") or start_time_value
+        in_progress = mapping.get("in_progress") if mapping.get("in_progress") is not None else in_progress
+        final = mapping.get("final") if mapping.get("final") is not None else final
+        period = mapping.get("period") if mapping.get("period") is not None else period
+        clock = mapping.get("clock") if mapping.get("clock") is not None else mapping.get("displayClock") if mapping.get("displayClock") is not None else clock
+    status_text = _safe_text(status_value, _safe_text(detail_value, "Scheduled"))
+    detail_text = _safe_text(detail_value, status_text)
+    inferred_period, inferred_clock = _infer_period_clock_from_status_text(detail_text)
+    if period is None and inferred_period is not None:
+        period = inferred_period
+    if not _safe_text(clock, "") and inferred_clock:
+        clock = inferred_clock
+    return {
+        "status": status_text,
+        "detail": detail_text,
+        "startTime": _safe_text(start_time_value, "") or None,
+        "in_progress": bool(in_progress),
+        "final": bool(final),
+        "period": period,
+        "clock": _safe_text(clock, ""),
+    }
+
+
 def _wnba_generated_at() -> str:
     return central_now().isoformat(timespec="seconds")
 
@@ -3401,18 +3453,15 @@ def _source_status_contract(
     period: object = None,
     clock: object = None,
 ) -> dict[str, Any]:
-    status_value = str(status_text or "").strip() or str(detail_text or "").strip() or "Scheduled"
-    detail_value = str(detail_text or "").strip() or status_value
-    start_time_value = str(start_time_utc or "").strip() or None
-    return {
-        "status": status_value,
-        "detail": detail_value,
-        "startTime": start_time_value,
-        "in_progress": bool(in_progress),
-        "final": bool(final),
-        "period": period,
-        "clock": str(clock or "").strip(),
-    }
+    return _status_fields_from_value(
+        status_value=status_text,
+        detail_value=detail_text,
+        start_time_value=start_time_utc,
+        in_progress=in_progress,
+        final=final,
+        period=period,
+        clock=clock,
+    )
 
 
 def _source_predictions_contract(game: dict[str, Any]) -> dict[str, Any]:
@@ -4119,11 +4168,27 @@ def build_live_state_payload(selected_date: str, ttl: int = 12, *, allow_stored_
         source_row = public_row if isinstance(public_row, dict) else None
         source_away_pts = _safe_float(source_row.get("away_pts")) if source_row else _safe_float(sim_score.get("away_mean"))
         source_home_pts = _safe_float(source_row.get("home_pts")) if source_row else _safe_float(sim_score.get("home_mean"))
-        source_status = str(source_row.get("status") or "").strip() if source_row else normalized_status["detail"]
-        source_clock = str(source_row.get("clock") or "").strip() if source_row else normalized_status.get("clock") or ""
-        source_period = source_row.get("period") if source_row else normalized_status.get("period")
-        source_in_progress = bool(source_row.get("in_progress")) if source_row else bool(normalized_status["in_progress"])
-        source_final = bool(source_row.get("final")) if source_row else bool(normalized_status["final"])
+        if source_row:
+            source_status_fields = _status_fields_from_value(
+                status_value=source_row.get("status"),
+                detail_value=source_row.get("detail"),
+                start_time_value=source_row.get("startTime") or source_row.get("start_time") or source_row.get("detail"),
+                in_progress=source_row.get("in_progress"),
+                final=source_row.get("final"),
+                period=source_row.get("period"),
+                clock=source_row.get("clock"),
+            )
+            source_status = source_status_fields["status"]
+            source_clock = source_status_fields["clock"]
+            source_period = source_status_fields["period"]
+            source_in_progress = bool(source_status_fields["in_progress"])
+            source_final = bool(source_status_fields["final"])
+        else:
+            source_status = normalized_status["detail"]
+            source_clock = normalized_status.get("clock") or ""
+            source_period = normalized_status.get("period")
+            source_in_progress = bool(normalized_status["in_progress"])
+            source_final = bool(normalized_status["final"])
         out_games.append(
             {
                 "game_id": game.get("gamePk"),
