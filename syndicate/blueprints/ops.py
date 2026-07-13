@@ -510,6 +510,7 @@ def page_ops_odds_refresh() -> Any:
         "skip_mirror": _coerce_bool(request.args.get("skip_mirror")),
         "mirror_only": _coerce_bool(request.args.get("mirror_only")),
         "force_refresh": _coerce_bool(request.args.get("force_refresh")),
+        "mode": str(request.args.get("mode") or "fast").strip().lower() or "fast",
     }
     return render_template(
         "shared/ops_odds_refresh.html",

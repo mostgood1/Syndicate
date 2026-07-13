@@ -1015,6 +1015,28 @@ class OpsRefreshApiTests(unittest.TestCase):
         self.assertIn("Contract: artifact_bundle_or_existing_mirror", html)
         self.assertIn("Source repo: C:/repos/mlb_source_bundle", html)
 
+    def test_ops_page_renders_run_form_posting_to_run_endpoint(self) -> None:
+        fake_status = {"refresh_status": {"mirror_manifests": [], "runtime": {"state": "idle", "detail": "No active refresh run."}}, "daily_update": {"manifest": None}}
+        fake_plan = {"ok": True, "date": "2026-05-20", "phase": "all", "sports": ["mlb"], "skip_mirror": False, "mirror_only": False, "results": []}
+        with patch.dict(os.environ, {"ADMIN_TOKEN": "secret-token"}, clear=False), patch(
+            "syndicate.blueprints.ops.load_latest_refresh_status",
+            return_value=fake_status,
+        ), patch(
+            "syndicate.blueprints.ops.build_refresh_plan",
+            return_value=fake_plan,
+        ):
+            response = self.client.get(
+                "/ops/odds-refresh?force_refresh=1&mode=full",
+                headers={"X-Admin-Token": "secret-token"},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        html = response.get_data(as_text=True)
+        self.assertIn('action="/ops/odds-refresh/run"', html)
+        self.assertIn("Run Refresh Now", html)
+        self.assertIn('name="mode"', html)
+        self.assertIn('<option value="full" selected>full</option>', html)
+
     def test_ops_page_labels_bundle_local_generation_as_source_context(self) -> None:
         fake_status = {"refresh_status": {"mirror_manifests": [], "runtime": {"state": "idle", "detail": "No active refresh run."}}, "daily_update": {"manifest": None}}
         fake_plan = {

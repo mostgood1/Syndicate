@@ -225,7 +225,7 @@
     <section class="ops-card">
       <div class="section-label">Admin</div>
       <h2 class="ops-section-title">Odds refresh control plane</h2>
-      <p class="lead">This page is a protected read-only view over the shared cross-sport odds refresh workflow. It renders the latest persisted refresh status and the current dry-run command plan from the same helpers used by the JSON ops endpoints.</p>
+      <p class="lead">This page renders the latest persisted refresh status and the current dry-run command plan from the same helpers used by the JSON ops endpoints. The "Run Refresh Now" action below launches a live refresh and spends Odds API quota &mdash; use it deliberately.</p>
       {% set runtime = (status_payload.get('refresh_status') or {}).get('runtime') or {} %}
       {% if launch_notice.started %}
         <p class="ops-note"><strong>Launch queued.</strong> PID {{ launch_notice.pid or 'unknown' }}{% if launch_notice.run_stamp %} · Run {{ launch_notice.run_stamp }}{% endif %}{% if launch_notice.dry_run %} · dry run{% endif %}</p>
@@ -307,6 +307,44 @@
           <div class="action-row">
             <button class="cards-submit-button" type="submit">Refresh Plan View</button>
             <a class="cards-nav-pill" href="/ops/odds-refresh{% if request.args.get('admin_token') %}?admin_token={{ request.args.get('admin_token') }}{% endif %}">Reset</a>
+          </div>
+        </form>
+        <form class="ops-form" method="post" action="/ops/odds-refresh/run" onsubmit="return confirm('Launch a live refresh run now? This spends Odds API quota and, with force refresh checked, forces a full recompute.');">
+          {% if request.args.get('admin_token') %}
+            <input type="hidden" name="admin_token" value="{{ request.args.get('admin_token') }}" />
+          {% endif %}
+          <div class="ops-form-grid">
+            <div class="ops-field">
+              <label for="run-date">Date</label>
+              <input id="run-date" type="date" name="date" value="{{ form_state.date }}" />
+            </div>
+            <div class="ops-field">
+              <label for="run-phase">Phase</label>
+              <select id="run-phase" name="phase">
+                <option value="all"{% if form_state.phase == 'all' %} selected{% endif %}>all</option>
+                <option value="pregame"{% if form_state.phase == 'pregame' %} selected{% endif %}>pregame</option>
+                <option value="live"{% if form_state.phase == 'live' %} selected{% endif %}>live</option>
+              </select>
+            </div>
+            <div class="ops-field">
+              <label for="run-mode">Mode</label>
+              <select id="run-mode" name="mode">
+                <option value="fast"{% if form_state.mode != 'full' %} selected{% endif %}>fast</option>
+                <option value="full"{% if form_state.mode == 'full' %} selected{% endif %}>full</option>
+              </select>
+            </div>
+            <div class="ops-field ops-field--full">
+              <label for="run-sports">Sports</label>
+              <input id="run-sports" type="text" name="sports" value="{{ form_state.sports }}" placeholder="all or mlb,nba,nhl" />
+            </div>
+          </div>
+          <div class="ops-toggle-row">
+            <label class="ops-toggle"><input type="checkbox" name="skip_mirror" value="1"{% if form_state.skip_mirror %} checked{% endif %} /> Skip mirror</label>
+            <label class="ops-toggle"><input type="checkbox" name="mirror_only" value="1"{% if form_state.mirror_only %} checked{% endif %} /> Mirror only</label>
+            <label class="ops-toggle"><input type="checkbox" name="force_refresh" value="1"{% if form_state.force_refresh %} checked{% endif %} /> Force refresh (bypass cache, WNBA/NBA)</label>
+          </div>
+          <div class="action-row action-row--compact">
+            <button class="cards-nav-pill" type="submit">Run Refresh Now</button>
           </div>
         </form>
         <form class="ops-form" method="post" action="/ops/odds-refresh/cancel">
