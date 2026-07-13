@@ -1,3 +1,10 @@
+# 2026-07-12 - Intelligence live pipeline status now records replayable live counts
+- Symptom: The persisted intelligence state had no replayable live-pipeline visibility, so later live-board zeros could not be traced back to live games, live props, or downstream recommendation loss.
+- Root cause: The worker/status persistence path did not store a live_pipeline summary or preserve the last successful live cycle, and there was no small replay entrypoint for a saved snapshot.
+- Fix: Add live_pipeline diagnostics to the persisted intelligence state, write the last successful live cycle to a durable JSON file, and add `scripts/replay_intelligence_live_pipeline.py` so a saved snapshot can print the recorded live pipeline block.
+- Validation: `pipeline/intelligence_state.py` and `scripts/replay_intelligence_live_pipeline.py` passed error checks, the replay script was validated against the persisted snapshot, and the temporary WNBA trace helper was removed.
+- Follow-up: Use the new status fields to confirm whether future live-board zeros come from missing live games, missing live props, or a later-stage recommendation collapse.
+
 # 2026-07-12 - Intelligence request-path persist now writes the dated board snapshot
 - Symptom: The live 2026-07-12 board state updated `query_state_cache.json` and `board_snapshot.json`, but `board_snapshot_2026_07_12.json` never appeared.
 - Root cause: The active request-side publication path stopped at `_persist_locked()`, which only wrote the generic state cache and generic board snapshot, while `write_latest_intelligence_state()` remained worker-only.

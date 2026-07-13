@@ -21,12 +21,16 @@ from pipeline.intelligence_entrypoint import run_routed_intelligence_pipeline
 from pipeline.intelligence_pipeline import run_intelligence_pipeline
 from syndicate.features.intelligence import build_intelligence_status
 from syndicate.features.intelligence import build_intelligence_overview
+from syndicate.features.intelligence import _advanced_input_rows_for_sport
 from syndicate.features.intelligence import _build_board_dictionary
 from syndicate.features.intelligence import _balanced_recommendation_order
 from syndicate.features.intelligence import collect_candidates
 from syndicate.features.intelligence import collect_all_recommendations
 from syndicate.features.intelligence import _apply_candidate_tier_penalty
+from syndicate.features.intelligence import _greedy_low_correlation_selection
 from syndicate.features.intelligence import _query_preferences
+from syndicate.features.intelligence import _score_candidates
+from syndicate.features.intelligence import _tracked_repo_files
 from syndicate.features.intelligence import rank_global_recommendations
 from syndicate.features.intelligence_board import build_intelligence_board_contract
 from syndicate.features.intelligence.signals.normalization import _numeric_hint
@@ -53,6 +57,7 @@ BOARD_SNAPSHOT_PATH = reports_root() / "intelligence" / "board_snapshot.json"
 STATUS_CACHE_PATH = reports_root() / "intelligence" / "status_response_cache.json"
 INTELLIGENCE_STATE_PATH = reports_root() / "intelligence" / "intelligence_state.json"
 INTELLIGENCE_HISTORY_PATH = reports_root() / "intelligence" / "intelligence_state_history.jsonl"
+LIVE_PIPELINE_LAST_SUCCESSFUL_PATH = reports_root() / "intelligence" / "live_pipeline_last_successful.json"
 logger = logging.getLogger(__name__)
 _INTELLIGENCE_EXECUTION_GUARD = threading.RLock()
 _INTELLIGENCE_LAST_RUN_STARTED_AT: float = 0.0
@@ -344,17 +349,69 @@ def _intelligence_state_candidate_count(state: dict[str, Any] | None) -> int:
     return 0
 
 
+def _pipeline_row_counts(rows: list[dict[str, Any]] | list[Mapping[str, Any]] | None) -> dict[str, int]:
+    materialized = [row for row in rows or [] if isinstance(row, Mapping)]
+    live_count = sum(1 for row in materialized if bool(row.get("is_live")))
+    total = len(materialized)
+    return {
+        "total": total,
+        "live": live_count,
+        "pregame": max(0, total - live_count),
+    }
+
+
+def _latest_item_timestamp(rows: list[dict[str, Any]] | list[Mapping[str, Any]] | None) -> str | None:
+    latest_timestamp = None
+    latest_epoch = -1.0
+    for row in rows or []:
+        if not isinstance(row, Mapping):
+            continue
+        timestamp_value = _response_item_latest_timestamp(dict(row))
+        if timestamp_value is None:
+            continue
+        try:
+            epoch_value = timestamp_value.timestamp()
+        except Exception:
+            continue
+        if epoch_value > latest_epoch:
+            latest_epoch = epoch_value
+            latest_timestamp = timestamp_value
+    if latest_timestamp is None:
+        return None
+    return latest_timestamp.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def _live_pipeline_has_activity(live_pipeline: dict[str, Any] | None) -> bool:
+    current = dict(live_pipeline or {})
+    numeric_keys = ("live_games", "live_props", "live_prop_items", "live_odds_game_ids", "live_candidates", "live_recommendations", "board_live_count", "top_live_opportunities")
+    return any(int(current.get(key) or 0) > 0 for key in numeric_keys)
+
+
+def _load_last_successful_live_pipeline() -> dict[str, Any] | None:
+    payload = read_json_file(LIVE_PIPELINE_LAST_SUCCESSFUL_PATH)
+    return dict(payload) if isinstance(payload, dict) else None
+
+
 def _normalize_intelligence_state_payload(state: dict[str, Any] | None) -> dict[str, Any] | None:
     current = dict(state or {})
     if not current:
         return None
     current = _promote_board_contract_cards(current)
+    live_pipeline = current.get("live_pipeline") if isinstance(current.get("live_pipeline"), dict) else {}
+    if not isinstance(live_pipeline, dict):
+        live_pipeline = {}
+    last_successful_live_pipeline = _load_last_successful_live_pipeline()
+    if last_successful_live_pipeline and not live_pipeline.get("last_successful_live_cycle"):
+        live_pipeline["last_successful_live_cycle"] = dict(last_successful_live_pipeline)
+    current["live_pipeline"] = live_pipeline
     candidate_count = _intelligence_state_candidate_count(current)
     current["candidate_count"] = candidate_count
     nested_response = current.get("response") if isinstance(current.get("response"), dict) else None
     if isinstance(nested_response, dict):
         nested_response = dict(nested_response)
         nested_response["candidate_count"] = candidate_count
+        if live_pipeline:
+            nested_response["live_pipeline"] = dict(live_pipeline)
         current["response"] = nested_response
     return current
 
@@ -531,6 +588,7 @@ def write_latest_intelligence_state(state: Any) -> dict[str, Any] | None:
     logger.info("INTELLIGENCE STATE PERSIST BEFORE", extra={"candidate_count": candidate_count})
     daily_paths = _intelligence_state_daily_paths()
     state_meta = dict(normalized.get("state_meta") or {})
+    live_pipeline = dict(normalized.get("live_pipeline") or {})
     board_snapshot_payload = _intelligence_board_snapshot_payload(normalized)
     write_json_file(INTELLIGENCE_STATE_PATH, normalized)
     write_json_file(daily_paths["state"], normalized)
@@ -545,6 +603,9 @@ def write_latest_intelligence_state(state: Any) -> dict[str, Any] | None:
         history_file.write("\n")
     write_json_file(BOARD_SNAPSHOT_PATH, board_snapshot_payload)
     write_json_file(daily_paths["board_snapshot"], board_snapshot_payload)
+    if _live_pipeline_has_activity(live_pipeline):
+        live_pipeline["generated_at"] = str(live_pipeline.get("generated_at") or state_meta.get("computed_at") or normalized.get("snapshot_generated_at") or _utc_now()).strip() or _utc_now()
+        write_json_file(LIVE_PIPELINE_LAST_SUCCESSFUL_PATH, live_pipeline)
     logger.info("INTELLIGENCE STATE PERSIST AFTER", extra={"candidate_count": candidate_count})
     logger.info("STATE WRITTEN", extra={"written": True, "candidate_count": int(normalized.get("candidate_count") or 0)})
     return normalized
@@ -1068,6 +1129,102 @@ class IntelligenceStateService:
             "implied_probability": candidate.get("implied_probability"),
         }
 
+    @staticmethod
+    def _stage_row_counts(rows: list[dict[str, Any]] | list[Mapping[str, Any]] | None) -> dict[str, int]:
+        materialized = [row for row in rows or [] if isinstance(row, Mapping)]
+        live_count = sum(1 for row in materialized if bool(row.get("is_live")))
+        total = len(materialized)
+        return {
+            "total": total,
+            "live": live_count,
+            "pregame": max(0, total - live_count),
+        }
+
+    def _live_pipeline_summary(
+        self,
+        *,
+        candidate_pool: dict[str, Any],
+        candidates: list[dict[str, Any]],
+        top_candidates: list[dict[str, Any]],
+        top_opportunities: list[dict[str, Any]],
+        board_contract: dict[str, Any],
+        selected_date: str | None,
+        sport: str | None,
+    ) -> dict[str, Any]:
+        overview = candidate_pool.get("overview") if isinstance(candidate_pool.get("overview"), list) else []
+        overview_by_slug = {
+            _safe_text(row.get("slug"), "sport").lower(): row
+            for row in overview
+            if isinstance(row, Mapping)
+        }
+        sport_slugs = sorted({*overview_by_slug.keys(), *{str(candidate.get("sport") or candidate.get("sport_slug") or "").strip().lower() for candidate in candidates if str(candidate.get("sport") or candidate.get("sport_slug") or "").strip()}})
+        sport_slugs = [slug for slug in sport_slugs if slug]
+        by_sport: dict[str, dict[str, Any]] = {}
+        board_cards = board_contract.get("cards") if isinstance(board_contract.get("cards"), list) else []
+
+        for sport_slug in sport_slugs:
+            sport_overview = overview_by_slug.get(sport_slug) or {}
+            home_rails = sport_overview.get("home_rails") if isinstance(sport_overview.get("home_rails"), dict) else {}
+            live_items = (home_rails.get("live") or {}).get("items") if isinstance(home_rails.get("live"), dict) else []
+            live_items = [item for item in live_items if isinstance(item, Mapping)]
+            dashboard_games = sport_overview.get("dashboard_games") if isinstance(sport_overview.get("dashboard_games"), list) else []
+            live_games = [game for game in dashboard_games if isinstance(game, Mapping) and bool(game.get("is_live"))]
+            sport_candidates = [row for row in candidates if _safe_text(row.get("sport") or row.get("sport_slug"), "").lower() == sport_slug]
+            sport_ranked = [row for row in top_candidates if _safe_text(row.get("sport") or row.get("sport_slug"), "").lower() == sport_slug]
+            sport_selected = [row for row in top_opportunities if _safe_text(row.get("sport") or row.get("sport_slug"), "").lower() == sport_slug]
+            sport_board = [card for card in board_cards if isinstance(card, Mapping) and _safe_text(card.get("sport") or card.get("sport_slug"), "").lower() == sport_slug]
+            by_sport[sport_slug] = {
+                "live_games": len(live_games),
+                "live_props": len(live_items),
+                "live_prop_items": len(live_items),
+                "live_odds_game_ids": len({str(item.get("game_id") or item.get("event_id") or item.get("id") or "").strip() for item in live_items if str(item.get("game_id") or item.get("event_id") or item.get("id") or "").strip()}),
+                "live_candidates": sum(1 for row in sport_candidates if bool(row.get("is_live"))),
+                "live_recommendations": sum(1 for row in sport_selected if bool(row.get("is_live"))),
+                "board_live_count": sum(1 for row in sport_board if bool(row.get("is_live"))),
+                "top_live_opportunities": sum(1 for row in sport_selected if bool(row.get("is_live"))),
+                "live_mirror_exists": bool(live_games or live_items),
+                "live_mirror_timestamp": _latest_item_timestamp([*live_games, *live_items]),
+            }
+
+        live_games = sum(item["live_games"] for item in by_sport.values())
+        live_props = sum(item["live_props"] for item in by_sport.values())
+        live_prop_items = sum(item["live_prop_items"] for item in by_sport.values())
+        live_odds_game_ids = sum(item["live_odds_game_ids"] for item in by_sport.values())
+        live_candidates = sum(item["live_candidates"] for item in by_sport.values())
+        live_recommendations = sum(item["live_recommendations"] for item in by_sport.values())
+        board_live_count = int((board_contract.get("board_summary") or {}).get("live_count") or sum(item["board_live_count"] for item in by_sport.values()))
+        top_live_opportunities = sum(1 for row in top_opportunities if bool(row.get("is_live")))
+        live_mirror_exists = any(item["live_mirror_exists"] for item in by_sport.values())
+        live_mirror_timestamp = max((str(item.get("live_mirror_timestamp") or "") for item in by_sport.values()), default="") or None
+        current_pipeline = {
+            "generated_at": _utc_now(),
+            "sport": _safe_text(sport, "all") or "all",
+            "selected_date": _safe_text(selected_date, central_today_iso()),
+            "live_games": live_games,
+            "live_props": live_props,
+            "live_prop_items": live_prop_items,
+            "live_odds_game_ids": live_odds_game_ids,
+            "live_candidates": live_candidates,
+            "live_recommendations": live_recommendations,
+            "board_live_count": board_live_count,
+            "top_live_opportunities": top_live_opportunities,
+            "live_mirror_exists": live_mirror_exists,
+            "live_mirror_timestamp": live_mirror_timestamp,
+            "stage_counts": {
+                "raw_candidates": self._stage_row_counts(candidates),
+                "ranked_candidates": self._stage_row_counts(top_candidates),
+                "selected_recommendations": self._stage_row_counts(top_opportunities),
+                "board_payload": self._stage_row_counts(board_cards),
+            },
+            "by_sport": by_sport,
+        }
+        last_successful_live_pipeline = _load_last_successful_live_pipeline()
+        if _live_pipeline_has_activity(current_pipeline):
+            current_pipeline["last_successful_live_cycle"] = dict(current_pipeline)
+        elif last_successful_live_pipeline:
+            current_pipeline["last_successful_live_cycle"] = last_successful_live_pipeline
+        return current_pipeline
+
     def _serialize_candidate(self, candidate: Any) -> dict[str, Any]:
         if hasattr(candidate, "to_dict"):
             try:
@@ -1243,6 +1400,7 @@ class IntelligenceStateService:
         pool = {
             "selected_date": selected_date,
             "source_fingerprint": source_fingerprint,
+            "overview": [dict(item) for item in overview if isinstance(item, Mapping)],
             "candidate_count": len(global_pool),
             "candidate_pools": {
                 sport_slug: {
@@ -1578,6 +1736,15 @@ class IntelligenceStateService:
             "candidate_count": response_candidate_count,
         }
         response["board_contract"] = build_intelligence_board_contract(response)
+        response["live_pipeline"] = self._live_pipeline_summary(
+            candidate_pool=candidate_pool,
+            candidates=candidates,
+            top_candidates=top_candidates,
+            top_opportunities=top_opportunities,
+            board_contract=response["board_contract"],
+            selected_date=selected_date,
+            sport=str(request_payload.get("sport") or "all").strip().lower() or "all",
+        )
         response = _decorate_response_with_state_meta(dict(response), None, source="worker", run_key=cache_key, sla_seconds=self._interval_seconds) or dict(response)
         _log_stage_timing("board_publication", (time.perf_counter() - request_started_at) * 1000.0)
         logger.info("BETTING_BOARD_PUBLISH_COMPLETE", extra={"selected_date": selected_date, "candidate_count": response_candidate_count, "snapshot_generated_at": response_last_updated})
@@ -1696,6 +1863,15 @@ class IntelligenceStateService:
             board_payload = dict(response)
             board_payload["board"] = _build_board_dictionary(ranked_candidates)
             response["board_contract"] = build_intelligence_board_contract(board_payload)
+            response["live_pipeline"] = self._live_pipeline_summary(
+                candidate_pool=candidate_pool,
+                candidates=candidates,
+                top_candidates=top_candidates,
+                top_opportunities=top_opportunities,
+                board_contract=response["board_contract"],
+                selected_date=selected_date,
+                sport=str(request_payload.get("sport") or "all").strip().lower() or "all",
+            )
             response = _promote_board_contract_cards(response)
             _log_stage_timing("response_building", (time.perf_counter() - response_build_started_at) * 1000.0)
             response = _decorate_response_with_state_meta(dict(response), None, source="worker", run_key=cache_key, sla_seconds=self._interval_seconds) or dict(response)
