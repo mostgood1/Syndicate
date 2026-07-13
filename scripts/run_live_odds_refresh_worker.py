@@ -25,6 +25,7 @@ from syndicate.features.shared.live_refresh_loop import _run_live_refresh_tick
 from syndicate.features.shared.live_refresh_loop import _acquire_process_lock
 from syndicate.features.shared.live_refresh_loop import _release_process_lock
 from syndicate.features.shared.live_refresh_loop import _LIVE_REFRESH_LOOP_STOP
+from syndicate.features.shared.live_lens_loop import start_live_lens_loop
 from syndicate.features.shared.refresh_state_store import assert_refresh_state_backend_ready
 from syndicate.features.shared.memory_observability import log_all_process_memory
 from syndicate.features.shared.memory_observability import log_runtime_memory
@@ -157,6 +158,13 @@ def _start_live_lens_reports() -> None:
         _log_worker_memory("start_live_lens_reports_after")
     except Exception:
         _log_worker_memory("start_live_lens_reports_error")
+        pass
+    try:
+        _log_worker_memory("start_live_lens_loop_before")
+        start_live_lens_loop()
+        _log_worker_memory("start_live_lens_loop_after")
+    except Exception:
+        _log_worker_memory("start_live_lens_loop_error")
         pass
 
 

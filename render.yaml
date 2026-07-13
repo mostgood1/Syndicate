@@ -398,4 +398,8 @@ services:
         value: "60"
       - key: MLB_LIVE_ODDSAPI_REFRESH_INTERVAL_SECONDS
         value: "60"
+      - key: SYNDICATE_ENABLE_LIVE_LENS_LOOP
+        value: "true"
+      - key: SYNDICATE_LIVE_LENS_INTERVAL_SECONDS
+        value: "60"
 

@@ -15,12 +15,14 @@ from syndicate.features.nba.sources import load_json
 from syndicate.features.shared.live_lens_contract import attach_live_lens_contract
 from syndicate.features.shared.rank_board import build_rank_api_payload
 from syndicate.features.shared.rank_board import build_rank_page_context
+from syndicate.features.shared.refresh_state_store import data_root
 
 
 build_cards_page_context = _compute_cards_page_context
 
 
-LIVE_LENS_SNAPSHOT_PATH = Path("data/live/nba_live_lens.json")
+def live_lens_snapshot_path() -> Path:
+    return data_root() / "live" / "nba_live_lens.json"
 
 
 def _safe_text(value: Any, fallback: str = "-") -> str:
@@ -77,7 +79,7 @@ def _snapshot_text(payload: dict[str, Any], key: str, fallback: str) -> str:
 
 
 def _load_live_lens_snapshot() -> dict[str, Any] | None:
-    payload = load_json(LIVE_LENS_SNAPSHOT_PATH)
+    payload = load_json(live_lens_snapshot_path())
     return payload if isinstance(payload, dict) else None
 
 
@@ -291,7 +293,7 @@ def _empty_live_lens_context(selected_date: str, *, season: int | None = None, p
         intro_title="NBA Live Lens",
         intro_body="NBA live lens serves the stored snapshot artifact directly.",
         aria_label="NBA live lens board",
-        source_path=str(LIVE_LENS_SNAPSHOT_PATH),
+        source_path=str(live_lens_snapshot_path()),
         source_title="NBA live lens snapshot",
         rank_cards=[],
         using_sample_data=False,
@@ -299,7 +301,7 @@ def _empty_live_lens_context(selected_date: str, *, season: int | None = None, p
             {"label": "Games", "value": "0"},
             {"label": "Top plays", "value": "0"},
             {"label": "Prop signals", "value": "0"},
-            {"label": "Source", "value": LIVE_LENS_SNAPSHOT_PATH.name},
+            {"label": "Source", "value": live_lens_snapshot_path().name},
         ],
         module_links=build_module_links(selected_date, "Live Lens"),
         warning_panel={
@@ -379,7 +381,7 @@ def _compute_live_lens_page_context(selected_date: str, *, season: int | None = 
         intro_title="NBA Live Lens",
         intro_body="NBA live lens now serves the stored snapshot artifact directly.",
         aria_label="NBA live lens board",
-        source_path=str(cards_context.get("source_path") or LIVE_LENS_SNAPSHOT_PATH),
+        source_path=str(cards_context.get("source_path") or live_lens_snapshot_path()),
         source_title="NBA live lens snapshot" if rank_cards else "NBA live lens unavailable",
         rank_cards=rank_cards,
         using_sample_data=False,
@@ -556,7 +558,7 @@ def build_live_lens_snapshot(selected_date: str, *, limit: int = 50) -> dict[str
         "date": resolved_date,
         "requested_date": selected_date,
         "generated_at": api_payload.get("generated_at") if isinstance(api_payload, dict) else None,
-        "source_path": str(page_context.get("source_path") or LIVE_LENS_SNAPSHOT_PATH),
+        "source_path": str(page_context.get("source_path") or live_lens_snapshot_path()),
         "page_context": dict(page_context),
         "api_payload": dict(api_payload),
         "live_player_lens_payload": dict(live_player_lens_payload) if isinstance(live_player_lens_payload, dict) else _empty_live_player_lens_payload(resolved_date, event_ids),

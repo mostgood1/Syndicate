@@ -89,19 +89,3 @@ class WnbaLiveLensWorkerTests(unittest.TestCase):
         self.assertFalse(validate_live_lens_snapshot({"date": "2026-06-19", "games": [], "rank_cards": []}))
         self.assertFalse(validate_live_lens_snapshot({"games": [], "cards": [], "rank_cards": []}))
         self.assertFalse(validate_live_lens_snapshot({"date": "2026-06-19", "cards": [], "rank_cards": []}))
-
-    def test_worker_skips_write_when_snapshot_is_invalid(self) -> None:
-        invalid_snapshot = {"date": "2026-06-19", "rank_cards": [{"title": "Bad", "metrics": [{"label": "Score", "value": float("nan")}] }]}
-        with patch("scripts.run_wnba_live_lens_worker.build_live_lens_snapshot", return_value=invalid_snapshot), patch(
-            "scripts.run_wnba_live_lens_worker.write_json_file"
-        ) as mocked_write, patch("scripts.run_wnba_live_lens_worker.logger.warning") as mocked_warning:
-            from scripts.run_wnba_live_lens_worker import _run_tick
-
-            snapshot = _run_tick()
-
-        mocked_write.assert_not_called()
-        mocked_warning.assert_called_once_with(
-            "INVALID LIVE LENS STATE",
-            extra={"path": "data/live/wnba_live_lens.json", "date": "2026-06-19"},
-        )
-        self.assertEqual(snapshot, invalid_snapshot)

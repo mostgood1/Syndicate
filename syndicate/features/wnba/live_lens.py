@@ -8,6 +8,7 @@ from typing import Any
 from syndicate.features.shared.rank_board import build_rank_api_payload
 from syndicate.features.shared.rank_board import build_rank_page_context
 from syndicate.features.shared.live_lens_contract import attach_live_lens_contract
+from syndicate.features.shared.refresh_state_store import data_root
 from syndicate.features.shared.request_path_guard import warn_if_compute_in_request_path
 from syndicate.features.shared.timezone import central_today_iso
 from syndicate.features.wnba.cards import build_cards_page_context
@@ -16,7 +17,8 @@ from syndicate.features.wnba.sources import build_module_links
 from syndicate.features.wnba.sources import load_json
 
 
-LIVE_LENS_SNAPSHOT_PATH = Path("data/live/wnba_live_lens.json")
+def live_lens_snapshot_path() -> Path:
+    return data_root() / "live" / "wnba_live_lens.json"
 
 
 def _safe_text(value: Any, fallback: str = "-") -> str:
@@ -50,7 +52,7 @@ def _live_line_map(selected_date: str, games: list[dict[str, Any]]) -> dict[str,
 
 
 def _load_live_lens_snapshot() -> dict[str, Any] | None:
-    payload = load_json(LIVE_LENS_SNAPSHOT_PATH)
+    payload = load_json(live_lens_snapshot_path())
     return payload if isinstance(payload, dict) else None
 
 
@@ -83,7 +85,7 @@ def _snapshot_context(selected_date: str, payload: dict[str, Any] | None) -> dic
     if not rank_cards:
         rank_cards = [dict(card) for card in _snapshot_list(snapshot, "cards") if isinstance(card, dict)]
     games = [dict(game) for game in _snapshot_list(snapshot, "games") if isinstance(game, dict)]
-    source_path = str(snapshot.get("source_path") or LIVE_LENS_SNAPSHOT_PATH).strip()
+    source_path = str(snapshot.get("source_path") or live_lens_snapshot_path()).strip()
     header_stats = [dict(item) for item in _snapshot_list(snapshot, "header_stats") if isinstance(item, dict)]
     if not header_stats:
         header_stats = [
@@ -241,7 +243,7 @@ def build_live_lens_snapshot(selected_date: str, *, limit: int = 50) -> dict[str
         for game in games
         if isinstance(game, dict) and isinstance(game.get("shared_prop_rows"), list)
     )
-    source_path = str(cards_context.get("source_path") or LIVE_LENS_SNAPSHOT_PATH).strip()
+    source_path = str(cards_context.get("source_path") or live_lens_snapshot_path()).strip()
     warning_panel = {
         "eyebrow": "Artifact-backed lens",
         "title": "WNBA live lens now runs off the same cards and props snapshots as the board contract",

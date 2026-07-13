@@ -20,9 +20,13 @@ from syndicate.features.mlb.sources import live_lens_report_path
 from syndicate.features.mlb.sources import load_json_file
 from syndicate.features.shared.game_board_contract import apply_game_board_contract
 from syndicate.features.shared.live_lens_contract import attach_live_lens_contract
+from syndicate.features.shared.refresh_state_store import data_root
 
 
-LIVE_LENS_SNAPSHOT_PATH = Path("data/live/mlb_live_lens.json")
+def live_lens_snapshot_path() -> Path:
+    return data_root() / "live" / "mlb_live_lens.json"
+
+
 _LIVE_LENS_REPORT_MAX_AGE_DEFAULT_SECONDS = 60
 
 
@@ -1077,7 +1081,7 @@ def _snapshot_counts(games: list[dict[str, Any]]) -> dict[str, int]:
 
 def _snapshot_route_context(selected_date: str, *, season: int | None = None, snapshot: dict[str, Any] | None = None) -> dict[str, Any]:
     route_path = f"/mlb/season/{int(season)}/live-lens" if season is not None else "/mlb/live-lens"
-    report_path = LIVE_LENS_SNAPSHOT_PATH
+    report_path = live_lens_snapshot_path()
     base = dict(snapshot.get("page_context") if isinstance(snapshot, dict) and isinstance(snapshot.get("page_context"), dict) else snapshot or {})
     games = _snapshot_games(snapshot or {}) if isinstance(snapshot, dict) else []
     if not base:
@@ -1176,7 +1180,7 @@ def _snapshot_api_payload(selected_date: str, *, season: int | None = None, snap
 
 
 def read_latest_live_lens_snapshot() -> dict[str, Any] | None:
-    snapshot = load_json_file(LIVE_LENS_SNAPSHOT_PATH)
+    snapshot = load_json_file(live_lens_snapshot_path())
     return dict(snapshot) if isinstance(snapshot, dict) else None
 
 
@@ -1353,7 +1357,7 @@ def build_live_lens_snapshot_internal(selected_date: str, *, season: int | None 
         "requested_date": selected_date,
         "generatedAt": page_context.get("generatedAt") or datetime.now().astimezone().isoformat(timespec="seconds"),
         "odds_refreshed_at": page_context.get("odds_refreshed_at") or page_context.get("oddsRefreshedAt"),
-        "source_path": page_context.get("source_path") or str(LIVE_LENS_SNAPSHOT_PATH),
+        "source_path": page_context.get("source_path") or str(live_lens_snapshot_path()),
         "page_context": page_context,
         "api_payload": api_payload,
         "games": games,
