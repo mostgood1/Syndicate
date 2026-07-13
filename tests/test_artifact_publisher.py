@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import time
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -15,6 +16,9 @@ from syndicate.features.shared.artifact_publisher import publish_hot_artifact
 from syndicate.features.shared.artifact_publisher import publish_changed_hot_artifacts
 
 
+HOT_RELATIVE_PATH = "wnba_source/source_artifacts/data/processed/recommendations_slate_2026-07-13.json"
+
+
 class HotArtifactAllowlistTests(unittest.TestCase):
     def test_accepts_known_hot_artifact_shapes(self) -> None:
         self.assertTrue(
@@ -22,34 +26,32 @@ class HotArtifactAllowlistTests(unittest.TestCase):
                 "mlb_source/source_artifacts/data/live_lens/live_lens_report_2026_07_13.json"
             )
         )
-        self.assertTrue(is_hot_artifact_relative_path("reports/intelligence/board_snapshot.json"))
-        self.assertTrue(is_hot_artifact_relative_path("reports/intelligence/intelligence_state.json"))
-        self.assertTrue(
-            is_hot_artifact_relative_path(
-                "wnba_source/source_artifacts/data/processed/recommendations_slate_2026-07-13.json"
-            )
-        )
+        self.assertTrue(is_hot_artifact_relative_path(HOT_RELATIVE_PATH))
 
     def test_rejects_paths_outside_allowlist(self) -> None:
         self.assertFalse(is_hot_artifact_relative_path("reports/intelligence/evaluation_ledger_chunks/part_1.json"))
         self.assertFalse(is_hot_artifact_relative_path("mlb_source/source_artifacts/data/statcast/2026.csv"))
         self.assertFalse(is_hot_artifact_relative_path(""))
 
+    def test_rejects_intelligence_board_snapshot_and_state(self) -> None:
+        # board_snapshot.json / intelligence_state.json are written through the
+        # shared keyvalue (Redis) backend already, so they're intentionally
+        # excluded from the HTTP-push allowlist. A file never exists on disk for
+        # these on Render, so publishing would always fail anyway.
+        self.assertFalse(is_hot_artifact_relative_path("reports/intelligence/board_snapshot.json"))
+        self.assertFalse(is_hot_artifact_relative_path("reports/intelligence/intelligence_state.json"))
+
     def test_rejects_path_traversal_and_absolute_paths(self) -> None:
         self.assertFalse(is_hot_artifact_relative_path("../../etc/passwd"))
-        self.assertFalse(
-            is_hot_artifact_relative_path("/reports/intelligence/board_snapshot.json")
-        )
-        self.assertFalse(
-            is_hot_artifact_relative_path("mlb_source/../../../reports/intelligence/board_snapshot.json")
-        )
+        self.assertFalse(is_hot_artifact_relative_path(f"/{HOT_RELATIVE_PATH}"))
+        self.assertFalse(is_hot_artifact_relative_path(f"wnba_source/../../../{HOT_RELATIVE_PATH}"))
 
 
 class PublishHotArtifactClientTests(unittest.TestCase):
     def test_noop_when_publish_url_not_configured(self) -> None:
         with TemporaryDirectory() as tmp_dir:
             data_root = Path(tmp_dir)
-            target = data_root / "reports" / "intelligence" / "board_snapshot.json"
+            target = data_root / HOT_RELATIVE_PATH
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_text("{}", encoding="utf-8")
             with patch.dict(
@@ -86,7 +88,7 @@ class PublishHotArtifactClientTests(unittest.TestCase):
     def test_publishes_allowlisted_file_with_expected_request(self) -> None:
         with TemporaryDirectory() as tmp_dir:
             data_root = Path(tmp_dir)
-            target = data_root / "reports" / "intelligence" / "board_snapshot.json"
+            target = data_root / HOT_RELATIVE_PATH
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_text(json.dumps({"candidate_count": 3}), encoding="utf-8")
 
@@ -112,13 +114,13 @@ class PublishHotArtifactClientTests(unittest.TestCase):
         self.assertEqual(sent_request.full_url, "https://syndicate.onrender.com/api/ops/artifacts/publish")
         self.assertEqual(sent_request.get_header("Authorization"), "Bearer secret-token")
         body = json.loads(sent_request.data.decode("utf-8"))
-        self.assertEqual(body["relative_path"], "reports/intelligence/board_snapshot.json")
+        self.assertEqual(body["relative_path"], HOT_RELATIVE_PATH)
         self.assertIn("candidate_count", body["content"])
 
     def test_network_failure_is_swallowed(self) -> None:
         with TemporaryDirectory() as tmp_dir:
             data_root = Path(tmp_dir)
-            target = data_root / "reports" / "intelligence" / "board_snapshot.json"
+            target = data_root / HOT_RELATIVE_PATH
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_text("{}", encoding="utf-8")
             with patch.dict(
@@ -137,15 +139,12 @@ class PublishHotArtifactClientTests(unittest.TestCase):
     def test_publish_changed_hot_artifacts_only_publishes_recent_matching_files(self) -> None:
         with TemporaryDirectory() as tmp_dir:
             data_root = Path(tmp_dir)
-            fresh = data_root / "reports" / "intelligence" / "board_snapshot.json"
-            stale_dir = data_root / "reports" / "intelligence"
+            fresh = data_root / HOT_RELATIVE_PATH
             fresh.parent.mkdir(parents=True, exist_ok=True)
             fresh.write_text("{}", encoding="utf-8")
             not_allowlisted = data_root / "reports" / "intelligence" / "evaluation_ledger_chunks" / "part_1.json"
             not_allowlisted.parent.mkdir(parents=True, exist_ok=True)
             not_allowlisted.write_text("{}", encoding="utf-8")
-
-            import time
 
             since_epoch = time.time() - 3600
 
@@ -178,7 +177,7 @@ class ArtifactPublishEndpointTests(unittest.TestCase):
     def test_requires_admin_token(self) -> None:
         response = self.client.post(
             "/api/ops/artifacts/publish",
-            json={"relative_path": "reports/intelligence/board_snapshot.json", "content": "{}"},
+            json={"relative_path": HOT_RELATIVE_PATH, "content": "{}"},
         )
         self.assertEqual(response.status_code, 503)
 
@@ -186,7 +185,7 @@ class ArtifactPublishEndpointTests(unittest.TestCase):
         with patch.dict(os.environ, {"ADMIN_TOKEN": "secret-token"}, clear=False):
             response = self.client.post(
                 "/api/ops/artifacts/publish",
-                json={"relative_path": "reports/intelligence/board_snapshot.json", "content": "{}"},
+                json={"relative_path": HOT_RELATIVE_PATH, "content": "{}"},
                 headers={"Authorization": "Bearer wrong-token"},
             )
         self.assertEqual(response.status_code, 401)
@@ -200,12 +199,21 @@ class ArtifactPublishEndpointTests(unittest.TestCase):
             )
         self.assertEqual(response.status_code, 403)
 
+    def test_rejects_intelligence_board_snapshot_path(self) -> None:
+        with patch.dict(os.environ, {"ADMIN_TOKEN": "secret-token"}, clear=False):
+            response = self.client.post(
+                "/api/ops/artifacts/publish",
+                json={"relative_path": "reports/intelligence/board_snapshot.json", "content": "{}"},
+                headers={"Authorization": "Bearer secret-token"},
+            )
+        self.assertEqual(response.status_code, 403)
+
     def test_rejects_path_traversal(self) -> None:
         with patch.dict(os.environ, {"ADMIN_TOKEN": "secret-token"}, clear=False):
             response = self.client.post(
                 "/api/ops/artifacts/publish",
                 json={
-                    "relative_path": "../../reports/intelligence/board_snapshot.json",
+                    "relative_path": f"../../{HOT_RELATIVE_PATH}",
                     "content": "{}",
                 },
                 headers={"Authorization": "Bearer secret-token"},
@@ -223,7 +231,7 @@ class ArtifactPublishEndpointTests(unittest.TestCase):
                 response = self.client.post(
                     "/api/ops/artifacts/publish",
                     json={
-                        "relative_path": "reports/intelligence/board_snapshot.json",
+                        "relative_path": HOT_RELATIVE_PATH,
                         "content": json.dumps({"candidate_count": 5}),
                     },
                     headers={"Authorization": "Bearer secret-token"},
@@ -232,11 +240,11 @@ class ArtifactPublishEndpointTests(unittest.TestCase):
             self.assertEqual(response.status_code, 200)
             payload = response.get_json()
             self.assertTrue(payload["ok"])
-            written_path = data_root / "reports" / "intelligence" / "board_snapshot.json"
+            written_path = data_root / HOT_RELATIVE_PATH
             self.assertTrue(written_path.exists())
             self.assertEqual(json.loads(written_path.read_text(encoding="utf-8"))["candidate_count"], 5)
             # No leftover temp files from the atomic write.
-            leftovers = list(written_path.parent.glob("board_snapshot.json.*.tmp"))
+            leftovers = list(written_path.parent.glob(f"{written_path.name}.*.tmp"))
             self.assertEqual(leftovers, [])
 
 

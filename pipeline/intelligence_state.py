@@ -19,7 +19,6 @@ from flask import current_app
 
 from pipeline.intelligence_entrypoint import run_routed_intelligence_pipeline
 from pipeline.intelligence_pipeline import run_intelligence_pipeline
-from syndicate.features.shared.artifact_publisher import publish_hot_artifact
 from syndicate.features.intelligence import build_intelligence_status
 from syndicate.features.intelligence import build_intelligence_overview
 from syndicate.features.intelligence import _advanced_input_rows_for_sport
@@ -594,7 +593,6 @@ def write_latest_intelligence_state(state: Any) -> dict[str, Any] | None:
     live_pipeline = dict(normalized.get("live_pipeline") or {})
     board_snapshot_payload = _intelligence_board_snapshot_payload(normalized)
     write_json_file(INTELLIGENCE_STATE_PATH, normalized)
-    publish_hot_artifact(INTELLIGENCE_STATE_PATH)
     write_json_file(daily_paths["state"], normalized)
     history_entry = _intelligence_state_history_entry(normalized)
     INTELLIGENCE_HISTORY_PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -606,7 +604,6 @@ def write_latest_intelligence_state(state: Any) -> dict[str, Any] | None:
         history_file.write(json.dumps(history_entry, sort_keys=True, ensure_ascii=False, default=str))
         history_file.write("\n")
     write_json_file(BOARD_SNAPSHOT_PATH, board_snapshot_payload)
-    publish_hot_artifact(BOARD_SNAPSHOT_PATH)
     write_json_file(daily_paths["board_snapshot"], board_snapshot_payload)
     if _live_pipeline_has_activity(live_pipeline):
         live_pipeline["generated_at"] = str(live_pipeline.get("generated_at") or state_meta.get("computed_at") or normalized.get("snapshot_generated_at") or _utc_now()).strip() or _utc_now()
@@ -2033,7 +2030,6 @@ class IntelligenceStateService:
                     **board_snapshot_payload,
                 },
             )
-            publish_hot_artifact(BOARD_SNAPSHOT_PATH)
             write_json_file(
                 daily_paths["board_snapshot"],
                 {

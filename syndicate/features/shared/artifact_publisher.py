@@ -39,8 +39,10 @@ HOT_ARTIFACT_PATTERNS: tuple[str, ...] = (
     "*_source/source_artifacts/data/processed/cards_sim_detail_*.json",
     "*_source/source_artifacts/data/processed/cards_props_snapshot_*.json",
     "*_source/source_artifacts/data/market/*.json",
-    "reports/intelligence/board_snapshot.json",
-    "reports/intelligence/intelligence_state.json",
+    # Note: reports/intelligence/board_snapshot.json and intelligence_state.json are
+    # intentionally excluded here. They're written through refresh_state_store's
+    # write_json_file, which already goes over the shared keyvalue (Redis) backend on
+    # Render, so all three services see them without needing this HTTP push at all.
 )
 
 
