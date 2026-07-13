@@ -1,3 +1,10 @@
+# 2026-07-13 - Intelligence board query path stopped computing on request
+- Symptom: The hosted `/api/intelligence/query` path kept trying to compute a fresh board when the cached snapshot was empty, which was too expensive for the Render web dyno.
+- Root cause: The hosted refresh branch still had a compute fallback after the cache read, so an empty snapshot could trigger request-time intelligence computation.
+- Fix: Remove the request-time compute fallback and make the hosted refresh path cache-only again. It now queues refresh work and returns the persisted board snapshot when available instead of rebuilding the slate inline.
+- Validation: Focused `tests/test_intelligence.py` query-slice regressions passed, and syntax checks for `syndicate/blueprints/intelligence.py` were clean.
+- Follow-up: Redeploy Render and confirm the live board reads a populated persisted snapshot rather than attempting inline compute.
+
 # 2026-07-12 - WNBA cards stopped printing raw live-status objects
 - Symptom: The WNBA game cards and live-lens tiles were rendering Python-like status dictionaries directly into the UI text, which made the live page hard to read.
 - Root cause: The WNBA static renderer was stringifying object-valued live status and signal detail fields instead of collapsing them to a short label before interpolation.
