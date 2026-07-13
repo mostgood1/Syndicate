@@ -84,10 +84,48 @@ def _read_jsonl_snapshot_payload(path: Path) -> dict[str, Any] | None:
             continue
         payload = record.get("payload") if isinstance(record, dict) and isinstance(record.get("payload"), dict) else None
         if isinstance(payload, dict):
-            return payload
+            return _normalize_live_snapshot_payload(payload)
         if isinstance(record, dict) and isinstance(record.get("games"), list):
-            return record
+            return _normalize_live_snapshot_payload(record)
     return None
+
+
+def _normalize_live_snapshot_game(game: dict[str, Any]) -> dict[str, Any]:
+    if not isinstance(game, dict):
+        return game
+    status_fields = _status_fields_from_value(
+        status_value=game.get("status"),
+        detail_value=game.get("detail"),
+        start_time_value=game.get("startTime") or game.get("start_time"),
+        in_progress=game.get("in_progress"),
+        final=game.get("final"),
+        period=game.get("period"),
+        clock=game.get("clock"),
+    )
+    normalized = dict(game)
+    normalized["status"] = status_fields["status"]
+    normalized["detail"] = status_fields["detail"]
+    if status_fields.get("startTime"):
+        normalized["startTime"] = status_fields["startTime"]
+    normalized["in_progress"] = bool(status_fields["in_progress"])
+    normalized["final"] = bool(status_fields["final"])
+    normalized["period"] = status_fields.get("period")
+    normalized["clock"] = status_fields.get("clock") or ""
+    return normalized
+
+
+def _normalize_live_snapshot_payload(payload: dict[str, Any] | None) -> dict[str, Any] | None:
+    if not isinstance(payload, dict):
+        return payload
+    games = payload.get("games") if isinstance(payload.get("games"), list) else None
+    if not games:
+        return payload
+    normalized = dict(payload)
+    normalized["games"] = [
+        _normalize_live_snapshot_game(game) if isinstance(game, dict) else game
+        for game in games
+    ]
+    return normalized
 
 
 def _write_jsonl_snapshot_payload(path: Path, payload: dict[str, Any]) -> bool:
@@ -466,10 +504,19 @@ def _normalized_game_status(
     away_pts: Any = None,
     home_pts: Any = None,
 ) -> dict[str, Any]:
-    status_raw = str(status_text or "").strip()
-    detail_raw = str(detail_text or "").strip()
-    live = bool(in_progress)
-    is_final = bool(final)
+    status_fields = _status_fields_from_value(
+        status_value=status_text,
+        detail_value=detail_text,
+        start_time_value=start_time_utc,
+        in_progress=in_progress,
+        final=final,
+        period=None,
+        clock=None,
+    )
+    status_raw = str(status_fields.get("status") or "").strip()
+    detail_raw = str(status_fields.get("detail") or "").strip()
+    live = bool(status_fields.get("in_progress"))
+    is_final = bool(status_fields.get("final"))
     away_val = _safe_float(away_pts)
     home_val = _safe_float(home_pts)
     has_score_evidence = bool(
@@ -491,7 +538,13 @@ def _normalized_game_status(
     if live:
         is_final = False
 
-    period, clock = _infer_period_clock_from_status_text(detail_raw or status_raw)
+    period = status_fields.get("period")
+    clock = status_fields.get("clock") or ""
+    inferred_period, inferred_clock = _infer_period_clock_from_status_text(detail_raw or status_raw)
+    if period is None and inferred_period is not None:
+        period = inferred_period
+    if not clock and inferred_clock:
+        clock = inferred_clock
 
     if is_final:
         status_label = "Final"
@@ -2647,7 +2700,7 @@ def _filtered_local_live_snapshot_payload(kind: str, selected_date: str, event_i
     ]
     if selected_date and "date" not in filtered_payload:
         filtered_payload["date"] = selected_date
-    return filtered_payload
+    return _normalize_live_snapshot_payload(filtered_payload)
 
 
 def _ensure_wnba_game_ids(payload: dict[str, Any]) -> dict[str, Any]:
@@ -4097,6 +4150,15 @@ def build_live_state_payload(selected_date: str, ttl: int = 12, *, allow_stored_
             away_info = game.get("away") if isinstance(game.get("away"), dict) else {}
             home_info = game.get("home") if isinstance(game.get("home"), dict) else {}
             sim_score = (_sim_payload(game).get("score") or {})
+            status_fields = _status_fields_from_value(
+                status_value=game.get("status"),
+                detail_value=game.get("detail"),
+                start_time_value=game.get("startTime") or game.get("start_time") or ((game.get("odds") or {}).get("commence_time") if isinstance(game.get("odds"), dict) else None),
+                in_progress=(game.get("live_state") or {}).get("in_progress") if isinstance(game.get("live_state"), dict) else False,
+                final=(game.get("live_state") or {}).get("final") if isinstance(game.get("live_state"), dict) else False,
+                period=game.get("period"),
+                clock=game.get("clock"),
+            )
             out_games.append(
                 {
                     "game_id": game.get("gamePk"),
@@ -4106,11 +4168,11 @@ def build_live_state_payload(selected_date: str, ttl: int = 12, *, allow_stored_
                     "home_pts": _safe_float(sim_score.get("home_mean")),
                     "away_pts": _safe_float(sim_score.get("away_mean")),
                     "status_id": None,
-                    "status": _safe_text(game.get("status"), _safe_text(game.get("detail"), "Scheduled")),
-                    "period": None,
-                    "clock": "",
-                    "in_progress": bool((game.get("live_state") or {}).get("in_progress") if isinstance(game.get("live_state"), dict) else False),
-                    "final": bool((game.get("live_state") or {}).get("final") if isinstance(game.get("live_state"), dict) else False),
+                    "status": status_fields["status"],
+                    "period": status_fields.get("period"),
+                    "clock": status_fields.get("clock") or "",
+                    "in_progress": bool(status_fields.get("in_progress")),
+                    "final": bool(status_fields.get("final")),
                     "periods": [],
                 }
             )
@@ -4272,12 +4334,30 @@ def _payload_has_meaningful_live_state(payload: dict[str, Any] | None) -> bool:
     for game in games:
         if not isinstance(game, dict):
             continue
-        if bool(game.get("in_progress")) or bool(game.get("final")):
+        status_fields = _status_fields_from_value(
+            status_value=game.get("status"),
+            detail_value=game.get("detail"),
+            start_time_value=game.get("startTime") or game.get("start_time"),
+            in_progress=game.get("in_progress"),
+            final=game.get("final"),
+            period=game.get("period"),
+            clock=game.get("clock"),
+        )
+        if bool(status_fields.get("final")):
+            return True
+        if bool(status_fields.get("in_progress")) and (
+            status_fields.get("period") is not None
+            or bool(status_fields.get("clock"))
+            or _safe_float(game.get("home_pts")) is not None
+            or _safe_float(game.get("away_pts")) is not None
+        ):
             return True
         if _safe_float(game.get("home_pts")) is not None or _safe_float(game.get("away_pts")) is not None:
             return True
-        status_text = str(game.get("status") or "").strip().lower()
-        if status_text and status_text not in {"scheduled", ""}:
+        status_text = str(status_fields.get("status") or "").strip().lower()
+        if status_text and status_text not in {"scheduled", ""} and (
+            status_fields.get("period") is not None or bool(status_fields.get("clock"))
+        ):
             return True
     return False
 

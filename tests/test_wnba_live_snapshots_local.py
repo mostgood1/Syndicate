@@ -397,6 +397,48 @@ class WnbaLiveSnapshotLocalTests(unittest.TestCase):
         self.assertEqual(remote_payload.call_count, 0)
         self.assertEqual(public_payload.call_count, 0)
 
+    def test_live_state_payload_render_normalizes_stringified_status_dict(self) -> None:
+        with patch.dict("os.environ", {"RENDER": "1"}, clear=False), patch(
+            "syndicate.features.wnba.cards.central_today_iso",
+            return_value="2026-05-21",
+        ), patch(
+            "syndicate.features.wnba.cards._local_live_state_payload",
+            return_value=None,
+        ), patch(
+            "syndicate.features.wnba.cards._remote_live_snapshot_payload",
+            return_value=None,
+        ), patch(
+            "syndicate.features.wnba.cards._public_scoreboard_live_state_payload",
+            return_value=None,
+        ), patch(
+            "syndicate.features.wnba.cards.build_cards_page_context",
+            return_value={
+                "games": [
+                    {
+                        "gamePk": "401857062",
+                        "event_id": "401857062",
+                        "away_tri": "CHI",
+                        "home_tri": "DAL",
+                        "away": {"abbr": "CHI", "score": 31},
+                        "home": {"abbr": "DAL", "score": 28},
+                        "status": "{'status': 'Live', 'detail': '3:27 - 4th', 'startTime': '2026-05-21', 'in_progress': True, 'final': False, 'period': 4, 'clock': '3:27'}",
+                        "detail": "{'status': 'Live', 'detail': '3:27 - 4th', 'startTime': '2026-05-21', 'in_progress': True, 'final': False, 'period': 4, 'clock': '3:27'}",
+                        "live_state": {"in_progress": True, "final": False},
+                    }
+                ]
+            },
+        ):
+            _local_live_state_payload.cache_clear()
+            payload = build_live_state_payload("2026-05-21", ttl=12)
+            _local_live_state_payload.cache_clear()
+
+        game = (payload.get("games") or [{}])[0]
+        self.assertEqual(payload.get("source"), "wnba_artifacts")
+        self.assertEqual(game.get("status"), "Live")
+        self.assertEqual(game.get("period"), 4)
+        self.assertEqual(game.get("clock"), "3:27")
+        self.assertTrue(game.get("in_progress"))
+
     def test_live_state_payload_repairs_stale_public_scoreboard_with_cards_context(self) -> None:
         with patch("syndicate.features.wnba.cards.central_today_iso", return_value="2026-05-21"), patch(
             "syndicate.features.wnba.cards._remote_live_snapshot_payload",
