@@ -1,9 +1,9 @@
 ﻿{
-    "date":  "2026-07-12",
-    "runStamp":  "20260712_230730",
-    "generatedAt":  "2026-07-12T23:07:35.6961231+00:00",
-    "artifactsDir":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-12\\20260712_225804\\migration",
-    "refreshStatusDir":  "D:\\a\\Syndicate\\Syndicate\\reports\\refresh_status\\2026-07-12\\20260712_230730",
+    "date":  "2026-07-13",
+    "runStamp":  "20260713_071513",
+    "generatedAt":  "2026-07-13T07:15:17.9210115+00:00",
+    "artifactsDir":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-13\\20260713_070706\\migration",
+    "refreshStatusDir":  "D:\\a\\Syndicate\\Syndicate\\reports\\refresh_status\\2026-07-13\\20260713_071513",
     "latestManifestPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\refresh_status\\latest\\refresh_status_latest.json",
     "refreshOdds":  true,
     "preferLocalMirrorArtifacts":  true,
@@ -14,8 +14,8 @@
     "jsonMode":  false,
     "skipTests":  false,
     "skipSmoke":  false,
-    "runSummaryPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-12\\20260712_225804\\migration\\refresh_and_gate_run.json",
-    "oddsRefreshPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-12\\20260712_225804\\migration\\odds_refresh.json",
-    "migrationGateReportPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-12\\20260712_225804\\migration\\migration_gate_report.json",
-    "migrationGateConsolePath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-12\\20260712_225804\\migration\\migration_gate_console.txt"
+    "runSummaryPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-13\\20260713_070706\\migration\\refresh_and_gate_run.json",
+    "oddsRefreshPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-13\\20260713_070706\\migration\\odds_refresh.json",
+    "migrationGateReportPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-13\\20260713_070706\\migration\\migration_gate_report.json",
+    "migrationGateConsolePath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-13\\20260713_070706\\migration\\migration_gate_console.txt"
 }

@@ -1,0 +1,151 @@
+{
+  "date": "2026-07-13",
+  "counts": {
+    "games": 2,
+    "picks": 6
+  },
+  "per_game": [
+    {
+      "home": "MIN",
+      "away": "PHX",
+      "matchup": "PHX @ MIN",
+      "picks": [
+        {
+          "market": "PROPS",
+          "team": "MIN",
+          "display_pick": "Olivia Miles UNDER 18.5",
+          "selection": "UNDER 18.5",
+          "projection": 14.48733865944482,
+          "projected": 14.48733865944482,
+          "odds": -106.0,
+          "price": -106.0,
+          "score": 29.18186032726926,
+          "ev_pct": 29.18186032726926,
+          "win_prob": 0.5145631067961165,
+          "p_win": 0.5145631067961165,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 29.2%",
+            "Regular price range (-150 to +150)",
+            "Consensus: 3 books aligned",
+            "Best line available"
+          ],
+          "matchup": "PHX @ MIN"
+        },
+        {
+          "market": "PROPS",
+          "team": "MIN",
+          "display_pick": "Natasha Howard OVER 10.5",
+          "selection": "OVER 10.5",
+          "projection": 12.72976408839779,
+          "projected": 12.72976408839779,
+          "odds": -101.0,
+          "price": -101.0,
+          "score": 14.097465876830261,
+          "ev_pct": 14.097465876830261,
+          "win_prob": 0.5024875621890548,
+          "p_win": 0.5024875621890548,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 14.1%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "PHX @ MIN"
+        },
+        {
+          "market": "PROPS",
+          "team": "MIN",
+          "display_pick": "Nia Coffey UNDER 7.5",
+          "selection": "UNDER 7.5",
+          "projection": 6.400460098522168,
+          "projected": 6.400460098522168,
+          "odds": 114.0,
+          "price": 114.0,
+          "score": 12.872944301739942,
+          "ev_pct": 12.872944301739942,
+          "win_prob": 0.4672897196261682,
+          "p_win": 0.4672897196261682,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.9%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "PHX @ MIN"
+        }
+      ]
+    },
+    {
+      "home": "ATL",
+      "away": "LVA",
+      "matchup": "LVA @ ATL",
+      "picks": [
+        {
+          "market": "PROPS",
+          "team": "ATL",
+          "display_pick": "Allisha Gray UNDER 1.5",
+          "selection": "UNDER 1.5",
+          "projection": 1.4341971014492754,
+          "projected": 1.4341971014492754,
+          "odds": 118.0,
+          "price": 118.0,
+          "score": 14.718721248535093,
+          "ev_pct": 14.718721248535093,
+          "win_prob": 0.45871559633027525,
+          "p_win": 0.45871559633027525,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 14.7%",
+            "Regular price range (-150 to +150)",
+            "Consensus: 4 books aligned",
+            "Best line available"
+          ],
+          "matchup": "LVA @ ATL"
+        },
+        {
+          "market": "PROPS",
+          "team": "ATL",
+          "display_pick": "Rhyne Howard UNDER 24.5",
+          "selection": "UNDER 24.5",
+          "projection": 21.194200000000002,
+          "projected": 21.194200000000002,
+          "odds": -126.0,
+          "price": -126.0,
+          "score": 8.730939213942335,
+          "ev_pct": 8.730939213942335,
+          "win_prob": 0.5575221238938053,
+          "p_win": 0.5575221238938053,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 8.7%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "LVA @ ATL"
+        },
+        {
+          "market": "PROPS",
+          "team": "ATL",
+          "display_pick": "Jordin Canada OVER 4.5",
+          "selection": "OVER 4.5",
+          "projection": 4.599393788819876,
+          "projected": 4.599393788819876,
+          "odds": 125.0,
+          "price": 125.0,
+          "score": 3.0374180387292338,
+          "ev_pct": 3.0374180387292338,
+          "win_prob": 0.4444444444444444,
+          "p_win": 0.4444444444444444,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 3.0%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "LVA @ ATL"
+        }
+      ]
+    }
+  ]
+}
