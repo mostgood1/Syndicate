@@ -64,7 +64,6 @@ def _canonical_wnba_tri(value: object) -> str:
         "LA": "LAS",
         "LV": "LVA",
         "LVA": "LVA",
-        "LAS": "LVA",
         "GS": "GSV",
         "GSW": "GSV",
         "NY": "NYL",

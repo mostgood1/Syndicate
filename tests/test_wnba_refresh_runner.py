@@ -2133,7 +2133,7 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
                         {
                             "event_id": "401856963",
                             "game_id": "0401",
-                            "home": "LAS",
+                            "home": "LVA",
                             "away": "NYL",
                             "in_progress": False,
                             "final": True,
@@ -2751,3 +2751,17 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
 
             self.assertEqual(rc, 0)
             export_snapshots.assert_not_called()
+
+    def test_canonical_wnba_tri_does_not_confuse_la_sparks_with_las_vegas(self) -> None:
+        module = self._load_module()
+
+        # LA Sparks' own canonical code is "LAS" -- it must be stable under
+        # repeated canonicalization, not drift into Las Vegas' "LVA" code.
+        self.assertEqual(module._canonical_wnba_tri("LAS"), "LAS")
+        self.assertEqual(module._canonical_wnba_tri("LA"), "LAS")
+        self.assertEqual(module._canonical_wnba_tri(module._to_tricode_local("Los Angeles Sparks")), "LAS")
+
+        # Las Vegas Aces must still resolve correctly via its own aliases.
+        self.assertEqual(module._canonical_wnba_tri("LV"), "LVA")
+        self.assertEqual(module._canonical_wnba_tri("LVA"), "LVA")
+        self.assertEqual(module._canonical_wnba_tri(module._to_tricode_local("Las Vegas Aces")), "LVA")
