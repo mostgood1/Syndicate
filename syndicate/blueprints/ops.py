@@ -326,6 +326,52 @@ def api_ops_mlb_sims_list() -> Any:
     return jsonify({"ok": True, "date": date, "results": results})
 
 
+@ops_bp.get("/api/ops/wnba/artifact-counts")
+def api_ops_wnba_artifact_counts() -> Any:
+    # Protected endpoint: requires admin token (enforced by before_request)
+    date = str(request.args.get("date") or "").strip()
+    if not date:
+        return jsonify({"ok": False, "error": "date parameter required (YYYY-MM-DD)"}), 400
+    try:
+        from syndicate.features.wnba.sources import processed_root as wnba_processed_root
+    except Exception as exc:
+        return jsonify({"ok": False, "error": f"ImportError: {type(exc).__name__}: {exc}"}), 500
+
+    root = wnba_processed_root()
+    file_names = [
+        f"game_cards_{date}.csv",
+        f"props_edges_{date}.csv",
+        f"props_predictions_{date}.csv",
+        f"props_recommendations_{date}.csv",
+        f"props_recommendations_top_by_game_{date}.json",
+        f"recommendations_slate_{date}.json",
+    ]
+    results: dict[str, Any] = {}
+    for file_name in file_names:
+        path = root / file_name
+        entry: dict[str, Any] = {"path": str(path), "exists": path.exists() and path.is_file()}
+        if entry["exists"]:
+            try:
+                entry["size_bytes"] = path.stat().st_size
+                if path.suffix == ".csv":
+                    with path.open("r", encoding="utf-8", newline="") as handle:
+                        line_count = sum(1 for _ in handle)
+                    entry["data_rows"] = max(0, line_count - 1)
+                elif path.suffix == ".json":
+                    import json as _json
+
+                    payload = _json.loads(path.read_text(encoding="utf-8"))
+                    if isinstance(payload, dict):
+                        data_value = payload.get("data") if payload.get("data") is not None else payload.get("per_game")
+                        entry["data_rows"] = len(data_value) if isinstance(data_value, list) else None
+                        entry["top_level_keys"] = sorted(payload.keys())[:20]
+            except Exception as exc:
+                entry["error"] = f"{type(exc).__name__}: {exc}"
+        results[file_name] = entry
+
+    return jsonify({"ok": True, "date": date, "processed_root": str(root), "results": results})
+
+
 @ops_bp.get("/api/ops/mlb/live-check")
 def api_ops_mlb_live_check() -> Any:
     # Protected endpoint: requires admin token

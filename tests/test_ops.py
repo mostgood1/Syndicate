@@ -924,6 +924,48 @@ class OpsRefreshApiTests(unittest.TestCase):
         self.assertIn("-SourceArtifactRoot", command)
         self.assertIn("C:/published/ncaaf-bundle", command)
 
+    def test_wnba_artifact_counts_requires_date(self) -> None:
+        with patch.dict(os.environ, {"ADMIN_TOKEN": "secret-token"}, clear=False):
+            response = self.client.get(
+                "/api/ops/wnba/artifact-counts",
+                headers={"X-Admin-Token": "secret-token"},
+            )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(response.get_json()["ok"])
+
+    def test_wnba_artifact_counts_reports_row_counts(self) -> None:
+        with TemporaryDirectory() as tmp_dir:
+            processed_root = Path(tmp_dir) / "processed"
+            processed_root.mkdir(parents=True, exist_ok=True)
+            (processed_root / "game_cards_2026-07-13.csv").write_text(
+                "date,home_tri,away_tri\n2026-07-13,ATL,LAS\n2026-07-13,MIN,PHX\n",
+                encoding="utf-8",
+            )
+            (processed_root / "props_recommendations_top_by_game_2026-07-13.json").write_text(
+                json.dumps({"date": "2026-07-13", "data": []}),
+                encoding="utf-8",
+            )
+
+            with patch.dict(os.environ, {"ADMIN_TOKEN": "secret-token"}, clear=False), patch(
+                "syndicate.features.wnba.sources.processed_root",
+                return_value=processed_root,
+            ):
+                response = self.client.get(
+                    "/api/ops/wnba/artifact-counts?date=2026-07-13",
+                    headers={"X-Admin-Token": "secret-token"},
+                )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json()
+        self.assertTrue(payload["ok"])
+        results = payload["results"]
+        self.assertTrue(results["game_cards_2026-07-13.csv"]["exists"])
+        self.assertEqual(results["game_cards_2026-07-13.csv"]["data_rows"], 2)
+        self.assertTrue(results["props_recommendations_top_by_game_2026-07-13.json"]["exists"])
+        self.assertEqual(results["props_recommendations_top_by_game_2026-07-13.json"]["data_rows"], 0)
+        self.assertFalse(results["props_recommendations_2026-07-13.csv"]["exists"])
+
     def test_ops_page_requires_admin_token(self) -> None:
         with patch.dict(os.environ, {"ADMIN_TOKEN": "secret-token"}, clear=False):
             response = self.client.get("/ops/odds-refresh")
