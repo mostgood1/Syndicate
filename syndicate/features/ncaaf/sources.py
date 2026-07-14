@@ -42,6 +42,34 @@ def data_path(*parts: str) -> Path:
     return Path(__file__).resolve().parents[3] / "data" / "ncaaf_source" / "data" / Path(*parts)
 
 
+def ncaaf_source_artifacts_data_path(*parts: str) -> Path:
+    return default_ncaaf_source_root() / "source_artifacts" / "data" / Path(*parts)
+
+
+def player_identity_snapshot_path() -> Path:
+    return ncaaf_source_artifacts_data_path("processed", "player_identity", "ncaaf_player_identity_snapshot.csv")
+
+
+def roster_snapshot_path() -> Path:
+    return ncaaf_source_artifacts_data_path("processed", "roster", "ncaaf_roster_snapshot.csv")
+
+
+def transfer_portal_snapshot_path() -> Path:
+    return ncaaf_source_artifacts_data_path("processed", "transfers", "ncaaf_transfer_portal_snapshot.csv")
+
+
+def team_registry_snapshot_path() -> Path:
+    return ncaaf_source_artifacts_data_path("processed", "team_registry", "ncaaf_team_registry_snapshot.csv")
+
+
+def returning_production_snapshot_path() -> Path:
+    return ncaaf_source_artifacts_data_path("processed", "returning_production", "ncaaf_returning_production_snapshot.csv")
+
+
+def coach_continuity_snapshot_path() -> Path:
+    return ncaaf_source_artifacts_data_path("processed", "coach_continuity", "ncaaf_coach_continuity_snapshot.csv")
+
+
 def load_json(path: Path) -> dict[str, Any] | None:
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
