@@ -1,0 +1,208 @@
+<article class="feature-game-card cards-game-card" id="game-{{ game.gamePk }}">
+  {% set ncaaf = game.ncaaf_card if game.ncaaf_card is defined else None %}
+  {% set summary = ncaaf.summary if ncaaf else {} %}
+  {% set teams = ncaaf.teams if ncaaf else {} %}
+  {% set sections = ncaaf.context_sections if ncaaf else [] %}
+  {% set live_state = game.shared_is_live if game.shared_is_live is defined else false %}
+  {% set metrics = game.metrics if game.metrics is defined and game.metrics else [] %}
+
+  {% if not ncaaf %}
+    {% include 'shared/_game_card_generic.html' %}
+  {% else %}
+    <div class="cards-strip-head">
+      <div class="cards-head-left cards-head-matchup">
+        <div class="cards-head-team">
+          <div class="cards-strip-logo">{{ game.away.abbr }}</div>
+          <div>
+            <div class="cards-head-team-name">{{ game.away.name }}</div>
+            <div class="cards-mini-copy">{{ game.away.abbr }}</div>
+          </div>
+        </div>
+        <span class="cards-score-divider">@</span>
+        <div class="cards-head-team">
+          <div class="cards-strip-logo">{{ game.home.abbr }}</div>
+          <div>
+            <div class="cards-head-team-name">{{ game.home.name }}</div>
+            <div class="cards-mini-copy">{{ game.home.abbr }}</div>
+          </div>
+        </div>
+      </div>
+      <div class="cards-status-cluster">
+        <div class="cards-game-time-row">
+          <span class="cards-game-time-label">{{ game.detail_label or 'Slate context' }}</span>
+          <span class="cards-game-time-value">{{ game.detail }}</span>
+        </div>
+        <span class="cards-status-badge">{{ game.status }}</span>
+        <div class="cards-start-time">{{ summary.ready_label if summary else 'Publication status unavailable' }}</div>
+        {% if game.href %}
+          <a class="cards-game-link" href="{{ game.href }}">{{ game.href_label or 'Open game detail' }}</a>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="cards-score-ribbon">
+      <div class="cards-score-meta">
+        <div class="cards-live-line">{{ game.summary }}</div>
+        <div class="cards-sim-line">{{ summary.ready_label if summary else 'NCAAF SmartSim summary' }}</div>
+        <div class="cards-mini-copy">
+          {% if summary and summary.publication_ready %}
+            {{ game.home.name }} and {{ game.away.name }} are ready for publication.
+          {% elif summary %}
+            {{ game.home.name }} and {{ game.away.name }} remain suppressed until missing feature layers are backfilled.
+          {% else %}
+            Dedicated NCAAF card data is unavailable, so the generic fallback should be used.
+          {% endif %}
+        </div>
+      </div>
+      <div class="cards-mini-metrics cards-mini-metrics--rail">
+        {% if summary and summary.tier_badges %}
+          {% for badge in summary.tier_badges %}
+            <span class="cards-source-meta-pill{% if badge.active %} is-active{% endif %}">Tier {{ badge.label }}</span>
+          {% endfor %}
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="cards-market-row">
+      {% for tile in game.market_tiles[:4] if game.market_tiles is defined and game.market_tiles %}
+        <div class="cards-market-tile">
+          <div class="cards-market-label">{{ tile.label }}</div>
+          <div class="cards-market-main">{{ tile.title }}</div>
+          <div class="cards-market-sub">{{ tile.sub }}</div>
+        </div>
+      {% endfor %}
+    </div>
+
+    <div class="cards-tabs-rail">
+      <div class="cards-tabs">
+        <button class="cards-tab is-active" type="button" data-tab-target="game">Game</button>
+        <button class="cards-tab" type="button" data-tab-target="context">Team Context</button>
+        <button class="cards-tab" type="button" data-tab-target="details">Details</button>
+      </div>
+      <div class="cards-mini-metrics cards-mini-metrics--rail">
+        <div class="cards-mini-metric">
+          <span>Coverage</span>
+          <strong>{{ '%.3f'|format(summary.coverage_score|float) if summary and summary.coverage_score is not none else '-' }}</strong>
+        </div>
+        <div class="cards-mini-metric">
+          <span>Tier</span>
+          <strong>{{ summary.coverage_tier if summary else '-' }}</strong>
+        </div>
+        <div class="cards-mini-metric">
+          <span>Status</span>
+          <strong>{{ summary.publication_status if summary else '-' }}</strong>
+        </div>
+      </div>
+    </div>
+
+    <section class="cards-panel is-active" data-panel-id="game">
+      <div class="cards-overview-grid">
+        <div class="cards-panel-card cards-panel-card--overview-main">
+          <div class="cards-box-head">
+            <div>
+              <div class="cards-table-kicker">SmartSim</div>
+              <div class="cards-table-title"><strong>Coverage and publication summary</strong></div>
+            </div>
+            <span class="cards-overview-badge{% if summary.publication_ready %} is-ready{% else %} is-suppressed{% endif %}">{{ summary.ready_label if summary else 'Unavailable' }}</span>
+          </div>
+          <div class="cards-summary-grid">
+            <div class="cards-data-pair"><span>Coverage score</span><strong>{{ '%.3f'|format(summary.coverage_score|float) if summary and summary.coverage_score is not none else '-' }}</strong></div>
+            <div class="cards-data-pair"><span>Coverage tier</span><strong>{{ summary.coverage_tier if summary else '-' }}</strong></div>
+            <div class="cards-data-pair"><span>Publication status</span><strong>{{ summary.publication_status if summary else '-' }}</strong></div>
+            <div class="cards-data-pair"><span>Publication priority</span><strong>{{ summary.publication_priority if summary and summary.publication_priority is not none else '-' }}</strong></div>
+          </div>
+          <div class="cards-callout-list">
+            {% if summary and summary.tier_badges %}
+              <div class="cards-callout">
+                <strong>Tier badges</strong>
+                <span class="cards-callout-copy">
+                  {% for badge in summary.tier_badges %}
+                    {{ 'Tier ' ~ badge.label ~ (' active' if badge.active else '') }}{% if not loop.last %} · {% endif %}
+                  {% endfor %}
+                </span>
+              </div>
+            {% endif %}
+            <div class="cards-callout">
+              <strong>Publication-ready indicator</strong>
+              <span class="cards-callout-copy">{{ 'Publishable now' if summary and summary.publication_ready else 'Held for audit and backfill' }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="cards-panel-card">
+          <div class="cards-box-head">
+            <div>
+              <div class="cards-table-kicker">Game context</div>
+              <div class="cards-table-title"><strong>Model and source summary</strong></div>
+            </div>
+            <span class="cards-chip">{{ game.card_variant }}</span>
+          </div>
+          <div class="cards-callout-list">
+            {% for metric in metrics[:5] %}
+              <div class="cards-callout">
+                <strong>{{ metric.label }}</strong>
+                <span class="cards-callout-copy">{{ metric.value }}</span>
+              </div>
+            {% endfor %}
+          </div>
+          <div class="cards-mini-copy">The dedicated NCAAF card keeps the existing summary model output visible while elevating SmartSim and team context.</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="cards-panel" data-panel-id="context">
+      <div class="cards-box-grid">
+        {% for section in sections %}
+          <div class="cards-panel-card">
+            <div class="cards-box-head">
+              <div>
+                <div class="cards-table-kicker">Team Context</div>
+                <div class="cards-table-title"><strong>{{ section.label }}</strong></div>
+              </div>
+              <span class="cards-chip">{{ game.home.abbr }} / {{ game.away.abbr }}</span>
+            </div>
+            <div class="cards-callout-list">
+              <div class="cards-callout">
+                <strong>{{ game.home.name }}</strong>
+                <span class="cards-callout-copy">{{ section.home }}</span>
+              </div>
+              <div class="cards-callout">
+                <strong>{{ game.away.name }}</strong>
+                <span class="cards-callout-copy">{{ section.away }}</span>
+              </div>
+            </div>
+            <div class="cards-mini-copy">{{ section.detail }}</div>
+          </div>
+        {% else %}
+          <div class="cards-panel-card">
+            <div class="cards-empty-copy">No NCAAF team context was available for this matchup yet.</div>
+          </div>
+        {% endfor %}
+      </div>
+    </section>
+
+    <section class="cards-panel" data-panel-id="details">
+      <div class="cards-box-grid{% if game.panels is defined and game.panels|length < 2 %} cards-box-grid--stack{% endif %}">
+        {% for panel in game.panels %}
+          <div class="cards-panel-card">
+            <div class="cards-box-head">
+              <div>
+                <div class="cards-table-kicker">{{ panel.eyebrow }}</div>
+                <div class="cards-table-title"><strong>{{ panel.title }}</strong></div>
+              </div>
+              <span class="cards-chip">Source</span>
+            </div>
+            <div class="cards-callout-copy">{{ panel.body }}</div>
+            {% if panel.items %}
+              <div class="cards-callout-list">
+                {% for item in panel.items %}
+                  <div class="cards-callout"><strong>{{ item.split(':', 1)[0] if ':' in item else 'Detail' }}</strong><span class="cards-callout-copy">{{ item.split(':', 1)[1].strip() if ':' in item else item }}</span></div>
+                {% endfor %}
+              </div>
+            {% endif %}
+          </div>
+        {% endfor %}
+      </div>
+    </section>
+  {% endif %}
+</article>

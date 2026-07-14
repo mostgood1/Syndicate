@@ -1,5 +1,7 @@
 {% if game.card_variant == 'mlb_main' %}
   {% include 'shared/_game_card_mlb.html' %}
+{% elif game.card_variant == 'ncaaf_main' %}
+  {% include 'shared/_game_card_ncaaf.html' %}
 {% else %}
   {% include 'shared/_game_card_generic.html' %}
 {% endif %}
