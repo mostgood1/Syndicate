@@ -936,20 +936,24 @@ class OpsRefreshApiTests(unittest.TestCase):
 
     def test_wnba_artifact_counts_reports_row_counts(self) -> None:
         with TemporaryDirectory() as tmp_dir:
-            processed_root = Path(tmp_dir) / "processed"
-            processed_root.mkdir(parents=True, exist_ok=True)
-            (processed_root / "game_cards_2026-07-13.csv").write_text(
+            fake_root = Path(tmp_dir) / "wnba_source"
+            processed = fake_root / "data" / "processed"
+            processed.mkdir(parents=True, exist_ok=True)
+            (processed / "game_cards_2026-07-13.csv").write_text(
                 "date,home_tri,away_tri\n2026-07-13,ATL,LAS\n2026-07-13,MIN,PHX\n",
                 encoding="utf-8",
             )
-            (processed_root / "props_recommendations_top_by_game_2026-07-13.json").write_text(
+            (processed / "props_recommendations_top_by_game_2026-07-13.json").write_text(
                 json.dumps({"date": "2026-07-13", "data": []}),
                 encoding="utf-8",
             )
 
             with patch.dict(os.environ, {"ADMIN_TOKEN": "secret-token"}, clear=False), patch(
+                "syndicate.features.shared.source_roots.preferred_artifact_roots",
+                return_value=[fake_root],
+            ), patch(
                 "syndicate.features.wnba.sources.processed_root",
-                return_value=processed_root,
+                return_value=processed,
             ):
                 response = self.client.get(
                     "/api/ops/wnba/artifact-counts?date=2026-07-13",
@@ -960,11 +964,15 @@ class OpsRefreshApiTests(unittest.TestCase):
         payload = response.get_json()
         self.assertTrue(payload["ok"])
         results = payload["results"]
-        self.assertTrue(results["game_cards_2026-07-13.csv"]["exists"])
-        self.assertEqual(results["game_cards_2026-07-13.csv"]["data_rows"], 2)
-        self.assertTrue(results["props_recommendations_top_by_game_2026-07-13.json"]["exists"])
-        self.assertEqual(results["props_recommendations_top_by_game_2026-07-13.json"]["data_rows"], 0)
-        self.assertFalse(results["props_recommendations_2026-07-13.csv"]["exists"])
+        game_cards_entries = results["game_cards_2026-07-13.csv"]
+        self.assertEqual(len(game_cards_entries), 1)
+        self.assertTrue(game_cards_entries[0]["exists"])
+        self.assertEqual(game_cards_entries[0]["data_rows"], 2)
+        self.assertTrue(game_cards_entries[0]["is_processed_root_default"])
+        top_by_game_entries = results["props_recommendations_top_by_game_2026-07-13.json"]
+        self.assertTrue(top_by_game_entries[0]["exists"])
+        self.assertEqual(top_by_game_entries[0]["data_rows"], 0)
+        self.assertFalse(results["props_recommendations_2026-07-13.csv"][0]["exists"])
 
     def test_ops_page_requires_admin_token(self) -> None:
         with patch.dict(os.environ, {"ADMIN_TOKEN": "secret-token"}, clear=False):

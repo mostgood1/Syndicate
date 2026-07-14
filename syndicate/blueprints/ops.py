@@ -326,6 +326,29 @@ def api_ops_mlb_sims_list() -> Any:
     return jsonify({"ok": True, "date": date, "results": results})
 
 
+def _inspect_artifact_path(path: Path) -> dict[str, Any]:
+    entry: dict[str, Any] = {"path": str(path), "exists": path.exists() and path.is_file()}
+    if not entry["exists"]:
+        return entry
+    try:
+        entry["size_bytes"] = path.stat().st_size
+        if path.suffix == ".csv":
+            with path.open("r", encoding="utf-8", newline="") as handle:
+                line_count = sum(1 for _ in handle)
+            entry["data_rows"] = max(0, line_count - 1)
+        elif path.suffix == ".json":
+            import json as _json
+
+            payload = _json.loads(path.read_text(encoding="utf-8"))
+            if isinstance(payload, dict):
+                data_value = payload.get("data") if payload.get("data") is not None else payload.get("per_game")
+                entry["data_rows"] = len(data_value) if isinstance(data_value, list) else None
+                entry["top_level_keys"] = sorted(payload.keys())[:20]
+    except Exception as exc:
+        entry["error"] = f"{type(exc).__name__}: {exc}"
+    return entry
+
+
 @ops_bp.get("/api/ops/wnba/artifact-counts")
 def api_ops_wnba_artifact_counts() -> Any:
     # Protected endpoint: requires admin token (enforced by before_request)
@@ -333,11 +356,19 @@ def api_ops_wnba_artifact_counts() -> Any:
     if not date:
         return jsonify({"ok": False, "error": "date parameter required (YYYY-MM-DD)"}), 400
     try:
+        from syndicate.features.shared.source_roots import preferred_artifact_roots
         from syndicate.features.wnba.sources import processed_root as wnba_processed_root
     except Exception as exc:
         return jsonify({"ok": False, "error": f"ImportError: {type(exc).__name__}: {exc}"}), 500
 
-    root = wnba_processed_root()
+    # processed_root() unconditionally prefers a "source_artifacts" candidate
+    # root whether or not that location actually has anything written to it,
+    # so report every candidate root's status rather than just the first one
+    # -- that mismatch is exactly what made this endpoint necessary.
+    candidate_roots = [
+        candidate / "data" / "processed"
+        for candidate in preferred_artifact_roots(__file__, env_var="SYNDICATE_WNBA_SOURCE_ROOT", local_dir_name="wnba_source")
+    ]
     file_names = [
         f"game_cards_{date}.csv",
         f"props_edges_{date}.csv",
@@ -348,28 +379,20 @@ def api_ops_wnba_artifact_counts() -> Any:
     ]
     results: dict[str, Any] = {}
     for file_name in file_names:
-        path = root / file_name
-        entry: dict[str, Any] = {"path": str(path), "exists": path.exists() and path.is_file()}
-        if entry["exists"]:
-            try:
-                entry["size_bytes"] = path.stat().st_size
-                if path.suffix == ".csv":
-                    with path.open("r", encoding="utf-8", newline="") as handle:
-                        line_count = sum(1 for _ in handle)
-                    entry["data_rows"] = max(0, line_count - 1)
-                elif path.suffix == ".json":
-                    import json as _json
+        results[file_name] = [
+            {"root": str(root), "is_processed_root_default": root == wnba_processed_root(), **_inspect_artifact_path(root / file_name)}
+            for root in candidate_roots
+        ]
 
-                    payload = _json.loads(path.read_text(encoding="utf-8"))
-                    if isinstance(payload, dict):
-                        data_value = payload.get("data") if payload.get("data") is not None else payload.get("per_game")
-                        entry["data_rows"] = len(data_value) if isinstance(data_value, list) else None
-                        entry["top_level_keys"] = sorted(payload.keys())[:20]
-            except Exception as exc:
-                entry["error"] = f"{type(exc).__name__}: {exc}"
-        results[file_name] = entry
-
-    return jsonify({"ok": True, "date": date, "processed_root": str(root), "results": results})
+    return jsonify(
+        {
+            "ok": True,
+            "date": date,
+            "processed_root": str(wnba_processed_root()),
+            "candidate_roots": [str(root) for root in candidate_roots],
+            "results": results,
+        }
+    )
 
 
 @ops_bp.get("/api/ops/mlb/live-check")

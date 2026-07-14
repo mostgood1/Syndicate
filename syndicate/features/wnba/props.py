@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import ast
 import csv
+from pathlib import Path
 from typing import Any
 
+from syndicate.features.shared.source_roots import preferred_artifact_roots
 from syndicate.features.shared.top_props_board import build_top_props_page_context
 from syndicate.features.wnba.sources import build_module_links
 from syndicate.features.wnba.sources import available_dates
@@ -116,8 +118,26 @@ def _load_props_recommendations_summary(path):
     return load_json(path)
 
 
+def _resolve_top_by_game_source_path(selected_date: str) -> Path:
+    file_name = f"props_recommendations_top_by_game_{selected_date}.json"
+    # processed_root() unconditionally prefers a "source_artifacts" candidate
+    # root, whether or not that location actually has anything written to it.
+    # The refresh pipeline writes this file straight into the WNBA source
+    # root's data/processed dir, so if that's not where processed_root()
+    # landed, search every candidate root and use whichever one actually has
+    # the file rather than silently reporting the props board as empty.
+    default_path = processed_root() / file_name
+    if default_path.exists():
+        return default_path
+    for root in preferred_artifact_roots(__file__, env_var="SYNDICATE_WNBA_SOURCE_ROOT", local_dir_name="wnba_source"):
+        candidate = root / "data" / "processed" / file_name
+        if candidate.exists():
+            return candidate
+    return default_path
+
+
 def build_props_page_context(selected_date: str) -> dict[str, Any]:
-    source_path = str(processed_root() / f"props_recommendations_top_by_game_{selected_date}.json")
+    source_path = str(_resolve_top_by_game_source_path(selected_date))
     return build_top_props_page_context(
         selected_date=selected_date,
         route_path="/wnba/props",
