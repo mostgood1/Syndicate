@@ -7,6 +7,16 @@ from syndicate.app import create_app
 
 
 class NbaLiveLensRouteTests(unittest.TestCase):
+    def test_load_live_lens_snapshot_uses_keyvalue_aware_reader(self) -> None:
+        from syndicate.features.nba import live_lens as nba_live_lens
+
+        snapshot = {"date": "2026-07-13", "rank_cards": [], "cards": [], "games": []}
+        with patch.object(nba_live_lens, "read_json_file", return_value=snapshot) as mocked_read:
+            result = nba_live_lens._load_live_lens_snapshot()
+
+        self.assertEqual(result, snapshot)
+        mocked_read.assert_called_once_with(nba_live_lens.live_lens_snapshot_path())
+
     def test_nba_live_lens_snapshot_readers_return_empty_contract_on_failure(self) -> None:
         from syndicate.features.nba import live_lens as nba_live_lens
 

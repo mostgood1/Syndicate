@@ -11,11 +11,11 @@ from syndicate.features.nba.cards import build_live_pbp_stats_payload as _comput
 from syndicate.features.nba.cards import build_live_player_lens_payload as _compute_live_player_lens_payload
 from syndicate.features.nba.sources import build_module_links
 from syndicate.features.nba.sources import parse_iso_date
-from syndicate.features.nba.sources import load_json
 from syndicate.features.shared.live_lens_contract import attach_live_lens_contract
 from syndicate.features.shared.rank_board import build_rank_api_payload
 from syndicate.features.shared.rank_board import build_rank_page_context
 from syndicate.features.shared.refresh_state_store import data_root
+from syndicate.features.shared.refresh_state_store import read_json_file
 
 
 build_cards_page_context = _compute_cards_page_context
@@ -79,7 +79,7 @@ def _snapshot_text(payload: dict[str, Any], key: str, fallback: str) -> str:
 
 
 def _load_live_lens_snapshot() -> dict[str, Any] | None:
-    payload = load_json(live_lens_snapshot_path())
+    payload = read_json_file(live_lens_snapshot_path())
     return payload if isinstance(payload, dict) else None
 
 

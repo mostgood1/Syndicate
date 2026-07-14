@@ -9,12 +9,12 @@ from syndicate.features.shared.rank_board import build_rank_api_payload
 from syndicate.features.shared.rank_board import build_rank_page_context
 from syndicate.features.shared.live_lens_contract import attach_live_lens_contract
 from syndicate.features.shared.refresh_state_store import data_root
+from syndicate.features.shared.refresh_state_store import read_json_file
 from syndicate.features.shared.request_path_guard import warn_if_compute_in_request_path
 from syndicate.features.shared.timezone import central_today_iso
 from syndicate.features.wnba.cards import build_cards_page_context
 from syndicate.features.wnba.cards import build_live_lines_payload
 from syndicate.features.wnba.sources import build_module_links
-from syndicate.features.wnba.sources import load_json
 
 
 def live_lens_snapshot_path() -> Path:
@@ -52,7 +52,7 @@ def _live_line_map(selected_date: str, games: list[dict[str, Any]]) -> dict[str,
 
 
 def _load_live_lens_snapshot() -> dict[str, Any] | None:
-    payload = load_json(live_lens_snapshot_path())
+    payload = read_json_file(live_lens_snapshot_path())
     return payload if isinstance(payload, dict) else None
 
 

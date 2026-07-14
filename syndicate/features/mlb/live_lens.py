@@ -21,6 +21,7 @@ from syndicate.features.mlb.sources import load_json_file
 from syndicate.features.shared.game_board_contract import apply_game_board_contract
 from syndicate.features.shared.live_lens_contract import attach_live_lens_contract
 from syndicate.features.shared.refresh_state_store import data_root
+from syndicate.features.shared.refresh_state_store import read_json_file
 
 
 def live_lens_snapshot_path() -> Path:
@@ -1180,7 +1181,7 @@ def _snapshot_api_payload(selected_date: str, *, season: int | None = None, snap
 
 
 def read_latest_live_lens_snapshot() -> dict[str, Any] | None:
-    snapshot = load_json_file(live_lens_snapshot_path())
+    snapshot = read_json_file(live_lens_snapshot_path())
     return dict(snapshot) if isinstance(snapshot, dict) else None
 
 
