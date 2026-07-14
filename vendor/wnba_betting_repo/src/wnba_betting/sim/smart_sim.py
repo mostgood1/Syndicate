@@ -3103,6 +3103,17 @@ def _apply_player_priors(team_df: pd.DataFrame, priors, team_tri: str, sim_minut
     else:
         out["_sim_min"] = _derive_sim_minutes(out, date_str=date_str, team_tri=team_tri)
 
+    # Guardrail: some upstream paths (e.g. teams with no rotation-stint history, such as a
+    # first-season expansion franchise) can hand back per-player minutes that were never
+    # capped/rescaled to a regulation team total, inflating headcount and scoring. Re-cap here
+    # so every path into this function ends up with a realistic total regardless of source.
+    _sim_min_total = float(pd.to_numeric(out["_sim_min"], errors="coerce").fillna(0.0).sum())
+    if _sim_min_total > 0.0 and not np.isclose(_sim_min_total, float(LEAGUE.regulation_team_minutes), atol=1.0):
+        _caps = _minutes_caps_from_team_df(out, base_minutes=out["_sim_min"])
+        out["_sim_min"] = _cap_and_redistribute_minutes(
+            out["_sim_min"], total_target=LEAGUE.regulation_team_minutes, cap=_caps, iters=12
+        ).astype(float)
+
     # Prediction-derived per-minute fallbacks
     pred_cols = {
         "pts": "pred_pts",
