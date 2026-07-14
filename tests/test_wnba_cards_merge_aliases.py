@@ -523,6 +523,14 @@ class WnbaCardsMergeAliasTests(unittest.TestCase):
         ), patch(
             "syndicate.features.wnba.cards._games_from_live_state_fallback",
             return_value=(live_games, "espn_scoreboard_fallback"),
+        ), patch(
+            # A fresh ESPN scoreboard fetch is now tried first and merged in
+            # preference to the keyvalue-backed live_state fallback above;
+            # returning nothing here keeps this test exercising that
+            # keyvalue-fallback path specifically, without hitting the real
+            # network.
+            "syndicate.features.wnba.cards._games_from_public_scoreboard",
+            return_value=([], "espn_scoreboard_fallback"),
         ):
             payload = build_source_cards_payload("2026-06-22")
 

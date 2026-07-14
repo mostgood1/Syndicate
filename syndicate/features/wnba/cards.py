@@ -1657,7 +1657,16 @@ def build_source_cards_payload(selected_date: str, *, allow_stored_date_fallback
             games = [_source_game_contract(game, default_start_time=resolved_date) for game in public_games]
             used_public_scoreboard_fallback = True
     if resolved_date == central_today_iso() and not used_public_scoreboard_fallback:
-        games, _, _, _ = _supplement_games_with_live_state(games, resolved_date)
+        # Prefer a fresh ESPN fetch for status/score over the (possibly
+        # stale, keyvalue-backed) live_state.jsonl artifact -- falls back to
+        # the artifact automatically when ESPN has nothing for this date.
+        espn_games, espn_source_path = _games_from_public_scoreboard(resolved_date)
+        games, _, _, _ = _supplement_games_with_live_state(
+            games,
+            resolved_date,
+            live_games=espn_games or None,
+            live_source_path=espn_source_path if espn_games else None,
+        )
     if odds_refreshed_at:
         for game in games:
             if not isinstance(game, dict):
@@ -2148,8 +2157,15 @@ def _game_matchup_key(game: dict[str, Any]) -> tuple[str, str]:
     return (away_tri, home_tri)
 
 
-def _supplement_games_with_live_state(games: list[dict[str, Any]], selected_date: str) -> tuple[list[dict[str, Any]], str | None, int, int]:
-    live_games, live_source_path = _games_from_live_state_fallback(selected_date)
+def _supplement_games_with_live_state(
+    games: list[dict[str, Any]],
+    selected_date: str,
+    *,
+    live_games: list[dict[str, Any]] | None = None,
+    live_source_path: str | None = None,
+) -> tuple[list[dict[str, Any]], str | None, int, int]:
+    if live_games is None:
+        live_games, live_source_path = _games_from_live_state_fallback(selected_date)
     if not live_games:
         return games, None, 0, 0
 
@@ -2309,7 +2325,15 @@ def build_cards_page_context(selected_date: str, *, allow_stored_date_fallback: 
             source_kind="artifact_backed",
             live_lens_integrated=True,
         )
-    if allow_stored_date_fallback and requested_date == central_today_iso():
+    if (
+        allow_stored_date_fallback
+        and requested_date == central_today_iso()
+        and not bool(_games_from_artifacts(requested_date)[0])
+    ):
+        # Only take the ESPN-only shortcut when there's no odds-rich
+        # artifact data to show at all -- when artifact games exist, ESPN's
+        # status gets merged into them further down instead of fully
+        # replacing the odds/sim/props data with bare scoreboard rows.
         public_games, public_source_path = _games_from_public_scoreboard(requested_date)
         if public_games:
             parsed_date = parse_iso_date(requested_date)
@@ -2396,6 +2420,7 @@ def build_cards_page_context(selected_date: str, *, allow_stored_date_fallback: 
     source_title = "WNBA processed game cards"
     had_artifact_games = bool(games)
     used_public_scoreboard_fallback = False
+    used_public_scoreboard_merge = False
     if not games and allow_stored_date_fallback and resolved_date == central_today_iso():
         public_games, public_source_path = _games_from_public_scoreboard(resolved_date)
         if public_games:
@@ -2405,7 +2430,24 @@ def build_cards_page_context(selected_date: str, *, allow_stored_date_fallback: 
             source_title = "WNBA live scoreboard fallback"
             had_artifact_games = False
             used_public_scoreboard_fallback = True
-    if not _render_web_dyno() and not used_public_scoreboard_fallback:
+    elif games and allow_stored_date_fallback and resolved_date == central_today_iso():
+        # Merge ESPN's live status/score into the odds-rich artifact games
+        # instead of discarding the odds/sim/props data for a bare
+        # scoreboard-only view -- this is the same fresh source the
+        # ESPN-only shortcut above already proved works for status, applied
+        # without throwing away everything else. Runs regardless of
+        # _render_web_dyno() since this is a direct ESPN fetch, not the
+        # (separately gated) keyvalue-backed live_state.jsonl merge below.
+        public_games, public_source_path = _games_from_public_scoreboard(resolved_date)
+        if public_games:
+            games, live_source_path, supplemented_count, updated_count = _supplement_games_with_live_state(
+                games, resolved_date, live_games=public_games, live_source_path=public_source_path
+            )
+            if supplemented_count > 0 or updated_count > 0:
+                used_public_scoreboard_merge = True
+                source_title = "WNBA processed game cards + live scoreboard supplement"
+                cards_path = f"{cards_path} | {live_source_path}"
+    if not _render_web_dyno() and not used_public_scoreboard_fallback and not used_public_scoreboard_merge:
         games, live_source_path, supplemented_count, updated_count = _supplement_games_with_live_state(games, resolved_date)
         if supplemented_count > 0 or updated_count > 0:
             if had_artifact_games:
@@ -2528,7 +2570,12 @@ def build_cards_page_context(selected_date: str, *, allow_stored_date_fallback: 
         "skipWhenHidden": False,
         "poller": "shared.polling",
     }
-    _WNBA_CARDS_CONTEXT_CACHE[cache_key] = deepcopy(result)
+    if not used_public_scoreboard_merge:
+        # The ESPN status merge above is a live fetch, not reflected in
+        # cache_key's game_cards/live_state signatures -- caching this
+        # result would freeze whatever status ESPN happened to report on
+        # this one request until something else changes those signatures.
+        _WNBA_CARDS_CONTEXT_CACHE[cache_key] = deepcopy(result)
     return deepcopy(result)
 
 
