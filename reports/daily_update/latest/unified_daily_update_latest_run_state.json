@@ -2,20 +2,20 @@
   "scope": "daily_update",
   "date": "2026-07-14",
   "runMode": "standard",
-  "overallStatus": "started",
+  "overallStatus": "ok",
   "generatedAt": "2026-07-14T06:44:22.7418901+00:00",
-  "updatedAt": "2026-07-14T06:55:51.8035661+00:00",
+  "updatedAt": "2026-07-14T06:55:59.2588063+00:00",
   "runManifestPath": "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-14\\20260714_064422\\unified_daily_update_run.json",
   "latestManifestPath": "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest.json",
   "runCheckpointPath": "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-14\\20260714_064422\\unified_daily_update_checkpoint.json",
   "latestCheckpointPath": "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest_checkpoint.json",
-  "currentStage": "queued",
+  "currentStage": "completed",
   "completedStages": [
     "source_update",
     "refresh_gate"
   ],
   "failedStage": null,
-  "lastUpdatedAt": "2026-07-14T06:55:51.8029734+00:00",
+  "lastUpdatedAt": "2026-07-14T06:55:59.2579680+00:00",
   "replayContext": {
     "latestCheckpointLoaded": true,
     "latestCheckpointPath": "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest_checkpoint.json",
@@ -128,8 +128,385 @@
     ],
     "simExecutionDecision": true
   },
-  "simulationContractPath": null,
-  "simulationContractRunPath": null,
-  "simulationContractSportCount": null,
-  "simulationContractAdvancedBySport": null
+  "simulationContractPath": "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest_simulation_contract.json",
+  "simulationContractRunPath": "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-14\\20260714_064422\\unified_daily_update_simulation_contract.json",
+  "simulationContractSportCount": 2,
+  "simulationContractAdvancedBySport": {
+    "mlb": {
+      "page": {
+        "scoreboard_items": [
+          {
+            "target_id": "game-823443",
+            "label": "AL @ NL",
+            "status": "Pre-Game"
+          }
+        ],
+        "module_links": [
+          {
+            "label": "Cards",
+            "href": "/mlb/cards?date=2026-07-14",
+            "active": true
+          },
+          {
+            "label": "Betting Card",
+            "href": "/mlb/season/2026/betting-card?date=2026-07-14",
+            "active": false
+          },
+          {
+            "label": "Live Lens",
+            "href": "/mlb/live-lens?date=2026-07-14",
+            "active": false
+          },
+          {
+            "label": "Market Accuracy",
+            "href": "/mlb/market-accuracy?date=2026-07-14",
+            "active": false
+          },
+          {
+            "label": "Daily Archive",
+            "href": "/mlb/archive?date=2026-07-14",
+            "active": false
+          },
+          {
+            "label": "Season Review",
+            "href": "/mlb/season/2026?date=2026-07-14",
+            "active": false
+          },
+          {
+            "label": "Pitcher top props",
+            "href": "/mlb/pitcher-top-props?date=2026-07-14",
+            "active": false
+          },
+          {
+            "label": "Hitter top props",
+            "href": "/mlb/hitter-top-props?date=2026-07-14",
+            "active": false
+          },
+          {
+            "label": "Top props",
+            "href": "/mlb/top-props?date=2026-07-14",
+            "active": false
+          },
+          {
+            "label": "HR targets",
+            "href": "/mlb/hr-targets?date=2026-07-14",
+            "active": false
+          },
+          {
+            "label": "RFI targets",
+            "href": "/mlb/rfi-targets?date=2026-07-14",
+            "active": false
+          },
+          {
+            "label": "Pitcher ladders",
+            "href": "/mlb/pitcher-ladders?date=2026-07-14",
+            "active": false
+          },
+          {
+            "label": "Hitter ladders",
+            "href": "/mlb/hitter-ladders?date=2026-07-14",
+            "active": false
+          },
+          {
+            "label": "Hub",
+            "href": "/mlb/hub",
+            "active": false
+          }
+        ],
+        "cards_control_links": [],
+        "cards_header_meta": "Artifact-backed slate | 2026-07-14",
+        "cards_header_title": "MLB Game Cards",
+        "source_path": "daily_summary_2026_07_14.json",
+        "source_title": "MLB cards unavailable"
+      },
+      "game": {},
+      "available": true
+    },
+    "wnba": {
+      "page": {
+        "scoreboard_items": [
+          {
+            "target_id": "game-0c2ecfa7d05172b4ecf75b85d53482efe",
+            "label": "POR @ CON",
+            "status": "2026-07-14"
+          },
+          {
+            "target_id": "game-0d6adc93ae6db516941aa0c9eabe442fd",
+            "label": "WSH @ TOR",
+            "status": "2026-07-14"
+          }
+        ],
+        "module_links": [
+          {
+            "label": "Cards",
+            "href": "/wnba/cards?date=2026-07-14",
+            "active": true
+          },
+          {
+            "label": "Betting Card",
+            "href": "/wnba/season/2026/betting-card?date=2026-07-14",
+            "active": false
+          },
+          {
+            "label": "Picks",
+            "href": "/wnba/picks?date=2026-07-14",
+            "active": false
+          },
+          {
+            "label": "Props",
+            "href": "/wnba/props?date=2026-07-14",
+            "active": false
+          },
+          {
+            "label": "Live Lens",
+            "href": "/wnba/live-lens?date=2026-07-14",
+            "active": false
+          },
+          {
+            "label": "Daily Archive",
+            "href": "/wnba/archive?date=2026-07-14",
+            "active": false
+          },
+          {
+            "label": "Hub",
+            "href": "/wnba/hub",
+            "active": false
+          }
+        ],
+        "cards_control_links": [
+          {
+            "label": "Betting Card",
+            "href": "/wnba/season/2026/betting-card?date=2026-07-14"
+          },
+          {
+            "label": "Props",
+            "href": "/wnba/props?date=2026-07-14"
+          },
+          {
+            "label": "Live Lens",
+            "href": "/wnba/live-lens?date=2026-07-14"
+          }
+        ],
+        "source_path": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\data\\processed\\game_cards_2026-07-14.csv | espn_scoreboard_fallback",
+        "source_title": "WNBA processed game cards + live scoreboard supplement",
+        "wnba_advanced_contract": {
+          "available": true,
+          "sport": "wnba",
+          "selection": {
+            "kind": "date",
+            "requested": "2026-07-14",
+            "resolved": "2026-07-14"
+          },
+          "source": {
+            "title": "WNBA processed game cards + live scoreboard supplement",
+            "path": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\data\\processed\\game_cards_2026-07-14.csv | espn_scoreboard_fallback",
+            "mode": "live"
+          },
+          "freshness": {
+            "requested": "2026-07-14",
+            "resolved": "2026-07-14",
+            "selection_kind": "date",
+            "is_current_day": true,
+            "is_stale": false,
+            "lookahead_applied": false
+          },
+          "coverage": {
+            "games_with_sim": 2,
+            "games_with_periods": 0,
+            "games_with_intervals": 2,
+            "games_with_players": 2,
+            "games_with_injuries": 2,
+            "games_with_props": 2
+          },
+          "game_count": 2,
+          "games": [
+            {
+              "game_id": "0c2ecfa7d05172b4ecf75b85d53482efe",
+              "event_id": "401857066",
+              "matchup": {
+                "away": {
+                  "tri": "POR",
+                  "name": "Portland Fire"
+                },
+                "home": {
+                  "tri": "CON",
+                  "name": "Connecticut Sun"
+                }
+              },
+              "status": {
+                "status": "{'status': 'Scheduled', 'detail': '2026-07-14', 'startTime': '2026-07-14', 'in_progress': False, 'final': False, 'period': None, 'clock': ''}",
+                "detail": "2026-07-14",
+                "live": false,
+                "final": false
+              },
+              "market": {
+                "home_ml": 346.0,
+                "away_ml": -346.0,
+                "home_spread": 8.0,
+                "total": 217.5,
+                "p_home_win": 0.22430211836444208,
+                "p_away_win": 0.775697881635558,
+                "p_home_cover": 0.4978333468949599,
+                "p_total_over": 0.49969047623001456
+              },
+              "simulation": {
+                "score": {
+                  "away_mean": 112.776,
+                  "home_mean": 104.711,
+                  "total_mean": 217.487,
+                  "margin_mean": -8.065
+                },
+                "periods": {},
+                "intervals": {
+                  "quarters": "",
+                  "halves": ""
+                },
+                "quarters": [],
+                "players_summary": {
+                  "away": 15,
+                  "home": 16,
+                  "missing_away": 0,
+                  "missing_home": 0,
+                  "injured_away": 0,
+                  "injured_home": 0
+                },
+                "players": {
+                  "away": "              ",
+                  "home": "               "
+                },
+                "missing_prop_players": {
+                  "away": "",
+                  "home": ""
+                },
+                "injuries": {
+                  "away": "",
+                  "home": ""
+                },
+                "pregame_context": {
+                  "home_injuries_out": 0,
+                  "away_injuries_out": 0,
+                  "home_pace": 79.5,
+                  "away_pace": 79.5,
+                  "home_b2b": false,
+                  "away_b2b": false
+                }
+              },
+              "props": {
+                "prop_recommendations": {
+                  "away": "     ",
+                  "home": "    "
+                },
+                "game_market_recommendations": [
+                  "@{market_label=PROPS; display_pick=Bridget Carleton OVER 2.5; selection=OVER 2.5; p_win=0.460829493087558; ev_pct=36.6253982672664; basketball_summary=Prop projection -; why_explain=Prop projection -; historical_context=; confidence=; line=; market_line=; price=117; card_bucket=playable; recommendation_priority_score=36.6253982672664; score=36.6253982672664; stake_amount=; stake_units=; portfolio_rank=; portfolio_score=; evidence_pack=}",
+                  "@{market_label=PROPS; display_pick=Carla Leite UNDER 8.5; selection=UNDER 8.5; p_win=0.583333333333333; ev_pct=8.29413119814565; basketball_summary=Prop projection -; why_explain=Prop projection -; historical_context=; confidence=; line=; market_line=; price=-140; card_bucket=playable; recommendation_priority_score=8.29413119814565; score=8.29413119814565; stake_amount=; stake_units=; portfolio_rank=; portfolio_score=; evidence_pack=}",
+                  "@{market_label=PROPS; display_pick=Charlisse Leger-Walker UNDER 11.5; selection=UNDER 11.5; p_win=0.528301886792453; ev_pct=5.42110001037879; basketball_summary=Prop projection -; why_explain=Prop projection -; historical_context=; confidence=; line=; market_line=; price=-112; card_bucket=playable; recommendation_priority_score=5.42110001037879; score=5.42110001037879; stake_amount=; stake_units=; portfolio_rank=; portfolio_score=; evidence_pack=}"
+                ]
+              },
+              "coverage": {
+                "has_simulation": true,
+                "has_periods": false,
+                "has_intervals": true,
+                "has_players": true,
+                "has_injuries": true,
+                "has_pregame_context": true
+              }
+            },
+            {
+              "game_id": "0d6adc93ae6db516941aa0c9eabe442fd",
+              "event_id": "401857067",
+              "matchup": {
+                "away": {
+                  "tri": "WSH",
+                  "name": "Washington Mystics"
+                },
+                "home": {
+                  "tri": "TOR",
+                  "name": "Toronto Tempo"
+                }
+              },
+              "status": {
+                "status": "{'status': 'Scheduled', 'detail': '2026-07-14', 'startTime': '2026-07-14', 'in_progress': False, 'final': False, 'period': None, 'clock': ''}",
+                "detail": "2026-07-14",
+                "live": false,
+                "final": false
+              },
+              "market": {
+                "home_ml": -2591.0,
+                "away_ml": 2591.0,
+                "home_spread": -21.0,
+                "total": 218.0,
+                "p_home_win": 0.9628441105955912,
+                "p_away_win": 0.03715588940440884,
+                "p_home_cover": 0.5051998125307773,
+                "p_total_over": 0.49961904769276194
+              },
+              "simulation": {
+                "score": {
+                  "away_mean": 98.414,
+                  "home_mean": 119.57,
+                  "total_mean": 217.984,
+                  "margin_mean": 21.156
+                },
+                "periods": {},
+                "intervals": {
+                  "quarters": "",
+                  "halves": ""
+                },
+                "quarters": [],
+                "players_summary": {
+                  "away": 13,
+                  "home": 15,
+                  "missing_away": 0,
+                  "missing_home": 0,
+                  "injured_away": 0,
+                  "injured_home": 0
+                },
+                "players": {
+                  "away": "            ",
+                  "home": "              "
+                },
+                "missing_prop_players": {
+                  "away": "",
+                  "home": ""
+                },
+                "injuries": {
+                  "away": "",
+                  "home": ""
+                },
+                "pregame_context": {
+                  "home_injuries_out": 0,
+                  "away_injuries_out": 0,
+                  "home_pace": 79.5,
+                  "away_pace": 79.5,
+                  "home_b2b": false,
+                  "away_b2b": false
+                }
+              },
+              "props": {
+                "prop_recommendations": {
+                  "away": "    ",
+                  "home": "    "
+                },
+                "game_market_recommendations": [
+                  "@{market_label=PROPS; display_pick=Sonia Citron UNDER 1.5; selection=UNDER 1.5; p_win=0.54954954954955; ev_pct=37.8848176539034; basketball_summary=Prop projection -; why_explain=Prop projection -; historical_context=; confidence=; line=; market_line=; price=-122; card_bucket=playable; recommendation_priority_score=37.8848176539034; score=37.8848176539034; stake_amount=; stake_units=; portfolio_rank=; portfolio_score=; evidence_pack=}",
+                  "@{market_label=PROPS; display_pick=Julie Allemand UNDER 7.5; selection=UNDER 7.5; p_win=0.559471365638767; ev_pct=29.5793199515276; basketball_summary=Prop projection -; why_explain=Prop projection -; historical_context=; confidence=; line=; market_line=; price=-127; card_bucket=playable; recommendation_priority_score=29.5793199515276; score=29.5793199515276; stake_amount=; stake_units=; portfolio_rank=; portfolio_score=; evidence_pack=}",
+                  "@{market_label=PROPS; display_pick=Shakira Austin UNDER 8.5; selection=UNDER 8.5; p_win=0.530516431924883; ev_pct=7.03887503720283; basketball_summary=Prop projection -; why_explain=Prop projection -; historical_context=; confidence=; line=; market_line=; price=-113; card_bucket=playable; recommendation_priority_score=7.03887503720283; score=7.03887503720283; stake_amount=; stake_units=; portfolio_rank=; portfolio_score=; evidence_pack=}"
+                ]
+              },
+              "coverage": {
+                "has_simulation": true,
+                "has_periods": false,
+                "has_intervals": true,
+                "has_players": true,
+                "has_injuries": true,
+                "has_pregame_context": true
+              }
+            }
+          ]
+        }
+      },
+      "game": {},
+      "available": true
+    }
+  }
 }

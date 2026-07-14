@@ -1,0 +1,152 @@
+{
+  "date": "2026-07-14",
+  "counts": {
+    "games": 2,
+    "picks": 6
+  },
+  "per_game": [
+    {
+      "home": "CON",
+      "away": "POR",
+      "matchup": "POR @ CON",
+      "picks": [
+        {
+          "market": "PROPS",
+          "team": "POR",
+          "display_pick": "Bridget Carleton OVER 2.5",
+          "selection": "OVER 2.5",
+          "projection": 2.830820961952621,
+          "projected": 2.830820961952621,
+          "odds": 117.0,
+          "price": 117.0,
+          "score": 36.62539826726642,
+          "ev_pct": 36.62539826726642,
+          "win_prob": 0.4608294930875576,
+          "p_win": 0.4608294930875576,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 36.6%",
+            "Regular price range (-150 to +150)",
+            "Consensus: 4 books aligned",
+            "Best line available"
+          ],
+          "matchup": "POR @ CON"
+        },
+        {
+          "market": "PROPS",
+          "team": "POR",
+          "display_pick": "Carla Leite UNDER 8.5",
+          "selection": "UNDER 8.5",
+          "projection": 7.177378761061947,
+          "projected": 7.177378761061947,
+          "odds": -140.0,
+          "price": -140.0,
+          "score": 8.29413119814565,
+          "ev_pct": 8.29413119814565,
+          "win_prob": 0.5833333333333334,
+          "p_win": 0.5833333333333334,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 8.3%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "POR @ CON"
+        },
+        {
+          "market": "PROPS",
+          "team": "CON",
+          "display_pick": "Charlisse Leger-Walker UNDER 11.5",
+          "selection": "UNDER 11.5",
+          "projection": 10.614894117647058,
+          "projected": 10.614894117647058,
+          "odds": -112.0,
+          "price": -112.0,
+          "score": 5.421100010378793,
+          "ev_pct": 5.421100010378793,
+          "win_prob": 0.5283018867924528,
+          "p_win": 0.5283018867924528,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 5.4%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "POR @ CON"
+        }
+      ]
+    },
+    {
+      "home": "TOR",
+      "away": "WSH",
+      "matchup": "WSH @ TOR",
+      "picks": [
+        {
+          "market": "PROPS",
+          "team": "WSH",
+          "display_pick": "Sonia Citron UNDER 1.5",
+          "selection": "UNDER 1.5",
+          "projection": 0.8009315315315315,
+          "projected": 0.8009315315315315,
+          "odds": -122.0,
+          "price": -122.0,
+          "score": 37.88481765390338,
+          "ev_pct": 37.88481765390338,
+          "win_prob": 0.5495495495495496,
+          "p_win": 0.5495495495495496,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 37.9%",
+            "Regular price range (-150 to +150)",
+            "Consensus: 4 books aligned",
+            "Best line available"
+          ],
+          "matchup": "WSH @ TOR"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Julie Allemand UNDER 7.5",
+          "selection": "UNDER 7.5",
+          "projection": 3.756360294117648,
+          "projected": 3.756360294117648,
+          "odds": -127.0,
+          "price": -127.0,
+          "score": 29.579319951527626,
+          "ev_pct": 29.579319951527626,
+          "win_prob": 0.5594713656387665,
+          "p_win": 0.5594713656387665,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 29.6%",
+            "Regular price range (-150 to +150)",
+            "Consensus: 4 books aligned",
+            "Best line available"
+          ],
+          "matchup": "WSH @ TOR"
+        },
+        {
+          "market": "PROPS",
+          "team": "WSH",
+          "display_pick": "Shakira Austin UNDER 8.5",
+          "selection": "UNDER 8.5",
+          "projection": 7.127299999999999,
+          "projected": 7.127299999999999,
+          "odds": -113.0,
+          "price": -113.0,
+          "score": 7.03887503720283,
+          "ev_pct": 7.03887503720283,
+          "win_prob": 0.5305164319248826,
+          "p_win": 0.5305164319248826,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 7.0%",
+            "Regular price range (-150 to +150)",
+            "Consensus: 3 books aligned"
+          ],
+          "matchup": "WSH @ TOR"
+        }
+      ]
+    }
+  ]
+}

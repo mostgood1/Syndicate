@@ -1,0 +1,179 @@
+{
+  "ok": true,
+  "date": "2026-07-14",
+  "optimizationRegime": {
+    "date": "2026-07-14",
+    "kind": "forward_tuned_live",
+    "label": "Forward tuned live",
+    "isLegacyComparison": false,
+    "isCleanBaseline": false,
+    "baselineStartDate": "2026-03-31",
+    "legacyWindowStartDate": "2026-03-25",
+    "recommendedUse": "post_retune_monitoring",
+    "forwardTuningStartDate": "2026-04-14"
+  },
+  "logPath": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/live_lens/live_lens_2026_07_14.jsonl",
+  "propObservationLogPath": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/live_lens/prop_registry/live_prop_observations_2026_07_14.jsonl",
+  "registryPath": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/live_lens/prop_registry/live_prop_registry_2026_07_14.json",
+  "registryLogPath": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/live_lens/prop_registry/live_prop_registry_2026_07_14.jsonl",
+  "reportPath": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/live_lens/live_lens_report_2026_07_14.json",
+  "dailyRecapPath": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/live_lens/recaps/live_lens_daily_recap_2026_07_14.json",
+  "entries": 2,
+  "latestEntry": {
+    "recordedAt": "2026-07-14T06:44:13+00:00",
+    "date": "2026-07-14",
+    "generatedAt": "2026-07-14T01:44:13-05:00",
+    "oddsRefreshedAt": null,
+    "counts": {
+      "games": 1,
+      "live": 0,
+      "final": 0,
+      "pregame": 1,
+      "props": 0,
+      "archivedLiveProps": 0
+    },
+    "performance": {
+      "marketsRefreshed": false,
+      "marketRefreshMs": 0.0,
+      "totalMs": 229.3,
+      "snapshotLoadMs": 0.3,
+      "simContextLoadMs": 0.1,
+      "propEvalMs": 0.0,
+      "gameLensMs": 0.2,
+      "gameCount": 1,
+      "liveGameCount": 0,
+      "feedFetchCount": 1,
+      "persistMs": 0.0
+    },
+    "games": [
+      {
+        "gamePk": 823443,
+        "status": "Preview",
+        "score": {
+          "away": 0,
+          "home": 0
+        },
+        "liveText": "",
+        "propCount": 0,
+        "topProps": []
+      }
+    ]
+  },
+  "latestReport": {
+    "date": "2026-07-14",
+    "generatedAt": "2026-07-14T01:45:16-05:00",
+    "counts": {
+      "games": 1,
+      "live": 0,
+      "final": 0,
+      "pregame": 1,
+      "props": 0,
+      "archivedLiveProps": 0
+    },
+    "performance": {
+      "marketsRefreshed": false,
+      "marketRefreshMs": 0.0,
+      "totalMs": 229.3,
+      "snapshotLoadMs": 0.3,
+      "simContextLoadMs": 0.1,
+      "propEvalMs": 0.0,
+      "gameLensMs": 0.2,
+      "gameCount": 1,
+      "liveGameCount": 0,
+      "feedFetchCount": 1,
+      "persistMs": 0.0
+    },
+    "games": [
+      {
+        "gamePk": 823443,
+        "startTime": "7:00 PM",
+        "status": {
+          "abstract": "Preview",
+          "detailed": "Pre-Game"
+        }
+      }
+    ]
+  },
+  "registrySummary": {
+    "date": "2026-07-14",
+    "updatedAt": null,
+    "totalEntries": 0,
+    "uniqueGames": 0,
+    "uniqueOwners": 0,
+    "settledEntries": 0,
+    "resultCounts": {
+      "win": 0,
+      "loss": 0,
+      "push": 0,
+      "pending": 0
+    },
+    "byProp": {},
+    "bySelection": {},
+    "topStable": [],
+    "topEdges": []
+  },
+  "summary": {
+    "counts": {
+      "games": 1,
+      "live": 0,
+      "final": 0,
+      "pregame": 1,
+      "props": 0,
+      "archivedLiveProps": 0
+    },
+    "performance": {
+      "marketsRefreshed": false,
+      "marketRefreshMs": 0.0,
+      "totalMs": 229.3,
+      "snapshotLoadMs": 0.3,
+      "simContextLoadMs": 0.1,
+      "propEvalMs": 0.0,
+      "gameLensMs": 0.2,
+      "gameCount": 1,
+      "liveGameCount": 0,
+      "feedFetchCount": 1,
+      "persistMs": 0.0
+    },
+    "topStable": [],
+    "topEdges": []
+  },
+  "firstObservationArchive": [],
+  "rawArtifacts": {
+    "total_bytes": 10367,
+    "total_bytes_text": "10.12 KB",
+    "files": {
+      "log": {
+        "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/live_lens/live_lens_2026_07_14.jsonl",
+        "exists": true,
+        "bytes": 1226,
+        "bytes_text": "1.20 KB",
+        "modified_at": "2026-07-14T01:44:13-05:00"
+      },
+      "observation_log": {
+        "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/live_lens/prop_registry/live_prop_observations_2026_07_14.jsonl",
+        "exists": false,
+        "bytes": 0,
+        "bytes_text": "0 B"
+      },
+      "registry": {
+        "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/live_lens/prop_registry/live_prop_registry_2026_07_14.json",
+        "exists": false,
+        "bytes": 0,
+        "bytes_text": "0 B"
+      },
+      "registry_log": {
+        "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/live_lens/prop_registry/live_prop_registry_2026_07_14.jsonl",
+        "exists": false,
+        "bytes": 0,
+        "bytes_text": "0 B"
+      },
+      "report": {
+        "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/live_lens/live_lens_report_2026_07_14.json",
+        "exists": true,
+        "bytes": 9141,
+        "bytes_text": "8.93 KB",
+        "modified_at": "2026-07-14T01:44:13-05:00"
+      }
+    }
+  }
+}

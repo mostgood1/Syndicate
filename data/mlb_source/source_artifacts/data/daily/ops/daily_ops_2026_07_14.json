@@ -1,0 +1,192 @@
+{
+  "tool": "tools/daily_update.py",
+  "workflow": "ui-daily",
+  "generated_at": "2026-07-14T06:44:31.394372",
+  "date": "2026-07-14",
+  "season": 2026,
+  "run_lock": {
+    "status": "acquired",
+    "path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/runtime/locks/daily_update_ui-daily_2026_2026-07-14_1166be09fd3e.lock",
+    "pid": 1944,
+    "created_at": "2026-07-14T06:44:31.391587"
+  },
+  "seed": {
+    "value": 1337,
+    "source": "default_fixed",
+    "explicit_cli": false
+  },
+  "prior_day": {
+    "date": "2026-07-13",
+    "season": 2026,
+    "eval_report_path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/eval/batches/season_2026_ui_daily_live/sim_vs_actual_2026-07-13.json",
+    "top_props_artifact_path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/top_props/daily_top_props_2026_07_13.json",
+    "live_lens": {
+      "status": "ok",
+      "source": "local_files",
+      "sync_out_path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/live_lens/render_sync/live_lens_reports_2026_07_13.json",
+      "headline": "No prior-day live-lens activity found for 2026-07-13."
+    }
+  },
+  "current_day": {
+    "date": "2026-07-14",
+    "season": 2026,
+    "out_game": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily",
+    "out_pitcher": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily_pitcher_props",
+    "out_hitter": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily_hitter_props",
+    "summary_path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_07_14.json",
+    "profile_bundle_path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_07_14_profile_bundle.json",
+    "locked_policy_path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_07_14_locked_policy.json",
+    "top_props_artifact_path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/top_props/daily_top_props_2026_07_14.json",
+    "season_frontend_dir": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/season_frontend",
+    "season_manifest_artifact_path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/season_frontend/season_manifest_2026_2026_07_14.json",
+    "season_day_artifact_path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/season_frontend/season_day_2026_2026_07_14_retuned.json",
+    "season_betting_day_artifact_path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/season_frontend/season_betting_day_2026_2026_07_14_retuned.json",
+    "season_official_betting_day_artifact_path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/season_frontend/season_official_betting_day_2026_2026_07_14_retuned.json"
+  },
+  "stages": {
+    "prior_day_feed_live_refresh": {
+      "status": "ok",
+      "date": "2026-07-13",
+      "season": 2026,
+      "games_scheduled": 0,
+      "regular_season_games_scheduled": 0,
+      "games_written": 0,
+      "errors": [],
+      "error_count": 0,
+      "out_dir": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/raw/statsapi/feed_live/2026/2026-07-13",
+      "pbp_source": "statsapi_feed_live"
+    },
+    "prior_day_card_settlement": {
+      "status": "skipped",
+      "date": "2026-07-13",
+      "card_path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_07_13_locked_policy.json",
+      "reason": "prior-day locked-policy card not found"
+    },
+    "prior_day_live_lens": {
+      "status": "ok",
+      "date": "2026-07-13",
+      "sync_requested": true,
+      "sync_out_path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/live_lens/render_sync/live_lens_reports_2026_07_13.json",
+      "local_report_path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/live_lens/live_lens_report_2026_07_13.json",
+      "local_registry_path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/live_lens/prop_registry/live_prop_registry_2026_07_13.json",
+      "render_base_url": "",
+      "reason": "live-lens sync requested but Render base URL or cron token is unavailable",
+      "missing_credentials": [
+        "live_lens_base_url",
+        "live_lens_cron_token"
+      ],
+      "used_local_report": true,
+      "source": "local_files",
+      "registry_summary": {},
+      "readout": {
+        "headline": "No prior-day live-lens activity found for 2026-07-13.",
+        "learnings": [],
+        "performance": [
+          "Local live-lens report processed 0 games in 17.6 ms with 0 ms spent refreshing markets."
+        ]
+      }
+    },
+    "live_pitcher_corrections": {
+      "status": "skipped",
+      "max_date": "2026-07-13",
+      "artifacts": {},
+      "render_base_url": "",
+      "reason": "live pitcher correction refresh requested but Render base URL or cron token is unavailable",
+      "missing_credentials": [
+        "live_lens_base_url",
+        "live_lens_cron_token"
+      ]
+    },
+    "prior_day_eval_report": {
+      "status": "skipped",
+      "date": "2026-07-13",
+      "report_path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/eval/batches/season_2026_ui_daily_live/sim_vs_actual_2026-07-13.json",
+      "reason": "no scheduled prior-day regular-season games"
+    },
+    "season_publish": {
+      "status": "skipped",
+      "season": 2026,
+      "batch_dir": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/eval/batches/season_2026_ui_daily_live",
+      "reason": "no prior-day report to publish"
+    },
+    "prior_day_top_props_artifact": {
+      "status": "ok",
+      "date": "2026-07-13",
+      "artifact_path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/top_props/daily_top_props_2026_07_13.json",
+      "group_summaries": {
+        "pitcher": {
+          "found": false,
+          "candidateCount": 0,
+          "displayedCount": 0,
+          "sectionCount": 5
+        },
+        "hitter": {
+          "found": false,
+          "candidateCount": 0,
+          "displayedCount": 0,
+          "sectionCount": 7
+        }
+      }
+    },
+    "current_day_oddsapi": {
+      "status": "error",
+      "date": "2026-07-14",
+      "mode": "live",
+      "out_dir": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\market\\oddsapi",
+      "game_lines_path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\market\\oddsapi\\oddsapi_game_lines_2026_07_14.json",
+      "pitcher_props_path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\market\\oddsapi\\oddsapi_pitcher_props_2026_07_14.json",
+      "hitter_props_path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\market\\oddsapi\\oddsapi_hitter_props_2026_07_14.json",
+      "counts": {
+        "game_lines": {
+          "events_matched": 1,
+          "games": 1,
+          "h2h_games": 1,
+          "totals_games": 1,
+          "spreads_games": 1
+        },
+        "pitcher_props": {
+          "players": 0,
+          "markets": {},
+          "events_matched": 1
+        },
+        "hitter_props": {
+          "players": 7,
+          "markets": {
+            "batter_home_runs": 7
+          },
+          "events_matched": 1
+        }
+      },
+      "errors": [
+        "current-day OddsAPI ingest captured no pitcher props"
+      ]
+    }
+  },
+  "notes": [],
+  "warnings": [],
+  "validation_errors": [],
+  "errors": [
+    "current-day OddsAPI ingest captured no pitcher props"
+  ],
+  "next_day": {
+    "requested": true,
+    "date": "2026-07-15",
+    "season": 2026
+  },
+  "git_push": {
+    "requested": false,
+    "remote": "origin",
+    "branch": "",
+    "phases": [
+      {
+        "phase": "prior_day",
+        "label": "prior-day reconciliation outputs for 2026-07-13",
+        "requested": false,
+        "status": "skipped",
+        "reason": "git_push=off"
+      }
+    ],
+    "status": "skipped"
+  },
+  "status": "error"
+}

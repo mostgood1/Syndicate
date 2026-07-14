@@ -1,0 +1,261 @@
+{
+  "date": "2026-07-14",
+  "data": [
+    {
+      "game_key": "POR@CON",
+      "game_id": "0c2ecfa7d05172b4ecf75b85d53482efe",
+      "player": "Frieda Buhner",
+      "team": "POR",
+      "team_tricode": "POR",
+      "opponent": "CON",
+      "score": 46.41517690053604,
+      "score_adj": 46.41517690053604,
+      "tier": "High",
+      "model": {
+        "pts": 3.135269565217391,
+        "reb": 1.5576347826086956,
+        "ast": 0.2597043478260869,
+        "threes": 0.2597043478260869,
+        "stl": 0.0,
+        "blk": 0.0,
+        "tov": 0.5785217391304347,
+        "pra": 4.952608695652174,
+        "pr": 4.692904347826087,
+        "pa": 3.394973913043478,
+        "ra": 1.8173391304347826
+      },
+      "top_play": {
+        "market": "pts",
+        "side": "UNDER",
+        "line": 6.5,
+        "price": 102.0,
+        "edge": 0.2297781034680002,
+        "ev": 0.46415176900536037,
+        "ev_pct": 46.41517690053604,
+        "book": "betonlineag",
+        "p_win": 0.9592012739558554,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 46.4%",
+        "Regular price range (-150 to +150)",
+        "Best line available"
+      ],
+      "basketball_summary": "model 3.1 vs line 6.5 (-3.4)"
+    },
+    {
+      "game_key": "WSH@TOR",
+      "game_id": "0d6adc93ae6db516941aa0c9eabe442fd",
+      "player": "Maria Conde",
+      "team": "TOR",
+      "team_tricode": "TOR",
+      "opponent": "WSH",
+      "score": 43.05668967768482,
+      "score_adj": 43.05668967768482,
+      "tier": "High",
+      "model": {
+        "pts": 5.827511656441718,
+        "reb": 3.5655188431200697,
+        "ast": 1.1085852760736197,
+        "threes": 1.1704667835232252,
+        "stl": 0.2917072743207712,
+        "blk": 0.1458536371603856,
+        "tov": 1.166829097283085,
+        "pra": 10.501615775635408,
+        "pr": 9.393030499561789,
+        "pa": 6.936096932515338,
+        "ra": 4.674104119193689
+      },
+      "top_play": {
+        "market": "pts",
+        "side": "UNDER",
+        "line": 9.5,
+        "price": -102.0,
+        "edge": 0.2174149676793986,
+        "ev": 0.43056689677684823,
+        "ev_pct": 43.05668967768482,
+        "book": "betonlineag",
+        "p_win": 0.9355173918263532,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 43.1%",
+        "Regular price range (-150 to +150)",
+        "Consensus: 4 books aligned",
+        "Best line available"
+      ],
+      "basketball_summary": "model 5.8 vs line 9.5 (-3.7)"
+    },
+    {
+      "game_key": "WSH@TOR",
+      "game_id": "0d6adc93ae6db516941aa0c9eabe442fd",
+      "player": "Michaela Onyenwere",
+      "team": "WSH",
+      "team_tricode": "WSH",
+      "opponent": "TOR",
+      "score": 40.69886844554438,
+      "score_adj": 40.69886844554438,
+      "tier": "High",
+      "model": {
+        "pts": 5.999999999999999,
+        "reb": 0.0,
+        "ast": 0.0,
+        "threes": 0.0,
+        "stl": 0.374,
+        "blk": 0.306,
+        "tov": 1.02,
+        "pra": 5.999999999999999,
+        "pr": 5.999999999999999,
+        "pa": 5.999999999999999,
+        "ra": 0.0
+      },
+      "top_play": {
+        "market": "pts",
+        "side": "UNDER",
+        "line": 8.5,
+        "price": 100.0,
+        "edge": 0.2034943422277219,
+        "ev": 0.4069886844554438,
+        "ev_pct": 40.69886844554438,
+        "book": "fanduel",
+        "p_win": 0.9069886844554438,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 40.7%",
+        "Regular price range (-150 to +150)",
+        "Consensus: 4 books aligned"
+      ],
+      "basketball_summary": "model 6.0 vs line 8.5 (-2.5)"
+    },
+    {
+      "game_key": "WSH@TOR",
+      "game_id": "0d6adc93ae6db516941aa0c9eabe442fd",
+      "player": "Sonia Citron",
+      "team": "WSH",
+      "team_tricode": "WSH",
+      "opponent": "TOR",
+      "score": 37.88481765390338,
+      "score_adj": 37.88481765390338,
+      "tier": "High",
+      "model": {
+        "pts": 17.61900324324324,
+        "reb": 3.751912432432432,
+        "ast": 2.046235675675676,
+        "threes": 0.8009315315315315,
+        "stl": 1.3713729729729731,
+        "blk": 0.5142648648648649,
+        "tov": 2.2284810810810813,
+        "pra": 23.41715135135135,
+        "pr": 21.370915675675676,
+        "pa": 19.665238918918917,
+        "ra": 5.7981481081081085
+      },
+      "top_play": {
+        "market": "threes",
+        "side": "UNDER",
+        "line": 1.5,
+        "price": -122.0,
+        "edge": 0.20819584476469422,
+        "ev": 0.3788481765390338,
+        "ev_pct": 37.88481765390338,
+        "book": "fanduel",
+        "p_win": 0.9283977260885834,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 37.9%",
+        "Regular price range (-150 to +150)",
+        "Consensus: 4 books aligned",
+        "Best line available"
+      ],
+      "basketball_summary": "model 0.8 vs line 1.5 (-0.7)"
+    },
+    {
+      "game_key": "POR@CON",
+      "game_id": "0c2ecfa7d05172b4ecf75b85d53482efe",
+      "player": "Bridget Carleton",
+      "team": "POR",
+      "team_tricode": "POR",
+      "opponent": "CON",
+      "score": 36.62539826726642,
+      "score_adj": 36.62539826726642,
+      "tier": "High",
+      "model": {
+        "pts": 15.788455994257,
+        "reb": 2.721409332376167,
+        "ast": 1.9103511844938983,
+        "threes": 2.830820961952621,
+        "stl": 2.149576453697057,
+        "blk": 0.2866101938262742,
+        "tov": 0.8598305814788227,
+        "pra": 20.420216511127062,
+        "pr": 18.509865326633168,
+        "pa": 17.698807178750897,
+        "ra": 4.631760516870065
+      },
+      "top_play": {
+        "market": "threes",
+        "side": "OVER",
+        "line": 2.5,
+        "price": 117.0,
+        "edge": 0.16878063717634295,
+        "ev": 0.3662539826726642,
+        "ev_pct": 36.62539826726642,
+        "book": "betonlineag",
+        "p_win": 0.8270834757602218,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 36.6%",
+        "Regular price range (-150 to +150)",
+        "Consensus: 4 books aligned",
+        "Best line available"
+      ],
+      "basketball_summary": "model 2.8 vs line 2.5 (+0.3)"
+    },
+    {
+      "game_key": "POR@CON",
+      "game_id": "0c2ecfa7d05172b4ecf75b85d53482efe",
+      "player": "Olivia Nelson-Ododa",
+      "team": "CON",
+      "team_tricode": "CON",
+      "opponent": "POR",
+      "score": 35.99244125185985,
+      "score_adj": 35.99244125185985,
+      "tier": "High",
+      "model": {
+        "pts": 7.784720238095236,
+        "reb": 3.474529761904761,
+        "ast": 1.943208333333333,
+        "threes": 0.0,
+        "stl": 0.7844345238095236,
+        "blk": 0.522956349206349,
+        "tov": 1.5688690476190472,
+        "pra": 13.20245833333333,
+        "pr": 11.259249999999998,
+        "pa": 9.727928571428569,
+        "ra": 5.417738095238094
+      },
+      "top_play": {
+        "market": "pts",
+        "side": "UNDER",
+        "line": 11.5,
+        "price": -110.0,
+        "edge": 0.18853183512878968,
+        "ev": 0.3599244125185985,
+        "ev_pct": 35.99244125185985,
+        "book": "fanduel",
+        "p_win": 0.8837339363281224,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 36.0%",
+        "Regular price range (-150 to +150)",
+        "Consensus: 4 books aligned",
+        "Best line available"
+      ],
+      "basketball_summary": "model 7.8 vs line 11.5 (-3.7)"
+    }
+  ]
+}

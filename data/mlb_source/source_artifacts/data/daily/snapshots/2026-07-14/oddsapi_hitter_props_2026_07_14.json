@@ -1,0 +1,146 @@
+{
+  "date": "2026-07-14",
+  "mode": "live",
+  "retrieved_at": "2026-07-14T06:45:16.765955",
+  "hitter_props": {
+    "kyle schwarber": {
+      "batter_home_runs": {
+        "line": 0.5,
+        "over_odds": "+360",
+        "under_odds": null,
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 0.5,
+            "over_odds": "+360",
+            "under_odds": null,
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": []
+      }
+    },
+    "yordan alvarez": {
+      "batter_home_runs": {
+        "line": 0.5,
+        "over_odds": "+550",
+        "under_odds": null,
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 0.5,
+            "over_odds": "+550",
+            "under_odds": null,
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": []
+      }
+    },
+    "junior caminero": {
+      "batter_home_runs": {
+        "line": 0.5,
+        "over_odds": "+550",
+        "under_odds": null,
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 0.5,
+            "over_odds": "+550",
+            "under_odds": null,
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": []
+      }
+    },
+    "cj abrams": {
+      "batter_home_runs": {
+        "line": 0.5,
+        "over_odds": "+750",
+        "under_odds": null,
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 0.5,
+            "over_odds": "+750",
+            "under_odds": null,
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": []
+      }
+    },
+    "freddie freeman": {
+      "batter_home_runs": {
+        "line": 0.5,
+        "over_odds": "+850",
+        "under_odds": null,
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 0.5,
+            "over_odds": "+850",
+            "under_odds": null,
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": []
+      }
+    },
+    "bobby witt jr.": {
+      "batter_home_runs": {
+        "line": 0.5,
+        "over_odds": "+900",
+        "under_odds": null,
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 0.5,
+            "over_odds": "+900",
+            "under_odds": null,
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": []
+      }
+    },
+    "riley greene": {
+      "batter_home_runs": {
+        "line": 0.5,
+        "over_odds": "+1000",
+        "under_odds": null,
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 0.5,
+            "over_odds": "+1000",
+            "under_odds": null,
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": []
+      }
+    }
+  },
+  "meta": {
+    "markets": [
+      "batter_hits",
+      "batter_hits_runs_rbis",
+      "batter_total_bases",
+      "batter_home_runs",
+      "batter_rbis",
+      "batter_runs_scored",
+      "batter_strikeouts"
+    ],
+    "regions": "us",
+    "bookmakers": null,
+    "counts": {
+      "players": 7,
+      "markets": {
+        "batter_home_runs": 7
+      },
+      "events_matched": 1
+    }
+  }
+}
