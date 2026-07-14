@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import OrderedDict
 from copy import deepcopy
 import csv
 import json
@@ -39,7 +40,22 @@ def _render_web_dyno() -> bool:
     return str(os.environ.get("RENDER") or "").strip().lower() in {"1", "true", "yes", "on"}
 
 
-_NBA_CARDS_CONTEXT_CACHE: dict[tuple[Any, ...], dict[str, Any]] = {}
+_NBA_CARDS_CONTEXT_CACHE: "OrderedDict[tuple[Any, ...], dict[str, Any]]" = OrderedDict()
+_NBA_CARDS_CONTEXT_CACHE_MAX_ENTRIES = 32
+
+
+def _cache_get_context(cache_key: tuple[Any, ...]) -> dict[str, Any] | None:
+    cached = _NBA_CARDS_CONTEXT_CACHE.get(cache_key)
+    if cached is not None:
+        _NBA_CARDS_CONTEXT_CACHE.move_to_end(cache_key)
+    return cached
+
+
+def _cache_put_context(cache_key: tuple[Any, ...], result: dict[str, Any]) -> None:
+    _NBA_CARDS_CONTEXT_CACHE[cache_key] = result
+    _NBA_CARDS_CONTEXT_CACHE.move_to_end(cache_key)
+    while len(_NBA_CARDS_CONTEXT_CACHE) > _NBA_CARDS_CONTEXT_CACHE_MAX_ENTRIES:
+        _NBA_CARDS_CONTEXT_CACHE.popitem(last=False)
 
 
 def _path_cache_signature(path: Path | None) -> int:
@@ -2290,7 +2306,7 @@ def build_cards_page_context(selected_date: str, *, allow_stored_date_fallback: 
         _path_cache_signature(_artifact_paths(requested_date)["props"]),
         _path_cache_signature(live_snapshot_path(f"live_state_{requested_date}.jsonl")),
     )
-    cached_context = _NBA_CARDS_CONTEXT_CACHE.get(cache_key)
+    cached_context = _cache_get_context(cache_key)
     if cached_context is not None:
         return deepcopy(cached_context)
 
@@ -2429,7 +2445,7 @@ def build_cards_page_context(selected_date: str, *, allow_stored_date_fallback: 
         "skipWhenHidden": False,
         "poller": "shared.polling",
     }
-    _NBA_CARDS_CONTEXT_CACHE[cache_key] = deepcopy(result)
+    _cache_put_context(cache_key, deepcopy(result))
     return deepcopy(result)
 
 

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from copy import deepcopy
 from collections import defaultdict
+from collections import OrderedDict
 from datetime import date
 from datetime import datetime, timedelta
 import importlib.util
@@ -45,8 +46,38 @@ from syndicate.features.shared.timezone import central_today_iso
 
 
 _MLB_TODAY_CACHE_TTL_SECONDS = 60
-_MLB_TODAY_CACHE: dict[tuple[str, str, int, int], dict[str, Any]] = {}
-_MLB_CARDS_CONTEXT_CACHE: dict[tuple[Any, ...], dict[str, Any]] = {}
+_MLB_TODAY_CACHE: "OrderedDict[tuple[str, str, int, int], dict[str, Any]]" = OrderedDict()
+_MLB_TODAY_CACHE_MAX_ENTRIES = 64
+_MLB_CARDS_CONTEXT_CACHE: "OrderedDict[tuple[Any, ...], dict[str, Any]]" = OrderedDict()
+_MLB_CARDS_CONTEXT_CACHE_MAX_ENTRIES = 32
+
+
+def _today_cache_get(cache_key: tuple[Any, ...]) -> dict[str, Any] | None:
+    cached = _MLB_TODAY_CACHE.get(cache_key)
+    if cached is not None:
+        _MLB_TODAY_CACHE.move_to_end(cache_key)
+    return cached
+
+
+def _today_cache_put(cache_key: tuple[Any, ...], result: dict[str, Any]) -> None:
+    _MLB_TODAY_CACHE[cache_key] = result
+    _MLB_TODAY_CACHE.move_to_end(cache_key)
+    while len(_MLB_TODAY_CACHE) > _MLB_TODAY_CACHE_MAX_ENTRIES:
+        _MLB_TODAY_CACHE.popitem(last=False)
+
+
+def _cards_context_cache_get(cache_key: tuple[Any, ...]) -> dict[str, Any] | None:
+    cached = _MLB_CARDS_CONTEXT_CACHE.get(cache_key)
+    if cached is not None:
+        _MLB_CARDS_CONTEXT_CACHE.move_to_end(cache_key)
+    return cached
+
+
+def _cards_context_cache_put(cache_key: tuple[Any, ...], result: dict[str, Any]) -> None:
+    _MLB_CARDS_CONTEXT_CACHE[cache_key] = result
+    _MLB_CARDS_CONTEXT_CACHE.move_to_end(cache_key)
+    while len(_MLB_CARDS_CONTEXT_CACHE) > _MLB_CARDS_CONTEXT_CACHE_MAX_ENTRIES:
+        _MLB_CARDS_CONTEXT_CACHE.popitem(last=False)
 
 
 def _render_web_dyno() -> bool:
@@ -1887,7 +1918,7 @@ def source_cards_api_payload(context: dict[str, Any]) -> dict[str, Any]:
             _path_cache_signature(daily_artifact_path(selected_date)),
             _path_cache_signature(live_lens_report_path(selected_date)),
         )
-        cached_payload = _MLB_TODAY_CACHE.get(cache_key)
+        cached_payload = _today_cache_get(cache_key)
         if cached_payload is not None:
             return cached_payload
     lineups_path = daily_snapshot_lineups_path(selected_date) if selected_date else None
@@ -2160,7 +2191,7 @@ def source_cards_api_payload(context: dict[str, Any]) -> dict[str, Any]:
         },
     }
     if cache_key is not None:
-        _MLB_TODAY_CACHE[cache_key] = result
+        _today_cache_put(cache_key, result)
     return result
 
 
@@ -4446,7 +4477,7 @@ def build_cards_page_context(selected_date: str) -> dict[str, Any]:
         _path_cache_signature(summary_path),
         _path_cache_signature(live_lens_path),
     )
-    cached_context = _MLB_CARDS_CONTEXT_CACHE.get(page_cache_key)
+    cached_context = _cards_context_cache_get(page_cache_key)
     if cached_context is not None:
         return deepcopy(cached_context)
     cache_key = None
@@ -4458,7 +4489,7 @@ def build_cards_page_context(selected_date: str) -> dict[str, Any]:
             _path_cache_signature(summary_path),
             _path_cache_signature(live_lens_path),
         )
-        cached_context = _MLB_TODAY_CACHE.get(cache_key)
+        cached_context = _today_cache_get(cache_key)
         if cached_context is not None:
             return cached_context
 
@@ -4631,7 +4662,7 @@ def build_cards_page_context(selected_date: str) -> dict[str, Any]:
         "skipWhenHidden": False,
         "poller": "shared.polling",
     }
-    _MLB_CARDS_CONTEXT_CACHE[page_cache_key] = deepcopy(result)
+    _cards_context_cache_put(page_cache_key, deepcopy(result))
     if cache_key is not None and games:
-        _MLB_TODAY_CACHE[cache_key] = result
+        _today_cache_put(cache_key, result)
     return deepcopy(result)

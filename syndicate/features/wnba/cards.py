@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ast
+from collections import OrderedDict
 from copy import deepcopy
 import csv
 from datetime import date
@@ -46,7 +47,29 @@ from syndicate.features.shared.timezone import central_now
 from syndicate.features.shared.timezone import central_today_iso
 
 
-_WNBA_CARDS_CONTEXT_CACHE: dict[tuple[Any, ...], dict[str, Any]] = {}
+_WNBA_CARDS_CONTEXT_CACHE: "OrderedDict[tuple[Any, ...], dict[str, Any]]" = OrderedDict()
+_WNBA_CARDS_CONTEXT_CACHE_MAX_ENTRIES = 32
+
+
+def _cache_get_context(cache_key: tuple[Any, ...]) -> dict[str, Any] | None:
+    cached = _WNBA_CARDS_CONTEXT_CACHE.get(cache_key)
+    if cached is not None:
+        _WNBA_CARDS_CONTEXT_CACHE.move_to_end(cache_key)
+    return cached
+
+
+def _cache_put_context(cache_key: tuple[Any, ...], result: dict[str, Any]) -> None:
+    # Plain dicts here grow without bound on a long-lived process (the
+    # live-lens background loop never restarts), and the cache key now
+    # legitimately changes every refresh cycle once real game_cards/
+    # live_state content changes are actually detected (see the content-hash
+    # signature fix above) -- unlike before, when a frozen live_state made
+    # this cache key rarely change, so growth was slow enough to go
+    # unnoticed. Bound it with simple LRU eviction instead.
+    _WNBA_CARDS_CONTEXT_CACHE[cache_key] = result
+    _WNBA_CARDS_CONTEXT_CACHE.move_to_end(cache_key)
+    while len(_WNBA_CARDS_CONTEXT_CACHE) > _WNBA_CARDS_CONTEXT_CACHE_MAX_ENTRIES:
+        _WNBA_CARDS_CONTEXT_CACHE.popitem(last=False)
 
 
 def _render_web_dyno() -> bool:
@@ -2408,7 +2431,7 @@ def build_cards_page_context(selected_date: str, *, allow_stored_date_fallback: 
         _game_cards_or_live_state_signature(_live_state_keyvalue_path(resolved_date)),
         _path_cache_signature(processed_root() / "live_snapshots" / f"live_state_{resolved_date}.jsonl"),
     )
-    cached_context = _WNBA_CARDS_CONTEXT_CACHE.get(cache_key)
+    cached_context = _cache_get_context(cache_key)
     if cached_context is not None:
         return deepcopy(cached_context)
 
@@ -2575,7 +2598,7 @@ def build_cards_page_context(selected_date: str, *, allow_stored_date_fallback: 
         # cache_key's game_cards/live_state signatures -- caching this
         # result would freeze whatever status ESPN happened to report on
         # this one request until something else changes those signatures.
-        _WNBA_CARDS_CONTEXT_CACHE[cache_key] = deepcopy(result)
+        _cache_put_context(cache_key, deepcopy(result))
     return deepcopy(result)
 
 
