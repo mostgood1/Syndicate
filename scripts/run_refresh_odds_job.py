@@ -406,6 +406,8 @@ def main() -> int:
         failure_error = None
     except Exception as exc:
         started_at = locals().get("started_at", _utc_now())
+        failure_error = f"{type(exc).__name__}: {exc}"
+        trace_text = traceback.format_exc()
         stdout_text = json.dumps(
             {
                 "ok": False,

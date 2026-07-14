@@ -13,7 +13,7 @@ from syndicate.features.shared.odds_lifecycle import load_odds_lifecycle_events
 
 class OddsRefreshTrackingTests(unittest.TestCase):
     def test_sync_nhl_tracking_writes_tracking_files(self) -> None:
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory() as tmpdir, patch.dict("os.environ", {"SYNDICATE_REPORTS_ROOT": str(Path(tmpdir) / "reports")}, clear=False):
             root = Path(tmpdir)
             props_root = root / "data" / "props" / "player_props_lines" / "date=2026-06-07"
             team_root = root / "data" / "odds" / "team" / "date=2026-06-07"
@@ -35,7 +35,7 @@ class OddsRefreshTrackingTests(unittest.TestCase):
             self.assertTrue(result["ok"])
             self.assertFalse(result.get("skipped", False))
             self.assertTrue((root / "tracking" / "odds_nhl_player_props_opening_2026-06-07.csv").exists())
-            history_path = root / "tracking" / "odds_history.json"
+            history_path = root / "tracking" / "odds_history" / "2026-06-07.json"
             shared_history_path = Path(result["artifacts"]["odds_history"]["shared_history_path"])
             self.assertTrue(history_path.exists())
             self.assertTrue(shared_history_path.exists())
@@ -90,7 +90,7 @@ class OddsRefreshTrackingTests(unittest.TestCase):
             self.assertEqual(market_state["history"][1]["movement"], "up")
 
     def test_sync_nhl_tracking_appends_when_odds_change_without_line_change(self) -> None:
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory() as tmpdir, patch.dict("os.environ", {"SYNDICATE_REPORTS_ROOT": str(Path(tmpdir) / "reports")}, clear=False):
             root = Path(tmpdir)
             props_root = root / "data" / "props" / "player_props_lines" / "date=2026-06-07"
             props_root.mkdir(parents=True)
@@ -113,7 +113,7 @@ class OddsRefreshTrackingTests(unittest.TestCase):
 
             self.assertTrue(second_result["ok"])
             self.assertEqual(second_result["artifacts"]["odds_history"]["entries_appended"], 1)
-            history_payload = json.loads((root / "tracking" / "odds_history.json").read_text(encoding="utf-8"))
+            history_payload = json.loads((root / "tracking" / "odds_history" / "2026-06-07.json").read_text(encoding="utf-8"))
             market_key = next(key for key in history_payload["markets"] if "selection=" in key)
             market_state = history_payload["markets"][market_key]
             self.assertEqual(len(market_state["history"]), 2)
@@ -121,7 +121,7 @@ class OddsRefreshTrackingTests(unittest.TestCase):
             self.assertNotEqual(market_state["history"][0]["last_odds"], market_state["history"][1]["last_odds"])
 
     def test_sync_nhl_tracking_appends_when_refresh_timestamp_changes_without_market_change(self) -> None:
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory() as tmpdir, patch.dict("os.environ", {"SYNDICATE_REPORTS_ROOT": str(Path(tmpdir) / "reports")}, clear=False):
             root = Path(tmpdir)
             props_root = root / "data" / "props" / "player_props_lines" / "date=2026-06-07"
             props_root.mkdir(parents=True)
@@ -145,7 +145,7 @@ class OddsRefreshTrackingTests(unittest.TestCase):
 
             self.assertTrue(second_result["ok"])
             self.assertEqual(second_result["artifacts"]["odds_history"]["entries_appended"], 1)
-            history_payload = json.loads((root / "tracking" / "odds_history.json").read_text(encoding="utf-8"))
+            history_payload = json.loads((root / "tracking" / "odds_history" / "2026-06-07.json").read_text(encoding="utf-8"))
             market_key = next(key for key in history_payload["markets"] if "selection=" in key)
             market_state = history_payload["markets"][market_key]
             self.assertEqual(len(market_state["history"]), 2)
@@ -154,7 +154,7 @@ class OddsRefreshTrackingTests(unittest.TestCase):
             self.assertNotEqual(market_state["history"][0]["snapshot_ts"], market_state["history"][1]["snapshot_ts"])
 
     def test_sync_nfl_tracking_reads_source_artifacts(self) -> None:
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory() as tmpdir, patch.dict("os.environ", {"SYNDICATE_REPORTS_ROOT": str(Path(tmpdir) / "reports")}, clear=False):
             root = Path(tmpdir)
             artifact_root = root / "source_artifacts"
             artifact_root.mkdir(parents=True)
@@ -189,7 +189,7 @@ class OddsRefreshTrackingTests(unittest.TestCase):
             self.assertTrue(team_opening_path.exists())
 
     def test_sync_mlb_tracking_writes_snapshot_artifacts(self) -> None:
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory() as tmpdir, patch.dict("os.environ", {"SYNDICATE_REPORTS_ROOT": str(Path(tmpdir) / "reports")}, clear=False):
             root = Path(tmpdir)
             snapshot_root = root / "source_artifacts" / "data" / "daily" / "snapshots" / "2026-06-07"
             snapshot_root.mkdir(parents=True)
@@ -230,8 +230,60 @@ class OddsRefreshTrackingTests(unittest.TestCase):
             self.assertIn("hitter_props", result["artifacts"])
             self.assertTrue((root / "tracking" / "odds_mlb_game_lines_opening_2026-06-07.csv").exists())
 
+    def test_sync_mlb_tracking_shards_by_commence_time_not_invocation_date(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir, patch.dict("os.environ", {"SYNDICATE_REPORTS_ROOT": str(Path(tmpdir) / "reports")}, clear=False):
+            root = Path(tmpdir)
+            snapshot_root = root / "source_artifacts" / "data" / "daily" / "snapshots" / "2026-06-07"
+            snapshot_root.mkdir(parents=True)
+            (snapshot_root / "oddsapi_game_lines_2026_06_07.json").write_text(
+                json.dumps(
+                    {
+                        "retrieved_at": "2026-06-07T12:00:00Z",
+                        "games": [
+                            {
+                                "away_team": "Away",
+                                "home_team": "Home",
+                                "bookmaker": "draftkings",
+                                "commence_time": "2026-06-07T23:00:00Z",
+                                "markets": {
+                                    "h2h": {"home_odds": "-140", "away_odds": "+120"},
+                                },
+                            },
+                            {
+                                "away_team": "Away2",
+                                "home_team": "Home2",
+                                "bookmaker": "draftkings",
+                                "commence_time": "2026-06-08T00:30:00Z",
+                                "markets": {
+                                    "h2h": {"home_odds": "-130", "away_odds": "+110"},
+                                },
+                            },
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            result = sync_post_refresh_tracking_for_source_root(sport="mlb", source_root=root, date_str="2026-06-07")
+
+            self.assertTrue(result["ok"])
+            shards = result["artifacts"]["odds_history"]["shards"]
+            self.assertEqual(sorted(shards.keys()), ["2026-06-07", "2026-06-08"])
+
+            today_path = root / "tracking" / "odds_history" / "2026-06-07.json"
+            tomorrow_path = root / "tracking" / "odds_history" / "2026-06-08.json"
+            self.assertTrue(today_path.exists())
+            self.assertTrue(tomorrow_path.exists())
+
+            today_payload = json.loads(today_path.read_text(encoding="utf-8"))
+            tomorrow_payload = json.loads(tomorrow_path.read_text(encoding="utf-8"))
+            today_key = next(key for key in today_payload["markets"] if "home_team=Home|" in key)
+            tomorrow_key = next(key for key in tomorrow_payload["markets"] if "home_team=Home2|" in key)
+            self.assertNotIn(tomorrow_key, today_payload["markets"])
+            self.assertNotIn(today_key, tomorrow_payload["markets"])
+
     def test_sync_ncaab_tracking_writes_team_lines(self) -> None:
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory() as tmpdir, patch.dict("os.environ", {"SYNDICATE_REPORTS_ROOT": str(Path(tmpdir) / "reports")}, clear=False):
             root = Path(tmpdir)
             odds_root = root / "raw_outputs" / "by_date" / "2026-06-07"
             odds_root.mkdir(parents=True)
@@ -248,7 +300,7 @@ class OddsRefreshTrackingTests(unittest.TestCase):
             self.assertTrue(opening_path.exists())
 
     def test_sync_ncaaf_tracking_writes_manifest(self) -> None:
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory() as tmpdir, patch.dict("os.environ", {"SYNDICATE_REPORTS_ROOT": str(Path(tmpdir) / "reports")}, clear=False):
             root = Path(tmpdir)
             artifact_root = root / "source_artifacts"
             artifact_root.mkdir(parents=True)
@@ -336,7 +388,7 @@ class OddsRefreshTrackingTests(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            with patch.dict("os.environ", {"SYNDICATE_ODDS_EVENTS_ROOT": str(lifecycle_root)}, clear=False):
+            with patch.dict("os.environ", {"SYNDICATE_ODDS_EVENTS_ROOT": str(lifecycle_root), "SYNDICATE_REPORTS_ROOT": str(root / "reports")}, clear=False):
                 first = sync_post_refresh_tracking_for_source_root(sport="nhl", source_root=root, date_str="2026-06-07")
 
                 (team_root / "oddsapi.csv").write_text(

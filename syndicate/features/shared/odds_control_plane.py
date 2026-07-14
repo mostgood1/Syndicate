@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+import re
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -10,6 +11,12 @@ from syndicate.features.shared.refresh_state_store import reports_root
 from syndicate.features.shared.refresh_state_store import write_json_file
 from syndicate.features.shared.source_roots import preferred_artifact_roots
 from syndicate.features.shared.source_roots import preferred_source_roots
+from syndicate.features.shared.week_calendar import shard_key_for_week
+from syndicate.features.shared.week_calendar import week_for_date
+
+
+_WEEKLY_SPORTS = {"nfl", "ncaaf"}
+_WEEKLY_SHARD_KEY_RE = re.compile(r"^(?P<season>\d{4})_wk(?P<week>\d+)$")
 
 
 def _utc_now() -> str:
@@ -58,29 +65,33 @@ def odds_history_roots_for_sport(sport_slug: str) -> list[Path]:
     return roots
 
 
-def odds_history_paths_for_sport(sport_slug: str) -> list[Path]:
+def odds_history_paths_for_sport(sport_slug: str, shard_key: str) -> list[Path]:
+    slug = str(sport_slug or "").strip().lower()
     paths: list[Path] = []
-    shared_path = shared_odds_history_root() / str(sport_slug or "").strip().lower() / "odds_history.json"
+    shared_path = shared_odds_history_root() / slug / f"{shard_key}.json"
     paths.append(shared_path)
-    for root in odds_history_roots_for_sport(sport_slug):
+    for root in odds_history_roots_for_sport(slug):
         if root == shared_path.parent:
             continue
-        for candidate in (root / "artifacts" / str(sport_slug).strip().lower() / "odds_history.json", root / "tracking" / "odds_history.json"):
+        for candidate in (
+            root / "artifacts" / slug / "odds_history" / f"{shard_key}.json",
+            root / "tracking" / "odds_history" / f"{shard_key}.json",
+        ):
             if candidate not in paths:
                 paths.append(candidate)
     return paths
 
 
-def load_odds_history_payload_for_sport(sport_slug: str) -> dict[str, Any] | None:
-    for path in odds_history_paths_for_sport(sport_slug):
+def load_odds_history_payload_for_sport(sport_slug: str, shard_key: str) -> dict[str, Any] | None:
+    for path in odds_history_paths_for_sport(sport_slug, shard_key):
         payload = read_json_file(path)
         if isinstance(payload, dict):
             return payload
     return None
 
 
-def odds_history_path_status_for_sport(sport_slug: str) -> dict[str, Any]:
-    candidate_paths = odds_history_paths_for_sport(sport_slug)
+def odds_history_path_status_for_sport(sport_slug: str, shard_key: str) -> dict[str, Any]:
+    candidate_paths = odds_history_paths_for_sport(sport_slug, shard_key)
     active_path = None
     active_payload: dict[str, Any] | None = None
     for candidate_path in candidate_paths:
@@ -92,11 +103,90 @@ def odds_history_path_status_for_sport(sport_slug: str) -> dict[str, Any]:
 
     return {
         "sport": str(sport_slug or "").strip().lower(),
+        "shard_key": shard_key,
         "candidate_paths": [str(path) for path in candidate_paths],
         "active_path": str(active_path) if active_path is not None else None,
         "has_payload": bool(active_payload),
         "source_precedence": ["shared_history", "artifact_history", "tracking_history"],
     }
+
+
+def _current_tracked_week(sport_slug: str, root: Path) -> tuple[int, int] | None:
+    if str(sport_slug or "").strip().lower() != "nfl":
+        return None
+    for candidate in (root / "current_week.json", root / "source_artifacts" / "current_week.json"):
+        payload = read_json_file(candidate)
+        if isinstance(payload, dict):
+            try:
+                return int(payload["season"]), int(payload["week"])
+            except Exception:
+                continue
+    return None
+
+
+def resolve_current_shard_key(sport_slug: str, date_str: str | None, *, source_root: Path | None = None) -> str:
+    slug = str(sport_slug or "").strip().lower()
+    date_str = str(date_str or "").strip() or datetime.now(timezone.utc).date().isoformat()
+    if slug not in _WEEKLY_SPORTS:
+        return date_str
+    root = source_root or odds_history_roots_for_sport(slug)[-1]
+    try:
+        target_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+    except Exception:
+        target_date = None
+    if target_date is not None:
+        resolved = week_for_date(slug, target_date, source_root=root)
+        if resolved is not None:
+            return shard_key_for_week(*resolved)
+    tracked = _current_tracked_week(slug, root)
+    if tracked is not None:
+        return shard_key_for_week(*tracked)
+    return date_str
+
+
+def list_available_shard_keys(sport_slug: str) -> list[str]:
+    slug = str(sport_slug or "").strip().lower()
+    keys: set[str] = set()
+    shared_dir = shared_odds_history_root() / slug
+    if shared_dir.exists():
+        for path in shared_dir.glob("*.json"):
+            keys.add(path.stem)
+    for root in odds_history_roots_for_sport(slug):
+        if root == shared_dir:
+            continue
+        for base in (root / "artifacts" / slug / "odds_history", root / "tracking" / "odds_history"):
+            if base.exists():
+                for path in base.glob("*.json"):
+                    keys.add(path.stem)
+    return sorted(keys)
+
+
+def odds_history_lookback_shard_keys(sport_slug: str, shard_key: str, lookback: int) -> list[str]:
+    slug = str(sport_slug or "").strip().lower()
+    if lookback <= 0:
+        return []
+    if slug in _WEEKLY_SPORTS:
+        match = _WEEKLY_SHARD_KEY_RE.match(shard_key)
+        if not match:
+            return []
+        season = int(match.group("season"))
+        week = int(match.group("week"))
+        keys: list[str] = []
+        for _ in range(lookback):
+            week -= 1
+            if week < 1:
+                # Week counts vary by season/sport; this is a best-effort
+                # lookback across a season boundary, not an exact calendar
+                # walk, since no schedule is consulted here.
+                season -= 1
+                week = 22
+            keys.append(shard_key_for_week(season, week))
+        return keys
+    try:
+        current = datetime.strptime(shard_key, "%Y-%m-%d").date()
+    except Exception:
+        return []
+    return [(current - timedelta(days=offset)).isoformat() for offset in range(1, lookback + 1)]
 
 
 def build_odds_control_plane_snapshot(summary: dict[str, Any]) -> dict[str, Any]:
@@ -106,7 +196,8 @@ def build_odds_control_plane_snapshot(summary: dict[str, Any]) -> dict[str, Any]
         if not isinstance(result, dict):
             continue
         sport = str(result.get("sport") or "").strip().lower()
-        odds_history_status = odds_history_path_status_for_sport(sport)
+        shard_keys = list_available_shard_keys(sport)
+        odds_history_shards = [odds_history_path_status_for_sport(sport, shard_key) for shard_key in shard_keys]
         sport_snapshots.append(
             {
                 "sport": sport,
@@ -118,7 +209,12 @@ def build_odds_control_plane_snapshot(summary: dict[str, Any]) -> dict[str, Any]
                 "artifact_paths": list(result.get("artifact_paths") or []),
                 "post_refresh_ok": (result.get("sport_manifest") or {}).get("payload", {}).get("metadata", {}).get("post_refresh_ok") if isinstance(result.get("sport_manifest"), dict) else None,
                 "mirror_ok": (result.get("sport_manifest") or {}).get("payload", {}).get("metadata", {}).get("mirror_ok") if isinstance(result.get("sport_manifest"), dict) else None,
-                "odds_history": odds_history_status,
+                "odds_history": {
+                    "sport": sport,
+                    "shard_count": len(shard_keys),
+                    "shards": odds_history_shards,
+                    "source_precedence": ["shared_history", "artifact_history", "tracking_history"],
+                },
             }
         )
 

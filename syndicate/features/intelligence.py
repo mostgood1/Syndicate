@@ -68,12 +68,16 @@ from syndicate.features.market_data import attach_market_data as _attach_market_
 from syndicate.features.simulation_engine import SimulationEngine
 from syndicate.features.prediction_ledger import _signal_weight
 from syndicate.features.shared.intelligence_evaluation import adjust_confidence
+from syndicate.features.shared.intelligence_evaluation import build_feature_coverage_profile
 from syndicate.features.shared.intelligence_evaluation import build_reliability_profile
 from syndicate.features.shared.intelligence_contracts import UniversalCandidate
 from syndicate.features.shared.recommendation_engine import filter_candidates as _shared_filter_candidates
 from syndicate.features.shared.recommendation_engine import rank_recommendations as _shared_rank_recommendations
 from syndicate.features.shared.ops_refresh import load_latest_refresh_status
+from syndicate.features.shared.odds_control_plane import load_odds_history_payload_for_sport as _canonical_load_odds_history_payload_for_sport
+from syndicate.features.shared.odds_control_plane import resolve_current_shard_key
 from syndicate.features.shared.refresh_state_store import reports_root
+from syndicate.features.shared.week_calendar import shard_key_for_week
 from syndicate.features.intelligence_parlay_correlation import parlay_leg_market_key as _runtime_parlay_leg_market_key
 from syndicate.features.intelligence_parlay_correlation import parlay_leg_market_shape as _runtime_parlay_leg_market_shape
 from syndicate.features.intelligence_parlay_correlation import parlay_matches_preferences as _runtime_parlay_matches_preferences
@@ -2527,85 +2531,36 @@ def _wnba_repo_artifact_path(*parts: str) -> Path:
     return default_wnba_source_root().joinpath("data", "processed", *parts)
 
 
-def _odds_history_tracking_root_for_sport(slug: str) -> Path | None:
-    sport_slug = _safe_text(slug, "").lower()
-    if sport_slug == "mlb":
-        return default_mlb_source_root()
-    if sport_slug == "nba":
-        return nba_processed_path("team_advanced_stats_2026.csv").parents[2]
-    if sport_slug == "wnba":
-        return default_wnba_source_root()
-    if sport_slug == "nhl":
-        return nhl_processed_path("odds_history_placeholder.csv").parents[2]
-    if sport_slug == "nfl":
-        return nfl_sources.default_nfl_source_root()
-    if sport_slug == "ncaaf":
-        return ncaaf_sources.default_ncaaf_source_root()
-    if sport_slug == "ncaab":
-        roots = ncaab_sources._source_roots()
-        return roots[0] if roots else None
-    return None
+def _shard_key_from_context_label(slug: str, context_label: str) -> str:
+    label = _safe_text(context_label, "").strip()
+    if slug in {"nfl", "ncaaf"}:
+        week_match = re.search(r"(?P<season>\d{4})\s+Week\s+(?P<week>\d+)", label)
+        if week_match:
+            return shard_key_for_week(int(week_match.group("season")), int(week_match.group("week")))
+        return resolve_current_shard_key(slug, central_today_iso())
+    if re.fullmatch(r"\d{4}-\d{2}-\d{2}", label):
+        return label
+    return resolve_current_shard_key(slug, central_today_iso())
 
 
-def _odds_history_path_for_sport(slug: str) -> Path | None:
-    sport_slug = _safe_text(slug, "").lower()
-    shared_path = reports_root() / "odds_control_plane" / "odds_history" / sport_slug / "odds_history.json"
-    if shared_path.exists():
-        return shared_path
-    root = _odds_history_tracking_root_for_sport(sport_slug)
-    if root is None:
-        return shared_path
-    tracking_path = root / "tracking" / "odds_history.json"
-    if tracking_path.exists():
-        return tracking_path
-    return shared_path if shared_path.exists() else tracking_path
-
-
-def _load_odds_history_payload_for_sport(slug: str) -> dict[str, Any] | None:
-    path = _odds_history_path_for_sport(slug)
-    exists = False
-    if path is not None:
-        try:
-            exists = path.exists()
-        except OSError:
-            exists = False
-    if path is None or not exists:
-        _intel_trace(
-            "odds_history_input",
-            sport=_safe_text(slug, "sport").lower(),
-            path=str(path) if path is not None else None,
-            present=False,
-            entry_count=0,
-        )
-        return None
-    try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
-    except Exception:
-        _intel_trace(
-            "odds_history_input",
-            sport=_safe_text(slug, "sport").lower(),
-            path=str(path),
-            present=False,
-            entry_count=0,
-            reason="load_failed",
-        )
-        return None
+def _load_odds_history_payload_for_sport(slug: str, shard_key: str) -> dict[str, Any] | None:
+    sport_slug = _safe_text(slug, "sport").lower()
+    payload = _canonical_load_odds_history_payload_for_sport(sport_slug, shard_key)
     if not isinstance(payload, dict):
         _intel_trace(
             "odds_history_input",
-            sport=_safe_text(slug, "sport").lower(),
-            path=str(path),
+            sport=sport_slug,
+            shard_key=shard_key,
             present=False,
             entry_count=0,
-            reason="non_dict_payload",
         )
         return None
     markets = payload.get("markets") if isinstance(payload.get("markets"), dict) else {}
     market_keys = list(markets.keys()) if isinstance(markets, dict) else []
     _intel_trace(
         "odds_history_input",
-        sport=_safe_text(slug, "sport").lower(),
-        path=str(path),
+        sport=sport_slug,
+        shard_key=shard_key,
         present=True,
         entry_count=len(market_keys),
         sample_market_keys=market_keys[:5],
@@ -2621,7 +2576,8 @@ def _odds_history_payloads_by_sport(overview: list[dict[str, Any]]) -> dict[str,
         slug = _safe_text(sport.get("slug"), "sport").lower()
         if not slug or slug in payloads:
             continue
-        payload = _load_odds_history_payload_for_sport(slug)
+        shard_key = _shard_key_from_context_label(slug, _safe_text(sport.get("context_label"), ""))
+        payload = _load_odds_history_payload_for_sport(slug, shard_key)
         if isinstance(payload, dict):
             payloads[slug] = payload
     _intel_trace(
@@ -4676,6 +4632,16 @@ def _apply_advanced_context_to_candidates(
         candidate["market_focuses"] = market_focuses
         candidate["market_fit"] = market_fit
         candidate["mlb_statcast_profile"] = statcast_profile
+        artifact_features = candidate.get("artifact_features") if isinstance(candidate.get("artifact_features"), dict) else {}
+        if artifact_features:
+            candidate["artifact_features"] = dict(artifact_features)
+            candidate["feature_coverage"] = dict(artifact_features.get("feature_coverage") or candidate.get("feature_coverage") or {})
+        coverage_profile = build_feature_coverage_profile(candidate.get("feature_coverage") or (artifact_features.get("feature_coverage") if artifact_features else {}))
+        if coverage_profile:
+            candidate["model_confidence"] = candidate.get("confidence")
+            candidate.update(coverage_profile)
+            if candidate.get("coverage_adjusted_confidence") is not None:
+                candidate["confidence"] = candidate.get("coverage_adjusted_confidence")
         simulation_context = build_simulation_engine_context_from_candidate(candidate)
         candidate["simulation"] = _SIMULATION_ENGINE.run_simulation(simulation_context)
         candidate["advanced_signals"] = inferred_signals + existing_signals
@@ -6702,6 +6668,16 @@ def run_intelligence_query(
     for recommendation in recommendations:
         if not recommendation.get("advanced_inputs") and recommendation.get("advanced_context"):
             recommendation["advanced_inputs"] = recommendation.get("advanced_context")
+        artifact_features = recommendation.get("artifact_features") if isinstance(recommendation.get("artifact_features"), dict) else {}
+        if artifact_features:
+            recommendation["artifact_features"] = dict(artifact_features)
+            recommendation["feature_coverage"] = dict(artifact_features.get("feature_coverage") or recommendation.get("feature_coverage") or {})
+        coverage_profile = build_feature_coverage_profile(recommendation.get("feature_coverage") or (artifact_features.get("feature_coverage") if artifact_features else {}))
+        if coverage_profile:
+            recommendation["model_confidence"] = recommendation.get("confidence")
+            recommendation.update(coverage_profile)
+            if recommendation.get("coverage_adjusted_confidence") is not None:
+                recommendation["confidence"] = recommendation.get("coverage_adjusted_confidence")
     _log_candidate_pipeline(
         candidates=candidates,
         filtered_candidates=filtered_candidates,

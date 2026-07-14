@@ -5,10 +5,13 @@ from flask import Blueprint, jsonify, render_template, request
 from syndicate.features.ncaaf.archive import build_archive_api_payload
 from syndicate.features.ncaaf.archive import build_archive_page_context
 from syndicate.features.ncaaf.cards import build_cards_page_context
+from syndicate.features.ncaaf.cards import build_smartsim_cards_page_context
 from syndicate.features.ncaaf.game_detail import build_game_detail_page_context
 from syndicate.features.ncaaf.live_lens import build_live_lens_page_context
+from syndicate.features.ncaaf.live_lens import build_smartsim_live_lens_page_context
 from syndicate.features.ncaaf.picks import build_picks_page_context
 from syndicate.features.ncaaf.picks import build_betting_card_page_context
+from syndicate.features.ncaaf.picks import build_smartsim_picks_page_context
 from syndicate.features.ncaaf.sources import default_season
 from syndicate.features.ncaaf.sources import default_week
 from syndicate.features.ncaaf.sources import week_summaries
@@ -53,13 +56,13 @@ def root_cards():
 
 @ncaaf_bp.get("/cards")
 def cards():
-    context = build_cards_page_context(_selected_week())
+    context = build_smartsim_cards_page_context(_selected_week())
     return render_template("shared/game_cards_board.html", **context)
 
 
 @ncaaf_bp.get("/api/cards")
 def api_cards():
-    context = build_cards_page_context(_selected_week())
+    context = build_smartsim_cards_page_context(_selected_week())
     return jsonify(build_game_board_api_payload(context))
 
 
@@ -99,19 +102,19 @@ def api_archive():
 
 @ncaaf_bp.get("/picks")
 def picks():
-    context = build_picks_page_context(_selected_week())
+    context = build_smartsim_picks_page_context(_selected_week())
     return render_template("shared/rank_board.html", **context)
 
 
 @ncaaf_bp.get("/live-lens")
 def live_lens():
-    context = build_live_lens_page_context(_selected_week())
+    context = build_smartsim_live_lens_page_context(_selected_week())
     return render_template("shared/rank_board.html", **context)
 
 
 @ncaaf_bp.get("/api/live-lens")
 def api_live_lens():
-    context = build_live_lens_page_context(_selected_week())
+    context = build_smartsim_live_lens_page_context(_selected_week())
     payload = build_rank_api_payload(context)
     payload["week"] = context["week"]
     payload["available_weeks"] = context["available_weeks"]
@@ -135,7 +138,7 @@ def api_betting_card(season: int):
 
 @ncaaf_bp.get("/api/picks")
 def api_picks():
-    context = build_picks_page_context(_selected_week())
+    context = build_smartsim_picks_page_context(_selected_week())
     payload = build_rank_api_payload(context)
     payload["week"] = context["week"]
     payload["available_weeks"] = context["available_weeks"]

@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import json
+import os
 import time
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -15,6 +16,8 @@ from syndicate.features.shared.odds_framework import normalize_odds_entry
 from syndicate.features.shared.odds_lifecycle import append_odds_lifecycle_events
 from syndicate.features.shared.odds_lifecycle import odds_lifecycle_path
 from syndicate.features.shared.recommendation_engine import build_recommendation_output
+from syndicate.features.shared.week_calendar import shard_key_for_week
+from syndicate.features.shared.week_calendar import week_for_date
 
 
 _ODDS_HISTORY_LIMIT = 50
@@ -93,16 +96,16 @@ def _write_json(path: Path, payload: Any) -> None:
     _trace_log("after_write_json", **_trace_path_payload(path), elapsed_ms=round((time.perf_counter() - started) * 1000, 3))
 
 
-def _odds_history_path(tracking_root: Path) -> Path:
-    return tracking_root / "odds_history.json"
+def _odds_history_path(tracking_root: Path, shard_key: str) -> Path:
+    return tracking_root / "odds_history" / f"{shard_key}.json"
 
 
-def _odds_history_artifact_path(source_root: Path, sport: str) -> Path:
-    return source_root / "artifacts" / sport / "odds_history.json"
+def _odds_history_artifact_path(source_root: Path, sport: str, shard_key: str) -> Path:
+    return source_root / "artifacts" / sport / "odds_history" / f"{shard_key}.json"
 
 
-def _shared_odds_history_path(sport: str) -> Path:
-    return shared_odds_history_root() / str(sport or "").strip().lower() / "odds_history.json"
+def _shared_odds_history_path(sport: str, shard_key: str) -> Path:
+    return shared_odds_history_root() / str(sport or "").strip().lower() / f"{shard_key}.json"
 
 
 def _json_safe(value: Any) -> Any:
@@ -436,6 +439,7 @@ def _market_rows_from_mapping(payload: Mapping[str, Any], *, context: Mapping[st
         "bookmaker",
         "date",
         "sport",
+        "commence_time",
     ):
         value = payload.get(key)
         if value in (None, ""):
@@ -630,12 +634,94 @@ def _odds_history_snapshot_paths(*, sport: str, source_root: Path, date_str: str
     return []
 
 
+def _parse_game_date_token(value: Any) -> date | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    normalized = text.replace("Z", "+00:00")
+    try:
+        return datetime.fromisoformat(normalized).date()
+    except Exception:
+        pass
+    try:
+        return date.fromisoformat(text[:10])
+    except Exception:
+        return None
+
+
+def _row_game_date(row: Mapping[str, Any], *, sport: str) -> date | None:
+    slug = str(sport or "").strip().lower()
+    if slug == "mlb":
+        return _parse_game_date_token(row.get("commence_time"))
+    if slug == "nhl":
+        return _parse_game_date_token(row.get("commence_time") or row.get("gameDate"))
+    if slug == "ncaab":
+        return _parse_game_date_token(row.get("commence_time"))
+    if slug == "nfl":
+        return _parse_game_date_token(row.get("game_time"))
+    if slug == "ncaaf":
+        return _parse_game_date_token(row.get("start_date") or row.get("start_date_api"))
+    return None
+
+
+def _row_week_scope(row: Mapping[str, Any], *, sport: str, date_str: str, source_root: Path) -> str:
+    slug = str(sport or "").strip().lower()
+    if slug == "ncaaf":
+        try:
+            season = int(row.get("season") or 0)
+            week = int(row.get("week") or 0)
+        except Exception:
+            season = week = 0
+        if season and week:
+            return shard_key_for_week(season, week)
+    game_date = _row_game_date(row, sport=slug)
+    if game_date is not None:
+        resolved = week_for_date(slug, game_date, source_root=source_root)
+        if resolved is not None:
+            return shard_key_for_week(*resolved)
+    if slug == "nfl":
+        scope, _ = _infer_nfl_week_scope(source_root)
+        if scope and scope != "unknown":
+            return scope
+    # No reliable season/week signal at all (e.g. an NCAAF format without
+    # season/week columns) -- degrade to a date-keyed bucket rather than
+    # losing the row.
+    return f"unscoped_{date_str}"
+
+
+def _shard_key_for_row(row: Mapping[str, Any], *, sport: str, date_str: str, source_root: Path) -> str:
+    slug = str(sport or "").strip().lower()
+    if slug in {"nfl", "ncaaf"}:
+        return _row_week_scope(row, sport=slug, date_str=date_str, source_root=source_root)
+    game_date = _row_game_date(row, sport=slug)
+    if game_date is not None:
+        return game_date.isoformat()
+    return date_str
+
+
+def _load_shard_existing_markets(*, source_root: Path, tracking_root: Path, slug: str, shard_key: str) -> dict[str, dict[str, Any]]:
+    artifact_path = _odds_history_artifact_path(source_root, slug, shard_key)
+    tracking_path = _odds_history_path(tracking_root, shard_key)
+    existing: dict[str, Any] = {}
+    for candidate_path in (artifact_path, tracking_path):
+        _trace_log("before_odds_history_existing_read", sport=slug, shard_key=shard_key, **_trace_path_payload(candidate_path))
+        try:
+            if candidate_path.exists():
+                read_started = time.perf_counter()
+                payload = json.loads(candidate_path.read_text(encoding="utf-8"))
+                if isinstance(payload, dict):
+                    existing = payload
+                    _trace_log("after_odds_history_existing_read", sport=slug, shard_key=shard_key, **_trace_path_payload(candidate_path, rows=int(len(payload) if hasattr(payload, "__len__") else 0)), elapsed_ms=round((time.perf_counter() - read_started) * 1000, 3), hit=True)
+                    break
+        except Exception:
+            _trace_log("after_odds_history_existing_read", sport=slug, shard_key=shard_key, **_trace_path_payload(candidate_path), error=True)
+            continue
+    return _odds_history_market_states(existing)
+
+
 def _sync_odds_history_for_refresh(*, sport: str, source_root: Path, date_str: str) -> dict[str, Any]:
     slug = str(sport or "").strip().lower()
     tracking_root = source_root / "tracking"
-    history_path = _odds_history_path(tracking_root)
-    artifact_history_path = _odds_history_artifact_path(source_root, slug)
-    shared_history_path = _shared_odds_history_path(slug)
     candidates = _odds_history_snapshot_paths(sport=slug, source_root=source_root, date_str=date_str)
     _trace_log("before_sync_odds_history", sport=slug, date=date_str, candidates=[str(path) for path in candidates], candidate_count=len(candidates))
     if not candidates:
@@ -645,28 +731,10 @@ def _sync_odds_history_for_refresh(*, sport: str, source_root: Path, date_str: s
             "reason": "no_odds_snapshots",
             "sport": slug,
             "date": date_str,
-            "history_path": str(history_path),
-            "shared_history_path": str(shared_history_path),
             "files_scanned": 0,
             "entries_appended": 0,
+            "shards": {},
         }
-
-    existing: dict[str, Any] = {}
-    for candidate_path in (artifact_history_path, history_path):
-        _trace_log("before_odds_history_existing_read", sport=slug, **_trace_path_payload(candidate_path))
-        try:
-            if candidate_path.exists():
-                read_started = time.perf_counter()
-                payload = json.loads(candidate_path.read_text(encoding="utf-8"))
-                if isinstance(payload, dict):
-                    existing = payload
-                    _trace_log("after_odds_history_existing_read", sport=slug, **_trace_path_payload(candidate_path, rows=int(len(payload) if hasattr(payload, "__len__") else 0)), elapsed_ms=round((time.perf_counter() - read_started) * 1000, 3), hit=True)
-                    break
-        except Exception:
-            _trace_log("after_odds_history_existing_read", sport=slug, **_trace_path_payload(candidate_path), elapsed_ms=round((time.perf_counter() - read_started) * 1000, 3) if 'read_started' in locals() else None, error=True)
-            continue
-
-    markets = _odds_history_market_states(existing)
 
     now = _utc_now()
     entries_appended = 0
@@ -675,8 +743,18 @@ def _sync_odds_history_for_refresh(*, sport: str, source_root: Path, date_str: s
     files_scanned = 0
     seen_current_snapshots: set[tuple[str, float, float | None]] = set()
     lifecycle_events: list[dict[str, Any]] = []
-    seen_market_keys: set[str] = set()
-    seen_live_market_keys: set[str] = set()
+    shards: dict[str, dict[str, dict[str, Any]]] = {}
+    shard_seen_market_keys: dict[str, set[str]] = {}
+    shard_seen_live_market_keys: dict[str, set[str]] = {}
+    shard_entries_appended: dict[str, int] = {}
+
+    def _shard_markets(shard_key: str) -> dict[str, dict[str, Any]]:
+        if shard_key not in shards:
+            shards[shard_key] = _load_shard_existing_markets(source_root=source_root, tracking_root=tracking_root, slug=slug, shard_key=shard_key)
+            shard_seen_market_keys[shard_key] = set()
+            shard_seen_live_market_keys[shard_key] = set()
+            shard_entries_appended[shard_key] = 0
+        return shards[shard_key]
 
     for candidate in candidates:
         files_scanned += 1
@@ -708,6 +786,12 @@ def _sync_odds_history_for_refresh(*, sport: str, source_root: Path, date_str: s
             if dedupe_key in seen_current_snapshots:
                 continue
             seen_current_snapshots.add(dedupe_key)
+
+            shard_key = _shard_key_for_row(row, sport=slug, date_str=date_str, source_root=source_root)
+            row_game_date = _row_game_date(row, sport=slug)
+            markets = _shard_markets(shard_key)
+            seen_market_keys = shard_seen_market_keys[shard_key]
+            seen_live_market_keys = shard_seen_live_market_keys[shard_key]
             seen_market_keys.add(market_key)
 
             market_state = markets.get(market_key)
@@ -808,6 +892,7 @@ def _sync_odds_history_for_refresh(*, sport: str, source_root: Path, date_str: s
                     "timestamp": now,
                     "sport": slug,
                     "date": date_str,
+                    "game_date": row_game_date.isoformat() if row_game_date is not None else None,
                     "source_path": source_path,
                     "market_key": market_key,
                     "market_id": canonical_row.get("market_id"),
@@ -840,74 +925,96 @@ def _sync_odds_history_for_refresh(*, sport: str, source_root: Path, date_str: s
             market_state["last_source_path"] = source_path
             markets[market_key] = market_state
             entries_appended += 1
+            shard_entries_appended[shard_key] += 1
 
-    missing_market_keys = [key for key in markets.keys() if key not in seen_market_keys]
-    for market_key in missing_market_keys:
-        market_state = markets.get(market_key)
-        if not isinstance(market_state, dict):
-            continue
-        history = market_state.get("history") if isinstance(market_state.get("history"), list) else []
-        latest = history[-1] if history else {}
-        if not isinstance(latest, Mapping):
-            continue
-        normalized_entry = latest.get("normalized") if isinstance(latest.get("normalized"), Mapping) else {}
-        lifecycle_events.append(
-            _market_lifecycle_event(
-                row=latest.get("row") if isinstance(latest.get("row"), Mapping) else latest,
-                normalized_entry=normalized_entry,
-                event_type="close",
-                sport=slug,
-                timestamp=now,
-                market_key=market_key,
-                current_line=_line_number(latest.get("current_line")),
-                current_odds=_line_number(latest.get("last_odds")),
-                is_live=bool(normalized_entry.get("is_live") if isinstance(normalized_entry, Mapping) else False),
+    for shard_key, markets in shards.items():
+        seen_market_keys = shard_seen_market_keys.get(shard_key, set())
+        missing_market_keys = [key for key in markets.keys() if key not in seen_market_keys]
+        for market_key in missing_market_keys:
+            market_state = markets.get(market_key)
+            if not isinstance(market_state, dict):
+                continue
+            history = market_state.get("history") if isinstance(market_state.get("history"), list) else []
+            latest = history[-1] if history else {}
+            if not isinstance(latest, Mapping):
+                continue
+            normalized_entry = latest.get("normalized") if isinstance(latest.get("normalized"), Mapping) else {}
+            lifecycle_events.append(
+                _market_lifecycle_event(
+                    row=latest.get("row") if isinstance(latest.get("row"), Mapping) else latest,
+                    normalized_entry=normalized_entry,
+                    event_type="close",
+                    sport=slug,
+                    timestamp=now,
+                    market_key=market_key,
+                    current_line=_line_number(latest.get("current_line")),
+                    current_odds=_line_number(latest.get("last_odds")),
+                    is_live=bool(normalized_entry.get("is_live") if isinstance(normalized_entry, Mapping) else False),
+                )
             )
-        )
 
     if lifecycle_events:
         _trace_log("before_append_odds_lifecycle_events", sport=slug, date=date_str, events=len(lifecycle_events), path=str(odds_lifecycle_path(date_str)))
         append_odds_lifecycle_events(date_str, lifecycle_events)
         _trace_log("after_append_odds_lifecycle_events", sport=slug, date=date_str, events=len(lifecycle_events), path=str(odds_lifecycle_path(date_str)), size_bytes=_trace_file_size(odds_lifecycle_path(date_str)))
 
-    if not entries_appended and history_path.exists():
+    if not entries_appended:
         return {
             "ok": True,
             "skipped": True,
             "reason": "no_line_or_odds_changes",
             "sport": slug,
             "date": date_str,
-            "history_path": str(history_path),
             "files_scanned": int(files_scanned),
             "entries_appended": 0,
+            "shards": {},
         }
 
-    payload = {
-        "schema_version": 1,
-        "sport": slug,
-        "date": date_str,
-        "updated_at": now,
-        "history_limit": _ODDS_HISTORY_LIMIT,
-        "markets": markets,
-    }
-    payload.update(markets)
-    _trace_log("before_write_odds_history_json", sport=slug, history_path=str(history_path), shared_history_path=str(shared_history_path), artifact_history_path=str(artifact_history_path), markets=len(markets), entries_appended=int(entries_appended))
-    _write_json(history_path, payload)
-    _write_json(shared_history_path, payload)
-    _write_json(artifact_history_path, payload)
-    _trace_log("after_write_odds_history_json", sport=slug, history_path=str(history_path), shared_history_path=str(shared_history_path), artifact_history_path=str(artifact_history_path), markets=len(markets), entries_appended=int(entries_appended))
+    shard_results: dict[str, dict[str, Any]] = {}
+    for shard_key, shard_markets in shards.items():
+        if shard_entries_appended.get(shard_key, 0) <= 0:
+            continue
+        history_path = _odds_history_path(tracking_root, shard_key)
+        artifact_history_path = _odds_history_artifact_path(source_root, slug, shard_key)
+        shared_history_path = _shared_odds_history_path(slug, shard_key)
+        payload = {
+            "schema_version": 1,
+            "sport": slug,
+            "shard_key": shard_key,
+            "date": date_str,
+            "updated_at": now,
+            "history_limit": _ODDS_HISTORY_LIMIT,
+            "markets": shard_markets,
+        }
+        payload.update(shard_markets)
+        _trace_log("before_write_odds_history_json", sport=slug, shard_key=shard_key, history_path=str(history_path), shared_history_path=str(shared_history_path), artifact_history_path=str(artifact_history_path), markets=len(shard_markets), entries_appended=shard_entries_appended[shard_key])
+        _write_json(history_path, payload)
+        _write_json(shared_history_path, payload)
+        _write_json(artifact_history_path, payload)
+        _trace_log("after_write_odds_history_json", sport=slug, shard_key=shard_key, history_path=str(history_path), shared_history_path=str(shared_history_path), artifact_history_path=str(artifact_history_path), markets=len(shard_markets), entries_appended=shard_entries_appended[shard_key])
+        shard_results[shard_key] = {
+            "history_path": str(history_path),
+            "shared_history_path": str(shared_history_path),
+            "artifact_history_path": str(artifact_history_path),
+            "markets_tracked": len(shard_markets),
+            "entries_appended": shard_entries_appended[shard_key],
+        }
+
+    primary_shard_key = next(iter(shard_results), None)
+    primary = shard_results.get(primary_shard_key, {}) if primary_shard_key else {}
     return {
         "ok": True,
         "skipped": False,
         "reason": None,
         "sport": slug,
         "date": date_str,
-        "history_path": str(history_path),
-        "shared_history_path": str(shared_history_path),
-        "artifact_history_path": str(artifact_history_path),
+        "history_path": primary.get("history_path"),
+        "shared_history_path": primary.get("shared_history_path"),
+        "artifact_history_path": primary.get("artifact_history_path"),
         "files_scanned": int(files_scanned),
         "entries_appended": int(entries_appended),
-        "markets_tracked": len(markets),
+        "markets_tracked": sum(result["markets_tracked"] for result in shard_results.values()),
+        "shards": shard_results,
     }
 
 

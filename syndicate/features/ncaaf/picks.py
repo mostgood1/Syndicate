@@ -15,6 +15,12 @@ from syndicate.features.shared.discrete_nav import neighboring_values
 from syndicate.features.shared.discrete_nav import resolve_selected_value
 from syndicate.features.shared.rank_board import build_rank_page_context
 
+from syndicate.features.ncaaf.cards import _prediction_source_path
+from syndicate.features.ncaaf.cards import _prediction_weeks
+from syndicate.features.ncaaf.cards import _normalize_probability
+from syndicate.features.ncaaf.cards import _runtime_scoreboard_projection
+from syndicate.features.ncaaf.cards import _runtime_prediction_rows
+
 
 def _stake_text(value: Any) -> str:
     try:
@@ -107,8 +113,141 @@ def _collapse_results(summary: dict[str, Any], *, limit: int = 12) -> list[dict[
     return cards
 
 
+def _runtime_pick_score(row: dict[str, Any], scoreboard: dict[str, Any]) -> float:
+    win_probability = _normalize_probability(scoreboard.get("win_probability")) or 0.0
+    spread_text = str(scoreboard.get("spread_label") or "").strip()
+    spread_value = 0.0
+    for token in spread_text.split():
+        try:
+            spread_value = abs(float(token))
+            break
+        except Exception:
+            continue
+    total_points = 0.0
+    try:
+        total_points = float(str(scoreboard.get("total_points") or "0").strip())
+    except Exception:
+        total_points = 0.0
+    return abs(win_probability - 0.5) * 100.0 + spread_value + (total_points / 100.0)
+
+
+def _runtime_pick_cards(week: int, *, season: int) -> list[dict[str, Any]]:
+    runtime_rows = _runtime_prediction_rows(week)
+    candidate_rows: list[dict[str, Any]] = []
+    for row in runtime_rows:
+        scoreboard = _runtime_scoreboard_projection(row, week)
+        home_team = str(row.get("home_team") or "Home").strip() or "Home"
+        away_team = str(row.get("away_team") or "Away").strip() or "Away"
+        candidate_rows.append(
+            {
+                "row": row,
+                "scoreboard": scoreboard,
+                "score": _runtime_pick_score(row, scoreboard),
+                "home_team": home_team,
+                "away_team": away_team,
+            }
+        )
+    ordered_rows = sorted(candidate_rows, key=lambda item: (item["score"], str(item["home_team"]), str(item["away_team"])), reverse=True)
+    cards: list[dict[str, Any]] = []
+    for item in ordered_rows[:12]:
+        row = item["row"]
+        scoreboard = item["scoreboard"]
+        home_team = item["home_team"]
+        away_team = item["away_team"]
+        cards.append(
+            {
+                "title": f"{home_team} vs {away_team} SmartSim candidate",
+                "eyebrow": "SmartSim runtime",
+                "badge": f"{scoreboard.get('win_probability') or '-'} win prob",
+                "meta": f"{away_team} at {home_team}",
+                "metrics": [
+                    {"label": "Home mean", "value": scoreboard.get("home_points") or "-"},
+                    {"label": "Away mean", "value": scoreboard.get("away_points") or "-"},
+                    {"label": "Spread", "value": scoreboard.get("spread_label") or "-"},
+                    {"label": "Total", "value": scoreboard.get("total_points") or "-"},
+                ],
+                "summary": (
+                    f"SmartSim projects {home_team} {scoreboard.get('home_points') or '-'} - {scoreboard.get('away_points') or '-'} "
+                    f"{away_team} with a projected total of {scoreboard.get('total_points') or '-'} and a home win probability of {scoreboard.get('win_probability') or '-'}."
+                ),
+                "list_items": [
+                    f"Projected spread: {scoreboard.get('spread_label') or '-'}",
+                    f"Home mean: {scoreboard.get('home_points') or '-'}",
+                    f"Away mean: {scoreboard.get('away_points') or '-'}",
+                    f"Projection source: {scoreboard.get('source_label') or 'SmartSim runtime'}",
+                ],
+            }
+        )
+    return cards
+
+
 def _clamp_week(selected_week: int) -> int:
     return resolve_selected_value(selected_week, available_weeks(), 1)
+
+
+def build_smartsim_picks_page_context(selected_week: int) -> dict[str, Any]:
+    season = default_season()
+    runtime_weeks = _prediction_weeks()
+    if not runtime_weeks:
+        return build_picks_page_context(selected_week)
+    requested_week = int(selected_week or runtime_weeks[-1])
+    resolved_week = resolve_selected_value(requested_week, runtime_weeks, runtime_weeks[-1])
+    cards = _runtime_pick_cards(resolved_week, season=season)
+    if not cards:
+        return build_picks_page_context(selected_week)
+    weeks = runtime_weeks
+    prev_week, next_week = neighboring_values(weeks, resolved_week, fallback=resolved_week)
+    source_path = _prediction_source_path()
+    empty_state = None
+    if not cards:
+        empty_state = {
+            "eyebrow": "NCAAF SmartSim picks",
+            "title": "No runtime picks were available.",
+            "body": "The SmartSim picks board first reads the predicted-totals snapshot and falls back to saved weekly summaries only if the runtime source is unavailable.",
+            "list_items": [
+                f"Requested week: {selected_week}",
+                f"Resolved week: {resolved_week}",
+            ],
+        }
+    return {
+        **build_rank_page_context(
+            selected_date=_selected_date_token(resolved_week, season=season),
+            route_path="/ncaaf/picks",
+            intro_title="NCAAF Picks",
+            intro_body="NCAAF picks now generate SmartSim runtime candidates first, then fall back to summary artifacts if the runtime source is missing.",
+            aria_label="NCAAF picks board",
+            source_path=source_path or "NCAAF SmartSim predicted totals",
+            source_title="NCAAF SmartSim picks runtime",
+            source_date_display=f"Week {resolved_week}",
+            rank_cards=cards,
+            using_sample_data=False,
+            header_stats=[
+                {"label": "Cards", "value": str(len(cards))},
+                {"label": "Candidates", "value": str(len(cards))},
+                {"label": "Weeks", "value": str(len(weeks) or "-")},
+            ],
+            module_links=build_module_links(resolved_week, "Picks"),
+            control_label="Week",
+            control_type="number",
+            control_name="week",
+            control_value=str(resolved_week),
+            prev_href=f"/ncaaf/picks?week={prev_week}",
+            next_href=f"/ncaaf/picks?week={next_week}",
+            empty_state=empty_state,
+            warning_panel={
+                "eyebrow": "SmartSim runtime",
+                "title": "Picks are now generated from runtime projections first",
+                "body": "The picks board uses SmartSim projection rows as its primary candidate source and only reverts to stored weekly summaries if the runtime source fails.",
+                "list_items": [
+                    "Candidate rows are built from home_mean, away_mean, win_probability, projected_spread, and projected_total.",
+                    "Summary artifacts remain as a fallback path only.",
+                ],
+            },
+        ),
+        "week": resolved_week,
+        "available_weeks": weeks,
+        "season": season,
+    }
 
 
 def build_picks_page_context(selected_week: int) -> dict[str, Any]:

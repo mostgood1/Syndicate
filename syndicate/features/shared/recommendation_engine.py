@@ -21,6 +21,7 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping
 
 from syndicate.features.shared.intelligence_evaluation import _iter_record_payloads
+from syndicate.features.shared.intelligence_evaluation import build_feature_coverage_profile
 from syndicate.features.shared.intelligence_evaluation import build_reliability_profile
 from syndicate.features.shared.odds_lifecycle import build_market_features
 from syndicate.features.shared.source_roots import repo_root_from
@@ -1057,6 +1058,9 @@ def rank_recommendations(
         market_strength = float(market_profile.get("reliability_multiplier") or 1.0)
         sport_strength = float(sport_profile.get("reliability_multiplier") or 1.0)
         market_dynamics = _market_dynamics_score(candidate, market_features)
+        coverage_profile = build_feature_coverage_profile(candidate.get("feature_coverage") or candidate.get("artifact_features", {}).get("feature_coverage") if isinstance(candidate.get("artifact_features"), Mapping) else candidate.get("feature_coverage"))
+        coverage_score = _coerce_float(coverage_profile.get("coverage_score")) if coverage_profile else None
+        coverage_tier = str(coverage_profile.get("coverage_tier") or "") if coverage_profile else ""
         sim_weight = float(market_dynamics.get("sim_weight") or 1.0)
         movement_weight = float(market_dynamics.get("movement_weight") or 1.0)
         clv_weight = float(market_dynamics.get("clv_weight") or 1.0)
@@ -1083,6 +1087,8 @@ def rank_recommendations(
         )
         performance_multiplier = float(performance_profile.get("performance_multiplier") or 1.0)
         adjusted_score = core_adjusted_score * performance_multiplier
+        if coverage_score is not None:
+            adjusted_score *= 0.92 + (coverage_score * 0.08)
         reasoning = str(candidate.get("rationale") or candidate.get("summary") or candidate.get("writeup") or candidate.get("name") or "Recommendation built from the current board.").strip()
         risk_factors = list(candidate.get("risk_factors") or [])
         for note in candidate.get("risk_flags") or []:
@@ -1167,6 +1173,10 @@ def rank_recommendations(
                 },
                 "decision_strategy": selected_policy,
                 "adjusted_score": round(adjusted_score, 3),
+                "coverage_score": coverage_score,
+                "coverage_tier": coverage_tier or None,
+                "coverage_warnings": list(coverage_profile.get("coverage_warnings") or []) if coverage_profile else [],
+                "publication_status": coverage_profile.get("publication_status") if coverage_profile else None,
             }
         )
         scored.append(_standardize_recommendation_fields(recommendation, edge=edge, fair_probability=fair_probability, implied_probability=implied_probability))
@@ -1174,6 +1184,7 @@ def rank_recommendations(
     scored.sort(
         key=lambda item: (
             float(item.get("adjusted_score") or 0.0),
+            float(item.get("coverage_score") or 0.0),
             float(item.get("expected_value") or 0.0),
             float(item.get("edge") or 0.0),
             float(item.get("confidence") or 0.0),

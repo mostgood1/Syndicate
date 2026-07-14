@@ -58,6 +58,219 @@ _WEEK1_COVERAGE_PROFILE = {
 _NCAAF_CARD_CONTRACT_VERSION = "1"
 
 
+@lru_cache(maxsize=1)
+def _prediction_rows() -> tuple[dict[str, Any], ...]:
+    data_root = Path(__file__).resolve().parents[3] / "data" / "ncaaf_source" / "data"
+    if not data_root.exists():
+        return ()
+    candidate_paths = sorted(
+        data_root.glob("college_football_schedule_2025_predicted_totals_enhanced*.csv"),
+        key=lambda path: path.stat().st_mtime,
+        reverse=True,
+    )
+    fallback_rows: tuple[dict[str, Any], ...] = ()
+    for path in candidate_paths:
+        try:
+            with path.open("r", encoding="utf-8", newline="") as handle:
+                reader = csv.DictReader(handle)
+                headers = set(reader.fieldnames or [])
+                required = {"home_team", "away_team", "predicted_home_points", "predicted_away_points", "predicted_total_points"}
+                if not required.issubset(headers):
+                    continue
+                rows = tuple(dict(row) for row in reader)
+                if "model_home_win_prob" in headers:
+                    return rows
+                if not fallback_rows:
+                    fallback_rows = rows
+        except Exception:
+            continue
+    return fallback_rows
+
+
+@lru_cache(maxsize=1)
+def _prediction_source_path() -> Path | None:
+    data_root = Path(__file__).resolve().parents[3] / "data" / "ncaaf_source" / "data"
+    if not data_root.exists():
+        return None
+    candidate_paths = sorted(
+        data_root.glob("college_football_schedule_2025_predicted_totals_enhanced*.csv"),
+        key=lambda path: path.stat().st_mtime,
+        reverse=True,
+    )
+    for path in candidate_paths:
+        try:
+            with path.open("r", encoding="utf-8", newline="") as handle:
+                reader = csv.DictReader(handle)
+                headers = set(reader.fieldnames or [])
+                required = {"home_team", "away_team", "predicted_home_points", "predicted_away_points", "predicted_total_points"}
+                if required.issubset(headers):
+                    return path
+        except Exception:
+            continue
+    return None
+
+
+def _prediction_weeks() -> list[int]:
+    weeks = sorted(
+        {
+            int(str(row.get("week") or "0").strip() or 0)
+            for row in _prediction_rows()
+            if str(row.get("week") or "").strip().isdigit()
+        }
+    )
+    return [week for week in weeks if week > 0]
+
+
+@lru_cache(maxsize=1)
+def _prediction_index() -> dict[tuple[str, str, str], dict[str, Any]]:
+    index: dict[tuple[str, str, str], dict[str, Any]] = {}
+    for row in _prediction_rows():
+        week = str(row.get("week") or "").strip()
+        home_team = _normalize_text(row.get("home_team"))
+        away_team = _normalize_text(row.get("away_team"))
+        if not week or not home_team or not away_team:
+            continue
+        index.setdefault((week, away_team, home_team), row)
+    return index
+
+
+def _scoreboard_projection(row: dict[str, Any], week: int) -> dict[str, Any]:
+    lookup = _prediction_index().get((str(week), _normalize_text(row.get("away_team")), _normalize_text(row.get("home_team"))))
+    if not lookup:
+        return {}
+    home_points = _safe_float(lookup.get("predicted_home_points"))
+    away_points = _safe_float(lookup.get("predicted_away_points"))
+    total_points = _safe_float(lookup.get("predicted_total_points"))
+    margin = _safe_float(lookup.get("predicted_win_margin"))
+    if margin is None and home_points is not None and away_points is not None:
+        margin = home_points - away_points
+    win_probability = _safe_float(lookup.get("model_home_win_prob"))
+    home_name = str(row.get("home_team") or "Home").strip() or "Home"
+    away_name = str(row.get("away_team") or "Away").strip() or "Away"
+    if margin is None:
+        spread_label = "-"
+    elif margin >= 0:
+        spread_label = f"{home_name} by {abs(margin):.1f}"
+    else:
+        spread_label = f"{away_name} by {abs(margin):.1f}"
+    kickoff = str(lookup.get("start_date_api") or lookup.get("start_date") or "").strip()
+    venue = str(lookup.get("venue") or "").strip()
+    return {
+        "home_points": _format_decimal(home_points, places=1),
+        "away_points": _format_decimal(away_points, places=1),
+        "total_points": _format_decimal(total_points, places=1),
+        "spread_label": spread_label,
+        "win_probability": format_pct(win_probability),
+        "source_label": "Predicted totals artifact",
+        "kickoff": kickoff,
+        "venue": venue,
+    }
+
+
+def _runtime_scoreboard_projection(row: dict[str, Any], week: int) -> dict[str, Any]:
+    home_points = _safe_float(row.get("predicted_home_points"))
+    away_points = _safe_float(row.get("predicted_away_points"))
+    total_points = _safe_float(row.get("predicted_total_points"))
+    margin = _safe_float(row.get("predicted_win_margin"))
+    if margin is None and home_points is not None and away_points is not None:
+        margin = home_points - away_points
+    win_probability = _normalize_probability(row.get("model_home_win_prob"))
+    home_name = str(row.get("home_team") or "Home").strip() or "Home"
+    away_name = str(row.get("away_team") or "Away").strip() or "Away"
+    if margin is None:
+        spread_label = "-"
+    elif margin >= 0:
+        spread_label = f"{home_name} by {abs(margin):.1f}"
+    else:
+        spread_label = f"{away_name} by {abs(margin):.1f}"
+    kickoff = str(row.get("start_date_api") or row.get("start_date") or "").strip()
+    venue = str(row.get("venue") or "").strip()
+    return {
+        "home_points": _format_decimal(home_points, places=1),
+        "away_points": _format_decimal(away_points, places=1),
+        "total_points": _format_decimal(total_points, places=1),
+        "spread_label": spread_label,
+        "win_probability": format_pct(win_probability),
+        "source_label": "SmartSim runtime",
+        "kickoff": kickoff,
+        "venue": venue,
+    }
+
+
+def _runtime_publication_profile(scoreboard: dict[str, Any]) -> dict[str, Any]:
+    home_points = _safe_float(str(scoreboard.get("home_points") or "").strip())
+    away_points = _safe_float(str(scoreboard.get("away_points") or "").strip())
+    total_points = _safe_float(str(scoreboard.get("total_points") or "").strip())
+    win_probability = _normalize_probability(scoreboard.get("win_probability"))
+    margin = None
+    if home_points is not None and away_points is not None:
+        margin = abs(home_points - away_points)
+    edge_strength = abs((win_probability or 0.5) - 0.5)
+    spread_strength = min((margin or 0.0) / 28.0, 1.0)
+    total_strength = min((total_points or 0.0) / 100.0, 1.0)
+    coverage_score = round(min(1.0, max(0.0, (edge_strength * 0.55) + (spread_strength * 0.30) + (total_strength * 0.15))), 3)
+    if coverage_score >= 0.75:
+        coverage_tier = "A"
+    elif coverage_score >= 0.60:
+        coverage_tier = "B"
+    elif coverage_score >= 0.45:
+        coverage_tier = "C"
+    else:
+        coverage_tier = "D"
+    publication_ready = coverage_tier in {"A", "B"}
+    publication_status = "publishable" if publication_ready else "suppressed"
+    if publication_ready:
+        coverage_warnings = ["runtime candidate passes publication threshold"]
+    else:
+        coverage_warnings = ["runtime candidate below publication threshold"]
+    return {
+        "coverage_score": coverage_score,
+        "coverage_tier": coverage_tier,
+        "coverage_warnings": coverage_warnings,
+        "publication_status": publication_status,
+        "publication_priority": {"A": 3, "B": 2, "C": 1, "D": 0}.get(coverage_tier, 0),
+        "publication_ready": publication_ready,
+        "ready_label": "Publication ready" if publication_ready else "Publication blocked",
+        "tier_badges": _tier_badges(coverage_tier),
+    }
+
+
+def _runtime_prediction_rows(week: int) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for row in _prediction_rows():
+        try:
+            row_week = int(str(row.get("week") or "").strip())
+        except Exception:
+            continue
+        if row_week != int(week):
+            continue
+        home_team = str(row.get("home_team") or "").strip()
+        away_team = str(row.get("away_team") or "").strip()
+        if not home_team or not away_team:
+            continue
+        if any(
+            _safe_float(row.get(field)) is None
+            for field in ("predicted_home_points", "predicted_away_points", "predicted_total_points")
+        ):
+            continue
+        rows.append(dict(row))
+    best_rows: dict[tuple[str, str], dict[str, Any]] = {}
+    for row in rows:
+        key = (_normalize_text(row.get("away_team")), _normalize_text(row.get("home_team")))
+        if not all(key):
+            continue
+        best_rows.setdefault(key, row)
+    ordered_rows = sorted(
+        best_rows.values(),
+        key=lambda row: (
+            abs((_safe_float(row.get("predicted_home_points")) or 0.0) - (_safe_float(row.get("predicted_away_points")) or 0.0)),
+            _safe_float(row.get("predicted_total_points")) or 0.0,
+        ),
+        reverse=True,
+    )
+    return ordered_rows
+
+
 def _processed_artifact_path(*parts: str) -> Path:
     return Path(__file__).resolve().parents[3] / "data" / "ncaaf_source" / "source_artifacts" / "data" / "processed" / Path(*parts)
 
@@ -184,6 +397,13 @@ def _tier_badges(coverage_tier: str | None) -> list[dict[str, Any]]:
 def _team_context(team_name: str, season: int) -> dict[str, Any]:
     registry_row = _resolve_team(team_name) or {}
     team_id = str(registry_row.get("team_id") or "").strip()
+    team_rank = str(
+        registry_row.get("rank")
+        or registry_row.get("ap_rank")
+        or registry_row.get("cfp_rank")
+        or registry_row.get("ranking")
+        or ""
+    ).strip()
     returning_row = _first_row(_returning_rows(), team_id=team_id, season=season)
     coach_row = _first_row(_coach_rows(), team_id=team_id, season=season)
     roster_count = _count_rows(_roster_rows(), key="team_id", team_id=team_id, season=season)
@@ -199,7 +419,11 @@ def _team_context(team_name: str, season: int) -> dict[str, Any]:
         "team_name": team_name,
         "team_id": team_id,
         "abbreviation": str(registry_row.get("abbreviation") or _abbr(team_name)).strip(),
+        "rank": team_rank,
+        "school_name": str(registry_row.get("school_name") or team_name).strip() or team_name,
+        "mascot_name": str(registry_row.get("mascot_name") or "").strip(),
         "conference": str(registry_row.get("conference") or "").strip(),
+        "conference_short_name": str(registry_row.get("conference_short_name") or "").strip(),
         "subdivision": str(registry_row.get("subdivision") or "").strip(),
         "returning": {
             "starter_estimate": returning_starter_estimate,
@@ -227,6 +451,354 @@ def _team_context(team_name: str, season: int) -> dict[str, Any]:
     }
 
 
+def _team_context_tone(value: str) -> str:
+    normalized = str(value or "").strip().lower()
+    if normalized in {"high", "positive", "stable", "veteran", "returning hc"}:
+        return "positive"
+    if normalized in {"neutral", "mixed"}:
+        return "neutral"
+    if normalized in {"low", "negative", "unstable", "freshman", "rebuilding"}:
+        return "negative"
+    return "neutral"
+
+
+def _team_context_label(value: str, *, default: str) -> str:
+    text = str(value or "").strip()
+    return text or default
+
+
+def _build_team_context_items(home_context: dict[str, Any], away_context: dict[str, Any]) -> list[dict[str, str]]:
+    home_returning = home_context.get("returning") if isinstance(home_context.get("returning"), dict) else {}
+    away_returning = away_context.get("returning") if isinstance(away_context.get("returning"), dict) else {}
+    home_transfer = home_context.get("transfer") if isinstance(home_context.get("transfer"), dict) else {}
+    away_transfer = away_context.get("transfer") if isinstance(away_context.get("transfer"), dict) else {}
+    home_coach = home_context.get("coach") if isinstance(home_context.get("coach"), dict) else {}
+    away_coach = away_context.get("coach") if isinstance(away_context.get("coach"), dict) else {}
+    home_roster = home_context.get("roster") if isinstance(home_context.get("roster"), dict) else {}
+    away_roster = away_context.get("roster") if isinstance(away_context.get("roster"), dict) else {}
+
+    returning_home = _safe_float(home_returning.get("percent_ppa"))
+    returning_away = _safe_float(away_returning.get("percent_ppa"))
+    if returning_home is not None and returning_away is not None:
+        returning_value = "High" if max(returning_home, returning_away) >= 0.70 else "Moderate" if max(returning_home, returning_away) >= 0.55 else "Developing"
+    else:
+        returning_value = "Available"
+
+    transfer_net = int(_safe_float(home_transfer.get("net")) or 0) + int(_safe_float(away_transfer.get("net")) or 0)
+    portal_value = "Positive" if transfer_net > 0 else "Negative" if transfer_net < 0 else "Neutral"
+    coach_value = "Returning HC" if str(home_coach.get("name") or away_coach.get("name") or "").strip() else "Stable"
+    roster_total = int(_safe_float(home_roster.get("active_count")) or 0) + int(_safe_float(away_roster.get("active_count")) or 0)
+    roster_value = "Veteran" if roster_total >= 180 else "Balanced" if roster_total >= 120 else "Young"
+
+    return [
+        {
+            "label": "Returning Production",
+            "value": returning_value,
+            "detail": f"Home {home_returning.get('summary') or '-'} | Away {away_returning.get('summary') or '-'}",
+            "tone": _team_context_tone(returning_value),
+        },
+        {
+            "label": "Portal Impact",
+            "value": portal_value,
+            "detail": f"Home {home_transfer.get('summary') or '-'} | Away {away_transfer.get('summary') or '-'}",
+            "tone": _team_context_tone(portal_value),
+        },
+        {
+            "label": "Coach Continuity",
+            "value": coach_value,
+            "detail": f"Home {home_coach.get('summary') or '-'} | Away {away_coach.get('summary') or '-'}",
+            "tone": _team_context_tone(coach_value),
+        },
+        {
+            "label": "Roster Experience",
+            "value": roster_value,
+            "detail": f"Home {home_roster.get('summary') or '-'} | Away {away_roster.get('summary') or '-'}",
+            "tone": _team_context_tone(roster_value),
+        },
+    ]
+
+
+def _build_matchup_context_items(home_context: dict[str, Any], away_context: dict[str, Any]) -> list[dict[str, str]]:
+    def _team_label(context: dict[str, Any]) -> str:
+        return str(context.get("school_name") or context.get("abbreviation") or context.get("team_name") or "Team").strip() or "Team"
+
+    def _advantage_label(home_value: float | None, away_value: float | None, *, home_text: str, away_text: str, higher_is_better: bool, percent: bool = False, neutral_delta: float = 0.03) -> tuple[str, str, str]:
+        if home_value is None or away_value is None:
+            return "Unavailable", "Unable to compare", "neutral"
+        delta = float(home_value) - float(away_value)
+        if not higher_is_better:
+            delta = -delta
+        if abs(delta) <= float(neutral_delta):
+            return "Even", f"{home_text} | {away_text}", "neutral"
+        leader = home_text if delta > 0 else away_text
+        magnitude = abs(delta)
+        if percent:
+            return f"{leader} +{magnitude * 100.0:.0f}%", f"{home_text} {float(home_value) * 100.0:.1f}% | {away_text} {float(away_value) * 100.0:.1f}%", "positive" if delta > 0 else "negative"
+        return f"{leader} Advantage", f"{home_text} {float(home_value):.3f} | {away_text} {float(away_value):.3f}", "positive" if delta > 0 else "negative"
+
+    home_returning = home_context.get("returning") if isinstance(home_context.get("returning"), dict) else {}
+    away_returning = away_context.get("returning") if isinstance(away_context.get("returning"), dict) else {}
+    home_transfer = home_context.get("transfer") if isinstance(home_context.get("transfer"), dict) else {}
+    away_transfer = away_context.get("transfer") if isinstance(away_context.get("transfer"), dict) else {}
+    home_coach = home_context.get("coach") if isinstance(home_context.get("coach"), dict) else {}
+    away_coach = away_context.get("coach") if isinstance(away_context.get("coach"), dict) else {}
+    home_roster = home_context.get("roster") if isinstance(home_context.get("roster"), dict) else {}
+    away_roster = away_context.get("roster") if isinstance(away_context.get("roster"), dict) else {}
+
+    home_conf = _team_context_label(str(home_context.get("conference_short_name") or home_context.get("conference") or ""), default="Home")
+    away_conf = _team_context_label(str(away_context.get("conference_short_name") or away_context.get("conference") or ""), default="Away")
+    home_name = _team_label(home_context)
+    away_name = _team_label(away_context)
+
+    home_returning_pct = _safe_float(home_returning.get("percent_ppa"))
+    away_returning_pct = _safe_float(away_returning.get("percent_ppa"))
+    home_transfer_net = _safe_float(home_transfer.get("net"))
+    away_transfer_net = _safe_float(away_transfer.get("net"))
+    home_coach_continuity = _safe_float(home_coach.get("continuity_score"))
+    away_coach_continuity = _safe_float(away_coach.get("continuity_score"))
+    home_roster_count = _safe_float(home_roster.get("active_count"))
+    away_roster_count = _safe_float(away_roster.get("active_count"))
+    home_experience = (
+        (home_returning_pct or 0.0) * 0.6
+        + (home_coach_continuity or 0.0) * 0.25
+        + min((home_roster_count or 0.0) / 200.0, 1.0) * 0.15
+    )
+    away_experience = (
+        (away_returning_pct or 0.0) * 0.6
+        + (away_coach_continuity or 0.0) * 0.25
+        + min((away_roster_count or 0.0) / 200.0, 1.0) * 0.15
+    )
+
+    conference_value = f"{away_conf} vs {home_conf}" if away_conf != home_conf else f"Same conference: {home_conf}"
+    conference_detail = f"Away {away_conf} | Home {home_conf}"
+    if away_conf == home_conf:
+        conference_detail = f"Both teams are in {home_conf}"
+
+    returning_value, returning_detail, returning_tone = _advantage_label(home_returning_pct, away_returning_pct, home_text=home_name, away_text=away_name, higher_is_better=True, percent=True, neutral_delta=0.03)
+    portal_value, portal_detail, portal_tone = _advantage_label(home_transfer_net, away_transfer_net, home_text=home_name, away_text=away_name, higher_is_better=True, percent=False, neutral_delta=0.5)
+    coach_value, coach_detail, coach_tone = _advantage_label(home_coach_continuity, away_coach_continuity, home_text=home_name, away_text=away_name, higher_is_better=True, percent=False, neutral_delta=0.03)
+    roster_value, roster_detail, roster_tone = _advantage_label(home_roster_count, away_roster_count, home_text=home_name, away_text=away_name, higher_is_better=True, percent=False, neutral_delta=2.0)
+    experience_value, experience_detail, experience_tone = _advantage_label(home_experience, away_experience, home_text=home_name, away_text=away_name, higher_is_better=True, percent=False, neutral_delta=0.03)
+
+    return [
+        {
+            "label": "Conference Context",
+            "value": conference_value,
+            "detail": conference_detail,
+            "tone": "neutral",
+        },
+        {
+            "label": "Returning Production",
+            "value": returning_value,
+            "detail": returning_detail,
+            "tone": returning_tone,
+        },
+        {
+            "label": "Portal Impact",
+            "value": portal_value,
+            "detail": portal_detail,
+            "tone": portal_tone,
+        },
+        {
+            "label": "Coach Continuity",
+            "value": coach_value,
+            "detail": coach_detail,
+            "tone": coach_tone,
+        },
+        {
+            "label": "Roster Comparison",
+            "value": roster_value if roster_value != "Even" else experience_value,
+            "detail": f"Roster size {home_roster_count or 0:.0f} vs {away_roster_count or 0:.0f} | Experience {experience_detail}",
+            "tone": roster_tone if roster_tone != "neutral" else experience_tone,
+        },
+    ]
+
+
+def _build_smartsim_reasons_items(home_context: dict[str, Any], away_context: dict[str, Any], scoreboard: dict[str, Any]) -> dict[str, Any]:
+    def _team_label(context: dict[str, Any]) -> str:
+        return str(context.get("school_name") or context.get("abbreviation") or context.get("team_name") or "Team").strip() or "Team"
+
+    def _subdivision_rank(value: str) -> int:
+        normalized = str(value or "").strip().upper()
+        if not normalized:
+            return -1
+        if "FBS" in normalized:
+            return 4
+        if "FCS" in normalized:
+            return 3
+        if "DIVISION I" in normalized or normalized in {"D1", "DI"}:
+            return 4
+        if "DIVISION II" in normalized or normalized in {"D2", "DII"}:
+            return 2
+        if "DIVISION III" in normalized or normalized in {"D3", "DIII"}:
+            return 1
+        if "NAIA" in normalized:
+            return 0
+        return 0
+
+    def _positive_reason(favored_label: str, detail: str, *, weight: int, tone: str = "positive") -> dict[str, Any] | None:
+        if not detail:
+            return None
+        return {
+            "label": favored_label,
+            "value": favored_label,
+            "detail": detail,
+            "tone": tone,
+            "weight": weight,
+        }
+
+    home_returning = home_context.get("returning") if isinstance(home_context.get("returning"), dict) else {}
+    away_returning = away_context.get("returning") if isinstance(away_context.get("returning"), dict) else {}
+    home_transfer = home_context.get("transfer") if isinstance(home_context.get("transfer"), dict) else {}
+    away_transfer = away_context.get("transfer") if isinstance(away_context.get("transfer"), dict) else {}
+    home_coach = home_context.get("coach") if isinstance(home_context.get("coach"), dict) else {}
+    away_coach = away_context.get("coach") if isinstance(away_context.get("coach"), dict) else {}
+    home_roster = home_context.get("roster") if isinstance(home_context.get("roster"), dict) else {}
+    away_roster = away_context.get("roster") if isinstance(away_context.get("roster"), dict) else {}
+
+    home_returning_pct = _safe_float(home_returning.get("percent_ppa"))
+    away_returning_pct = _safe_float(away_returning.get("percent_ppa"))
+    home_transfer_net = _safe_float(home_transfer.get("net"))
+    away_transfer_net = _safe_float(away_transfer.get("net"))
+    home_coach_continuity = _safe_float(home_coach.get("continuity_score"))
+    away_coach_continuity = _safe_float(away_coach.get("continuity_score"))
+    home_roster_count = _safe_float(home_roster.get("active_count"))
+    away_roster_count = _safe_float(away_roster.get("active_count"))
+    home_experience = (
+        (home_returning_pct or 0.0) * 0.6
+        + (home_coach_continuity or 0.0) * 0.25
+        + min((home_roster_count or 0.0) / 200.0, 1.0) * 0.15
+    )
+    away_experience = (
+        (away_returning_pct or 0.0) * 0.6
+        + (away_coach_continuity or 0.0) * 0.25
+        + min((away_roster_count or 0.0) / 200.0, 1.0) * 0.15
+    )
+
+    home_points = _safe_float(scoreboard.get("home_points"))
+    away_points = _safe_float(scoreboard.get("away_points"))
+    favored_is_home = home_points is None or away_points is None or home_points >= away_points
+    favored_context = home_context if favored_is_home else away_context
+    underdog_context = away_context if favored_is_home else home_context
+    favored_name = _team_label(favored_context)
+    underdog_name = _team_label(underdog_context)
+
+    items: list[dict[str, Any]] = []
+
+    if home_returning_pct is not None and away_returning_pct is not None:
+        if favored_is_home and home_returning_pct > away_returning_pct + 0.03:
+            items.append({
+                "label": "Returning Production",
+                "value": "Higher returning production",
+                "detail": f"{favored_name} {home_returning_pct:.3f} | {underdog_name} {away_returning_pct:.3f}",
+                "tone": "positive",
+                "weight": 100,
+            })
+        elif not favored_is_home and away_returning_pct > home_returning_pct + 0.03:
+            items.append({
+                "label": "Returning Production",
+                "value": "Higher returning production",
+                "detail": f"{favored_name} {away_returning_pct:.3f} | {underdog_name} {home_returning_pct:.3f}",
+                "tone": "positive",
+                "weight": 100,
+            })
+
+    if home_experience is not None and away_experience is not None:
+        if favored_is_home and home_experience > away_experience + 0.03:
+            items.append({
+                "label": "Roster Experience",
+                "value": "Stronger roster experience",
+                "detail": f"{favored_name} experience {home_experience:.3f} | {underdog_name} experience {away_experience:.3f}",
+                "tone": "positive",
+                "weight": 90,
+            })
+        elif not favored_is_home and away_experience > home_experience + 0.03:
+            items.append({
+                "label": "Roster Experience",
+                "value": "Stronger roster experience",
+                "detail": f"{favored_name} experience {away_experience:.3f} | {underdog_name} experience {home_experience:.3f}",
+                "tone": "positive",
+                "weight": 90,
+            })
+
+    if home_transfer_net is not None and away_transfer_net is not None:
+        if favored_is_home and home_transfer_net > away_transfer_net + 0.5:
+            items.append({
+                "label": "Portal Activity",
+                "value": "Positive portal balance",
+                "detail": f"{favored_name} net {home_transfer_net:+.0f} | {underdog_name} net {away_transfer_net:+.0f}".replace("+", ""),
+                "tone": "positive",
+                "weight": 80,
+            })
+        elif not favored_is_home and away_transfer_net > home_transfer_net + 0.5:
+            items.append({
+                "label": "Portal Activity",
+                "value": "Positive portal balance",
+                "detail": f"{favored_name} net {away_transfer_net:+.0f} | {underdog_name} net {home_transfer_net:+.0f}".replace("+", ""),
+                "tone": "positive",
+                "weight": 80,
+            })
+
+    if home_coach_continuity is not None and away_coach_continuity is not None:
+        if favored_is_home and home_coach_continuity > away_coach_continuity + 0.03:
+            items.append({
+                "label": "Coach Continuity",
+                "value": "More stable coach continuity",
+                "detail": f"{favored_name} {home_coach_continuity:.3f} | {underdog_name} {away_coach_continuity:.3f}",
+                "tone": "positive",
+                "weight": 70,
+            })
+        elif not favored_is_home and away_coach_continuity > home_coach_continuity + 0.03:
+            items.append({
+                "label": "Coach Continuity",
+                "value": "More stable coach continuity",
+                "detail": f"{favored_name} {away_coach_continuity:.3f} | {underdog_name} {home_coach_continuity:.3f}",
+                "tone": "positive",
+                "weight": 70,
+            })
+
+    favored_conference = str(favored_context.get("conference_short_name") or favored_context.get("conference") or "").strip()
+    underdog_conference = str(underdog_context.get("conference_short_name") or underdog_context.get("conference") or "").strip()
+    favored_subdivision = str(favored_context.get("subdivision") or "").strip()
+    underdog_subdivision = str(underdog_context.get("subdivision") or "").strip()
+    context_detail = f"{favored_name} {favored_conference or '-'} / {favored_subdivision or '-'} | {underdog_name} {underdog_conference or '-'} / {underdog_subdivision or '-'}"
+    if favored_conference == underdog_conference and favored_subdivision == underdog_subdivision:
+        context_value = "Comparable conference / subdivision context"
+        context_tone = "neutral"
+    elif favored_subdivision and underdog_subdivision and _subdivision_rank(favored_subdivision) > _subdivision_rank(underdog_subdivision):
+        context_value = "Higher subdivision context"
+        context_tone = "positive"
+    else:
+        context_value = "Comparable conference / subdivision context"
+        context_tone = "neutral"
+    items.append({
+        "label": "Conference / Subdivision Context",
+        "value": context_value,
+        "detail": context_detail,
+        "tone": context_tone,
+        "weight": 60,
+    })
+
+    ordered_items = sorted(items, key=lambda item: (1 if str(item.get("tone") or "").strip().lower() == "positive" else 0, int(item.get("weight") or 0)), reverse=True)
+    lead_phrases = [str(item.get("value") or "").strip() for item in ordered_items if str(item.get("tone") or "").strip().lower() == "positive"]
+    if not lead_phrases:
+        lead_phrases = [str(item.get("value") or "").strip() for item in ordered_items[:3] if str(item.get("value") or "").strip()]
+    lead_text = " and ".join(lead_phrases[:2]) if len(lead_phrases) == 2 else ", ".join(lead_phrases[:2])
+    if len(lead_phrases) > 2:
+        lead_text = f"{', '.join(lead_phrases[:2])}, and {lead_phrases[2]}"
+    if lead_text:
+        summary = f"SmartSim favors {favored_name} because of {lead_text.lower()}."
+    else:
+        summary = f"SmartSim favors {favored_name} because the current matchup context leans that way."
+
+    return {
+        "lead": summary,
+        "summary": summary,
+        "favored_team": favored_name,
+        "items": ordered_items[:5],
+    }
+
+
 def _build_ncaaf_card_contract(row: dict[str, Any], week: int, *, season: int) -> dict[str, Any]:
     home_team = str(row.get("home_team") or "Home").strip() or "Home"
     away_team = str(row.get("away_team") or "Away").strip() or "Away"
@@ -238,7 +810,34 @@ def _build_ncaaf_card_contract(row: dict[str, Any], week: int, *, season: int) -
     publication_ready = _publication_ready(coverage_tier)
     home_context = _team_context(home_team, season)
     away_context = _team_context(away_team, season)
-    matchup_context = [
+    scoreboard = _scoreboard_projection(row, week)
+    scoreboard_header = {
+        "away": {
+            "abbr": away_context["abbreviation"],
+                "rank": away_context["rank"],
+            "school_name": away_context["school_name"],
+            "mascot_name": away_context["mascot_name"],
+            "conference": away_context["conference"],
+            "conference_short_name": away_context["conference_short_name"],
+            "logo_url": None,
+            "logo_text": away_context["abbreviation"],
+        },
+        "home": {
+            "abbr": home_context["abbreviation"],
+                "rank": home_context["rank"],
+            "school_name": home_context["school_name"],
+            "mascot_name": home_context["mascot_name"],
+            "conference": home_context["conference"],
+            "conference_short_name": home_context["conference_short_name"],
+            "logo_url": None,
+            "logo_text": home_context["abbreviation"],
+        },
+        "kickoff": scoreboard.get("kickoff") or f"{_week_label(week, season=season)} kickoff unavailable",
+        "venue": scoreboard.get("venue") or "Venue unavailable",
+        "status": f"Week {week}",
+        "status_detail": "Historical summary",
+    }
+    context_sections = [
         {
             "label": "Returning production",
             "home": home_context["returning"]["summary"],
@@ -264,6 +863,15 @@ def _build_ncaaf_card_contract(row: dict[str, Any], week: int, *, season: int) -
             "detail": "Active roster snapshot rows linked to each team.",
         },
     ]
+    team_context = {
+        "items": _build_team_context_items(home_context, away_context),
+        "summary": "Return production, portal impact, coach continuity, and roster experience",
+    }
+    matchup_context = {
+        "items": _build_matchup_context_items(home_context, away_context),
+        "summary": "Conference, returning production, portal, coach, and roster comparisons",
+    }
+    smartsim_reasons = _build_smartsim_reasons_items(home_context, away_context, scoreboard)
     return {
         "version": _NCAAF_CARD_CONTRACT_VERSION,
         "summary": {
@@ -279,7 +887,12 @@ def _build_ncaaf_card_contract(row: dict[str, Any], week: int, *, season: int) -
             "home": home_context,
             "away": away_context,
         },
-        "context_sections": matchup_context,
+        "scoreboard": scoreboard,
+        "scoreboard_header": scoreboard_header,
+        "smartsim_reasons": smartsim_reasons,
+        "team_context": team_context,
+        "matchup_context": matchup_context,
+        "context_sections": context_sections,
     }
 
 
@@ -299,6 +912,24 @@ def _safe_float(value: Any) -> float | None:
         return float(value)
     except Exception:
         return None
+
+
+def _normalize_probability(value: Any) -> float | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    text = text.rstrip("%").strip()
+    try:
+        amount = float(text)
+    except Exception:
+        return None
+    if amount > 1.0:
+        amount /= 100.0
+    if amount < 0.0:
+        return 0.0
+    if amount > 1.0:
+        return 1.0
+    return amount
 
 
 def _stake_text(value: Any) -> str:
@@ -437,6 +1068,246 @@ def _collapse_games(summary: dict[str, Any], week: int, *, limit: int = 16) -> l
 
 def _clamp_week(selected_week: int) -> int:
     return resolve_selected_value(selected_week, available_weeks(), 1)
+
+
+def _build_smartsim_ncaaf_card_contract(row: dict[str, Any], week: int, *, season: int) -> dict[str, Any]:
+    home_team = str(row.get("home_team") or "Home").strip() or "Home"
+    away_team = str(row.get("away_team") or "Away").strip() or "Away"
+    home_abbr = _abbr(home_team)
+    away_abbr = _abbr(away_team)
+    home_context = _team_context(home_team, season)
+    away_context = _team_context(away_team, season)
+    scoreboard = _runtime_scoreboard_projection(row, week)
+    publication_profile = _runtime_publication_profile(scoreboard)
+    coverage_score = publication_profile.get("coverage_score")
+    coverage_tier = publication_profile.get("coverage_tier")
+    publication_status = publication_profile.get("publication_status")
+    publication_priority = publication_profile.get("publication_priority")
+    publication_ready = publication_profile.get("publication_ready")
+    metric_rows = [
+        {"label": "Home mean", "value": scoreboard.get("home_points") or "-"},
+        {"label": "Away mean", "value": scoreboard.get("away_points") or "-"},
+        {"label": "Projected total", "value": scoreboard.get("total_points") or "-"},
+        {"label": "Projected spread", "value": scoreboard.get("spread_label") or "-"},
+        {"label": "Win probability", "value": scoreboard.get("win_probability") or "-"},
+    ]
+    summary_text = (
+        f"SmartSim projects {home_team} {scoreboard.get('home_points') or '-'} - "
+        f"{scoreboard.get('away_points') or '-'} {away_team} with a total of "
+        f"{scoreboard.get('total_points') or '-'} and a home win probability of "
+        f"{scoreboard.get('win_probability') or '-'}."
+    )
+    matchup_context_sections = [
+        {
+            "label": "Returned production",
+            "home": home_context["returning"]["summary"],
+            "away": away_context["returning"]["summary"],
+            "detail": "Starter estimate, production share, and usage from the published snapshot.",
+        },
+        {
+            "label": "Coach continuity",
+            "home": home_context["coach"]["summary"],
+            "away": away_context["coach"]["summary"],
+            "detail": "Continuity score and tenure from the published coach snapshot.",
+        },
+        {
+            "label": "Transfer activity",
+            "home": home_context["transfer"]["summary"],
+            "away": away_context["transfer"]["summary"],
+            "detail": "Incoming, outgoing, and net transfer counts.",
+        },
+        {
+            "label": "Roster base",
+            "home": home_context["roster"]["summary"],
+            "away": away_context["roster"]["summary"],
+            "detail": "Active roster snapshot rows linked to each team.",
+        },
+    ]
+    team_context = {
+        "items": _build_team_context_items(home_context, away_context),
+        "summary": "Return production, portal impact, coach continuity, and roster experience",
+    }
+    matchup_context = {
+        "items": _build_matchup_context_items(home_context, away_context),
+        "summary": "Conference, returning production, portal, coach, and roster comparisons",
+    }
+    smartsim_reasons = _build_smartsim_reasons_items(home_context, away_context, scoreboard)
+    return {
+        "gamePk": f"{week}_{away_team}_{home_team}".replace(" ", "_"),
+        "card_variant": "ncaaf_main",
+        "away": {"abbr": away_abbr, "name": away_team},
+        "home": {"abbr": home_abbr, "name": home_team},
+        "href": f"/ncaaf/game/{f'{week}_{away_team}_{home_team}'.replace(' ', '_')}?week={week}",
+        "href_label": "Open NCAAF game detail",
+        "status": f"Week {week}",
+        "detail": "SmartSim runtime",
+        "summary": summary_text,
+        "metrics": metric_rows,
+        "smartsim_reasons": smartsim_reasons,
+        "panels": [
+            {
+                "eyebrow": "SmartSim runtime",
+                "title": "Projection contract",
+                "body": "Cards now read directly from the predicted totals snapshot instead of saved recommendation summaries.",
+                "items": [
+                    f"Home mean: {scoreboard.get('home_points') or '-'}",
+                    f"Away mean: {scoreboard.get('away_points') or '-'}",
+                    f"Projected spread: {scoreboard.get('spread_label') or '-'}",
+                    f"Projected total: {scoreboard.get('total_points') or '-'}",
+                    f"Win probability: {scoreboard.get('win_probability') or '-'}",
+                ],
+            },
+            {
+                "eyebrow": "SmartSim runtime",
+                "title": "Source and fallback",
+                "body": "The runtime cards path can fall back to the summary artifact path if the predicted-totals snapshot is unavailable.",
+                "items": [
+                    f"Projection source: {scoreboard.get('source_label') or 'SmartSim runtime'}",
+                    f"Kickoff: {scoreboard.get('kickoff') or 'Kickoff unavailable'}",
+                    f"Venue: {scoreboard.get('venue') or 'Venue unavailable'}",
+                ],
+            },
+        ],
+        "market_tiles": [
+            {"label": "Coverage", "title": _format_decimal(coverage_score, places=3), "sub": "SmartSim tier"},
+            {"label": "Tier", "title": str(coverage_tier or "-").upper(), "sub": "SmartSim tier"},
+            {"label": "Status", "title": str(publication_status or "-").title(), "sub": "Publication state"},
+            {"label": "Priority", "title": str(publication_priority or "-"), "sub": "Board order"},
+        ],
+        "ncaaf_card": {
+            "version": _NCAAF_CARD_CONTRACT_VERSION,
+            "summary": {
+                "coverage_score": coverage_score,
+                "coverage_tier": coverage_tier,
+                "publication_status": publication_status,
+                "publication_priority": publication_priority,
+                "publication_ready": publication_ready,
+                "ready_label": "Publication ready" if publication_ready else "Publication blocked",
+                "tier_badges": publication_profile.get("tier_badges") or _tier_badges(coverage_tier),
+            },
+            "teams": {
+                "home": home_context,
+                "away": away_context,
+            },
+            "scoreboard": scoreboard,
+            "scoreboard_header": {
+                "away": {
+                    "abbr": away_context["abbreviation"],
+                    "rank": away_context["rank"],
+                    "school_name": away_context["school_name"],
+                    "mascot_name": away_context["mascot_name"],
+                    "conference": away_context["conference"],
+                    "conference_short_name": away_context["conference_short_name"],
+                    "logo_url": None,
+                    "logo_text": away_context["abbreviation"],
+                },
+                "home": {
+                    "abbr": home_context["abbreviation"],
+                    "rank": home_context["rank"],
+                    "school_name": home_context["school_name"],
+                    "mascot_name": home_context["mascot_name"],
+                    "conference": home_context["conference"],
+                    "conference_short_name": home_context["conference_short_name"],
+                    "logo_url": None,
+                    "logo_text": home_context["abbreviation"],
+                },
+                "kickoff": scoreboard.get("kickoff") or f"{_week_label(week, season=season)} kickoff unavailable",
+                "venue": scoreboard.get("venue") or "Venue unavailable",
+                "status": f"Week {week}",
+                "status_detail": "SmartSim runtime",
+            },
+            "team_context": team_context,
+            "matchup_context": matchup_context,
+            "smartsim_reasons": smartsim_reasons,
+            "context_sections": matchup_context_sections,
+        },
+    }
+
+def build_smartsim_cards_page_context(selected_week: int) -> dict[str, Any]:
+    season = default_season()
+    runtime_weeks = _prediction_weeks()
+    if not runtime_weeks:
+        return build_cards_page_context(selected_week)
+    requested_week = int(selected_week or runtime_weeks[-1])
+    resolved_week = resolve_selected_value(requested_week, runtime_weeks, runtime_weeks[-1])
+    runtime_rows = _runtime_prediction_rows(resolved_week)
+    if not runtime_rows:
+        return build_cards_page_context(selected_week)
+    games = [
+        _build_smartsim_ncaaf_card_contract(row, resolved_week, season=season)
+        for row in runtime_rows[:16]
+    ]
+    weeks = runtime_weeks
+    prev_week, next_week = neighboring_values(weeks, resolved_week, fallback=resolved_week)
+    source_path = _prediction_source_path()
+    betting_href = f"/ncaaf/season/{season}/betting-card?week={resolved_week}"
+    return apply_game_board_contract(
+        {
+            "date": _week_label(resolved_week, season=season),
+            "requested_date": _week_label(selected_week, season=season),
+            "prev_date": str(prev_week),
+            "next_date": str(next_week),
+            "control_action": "/ncaaf/cards",
+            "controls_prev_href": f"/ncaaf/cards?week={prev_week}",
+            "controls_next_href": f"/ncaaf/cards?week={next_week}",
+            "control_label": "Week",
+            "control_type": "number",
+            "control_name": "week",
+            "control_value": str(resolved_week),
+            "module_links": build_module_links(resolved_week, "Cards"),
+            "games": games,
+            "scoreboard_items": [
+                {
+                    "target_id": f"game-{game['gamePk']}",
+                    "label": f"{game['away']['abbr']} @ {game['home']['abbr']}",
+                    "status": game["status"],
+                }
+                for game in games
+            ],
+            "source_path": str(source_path) if source_path else "NCAAF SmartSim predicted totals",
+            "source_title": "NCAAF SmartSim cards runtime",
+            "empty_state": {
+                "eyebrow": "NCAAF cards",
+                "title": "No SmartSim cards were available for this week",
+                "body": "The cards board first reads the predicted-totals SmartSim snapshot and falls back to saved weekly summaries only if the runtime path is unavailable.",
+                "list_items": [
+                    f"Requested week: {selected_week}",
+                    f"Resolved week: {resolved_week}",
+                ],
+            } if not games else None,
+            "using_sample_data": False,
+            "route_path": "/ncaaf/cards",
+            "intro_title": "NCAAF Cards",
+            "intro_body": "NCAAF cards now read directly from SmartSim predicted totals first, with saved recommendation summaries kept as a fallback path.",
+            "cards_control_links": [
+                {"label": "Betting Card", "href": betting_href},
+                {"label": "Picks", "href": f"/ncaaf/picks?week={resolved_week}"},
+                {"label": "Live Lens", "href": f"/ncaaf/live-lens?week={resolved_week}"},
+            ],
+            "header_stats": [
+                {"label": "Games", "value": str(len(games))},
+                {"label": "Candidates", "value": str(len(runtime_rows))},
+                {"label": "Weeks", "value": str(len(weeks) or "-")},
+                {"label": "Source", "value": "SmartSim" if games else "No data"},
+            ],
+            "cards_stylesheet": None,
+            "cards_grid_class": "cards-grid",
+            "show_source_summary": True,
+            "show_intro": True,
+            "teaser": {
+                "label": "NCAAF picks",
+                "body": "Use the picks board for the historical weekly recommendation rows that remain separate from the SmartSim cards path.",
+                "href": f"/ncaaf/picks?week={resolved_week}",
+                "cta": "Open NCAAF picks",
+            },
+            "active_sport_name": "NCAAF",
+        },
+        sport="ncaaf",
+        module="cards",
+        source_kind="smartsim_runtime",
+        live_lens_integrated=False,
+        include_simulation_contract=True,
+    )
 
 
 def build_cards_page_context(selected_week: int) -> dict[str, Any]:

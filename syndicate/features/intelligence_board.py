@@ -17,6 +17,8 @@ import re
 
 from typing import Any, Mapping
 
+from syndicate.features.shared.intelligence_evaluation import build_feature_coverage_profile
+
 
 def _intel_trace(event: str, **fields: Any) -> None:
     try:
@@ -151,6 +153,12 @@ def _recommendation_lane(item: Mapping[str, Any]) -> str:
 
 def _recommendation_card(item: Mapping[str, Any]) -> dict[str, Any]:
     card = _copy_mapping(item)
+    if card.get("artifact_features") or card.get("feature_coverage"):
+        card["artifact_features"] = dict(card.get("artifact_features") or {})
+        card["feature_coverage"] = dict(card.get("feature_coverage") or card.get("artifact_features", {}).get("feature_coverage") or {})
+    coverage_profile = build_feature_coverage_profile(card.get("feature_coverage"))
+    if coverage_profile:
+        card.update(coverage_profile)
     lane = _recommendation_lane(card)
     line = _number(card.get("line"), card.get("line_open"), card.get("market_data", {}).get("current_line") if isinstance(card.get("market_data"), Mapping) else None)
     edge = _number(card.get("edge"), card.get("adjusted_edge"), card.get("expected_value"), card.get("ev_current"))
@@ -200,6 +208,7 @@ def _recommendation_card(item: Mapping[str, Any]) -> dict[str, Any]:
             "simulated_edge": edge,
             "trace": trace,
             "trace_path": trace.get("path"),
+            "publication_priority": card.get("publication_priority"),
         }
     )
     return card
@@ -268,6 +277,15 @@ def build_intelligence_board_contract(response: Mapping[str, Any] | None) -> dic
     payload = _copy_mapping(response)
     recommendations = _recommendation_sources(payload)
     cards = [_recommendation_card(item) for item in recommendations if isinstance(item, Mapping)]
+    cards.sort(
+        key=lambda card: (
+            int(card.get("publication_priority") or 0),
+            float(card.get("coverage_score") or 0.0),
+            float(card.get("simulated_edge") or 0.0),
+            float(card.get("confidence") or 0.0),
+        ),
+        reverse=True,
+    )
     lane_counts = {
         "live": sum(1 for card in cards if card.get("lane") == "live"),
         "pregame": sum(1 for card in cards if card.get("lane") == "pregame"),
@@ -298,7 +316,7 @@ def build_intelligence_board_contract(response: Mapping[str, Any] | None) -> dic
     ]
     return {
         "schema": "intelligence_board_v1",
-        "card_fields": ["sport", "team", "player", "market", "line", "projected", "live_projection", "actual", "status_display", "movement", "simulated_edge", "trace_path", "game_pk"],
+        "card_fields": ["sport", "team", "player", "market", "line", "projected", "live_projection", "actual", "status_display", "movement", "simulated_edge", "trace_path", "game_pk", "coverage_score", "coverage_tier", "coverage_warnings", "publication_status", "publication_priority"],
         "recommendation_count": len(cards),
         "lane_counts": lane_counts,
         "active_lanes": active_lanes,

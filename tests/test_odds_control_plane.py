@@ -6,9 +6,12 @@ from pathlib import Path
 from unittest.mock import patch
 
 from syndicate.features.shared.odds_control_plane import build_odds_control_plane_snapshot
+from syndicate.features.shared.odds_control_plane import list_available_shard_keys
 from syndicate.features.shared.odds_control_plane import load_odds_history_payload_for_sport
+from syndicate.features.shared.odds_control_plane import odds_history_lookback_shard_keys
 from syndicate.features.shared.odds_control_plane import odds_history_paths_for_sport
 from syndicate.features.shared.odds_control_plane import odds_history_roots_for_sport
+from syndicate.features.shared.odds_control_plane import resolve_current_shard_key
 from syndicate.features.shared.odds_control_plane import write_odds_control_plane_snapshot
 
 
@@ -17,9 +20,10 @@ class OddsControlPlaneTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             data_root = Path(tmp_dir) / "data"
             report_root = Path(tmp_dir) / "reports"
-            shared_path = report_root / "odds_control_plane" / "odds_history" / "nba" / "odds_history.json"
-            artifact_path = data_root / "nba_source" / "artifacts" / "nba" / "odds_history.json"
-            tracking_path = data_root / "nba_source" / "tracking" / "odds_history.json"
+            shard_key = "2026-06-12"
+            shared_path = report_root / "odds_control_plane" / "odds_history" / "nba" / f"{shard_key}.json"
+            artifact_path = data_root / "nba_source" / "artifacts" / "nba" / "odds_history" / f"{shard_key}.json"
+            tracking_path = data_root / "nba_source" / "tracking" / "odds_history" / f"{shard_key}.json"
             shared_path.parent.mkdir(parents=True, exist_ok=True)
             artifact_path.parent.mkdir(parents=True, exist_ok=True)
             tracking_path.parent.mkdir(parents=True, exist_ok=True)
@@ -31,9 +35,9 @@ class OddsControlPlaneTests(unittest.TestCase):
                 "syndicate.features.shared.odds_control_plane.reports_root",
                 return_value=report_root,
             ):
-                actual_paths = [path.resolve() for path in odds_history_paths_for_sport("nba")]
+                actual_paths = [path.resolve() for path in odds_history_paths_for_sport("nba", shard_key)]
                 self.assertEqual(actual_paths, [shared_path.resolve(), artifact_path.resolve(), tracking_path.resolve()])
-                self.assertEqual(load_odds_history_payload_for_sport("nba"), {"source": "shared"})
+                self.assertEqual(load_odds_history_payload_for_sport("nba", shard_key), {"source": "shared"})
 
     def test_control_plane_snapshot_writes_central_summary(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -96,6 +100,59 @@ class OddsControlPlaneTests(unittest.TestCase):
                 (report_root / "odds_control_plane" / "odds_history" / "wnba").resolve(),
                 (data_root / "wnba_source").resolve(),
             ])
+
+    def test_resolve_current_shard_key_daily_sport_returns_date(self) -> None:
+        self.assertEqual(resolve_current_shard_key("mlb", "2026-06-12"), "2026-06-12")
+
+    def test_resolve_current_shard_key_weekly_sport_uses_current_week_json(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            data_root = Path(tmp_dir) / "data"
+            report_root = Path(tmp_dir) / "reports"
+            nfl_root = data_root / "nfl_source"
+            nfl_root.mkdir(parents=True)
+            (nfl_root / "current_week.json").write_text('{"season": 2025, "week": 3}', encoding="utf-8")
+
+            with patch("syndicate.features.shared.odds_control_plane.data_root", return_value=data_root), patch(
+                "syndicate.features.shared.odds_control_plane.reports_root",
+                return_value=report_root,
+            ):
+                # No schedule data on disk to derive a date->week window, so
+                # this falls back to the current_week.json tracked week.
+                shard_key = resolve_current_shard_key("nfl", "2026-06-12")
+
+            self.assertEqual(shard_key, "2025_wk3")
+
+    def test_list_available_shard_keys_across_mirrors(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            data_root = Path(tmp_dir) / "data"
+            report_root = Path(tmp_dir) / "reports"
+            shared_dir = report_root / "odds_control_plane" / "odds_history" / "mlb"
+            tracking_dir = data_root / "mlb_source" / "tracking" / "odds_history"
+            shared_dir.mkdir(parents=True)
+            tracking_dir.mkdir(parents=True)
+            (shared_dir / "2026-06-01.json").write_text("{}", encoding="utf-8")
+            (tracking_dir / "2026-06-02.json").write_text("{}", encoding="utf-8")
+
+            with patch("syndicate.features.shared.odds_control_plane.data_root", return_value=data_root), patch(
+                "syndicate.features.shared.odds_control_plane.reports_root",
+                return_value=report_root,
+            ):
+                keys = list_available_shard_keys("mlb")
+
+            self.assertEqual(keys, ["2026-06-01", "2026-06-02"])
+
+    def test_odds_history_lookback_shard_keys_daily(self) -> None:
+        self.assertEqual(
+            odds_history_lookback_shard_keys("mlb", "2026-06-08", 2),
+            ["2026-06-07", "2026-06-06"],
+        )
+        self.assertEqual(odds_history_lookback_shard_keys("mlb", "2026-06-08", 0), [])
+
+    def test_odds_history_lookback_shard_keys_weekly(self) -> None:
+        self.assertEqual(
+            odds_history_lookback_shard_keys("nfl", "2025_wk3", 2),
+            ["2025_wk2", "2025_wk1"],
+        )
 
 
 if __name__ == "__main__":

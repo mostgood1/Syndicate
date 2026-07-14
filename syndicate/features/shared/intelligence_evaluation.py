@@ -1078,6 +1078,139 @@ def _confidence_tier(value: Any) -> str:
     return "elite"
 
 
+def _coverage_component_score(value: Any) -> float | None:
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return 1.0 if value else 0.0
+    if isinstance(value, (int, float)):
+        numeric = float(value)
+        if numeric > 1.0:
+            if numeric <= 100.0:
+                numeric /= 100.0
+            else:
+                return 1.0
+        return max(0.0, min(1.0, numeric))
+    if isinstance(value, list):
+        return 1.0 if value else 0.0
+    if isinstance(value, Mapping):
+        for key in ("coverage_score", "coverage_ratio", "coverage_percent", "coverage_pct", "completeness", "ratio", "percent", "pct", "score"):
+            numeric = _coerce_float(value.get(key))
+            if numeric is None:
+                continue
+            if numeric > 1.0 and numeric <= 100.0:
+                numeric /= 100.0
+            elif numeric > 100.0:
+                numeric = 1.0
+            return max(0.0, min(1.0, numeric))
+        covered = _coerce_float(value.get("covered") or value.get("present") or value.get("available"))
+        required = _coerce_float(value.get("required") or value.get("expected") or value.get("total") or value.get("count"))
+        if covered is not None and required is not None and required > 0:
+            return max(0.0, min(1.0, covered / required))
+        if covered is not None:
+            return max(0.0, min(1.0, covered))
+        if required is not None:
+            return 1.0 if required > 0 else 0.0
+        for key in ("ready", "exists", "is_ready", "is_available", "complete", "present"):
+            raw = value.get(key)
+            if raw is None:
+                continue
+            parsed = _coerce_float(raw)
+            if parsed is not None:
+                return 1.0 if parsed > 0 else 0.0
+            text = str(raw).strip().lower()
+            if text in {"true", "yes", "y", "1", "ready", "available", "complete", "present"}:
+                return 1.0
+            if text in {"false", "no", "n", "0", "missing", "absent", "incomplete"}:
+                return 0.0
+        nested = value.get("feature_coverage") or value.get("coverage") or value.get("metrics")
+        if nested is not None and nested is not value:
+            nested_score = _coverage_component_score(nested)
+            if nested_score is not None:
+                return nested_score
+        return 1.0 if any(str(item).strip() for item in value.values()) else None
+    text = str(value).strip()
+    if not text:
+        return None
+    numeric = _coerce_float(text)
+    if numeric is not None:
+        if numeric > 1.0 and numeric <= 100.0:
+            numeric /= 100.0
+        elif numeric > 100.0:
+            numeric = 1.0
+        return max(0.0, min(1.0, numeric))
+    if text.lower() in {"true", "yes", "y", "ready", "available", "present", "complete", "covered"}:
+        return 1.0
+    if text.lower() in {"false", "no", "n", "missing", "absent", "incomplete"}:
+        return 0.0
+    return None
+
+
+def build_feature_coverage_profile(feature_coverage: Any) -> dict[str, Any]:
+    coverage_map = _copy_mapping(feature_coverage)
+    if not coverage_map:
+        return {}
+
+    component_aliases = {
+        "roster": ("roster", "roster_coverage", "roster_features", "roster_metrics", "roster_count"),
+        "transfer": ("transfer", "transfers", "transfer_coverage", "transfer_metrics", "transfer_count"),
+        "returning_production": ("returning_production", "returning", "returning_coverage", "returning_production_coverage", "returning_production_metrics"),
+        "coach_continuity": ("coach_continuity", "continuity", "coach_coverage", "coach_continuity_coverage", "coach_continuity_metrics"),
+    }
+    weights = {
+        "roster": 0.30,
+        "transfer": 0.20,
+        "returning_production": 0.25,
+        "coach_continuity": 0.25,
+    }
+
+    components: dict[str, float] = {}
+    coverage_warnings: list[str] = []
+    for component_name, aliases in component_aliases.items():
+        raw_value = None
+        for alias in aliases:
+            if alias in coverage_map:
+                raw_value = coverage_map.get(alias)
+                break
+        score = _coverage_component_score(raw_value)
+        if score is None:
+            coverage_warnings.append(f"missing {component_name.replace('_', ' ')} coverage")
+            score = 0.0
+        elif score < 1.0:
+            coverage_warnings.append(f"partial {component_name.replace('_', ' ')} coverage")
+        components[component_name] = round(score, 4)
+
+    coverage_score = round(sum(components[name] * weights[name] for name in components) / sum(weights.values()), 4)
+    if coverage_score >= 0.9:
+        coverage_tier = "A"
+    elif coverage_score >= 0.75:
+        coverage_tier = "B"
+    elif coverage_score >= 0.5:
+        coverage_tier = "C"
+    else:
+        coverage_tier = "D"
+
+    publication_ready = coverage_tier in {"A", "B"}
+    publication_status = "publishable" if publication_ready else "suppressed"
+    coverage_adjusted_confidence = round(max(0.05, min(0.99, 0.55 + (coverage_score * 0.40))), 2)
+
+    if not coverage_warnings and coverage_tier in {"A", "B"}:
+        coverage_warnings.append("coverage complete enough for publication")
+    elif coverage_tier in {"C", "D"}:
+        coverage_warnings.append("coverage below publication threshold")
+
+    return {
+        "coverage_score": coverage_score,
+        "coverage_tier": coverage_tier,
+        "coverage_warnings": coverage_warnings,
+        "coverage_components": components,
+        "publication_ready": publication_ready,
+        "publication_status": publication_status,
+        "coverage_adjusted_confidence": coverage_adjusted_confidence,
+        "publication_priority": {"A": 3, "B": 2, "C": 1, "D": 0}.get(coverage_tier, 0),
+    }
+
+
 def _edge_bucket(value: Any) -> str:
     edge = _coerce_float(value)
     if edge is None:
@@ -1284,6 +1417,17 @@ def build_intelligence_evaluation_bundle(*, query: Any, response: Any, persist: 
     response_payload = _copy_mapping(response)
     recommendation_rows = [item for item in response_payload.get("recommendations") or [] if isinstance(item, Mapping)]
     artifact_metadata = build_artifact_metadata(query=query_payload, response=response_payload)
+    artifact_context = {
+        "ncaaf": [
+            {
+                "artifact_features": dict(item.get("artifact_features") or {}),
+                "feature_coverage": dict(item.get("feature_coverage") or {}),
+                "sport": str(item.get("sport") or item.get("sport_slug") or "").strip().lower(),
+            }
+            for item in recommendation_rows
+            if str(item.get("sport") or item.get("sport_slug") or "").strip().lower() == "ncaaf"
+        ]
+    }
     policy_control = _policy_control_summary(response=response_payload, recommendations=recommendation_rows)
     portfolio_tracking = _portfolio_tracking_summary(response=response_payload, recommendations=recommendation_rows)
     portfolio_events = _portfolio_event_summary(response=response_payload)
@@ -1345,6 +1489,7 @@ def build_intelligence_evaluation_bundle(*, query: Any, response: Any, persist: 
         "prediction": prediction_record,
         "recommendations": recommendation_records,
         "artifact_metadata": artifact_metadata,
+        "artifact_context": artifact_context,
         "policy_control": policy_control,
         "portfolio_tracking": portfolio_tracking,
         "portfolio_events": portfolio_events,

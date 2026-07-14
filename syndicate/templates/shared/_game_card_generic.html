@@ -50,6 +50,37 @@
     </div>
   </div>
 
+  {% if game.coverage_score is defined or game.coverage_tier is defined or game.publication_status is defined %}
+    <div class="cards-panel-card cards-smartsim-box">
+      <div class="cards-box-head">
+        <div>
+          <div class="cards-table-kicker">SmartSim</div>
+          <div class="cards-table-title"><strong>Coverage and publication status</strong></div>
+        </div>
+        {% if game.publication_priority is defined %}
+          <span class="cards-chip">Priority {{ game.publication_priority }}</span>
+        {% endif %}
+      </div>
+      <div class="cards-summary-grid">
+        <div class="cards-data-pair">
+          <span>Coverage</span>
+          <strong>{% if game.coverage_score is defined %}{{ '%.3f'|format(game.coverage_score|float) }}{% else %}-{% endif %}</strong>
+        </div>
+        <div class="cards-data-pair">
+          <span>Publication Tier</span>
+          <strong>{{ game.coverage_tier if game.coverage_tier is defined else '-' }}</strong>
+        </div>
+        <div class="cards-data-pair">
+          <span>Publication Status</span>
+          <strong>{{ game.publication_status if game.publication_status is defined else '-' }}</strong>
+        </div>
+      </div>
+      {% if game.publication_priority is defined %}
+        <div class="cards-subcopy">Publication priority {{ game.publication_priority }}</div>
+      {% endif %}
+    </div>
+  {% endif %}
+
   <div class="cards-market-row">
     {% for tile in game.market_tiles[:4] if game.market_tiles is defined and game.market_tiles %}
       <div class="cards-market-tile">

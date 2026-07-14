@@ -1,3 +1,44 @@
+# 2026-07-14 - NCAAF generated reports and runtime artifacts were cleaned from the tree
+- Symptom: The working tree included a large set of generated NCAAF markdown reports plus runtime artifact JSONs that were not part of the source change set.
+- Root cause: The work had produced report-style docs and snapshot artifacts alongside the code changes, so the repo was carrying generated outputs in addition to the real edits.
+- Fix: Remove the generated NCAAF report markdowns and runtime artifact JSONs from the tree, leaving the source and test changes intact for commit.
+- Validation: `git status --short` still shows the expected source edits and no remaining generated NCAAF markdown artifacts.
+- Follow-up: Keep generated reports and runtime snapshots out of the commit path unless they are explicitly needed as versioned fixtures.
+
+# 2026-07-14 - NCAAF SmartSim reasons layer now explains the projection
+- Symptom: The NCAAF Game Hub showed the projection and comparative context, but it did not explicitly say which signals were driving the SmartSim lean.
+- Root cause: The card and hub contracts exposed team and matchup comparisons, but there was no ranked reasons section derived from those existing signals.
+- Fix: Add a `smartsim_reasons` contract section, rank the explanation items by signal importance, render the reasons block directly below SmartSim projections, and expose the same payload on the Game Hub page context.
+- Validation: `tests/test_ncaaf_cards_local.py` passed with 8 tests, including runtime-card and hub-level reasons contract assertions.
+- Follow-up: Keep expanding the reasons layer only with explanation fields; do not change projected scores, probabilities, spreads, or totals.
+
+# 2026-07-14 - NCAAF predicted-totals aliases regressed in the exported snapshot
+- Symptom: The selected Week 1 predicted-totals snapshot kept `model_*` projections but lost the `predicted_*` aliases on 51 rows, which made the runtime source incomplete even though the model outputs existed.
+- Root cause: A later artifact export/regeneration step dropped the alias population for `predicted_home_points`, `predicted_away_points`, `predicted_total_points`, and `predicted_win_margin`; the visible Syndicate mirror path only copied the broken snapshot forward.
+- Fix: Document the repair boundary, keep the runtime filter as a defense-in-depth fallback, and require regeneration plus a source-contract validation gate before removing the filter.
+- Validation: Compared the incomplete Week 1 snapshot with earlier versions and confirmed all 51 rows were complete in history before the 2025-12-25 late snapshot regression point.
+- Follow-up: Repair the upstream export so `predicted_*` aliases are never published blank when `model_*` values exist.
+
+# 2026-07-14 - NCAAF dedicated card now renders SmartSim contract instead of the generic fallback
+- Symptom: The NCAAF board still looked generic even after SmartSim metadata was available in the payload, so publication readiness and team context were not obvious on the visible card.
+- Root cause: `/ncaaf` was still routed through the shared generic renderer, and the payload did not yet carry a specialized NCAAF card contract built from the published team snapshots.
+- Fix: Build a dedicated `ncaaf_main` contract in `syndicate/features/ncaaf/cards.py`, route that variant to `syndicate/templates/shared/_game_card_ncaaf.html`, and keep `_game_card_generic.html` as the fallback path.
+- Validation: Focused `unittest` coverage for `tests.test_ncaaf_cards_local` passed for both publishable and suppressed Week 1 games.
+- Follow-up: Keep the generic fallback intact, but extend the dedicated NCAAF surface only with artifact-backed contract fields rather than model changes.
+
+# 2026-07-14 - NCAAF Phase 4 board validation confirmed Tier A-first coverage ordering
+- Symptom: The Week 1 NCAAF board needed a validation pass comparing legacy edge-first ordering against the new coverage-aware publication contract.
+- Root cause: Legacy ordering would interleave higher-edge Tier C games ahead of weaker Tier A games, which conflicted with the publication policy.
+- Fix: Validate the current Week 1 slice against the coverage-aware sort key and confirm Tier A games remain ahead of Tier C games in the board contract.
+- Validation: Reconstructed the Week 1 board from the mirrored predicted-totals artifact and confirmed the coverage-aware order keeps all 8 Tier A games above the 5 Tier C games.
+- Follow-up: Keep the board contract coverage-aware, and add a persisted true-EV field if future weekly calibration needs betting EV rather than the current model-edge proxy.
+
+# 2026-07-14 - NCAAF coverage tier now drives publication priority
+- Symptom: NCAAF recommendations already carried coverage metadata, but Tier A vs Tier C/D did not have an explicit publication-order signal.
+- Root cause: Coverage was influencing confidence and some ranking ties indirectly, while the response and board layers still lacked a first-class publication priority field.
+- Fix: Add `publication_priority` to the shared coverage profile, then sort recommendation payloads and board cards by that priority before edge/confidence tie-breakers.
+- Validation: `get_errors` reported no issues in the touched intelligence files.
+- Follow-up: Use the new priority field for any future board or UI slice that needs a stable Tier A-first publication order.
 # 2026-07-12 - Intelligence live pipeline status now records replayable live counts
 - Symptom: The persisted intelligence state had no replayable live-pipeline visibility, so later live-board zeros could not be traced back to live games, live props, or downstream recommendation loss.
 - Root cause: The worker/status persistence path did not store a live_pipeline summary or preserve the last successful live cycle, and there was no small replay entrypoint for a saved snapshot.

@@ -1771,12 +1771,26 @@ def get_wnba_overview(selected_date: str) -> dict[str, Any]:
 
     cards_context = build_cards_page_context(requested_date, allow_stored_date_fallback=True)
     games = list(cards_context.get("games") or [])
+    prop_rows = _finalize_home_prop_rows(
+        _load_home_prop_items(
+            "wnba",
+            context_label=str(cards_context.get("date") or requested_date).strip() or requested_date,
+            home_games=games,
+            season=None,
+            week=None,
+            is_active_today=str(cards_context.get("date") or requested_date).strip() == central_today_iso(),
+            lane="pregame",
+        ),
+        slug="wnba",
+        context_label=str(cards_context.get("date") or requested_date).strip() or requested_date,
+        home_games=games,
+    )
     if not games:
         return {
             "status": "no_games",
             "date": requested_date,
             "games": [],
-            "prop_rows": [],
+            "prop_rows": prop_rows,
             "source_title": _safe_text(cards_context.get("source_title"), "WNBA cards unavailable"),
             "source_path": _safe_text(cards_context.get("source_path"), str(processed_root() / f"game_cards_{requested_date}.csv")),
         }
@@ -1786,7 +1800,7 @@ def get_wnba_overview(selected_date: str) -> dict[str, Any]:
         "date": str(cards_context.get("date") or requested_date).strip() or requested_date,
         "requested_date": requested_date,
         "games": games,
-        "prop_rows": [],
+        "prop_rows": prop_rows,
         "source_title": _safe_text(cards_context.get("source_title"), "WNBA cards"),
         "source_path": _safe_text(cards_context.get("source_path"), str(processed_root() / f"game_cards_{requested_date}.csv")),
         "board_contract": cards_context.get("board_contract"),

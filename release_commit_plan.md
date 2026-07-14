@@ -1,22 +1,25 @@
-# Release Commit Plan
+# Release Commit Plan - Second Pass
 
-## Status Snapshot
+## Current State
 
-The working tree is mixed. Release-ready source changes are present alongside unrelated tracked edits, generated artifacts, tracking data, and scratch outputs. The plan below separates the deployable release slice from everything that should stay out of the push.
+The working tree now contains three kinds of changes:
 
-## Classification Legend
+- release source and test files that are safe to stage
+- unrelated tracked edits that should stay out of this release
+- generated artifacts, cache data, and deleted report files that should not be staged
 
-- `COMMIT` means stage it in one of the release commits below.
-- `REVIEW` means the file is code, but it is outside the release slice and should not be staged until separately approved.
-- `EXCLUDE` means generated, temporary, cache, tracking, or scratch output that should not be staged.
+## Recommended Commit Order
 
-## Exact Commit Plan
+1. Commit 1: NCAAF SmartSim + Runtime Integration
+2. Commit 2: NCAAF Card Parity + UI
+3. Commit 3: NFL / Football Foundation
+4. Commit 4: Documentation, optional
+
+## COMMIT
+
+Stage these files for the release commits.
 
 ### Commit 1: NCAAF SmartSim + Runtime Integration
-
-Purpose: restore the NCAAF source-contract and CFBD builder surface so NCAAF builder scripts and regression tests load cleanly.
-
-Exact files:
 
 - `syndicate/features/ncaaf/cfbd.py`
 - `syndicate/features/ncaaf/sources.py`
@@ -32,15 +35,7 @@ Exact files:
 - `tests/test_ncaaf_team_registry_builder.py`
 - `tests/test_ncaaf_transfer_portal_builder.py`
 
-Deployment risk: low to moderate. The change is contract-heavy, but the focused NCAAF/NFL suite already passed.
-
-Rollback risk: moderate. The CFBD builders and source helpers are coupled, so rollback should keep the commit as a single unit.
-
 ### Commit 2: NCAAF Card Parity + UI
-
-Purpose: keep the dedicated NCAAF card experience aligned with the shared card dispatcher and dedicated NCAAF renderer.
-
-Exact files:
 
 - `syndicate/features/ncaaf/cards.py`
 - `syndicate/templates/shared/_game_card.html`
@@ -48,15 +43,7 @@ Exact files:
 - `syndicate/templates/shared/_game_card_ncaaf.html`
 - `tests/test_ncaaf_cards_local.py`
 
-Deployment risk: low. This is UI/rendering work with dedicated regression coverage.
-
-Rollback risk: low. The surface is isolated to card rendering and local NCAAF card tests.
-
 ### Commit 3: NFL / Football Foundation
-
-Purpose: land the new football ingestion, simulation, validation, and support layer that backs NFL and football foundation work.
-
-Exact files:
 
 - `syndicate/features/football/__init__.py`
 - `syndicate/features/football/adapters.py`
@@ -90,54 +77,13 @@ Exact files:
 - `tests/test_football_sim_engine.py`
 - `tests/test_roster_snapshot_builder.py`
 
-Deployment risk: moderate. This is the largest code slice, but it is covered by the focused football regression suite.
-
-Rollback risk: moderate to high. The commit is broad, so rollback should be atomic and not split across multiple commits.
-
-### Commit 4: Documentation, Audit, and Release Notes, Optional
-
-Purpose: preserve the audit trail and remediation notes without mixing them into the functional commits.
-
-Exact files:
+### Commit 4: Documentation, optional
 
 - `docs/fix_notes_log.md`
-- `final_git_push_audit.md`
-- `release_blocker_remediation_report.md`
-- `release_commit_plan.md`
-- `release_readiness_audit.md`
 
-Deployment risk: none. Documentation only.
+## REVIEW
 
-Rollback risk: low. Documentation can be reverted independently of the release code.
-
-## Changed File Classification
-
-### COMMIT
-
-- `syndicate/features/ncaaf/cards.py`
-- `syndicate/features/ncaaf/cfbd.py`
-- `syndicate/features/ncaaf/sources.py`
-- `syndicate/templates/shared/_game_card.html`
-- `syndicate/templates/shared/_game_card_generic.html`
-- `syndicate/templates/shared/_game_card_ncaaf.html`
-- `syndicate/features/football/**`
-- `scripts/build_ncaaf_*.py`
-- `tests/test_depth_chart_snapshot_builder.py`
-- `tests/test_football_sim_engine.py`
-- `tests/test_ncaaf_cards_local.py`
-- `tests/test_ncaaf_cfbd_player_identity.py`
-- `tests/test_ncaaf_coach_continuity_builder.py`
-- `tests/test_ncaaf_returning_production_builder.py`
-- `tests/test_ncaaf_team_registry_builder.py`
-- `tests/test_ncaaf_transfer_portal_builder.py`
-- `tests/test_roster_snapshot_builder.py`
-- `docs/fix_notes_log.md`
-- `final_git_push_audit.md`
-- `release_blocker_remediation_report.md`
-- `release_commit_plan.md`
-- `release_readiness_audit.md`
-
-### REVIEW
+These files are real code changes, but they are outside the NCAAF/NFL release slice and should not be staged in this pass.
 
 - `syndicate/features/intelligence.py`
 - `syndicate/features/intelligence/api/response_builder.py`
@@ -146,47 +92,72 @@ Rollback risk: low. Documentation can be reverted independently of the release c
 - `syndicate/features/shared/live_refresh_loop.py`
 - `syndicate/features/shared/recommendation_engine.py`
 - `syndicate/features/wnba/cards.py`
+- `syndicate/templates/shared/_game_card_generic.html` is staged above for the NCAAF UI slice only if the diff is part of that release path; otherwise leave it in review until the card scope is confirmed.
+- `reports/manifests/wnba.json`
 - `tests/test_live_refresh_loop.py`
-
-Rationale: these files are real code, but they are outside the current NCAAF/NFL release slice and should not be bundled into the same push without separate signoff.
-
-### EXCLUDE
-
 - `data/mlb_source/source_artifacts/data/live_lens/live_lens_2026_07_13.jsonl`
 - `data/mlb_source/source_artifacts/data/live_lens/live_lens_report_2026_07_13.json`
+
+## EXCLUDE
+
+These are generated artifacts, cache/tracking files, scratch outputs, or deleted report files that should not be staged.
+
+- `data/nfl_source/tracking/odds_history.json`
+- `data/nfl_source/tracking/odds_nfl_team_odds_history_2026-06-12.csv`
+- `data/nfl_source/tracking/odds_nfl_team_odds_history_2026-07-09.csv`
+- `data/nfl_source/tracking/odds_nfl_team_odds_movement_signals_2026-06-12.csv`
+- `data/nfl_source/tracking/odds_nfl_team_odds_movement_signals_2026-07-09.csv`
+- `data/nfl_source/tracking/odds_nfl_team_odds_opening_2026-06-12.csv`
+- `data/nfl_source/tracking/odds_nfl_team_odds_opening_2026-07-09.csv`
+- `reports/live_refresh_loop/last_lineup_check.json`
 - `reports/live_refresh_loop/latest_live_refresh_tick.json`
-- `data/nfl_source/tracking/**`
-- `tmp/**`
-- `football_*.md`
-- `ncaaf_*.md`
-- `football_2026_*.md`
-- `nfl_season_validation*.json`
-- `run_feature_lift_analysis.py`
-- `syndicate/features/football/__pycache__/**`
-- `syndicate/features/football/features/__pycache__/**`
-- `syndicate/features/football/ingestion/__pycache__/**`
-- `syndicate/features/football/sim_engine/__pycache__/**`
+- `tmp/**` and the `nfl_season_validation*.json` files that were created there
+- All root-level deleted report files currently shown as `D` in git status:
+  - `ncaaf_card_experience_design.md`
+  - `ncaaf_card_parity_final_report.md`
+  - `ncaaf_card_parity_implementation_report.md`
+  - `ncaaf_cfbd_integration_report.md`
+  - `ncaaf_coach_continuity_generation_report.md`
+  - `ncaaf_coaching_continuity_onboarding_report.md`
+  - `ncaaf_coaching_source_validation_report.md`
+  - `ncaaf_onboarding_validation_report.md`
+  - `ncaaf_phase_2_1_smart_sim_integration_design.md`
+  - `ncaaf_phase_2_2_runtime_integration_report.md`
+  - `ncaaf_phase_2_3_runtime_integration_report.md`
+  - `ncaaf_phase_2_4_candidate_generation_report.md`
+  - `ncaaf_phase_2_5_feature_aware_evaluation_report.md`
+  - `ncaaf_phase_2_6_coverage_aware_ranking_report.md`
+  - `ncaaf_phase_3_smartsim_validation_report.md`
+  - `ncaaf_phase_4_board_validation_report.md`
+  - `ncaaf_player_identity_source_report.md`
+  - `ncaaf_returning_production_generation_report.md`
+  - `ncaaf_returning_production_onboarding_report.md`
+  - `ncaaf_roster_onboarding_report.md`
+  - `ncaaf_schedule_onboarding_report.md`
+  - `ncaaf_team_metadata_onboarding_report.md`
+  - `ncaaf_team_registry_generation_report.md`
+  - `ncaaf_transfer_portal_generation_report.md`
+  - `ncaaf_transfer_portal_onboarding_report.md`
+  - `ncaaf_week0_market_readiness_report.md`
+  - `ncaaf_week1_join_gap_report.md`
+  - `ncaaf_week1_market_readiness_report.md`
+  - `ncaaf_week1_publication_readiness_report.md`
+  - `release_blocker_remediation_report.md`
+  - `release_readiness_audit.md`
+  - `release_commit_plan.md`
+- `__pycache__/**` under the football tree or any other tree
 
-Rationale: these are generated artifacts, scratch outputs, cache/tracking files, or rerun products that do not belong in the release history.
+## What Should Be Staged Now
 
-## What to Stage Now
+Stage only the COMMIT files above. Leave REVIEW and EXCLUDE untouched.
 
-Stage the files in Commit 1, Commit 2, Commit 3, and optionally Commit 4 if you want the documentation trail in the same push.
+## What Must Not Be Staged
 
-Do not stage anything in `REVIEW` or `EXCLUDE`.
+- all generated tracking, cache, and scratch files
+- all deleted NCAAF/NFL report files listed under EXCLUDE
+- all unrelated intelligence, WNBA, and live-refresh edits listed under REVIEW
 
-## Recommended Commit Order
+## Push and Deploy Answer
 
-1. Commit 1: NCAAF SmartSim + Runtime Integration
-2. Commit 2: NCAAF Card Parity + UI
-3. Commit 3: NFL / Football Foundation
-4. Commit 4: Documentation, Audit, and Release Notes, optional
-
-## Push and Deploy Decision
-
-- After selective staging, is the repo safe to push? Yes, if you stage only the Commit 1 to Commit 3 release files, and optionally Commit 4 docs, while leaving `REVIEW` and `EXCLUDE` untouched.
-- After selective staging, is the repo safe to deploy? Yes, based on the passed focused validation suite and the remediation report, assuming the release commits are kept to the plan above.
-
-## Final Recommendation
-
-Use selective staging only. Do not batch the unrelated intelligence/WNBA/live-lens changes into the release. Commit the release slices in order, then push the resulting clean history.
+- After selective staging, is the repo safe to push? Yes, if you stage only the COMMIT files and leave REVIEW and EXCLUDE out.
+- After selective staging, is the repo safe to deploy? Yes, for the release slice covered by the focused validation suite.

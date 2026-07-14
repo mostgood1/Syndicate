@@ -22,7 +22,7 @@ class IntelligenceOddsHistoryTests(unittest.TestCase):
             },
             clear=False,
         ):
-            shared_history_path = Path(tmp_dir) / "reports" / "odds_control_plane" / "odds_history" / "mlb" / "odds_history.json"
+            shared_history_path = Path(tmp_dir) / "reports" / "odds_control_plane" / "odds_history" / "mlb" / "2026-07-05.json"
             shared_history_path.parent.mkdir(parents=True, exist_ok=True)
             refresh_state_store.write_json_file(
                 shared_history_path,
@@ -41,7 +41,7 @@ class IntelligenceOddsHistoryTests(unittest.TestCase):
                 },
             )
 
-            payload = _load_odds_history_payload_for_sport("mlb")
+            payload = _load_odds_history_payload_for_sport("mlb", "2026-07-05")
 
         self.assertIsNotNone(payload)
         self.assertEqual(payload.get("date"), "2026-07-05")

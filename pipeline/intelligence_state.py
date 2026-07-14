@@ -32,12 +32,14 @@ from syndicate.features.intelligence import _query_preferences
 from syndicate.features.intelligence import _score_candidates
 from syndicate.features.intelligence import _tracked_repo_files
 from syndicate.features.intelligence import rank_global_recommendations
+from syndicate.features.intelligence import _shard_key_from_context_label
 from syndicate.features.intelligence_board import build_intelligence_board_contract
 from syndicate.features.intelligence.signals.normalization import _numeric_hint
 from syndicate.features.shared.market_id import attach_market_id
 from syndicate.features.shared.odds_control_plane import load_odds_history_payload_for_sport
 from syndicate.features.shared.odds_control_plane import odds_history_roots_for_sport
 from syndicate.features.shared.odds_control_plane import odds_history_paths_for_sport
+from syndicate.features.shared.odds_control_plane import resolve_current_shard_key
 from syndicate.features.shared.refresh_state_store import read_json_file
 from syndicate.features.shared.refresh_state_store import reports_root
 from syndicate.features.shared.refresh_state_store import write_json_file
@@ -725,7 +727,7 @@ class IntelligenceStateService:
             "mtime_ns": int(stat_result.st_mtime_ns),
         }
 
-    def _sport_manifest_signature(self, sport_slug: str) -> dict[str, Any]:
+    def _sport_manifest_signature(self, sport_slug: str, selected_date: str | None = None) -> dict[str, Any]:
         manifest_path = reports_root() / "manifests" / f"{str(sport_slug or '').strip().lower()}.json"
         signature = self._artifact_signature(str(manifest_path))
         manifest = read_json_file(manifest_path)
@@ -738,11 +740,12 @@ class IntelligenceStateService:
                     "artifact_path_count": len(manifest.get("artifact_paths") or []) if isinstance(manifest.get("artifact_paths"), list) else 0,
                 }
             )
-        signature["odds_history"] = self._odds_history_signature(sport_slug)
+        signature["odds_history"] = self._odds_history_signature(sport_slug, selected_date)
         return signature
 
-    def _odds_history_signature(self, sport_slug: str) -> dict[str, Any]:
-        candidate_paths = self._odds_history_paths_for_sport(sport_slug)
+    def _odds_history_signature(self, sport_slug: str, selected_date: str | None = None) -> dict[str, Any]:
+        shard_key = resolve_current_shard_key(sport_slug, selected_date or central_today_iso())
+        candidate_paths = self._odds_history_paths_for_sport(sport_slug, shard_key)
         active_path: Path | None = None
         active_payload: dict[str, Any] | None = None
         for candidate_path in candidate_paths:
@@ -869,11 +872,11 @@ class IntelligenceStateService:
     def _odds_history_roots_for_sport(self, sport_slug: str) -> list[Path]:
         return odds_history_roots_for_sport(sport_slug)
 
-    def _odds_history_paths_for_sport(self, sport_slug: str) -> list[Path]:
-        return odds_history_paths_for_sport(sport_slug)
+    def _odds_history_paths_for_sport(self, sport_slug: str, shard_key: str) -> list[Path]:
+        return odds_history_paths_for_sport(sport_slug, shard_key)
 
-    def _load_odds_history_payload_for_sport(self, sport_slug: str) -> dict[str, Any] | None:
-        return load_odds_history_payload_for_sport(sport_slug)
+    def _load_odds_history_payload_for_sport(self, sport_slug: str, shard_key: str) -> dict[str, Any] | None:
+        return load_odds_history_payload_for_sport(sport_slug, shard_key)
 
     @staticmethod
     def _odds_history_market_states(payload: dict[str, Any] | None) -> dict[str, dict[str, Any]]:
@@ -898,7 +901,8 @@ class IntelligenceStateService:
             slug = str(sport.get("slug") or "").strip().lower()
             if not slug or slug in payloads:
                 continue
-            payload = self._load_odds_history_payload_for_sport(slug)
+            shard_key = _shard_key_from_context_label(slug, str(sport.get("context_label") or ""))
+            payload = self._load_odds_history_payload_for_sport(slug, shard_key)
             if isinstance(payload, dict):
                 payloads[slug] = payload
         return payloads
@@ -976,7 +980,7 @@ class IntelligenceStateService:
             "advanced_summary": status.get("advanced_summary") if isinstance(status.get("advanced_summary"), dict) else {},
             "readiness_gate": status.get("readiness_gate") if isinstance(status.get("readiness_gate"), dict) else {},
             "sport_manifests": [
-                self._sport_manifest_signature(str(sport.get("slug") or ""))
+                self._sport_manifest_signature(str(sport.get("slug") or ""), selected_date)
                 for sport in sports_payload
                 if isinstance(sport, dict) and str(sport.get("slug") or "").strip()
             ],
@@ -1023,7 +1027,7 @@ class IntelligenceStateService:
             slug = str(sport.get("slug") or "").strip().lower()
             if not slug:
                 continue
-            payload["sports"].append({"slug": slug, **self._sport_manifest_signature(slug)})
+            payload["sports"].append({"slug": slug, **self._sport_manifest_signature(slug, selected_date)})
         canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str)
         return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
@@ -1361,8 +1365,9 @@ class IntelligenceStateService:
 
         manifests = self._available_sport_manifests(selected_date)
         candidate_pools: OrderedDict[str, list[dict[str, Any]]] = OrderedDict()
+        manifest_shard_keys = {sport_slug: resolve_current_shard_key(sport_slug, selected_date) for sport_slug in manifests}
         for sport_slug, manifest in manifests.items():
-            odds_history_payload = self._load_odds_history_payload_for_sport(sport_slug)
+            odds_history_payload = self._load_odds_history_payload_for_sport(sport_slug, manifest_shard_keys[sport_slug])
             odds_history_markets = self._odds_history_market_states(odds_history_payload)
             sport_candidates: list[dict[str, Any]] = []
             for candidate in candidate_entries:
@@ -1413,7 +1418,7 @@ class IntelligenceStateService:
                     "metadata": dict(manifest.get("metadata") or {}) if isinstance(manifest.get("metadata"), dict) else {},
                     "candidate_count": len(candidate_pools.get(sport_slug, [])),
                     "candidates": candidate_pools.get(sport_slug, []),
-                    "odds_history": self._load_odds_history_payload_for_sport(sport_slug),
+                    "odds_history": self._load_odds_history_payload_for_sport(sport_slug, manifest_shard_keys.get(sport_slug, resolve_current_shard_key(sport_slug, selected_date))),
                 }
                 for sport_slug, manifest in manifests.items()
                 if sport_slug in candidate_pools

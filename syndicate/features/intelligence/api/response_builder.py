@@ -11,6 +11,7 @@ from syndicate.features.intelligence.scoring.edge import get_top_live_opportunit
 from syndicate.features.intelligence.signals.normalization import _numeric_hint
 from syndicate.features.intelligence.signals.normalization import _safe_float
 from syndicate.features.intelligence.signals.normalization import _safe_text as _base_safe_text
+from syndicate.features.shared.intelligence_evaluation import build_feature_coverage_profile
 
 
 MAX_CORRELATION_THRESHOLD = 0.65
@@ -288,6 +289,7 @@ def _balanced_recommendation_order(recommendations: list[dict[str, Any]]) -> lis
     ranked = sorted(
         [dict(candidate) for candidate in recommendations if isinstance(candidate, Mapping)],
         key=lambda item: (
+            _numeric_hint(item.get("publication_priority") if item.get("publication_priority") is not None else (3 if _safe_text(item.get("coverage_tier"), "").upper() == "A" else 2 if _safe_text(item.get("coverage_tier"), "").upper() == "B" else 1 if _safe_text(item.get("coverage_tier"), "").upper() == "C" else 0)) or 0.0,
             _numeric_hint(item.get("adjusted_score") or item.get("score") or item.get("source_summary_score") or item.get("edge")) or 0.0,
             _numeric_hint(item.get("expected_value") or item.get("ev_current") or item.get("ev")) or 0.0,
             _numeric_hint(item.get("confidence")) or 0.0,
@@ -361,6 +363,14 @@ def build_response(*, recommendations: list[dict[str, Any]], parlays: list[dict[
 
     def _frontend_recommendation(candidate: dict[str, Any]) -> dict[str, Any]:
         recommendation = dict(candidate)
+        if recommendation.get("artifact_features") or recommendation.get("feature_coverage"):
+            recommendation["artifact_features"] = dict(recommendation.get("artifact_features") or {})
+            recommendation["feature_coverage"] = dict(recommendation.get("feature_coverage") or recommendation.get("artifact_features", {}).get("feature_coverage") or {})
+        coverage_profile = build_feature_coverage_profile(recommendation.get("feature_coverage"))
+        if coverage_profile:
+            recommendation.update(coverage_profile)
+            if recommendation.get("coverage_adjusted_confidence") is not None:
+                recommendation["confidence"] = recommendation.get("coverage_adjusted_confidence")
         writeup = _safe_text(recommendation.get("writeup"), "")
         if not _safe_text(recommendation.get("rationale"), ""):
             rationale = recommendation.get("reasoning_text") or recommendation.get("summary") or writeup
@@ -387,6 +397,14 @@ def build_response(*, recommendations: list[dict[str, Any]], parlays: list[dict[
     ordered_recommendations = _balanced_recommendation_order(visible_recommendations)
     pick_payloads = [Pick.model_validate(_frontend_pick(candidate)).model_dump() for candidate in ordered_recommendations]
     recommendation_payloads = [_frontend_recommendation(candidate) for candidate in ordered_recommendations]
+    recommendation_payloads.sort(
+        key=lambda item: (
+            _numeric_hint(item.get("publication_priority") if item.get("publication_priority") is not None else (3 if _safe_text(item.get("coverage_tier"), "").upper() == "A" else 2 if _safe_text(item.get("coverage_tier"), "").upper() == "B" else 1 if _safe_text(item.get("coverage_tier"), "").upper() == "C" else 0)) or 0.0,
+            _numeric_hint(item.get("adjusted_score") or item.get("score") or item.get("edge")) or 0.0,
+            _numeric_hint(item.get("confidence")) or 0.0,
+        ),
+        reverse=True,
+    )
     movement_deltas = [value for value in (_safe_float(item.get("edge_delta")) for item in pick_payloads) if value is not None]
     movement_edge_delta = round(sum(movement_deltas) / len(movement_deltas), 4) if movement_deltas else None
     if movement_edge_delta is None:
