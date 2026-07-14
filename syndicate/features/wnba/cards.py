@@ -69,6 +69,22 @@ def _path_cache_signature(path: Path | None) -> int:
         return 0
 
 
+def _game_cards_or_live_state_signature(path: Path | None) -> int:
+    # game_cards.csv / live_state.jsonl are written cross-service through the
+    # keyvalue store, so they no longer exist as real local files under a
+    # keyvalue backend -- _path_cache_signature would always see "file not
+    # found" and return the same value forever, making
+    # _WNBA_CARDS_CONTEXT_CACHE permanently stale (never invalidated) on any
+    # long-lived process (e.g. the live-lens background loop). Hash the
+    # actual keyvalue content instead so the cache key changes whenever the
+    # underlying data does.
+    if path is not None:
+        keyvalue_text = _keyvalue_read_text_file(path)
+        if keyvalue_text is not None:
+            return hash(keyvalue_text)
+    return _path_cache_signature(path)
+
+
 def _live_snapshot_artifact_path(kind: str, selected_date: str) -> Path:
     return processed_root() / "live_snapshots" / f"{str(kind or '').strip().lower()}_{str(selected_date or '').strip()}.jsonl"
 
@@ -2360,10 +2376,12 @@ def build_cards_page_context(selected_date: str, *, allow_stored_date_fallback: 
         resolved_date,
         bool(allow_stored_date_fallback),
         tuple(available_dates()),
+        _game_cards_or_live_state_signature(_game_cards_keyvalue_path(resolved_date)),
         _path_cache_signature(_artifact_root_paths(resolved_date)["cards"]),
         _path_cache_signature(_artifact_root_paths(resolved_date)["recommendations"]),
         _path_cache_signature(_artifact_root_paths(resolved_date)["sim"]),
         _path_cache_signature(_artifact_root_paths(resolved_date)["props"]),
+        _game_cards_or_live_state_signature(_live_state_keyvalue_path(resolved_date)),
         _path_cache_signature(processed_root() / "live_snapshots" / f"live_state_{resolved_date}.jsonl"),
     )
     cached_context = _WNBA_CARDS_CONTEXT_CACHE.get(cache_key)
