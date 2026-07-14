@@ -395,6 +395,70 @@ def api_ops_wnba_artifact_counts() -> Any:
     )
 
 
+@ops_bp.get("/api/ops/wnba/status-trace")
+def api_ops_wnba_status_trace() -> Any:
+    # Protected endpoint: requires admin token (enforced by before_request)
+    date = str(request.args.get("date") or "").strip()
+    if not date:
+        return jsonify({"ok": False, "error": "date parameter required (YYYY-MM-DD)"}), 400
+    try:
+        from syndicate.features.wnba import cards as wnba_cards
+    except Exception as exc:
+        return jsonify({"ok": False, "error": f"ImportError: {type(exc).__name__}: {exc}"}), 500
+
+    def _summarize_games(games: Any) -> Any:
+        if not isinstance(games, list):
+            return games
+        out = []
+        for game in games:
+            if not isinstance(game, dict):
+                continue
+            out.append(
+                {
+                    "event_id": game.get("event_id"),
+                    "away_tri": game.get("away_tri"),
+                    "home_tri": game.get("home_tri"),
+                    "status": game.get("status"),
+                    "detail": game.get("detail"),
+                    "live_state": game.get("live_state"),
+                }
+            )
+        return out
+
+    trace: dict[str, Any] = {"ok": True, "date": date}
+    try:
+        trace["render_web_dyno"] = wnba_cards._render_web_dyno()
+    except Exception as exc:
+        trace["render_web_dyno_error"] = f"{type(exc).__name__}: {exc}"
+    try:
+        trace["local_live_state_payload"] = wnba_cards._local_live_state_payload(date)
+    except Exception as exc:
+        trace["local_live_state_payload_error"] = f"{type(exc).__name__}: {exc}"
+    try:
+        live_games, live_source_path = wnba_cards._games_from_live_state_fallback(date)
+        trace["games_from_live_state_fallback"] = {"source_path": live_source_path, "games": _summarize_games(live_games)}
+    except Exception as exc:
+        trace["games_from_live_state_fallback_error"] = f"{type(exc).__name__}: {exc}"
+    try:
+        artifact_games, cards_path, _recs_path = wnba_cards._games_from_artifacts(date)
+        trace["games_from_artifacts"] = {"source_path": str(cards_path), "games": _summarize_games(artifact_games)}
+    except Exception as exc:
+        trace["games_from_artifacts_error"] = f"{type(exc).__name__}: {exc}"
+    try:
+        cards_context = wnba_cards.build_cards_page_context(date, allow_stored_date_fallback=False)
+        trace["build_cards_page_context_games"] = _summarize_games(cards_context.get("games"))
+        trace["build_cards_page_context_source_path"] = cards_context.get("source_path")
+    except Exception as exc:
+        trace["build_cards_page_context_error"] = f"{type(exc).__name__}: {exc}"
+    try:
+        source_payload = wnba_cards.build_source_cards_payload(date, allow_stored_date_fallback=False)
+        trace["build_source_cards_payload_games"] = _summarize_games(source_payload.get("games"))
+    except Exception as exc:
+        trace["build_source_cards_payload_error"] = f"{type(exc).__name__}: {exc}"
+
+    return jsonify(trace)
+
+
 @ops_bp.get("/api/ops/mlb/live-check")
 def api_ops_mlb_live_check() -> Any:
     # Protected endpoint: requires admin token
