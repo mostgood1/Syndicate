@@ -2174,10 +2174,20 @@ def _supplement_games_with_live_state(games: list[dict[str, Any]], selected_date
         updated_count += 1
         merged_games.append(merged)
 
+    # A WNBA team can only play once per date, so an "extra" live-state game
+    # sharing a team with one already included is a duplicate/mislabeled entry
+    # (e.g. a team-code mismatch between data sources) rather than a real
+    # additional matchup -- drop it instead of appending a phantom card.
+    seen_teams: set[str] = set()
+    for matchup in seen_matchups:
+        seen_teams.update(code for code in matchup if code)
+
     extras = [
         game
         for key, game in live_by_identity.items()
-        if key not in seen_keys and _game_matchup_key(game) not in seen_matchups
+        if key not in seen_keys
+        and _game_matchup_key(game) not in seen_matchups
+        and not (set(code for code in _game_matchup_key(game) if code) & seen_teams)
     ]
     if extras:
         merged_games.extend(extras)

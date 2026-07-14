@@ -89,6 +89,48 @@ class WnbaCardsMergeAliasTests(unittest.TestCase):
         self.assertEqual(len(merged_games), 1)
         self.assertEqual(supplemented_count, 0)
 
+    def test_live_state_mislabeled_team_code_does_not_add_phantom_card(self) -> None:
+        # Regression: the live-state fallback source has been observed to
+        # mislabel the Los Angeles Sparks as "LVA" (Las Vegas Aces' code)
+        # instead of "LAS". Since that mismatched matchup key slips past the
+        # identity/matchup dedup, it must still be dropped because Atlanta
+        # already has a real game today -- a team can't play twice in one day.
+        processed_games = [
+            {
+                "gamePk": "1",
+                "event_id": "059e806dd41a1cdd33be91c732ab446be",
+                "away_tri": "LAS",
+                "home_tri": "ATL",
+                "status": "Scheduled",
+                "detail": "2026-07-13T23:08:15Z",
+            }
+        ]
+        live_games = [
+            {
+                "gamePk": "LVA@ATL",
+                "event_id": "",
+                "away_tri": "LVA",
+                "home_tri": "ATL",
+                "status": "Live",
+                "detail": "2026-07-13T23:08:15Z",
+                "live_state": {
+                    "away": "LVA",
+                    "home": "ATL",
+                    "status": "Live",
+                    "in_progress": True,
+                },
+            }
+        ]
+
+        with patch(
+            "syndicate.features.wnba.cards._games_from_live_state_fallback",
+            return_value=(live_games, "live_state_jsonl"),
+        ):
+            merged_games, _, supplemented_count, _ = _supplement_games_with_live_state(processed_games, "2026-07-13")
+
+        self.assertEqual(len(merged_games), 1)
+        self.assertEqual(merged_games[0]["away_tri"], "LAS")
+
     def test_live_state_fallback_keeps_old_zero_zero_rows_scheduled(self) -> None:
         live_games = [
             {
