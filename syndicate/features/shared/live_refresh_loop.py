@@ -2,8 +2,11 @@ from __future__ import annotations
 
 import atexit
 import csv
+import hashlib
 import json
 import os
+import subprocess
+import sys
 import threading
 from datetime import datetime, timezone
 from pathlib import Path
@@ -231,46 +234,124 @@ def _any_tracked_sport_game_live() -> bool:
 	return False
 
 
-def _live_refresh_loop_full_rerun_interval_seconds() -> int:
-	raw = str(os.environ.get("SYNDICATE_LIVE_ODDS_REFRESH_FULL_RERUN_INTERVAL_SECONDS") or "").strip()
+def _lineup_check_interval_seconds() -> int:
+	raw = str(os.environ.get("SYNDICATE_LINEUP_CHECK_INTERVAL_SECONDS") or "").strip()
 	try:
-		value = int(raw or 7200)
+		value = int(raw or 1800)
 	except Exception:
-		value = 7200
+		value = 1800
 	return max(300, int(value))
 
 
-def _last_full_mode_rerun_path() -> Path:
-	return _meta_dir() / "last_full_mode_rerun.json"
+def _last_lineup_check_path() -> Path:
+	return _meta_dir() / "last_lineup_check.json"
 
 
-def _last_full_mode_rerun_epoch() -> float:
-	payload = read_json_file(_last_full_mode_rerun_path())
-	if isinstance(payload, dict):
-		try:
-			return float(payload.get("epoch") or 0.0)
-		except (TypeError, ValueError):
-			return 0.0
-	return 0.0
+def _read_last_lineup_check() -> dict[str, Any]:
+	payload = read_json_file(_last_lineup_check_path())
+	return payload if isinstance(payload, dict) else {}
 
 
-def _record_full_mode_rerun(epoch: float) -> None:
-	write_json_file(_last_full_mode_rerun_path(), {"epoch": epoch, "recordedAt": _utc_now()})
+def _record_lineup_check(epoch: float, date_str: str, fingerprints: dict[str, str | None]) -> None:
+	write_json_file(
+		_last_lineup_check_path(),
+		{"epoch": epoch, "date": date_str, "fingerprints": fingerprints, "recordedAt": _utc_now()},
+	)
 
 
-def _should_run_full_mode(*, adaptive_enabled: bool, now_epoch: float) -> bool:
-	if not adaptive_enabled:
+def _vendor_source_root(sport: str) -> Path:
+	return REPO_ROOT / "vendor" / f"{sport}_betting_repo"
+
+
+def _vendor_worker_env(source_root: Path) -> dict[str, str]:
+	env = dict(os.environ)
+	src_dir = str(source_root / "src")
+	existing = str(env.get("PYTHONPATH") or "").strip()
+	env["PYTHONPATH"] = src_dir if not existing else f"{src_dir}{os.pathsep}{existing}"
+	env.setdefault("PYTHONUNBUFFERED", "1")
+	return env
+
+
+def _fetch_injuries(sport: str, date_str: str, *, package_name: str, timeout_s: float = 90.0) -> bool:
+	source_root = _vendor_source_root(sport)
+	if not source_root.exists():
 		return False
-	last_epoch = _last_full_mode_rerun_epoch()
-	if last_epoch <= 0.0:
-		# No prior full-mode run recorded in this environment (e.g. a fresh worker
-		# restart). Establish a baseline now rather than immediately forcing a full
-		# rerun on the very first tick -- avoids a burst of full-mode reruns on
-		# every restart.
-		_record_full_mode_rerun(now_epoch)
+	python_exe = sys.executable if (sys.executable and Path(sys.executable).exists()) else "python"
+	try:
+		result = subprocess.run(
+			[python_exe, "-m", f"{package_name}.cli", "fetch-injuries", "--date", date_str],
+			cwd=str(source_root),
+			env=_vendor_worker_env(source_root),
+			capture_output=True,
+			text=True,
+			timeout=timeout_s,
+		)
+		return result.returncode == 0
+	except Exception:
 		return False
-	elapsed = now_epoch - last_epoch
-	return elapsed >= _live_refresh_loop_full_rerun_interval_seconds()
+
+
+def _hash_file_bytes(path: Path) -> str | None:
+	try:
+		if not path.exists() or not path.is_file():
+			return None
+		digest = hashlib.sha256()
+		with path.open("rb") as handle:
+			for chunk in iter(lambda: handle.read(65536), b""):
+				digest.update(chunk)
+		return digest.hexdigest()
+	except Exception:
+		return None
+
+
+def _nba_lineup_injury_fingerprint(date_str: str) -> str | None:
+	root = data_root() / "nba_source" / "source_artifacts" / "data"
+	parts = [
+		_hash_file_bytes(root / "raw" / "injuries.csv"),
+		_hash_file_bytes(root / "processed" / f"league_status_{date_str}.csv"),
+	]
+	if all(part is None for part in parts):
+		return None
+	return "|".join(part or "" for part in parts)
+
+
+def _wnba_lineup_injury_fingerprint(date_str: str) -> str | None:
+	root = data_root() / "wnba_source" / "source_artifacts" / "data"
+	parts = [
+		_hash_file_bytes(root / "raw" / "injuries.csv"),
+		_hash_file_bytes(root / "processed" / f"league_status_{date_str}.csv"),
+	]
+	if all(part is None for part in parts):
+		return None
+	return "|".join(part or "" for part in parts)
+
+
+_LINEUP_INJURY_FETCH_PACKAGES = {
+	"nba": "nba_betting",
+	"wnba": "wnba_betting",
+}
+
+
+def _should_force_sim_rerun(*, now_epoch: float, date_str: str) -> bool:
+	interval = _lineup_check_interval_seconds()
+	last = _read_last_lineup_check()
+	last_epoch = float(last.get("epoch") or 0.0)
+	last_date = str(last.get("date") or "")
+	if last_epoch > 0.0 and last_date == date_str and (now_epoch - last_epoch) < interval:
+		return False
+	for sport, package_name in _LINEUP_INJURY_FETCH_PACKAGES.items():
+		_fetch_injuries(sport, date_str, package_name=package_name)
+	current_fingerprints = {
+		"nba": _nba_lineup_injury_fingerprint(date_str),
+		"wnba": _wnba_lineup_injury_fingerprint(date_str),
+	}
+	stored_fingerprints = last.get("fingerprints") if isinstance(last.get("fingerprints"), dict) else {}
+	changed = last_date != date_str or any(
+		current_fingerprints.get(sport) != stored_fingerprints.get(sport)
+		for sport in current_fingerprints
+	)
+	_record_lineup_check(now_epoch, date_str, current_fingerprints)
+	return changed
 
 
 def _live_refresh_loop_phase() -> str:
@@ -337,18 +418,19 @@ def _run_live_refresh_tick() -> dict[str, Any]:
 	adaptive_enabled = _live_refresh_loop_adaptive_enabled()
 	any_live = _any_tracked_sport_game_live() if adaptive_enabled else None
 	effective_phase = ("live" if any_live else "pregame") if adaptive_enabled else _live_refresh_loop_phase()
-	run_full_mode = _should_run_full_mode(adaptive_enabled=adaptive_enabled, now_epoch=tick_started_epoch)
-	effective_mode = "full" if run_full_mode else _live_refresh_loop_mode()
+	selected_date = central_today_iso()
+	force_sim_rerun = _should_force_sim_rerun(now_epoch=tick_started_epoch, date_str=selected_date)
+	effective_mode = "full" if force_sim_rerun else _live_refresh_loop_mode()
 	meta = {
 		"startedAt": _utc_now(),
-		"date": central_today_iso(),
+		"date": selected_date,
 		"phase": effective_phase,
 		"adaptive": adaptive_enabled,
 		"anyLive": bool(any_live) if adaptive_enabled else None,
 		"regions": _live_refresh_loop_regions(),
 		"executionMode": _live_refresh_loop_execution_mode(),
 		"mode": effective_mode,
-		"fullModeRerun": run_full_mode,
+		"simRerunTriggered": force_sim_rerun,
 		"skipMirror": bool(_live_refresh_loop_skip_mirror()),
 		"sports": _live_refresh_loop_sports() or "active",
 	}
@@ -364,12 +446,12 @@ def _run_live_refresh_tick() -> dict[str, Any]:
 			skip_mirror=bool(meta["skipMirror"]),
 			mirror_only=False,
 			dry_run=False,
+			force_refresh=force_sim_rerun,
 		)
 		meta["ok"] = True
 		meta["result"] = result
-		if run_full_mode:
-			_record_full_mode_rerun(tick_started_epoch)
-			print(f"[live_refresh_loop] FULL_MODE_RERUN_COMPLETE date={meta['date']} phase={meta['phase']}", flush=True)
+		if force_sim_rerun:
+			print(f"[live_refresh_loop] LINEUP_INJURY_CHANGE_RESIM_TRIGGERED date={meta['date']} phase={meta['phase']}", flush=True)
 	except ValueError as exc:
 		meta["ok"] = False
 		meta["skipped"] = True

@@ -30,6 +30,8 @@ class LiveRefreshLoopTests(unittest.TestCase):
             },
             clear=False,
         ), patch.object(live_refresh_loop, "central_today_iso", return_value="2026-06-07"), patch.object(
+            live_refresh_loop, "_should_force_sim_rerun", return_value=False
+        ), patch.object(
             live_refresh_loop,
             "launch_refresh_run",
             return_value={"ok": True, "state": "running"},
@@ -48,6 +50,7 @@ class LiveRefreshLoopTests(unittest.TestCase):
             skip_mirror=True,
             mirror_only=False,
             dry_run=False,
+            force_refresh=False,
         )
 
     def test_run_tick_defaults_to_detached_subprocess_on_render(self) -> None:
@@ -62,6 +65,8 @@ class LiveRefreshLoopTests(unittest.TestCase):
             },
             clear=False,
         ), patch.object(live_refresh_loop, "central_today_iso", return_value="2026-06-07"), patch.object(
+            live_refresh_loop, "_should_force_sim_rerun", return_value=False
+        ), patch.object(
             live_refresh_loop,
             "launch_refresh_run",
             return_value={"ok": True, "state": "pending_external"},
@@ -80,6 +85,7 @@ class LiveRefreshLoopTests(unittest.TestCase):
             skip_mirror=True,
             mirror_only=False,
             dry_run=False,
+            force_refresh=False,
         )
 
     def test_run_tick_uses_explicit_launch_mode_override(self) -> None:
@@ -93,6 +99,8 @@ class LiveRefreshLoopTests(unittest.TestCase):
             },
             clear=False,
         ), patch.object(live_refresh_loop, "central_today_iso", return_value="2026-06-07"), patch.object(
+            live_refresh_loop, "_should_force_sim_rerun", return_value=False
+        ), patch.object(
             live_refresh_loop,
             "launch_refresh_run",
             return_value={"ok": True, "state": "running"},
@@ -111,6 +119,7 @@ class LiveRefreshLoopTests(unittest.TestCase):
             skip_mirror=True,
             mirror_only=False,
             dry_run=False,
+            force_refresh=False,
         )
 
     def test_run_tick_marks_active_refresh_as_skipped(self) -> None:
@@ -118,7 +127,7 @@ class LiveRefreshLoopTests(unittest.TestCase):
             os.environ,
             {"SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP": "true", "SYNDICATE_LIVE_ODDS_REFRESH_ADAPTIVE": "false"},
             clear=False,
-        ), patch.object(
+        ), patch.object(live_refresh_loop, "_should_force_sim_rerun", return_value=False), patch.object(
             live_refresh_loop,
             "launch_refresh_run",
             side_effect=ValueError("A refresh run is already active (pid=123). Cancel it before starting a new run."),
@@ -282,7 +291,7 @@ class LiveRefreshLoopTests(unittest.TestCase):
         ), patch.object(live_refresh_loop, "central_today_iso", return_value="2026-07-13"), patch.object(
             live_refresh_loop, "_any_tracked_sport_game_live", return_value=False
         ), patch.object(
-            live_refresh_loop, "_should_run_full_mode", return_value=False
+            live_refresh_loop, "_should_force_sim_rerun", return_value=False
         ), patch.object(
             live_refresh_loop,
             "launch_refresh_run",
@@ -305,6 +314,7 @@ class LiveRefreshLoopTests(unittest.TestCase):
             skip_mirror=True,
             mirror_only=False,
             dry_run=False,
+            force_refresh=False,
         )
 
     def test_run_tick_uses_live_phase_and_short_interval_when_a_game_is_live(self) -> None:
@@ -315,7 +325,7 @@ class LiveRefreshLoopTests(unittest.TestCase):
         ), patch.object(live_refresh_loop, "central_today_iso", return_value="2026-07-13"), patch.object(
             live_refresh_loop, "_any_tracked_sport_game_live", return_value=True
         ), patch.object(
-            live_refresh_loop, "_should_run_full_mode", return_value=False
+            live_refresh_loop, "_should_force_sim_rerun", return_value=False
         ), patch.object(
             live_refresh_loop,
             "launch_refresh_run",
@@ -338,51 +348,95 @@ class LiveRefreshLoopTests(unittest.TestCase):
             skip_mirror=True,
             mirror_only=False,
             dry_run=False,
+            force_refresh=False,
         )
 
-    def test_full_rerun_interval_defaults_to_two_hours(self) -> None:
+    def test_lineup_check_interval_defaults_to_thirty_minutes(self) -> None:
         with patch.dict(os.environ, {}, clear=True):
-            interval_seconds = live_refresh_loop._live_refresh_loop_full_rerun_interval_seconds()
+            interval_seconds = live_refresh_loop._lineup_check_interval_seconds()
 
-        self.assertEqual(interval_seconds, 7200)
+        self.assertEqual(interval_seconds, 1800)
 
-    def test_should_run_full_mode_false_when_adaptive_disabled(self) -> None:
-        with patch.object(live_refresh_loop, "_last_full_mode_rerun_epoch", return_value=0.0), patch.object(
-            live_refresh_loop, "_record_full_mode_rerun"
+    def test_should_force_sim_rerun_false_before_interval_elapses(self) -> None:
+        with patch.object(
+            live_refresh_loop,
+            "_read_last_lineup_check",
+            return_value={"epoch": 1000.0, "date": "2026-07-13", "fingerprints": {"nba": "a", "wnba": "b"}},
+        ), patch.object(live_refresh_loop, "_fetch_injuries") as mocked_fetch, patch.object(
+            live_refresh_loop, "_record_lineup_check"
         ) as mocked_record:
-            result = live_refresh_loop._should_run_full_mode(adaptive_enabled=False, now_epoch=1000.0)
+            result = live_refresh_loop._should_force_sim_rerun(now_epoch=1000.0 + 60, date_str="2026-07-13")
 
         self.assertFalse(result)
+        mocked_fetch.assert_not_called()
         mocked_record.assert_not_called()
 
-    def test_should_run_full_mode_establishes_baseline_on_first_call(self) -> None:
-        with patch.object(live_refresh_loop, "_last_full_mode_rerun_epoch", return_value=0.0), patch.object(
-            live_refresh_loop, "_record_full_mode_rerun"
+    def test_should_force_sim_rerun_true_on_first_call(self) -> None:
+        with patch.object(
+            live_refresh_loop, "_read_last_lineup_check", return_value={}
+        ), patch.object(live_refresh_loop, "_fetch_injuries", return_value=True), patch.object(
+            live_refresh_loop, "_nba_lineup_injury_fingerprint", return_value="a"
+        ), patch.object(
+            live_refresh_loop, "_wnba_lineup_injury_fingerprint", return_value="b"
+        ), patch.object(
+            live_refresh_loop, "_record_lineup_check"
         ) as mocked_record:
-            result = live_refresh_loop._should_run_full_mode(adaptive_enabled=True, now_epoch=1000.0)
-
-        self.assertFalse(result)
-        mocked_record.assert_called_once_with(1000.0)
-
-    def test_should_run_full_mode_false_before_interval_elapses(self) -> None:
-        with patch.object(live_refresh_loop, "_last_full_mode_rerun_epoch", return_value=1000.0), patch.object(
-            live_refresh_loop, "_record_full_mode_rerun"
-        ) as mocked_record:
-            result = live_refresh_loop._should_run_full_mode(adaptive_enabled=True, now_epoch=1000.0 + 3600)
-
-        self.assertFalse(result)
-        mocked_record.assert_not_called()
-
-    def test_should_run_full_mode_true_after_interval_elapses(self) -> None:
-        with patch.object(live_refresh_loop, "_last_full_mode_rerun_epoch", return_value=1000.0), patch.object(
-            live_refresh_loop, "_record_full_mode_rerun"
-        ) as mocked_record:
-            result = live_refresh_loop._should_run_full_mode(adaptive_enabled=True, now_epoch=1000.0 + 7200)
+            result = live_refresh_loop._should_force_sim_rerun(now_epoch=1000.0, date_str="2026-07-13")
 
         self.assertTrue(result)
-        mocked_record.assert_not_called()
+        mocked_record.assert_called_once_with(1000.0, "2026-07-13", {"nba": "a", "wnba": "b"})
 
-    def test_run_tick_uses_full_mode_and_records_rerun_when_due(self) -> None:
+    def test_should_force_sim_rerun_false_when_fingerprints_unchanged(self) -> None:
+        with patch.object(
+            live_refresh_loop,
+            "_read_last_lineup_check",
+            return_value={"epoch": 1000.0, "date": "2026-07-13", "fingerprints": {"nba": "a", "wnba": "b"}},
+        ), patch.object(live_refresh_loop, "_fetch_injuries", return_value=True), patch.object(
+            live_refresh_loop, "_nba_lineup_injury_fingerprint", return_value="a"
+        ), patch.object(
+            live_refresh_loop, "_wnba_lineup_injury_fingerprint", return_value="b"
+        ), patch.object(
+            live_refresh_loop, "_record_lineup_check"
+        ) as mocked_record:
+            result = live_refresh_loop._should_force_sim_rerun(now_epoch=1000.0 + 1800, date_str="2026-07-13")
+
+        self.assertFalse(result)
+        mocked_record.assert_called_once_with(1000.0 + 1800, "2026-07-13", {"nba": "a", "wnba": "b"})
+
+    def test_should_force_sim_rerun_true_when_a_fingerprint_changed(self) -> None:
+        with patch.object(
+            live_refresh_loop,
+            "_read_last_lineup_check",
+            return_value={"epoch": 1000.0, "date": "2026-07-13", "fingerprints": {"nba": "a", "wnba": "b"}},
+        ), patch.object(live_refresh_loop, "_fetch_injuries", return_value=True), patch.object(
+            live_refresh_loop, "_nba_lineup_injury_fingerprint", return_value="a"
+        ), patch.object(
+            live_refresh_loop, "_wnba_lineup_injury_fingerprint", return_value="CHANGED"
+        ), patch.object(
+            live_refresh_loop, "_record_lineup_check"
+        ) as mocked_record:
+            result = live_refresh_loop._should_force_sim_rerun(now_epoch=1000.0 + 1800, date_str="2026-07-13")
+
+        self.assertTrue(result)
+        mocked_record.assert_called_once_with(1000.0 + 1800, "2026-07-13", {"nba": "a", "wnba": "CHANGED"})
+
+    def test_should_force_sim_rerun_true_on_new_date_even_if_not_due(self) -> None:
+        with patch.object(
+            live_refresh_loop,
+            "_read_last_lineup_check",
+            return_value={"epoch": 1000.0, "date": "2026-07-12", "fingerprints": {"nba": "a", "wnba": "b"}},
+        ), patch.object(live_refresh_loop, "_fetch_injuries", return_value=True), patch.object(
+            live_refresh_loop, "_nba_lineup_injury_fingerprint", return_value="a"
+        ), patch.object(
+            live_refresh_loop, "_wnba_lineup_injury_fingerprint", return_value="b"
+        ), patch.object(
+            live_refresh_loop, "_record_lineup_check"
+        ):
+            result = live_refresh_loop._should_force_sim_rerun(now_epoch=1000.0 + 60, date_str="2026-07-13")
+
+        self.assertTrue(result)
+
+    def test_run_tick_uses_full_mode_and_forces_refresh_when_lineup_changed(self) -> None:
         with patch.dict(
             os.environ,
             {"SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP": "true"},
@@ -390,17 +444,15 @@ class LiveRefreshLoopTests(unittest.TestCase):
         ), patch.object(live_refresh_loop, "central_today_iso", return_value="2026-07-13"), patch.object(
             live_refresh_loop, "_any_tracked_sport_game_live", return_value=True
         ), patch.object(
-            live_refresh_loop, "_should_run_full_mode", return_value=True
+            live_refresh_loop, "_should_force_sim_rerun", return_value=True
         ), patch.object(
-            live_refresh_loop, "_record_full_mode_rerun"
-        ) as mocked_record, patch.object(
             live_refresh_loop,
             "launch_refresh_run",
             return_value={"ok": True, "state": "running"},
         ) as mocked_launch:
             payload = live_refresh_loop._run_live_refresh_tick()
 
-        self.assertTrue(payload["fullModeRerun"])
+        self.assertTrue(payload["simRerunTriggered"])
         mocked_launch.assert_called_once_with(
             date="2026-07-13",
             sports=None,
@@ -412,10 +464,10 @@ class LiveRefreshLoopTests(unittest.TestCase):
             skip_mirror=True,
             mirror_only=False,
             dry_run=False,
+            force_refresh=True,
         )
-        mocked_record.assert_called_once()
 
-    def test_run_tick_does_not_record_full_rerun_when_launch_fails(self) -> None:
+    def test_run_tick_reports_not_ok_when_launch_fails(self) -> None:
         with patch.dict(
             os.environ,
             {"SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP": "true"},
@@ -423,10 +475,8 @@ class LiveRefreshLoopTests(unittest.TestCase):
         ), patch.object(live_refresh_loop, "central_today_iso", return_value="2026-07-13"), patch.object(
             live_refresh_loop, "_any_tracked_sport_game_live", return_value=True
         ), patch.object(
-            live_refresh_loop, "_should_run_full_mode", return_value=True
+            live_refresh_loop, "_should_force_sim_rerun", return_value=True
         ), patch.object(
-            live_refresh_loop, "_record_full_mode_rerun"
-        ) as mocked_record, patch.object(
             live_refresh_loop,
             "launch_refresh_run",
             side_effect=RuntimeError("boom"),
@@ -434,7 +484,6 @@ class LiveRefreshLoopTests(unittest.TestCase):
             payload = live_refresh_loop._run_live_refresh_tick()
 
         self.assertFalse(payload["ok"])
-        mocked_record.assert_not_called()
 
     def test_start_loop_returns_false_when_disabled(self) -> None:
         with patch.dict(os.environ, {}, clear=True):
