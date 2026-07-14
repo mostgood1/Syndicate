@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import csv
 import json
 import os
 import unittest
@@ -134,11 +135,11 @@ class LiveRefreshLoopTests(unittest.TestCase):
 
         self.assertEqual(interval_seconds, 60)
 
-    def test_idle_interval_defaults_to_thirty_minutes(self) -> None:
+    def test_idle_interval_defaults_to_fifteen_minutes(self) -> None:
         with patch.dict(os.environ, {}, clear=True):
             interval_seconds = live_refresh_loop._live_refresh_loop_idle_interval_seconds()
 
-        self.assertEqual(interval_seconds, 1800)
+        self.assertEqual(interval_seconds, 900)
 
     def test_mlb_has_live_game_reads_live_lens_counts(self) -> None:
         with TemporaryDirectory() as tmp_dir:
@@ -202,6 +203,77 @@ class LiveRefreshLoopTests(unittest.TestCase):
             with patch.dict(os.environ, {"SYNDICATE_DATA_ROOT": str(data_root)}, clear=False):
                 self.assertFalse(live_refresh_loop._wnba_has_live_game("2026-07-13"))
 
+    def test_nba_has_live_game_reads_last_jsonl_line(self) -> None:
+        with TemporaryDirectory() as tmp_dir:
+            data_root = Path(tmp_dir)
+            state_path = (
+                data_root
+                / "nba_source"
+                / "source_artifacts"
+                / "data"
+                / "processed"
+                / "live_snapshots"
+                / "live_state_2026-07-13.jsonl"
+            )
+            state_path.parent.mkdir(parents=True, exist_ok=True)
+            state_path.write_text(
+                json.dumps({"payload": {"games": [{"in_progress": False}]}}) + "\n"
+                + json.dumps({"payload": {"games": [{"in_progress": True}, {"in_progress": False}]}}) + "\n",
+                encoding="utf-8",
+            )
+
+            with patch.dict(os.environ, {"SYNDICATE_DATA_ROOT": str(data_root)}, clear=False):
+                self.assertTrue(live_refresh_loop._nba_has_live_game("2026-07-13"))
+
+    def test_nba_has_live_game_false_when_no_game_in_progress(self) -> None:
+        with TemporaryDirectory() as tmp_dir:
+            data_root = Path(tmp_dir)
+            state_path = (
+                data_root
+                / "nba_source"
+                / "source_artifacts"
+                / "data"
+                / "processed"
+                / "live_snapshots"
+                / "live_state_2026-07-13.jsonl"
+            )
+            state_path.parent.mkdir(parents=True, exist_ok=True)
+            state_path.write_text(
+                json.dumps({"payload": {"games": [{"in_progress": False}]}}) + "\n",
+                encoding="utf-8",
+            )
+
+            with patch.dict(os.environ, {"SYNDICATE_DATA_ROOT": str(data_root)}, clear=False):
+                self.assertFalse(live_refresh_loop._nba_has_live_game("2026-07-13"))
+
+    def test_nhl_has_live_game_reads_scoreboard_csv(self) -> None:
+        with TemporaryDirectory() as tmp_dir:
+            data_root = Path(tmp_dir)
+            scoreboard_path = (
+                data_root
+                / "nhl_source"
+                / "source_artifacts"
+                / "data"
+                / "odds"
+                / "games"
+                / "date=2026-07-13"
+                / "scoreboard.csv"
+            )
+            scoreboard_path.parent.mkdir(parents=True, exist_ok=True)
+            with scoreboard_path.open("w", encoding="utf-8", newline="") as handle:
+                writer = csv.DictWriter(handle, fieldnames=["gameState"])
+                writer.writeheader()
+                writer.writerow({"gameState": "OFF"})
+                writer.writerow({"gameState": "LIVE"})
+
+            with patch.dict(os.environ, {"SYNDICATE_DATA_ROOT": str(data_root)}, clear=False):
+                self.assertTrue(live_refresh_loop._nhl_has_live_game("2026-07-13"))
+
+    def test_nhl_has_live_game_false_when_scoreboard_missing(self) -> None:
+        with TemporaryDirectory() as tmp_dir:
+            with patch.dict(os.environ, {"SYNDICATE_DATA_ROOT": tmp_dir}, clear=False):
+                self.assertFalse(live_refresh_loop._nhl_has_live_game("2026-07-13"))
+
     def test_run_tick_uses_pregame_phase_and_idle_interval_when_nothing_live(self) -> None:
         with patch.dict(
             os.environ,
@@ -221,7 +293,7 @@ class LiveRefreshLoopTests(unittest.TestCase):
 
         self.assertEqual(payload["phase"], "pregame")
         self.assertFalse(payload["anyLive"])
-        self.assertEqual(interval_seconds, 1800)
+        self.assertEqual(interval_seconds, 900)
         mocked_launch.assert_called_once_with(
             date="2026-07-13",
             sports=None,

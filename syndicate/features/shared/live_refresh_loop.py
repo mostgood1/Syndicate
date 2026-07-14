@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import atexit
+import csv
 import json
 import os
 import threading
@@ -131,9 +132,9 @@ def _live_refresh_loop_interval_seconds() -> int:
 def _live_refresh_loop_idle_interval_seconds() -> int:
 	raw = str(os.environ.get("SYNDICATE_LIVE_ODDS_REFRESH_IDLE_INTERVAL_SECONDS") or "").strip()
 	try:
-		value = int(raw or 1800)
+		value = int(raw or 900)
 	except Exception:
-		value = 1800
+		value = 900
 	return max(60, int(value))
 
 
@@ -176,9 +177,46 @@ def _wnba_has_live_game(date_str: str) -> bool:
 	return any(bool(game.get("in_progress")) for game in games if isinstance(game, dict))
 
 
+def _nba_has_live_game(date_str: str) -> bool:
+	path = data_root() / "nba_source" / "source_artifacts" / "data" / "processed" / "live_snapshots" / f"live_state_{date_str}.jsonl"
+	try:
+		if not path.exists():
+			return False
+		last_line: str | None = None
+		with path.open("r", encoding="utf-8") as handle:
+			for raw_line in handle:
+				stripped = raw_line.strip()
+				if stripped:
+					last_line = stripped
+		if not last_line:
+			return False
+		record = json.loads(last_line)
+	except Exception:
+		return False
+	payload = record.get("payload") if isinstance(record, dict) else None
+	games = payload.get("games") if isinstance(payload, dict) else None
+	if not isinstance(games, list):
+		return False
+	return any(bool(game.get("in_progress")) for game in games if isinstance(game, dict))
+
+
+def _nhl_has_live_game(date_str: str) -> bool:
+	path = data_root() / "nhl_source" / "source_artifacts" / "data" / "odds" / "games" / f"date={date_str}" / "scoreboard.csv"
+	if not path.exists():
+		return False
+	try:
+		with path.open("r", encoding="utf-8", newline="") as handle:
+			rows = list(csv.DictReader(handle))
+	except Exception:
+		return False
+	return any(str(row.get("gameState") or "").strip().upper() in {"LIVE", "CRIT"} for row in rows)
+
+
 _LIVE_STATUS_CHECKERS = {
 	"mlb": _mlb_has_live_game,
 	"wnba": _wnba_has_live_game,
+	"nba": _nba_has_live_game,
+	"nhl": _nhl_has_live_game,
 }
 
 
