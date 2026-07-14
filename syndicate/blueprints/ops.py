@@ -349,6 +349,20 @@ def _inspect_artifact_path(path: Path) -> dict[str, Any]:
     return entry
 
 
+@ops_bp.post("/api/ops/live-refresh-loop/reset-lineup-gate")
+def api_ops_reset_lineup_gate() -> Any:
+    # Protected endpoint: requires admin token (enforced by before_request)
+    # Clears the shared (keyvalue-backed) "last lineup/injury check" state that
+    # gates when live-odds-worker's background loop is allowed to force a
+    # smart-sim recompute (see _should_force_sim_rerun in live_refresh_loop.py).
+    # An empty stored fingerprint set unconditionally reads as "changed" on the
+    # next tick, so this forces that loop to recompute+republish on its next
+    # cycle without waiting for an actual roster/injury change to be detected.
+    path = reports_root() / "live_refresh_loop" / "last_lineup_check.json"
+    write_json_file(path, {})
+    return jsonify({"ok": True, "path": str(path)})
+
+
 @ops_bp.get("/api/ops/wnba/artifact-counts")
 def api_ops_wnba_artifact_counts() -> Any:
     # Protected endpoint: requires admin token (enforced by before_request)
