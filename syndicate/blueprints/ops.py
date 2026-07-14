@@ -99,6 +99,7 @@ def _start_refresh_job(payload: dict[str, Any], *, mode: str = "fast") -> tuple[
             dry_run=_coerce_bool(_payload_value(launch_payload, "dry_run")),
             mode=str(_payload_value(launch_payload, "mode", "fast") or "fast"),
             force_refresh=_coerce_bool(_payload_value(launch_payload, "force_refresh")),
+            launch_mode=_payload_value(launch_payload, "launch_mode"),
         )
     except Exception as exc:
         return job_id, _store_ops_job(
