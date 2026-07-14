@@ -983,6 +983,49 @@ def _mean_or_none(values: list[float]) -> float | None:
     return float(sum(cleaned) / len(cleaned))
 
 
+def _aggregate_game_odds_from_market_rows(
+    group_rows: list[dict[str, object]], *, home_name: str, away_name: str
+) -> dict[str, float | None]:
+    home_ml_values: list[float] = []
+    away_ml_values: list[float] = []
+    home_spread_values: list[float] = []
+    away_spread_values: list[float] = []
+    total_values: list[float] = []
+
+    for current in group_rows:
+        market = str(current.get("market") or "").strip().lower()
+        outcome_name = str(current.get("outcome_name") or "").strip()
+        point_value = _float_or_none(current.get("point"))
+        price_value = _float_or_none(current.get("price"))
+        if market == "h2h":
+            if outcome_name == home_name and price_value is not None:
+                home_ml_values.append(price_value)
+            elif outcome_name == away_name and price_value is not None:
+                away_ml_values.append(price_value)
+        elif market == "spreads" and point_value is not None:
+            if outcome_name == home_name:
+                home_spread_values.append(point_value)
+            elif outcome_name == away_name:
+                away_spread_values.append(point_value)
+        elif market == "totals" and point_value is not None:
+            total_values.append(point_value)
+
+    home_spread = _mean_or_none(home_spread_values)
+    away_spread = _mean_or_none(away_spread_values)
+    if home_spread is None and away_spread is not None:
+        home_spread = -float(away_spread)
+    if away_spread is None and home_spread is not None:
+        away_spread = -float(home_spread)
+
+    return {
+        "home_ml": _mean_or_none(home_ml_values),
+        "away_ml": _mean_or_none(away_ml_values),
+        "home_spread": home_spread,
+        "away_spread": away_spread,
+        "total": _mean_or_none(total_values),
+    }
+
+
 def _structured_literal_or_none(value: object) -> object | None:
     if isinstance(value, (dict, list)):
         return value
@@ -1572,7 +1615,7 @@ def _build_local_game_cards_artifact(*, source_root: Path, processed_root: Path,
                 if not working.empty:
                     rows_out: list[dict[str, object]] = []
                     grouped = working.groupby(["event_id", "commence_time", "home_team", "away_team"], dropna=False, sort=True)
-                    for (event_id, commence_time, home_team, away_team), _group in grouped:
+                    for (event_id, commence_time, home_team, away_team), group in grouped:
                         home_name = str(home_team or "").strip()
                         away_name = str(away_team or "").strip()
                         if not home_name or not away_name:
@@ -1581,6 +1624,18 @@ def _build_local_game_cards_artifact(*, source_root: Path, processed_root: Path,
                         home_tri = _canonical_wnba_tri(_to_tricode_local(home_name))
                         away_tri = _canonical_wnba_tri(_to_tricode_local(away_name))
                         odds_row = odds_by_matchup.get((home_tri, away_tri)) if home_tri and away_tri else None
+                        # The processed game_odds file usually only has a matchup
+                        # skeleton (no prices) -- fall back to aggregating the raw
+                        # h2h/spreads/totals rows already present in this snapshot
+                        # group whenever the game_odds lookup has nothing usable.
+                        aggregated = _aggregate_game_odds_from_market_rows(
+                            group.to_dict("records"), home_name=home_name, away_name=away_name
+                        )
+                        home_ml = _float_or_none((odds_row or {}).get("home_ml"))
+                        away_ml = _float_or_none((odds_row or {}).get("away_ml"))
+                        home_spread = _float_or_none((odds_row or {}).get("home_spread"))
+                        away_spread = _float_or_none((odds_row or {}).get("away_spread"))
+                        total = _float_or_none((odds_row or {}).get("total"))
                         rows_out.append(
                             {
                                 "date": date_str,
@@ -1588,11 +1643,11 @@ def _build_local_game_cards_artifact(*, source_root: Path, processed_root: Path,
                                 "home_team": home_name,
                                 "visitor_team": away_name,
                                 "commence_time": str(commence_time or "").strip(),
-                                "home_ml": _float_or_none((odds_row or {}).get("home_ml")),
-                                "away_ml": _float_or_none((odds_row or {}).get("away_ml")),
-                                "home_spread": _float_or_none((odds_row or {}).get("home_spread")),
-                                "away_spread": _float_or_none((odds_row or {}).get("away_spread")),
-                                "total": _float_or_none((odds_row or {}).get("total")),
+                                "home_ml": home_ml if home_ml is not None else aggregated["home_ml"],
+                                "away_ml": away_ml if away_ml is not None else aggregated["away_ml"],
+                                "home_spread": home_spread if home_spread is not None else aggregated["home_spread"],
+                                "away_spread": away_spread if away_spread is not None else aggregated["away_spread"],
+                                "total": total if total is not None else aggregated["total"],
                                 "bookmaker": str((odds_row or {}).get("bookmaker") or "oddsapi_consensus").strip() or "oddsapi_consensus",
                                 "home_tri": home_tri,
                                 "away_tri": away_tri,
@@ -1752,36 +1807,7 @@ def _build_local_game_cards_artifact(*, source_root: Path, processed_root: Path,
             continue
 
         group_rows = group.to_dict("records")
-        home_ml_values: list[float] = []
-        away_ml_values: list[float] = []
-        home_spread_values: list[float] = []
-        away_spread_values: list[float] = []
-        total_values: list[float] = []
-
-        for current in group_rows:
-            market = str(current.get("market") or "").strip().lower()
-            outcome_name = str(current.get("outcome_name") or "").strip()
-            point_value = _float_or_none(current.get("point"))
-            price_value = _float_or_none(current.get("price"))
-            if market == "h2h":
-                if outcome_name == home_name and price_value is not None:
-                    home_ml_values.append(price_value)
-                elif outcome_name == away_name and price_value is not None:
-                    away_ml_values.append(price_value)
-            elif market == "spreads" and point_value is not None:
-                if outcome_name == home_name:
-                    home_spread_values.append(point_value)
-                elif outcome_name == away_name:
-                    away_spread_values.append(point_value)
-            elif market == "totals" and point_value is not None:
-                total_values.append(point_value)
-
-        home_spread = _mean_or_none(home_spread_values)
-        away_spread = _mean_or_none(away_spread_values)
-        if home_spread is None and away_spread is not None:
-            home_spread = -float(away_spread)
-        if away_spread is None and home_spread is not None:
-            away_spread = -float(home_spread)
+        aggregated = _aggregate_game_odds_from_market_rows(group_rows, home_name=home_name, away_name=away_name)
 
         rows_out.append(
             {
@@ -1790,11 +1816,11 @@ def _build_local_game_cards_artifact(*, source_root: Path, processed_root: Path,
                 "home_team": home_name,
                 "visitor_team": away_name,
                 "commence_time": str(commence_time or "").strip(),
-                "home_ml": _mean_or_none(home_ml_values),
-                "away_ml": _mean_or_none(away_ml_values),
-                "home_spread": home_spread,
-                "away_spread": away_spread,
-                "total": _mean_or_none(total_values),
+                "home_ml": aggregated["home_ml"],
+                "away_ml": aggregated["away_ml"],
+                "home_spread": aggregated["home_spread"],
+                "away_spread": aggregated["away_spread"],
+                "total": aggregated["total"],
                 "bookmaker": "oddsapi_consensus",
                 "home_tri": _to_tricode_local(home_name),
                 "away_tri": _to_tricode_local(away_name),

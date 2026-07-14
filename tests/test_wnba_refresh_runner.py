@@ -219,6 +219,55 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
         self.assertEqual(written[0].get("away_tri"), "WSH")
         self.assertEqual(written[0].get("bookmaker"), "oddsapi_consensus")
 
+    def test_build_local_game_cards_artifact_derives_odds_from_props_snapshot_market_rows(self) -> None:
+        # Regression: game_odds_{date}.csv is normally only ever seeded with a
+        # bare matchup skeleton (no prices), so the props-snapshot fallback path
+        # must aggregate h2h/spreads/totals rows directly out of the raw combined
+        # snapshot rather than relying solely on the (price-less) game_odds lookup.
+        module = self._load_module()
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            source_root = Path(tmp_dir) / "source"
+            processed_root = source_root / "data" / "processed"
+            raw_root = source_root / "data" / "raw"
+            processed_root.mkdir(parents=True, exist_ok=True)
+            raw_root.mkdir(parents=True, exist_ok=True)
+            date_str = "2026-07-13"
+            (raw_root / f"odds_wnba_player_props_{date_str}.csv").write_text(
+                "snapshot_ts,event_id,commence_time,bookmaker,bookmaker_title,market,outcome_name,player_name,point,price,last_update,home_team,away_team\n"
+                "2026-07-13T20:00:00Z,401,2026-07-13T23:08:15Z,draftkings,DraftKings,h2h,Atlanta Dream,,,-770,2026-07-13T20:00:00Z,Atlanta Dream,Los Angeles Sparks\n"
+                "2026-07-13T20:00:00Z,401,2026-07-13T23:08:15Z,draftkings,DraftKings,h2h,Los Angeles Sparks,,,450,2026-07-13T20:00:00Z,Atlanta Dream,Los Angeles Sparks\n"
+                "2026-07-13T20:00:00Z,401,2026-07-13T23:08:15Z,draftkings,DraftKings,spreads,Atlanta Dream,,-10.5,-110,2026-07-13T20:00:00Z,Atlanta Dream,Los Angeles Sparks\n"
+                "2026-07-13T20:00:00Z,401,2026-07-13T23:08:15Z,draftkings,DraftKings,spreads,Los Angeles Sparks,,10.5,-110,2026-07-13T20:00:00Z,Atlanta Dream,Los Angeles Sparks\n"
+                "2026-07-13T20:00:00Z,401,2026-07-13T23:08:15Z,draftkings,DraftKings,totals,Over,,197.5,-110,2026-07-13T20:00:00Z,Atlanta Dream,Los Angeles Sparks\n"
+                "2026-07-13T20:00:00Z,401,2026-07-13T23:08:15Z,draftkings,DraftKings,totals,Under,,197.5,-110,2026-07-13T20:00:00Z,Atlanta Dream,Los Angeles Sparks\n"
+                "2026-07-13T20:00:00Z,401,2026-07-13T23:08:15Z,draftkings,DraftKings,player_points,Over,Allisha Gray,16.5,-115,2026-07-13T20:00:00Z,Atlanta Dream,Los Angeles Sparks\n",
+                encoding="utf-8",
+            )
+
+            rows, out_path = module._build_local_game_cards_artifact(
+                source_root=source_root,
+                processed_root=processed_root,
+                date_str=date_str,
+                log_file=Path(tmp_dir) / "refresh.log",
+            )
+
+            self.assertEqual(rows, 1)
+            self.assertIsNotNone(out_path)
+            assert out_path is not None
+            with out_path.open("r", encoding="utf-8", newline="") as handle:
+                written = list(csv.DictReader(handle))
+
+        self.assertEqual(len(written), 1)
+        row = written[0]
+        self.assertEqual(row.get("home_tri"), "ATL")
+        self.assertEqual(row.get("away_tri"), "LAS")
+        self.assertAlmostEqual(float(row.get("home_ml")), -770.0)
+        self.assertAlmostEqual(float(row.get("away_ml")), 450.0)
+        self.assertAlmostEqual(float(row.get("home_spread")), -10.5)
+        self.assertAlmostEqual(float(row.get("away_spread")), 10.5)
+        self.assertAlmostEqual(float(row.get("total")), 197.5)
+
     def test_build_local_game_cards_artifact_promotes_full_slate_when_snapshot_is_partial(self) -> None:
         module = self._load_module()
 
