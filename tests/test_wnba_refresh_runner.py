@@ -2115,6 +2115,34 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
             read_back = module._read_live_snapshot_payload(path)
             self.assertEqual(read_back, payload)
 
+    def test_payload_has_snapshot_content_rejects_scheduled_only_live_state(self) -> None:
+        # Regression: every WNBA game starts life as a bare "Scheduled"
+        # placeholder with no real evidence (no score, no clock/period, not
+        # final). Treating that as "already has content" made the reuse-
+        # existing shortcut in _export_live_snapshot_artifacts permanently
+        # skip recomputing live_state once any placeholder got written,
+        # freezing status at "Scheduled" forever regardless of how many
+        # force-refreshes ran afterward -- this is what silently broke both
+        # the live-lens loop's status and the default /wnba/cards page.
+        module = self._load_module()
+
+        scheduled_only = {
+            "games": [
+                {"event_id": "401857064", "status": "Scheduled", "final": False, "in_progress": False, "home_pts": None, "away_pts": None},
+                {"event_id": "401857065", "status": "Scheduled", "final": False, "in_progress": False, "home_pts": None, "away_pts": None},
+            ]
+        }
+        self.assertFalse(module._payload_has_snapshot_content("live_state", scheduled_only))
+
+        final_game = {"games": [{"event_id": "401857064", "status": "Final", "final": True, "in_progress": False}]}
+        self.assertTrue(module._payload_has_snapshot_content("live_state", final_game))
+
+        live_with_score = {"games": [{"event_id": "401857065", "status": "Live", "final": False, "in_progress": True, "home_pts": 42, "away_pts": 38}]}
+        self.assertTrue(module._payload_has_snapshot_content("live_state", live_with_score))
+
+        live_no_evidence = {"games": [{"event_id": "401857065", "status": "Live", "final": False, "in_progress": True, "home_pts": None, "away_pts": None, "period": None, "clock": ""}]}
+        self.assertFalse(module._payload_has_snapshot_content("live_state", live_no_evidence))
+
     def test_export_live_snapshot_artifacts_overwrites_empty_lens_snapshot_with_local_build(self) -> None:
         module = self._load_module()
 

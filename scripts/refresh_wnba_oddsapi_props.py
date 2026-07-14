@@ -256,6 +256,29 @@ def _payload_has_snapshot_content(kind: str, payload: dict[str, object] | None) 
             and any(game.get(key) is not None for key in ("pbp_recent", "pbp_attempts", "pbp_possessions", "pbp_quarters"))
             for game in games
         )
+    if normalized_kind == "live_state":
+        # A non-empty games list alone isn't enough here -- every game
+        # starts as a bare "Scheduled" placeholder with no real evidence.
+        # Treating that as "already has content" made the reuse-existing
+        # shortcut below permanently skip recomputing live_state once any
+        # placeholder got written, freezing every game at "Scheduled"
+        # forever regardless of how many force-refreshes ran afterward.
+        return any(
+            isinstance(game, dict)
+            and (
+                bool(game.get("final"))
+                or (
+                    bool(game.get("in_progress"))
+                    and (
+                        game.get("period") is not None
+                        or bool(game.get("clock"))
+                        or _float_or_none(game.get("home_pts")) is not None
+                        or _float_or_none(game.get("away_pts")) is not None
+                    )
+                )
+            )
+            for game in games
+        )
     return True
 
 
