@@ -5,6 +5,7 @@ import json
 import os
 import subprocess
 import sys
+import time
 import traceback
 from datetime import datetime
 from pathlib import Path
@@ -14,6 +15,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
+from syndicate.features.shared.artifact_publisher import publish_changed_hot_artifacts
 from syndicate.features.shared.refresh_state_store import read_json_file
 from syndicate.features.shared.refresh_state_store import assert_refresh_state_backend_ready
 from syndicate.features.shared.refresh_state_store import reports_root
@@ -217,11 +219,17 @@ def main() -> int:
         print(json.dumps({"ok": True, "latest_manifest": str(latest_manifest_path), "wrapper_command": wrapper_command}, indent=2))
         return 0
 
+    started_epoch = time.time()
     try:
         print(f"[queue_runner] launching refresh job: {json.dumps(wrapper_command)}", flush=True)
         result = subprocess.run(wrapper_command)
         print(f"CONTRACT_EXECUTED contract_id={contract_id} return_code={result.returncode}", flush=True)
         print(f"[queue_runner] return code: {result.returncode}", flush=True)
+        try:
+            published_count = publish_changed_hot_artifacts(started_epoch)
+            print(f"[queue_runner] published_hot_artifacts count={published_count}", flush=True)
+        except Exception as publish_exc:
+            print(f"[queue_runner] publish_hot_artifacts_failed error={type(publish_exc).__name__}: {publish_exc}", file=sys.stderr, flush=True)
         return int(result.returncode)
     except Exception as exc:
         trace_text = traceback.format_exc()
@@ -229,6 +237,10 @@ def main() -> int:
         print(f"[queue_runner_fatal] {error_message}", file=sys.stderr, flush=True)
         print(trace_text, file=sys.stderr, flush=True)
         _mark_wrapper_failure(contract=contract, error_message=error_message, trace_text=trace_text)
+        try:
+            publish_changed_hot_artifacts(started_epoch)
+        except Exception:
+            pass
         return 1
 
 
