@@ -778,26 +778,60 @@ function Get-RunPlanDecisionValue {
     return $Fallback
 }
 
+function Get-OddsHistoryShardKeyForSport {
+    param(
+        [string]$RepoRoot,
+        [string]$Sport,
+        [string]$DateValue
+    )
+
+    if ($Sport -ne 'nfl' -and $Sport -ne 'ncaaf') {
+        return $DateValue
+    }
+
+    $weekCandidates = @(
+        (Join-Path $RepoRoot "data\$($Sport)_source\current_week.json"),
+        (Join-Path $RepoRoot "data\$($Sport)_source\source_artifacts\current_week.json")
+    )
+    foreach ($candidate in $weekCandidates) {
+        if (Test-Path -LiteralPath $candidate) {
+            try {
+                $weekPayload = Get-Content -Path $candidate -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
+                if ($null -ne $weekPayload.season -and $null -ne $weekPayload.week) {
+                    return "$($weekPayload.season)_wk$($weekPayload.week)"
+                }
+            }
+            catch {
+                continue
+            }
+        }
+    }
+    return $null
+}
+
 function Get-OddsHistoryPathForSport {
     param(
         [string]$RepoRoot,
-        [string]$Sport
+        [string]$Sport,
+        [string]$DateValue
     )
 
     if ([string]::IsNullOrWhiteSpace($RepoRoot) -or [string]::IsNullOrWhiteSpace($Sport)) {
         return $null
     }
 
-    switch ($Sport.ToLowerInvariant()) {
-        'mlb' { return Join-Path $RepoRoot 'data\mlb_source\tracking\odds_history.json' }
-        'nba' { return Join-Path $RepoRoot 'data\nba_source\tracking\odds_history.json' }
-        'wnba' { return Join-Path $RepoRoot 'data\wnba_source\tracking\odds_history.json' }
-        'nhl' { return Join-Path $RepoRoot 'data\nhl_source\tracking\odds_history.json' }
-        'nfl' { return Join-Path $RepoRoot 'data\nfl_source\tracking\odds_history.json' }
-        'ncaaf' { return Join-Path $RepoRoot 'data\ncaaf_source\tracking\odds_history.json' }
-        'ncaab' { return Join-Path $RepoRoot 'data\ncaab_source\tracking\odds_history.json' }
-        default { return $null }
+    $sportSlug = $Sport.ToLowerInvariant()
+    $validSports = @('mlb', 'nba', 'wnba', 'nhl', 'nfl', 'ncaaf', 'ncaab')
+    if ($validSports -notcontains $sportSlug) {
+        return $null
     }
+
+    $shardKey = Get-OddsHistoryShardKeyForSport -RepoRoot $RepoRoot -Sport $sportSlug -DateValue $DateValue
+    if ([string]::IsNullOrWhiteSpace($shardKey)) {
+        return $null
+    }
+
+    return Join-Path $RepoRoot "data\$($sportSlug)_source\tracking\odds_history\$shardKey.json"
 }
 
 function Get-OddsHistoryTriggerDecision {
@@ -817,7 +851,7 @@ function Get-OddsHistoryTriggerDecision {
         $scheduleCheck = Get-NhlScheduledGamesCheck -DateValue $DateValue
     }
 
-    $historyPath = Get-OddsHistoryPathForSport -RepoRoot $RepoRoot -Sport $Sport
+    $historyPath = Get-OddsHistoryPathForSport -RepoRoot $RepoRoot -Sport $Sport -DateValue $DateValue
     if ([string]::IsNullOrWhiteSpace($historyPath) -or -not (Test-Path -LiteralPath $historyPath)) {
         return $null
     }
@@ -3208,13 +3242,13 @@ function Get-ForcedPublishArtifactPaths {
                 "${rootRelative}/data/processed/live_snapshots/live_player_lens_${DateValue}.jsonl",
                 "${rootRelative}/data/live_lens/live_lens_projections_${DateValue}.jsonl",
                 "${rootRelative}/data/live_lens/live_lens_signals_${DateValue}.jsonl",
-                "${rootRelative}/data/live_lens/live_lens_tuning_override.json",
-                "${rootRelative}/tracking/odds_history.json",
-                "${rootRelative}/artifacts/${sportSlug}/odds_history.json"
+                "${rootRelative}/data/live_lens/live_lens_tuning_override.json"
             )) {
                 Add-PathIfPresent -RelativePath $relativePath
             }
 
+            Add-PathsUnderRoot -RelativeRoot "${rootRelative}/tracking/odds_history"
+            Add-PathsUnderRoot -RelativeRoot "${rootRelative}/artifacts/${sportSlug}/odds_history"
             Add-PathsUnderRoot -RelativeRoot "${rootRelative}/manifests"
 
             foreach ($relativePath in @(

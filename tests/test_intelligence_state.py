@@ -326,7 +326,7 @@ class IntelligenceStateTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             reports_root = Path(tmp_dir) / "reports"
             manifest_path = reports_root / "manifests" / "mlb.json"
-            odds_history_path = reports_root / "odds_control_plane" / "odds_history" / "mlb" / "odds_history.json"
+            odds_history_path = reports_root / "odds_control_plane" / "odds_history" / "mlb" / "2026-07-03.json"
             manifest_path.parent.mkdir(parents=True, exist_ok=True)
             odds_history_path.parent.mkdir(parents=True, exist_ok=True)
 
