@@ -1694,8 +1694,9 @@ def _build_local_game_cards_artifact(*, source_root: Path, processed_root: Path,
             return 0, None
 
         allowed_matchups: set[tuple[str, str]] = set()
+        props_market_rows_by_matchup: dict[tuple[str, str], list[dict[str, object]]] = {}
         props_snapshot_path = source_root / "data" / "raw" / f"odds_wnba_player_props_{date_str}.csv"
-        if (not expected_matchups or expected_matchups.issubset(snapshot_matchups)) and props_snapshot_path.exists() and props_snapshot_path.is_file() and _count_csv_rows_quick(props_snapshot_path) > 0:
+        if props_snapshot_path.exists() and props_snapshot_path.is_file() and _count_csv_rows_quick(props_snapshot_path) > 0:
             try:
                 with props_snapshot_path.open("r", encoding="utf-8", newline="") as props_handle:
                     props_reader = csv.DictReader(props_handle)
@@ -1704,10 +1705,14 @@ def _build_local_game_cards_artifact(*, source_root: Path, processed_root: Path,
                             continue
                         props_home = str(props_row.get("home_team") or "").strip().casefold()
                         props_away = str(props_row.get("away_team") or "").strip().casefold()
-                        if props_home and props_away:
+                        if not props_home or not props_away:
+                            continue
+                        if not expected_matchups or expected_matchups.issubset(snapshot_matchups):
                             allowed_matchups.add((props_home, props_away))
+                        props_market_rows_by_matchup.setdefault((props_home, props_away), []).append(props_row)
             except Exception:
                 allowed_matchups = set()
+                props_market_rows_by_matchup = {}
 
         rows_out: list[dict[str, object]] = []
         with game_odds_path.open("r", encoding="utf-8", newline="") as handle:
@@ -1721,6 +1726,26 @@ def _build_local_game_cards_artifact(*, source_root: Path, processed_root: Path,
                     continue
                 if allowed_matchups and (home_name.casefold(), away_name.casefold()) not in allowed_matchups:
                     continue
+                # game_odds_{date}.csv is frequently only ever seeded with a bare
+                # matchup skeleton (no prices) -- fall back to aggregating the raw
+                # h2h/spreads/totals rows from the props snapshot for this matchup
+                # whenever the game_odds row itself has nothing usable.
+                home_ml = _float_or_none(row.get("home_ml"))
+                away_ml = _float_or_none(row.get("away_ml"))
+                home_spread = _float_or_none(row.get("home_spread"))
+                away_spread = _float_or_none(row.get("away_spread"))
+                total = _float_or_none(row.get("total"))
+                if None in (home_ml, away_ml, home_spread, away_spread, total):
+                    market_rows = props_market_rows_by_matchup.get((home_name.casefold(), away_name.casefold())) or []
+                    if market_rows:
+                        aggregated = _aggregate_game_odds_from_market_rows(
+                            market_rows, home_name=home_name, away_name=away_name
+                        )
+                        home_ml = home_ml if home_ml is not None else aggregated["home_ml"]
+                        away_ml = away_ml if away_ml is not None else aggregated["away_ml"]
+                        home_spread = home_spread if home_spread is not None else aggregated["home_spread"]
+                        away_spread = away_spread if away_spread is not None else aggregated["away_spread"]
+                        total = total if total is not None else aggregated["total"]
                 rows_out.append(
                     {
                         "date": date_str,
@@ -1728,11 +1753,11 @@ def _build_local_game_cards_artifact(*, source_root: Path, processed_root: Path,
                         "home_team": home_name,
                         "visitor_team": away_name,
                         "commence_time": str(row.get("commence_time") or "").strip(),
-                        "home_ml": _float_or_none(row.get("home_ml")),
-                        "away_ml": _float_or_none(row.get("away_ml")),
-                        "home_spread": _float_or_none(row.get("home_spread")),
-                        "away_spread": _float_or_none(row.get("away_spread")),
-                        "total": _float_or_none(row.get("total")),
+                        "home_ml": home_ml,
+                        "away_ml": away_ml,
+                        "home_spread": home_spread,
+                        "away_spread": away_spread,
+                        "total": total,
                         "bookmaker": str(row.get("bookmaker") or "oddsapi_consensus").strip() or "oddsapi_consensus",
                         "home_tri": _to_tricode_local(home_name),
                         "away_tri": _to_tricode_local(away_name),
