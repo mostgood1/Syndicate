@@ -8,6 +8,7 @@ from datetime import datetime
 from datetime import timedelta
 from datetime import timezone
 from functools import lru_cache
+import io
 import json
 import math
 import os
@@ -24,6 +25,9 @@ from syndicate.features.shared.basketball_live_artifacts import _canonical_game_
 from syndicate.features.shared.basketball_live_artifacts import resolve_event_ids_from_games
 from syndicate.features.shared.game_board_contract import _sim_payload
 from syndicate.features.shared.memory_observability import log_runtime_memory
+from syndicate.features.shared.refresh_state_store import data_root as _refresh_state_data_root
+from syndicate.features.shared.refresh_state_store import read_json_file as _keyvalue_read_json_file
+from syndicate.features.shared.refresh_state_store import read_text_file as _keyvalue_read_text_file
 from syndicate.features.wnba.sources import available_dates
 from syndicate.features.wnba.sources import build_module_links
 from syndicate.features.wnba.sources import format_moneyline
@@ -195,6 +199,25 @@ def _load_csv_rows(path: Path) -> list[dict[str, str]]:
     try:
         with path.open("r", encoding="utf-8", newline="") as handle:
             return list(csv.DictReader(handle))
+    except Exception:
+        return []
+
+
+def _game_cards_keyvalue_path(selected_date: str) -> Path:
+    # Canonical path the refresh pipeline actually writes game_cards.csv
+    # through (see _write_game_cards_csv_rows in refresh_wnba_oddsapi_props.py)
+    # -- used here purely as a keyvalue key, independent of whichever local
+    # candidate root processed_root()/_wnba_source_roots() happen to resolve
+    # to on this particular service's disk.
+    return _refresh_state_data_root() / "wnba_source" / "data" / "processed" / f"game_cards_{selected_date}.csv"
+
+
+def _load_game_cards_csv_rows_from_keyvalue(selected_date: str) -> list[dict[str, str]]:
+    text = _keyvalue_read_text_file(_game_cards_keyvalue_path(selected_date))
+    if not text or not text.strip():
+        return []
+    try:
+        return [dict(row) for row in csv.DictReader(io.StringIO(text))]
     except Exception:
         return []
 
@@ -929,6 +952,18 @@ def _artifact_bundle(selected_date: str) -> dict[str, Any]:
                 best_score = score
                 best_rows = alt_rows
                 best_paths = candidate_paths
+
+    # game_cards.csv is written cross-service through the keyvalue store (see
+    # _write_game_cards_csv_rows in refresh_wnba_oddsapi_props.py); prefer
+    # that over whatever this particular service's own local disk candidates
+    # happen to have, since the loop/worker service and the web service each
+    # have their own separate local disk and can otherwise disagree about
+    # live game status/score.
+    keyvalue_rows = _load_game_cards_csv_rows_from_keyvalue(selected_date)
+    if keyvalue_rows:
+        best_rows = keyvalue_rows
+        best_paths = dict(best_paths)
+        best_paths["cards"] = _game_cards_keyvalue_path(selected_date)
 
     # ✅ Existing
     rows = best_rows
@@ -2504,7 +2539,38 @@ def _local_live_state_payload_cached(selected_date: str, snapshot_mtime_ns: int 
     return None
 
 
+def _live_state_keyvalue_path(selected_date: str) -> Path:
+    # Canonical path the refresh pipeline actually writes live_state through
+    # (see _write_live_snapshot_payload in refresh_wnba_oddsapi_props.py) --
+    # used here purely as a keyvalue key, independent of whichever local
+    # candidate root processed_root() happens to resolve to on this
+    # particular service's disk.
+    return _refresh_state_data_root() / "wnba_source" / "data" / "processed" / "live_snapshots" / f"live_state_{selected_date}.jsonl"
+
+
+def _load_live_state_payload_from_keyvalue(selected_date: str) -> dict[str, Any] | None:
+    record = _keyvalue_read_json_file(_live_state_keyvalue_path(selected_date))
+    if not isinstance(record, dict):
+        return None
+    payload = record.get("payload") if isinstance(record.get("payload"), dict) else None
+    if isinstance(payload, dict):
+        return payload
+    if isinstance(record.get("games"), list):
+        return record
+    return None
+
+
 def _local_live_state_payload(selected_date: str) -> dict[str, Any] | None:
+    # live_state.jsonl is written cross-service through the keyvalue store,
+    # so it must be read the same way rather than trusting this service's
+    # own local disk -- the live-lens loop/worker and the web service each
+    # have their own separate disk and can otherwise disagree about live
+    # game status/score. The local-file path below (with its mtime/size
+    # cache) remains only as a fallback for non-keyvalue backends.
+    keyvalue_payload = _load_live_state_payload_from_keyvalue(selected_date)
+    if keyvalue_payload is not None:
+        return keyvalue_payload
+
     path = processed_root() / "live_snapshots" / f"live_state_{selected_date}.jsonl"
     if not path.exists():
         return _local_live_state_payload_cached(selected_date, None, None)

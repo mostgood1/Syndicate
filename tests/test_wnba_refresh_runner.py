@@ -3,14 +3,35 @@ from __future__ import annotations
 import csv
 import importlib.util
 import json
+import os
 import tempfile
 import types
 import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+from syndicate.features.shared import refresh_state_store
+
+
+class _FakeKeyValueClient:
+    def __init__(self) -> None:
+        self.store: dict[str, str] = {}
+
+    def get(self, key: str) -> str | None:
+        return self.store.get(key)
+
+    def set(self, key: str, value: str) -> bool:
+        self.store[key] = str(value)
+        return True
+
+    def exists(self, key: str) -> int:
+        return 1 if key in self.store else 0
+
 
 class WnbaRefreshRunnerTests(unittest.TestCase):
+    def tearDown(self) -> None:
+        refresh_state_store.reset_state_store_caches()
+
     def _load_module(self):
         repo_root = Path(__file__).resolve().parents[1]
         script_path = repo_root / "scripts" / "refresh_wnba_oddsapi_props.py"
@@ -332,6 +353,54 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
         self.assertAlmostEqual(float(row.get("home_spread")), -10.5)
         self.assertAlmostEqual(float(row.get("away_spread")), 10.5)
         self.assertAlmostEqual(float(row.get("total")), 197.5)
+
+    def test_build_local_game_cards_artifact_writes_and_reads_through_keyvalue_backend(self) -> None:
+        # Regression: game_cards.csv is read cross-service (the live-lens
+        # loop on live-odds-worker needs what the web service just wrote),
+        # so on Render (SYNDICATE_REFRESH_STATE_BACKEND=keyvalue) both the
+        # write and this same script's own re-read of game_cards.csv (for
+        # top-by-game building) must go through the keyvalue store rather
+        # than a plain local file, which would be invisible cross-service.
+        module = self._load_module()
+        fake_client = _FakeKeyValueClient()
+
+        with tempfile.TemporaryDirectory() as tmp_dir, patch.dict(
+            os.environ,
+            {"SYNDICATE_REFRESH_STATE_BACKEND": "keyvalue", "SYNDICATE_REFRESH_STATE_URL": "redis://example"},
+            clear=False,
+        ), patch("syndicate.features.shared.refresh_state_store._get_keyvalue_client", return_value=fake_client):
+            source_root = Path(tmp_dir) / "source"
+            processed_root = source_root / "data" / "processed"
+            raw_root = source_root / "data" / "raw"
+            processed_root.mkdir(parents=True, exist_ok=True)
+            raw_root.mkdir(parents=True, exist_ok=True)
+            date_str = "2026-07-13"
+            (raw_root / f"odds_wnba_player_props_{date_str}.csv").write_text(
+                "snapshot_ts,event_id,commence_time,bookmaker,bookmaker_title,market,outcome_name,player_name,point,price,last_update,home_team,away_team\n"
+                "2026-07-13T20:00:00Z,401,2026-07-13T23:08:15Z,draftkings,DraftKings,h2h,Atlanta Dream,,,-770,2026-07-13T20:00:00Z,Atlanta Dream,Los Angeles Sparks\n"
+                "2026-07-13T20:00:00Z,401,2026-07-13T23:08:15Z,draftkings,DraftKings,h2h,Los Angeles Sparks,,,450,2026-07-13T20:00:00Z,Atlanta Dream,Los Angeles Sparks\n",
+                encoding="utf-8",
+            )
+
+            rows, out_path = module._build_local_game_cards_artifact(
+                source_root=source_root,
+                processed_root=processed_root,
+                date_str=date_str,
+                log_file=Path(tmp_dir) / "refresh.log",
+            )
+
+            self.assertEqual(rows, 1)
+            self.assertIsNotNone(out_path)
+            assert out_path is not None
+            # Went to the keyvalue store, not local disk.
+            self.assertFalse(out_path.exists())
+            self.assertTrue(fake_client.store)
+
+            # This script's own re-read (used to build top_by_game) must see
+            # the same data back out of the keyvalue store.
+            _, by_team, _ = module._local_game_cards_index(processed_root=processed_root, date_str=date_str)
+            self.assertIn("ATL", by_team)
+            self.assertIn("LAS", by_team)
 
     def test_build_local_game_cards_artifact_promotes_full_slate_when_snapshot_is_partial(self) -> None:
         module = self._load_module()
@@ -2021,6 +2090,30 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
         self.assertEqual(reb_row["game_id"], "0401")
         self.assertEqual(reb_row["actual"], "12.0")
         self.assertEqual(reb_row["line"], "10.5")
+
+    def test_write_and_read_live_snapshot_payload_round_trips_through_keyvalue_backend(self) -> None:
+        # Regression: live_state.jsonl (game status/score) is read
+        # cross-service, same reasoning as game_cards.csv above -- must go
+        # through the keyvalue store rather than a plain local write/read.
+        module = self._load_module()
+        fake_client = _FakeKeyValueClient()
+
+        with tempfile.TemporaryDirectory() as tmp_dir, patch.dict(
+            os.environ,
+            {"SYNDICATE_REFRESH_STATE_BACKEND": "keyvalue", "SYNDICATE_REFRESH_STATE_URL": "redis://example"},
+            clear=False,
+        ), patch("syndicate.features.shared.refresh_state_store._get_keyvalue_client", return_value=fake_client):
+            path = Path(tmp_dir) / "processed" / "live_snapshots" / "live_state_2026-07-13.jsonl"
+            payload = {"ok": True, "games": [{"event_id": "401857064", "status": "Live", "in_progress": True}]}
+
+            wrote = module._write_live_snapshot_payload(path, payload)
+
+            self.assertTrue(wrote)
+            self.assertFalse(path.exists())
+            self.assertTrue(fake_client.store)
+
+            read_back = module._read_live_snapshot_payload(path)
+            self.assertEqual(read_back, payload)
 
     def test_export_live_snapshot_artifacts_overwrites_empty_lens_snapshot_with_local_build(self) -> None:
         module = self._load_module()

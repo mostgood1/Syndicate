@@ -8,6 +8,7 @@ import datetime as dt
 import errno
 import importlib
 import importlib.util
+import io
 import json
 import os
 import shlex
@@ -34,8 +35,13 @@ from syndicate.features.shared.memory_observability import log_list_memory
 from syndicate.features.shared.memory_observability import log_runtime_memory
 from syndicate.features.shared.refresh_state_store import build_input_hash
 from syndicate.features.shared.refresh_state_store import path_fingerprint
+from syndicate.features.shared.refresh_state_store import path_exists as _keyvalue_path_exists
+from syndicate.features.shared.refresh_state_store import read_json_file as _keyvalue_read_json_file
+from syndicate.features.shared.refresh_state_store import read_text_file as _keyvalue_read_text_file
 from syndicate.features.shared.refresh_state_store import record_refresh_state
 from syndicate.features.shared.refresh_state_store import should_recompute
+from syndicate.features.shared.refresh_state_store import write_json_file as _keyvalue_write_json_file
+from syndicate.features.shared.refresh_state_store import write_text_file as _keyvalue_write_text_file
 
 
 def _json_ready(value):
@@ -172,6 +178,18 @@ def _copy_existing_live_snapshot_artifact(*, source_root: Path, file_name: str, 
 
 
 def _read_live_snapshot_payload(path: Path) -> dict[str, object] | None:
+    # The production writer below always overwrites with a single record, so
+    # try the keyvalue-aware reader first (cross-service consistent) before
+    # falling back to the old multi-line-JSONL local read, which only
+    # matters for files an external source app's own exporter appended to.
+    keyvalue_record = _keyvalue_read_json_file(path)
+    if isinstance(keyvalue_record, dict):
+        payload = keyvalue_record.get("payload") if isinstance(keyvalue_record.get("payload"), dict) else None
+        if isinstance(payload, dict):
+            return payload
+        if isinstance(keyvalue_record.get("games"), list):
+            return keyvalue_record
+
     try:
         lines = path.read_text(encoding="utf-8").splitlines()
     except Exception:
@@ -195,9 +213,12 @@ def _read_live_snapshot_payload(path: Path) -> dict[str, object] | None:
 def _write_live_snapshot_payload(path: Path, payload: dict[str, object]) -> bool:
     if not isinstance(payload, dict):
         return False
-    path.parent.mkdir(parents=True, exist_ok=True)
+    # Written cross-service through the keyvalue store: the live-lens
+    # background loop and the on-demand web request path run on different
+    # Render services with separate local disks, so a plain local write here
+    # would be invisible to whichever service didn't just write it.
     record = {"payload": payload}
-    path.write_text(json.dumps(record, ensure_ascii=False) + "\n", encoding="utf-8")
+    _keyvalue_write_json_file(path, record)
     return True
 
 
@@ -1081,9 +1102,30 @@ def _local_props_tier(ev_pct: float | None) -> str:
     return "Low"
 
 
+def _read_game_cards_csv_rows(path: Path) -> list[dict[str, str]]:
+    # game_cards.csv is written through the keyvalue-aware writer above (this
+    # process's own write, in the same run, when force-refreshing), so read
+    # it back the same way rather than assuming it landed on local disk.
+    text = _keyvalue_read_text_file(path)
+    if text is None:
+        if not path.exists() or not path.is_file():
+            return []
+        try:
+            text = path.read_text(encoding="utf-8")
+        except Exception:
+            return []
+    if not text or not text.strip():
+        return []
+    try:
+        return [dict(row) for row in csv.DictReader(io.StringIO(text))]
+    except Exception:
+        return []
+
+
 def _local_game_cards_index(*, processed_root: Path, date_str: str) -> tuple[list[dict[str, str]], dict[str, dict[str, str]], dict[tuple[str, str], dict[str, str]]]:
     game_cards_path = processed_root / f"game_cards_{date_str}.csv"
-    if not game_cards_path.exists() or not game_cards_path.is_file() or _count_csv_rows_quick(game_cards_path) <= 0:
+    game_cards_csv_rows = _read_game_cards_csv_rows(game_cards_path)
+    if not game_cards_csv_rows:
         schedule_path = processed_root / f"schedule_{date_str[:4]}.csv"
         if not schedule_path.exists() or not schedule_path.is_file() or _count_csv_rows_quick(schedule_path) <= 0:
             return [], {}, {}
@@ -1137,38 +1179,37 @@ def _local_game_cards_index(*, processed_root: Path, date_str: str) -> tuple[lis
     rows: list[dict[str, str]] = []
     by_team: dict[str, dict[str, str]] = {}
     by_names: dict[tuple[str, str], dict[str, str]] = {}
-    with game_cards_path.open("r", encoding="utf-8", newline="") as handle:
-        for row in csv.DictReader(handle):
-            if not isinstance(row, dict):
-                continue
-            normalized = {str(key): str(value or "").strip() for key, value in row.items()}
-            home_tri = normalized.get("home_tri", "").upper()
-            away_tri = normalized.get("away_tri", "").upper()
-            home_team = normalized.get("home_team", "")
-            away_team = normalized.get("visitor_team", "")
-            if not home_tri or not away_tri:
-                continue
-            rows.append(normalized)
-            by_team[home_tri] = {
-                "side": "home",
-                "opponent": away_tri,
-                "home_tri": home_tri,
-                "away_tri": away_tri,
-                "home_team": home_team,
-                "away_team": away_team,
-                "game_id": normalized.get("game_id", ""),
-            }
-            by_team[away_tri] = {
-                "side": "away",
-                "opponent": home_tri,
-                "home_tri": home_tri,
-                "away_tri": away_tri,
-                "home_team": home_team,
-                "away_team": away_team,
-                "game_id": normalized.get("game_id", ""),
-            }
-            if home_team and away_team:
-                by_names[(home_team.lower(), away_team.lower())] = normalized
+    for row in game_cards_csv_rows:
+        if not isinstance(row, dict):
+            continue
+        normalized = {str(key): str(value or "").strip() for key, value in row.items()}
+        home_tri = normalized.get("home_tri", "").upper()
+        away_tri = normalized.get("away_tri", "").upper()
+        home_team = normalized.get("home_team", "")
+        away_team = normalized.get("visitor_team", "")
+        if not home_tri or not away_tri:
+            continue
+        rows.append(normalized)
+        by_team[home_tri] = {
+            "side": "home",
+            "opponent": away_tri,
+            "home_tri": home_tri,
+            "away_tri": away_tri,
+            "home_team": home_team,
+            "away_team": away_team,
+            "game_id": normalized.get("game_id", ""),
+        }
+        by_team[away_tri] = {
+            "side": "away",
+            "opponent": home_tri,
+            "home_tri": home_tri,
+            "away_tri": away_tri,
+            "home_team": home_team,
+            "away_team": away_team,
+            "game_id": normalized.get("game_id", ""),
+        }
+        if home_team and away_team:
+            by_names[(home_team.lower(), away_team.lower())] = normalized
     return rows, by_team, by_names
 
 
@@ -1551,6 +1592,38 @@ def _build_local_cards_props_snapshot_artifact(*, processed_root: Path, date_str
     return len(games_out), out_path
 
 
+_GAME_CARDS_HEADER_ORDER = [
+    "date",
+    "game_id",
+    "home_team",
+    "visitor_team",
+    "commence_time",
+    "home_ml",
+    "away_ml",
+    "home_spread",
+    "away_spread",
+    "total",
+    "bookmaker",
+    "home_tri",
+    "away_tri",
+]
+
+
+def _write_game_cards_csv_rows(out_path: Path, rows_out: list[dict[str, object]]) -> None:
+    # game_cards.csv is read cross-service (the live-lens background loop on
+    # the live-odds-worker service needs the same data the web service just
+    # wrote), so this goes through the keyvalue-aware writer rather than a
+    # plain local file write -- each Render service has its own separate
+    # local disk, so a plain write here would be invisible to any other
+    # service reading the same nominal path.
+    buffer = io.StringIO()
+    writer = csv.DictWriter(buffer, fieldnames=_GAME_CARDS_HEADER_ORDER)
+    writer.writeheader()
+    for current in rows_out:
+        writer.writerow({field: current.get(field, "") for field in _GAME_CARDS_HEADER_ORDER})
+    _keyvalue_write_text_file(out_path, buffer.getvalue())
+
+
 def _build_local_game_cards_artifact(*, source_root: Path, processed_root: Path, date_str: str, log_file: Path | None = None) -> tuple[int, Path | None]:
     out_path = processed_root / f"game_cards_{date_str}.csv"
 
@@ -1655,28 +1728,7 @@ def _build_local_game_cards_artifact(*, source_root: Path, processed_root: Path,
                         )
 
                     if rows_out and (not expected_matchups or expected_matchups.issubset(snapshot_matchups)):
-                        header_order = [
-                            "date",
-                            "game_id",
-                            "home_team",
-                            "visitor_team",
-                            "commence_time",
-                            "home_ml",
-                            "away_ml",
-                            "home_spread",
-                            "away_spread",
-                            "total",
-                            "bookmaker",
-                            "home_tri",
-                            "away_tri",
-                        ]
-                        out_path.parent.mkdir(parents=True, exist_ok=True)
-                        with out_path.open("w", encoding="utf-8", newline="") as handle:
-                            writer = csv.DictWriter(handle, fieldnames=header_order)
-                            writer.writeheader()
-                            for current in rows_out:
-                                writer.writerow({field: current.get(field, "") for field in header_order})
-
+                        _write_game_cards_csv_rows(out_path, rows_out)
                         _log(f"Built local game_cards from raw player props snapshot fallback: {out_path} (rows={len(rows_out)})")
                         return len(rows_out), out_path
 
@@ -1770,28 +1822,7 @@ def _build_local_game_cards_artifact(*, source_root: Path, processed_root: Path,
             _log(f"Local game_cards build skipped for {date_str}: processed game_odds had no usable rows")
             return 0, None
 
-        header_order = [
-            "date",
-            "game_id",
-            "home_team",
-            "visitor_team",
-            "commence_time",
-            "home_ml",
-            "away_ml",
-            "home_spread",
-            "away_spread",
-            "total",
-            "bookmaker",
-            "home_tri",
-            "away_tri",
-        ]
-        out_path.parent.mkdir(parents=True, exist_ok=True)
-        with out_path.open("w", encoding="utf-8", newline="") as handle:
-            writer = csv.DictWriter(handle, fieldnames=header_order)
-            writer.writeheader()
-            for current in rows_out:
-                writer.writerow({field: current.get(field, "") for field in header_order})
-
+        _write_game_cards_csv_rows(out_path, rows_out)
         _append_log(log_file, f"Built local game_cards from game_odds fallback: {out_path} (rows={len(rows_out)})")
         return len(rows_out), out_path
 
@@ -1855,27 +1886,7 @@ def _build_local_game_cards_artifact(*, source_root: Path, processed_root: Path,
     if not rows_out:
         return 0, None
 
-    header_order = [
-        "date",
-        "game_id",
-        "home_team",
-        "visitor_team",
-        "commence_time",
-        "home_ml",
-        "away_ml",
-        "home_spread",
-        "away_spread",
-        "total",
-        "bookmaker",
-        "home_tri",
-        "away_tri",
-    ]
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    with out_path.open("w", encoding="utf-8", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=header_order)
-        writer.writeheader()
-        for current in rows_out:
-            writer.writerow({field: current.get(field, "") for field in header_order})
+    _write_game_cards_csv_rows(out_path, rows_out)
     return len(rows_out), out_path
 
 
