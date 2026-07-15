@@ -241,6 +241,16 @@
         "reused": false,
         "artifact_root": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts"
       }
+    },
+    "wnba_artifact_bundle:D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts:2026-07-15:1:1": {
+      "inputHash": "5d240ef53f40a3c1c1134cae985934e0c72340b19261a5052c139eb071e5300e",
+      "updatedAt": "2026-07-15T06:55:35-05:00",
+      "outputs": [],
+      "metadata": {
+        "date": "2026-07-15",
+        "reused": false,
+        "artifact_root": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts"
+      }
     }
   }
 }

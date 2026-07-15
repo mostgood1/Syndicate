@@ -1,7 +1,7 @@
 {
   "date": "2026-07-15",
   "generatedAt": "2026-07-15T06:44:48.8641962+00:00",
-  "lastUpdatedAt": "2026-07-15T06:44:48.9619545+00:00",
+  "lastUpdatedAt": "2026-07-15T06:55:48.2698974+00:00",
   "completedAt": null,
   "runMode": "standard",
   "overallStatus": "started",
@@ -317,8 +317,8 @@
         "workflow": "vendored_daily_update",
         "eventKey": "smart_sim_2026-06-17_CHI_NYL",
         "artifactPath": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_CHI_NYL.json",
-        "inputFingerprint": "c5476f9a48b960c58b05e954372f6bd6d792f9d6689ddbd109b683d3e082446e",
-        "previousInputFingerprint": "32c6b306a207be8fa32029a96fc8f520e736120440163f70da1b810c08a303d2",
+        "inputFingerprint": "56e32107743fea63b69548a51ad5cb6414e178b7a4b285a2e2ccf2bd06f0a727",
+        "previousInputFingerprint": "c5476f9a48b960c58b05e954372f6bd6d792f9d6689ddbd109b683d3e082446e",
         "eventStartTimeUtc": null,
         "timeToStartMinutes": null,
         "policyId": "sport:wnba:default",
@@ -337,8 +337,8 @@
         "workflow": "vendored_daily_update",
         "eventKey": "smart_sim_2026-06-17_CON_WSH",
         "artifactPath": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_CON_WSH.json",
-        "inputFingerprint": "c5476f9a48b960c58b05e954372f6bd6d792f9d6689ddbd109b683d3e082446e",
-        "previousInputFingerprint": "32c6b306a207be8fa32029a96fc8f520e736120440163f70da1b810c08a303d2",
+        "inputFingerprint": "56e32107743fea63b69548a51ad5cb6414e178b7a4b285a2e2ccf2bd06f0a727",
+        "previousInputFingerprint": "c5476f9a48b960c58b05e954372f6bd6d792f9d6689ddbd109b683d3e082446e",
         "eventStartTimeUtc": null,
         "timeToStartMinutes": null,
         "policyId": "sport:wnba:default",
@@ -357,8 +357,8 @@
         "workflow": "vendored_daily_update",
         "eventKey": "smart_sim_2026-06-17_GSV_DAL",
         "artifactPath": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_GSV_DAL.json",
-        "inputFingerprint": "c5476f9a48b960c58b05e954372f6bd6d792f9d6689ddbd109b683d3e082446e",
-        "previousInputFingerprint": "32c6b306a207be8fa32029a96fc8f520e736120440163f70da1b810c08a303d2",
+        "inputFingerprint": "56e32107743fea63b69548a51ad5cb6414e178b7a4b285a2e2ccf2bd06f0a727",
+        "previousInputFingerprint": "c5476f9a48b960c58b05e954372f6bd6d792f9d6689ddbd109b683d3e082446e",
         "eventStartTimeUtc": null,
         "timeToStartMinutes": null,
         "policyId": "sport:wnba:default",
@@ -377,8 +377,8 @@
         "workflow": "vendored_daily_update",
         "eventKey": "smart_sim_2026-06-17_LAS_MIN",
         "artifactPath": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_LAS_MIN.json",
-        "inputFingerprint": "c5476f9a48b960c58b05e954372f6bd6d792f9d6689ddbd109b683d3e082446e",
-        "previousInputFingerprint": "32c6b306a207be8fa32029a96fc8f520e736120440163f70da1b810c08a303d2",
+        "inputFingerprint": "56e32107743fea63b69548a51ad5cb6414e178b7a4b285a2e2ccf2bd06f0a727",
+        "previousInputFingerprint": "c5476f9a48b960c58b05e954372f6bd6d792f9d6689ddbd109b683d3e082446e",
         "eventStartTimeUtc": null,
         "timeToStartMinutes": null,
         "policyId": "sport:wnba:default",
@@ -397,8 +397,8 @@
         "workflow": "vendored_daily_update",
         "eventKey": "smart_sim_2026-06-17_PHX_LVA",
         "artifactPath": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_PHX_LVA.json",
-        "inputFingerprint": "c5476f9a48b960c58b05e954372f6bd6d792f9d6689ddbd109b683d3e082446e",
-        "previousInputFingerprint": "32c6b306a207be8fa32029a96fc8f520e736120440163f70da1b810c08a303d2",
+        "inputFingerprint": "56e32107743fea63b69548a51ad5cb6414e178b7a4b285a2e2ccf2bd06f0a727",
+        "previousInputFingerprint": "c5476f9a48b960c58b05e954372f6bd6d792f9d6689ddbd109b683d3e082446e",
         "eventStartTimeUtc": null,
         "timeToStartMinutes": null,
         "policyId": "sport:wnba:default",
@@ -417,8 +417,8 @@
         "workflow": "vendored_daily_update",
         "eventKey": "smart_sim_2026-06-17_POR_SEA",
         "artifactPath": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_POR_SEA.json",
-        "inputFingerprint": "c5476f9a48b960c58b05e954372f6bd6d792f9d6689ddbd109b683d3e082446e",
-        "previousInputFingerprint": "32c6b306a207be8fa32029a96fc8f520e736120440163f70da1b810c08a303d2",
+        "inputFingerprint": "56e32107743fea63b69548a51ad5cb6414e178b7a4b285a2e2ccf2bd06f0a727",
+        "previousInputFingerprint": "c5476f9a48b960c58b05e954372f6bd6d792f9d6689ddbd109b683d3e082446e",
         "eventStartTimeUtc": null,
         "timeToStartMinutes": null,
         "policyId": "sport:wnba:default",
@@ -669,8 +669,8 @@
         "workflow": "vendored_daily_update",
         "eventKey": "smart_sim_2026-06-17_CHI_NYL",
         "artifactPath": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_CHI_NYL.json",
-        "inputFingerprint": "c5476f9a48b960c58b05e954372f6bd6d792f9d6689ddbd109b683d3e082446e",
-        "previousInputFingerprint": "32c6b306a207be8fa32029a96fc8f520e736120440163f70da1b810c08a303d2",
+        "inputFingerprint": "56e32107743fea63b69548a51ad5cb6414e178b7a4b285a2e2ccf2bd06f0a727",
+        "previousInputFingerprint": "c5476f9a48b960c58b05e954372f6bd6d792f9d6689ddbd109b683d3e082446e",
         "policyId": "sport:wnba:default",
         "policySource": "sport",
         "policyKeyParameters": {
@@ -684,8 +684,8 @@
         "workflow": "vendored_daily_update",
         "eventKey": "smart_sim_2026-06-17_CON_WSH",
         "artifactPath": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_CON_WSH.json",
-        "inputFingerprint": "c5476f9a48b960c58b05e954372f6bd6d792f9d6689ddbd109b683d3e082446e",
-        "previousInputFingerprint": "32c6b306a207be8fa32029a96fc8f520e736120440163f70da1b810c08a303d2",
+        "inputFingerprint": "56e32107743fea63b69548a51ad5cb6414e178b7a4b285a2e2ccf2bd06f0a727",
+        "previousInputFingerprint": "c5476f9a48b960c58b05e954372f6bd6d792f9d6689ddbd109b683d3e082446e",
         "policyId": "sport:wnba:default",
         "policySource": "sport",
         "policyKeyParameters": {
@@ -699,8 +699,8 @@
         "workflow": "vendored_daily_update",
         "eventKey": "smart_sim_2026-06-17_GSV_DAL",
         "artifactPath": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_GSV_DAL.json",
-        "inputFingerprint": "c5476f9a48b960c58b05e954372f6bd6d792f9d6689ddbd109b683d3e082446e",
-        "previousInputFingerprint": "32c6b306a207be8fa32029a96fc8f520e736120440163f70da1b810c08a303d2",
+        "inputFingerprint": "56e32107743fea63b69548a51ad5cb6414e178b7a4b285a2e2ccf2bd06f0a727",
+        "previousInputFingerprint": "c5476f9a48b960c58b05e954372f6bd6d792f9d6689ddbd109b683d3e082446e",
         "policyId": "sport:wnba:default",
         "policySource": "sport",
         "policyKeyParameters": {
@@ -714,8 +714,8 @@
         "workflow": "vendored_daily_update",
         "eventKey": "smart_sim_2026-06-17_LAS_MIN",
         "artifactPath": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_LAS_MIN.json",
-        "inputFingerprint": "c5476f9a48b960c58b05e954372f6bd6d792f9d6689ddbd109b683d3e082446e",
-        "previousInputFingerprint": "32c6b306a207be8fa32029a96fc8f520e736120440163f70da1b810c08a303d2",
+        "inputFingerprint": "56e32107743fea63b69548a51ad5cb6414e178b7a4b285a2e2ccf2bd06f0a727",
+        "previousInputFingerprint": "c5476f9a48b960c58b05e954372f6bd6d792f9d6689ddbd109b683d3e082446e",
         "policyId": "sport:wnba:default",
         "policySource": "sport",
         "policyKeyParameters": {
@@ -729,8 +729,8 @@
         "workflow": "vendored_daily_update",
         "eventKey": "smart_sim_2026-06-17_PHX_LVA",
         "artifactPath": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_PHX_LVA.json",
-        "inputFingerprint": "c5476f9a48b960c58b05e954372f6bd6d792f9d6689ddbd109b683d3e082446e",
-        "previousInputFingerprint": "32c6b306a207be8fa32029a96fc8f520e736120440163f70da1b810c08a303d2",
+        "inputFingerprint": "56e32107743fea63b69548a51ad5cb6414e178b7a4b285a2e2ccf2bd06f0a727",
+        "previousInputFingerprint": "c5476f9a48b960c58b05e954372f6bd6d792f9d6689ddbd109b683d3e082446e",
         "policyId": "sport:wnba:default",
         "policySource": "sport",
         "policyKeyParameters": {
@@ -744,8 +744,8 @@
         "workflow": "vendored_daily_update",
         "eventKey": "smart_sim_2026-06-17_POR_SEA",
         "artifactPath": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_POR_SEA.json",
-        "inputFingerprint": "c5476f9a48b960c58b05e954372f6bd6d792f9d6689ddbd109b683d3e082446e",
-        "previousInputFingerprint": "32c6b306a207be8fa32029a96fc8f520e736120440163f70da1b810c08a303d2",
+        "inputFingerprint": "56e32107743fea63b69548a51ad5cb6414e178b7a4b285a2e2ccf2bd06f0a727",
+        "previousInputFingerprint": "c5476f9a48b960c58b05e954372f6bd6d792f9d6689ddbd109b683d3e082446e",
         "policyId": "sport:wnba:default",
         "policySource": "sport",
         "policyKeyParameters": {
@@ -826,7 +826,7 @@
         "roi": null
       },
       {
-        "policyId": "sport:wnba:default",
+        "policyId": "",
         "policySource": "sport",
         "keyParameters": {
           "forceWithinMinutes": 40
@@ -902,10 +902,12 @@
     "forceRebuildToday": false
   },
   "runState": {
-    "currentStage": "queued",
-    "completedStages": [],
+    "currentStage": "refresh_gate",
+    "completedStages": [
+      "source_update"
+    ],
     "failedStage": null,
-    "lastUpdatedAt": "2026-07-15T06:44:48.9619545+00:00",
+    "lastUpdatedAt": "2026-07-15T06:55:48.2698974+00:00",
     "simulationContractPath": null,
     "simulationContractRunPath": null,
     "simulationContractSportCount": 0,
@@ -1197,8 +1199,8 @@
       "workflow": "vendored_daily_update",
       "eventKey": "smart_sim_2026-06-17_CHI_NYL",
       "artifactPath": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_CHI_NYL.json",
-      "inputFingerprint": "c5476f9a48b960c58b05e954372f6bd6d792f9d6689ddbd109b683d3e082446e",
-      "previousInputFingerprint": "32c6b306a207be8fa32029a96fc8f520e736120440163f70da1b810c08a303d2",
+      "inputFingerprint": "56e32107743fea63b69548a51ad5cb6414e178b7a4b285a2e2ccf2bd06f0a727",
+      "previousInputFingerprint": "c5476f9a48b960c58b05e954372f6bd6d792f9d6689ddbd109b683d3e082446e",
       "eventStartTimeUtc": null,
       "timeToStartMinutes": null,
       "policyId": "sport:wnba:default",
@@ -1217,8 +1219,8 @@
       "workflow": "vendored_daily_update",
       "eventKey": "smart_sim_2026-06-17_CON_WSH",
       "artifactPath": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_CON_WSH.json",
-      "inputFingerprint": "c5476f9a48b960c58b05e954372f6bd6d792f9d6689ddbd109b683d3e082446e",
-      "previousInputFingerprint": "32c6b306a207be8fa32029a96fc8f520e736120440163f70da1b810c08a303d2",
+      "inputFingerprint": "56e32107743fea63b69548a51ad5cb6414e178b7a4b285a2e2ccf2bd06f0a727",
+      "previousInputFingerprint": "c5476f9a48b960c58b05e954372f6bd6d792f9d6689ddbd109b683d3e082446e",
       "eventStartTimeUtc": null,
       "timeToStartMinutes": null,
       "policyId": "sport:wnba:default",
@@ -1237,8 +1239,8 @@
       "workflow": "vendored_daily_update",
       "eventKey": "smart_sim_2026-06-17_GSV_DAL",
       "artifactPath": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_GSV_DAL.json",
-      "inputFingerprint": "c5476f9a48b960c58b05e954372f6bd6d792f9d6689ddbd109b683d3e082446e",
-      "previousInputFingerprint": "32c6b306a207be8fa32029a96fc8f520e736120440163f70da1b810c08a303d2",
+      "inputFingerprint": "56e32107743fea63b69548a51ad5cb6414e178b7a4b285a2e2ccf2bd06f0a727",
+      "previousInputFingerprint": "c5476f9a48b960c58b05e954372f6bd6d792f9d6689ddbd109b683d3e082446e",
       "eventStartTimeUtc": null,
       "timeToStartMinutes": null,
       "policyId": "sport:wnba:default",
@@ -1257,8 +1259,8 @@
       "workflow": "vendored_daily_update",
       "eventKey": "smart_sim_2026-06-17_LAS_MIN",
       "artifactPath": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_LAS_MIN.json",
-      "inputFingerprint": "c5476f9a48b960c58b05e954372f6bd6d792f9d6689ddbd109b683d3e082446e",
-      "previousInputFingerprint": "32c6b306a207be8fa32029a96fc8f520e736120440163f70da1b810c08a303d2",
+      "inputFingerprint": "56e32107743fea63b69548a51ad5cb6414e178b7a4b285a2e2ccf2bd06f0a727",
+      "previousInputFingerprint": "c5476f9a48b960c58b05e954372f6bd6d792f9d6689ddbd109b683d3e082446e",
       "eventStartTimeUtc": null,
       "timeToStartMinutes": null,
       "policyId": "sport:wnba:default",
@@ -1277,8 +1279,8 @@
       "workflow": "vendored_daily_update",
       "eventKey": "smart_sim_2026-06-17_PHX_LVA",
       "artifactPath": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_PHX_LVA.json",
-      "inputFingerprint": "c5476f9a48b960c58b05e954372f6bd6d792f9d6689ddbd109b683d3e082446e",
-      "previousInputFingerprint": "32c6b306a207be8fa32029a96fc8f520e736120440163f70da1b810c08a303d2",
+      "inputFingerprint": "56e32107743fea63b69548a51ad5cb6414e178b7a4b285a2e2ccf2bd06f0a727",
+      "previousInputFingerprint": "c5476f9a48b960c58b05e954372f6bd6d792f9d6689ddbd109b683d3e082446e",
       "eventStartTimeUtc": null,
       "timeToStartMinutes": null,
       "policyId": "sport:wnba:default",
@@ -1297,8 +1299,8 @@
       "workflow": "vendored_daily_update",
       "eventKey": "smart_sim_2026-06-17_POR_SEA",
       "artifactPath": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_POR_SEA.json",
-      "inputFingerprint": "c5476f9a48b960c58b05e954372f6bd6d792f9d6689ddbd109b683d3e082446e",
-      "previousInputFingerprint": "32c6b306a207be8fa32029a96fc8f520e736120440163f70da1b810c08a303d2",
+      "inputFingerprint": "56e32107743fea63b69548a51ad5cb6414e178b7a4b285a2e2ccf2bd06f0a727",
+      "previousInputFingerprint": "c5476f9a48b960c58b05e954372f6bd6d792f9d6689ddbd109b683d3e082446e",
       "eventStartTimeUtc": null,
       "timeToStartMinutes": null,
       "policyId": "sport:wnba:default",
@@ -1549,8 +1551,8 @@
       "workflow": "vendored_daily_update",
       "eventKey": "smart_sim_2026-06-17_CHI_NYL",
       "artifactPath": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_CHI_NYL.json",
-      "inputFingerprint": "c5476f9a48b960c58b05e954372f6bd6d792f9d6689ddbd109b683d3e082446e",
-      "previousInputFingerprint": "32c6b306a207be8fa32029a96fc8f520e736120440163f70da1b810c08a303d2",
+      "inputFingerprint": "56e32107743fea63b69548a51ad5cb6414e178b7a4b285a2e2ccf2bd06f0a727",
+      "previousInputFingerprint": "c5476f9a48b960c58b05e954372f6bd6d792f9d6689ddbd109b683d3e082446e",
       "policyId": "sport:wnba:default",
       "policySource": "sport",
       "policyKeyParameters": {
@@ -1564,8 +1566,8 @@
       "workflow": "vendored_daily_update",
       "eventKey": "smart_sim_2026-06-17_CON_WSH",
       "artifactPath": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_CON_WSH.json",
-      "inputFingerprint": "c5476f9a48b960c58b05e954372f6bd6d792f9d6689ddbd109b683d3e082446e",
-      "previousInputFingerprint": "32c6b306a207be8fa32029a96fc8f520e736120440163f70da1b810c08a303d2",
+      "inputFingerprint": "56e32107743fea63b69548a51ad5cb6414e178b7a4b285a2e2ccf2bd06f0a727",
+      "previousInputFingerprint": "c5476f9a48b960c58b05e954372f6bd6d792f9d6689ddbd109b683d3e082446e",
       "policyId": "sport:wnba:default",
       "policySource": "sport",
       "policyKeyParameters": {
@@ -1579,8 +1581,8 @@
       "workflow": "vendored_daily_update",
       "eventKey": "smart_sim_2026-06-17_GSV_DAL",
       "artifactPath": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_GSV_DAL.json",
-      "inputFingerprint": "c5476f9a48b960c58b05e954372f6bd6d792f9d6689ddbd109b683d3e082446e",
-      "previousInputFingerprint": "32c6b306a207be8fa32029a96fc8f520e736120440163f70da1b810c08a303d2",
+      "inputFingerprint": "56e32107743fea63b69548a51ad5cb6414e178b7a4b285a2e2ccf2bd06f0a727",
+      "previousInputFingerprint": "c5476f9a48b960c58b05e954372f6bd6d792f9d6689ddbd109b683d3e082446e",
       "policyId": "sport:wnba:default",
       "policySource": "sport",
       "policyKeyParameters": {
@@ -1594,8 +1596,8 @@
       "workflow": "vendored_daily_update",
       "eventKey": "smart_sim_2026-06-17_LAS_MIN",
       "artifactPath": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_LAS_MIN.json",
-      "inputFingerprint": "c5476f9a48b960c58b05e954372f6bd6d792f9d6689ddbd109b683d3e082446e",
-      "previousInputFingerprint": "32c6b306a207be8fa32029a96fc8f520e736120440163f70da1b810c08a303d2",
+      "inputFingerprint": "56e32107743fea63b69548a51ad5cb6414e178b7a4b285a2e2ccf2bd06f0a727",
+      "previousInputFingerprint": "c5476f9a48b960c58b05e954372f6bd6d792f9d6689ddbd109b683d3e082446e",
       "policyId": "sport:wnba:default",
       "policySource": "sport",
       "policyKeyParameters": {
@@ -1609,8 +1611,8 @@
       "workflow": "vendored_daily_update",
       "eventKey": "smart_sim_2026-06-17_PHX_LVA",
       "artifactPath": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_PHX_LVA.json",
-      "inputFingerprint": "c5476f9a48b960c58b05e954372f6bd6d792f9d6689ddbd109b683d3e082446e",
-      "previousInputFingerprint": "32c6b306a207be8fa32029a96fc8f520e736120440163f70da1b810c08a303d2",
+      "inputFingerprint": "56e32107743fea63b69548a51ad5cb6414e178b7a4b285a2e2ccf2bd06f0a727",
+      "previousInputFingerprint": "c5476f9a48b960c58b05e954372f6bd6d792f9d6689ddbd109b683d3e082446e",
       "policyId": "sport:wnba:default",
       "policySource": "sport",
       "policyKeyParameters": {
@@ -1624,8 +1626,8 @@
       "workflow": "vendored_daily_update",
       "eventKey": "smart_sim_2026-06-17_POR_SEA",
       "artifactPath": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-17_POR_SEA.json",
-      "inputFingerprint": "c5476f9a48b960c58b05e954372f6bd6d792f9d6689ddbd109b683d3e082446e",
-      "previousInputFingerprint": "32c6b306a207be8fa32029a96fc8f520e736120440163f70da1b810c08a303d2",
+      "inputFingerprint": "56e32107743fea63b69548a51ad5cb6414e178b7a4b285a2e2ccf2bd06f0a727",
+      "previousInputFingerprint": "c5476f9a48b960c58b05e954372f6bd6d792f9d6689ddbd109b683d3e082446e",
       "policyId": "sport:wnba:default",
       "policySource": "sport",
       "policyKeyParameters": {
@@ -1706,7 +1708,7 @@
       "roi": null
     },
     {
-      "policyId": "sport:wnba:default",
+      "policyId": "",
       "policySource": "sport",
       "keyParameters": {
         "forceWithinMinutes": 40
@@ -1853,8 +1855,10 @@
     "state": {
       "runMode": "standard",
       "overallStatus": "started",
-      "currentStage": "queued",
-      "completedStages": [],
+      "currentStage": "refresh_gate",
+      "completedStages": [
+        "source_update"
+      ],
       "failedStage": null,
       "policyPerformance": [
         {
@@ -1912,7 +1916,7 @@
           "roi": null
         },
         {
-          "policyId": "sport:wnba:default",
+          "policyId": "",
           "policySource": "sport",
           "keyParameters": {
             "forceWithinMinutes": 40
@@ -1953,10 +1957,80 @@
         "missingIntelligencePublishArtifactPaths": [],
         "status": "skipped"
       },
-      "lastUpdatedAt": "2026-07-15T06:44:48.9619545+00:00"
+      "lastUpdatedAt": "2026-07-15T06:55:48.2698974+00:00"
     }
   },
-  "sportRuns": [],
+  "sportRuns": [
+    {
+      "sport": "wnba",
+      "workflow": "vendored_daily_update",
+      "name": "WNBA vendored daily update",
+      "startedAt": "2026-07-15T06:44:51.6782036+00:00",
+      "completedAt": "2026-07-15T06:55:35.5910575+00:00",
+      "status": "ok",
+      "error": null,
+      "workingDirectory": "D:\\a\\Syndicate\\Syndicate",
+      "environmentOverrides": {
+        "SYNDICATE_WNBA_SOURCE_APP_FALLBACK": "1",
+        "REFRESH_PREDICT_PROPS_SMART_SIM_WORKERS": "3",
+        "APP_TZ": "America/Chicago",
+        "APP_TZ_OFFSET_HOURS": "-6",
+        "REFRESH_PREDICT_PROPS_SMART_SIM_N_SIMS": "1000",
+        "REFRESH_PLAYER_LOGS_FETCH_ON_MISS": "1",
+        "ODDS_API_KEY": "77ae1c35140c82da1675af85dde36a44"
+      },
+      "runtimePolicy": {
+        "smartsimNSims": 1000,
+        "smartsimWorkers": 3
+      },
+      "command": [
+        "C:\\hostedtoolcache\\windows\\Python\\3.11.9\\x64\\python.exe",
+        "scripts\\refresh_wnba_oddsapi_props.py",
+        "--date",
+        "2026-07-15",
+        "--source-root",
+        "vendor\\wnba_betting_repo",
+        "--artifact-root",
+        "data\\wnba_source\\source_artifacts",
+        "--log-file",
+        "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-15\\20260715_064448\\wnba_props_refresh.log",
+        "--force-refresh",
+        "--days-ahead",
+        "0",
+        "--do-edges",
+        "--do-export"
+      ],
+      "mirrorManifestPath": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\manifests\\mirror_refresh_2026-07-15.json",
+      "mirrorManifestExists": false
+    },
+    {
+      "sport": "wnba",
+      "workflow": "syndicate_mirror",
+      "name": "WNBA source mirror refresh",
+      "startedAt": "2026-07-15T06:55:35.6093920+00:00",
+      "completedAt": "2026-07-15T06:55:36.0912828+00:00",
+      "status": "ok",
+      "error": null,
+      "workingDirectory": "D:\\a\\Syndicate\\Syndicate",
+      "environmentOverrides": {},
+      "runtimePolicy": {
+        "smartsimNSims": 1000,
+        "smartsimWorkers": 3
+      },
+      "command": [
+        "powershell.exe",
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "scripts\\refresh_wnba_source_mirror.ps1",
+        "-Date",
+        "2026-07-15"
+      ],
+      "mirrorManifestPath": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\manifests\\mirror_refresh_2026-07-15.json",
+      "mirrorManifestExists": false
+    }
+  ],
   "skipGitPush": true,
   "gitRemote": null,
   "commitMessagePrefix": null,
@@ -1979,16 +2053,27 @@
     "oddsSports": "all",
     "oddsRegions": "us",
     "manifestPath": "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-15\\20260715_064448\\migration\\refresh_status_manifest.json",
-    "runSummaryPath": "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-15\\20260715_064448\\migration\\refresh_and_gate_run.json"
+    "runSummaryPath": "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-15\\20260715_064448\\migration\\refresh_and_gate_run.json",
+    "status": "ok"
   },
-  "pushResults": [],
+  "pushResults": [
+    {
+      "name": "Syndicate",
+      "repoPath": "D:\\a\\Syndicate\\Syndicate",
+      "remote": "",
+      "branch": "main",
+      "commitMessage": " 2026-07-15 (pre-source publish)",
+      "status": "pushed",
+      "commit": "aec56510548bc2f1bd524c16961c6d69a2690d5d"
+    }
+  ],
   "runTrace": {
     "eventSimExecutionCount": 21,
     "artifactUpdateCount": 21,
     "inputFingerprintCount": 2,
     "artifactPathCount": 21,
     "inputFingerprints": [
-      "c5476f9a48b960c58b05e954372f6bd6d792f9d6689ddbd109b683d3e082446e",
+      "56e32107743fea63b69548a51ad5cb6414e178b7a4b285a2e2ccf2bd06f0a727",
       "563a06b8e8830bba5d1cdcf73bb91ad105470d2e01ba859ebaa44c2126a6045d"
     ],
     "artifactPaths": [
