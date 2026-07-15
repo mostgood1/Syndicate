@@ -37,6 +37,20 @@ from syndicate.features.shared.timezone import central_today_iso
 
 
 def _render_web_dyno() -> bool:
+    # RENDER is injected by Render on every service type (web *and* background
+    # workers), so it can't distinguish "am I the request-serving web dyno"
+    # from "am I a worker script calling into this module directly" -- that
+    # ambiguity let worker-side snapshot builders (refresh_nba_oddsapi_props.py's
+    # _export_live_snapshot_artifacts calling build_live_state_payload) take the
+    # "just return whatever's cached" branch meant only for actual web requests,
+    # so a stale snapshot got read back and rewritten forever instead of ever
+    # being recomputed. Same root cause and fix as WNBA (see wnba/cards.py).
+    # SYNDICATE_WEB_DYNO is an explicit, unambiguous override set only on the
+    # web service in render.yaml; fall back to the old heuristic when unset
+    # (local dev, other hosts).
+    explicit = str(os.environ.get("SYNDICATE_WEB_DYNO") or "").strip().lower()
+    if explicit:
+        return explicit in {"1", "true", "yes", "on"}
     return str(os.environ.get("RENDER") or "").strip().lower() in {"1", "true", "yes", "on"}
 
 

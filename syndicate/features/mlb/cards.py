@@ -81,6 +81,20 @@ def _cards_context_cache_put(cache_key: tuple[Any, ...], result: dict[str, Any])
 
 
 def _render_web_dyno() -> bool:
+    # RENDER / RENDER_EXTERNAL_URL / RENDER_SERVICE_ID are injected by Render
+    # on every service type (web *and* background workers), so they can't
+    # distinguish "am I the request-serving web dyno" from "am I a worker
+    # script calling into this module directly". That ambiguity made
+    # worker-side calls skip the heavier recompute/refresh paths gated behind
+    # "not web dyno" below (shared odds-history loading, full board-contract
+    # computation) and take the lighter web-only cached-attach path instead.
+    # Same root cause and fix as WNBA/NBA (see wnba/cards.py, nba/cards.py).
+    # SYNDICATE_WEB_DYNO is an explicit, unambiguous override set only on the
+    # web service in render.yaml; fall back to the old heuristic when unset
+    # (local dev, other hosts).
+    explicit = str(os.environ.get("SYNDICATE_WEB_DYNO") or "").strip().lower()
+    if explicit:
+        return explicit in {"1", "true", "yes", "on"}
     return bool(
         str(os.environ.get("RENDER") or "").strip().lower() in {"1", "true", "yes", "on"}
         or str(os.environ.get("RENDER_EXTERNAL_URL") or "").strip()
