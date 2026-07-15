@@ -14,6 +14,8 @@ from typing import Any
 
 from syndicate.features.shared.artifact_publisher import publish_changed_hot_artifacts
 from syndicate.features.shared.ops_refresh import launch_refresh_run
+from syndicate.features.shared.schedule_adapter import events_starting_within
+from syndicate.features.shared.schedule_adapter import fetch_schedule_for_date
 from syndicate.features.shared.refresh_state_store import data_root
 from syndicate.features.shared.refresh_state_store import read_json_file
 from syndicate.features.shared.refresh_state_store import reports_root
@@ -332,12 +334,43 @@ _LINEUP_INJURY_FETCH_PACKAGES = {
 }
 
 
+def _event_sim_force_window_minutes() -> int:
+	raw = str(os.environ.get("SYNDICATE_EVENT_SIM_FORCE_WINDOW_MINUTES") or "").strip()
+	try:
+		value = int(raw or 30)
+	except Exception:
+		value = 30
+	return max(0, value)
+
+
+def _any_gated_sport_event_within_force_window(date_str: str, *, now_epoch: float) -> bool:
+	# Schedule-aware replacement for the retired GHA pipeline's per-event
+	# "forceWithinMinutes" policy: near a scheduled tip-off, re-check the
+	# lineup/injury fingerprint on every tick instead of waiting out the
+	# normal interval, so a late scratch isn't missed for up to 30 minutes.
+	# This only tightens *how often we check* -- it doesn't force a resim by
+	# itself; _should_force_sim_rerun still only returns True when the
+	# fingerprint (or date) actually changed.
+	window_minutes = _event_sim_force_window_minutes()
+	if window_minutes <= 0:
+		return False
+	for sport in _LINEUP_INJURY_FETCH_PACKAGES:
+		try:
+			events = fetch_schedule_for_date(sport, date_str)
+			if events_starting_within(events, now_epoch=now_epoch, window_minutes=window_minutes):
+				return True
+		except Exception:
+			continue
+	return False
+
+
 def _should_force_sim_rerun(*, now_epoch: float, date_str: str) -> bool:
 	interval = _lineup_check_interval_seconds()
 	last = _read_last_lineup_check()
 	last_epoch = float(last.get("epoch") or 0.0)
 	last_date = str(last.get("date") or "")
-	if last_epoch > 0.0 and last_date == date_str and (now_epoch - last_epoch) < interval:
+	within_tip_off_window = _any_gated_sport_event_within_force_window(date_str, now_epoch=now_epoch)
+	if not within_tip_off_window and last_epoch > 0.0 and last_date == date_str and (now_epoch - last_epoch) < interval:
 		return False
 	for sport, package_name in _LINEUP_INJURY_FETCH_PACKAGES.items():
 		_fetch_injuries(sport, date_str, package_name=package_name)
@@ -352,6 +385,145 @@ def _should_force_sim_rerun(*, now_epoch: float, date_str: str) -> bool:
 	)
 	_record_lineup_check(now_epoch, date_str, current_fingerprints)
 	return changed
+
+
+# ---------------------------------------------------------------------------
+# MLB daily sim: the one piece of the retired GHA daily-update pipeline that
+# has no equivalent on the always-on worker path today (NBA/WNBA prediction
+# generation already runs here; MLB's vendored Monte Carlo sim did not).
+# Gated behind SYNDICATE_ENABLE_MLB_DAILY_SIM_TRIGGER (default off) for a
+# dark-launch/shadow rollout alongside the still-running GHA pipeline.
+# ---------------------------------------------------------------------------
+
+def _mlb_daily_sim_enabled() -> bool:
+	return _env_bool("SYNDICATE_ENABLE_MLB_DAILY_SIM_TRIGGER", default=False)
+
+
+def _mlb_sim_check_interval_seconds() -> int:
+	raw = str(os.environ.get("SYNDICATE_MLB_SIM_CHECK_INTERVAL_SECONDS") or "").strip()
+	try:
+		value = int(raw or 600)
+	except Exception:
+		value = 600
+	return max(60, value)
+
+
+def _mlb_sim_timeout_seconds() -> int:
+	raw = str(os.environ.get("SYNDICATE_MLB_SIM_TIMEOUT_SECONDS") or "").strip()
+	try:
+		value = int(raw or 2700)
+	except Exception:
+		value = 2700
+	return max(60, value)
+
+
+def _mlb_sim_count() -> int:
+	raw = str(os.environ.get("SYNDICATE_MLB_SIM_COUNT") or "").strip()
+	try:
+		value = int(raw or 1000)
+	except Exception:
+		value = 1000
+	return max(1, value)
+
+
+def _mlb_sim_workers() -> int:
+	raw = str(os.environ.get("SYNDICATE_MLB_SIM_WORKERS") or "").strip()
+	try:
+		value = int(raw or 2)
+	except Exception:
+		value = 2
+	return max(1, value)
+
+
+def _last_mlb_sim_check_path() -> Path:
+	return _meta_dir() / "last_mlb_sim_check.json"
+
+
+def _read_last_mlb_sim_check() -> dict[str, Any]:
+	payload = read_json_file(_last_mlb_sim_check_path())
+	return payload if isinstance(payload, dict) else {}
+
+
+def _record_mlb_sim_check(epoch: float, date_str: str, fingerprint: str | None, *, launched: bool) -> None:
+	write_json_file(
+		_last_mlb_sim_check_path(),
+		{"epoch": epoch, "date": date_str, "fingerprint": fingerprint, "launched": bool(launched), "recordedAt": _utc_now()},
+	)
+
+
+def _mlb_daily_summary_path(date_str: str) -> Path:
+	date_slug = date_str.replace("-", "_")
+	return data_root() / "mlb_source" / "source_artifacts" / "data" / "daily" / f"daily_summary_{date_slug}.json"
+
+
+def _mlb_sim_input_fingerprint(date_str: str) -> str | None:
+	root = data_root() / "mlb_source" / "source_artifacts" / "data"
+	date_slug = date_str.replace("-", "_")
+	parts = [
+		_hash_file_bytes(root / "daily" / "lineups_last_known_by_team.json"),
+		_hash_file_bytes(root / "market" / "oddsapi" / f"oddsapi_game_lines_{date_slug}.json"),
+		_hash_file_bytes(root / "manager" / "probable_pitcher_overrides.json"),
+	]
+	if all(part is None for part in parts):
+		return None
+	return "|".join(part or "" for part in parts)
+
+
+def _mlb_daily_sim_decision(*, now_epoch: float, date_str: str) -> dict[str, Any]:
+	if not _mlb_daily_sim_enabled():
+		return {"force": False, "reason": "disabled"}
+	try:
+		events = fetch_schedule_for_date("mlb", date_str)
+	except Exception:
+		events = []
+	if not events:
+		return {"force": False, "reason": "no_games_scheduled"}
+
+	if not _mlb_daily_summary_path(date_str).exists():
+		return {"force": True, "reason": "first_appearance"}
+
+	window_minutes = _event_sim_force_window_minutes()
+	if window_minutes > 0 and events_starting_within(events, now_epoch=now_epoch, window_minutes=window_minutes):
+		return {"force": True, "reason": "tip_off_window"}
+
+	last = _read_last_mlb_sim_check()
+	last_epoch = float(last.get("epoch") or 0.0)
+	last_date = str(last.get("date") or "")
+	interval = _mlb_sim_check_interval_seconds()
+	if last_epoch > 0.0 and last_date == date_str and (now_epoch - last_epoch) < interval:
+		return {"force": False, "reason": "within_check_interval"}
+
+	current_fingerprint = _mlb_sim_input_fingerprint(date_str)
+	stored_fingerprint = last.get("fingerprint") if last_date == date_str else None
+	if current_fingerprint != stored_fingerprint:
+		_record_mlb_sim_check(now_epoch, date_str, current_fingerprint, launched=True)
+		return {"force": True, "reason": "fingerprint_change"}
+
+	_record_mlb_sim_check(now_epoch, date_str, current_fingerprint, launched=False)
+	return {"force": False, "reason": "no_change"}
+
+
+def _launch_mlb_daily_sim(date_str: str, decision: dict[str, Any]) -> dict[str, Any]:
+	command = [
+		sys.executable if (sys.executable and Path(sys.executable).exists()) else "python",
+		str(REPO_ROOT / "scripts" / "run_mlb_daily_sim_job.py"),
+		"--date", date_str,
+		"--season", str(int(date_str[:4])),
+		"--sims", str(_mlb_sim_count()),
+		"--workers", str(_mlb_sim_workers()),
+		"--reason", str(decision.get("reason") or ""),
+	]
+	popen_kwargs: dict[str, Any] = {"cwd": str(REPO_ROOT)}
+	if os.name == "nt":
+		popen_kwargs["creationflags"] = getattr(subprocess, "DETACHED_PROCESS", 0) | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+	else:
+		popen_kwargs["start_new_session"] = True
+	try:
+		process = subprocess.Popen(command, **popen_kwargs)
+		print(f"[live_refresh_loop] MLB_DAILY_SIM_TRIGGERED date={date_str} reason={decision.get('reason')} pid={process.pid}", flush=True)
+		return {"ok": True, "pid": process.pid, "command": command, "reason": decision.get("reason")}
+	except Exception as exc:
+		return {"ok": False, "error": f"{type(exc).__name__}: {exc}", "reason": decision.get("reason")}
 
 
 def _live_refresh_loop_phase() -> str:
@@ -434,6 +606,21 @@ def _run_live_refresh_tick() -> dict[str, Any]:
 		"skipMirror": bool(_live_refresh_loop_skip_mirror()),
 		"sports": _live_refresh_loop_sports() or "active",
 	}
+
+	# MLB daily sim is dispatched independently of the odds-refresh call below:
+	# its cadence/gate differs from NBA/WNBA's, and the vendor script's own
+	# PID lock (not ops_refresh's single-active-refresh assertion) is the
+	# correct concurrency guard for it. The launched wrapper publishes its own
+	# results synchronously on completion (see run_mlb_daily_sim_job.py), so
+	# this tick's publish sweep below doesn't need to account for it.
+	try:
+		mlb_decision = _mlb_daily_sim_decision(now_epoch=tick_started_epoch, date_str=selected_date)
+		if mlb_decision.get("force"):
+			meta["mlbDailySim"] = _launch_mlb_daily_sim(selected_date, mlb_decision)
+		else:
+			meta["mlbDailySim"] = {"launched": False, "reason": mlb_decision.get("reason")}
+	except Exception as exc:
+		meta["mlbDailySim"] = {"launched": False, "error": f"{type(exc).__name__}: {exc}"}
 	try:
 		result = launch_refresh_run(
 			date=meta["date"],

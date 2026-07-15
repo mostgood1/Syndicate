@@ -362,6 +362,8 @@ class LiveRefreshLoopTests(unittest.TestCase):
             live_refresh_loop,
             "_read_last_lineup_check",
             return_value={"epoch": 1000.0, "date": "2026-07-13", "fingerprints": {"nba": "a", "wnba": "b"}},
+        ), patch.object(
+            live_refresh_loop, "_any_gated_sport_event_within_force_window", return_value=False
         ), patch.object(live_refresh_loop, "_fetch_injuries") as mocked_fetch, patch.object(
             live_refresh_loop, "_record_lineup_check"
         ) as mocked_record:
@@ -374,6 +376,8 @@ class LiveRefreshLoopTests(unittest.TestCase):
     def test_should_force_sim_rerun_true_on_first_call(self) -> None:
         with patch.object(
             live_refresh_loop, "_read_last_lineup_check", return_value={}
+        ), patch.object(
+            live_refresh_loop, "_any_gated_sport_event_within_force_window", return_value=False
         ), patch.object(live_refresh_loop, "_fetch_injuries", return_value=True), patch.object(
             live_refresh_loop, "_nba_lineup_injury_fingerprint", return_value="a"
         ), patch.object(
@@ -391,6 +395,8 @@ class LiveRefreshLoopTests(unittest.TestCase):
             live_refresh_loop,
             "_read_last_lineup_check",
             return_value={"epoch": 1000.0, "date": "2026-07-13", "fingerprints": {"nba": "a", "wnba": "b"}},
+        ), patch.object(
+            live_refresh_loop, "_any_gated_sport_event_within_force_window", return_value=False
         ), patch.object(live_refresh_loop, "_fetch_injuries", return_value=True), patch.object(
             live_refresh_loop, "_nba_lineup_injury_fingerprint", return_value="a"
         ), patch.object(
@@ -408,6 +414,8 @@ class LiveRefreshLoopTests(unittest.TestCase):
             live_refresh_loop,
             "_read_last_lineup_check",
             return_value={"epoch": 1000.0, "date": "2026-07-13", "fingerprints": {"nba": "a", "wnba": "b"}},
+        ), patch.object(
+            live_refresh_loop, "_any_gated_sport_event_within_force_window", return_value=False
         ), patch.object(live_refresh_loop, "_fetch_injuries", return_value=True), patch.object(
             live_refresh_loop, "_nba_lineup_injury_fingerprint", return_value="a"
         ), patch.object(
@@ -425,6 +433,8 @@ class LiveRefreshLoopTests(unittest.TestCase):
             live_refresh_loop,
             "_read_last_lineup_check",
             return_value={"epoch": 1000.0, "date": "2026-07-12", "fingerprints": {"nba": "a", "wnba": "b"}},
+        ), patch.object(
+            live_refresh_loop, "_any_gated_sport_event_within_force_window", return_value=False
         ), patch.object(live_refresh_loop, "_fetch_injuries", return_value=True), patch.object(
             live_refresh_loop, "_nba_lineup_injury_fingerprint", return_value="a"
         ), patch.object(
@@ -435,6 +445,30 @@ class LiveRefreshLoopTests(unittest.TestCase):
             result = live_refresh_loop._should_force_sim_rerun(now_epoch=1000.0 + 60, date_str="2026-07-13")
 
         self.assertTrue(result)
+
+    def test_should_force_sim_rerun_rechecks_within_tip_off_window_even_inside_interval(self) -> None:
+        # Even when the normal 30-minute interval throttle would otherwise skip
+        # re-checking, a scheduled event within the tip-off force window should
+        # still trigger a real fingerprint re-check (not a blind force=True --
+        # the actual decision still depends on whether the fingerprint changed).
+        with patch.object(
+            live_refresh_loop,
+            "_read_last_lineup_check",
+            return_value={"epoch": 1000.0, "date": "2026-07-13", "fingerprints": {"nba": "a", "wnba": "b"}},
+        ), patch.object(
+            live_refresh_loop, "_any_gated_sport_event_within_force_window", return_value=True
+        ), patch.object(live_refresh_loop, "_fetch_injuries", return_value=True) as mocked_fetch, patch.object(
+            live_refresh_loop, "_nba_lineup_injury_fingerprint", return_value="a"
+        ), patch.object(
+            live_refresh_loop, "_wnba_lineup_injury_fingerprint", return_value="CHANGED"
+        ), patch.object(
+            live_refresh_loop, "_record_lineup_check"
+        ) as mocked_record:
+            result = live_refresh_loop._should_force_sim_rerun(now_epoch=1000.0 + 60, date_str="2026-07-13")
+
+        self.assertTrue(mocked_fetch.called)
+        self.assertTrue(result)
+        mocked_record.assert_called_once_with(1000.0 + 60, "2026-07-13", {"nba": "a", "wnba": "CHANGED"})
 
     def test_run_tick_uses_full_mode_and_forces_refresh_when_lineup_changed(self) -> None:
         with patch.dict(

@@ -55,6 +55,29 @@ HOT_ARTIFACT_PATTERNS: tuple[str, ...] = (
     "*_source/data/processed/cards_props_snapshot_*.json",
     "*_source/data/processed/smart_sim_*.json",
     "*_source/data/market/*.json",
+    # MLB's vendored daily sim (vendor/mlb_bettingv2/tools/daily_update.py,
+    # triggered from live_refresh_loop.py's MLB daily-sim gate) writes under
+    # data/daily/, data/manager/, data/park/, data/umpire/ -- none of which
+    # the processed/live_lens/market patterns above cover. Bulk/historical
+    # paths (data/cache, data/raw/statcast, data/eval/seasons/...) are
+    # deliberately excluded here, consistent with this module's "no
+    # bulk/historical data" constraint above.
+    "*_source/source_artifacts/data/daily/daily_summary_*.json",
+    "*_source/source_artifacts/data/daily/ladders/daily_ladders_*.json",
+    "*_source/source_artifacts/data/daily/top_props/daily_top_props_*.json",
+    "*_source/source_artifacts/data/daily/lineups_last_known_by_team.json",
+    "*_source/source_artifacts/data/manager/manager_tendencies.json",
+    "*_source/source_artifacts/data/manager/probable_pitcher_overrides.json",
+    "*_source/source_artifacts/data/park/park_factors.json",
+    "*_source/source_artifacts/data/umpire/umpire_factors*.json",
+    "*_source/data/daily/daily_summary_*.json",
+    "*_source/data/daily/ladders/daily_ladders_*.json",
+    "*_source/data/daily/top_props/daily_top_props_*.json",
+    "*_source/data/daily/lineups_last_known_by_team.json",
+    "*_source/data/manager/manager_tendencies.json",
+    "*_source/data/manager/probable_pitcher_overrides.json",
+    "*_source/data/park/park_factors.json",
+    "*_source/data/umpire/umpire_factors*.json",
     # Note: reports/intelligence/board_snapshot.json and intelligence_state.json are
     # intentionally excluded here. They're written through refresh_state_store's
     # write_json_file, which already goes over the shared keyvalue (Redis) backend on
