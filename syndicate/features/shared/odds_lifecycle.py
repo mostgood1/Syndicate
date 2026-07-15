@@ -166,9 +166,29 @@ def odds_lifecycle_path(date_str: str) -> Path:
     return odds_lifecycle_root() / f"{date_token}.jsonl"
 
 
+# load_recent_odds_events queries at most a handful of distinct date files per
+# call (days_back defaults to 7); this process has been up for days at a time
+# in production, so without a bound this cache would itself become another
+# unbounded, ever-growing structure -- exactly the failure mode being fixed
+# here. Once full, drop the whole cache rather than tracking real LRU: a miss
+# just means one full re-read of a file already capped to
+# _MAX_JSONL_ROWS_PER_FILE, not the unbounded read this cache exists to avoid.
+_JSONL_ROWS_CACHE_MAX_ENTRIES = 32
+_JSONL_ROWS_CACHE: dict[str, tuple[float, list[dict[str, Any]]]] = {}
+
+
 def _load_jsonl_rows(path: Path) -> list[dict[str, Any]]:
     if not path.exists():
         return []
+    cache_key = str(path)
+    try:
+        mtime = path.stat().st_mtime
+    except Exception:
+        mtime = None
+    if mtime is not None:
+        cached = _JSONL_ROWS_CACHE.get(cache_key)
+        if cached is not None and cached[0] == mtime:
+            return cached[1]
     rows: list[dict[str, Any]] = []
     for line in path.read_text(encoding="utf-8").splitlines():
         line = line.strip()
@@ -182,6 +202,19 @@ def _load_jsonl_rows(path: Path) -> list[dict[str, Any]]:
             rows.append(payload)
     if len(rows) > _MAX_JSONL_ROWS_PER_FILE:
         rows = rows[-_MAX_JSONL_ROWS_PER_FILE:]
+    if mtime is not None:
+        # This file only changes when the odds-refresh subprocess appends new
+        # lifecycle events -- read-only callers (live lens snapshot building,
+        # one call per game/candidate) hit this dozens to hundreds of times
+        # per pass with an unchanged file. Without this cache, capping the
+        # per-call row count above still leaves every one of those calls
+        # re-reading and re-parsing the whole file from disk; CPython's
+        # allocator doesn't reliably return that churn to the OS between
+        # calls, so RSS ratchets upward across a single pass even though each
+        # individual call's retained memory is bounded.
+        if len(_JSONL_ROWS_CACHE) >= _JSONL_ROWS_CACHE_MAX_ENTRIES:
+            _JSONL_ROWS_CACHE.clear()
+        _JSONL_ROWS_CACHE[cache_key] = (mtime, rows)
     return rows
 
 
