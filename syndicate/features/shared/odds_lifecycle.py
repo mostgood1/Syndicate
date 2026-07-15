@@ -18,6 +18,16 @@ from syndicate.features.shared.refresh_state_store import data_root
 
 _ODDS_HISTORY_SHARD_LOOKBACK_DEFAULT = 1
 
+# Per-day cap on how many jsonl rows _load_jsonl_rows keeps in memory. Without
+# this, a day's odds-event log (appended to on every market movement, all day,
+# every day the app has been live) gets read back in full -- and
+# load_recent_odds_events multiplies that by a 7-day lookback, with no caching
+# between calls. Confirmed in production: a single call surfaced a retained
+# list of 1,046,551 dicts and spiked the live-odds-worker's own RSS from
+# ~100MB to ~1.86GB in one tick. Rows are append-ordered, so keeping the most
+# recent N preserves exactly the "recent market history" this data is for.
+_MAX_JSONL_ROWS_PER_FILE = 2000
+
 
 def _odds_history_shard_lookback() -> int:
     raw = str(os.environ.get("SYNDICATE_ODDS_HISTORY_SHARD_LOOKBACK") or "").strip()
@@ -170,6 +180,8 @@ def _load_jsonl_rows(path: Path) -> list[dict[str, Any]]:
             continue
         if isinstance(payload, dict):
             rows.append(payload)
+    if len(rows) > _MAX_JSONL_ROWS_PER_FILE:
+        rows = rows[-_MAX_JSONL_ROWS_PER_FILE:]
     return rows
 
 
