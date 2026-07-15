@@ -1,36 +1,17 @@
 {
   "scope": "daily_update",
-  "date": "2026-07-14",
+  "date": "2026-07-15",
   "runMode": "standard",
-  "overallStatus": "ok",
-  "generatedAt": "2026-07-14T06:44:22.7418901+00:00",
-  "updatedAt": "2026-07-14T06:55:59.2636529+00:00",
-  "runDir": "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-14\\20260714_064422",
+  "overallStatus": "started",
+  "generatedAt": "2026-07-15T06:44:48.8641962+00:00",
+  "updatedAt": "2026-07-15T06:44:49.0516445+00:00",
+  "runDir": "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-15\\20260715_064448",
   "latestDir": "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest",
-  "lastUpdatedAt": "2026-07-14T06:55:59.2579680+00:00",
-  "currentStage": "completed",
-  "completedStages": [
-    "source_update",
-    "refresh_gate"
-  ],
+  "lastUpdatedAt": "2026-07-15T06:44:48.9619545+00:00",
+  "currentStage": "queued",
+  "completedStages": [],
   "failedStage": null,
   "stageDecisions": [
-    {
-      "stage": "source_update",
-      "sport": "mlb",
-      "workflow": "vendored_daily_update",
-      "name": "MLB vendored daily update",
-      "decision": "planned",
-      "status": "pending"
-    },
-    {
-      "stage": "source_update",
-      "sport": "mlb",
-      "workflow": "syndicate_refresh",
-      "name": "MLB current-day live-lens refresh",
-      "decision": "planned",
-      "status": "pending"
-    },
     {
       "stage": "source_update",
       "sport": "wnba",
@@ -79,18 +60,8 @@
     }
   ],
   "provenance": {
-    "sourceStepCount": 4,
+    "sourceStepCount": 2,
     "sourceSteps": [
-      {
-        "sport": "mlb",
-        "workflow": "vendored_daily_update",
-        "name": "MLB vendored daily update"
-      },
-      {
-        "sport": "mlb",
-        "workflow": "syndicate_refresh",
-        "name": "MLB current-day live-lens refresh"
-      },
       {
         "sport": "wnba",
         "workflow": "vendored_daily_update",
@@ -105,7 +76,7 @@
     "latestManifestLoaded": true,
     "latestEventSimExecutionPlanCount": 21,
     "latestArtifactUpdateCount": 21,
-    "oddsHistoryTriggerPlanCount": 4,
+    "oddsHistoryTriggerPlanCount": 2,
     "simExecutionDecision": true
   },
   "trace": {
