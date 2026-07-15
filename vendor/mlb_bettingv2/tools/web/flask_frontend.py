@@ -17309,8 +17309,28 @@ def _live_lens_reports_payload(d: str, *, include_archive: bool = False, slim: b
     }
 
 
+def _log_memory_checkpoint(stage: str, **extra: Any) -> None:
+    # This background loop runs independently of live_refresh_loop.py's own
+    # tick, in the same live-odds-worker process, with no memory
+    # instrumentation of its own -- the main tick's RSS stays flat at every
+    # checkpoint while the container still restarts roughly once per cycle
+    # with nothing visible in between, and this loop is the other leading
+    # candidate for where that gap is going. Import lazily and fail silent:
+    # this vendored module is loaded from a sys.path-adjusted entrypoint that
+    # makes the Syndicate package importable, but that isn't guaranteed for
+    # every context this file could run in.
+    try:
+        from syndicate.features.shared.memory_observability import log_all_process_memory
+
+        log_all_process_memory(stage, **extra)
+    except Exception:
+        pass
+
+
 def _persist_live_lens_tick(d: str, *, trigger: str = "api", refresh_markets: bool = True) -> Dict[str, Any]:
+    _log_memory_checkpoint("mlb_live_lens_persist_before", date=str(d), trigger=str(trigger))
     payload = _live_lens_payload(d, persist=True, refresh_markets=False)
+    _log_memory_checkpoint("mlb_live_lens_persist_after_payload", date=str(d), trigger=str(trigger))
     performance = payload.get("performance") if isinstance(payload.get("performance"), dict) else {}
     meta = {
         "recordedAt": _local_timestamp_text(),

@@ -13,6 +13,7 @@ from syndicate.features.mlb.live_lens import validate_live_lens_snapshot as _mlb
 from syndicate.features.nba.live_lens import build_live_lens_snapshot as _nba_build
 from syndicate.features.nba.live_lens import live_lens_snapshot_path as _nba_snapshot_path
 from syndicate.features.nba.live_lens import validate_live_lens_snapshot as _nba_validate
+from syndicate.features.shared.memory_observability import log_all_process_memory
 from syndicate.features.shared.refresh_state_store import read_json_file
 from syndicate.features.shared.refresh_state_store import reports_root
 from syndicate.features.shared.refresh_state_store import write_json_file
@@ -162,11 +163,19 @@ def _live_lens_loop_interval_seconds() -> int:
 
 def _run_live_lens_tick_for_sport(sport: str, date_str: str) -> dict[str, Any]:
 	meta: dict[str, Any] = {"sport": sport, "date": date_str, "startedAt": _utc_now()}
+	# This loop runs independently of live_refresh_loop.py's own tick, on its own
+	# interval, in the same process (live-odds-worker) -- and had no memory
+	# instrumentation of its own. Confirmed elsewhere that the main tick's RSS
+	# stays flat (~100-110MB) at every checkpoint while the container still
+	# restarts roughly once per cycle with nothing visible in between; this is
+	# the leading remaining candidate for where that gap is going.
 	try:
+		log_all_process_memory(f"live_lens_tick_before_{sport}", sport=sport, date=date_str)
 		builder = _LIVE_LENS_BUILDERS[sport]
 		validator = _LIVE_LENS_VALIDATORS[sport]
 		path_fn = _LIVE_LENS_SNAPSHOT_PATHS[sport]
 		snapshot = builder(date_str)
+		log_all_process_memory(f"live_lens_tick_after_build_{sport}", sport=sport, date=date_str)
 		if not validator(snapshot):
 			meta["ok"] = False
 			meta["skipped"] = True
@@ -180,6 +189,7 @@ def _run_live_lens_tick_for_sport(sport: str, date_str: str) -> dict[str, Any]:
 		meta["error"] = f"{type(exc).__name__}: {exc}"
 	finally:
 		meta["finishedAt"] = _utc_now()
+		log_all_process_memory(f"live_lens_tick_after_{sport}", sport=sport, date=date_str, ok=bool(meta.get("ok")))
 	return meta
 
 
