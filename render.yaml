@@ -38,6 +38,8 @@ services:
         value: 77ae1c35140c82da1675af85dde36a44
       - key: SYNDICATE_REFRESH_LAUNCH_MODE
         value: detached_subprocess
+      - key: SYNDICATE_WEB_DYNO
+        value: "true"
       - key: SYNDICATE_REQUIRE_HOSTED_STORAGE
         value: "true"
       - key: SYNDICATE_REFRESH_STATE_BACKEND
@@ -166,6 +168,8 @@ services:
         value: 77ae1c35140c82da1675af85dde36a44
       - key: SYNDICATE_REFRESH_LAUNCH_MODE
         value: detached_subprocess
+      - key: SYNDICATE_WEB_DYNO
+        value: "false"
       - key: SYNDICATE_REQUIRE_HOSTED_STORAGE
         value: "true"
       - key: SYNDICATE_REFRESH_STATE_BACKEND
@@ -295,6 +299,8 @@ services:
         value: 77ae1c35140c82da1675af85dde36a44
       - key: SYNDICATE_REFRESH_LAUNCH_MODE
         value: detached_subprocess
+      - key: SYNDICATE_WEB_DYNO
+        value: "false"
       - key: SYNDICATE_REQUIRE_HOSTED_STORAGE
         value: "true"
       - key: SYNDICATE_REFRESH_STATE_BACKEND

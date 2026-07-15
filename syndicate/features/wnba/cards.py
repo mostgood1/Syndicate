@@ -73,6 +73,20 @@ def _cache_put_context(cache_key: tuple[Any, ...], result: dict[str, Any]) -> No
 
 
 def _render_web_dyno() -> bool:
+    # RENDER / RENDER_EXTERNAL_URL / RENDER_SERVICE_ID are injected by Render
+    # on every service type (web *and* background workers), so they can't
+    # distinguish "am I the request-serving web dyno" from "am I a worker
+    # script calling into this module directly" -- that ambiguity previously
+    # made worker-side snapshot builders (e.g. _export_live_snapshot_artifacts
+    # in refresh_wnba_oddsapi_props.py calling build_live_state_payload) take
+    # the "just return whatever's cached" branch below meant only for actual
+    # web requests, so a stale snapshot got read back and rewritten forever
+    # instead of ever being recomputed. SYNDICATE_WEB_DYNO is an explicit,
+    # unambiguous override set only on the web service in render.yaml; fall
+    # back to the old heuristic when it's unset (local dev, other hosts).
+    explicit = str(os.environ.get("SYNDICATE_WEB_DYNO") or "").strip().lower()
+    if explicit:
+        return explicit in {"1", "true", "yes", "on"}
     return bool(
         str(os.environ.get("RENDER") or "").strip().lower() in {"1", "true", "yes", "on"}
         or str(os.environ.get("RENDER_EXTERNAL_URL") or "").strip()
@@ -4578,6 +4592,15 @@ def build_live_state_payload(selected_date: str, ttl: int = 12, *, allow_stored_
     }))
 
 
+# Above this age, a cached live_state snapshot for a slate that isn't fully
+# final yet is no longer trustworthy on its own -- a game's status/score can
+# legitimately change within minutes, so a snapshot this old is more likely
+# evidence the writer has stalled (see _render_web_dyno) than evidence
+# nothing changed. Fully-final slates are exempt below since a final score
+# doesn't go stale.
+_LIVE_STATE_STALE_AFTER_SECONDS = 600
+
+
 def _payload_has_meaningful_live_state(payload: dict[str, Any] | None) -> bool:
     if not isinstance(payload, dict):
         return False
@@ -4586,6 +4609,7 @@ def _payload_has_meaningful_live_state(payload: dict[str, Any] | None) -> bool:
         return False
     saw_final = False
     saw_valid_live = False
+    saw_non_final = False
     for game in games:
         if not isinstance(game, dict):
             continue
@@ -4601,6 +4625,7 @@ def _payload_has_meaningful_live_state(payload: dict[str, Any] | None) -> bool:
         if bool(status_fields.get("final")):
             saw_final = True
             continue
+        saw_non_final = True
         if bool(status_fields.get("in_progress")) and (
             status_fields.get("period") is not None
             or bool(status_fields.get("clock"))
@@ -4619,7 +4644,15 @@ def _payload_has_meaningful_live_state(payload: dict[str, Any] | None) -> bool:
             continue
         if _safe_float(game.get("home_pts")) is not None or _safe_float(game.get("away_pts")) is not None:
             saw_final = True
-    return saw_final or saw_valid_live
+    if not (saw_final or saw_valid_live):
+        return False
+    if saw_non_final:
+        generated_at = _parse_utc_datetime(payload.get("generated_at"))
+        if generated_at is not None:
+            age_seconds = (datetime.now(timezone.utc) - generated_at).total_seconds()
+            if age_seconds > _LIVE_STATE_STALE_AFTER_SECONDS:
+                return False
+    return True
 
 
 def build_live_player_boxscore_payload(
@@ -4676,7 +4709,7 @@ def build_live_player_lens_payload(
     allow_stored_date_fallback: bool = True,
 ) -> dict[str, Any]:
     normalized_event_ids = [str(event_id).strip() for event_id in event_ids if str(event_id).strip()]
-    log_runtime_memory("build_live_lines_payload_start", selected_date=selected_date, ttl=int(ttl), event_count=len(normalized_event_ids), include_period_totals=bool(include_period_totals))
+    log_runtime_memory("build_live_player_lens_payload_start", selected_date=selected_date, ttl=int(ttl), event_count=len(normalized_event_ids))
     if not normalized_event_ids:
         normalized_event_ids = _default_live_event_ids(
             selected_date,
