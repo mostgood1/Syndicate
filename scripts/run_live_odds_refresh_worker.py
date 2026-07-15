@@ -92,8 +92,7 @@ def _rss_bytes() -> int | None:
 
 def _largest_gc_object_summary() -> dict[str, object] | None:
     largest_size = -1
-    largest_type = None
-    largest_len = None
+    largest_obj: object = None
     try:
         for obj in gc.get_objects():
             try:
@@ -103,18 +102,37 @@ def _largest_gc_object_summary() -> dict[str, object] | None:
             if size <= largest_size:
                 continue
             largest_size = size
-            largest_type = type(obj).__name__
-            try:
-                largest_len = len(obj) if hasattr(obj, "__len__") else None
-            except Exception:
-                largest_len = None
+            largest_obj = obj
     except Exception:
         return None
     if largest_size < 0:
         return None
+    largest_type = type(largest_obj).__name__
+    try:
+        largest_len = len(largest_obj) if hasattr(largest_obj, "__len__") else None
+    except Exception:
+        largest_len = None
     payload: dict[str, object] = {"type": largest_type, "size_bytes": largest_size}
     if largest_len is not None:
         payload["len"] = largest_len
+    # A container this big is a memory-spike smoking gun on its own, but "type
+    # + len" alone isn't enough to trace it back to a call site. Sample its
+    # shape so a future spike is identifiable straight from the log line
+    # instead of needing another guess-and-deploy round to add this after
+    # the fact.
+    if largest_len and largest_len > 1000:
+        try:
+            if isinstance(largest_obj, (list, tuple)):
+                sample = largest_obj[0]
+                if isinstance(sample, dict):
+                    payload["sample_keys"] = sorted(str(key) for key in sample.keys())[:20]
+                else:
+                    payload["sample_repr"] = repr(sample)[:200]
+            elif isinstance(largest_obj, dict):
+                keys = list(largest_obj.keys())
+                payload["sample_keys"] = [str(key) for key in keys[:20]]
+        except Exception:
+            pass
     return payload
 
 
