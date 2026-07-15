@@ -2993,7 +2993,14 @@ def _apply_player_priors_local(*, smart_sim_module, team_df, priors, team_tri: s
     # capped/rescaled to a regulation team total, inflating headcount and scoring. Re-cap here
     # so every path into this function ends up with a realistic total regardless of source.
     sim_min_total = float(pd.to_numeric(out["_sim_min"], errors="coerce").fillna(0.0).sum())
-    if sim_min_total > 0.0 and not np.isclose(sim_min_total, float(league.regulation_team_minutes), atol=1.0):
+    _minutes_cap_triggered = sim_min_total > 0.0 and not np.isclose(sim_min_total, float(league.regulation_team_minutes), atol=1.0)
+    print(
+        f"APPLY_PLAYER_PRIORS_LOCAL team_tri={team_tri} date_str={date_str} n_players={len(out)} "
+        f"raw_total_minutes={round(sim_min_total, 1)} regulation_target={league.regulation_team_minutes} "
+        f"cap_guardrail_triggered={_minutes_cap_triggered}",
+        flush=True,
+    )
+    if _minutes_cap_triggered:
         caps = minutes_caps_from_team_df(out, base_minutes=out["_sim_min"])
         out["_sim_min"] = cap_and_redistribute_minutes(
             out["_sim_min"], total_target=league.regulation_team_minutes, cap=caps, iters=12
