@@ -38,7 +38,23 @@ HOT_ARTIFACT_PATTERNS: tuple[str, ...] = (
     "*_source/source_artifacts/data/processed/game_cards_*.csv",
     "*_source/source_artifacts/data/processed/cards_sim_detail_*.json",
     "*_source/source_artifacts/data/processed/cards_props_snapshot_*.json",
+    "*_source/source_artifacts/data/processed/smart_sim_*.json",
     "*_source/source_artifacts/data/market/*.json",
+    # Same set again, one directory shallower: some sports (confirmed for WNBA)
+    # write their processed artifacts straight to "<sport>_source/data/processed/"
+    # rather than nesting under a "source_artifacts" nested root, so the patterns
+    # above alone silently match zero files for those sports.
+    "*_source/data/live_lens/live_lens_report_*.json",
+    "*_source/data/live_lens/render_sync/*.json",
+    "*_source/data/processed/recommendations*.json",
+    "*_source/data/processed/recommendations*.csv",
+    "*_source/data/processed/props_recommendations*.json",
+    "*_source/data/processed/props_recommendations*.csv",
+    "*_source/data/processed/game_cards_*.csv",
+    "*_source/data/processed/cards_sim_detail_*.json",
+    "*_source/data/processed/cards_props_snapshot_*.json",
+    "*_source/data/processed/smart_sim_*.json",
+    "*_source/data/market/*.json",
     # Note: reports/intelligence/board_snapshot.json and intelligence_state.json are
     # intentionally excluded here. They're written through refresh_state_store's
     # write_json_file, which already goes over the shared keyvalue (Redis) backend on
