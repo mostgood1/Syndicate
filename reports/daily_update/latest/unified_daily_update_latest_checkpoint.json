@@ -2,13 +2,13 @@
   "scope": "daily_update",
   "date": "2026-07-15",
   "runMode": "standard",
-  "overallStatus": "started",
+  "overallStatus": "ok",
   "generatedAt": "2026-07-15T06:44:48.8641962+00:00",
-  "updatedAt": "2026-07-15T06:55:48.2879303+00:00",
+  "updatedAt": "2026-07-15T06:55:54.8092284+00:00",
   "runDir": "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-15\\20260715_064448",
   "latestDir": "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest",
-  "lastUpdatedAt": "2026-07-15T06:55:48.2792987+00:00",
-  "currentStage": "queued",
+  "lastUpdatedAt": "2026-07-15T06:55:54.8051203+00:00",
+  "currentStage": "completed",
   "completedStages": [
     "source_update",
     "refresh_gate"

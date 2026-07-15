@@ -2,20 +2,20 @@
   "scope": "daily_update",
   "date": "2026-07-15",
   "runMode": "standard",
-  "overallStatus": "started",
+  "overallStatus": "ok",
   "generatedAt": "2026-07-15T06:44:48.8641962+00:00",
-  "updatedAt": "2026-07-15T06:55:48.2800950+00:00",
+  "updatedAt": "2026-07-15T06:55:54.8057587+00:00",
   "runManifestPath": "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-15\\20260715_064448\\unified_daily_update_run.json",
   "latestManifestPath": "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest.json",
   "runCheckpointPath": "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-15\\20260715_064448\\unified_daily_update_checkpoint.json",
   "latestCheckpointPath": "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest_checkpoint.json",
-  "currentStage": "queued",
+  "currentStage": "completed",
   "completedStages": [
     "source_update",
     "refresh_gate"
   ],
   "failedStage": null,
-  "lastUpdatedAt": "2026-07-15T06:55:48.2792987+00:00",
+  "lastUpdatedAt": "2026-07-15T06:55:54.8051203+00:00",
   "replayContext": {
     "latestCheckpointLoaded": true,
     "latestCheckpointPath": "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest_checkpoint.json",
@@ -112,8 +112,391 @@
     ],
     "simExecutionDecision": true
   },
-  "simulationContractPath": null,
-  "simulationContractRunPath": null,
-  "simulationContractSportCount": null,
-  "simulationContractAdvancedBySport": null
+  "simulationContractPath": "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest_simulation_contract.json",
+  "simulationContractRunPath": "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-07-15\\20260715_064448\\unified_daily_update_simulation_contract.json",
+  "simulationContractSportCount": 1,
+  "simulationContractAdvancedBySport": {
+    "wnba": {
+      "page": {
+        "scoreboard_items": [
+          {
+            "target_id": "game-04db11d33553fba68fc607aaf009071aa",
+            "label": "LAS @ MIN",
+            "status": "2026-07-15"
+          },
+          {
+            "target_id": "game-08eace0d4309db9d618e7ba857166324b",
+            "label": "GSV @ IND",
+            "status": "2026-07-15"
+          },
+          {
+            "target_id": "game-0dd23179c4373849ae1da8476ec21def3",
+            "label": "SEA @ CHI",
+            "status": "2026-07-15"
+          }
+        ],
+        "module_links": [
+          {
+            "label": "Cards",
+            "href": "/wnba/cards?date=2026-07-15",
+            "active": true
+          },
+          {
+            "label": "Betting Card",
+            "href": "/wnba/season/2026/betting-card?date=2026-07-15",
+            "active": false
+          },
+          {
+            "label": "Picks",
+            "href": "/wnba/picks?date=2026-07-15",
+            "active": false
+          },
+          {
+            "label": "Props",
+            "href": "/wnba/props?date=2026-07-15",
+            "active": false
+          },
+          {
+            "label": "Live Lens",
+            "href": "/wnba/live-lens?date=2026-07-15",
+            "active": false
+          },
+          {
+            "label": "Daily Archive",
+            "href": "/wnba/archive?date=2026-07-15",
+            "active": false
+          },
+          {
+            "label": "Hub",
+            "href": "/wnba/hub",
+            "active": false
+          }
+        ],
+        "cards_control_links": [
+          {
+            "label": "Betting Card",
+            "href": "/wnba/season/2026/betting-card?date=2026-07-15"
+          },
+          {
+            "label": "Props",
+            "href": "/wnba/props?date=2026-07-15"
+          },
+          {
+            "label": "Live Lens",
+            "href": "/wnba/live-lens?date=2026-07-15"
+          }
+        ],
+        "source_path": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\data\\processed\\game_cards_2026-07-15.csv | espn_scoreboard_fallback",
+        "source_title": "WNBA processed game cards + live scoreboard supplement",
+        "wnba_advanced_contract": {
+          "available": true,
+          "sport": "wnba",
+          "selection": {
+            "kind": "date",
+            "requested": "2026-07-15",
+            "resolved": "2026-07-15"
+          },
+          "source": {
+            "title": "WNBA processed game cards + live scoreboard supplement",
+            "path": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\data\\processed\\game_cards_2026-07-15.csv | espn_scoreboard_fallback",
+            "mode": "live"
+          },
+          "freshness": {
+            "requested": "2026-07-15",
+            "resolved": "2026-07-15",
+            "selection_kind": "date",
+            "is_current_day": true,
+            "is_stale": false,
+            "lookahead_applied": false
+          },
+          "coverage": {
+            "games_with_sim": 3,
+            "games_with_periods": 0,
+            "games_with_intervals": 3,
+            "games_with_players": 3,
+            "games_with_injuries": 3,
+            "games_with_props": 3
+          },
+          "game_count": 3,
+          "games": [
+            {
+              "game_id": "04db11d33553fba68fc607aaf009071aa",
+              "event_id": "401857069",
+              "matchup": {
+                "away": {
+                  "tri": "LAS",
+                  "name": "Los Angeles Sparks"
+                },
+                "home": {
+                  "tri": "MIN",
+                  "name": "Minnesota Lynx"
+                }
+              },
+              "status": {
+                "status": "{'status': 'Scheduled', 'detail': '2026-07-15', 'startTime': '2026-07-15', 'in_progress': False, 'final': False, 'period': None, 'clock': ''}",
+                "detail": "2026-07-15",
+                "live": false,
+                "final": false
+              },
+              "market": {
+                "home_ml": 220.0,
+                "away_ml": -220.0,
+                "home_spread": 5.0,
+                "total": 193.0,
+                "p_home_win": 0.3123338620394767,
+                "p_away_win": 0.6876661379605233,
+                "p_home_cover": 0.4956667751572343,
+                "p_total_over": 0.498571432458685
+              },
+              "simulation": {
+                "score": {
+                  "away_mean": 99.035,
+                  "home_mean": 93.905,
+                  "total_mean": 192.94,
+                  "margin_mean": -5.13
+                },
+                "periods": {},
+                "intervals": {
+                  "quarters": "",
+                  "halves": ""
+                },
+                "quarters": [],
+                "players_summary": {
+                  "away": 10,
+                  "home": 11,
+                  "missing_away": 0,
+                  "missing_home": 0,
+                  "injured_away": 0,
+                  "injured_home": 0
+                },
+                "players": {
+                  "away": "         ",
+                  "home": "          "
+                },
+                "missing_prop_players": {
+                  "away": "",
+                  "home": ""
+                },
+                "injuries": {
+                  "away": "",
+                  "home": ""
+                },
+                "pregame_context": {
+                  "home_injuries_out": 0,
+                  "away_injuries_out": 0,
+                  "home_pace": 79.5,
+                  "away_pace": 79.5,
+                  "home_b2b": false,
+                  "away_b2b": false
+                }
+              },
+              "props": {
+                "prop_recommendations": {
+                  "away": "    ",
+                  "home": "    "
+                },
+                "game_market_recommendations": [
+                  "@{market_label=PROPS; display_pick=Olivia Miles UNDER 1.5; selection=UNDER 1.5; p_win=0.590163934426229; ev_pct=51.1170015341648; basketball_summary=Prop projection -; why_explain=Prop projection -; historical_context=; confidence=; line=; market_line=; price=-144; card_bucket=playable; recommendation_priority_score=51.1170015341648; score=51.1170015341648; stake_amount=; stake_units=; portfolio_rank=; portfolio_score=; evidence_pack=}",
+                  "@{market_label=PROPS; display_pick=Rae Burrell UNDER 14.5; selection=UNDER 14.5; p_win=0.504950495049505; ev_pct=43.47669672931; basketball_summary=Prop projection -; why_explain=Prop projection -; historical_context=; confidence=; line=; market_line=; price=-102; card_bucket=playable; recommendation_priority_score=43.47669672931; score=43.47669672931; stake_amount=; stake_units=; portfolio_rank=; portfolio_score=; evidence_pack=}",
+                  "@{market_label=PROPS; display_pick=Natasha Howard OVER 2.5; selection=OVER 2.5; p_win=0.523809523809524; ev_pct=11.8973938534765; basketball_summary=Prop projection -; why_explain=Prop projection -; historical_context=; confidence=; line=; market_line=; price=-110; card_bucket=playable; recommendation_priority_score=11.8973938534765; score=11.8973938534765; stake_amount=; stake_units=; portfolio_rank=; portfolio_score=; evidence_pack=}"
+                ]
+              },
+              "coverage": {
+                "has_simulation": true,
+                "has_periods": false,
+                "has_intervals": true,
+                "has_players": true,
+                "has_injuries": true,
+                "has_pregame_context": true
+              }
+            },
+            {
+              "game_id": "08eace0d4309db9d618e7ba857166324b",
+              "event_id": "401857070",
+              "matchup": {
+                "away": {
+                  "tri": "GSV",
+                  "name": "Golden State Valkyries"
+                },
+                "home": {
+                  "tri": "IND",
+                  "name": "Indiana Fever"
+                }
+              },
+              "status": {
+                "status": "{'status': 'Scheduled', 'detail': '2026-07-15', 'startTime': '2026-07-15', 'in_progress': False, 'final': False, 'period': None, 'clock': ''}",
+                "detail": "2026-07-15",
+                "live": false,
+                "final": false
+              },
+              "market": {
+                "home_ml": -4900.0,
+                "away_ml": 4900.0,
+                "home_spread": -36.0,
+                "total": 204.0,
+                "p_home_win": 0.9961559779231861,
+                "p_away_win": 0.003844022076813891,
+                "p_home_cover": 0.5040999081078047,
+                "p_total_over": 0.5045951087209066
+              },
+              "simulation": {
+                "score": {
+                  "away_mean": 84.035,
+                  "home_mean": 120.158,
+                  "total_mean": 204.193,
+                  "margin_mean": 36.123
+                },
+                "periods": {},
+                "intervals": {
+                  "quarters": "",
+                  "halves": ""
+                },
+                "quarters": [],
+                "players_summary": {
+                  "away": 10,
+                  "home": 15,
+                  "missing_away": 0,
+                  "missing_home": 0,
+                  "injured_away": 0,
+                  "injured_home": 0
+                },
+                "players": {
+                  "away": "         ",
+                  "home": "              "
+                },
+                "missing_prop_players": {
+                  "away": "",
+                  "home": ""
+                },
+                "injuries": {
+                  "away": "",
+                  "home": ""
+                },
+                "pregame_context": {
+                  "home_injuries_out": 0,
+                  "away_injuries_out": 0,
+                  "home_pace": 79.5,
+                  "away_pace": 79.5,
+                  "home_b2b": false,
+                  "away_b2b": false
+                }
+              },
+              "props": {
+                "prop_recommendations": {
+                  "away": "    ",
+                  "home": "    "
+                },
+                "game_market_recommendations": [
+                  "@{market_label=PROPS; display_pick=Kelsey Mitchell UNDER 2.5; selection=UNDER 2.5; p_win=0.539170506912442; ev_pct=35.0774970072653; basketball_summary=Prop projection -; why_explain=Prop projection -; historical_context=; confidence=; line=; market_line=; price=-117; card_bucket=playable; recommendation_priority_score=35.0774970072653; score=35.0774970072653; stake_amount=; stake_units=; portfolio_rank=; portfolio_score=; evidence_pack=}",
+                  "@{market_label=PROPS; display_pick=Caitlin Clark OVER 22.5; selection=OVER 22.5; p_win=0.530516431924883; ev_pct=16.9049602967413; basketball_summary=Prop projection -; why_explain=Prop projection -; historical_context=; confidence=; line=; market_line=; price=-113; card_bucket=playable; recommendation_priority_score=16.9049602967413; score=16.9049602967413; stake_amount=; stake_units=; portfolio_rank=; portfolio_score=; evidence_pack=}",
+                  "@{market_label=PROPS; display_pick=Veronica Burton OVER 17.5; selection=OVER 17.5; p_win=0.519230769230769; ev_pct=10.6361986148116; basketball_summary=Prop projection -; why_explain=Prop projection -; historical_context=; confidence=; line=; market_line=; price=-108; card_bucket=playable; recommendation_priority_score=10.6361986148116; score=10.6361986148116; stake_amount=; stake_units=; portfolio_rank=; portfolio_score=; evidence_pack=}"
+                ]
+              },
+              "coverage": {
+                "has_simulation": true,
+                "has_periods": false,
+                "has_intervals": true,
+                "has_players": true,
+                "has_injuries": true,
+                "has_pregame_context": true
+              }
+            },
+            {
+              "game_id": "0dd23179c4373849ae1da8476ec21def3",
+              "event_id": "401857068",
+              "matchup": {
+                "away": {
+                  "tri": "SEA",
+                  "name": "Seattle Storm"
+                },
+                "home": {
+                  "tri": "CHI",
+                  "name": "Chicago Sky"
+                }
+              },
+              "status": {
+                "status": "{'status': 'Scheduled', 'detail': '2026-07-15', 'startTime': '2026-07-15', 'in_progress': False, 'final': False, 'period': None, 'clock': ''}",
+                "detail": "2026-07-15",
+                "live": false,
+                "final": false
+              },
+              "market": {
+                "home_ml": -514.0,
+                "away_ml": 514.0,
+                "home_spread": -10.5,
+                "total": 230.5,
+                "p_home_win": 0.8371577754319236,
+                "p_away_win": 0.1628422245680764,
+                "p_home_cover": 0.5047331919414635,
+                "p_total_over": 0.49509539541229436
+              },
+              "simulation": {
+                "score": {
+                  "away_mean": 109.826,
+                  "home_mean": 120.468,
+                  "total_mean": 230.294,
+                  "margin_mean": 10.642
+                },
+                "periods": {},
+                "intervals": {
+                  "quarters": "",
+                  "halves": ""
+                },
+                "quarters": [],
+                "players_summary": {
+                  "away": 13,
+                  "home": 17,
+                  "missing_away": 0,
+                  "missing_home": 0,
+                  "injured_away": 0,
+                  "injured_home": 0
+                },
+                "players": {
+                  "away": "            ",
+                  "home": "                "
+                },
+                "missing_prop_players": {
+                  "away": "",
+                  "home": ""
+                },
+                "injuries": {
+                  "away": "",
+                  "home": ""
+                },
+                "pregame_context": {
+                  "home_injuries_out": 0,
+                  "away_injuries_out": 0,
+                  "home_pace": 79.5,
+                  "away_pace": 79.5,
+                  "home_b2b": false,
+                  "away_b2b": false
+                }
+              },
+              "props": {
+                "prop_recommendations": {
+                  "away": "    ",
+                  "home": "   "
+                },
+                "game_market_recommendations": [
+                  "@{market_label=PROPS; display_pick=Awa Fam UNDER 1.5; selection=UNDER 1.5; p_win=0.555555555555556; ev_pct=67.9747036473684; basketball_summary=Prop projection -; why_explain=Prop projection -; historical_context=; confidence=; line=; market_line=; price=-125; card_bucket=playable; recommendation_priority_score=67.9747036473684; score=67.9747036473684; stake_amount=; stake_units=; portfolio_rank=; portfolio_score=; evidence_pack=}",
+                  "@{market_label=PROPS; display_pick=Azura Stevens UNDER 13.5; selection=UNDER 13.5; p_win=0.54954954954955; ev_pct=31.9262060356626; basketball_summary=Prop projection -; why_explain=Prop projection -; historical_context=; confidence=; line=; market_line=; price=-122; card_bucket=playable; recommendation_priority_score=31.9262060356626; score=31.9262060356626; stake_amount=; stake_units=; portfolio_rank=; portfolio_score=; evidence_pack=}",
+                  "@{market_label=PROPS; display_pick=Flau'jae Johnson UNDER 8.5; selection=UNDER 8.5; p_win=0.523809523809524; ev_pct=13.953964245319; basketball_summary=Prop projection -; why_explain=Prop projection -; historical_context=; confidence=; line=; market_line=; price=-110; card_bucket=playable; recommendation_priority_score=13.953964245319; score=13.953964245319; stake_amount=; stake_units=; portfolio_rank=; portfolio_score=; evidence_pack=}"
+                ]
+              },
+              "coverage": {
+                "has_simulation": true,
+                "has_periods": false,
+                "has_intervals": true,
+                "has_players": true,
+                "has_injuries": true,
+                "has_pregame_context": true
+              }
+            }
+          ]
+        }
+      },
+      "game": {},
+      "available": true
+    }
+  }
 }

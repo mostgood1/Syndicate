@@ -1,0 +1,219 @@
+{
+  "date": "2026-07-15",
+  "counts": {
+    "games": 3,
+    "picks": 9
+  },
+  "per_game": [
+    {
+      "home": "MIN",
+      "away": "LAS",
+      "matchup": "LAS @ MIN",
+      "picks": [
+        {
+          "market": "PROPS",
+          "team": "MIN",
+          "display_pick": "Olivia Miles UNDER 1.5",
+          "selection": "UNDER 1.5",
+          "projection": 0.2636376438727149,
+          "projected": 0.2636376438727149,
+          "odds": -144.0,
+          "price": -144.0,
+          "score": 51.117001534164764,
+          "ev_pct": 51.117001534164764,
+          "win_prob": 0.5901639344262295,
+          "p_win": 0.5901639344262295,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 51.1%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "LAS @ MIN"
+        },
+        {
+          "market": "PROPS",
+          "team": "LAS",
+          "display_pick": "Rae Burrell UNDER 14.5",
+          "selection": "UNDER 14.5",
+          "projection": 8.226144000000001,
+          "projected": 8.226144000000001,
+          "odds": -102.0,
+          "price": -102.0,
+          "score": 43.476696729309985,
+          "ev_pct": 43.476696729309985,
+          "win_prob": 0.504950495049505,
+          "p_win": 0.504950495049505,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 43.5%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "LAS @ MIN"
+        },
+        {
+          "market": "PROPS",
+          "team": "MIN",
+          "display_pick": "Natasha Howard OVER 2.5",
+          "selection": "OVER 2.5",
+          "projection": 4.079481846882399,
+          "projected": 4.079481846882399,
+          "odds": -110.0,
+          "price": -110.0,
+          "score": 11.897393853476522,
+          "ev_pct": 11.897393853476522,
+          "win_prob": 0.5238095238095238,
+          "p_win": 0.5238095238095238,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 11.9%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "LAS @ MIN"
+        }
+      ]
+    },
+    {
+      "home": "IND",
+      "away": "GSV",
+      "matchup": "GSV @ IND",
+      "picks": [
+        {
+          "market": "PROPS",
+          "team": "IND",
+          "display_pick": "Kelsey Mitchell UNDER 2.5",
+          "selection": "UNDER 2.5",
+          "projection": 1.8923264285714283,
+          "projected": 1.8923264285714283,
+          "odds": -117.0,
+          "price": -117.0,
+          "score": 35.07749700726532,
+          "ev_pct": 35.07749700726532,
+          "win_prob": 0.5391705069124424,
+          "p_win": 0.5391705069124424,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 35.1%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "GSV @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "IND",
+          "display_pick": "Caitlin Clark OVER 22.5",
+          "selection": "OVER 22.5",
+          "projection": 32.077535714285716,
+          "projected": 32.077535714285716,
+          "odds": -113.0,
+          "price": -113.0,
+          "score": 16.9049602967413,
+          "ev_pct": 16.9049602967413,
+          "win_prob": 0.5305164319248826,
+          "p_win": 0.5305164319248826,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 16.9%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "GSV @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "GSV",
+          "display_pick": "Veronica Burton OVER 17.5",
+          "selection": "OVER 17.5",
+          "projection": 20.409100387096778,
+          "projected": 20.409100387096778,
+          "odds": -108.0,
+          "price": -108.0,
+          "score": 10.636198614811597,
+          "ev_pct": 10.636198614811597,
+          "win_prob": 0.5192307692307693,
+          "p_win": 0.5192307692307693,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 10.6%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "GSV @ IND"
+        }
+      ]
+    },
+    {
+      "home": "CHI",
+      "away": "SEA",
+      "matchup": "SEA @ CHI",
+      "picks": [
+        {
+          "market": "PROPS",
+          "team": "SEA",
+          "display_pick": "Awa Fam UNDER 1.5",
+          "selection": "UNDER 1.5",
+          "projection": 0.0,
+          "projected": 0.0,
+          "odds": -125.0,
+          "price": -125.0,
+          "score": 67.9747036473684,
+          "ev_pct": 67.9747036473684,
+          "win_prob": 0.5555555555555556,
+          "p_win": 0.5555555555555556,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 68.0%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "SEA @ CHI"
+        },
+        {
+          "market": "PROPS",
+          "team": "CHI",
+          "display_pick": "Azura Stevens UNDER 13.5",
+          "selection": "UNDER 13.5",
+          "projection": 5.999999999999999,
+          "projected": 5.999999999999999,
+          "odds": -122.0,
+          "price": -122.0,
+          "score": 31.926206035662553,
+          "ev_pct": 31.926206035662553,
+          "win_prob": 0.5495495495495496,
+          "p_win": 0.5495495495495496,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 31.9%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "SEA @ CHI"
+        },
+        {
+          "market": "PROPS",
+          "team": "SEA",
+          "display_pick": "Flau'jae Johnson UNDER 8.5",
+          "selection": "UNDER 8.5",
+          "projection": 6.758497142857143,
+          "projected": 6.758497142857143,
+          "odds": -110.0,
+          "price": -110.0,
+          "score": 13.953964245319018,
+          "ev_pct": 13.953964245319018,
+          "win_prob": 0.5238095238095238,
+          "p_win": 0.5238095238095238,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 14.0%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "SEA @ CHI"
+        }
+      ]
+    }
+  ]
+}

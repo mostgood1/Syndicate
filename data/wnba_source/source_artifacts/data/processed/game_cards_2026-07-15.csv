@@ -1,0 +1,4 @@
+date,game_id,home_team,visitor_team,commence_time,home_ml,away_ml,home_spread,away_spread,total,bookmaker,home_tri,away_tri
+2026-07-15,04db11d33553fba68fc607aaf009071aa,Minnesota Lynx,Los Angeles Sparks,2026-07-15T17:10:00Z,,,,,,mybookieag,MIN,LAS
+2026-07-15,08eace0d4309db9d618e7ba857166324b,Indiana Fever,Golden State Valkyries,2026-07-16T00:10:00Z,,,,,,betus,IND,GSV
+2026-07-15,0dd23179c4373849ae1da8476ec21def3,Chicago Sky,Seattle Storm,2026-07-15T16:10:00Z,,,,,,betus,CHI,SEA

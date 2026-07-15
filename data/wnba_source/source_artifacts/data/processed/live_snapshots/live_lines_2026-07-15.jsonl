@@ -1,0 +1,59 @@
+{
+  "payload": {
+    "ok": true,
+    "ttl": 20,
+    "date": "2026-07-15",
+    "requested_date": "2026-07-15",
+    "lookahead_applied": false,
+    "include_period_totals": true,
+    "games": [
+      {
+        "event_id": "401857069",
+        "found": true,
+        "lines": {
+          "total": 193.0,
+          "home_spread": 5.0,
+          "away_spread": null,
+          "home_ml": 220.0,
+          "away_ml": -220.0,
+          "period_totals": {},
+          "period_spreads": {}
+        },
+        "game_id": "401857069",
+        "gamePk": "401857069"
+      },
+      {
+        "event_id": "401857070",
+        "found": true,
+        "lines": {
+          "total": 204.0,
+          "home_spread": -36.0,
+          "away_spread": null,
+          "home_ml": -4900.0,
+          "away_ml": 4900.0,
+          "period_totals": {},
+          "period_spreads": {}
+        },
+        "game_id": "401857070",
+        "gamePk": "401857070"
+      },
+      {
+        "event_id": "401857068",
+        "found": true,
+        "lines": {
+          "total": 230.5,
+          "home_spread": -10.5,
+          "away_spread": null,
+          "home_ml": -514.0,
+          "away_ml": 514.0,
+          "period_totals": {},
+          "period_spreads": {}
+        },
+        "game_id": "401857068",
+        "gamePk": "401857068"
+      }
+    ],
+    "generated_at": "2026-07-15T01:55:17-05:00",
+    "odds_refreshed_at": "2026-07-15T01:55:17-05:00"
+  }
+}
