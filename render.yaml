@@ -142,6 +142,14 @@ services:
         value: "60"
       - key: MLB_LIVE_ODDSAPI_REFRESH_INTERVAL_SECONDS
         value: "60"
+      # Temporary mitigation for a confirmed production OOM in WNBA's smart-sim
+      # predictions step: play-by-play-level simulation is far more memory-hungry
+      # than the box-score-level fallback and the refresh subprocess dies before
+      # producing any output. Trades sim fidelity for actually getting real
+      # WNBA odds/predictions flowing again while the underlying memory blowup
+      # is root-caused. Revert once that's fixed.
+      - key: REFRESH_PREDICT_PROPS_SMART_SIM_PBP
+        value: "false"
 
   - type: worker
     name: refresh-worker
@@ -273,6 +281,14 @@ services:
         value: "30"
       - key: MLB_LIVE_ODDSAPI_REFRESH_INTERVAL_SECONDS
         value: "60"
+      # Temporary mitigation for a confirmed production OOM in WNBA's smart-sim
+      # predictions step: play-by-play-level simulation is far more memory-hungry
+      # than the box-score-level fallback and the refresh subprocess dies before
+      # producing any output. Trades sim fidelity for actually getting real
+      # WNBA odds/predictions flowing again while the underlying memory blowup
+      # is root-caused. Revert once that's fixed.
+      - key: REFRESH_PREDICT_PROPS_SMART_SIM_PBP
+        value: "false"
 
   - type: worker
     name: live-odds-worker
@@ -428,4 +444,12 @@ services:
         value: "true"
       - key: SYNDICATE_LIVE_LENS_INTERVAL_SECONDS
         value: "60"
+      # Temporary mitigation for a confirmed production OOM in WNBA's smart-sim
+      # predictions step: play-by-play-level simulation is far more memory-hungry
+      # than the box-score-level fallback and the refresh subprocess dies before
+      # producing any output. Trades sim fidelity for actually getting real
+      # WNBA odds/predictions flowing again while the underlying memory blowup
+      # is root-caused. Revert once that's fixed.
+      - key: REFRESH_PREDICT_PROPS_SMART_SIM_PBP
+        value: "false"
 
