@@ -42,10 +42,6 @@ REPO_ROOT = repo_root_from(__file__)
 REPORTS_ROOT = REPO_ROOT / "reports"
 
 
-def _memory_trace_enabled() -> bool:
-    return str(os.environ.get("SYNDICATE_LIVE_ODDS_REFRESH_MEMORY_TRACE") or "").strip().lower() in {"1", "true", "yes", "on"}
-
-
 def _today_date() -> str:
     return central_today_iso()
 
@@ -1010,24 +1006,28 @@ def launch_refresh_run(
             "state": "pending_external",
         }
 
-    if _memory_trace_enabled():
-        popen_kwargs: dict[str, Any] = {
-            "cwd": str(REPO_ROOT),
-        }
+    # Always launch detached and fire-and-forget: every caller (HTTP job-start
+    # endpoints, the worker loop's tick, run_refresh_worker.py's autorun) expects
+    # this to return immediately with a pid, not block until the refresh finishes.
+    # This used to switch to an attached, blocking `process.wait()` whenever
+    # SYNDICATE_LIVE_ODDS_REFRESH_MEMORY_TRACE was set -- a debug-logging flag
+    # that had no business changing subprocess launch semantics. With that flag
+    # left on in Render, it silently turned this into a synchronous call that
+    # stalled the live-odds-worker's tick loop for the full refresh duration and
+    # was a confirmed contributor to a production OOM. The child's stdout/stderr
+    # are already captured to odds_refresh.json/odds_refresh.stderr.txt by
+    # run_refresh_odds_job.py regardless, so there's no diagnostic value in
+    # inheriting them here.
+    popen_kwargs: dict[str, Any] = {
+        "cwd": str(REPO_ROOT),
+        "stdout": subprocess.DEVNULL,
+        "stderr": subprocess.DEVNULL,
+    }
+    if os.name == "nt":
+        popen_kwargs["creationflags"] = getattr(subprocess, "DETACHED_PROCESS", 0) | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
     else:
-        popen_kwargs = {
-            "cwd": str(REPO_ROOT),
-            "stdout": subprocess.DEVNULL,
-            "stderr": subprocess.DEVNULL,
-        }
-        if os.name == "nt":
-            popen_kwargs["creationflags"] = getattr(subprocess, "DETACHED_PROCESS", 0) | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
-        else:
-            popen_kwargs["start_new_session"] = True
+        popen_kwargs["start_new_session"] = True
     process = subprocess.Popen(command, **popen_kwargs)
-
-    if _memory_trace_enabled():
-        process.wait()
 
     refresh_status_manifest["pid"] = int(process.pid)
 
