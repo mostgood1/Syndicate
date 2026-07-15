@@ -2663,7 +2663,7 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
                 out_path.write_text("market\nATS\n", encoding="utf-8")
                 return str(out_path)
 
-            def _fake_cards_sim_detail_artifact(*, source_root, date_str, processed_root):
+            def _fake_cards_sim_detail_artifact(*, source_root, date_str, processed_root, force_refresh=False):
                 out_path = processed_root / f"cards_sim_detail_{date_str}.json"
                 out_path.write_text('{"games": []}\n', encoding="utf-8")
                 return str(out_path)

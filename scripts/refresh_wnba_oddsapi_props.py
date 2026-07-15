@@ -3812,13 +3812,19 @@ def _build_cards_sim_detail_from_local_smart_sim(*, processed_root: Path, date_s
     return games_out
 
 
-def _export_cards_sim_detail_snapshot(*, source_root: Path, date_str: str, processed_root: Path) -> str | None:
+def _export_cards_sim_detail_snapshot(*, source_root: Path, date_str: str, processed_root: Path, force_refresh: bool = False) -> str | None:
     existing = _copy_existing_processed_artifact(
         source_root=source_root,
         processed_root=processed_root,
         file_name=f"cards_sim_detail_{date_str}.json",
     )
-    if existing and _cards_sim_detail_has_quarter_content(Path(existing)):
+    # This snapshot covers every game on the date in one combined file, so once
+    # any single game reaches "quarter content" (live/final boxscore data), the
+    # whole file gets treated as already-good and never rebuilt again -- even for
+    # a still-pregame game elsewhere in the same file whose sim was just corrected
+    # by a force-refresh. force_refresh bypasses that reuse so an explicit resim
+    # actually lands here instead of being silently dropped.
+    if existing and not force_refresh and _cards_sim_detail_has_quarter_content(Path(existing)):
         return existing
     out_path = processed_root / f"cards_sim_detail_{date_str}.json"
     games_out = _build_cards_sim_detail_from_local_smart_sim(processed_root=processed_root, date_str=date_str)
@@ -4081,7 +4087,7 @@ def _export_live_lens_artifacts(*, source_root: Path, date_str: str, processed_r
     return copied
 
 
-def _materialize_artifact_bundle(*, state: dict[str, object], artifact_root: Path, source_root: Path) -> dict[str, object]:
+def _materialize_artifact_bundle(*, state: dict[str, object], artifact_root: Path, source_root: Path, force_refresh: bool = False) -> dict[str, object]:
     processed_root = artifact_root / "data" / "processed"
     raw_root = artifact_root / "data" / "raw"
     live_lens_root = artifact_root / "data" / "live_lens"
@@ -4139,7 +4145,7 @@ def _materialize_artifact_bundle(*, state: dict[str, object], artifact_root: Pat
         cards_props_snapshot_path = _export_cards_props_snapshot(source_root=source_root, date_str=date_text, processed_root=processed_root)
         if cards_props_snapshot_path:
             copied["cards_props_snapshot_path"] = cards_props_snapshot_path
-        cards_sim_detail_path = _export_cards_sim_detail_snapshot(source_root=source_root, date_str=date_text, processed_root=processed_root)
+        cards_sim_detail_path = _export_cards_sim_detail_snapshot(source_root=source_root, date_str=date_text, processed_root=processed_root, force_refresh=bool(force_refresh))
         if cards_sim_detail_path:
             copied["cards_sim_detail_path"] = cards_sim_detail_path
         top_by_game_path = _export_top_by_game_snapshot(source_root=source_root, date_str=date_text, processed_root=processed_root)
@@ -4480,6 +4486,7 @@ def main() -> int:
                 state=state,
                 artifact_root=artifact_root_path,
                 source_root=source_root,
+                force_refresh=bool(args.force_refresh),
             )
             if copied:
                 state["artifact_bundle_root"] = str(artifact_root_path)
