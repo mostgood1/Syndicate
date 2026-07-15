@@ -2973,6 +2973,9 @@ def _apply_player_priors_local(*, smart_sim_module, team_df, priors, team_tri: s
     normalize_position = getattr(smart_sim_module, "_normalize_position")
     boolish_series = getattr(smart_sim_module, "_boolish_series")
     safe_float = getattr(smart_sim_module, "_safe_float")
+    minutes_caps_from_team_df = getattr(smart_sim_module, "_minutes_caps_from_team_df")
+    cap_and_redistribute_minutes = getattr(smart_sim_module, "_cap_and_redistribute_minutes")
+    league = getattr(smart_sim_module, "LEAGUE")
 
     if team_df is None or getattr(team_df, "empty", True):
         return pd.DataFrame()
@@ -2984,6 +2987,17 @@ def _apply_player_priors_local(*, smart_sim_module, team_df, priors, team_tri: s
         out["_sim_min"] = pd.to_numeric(sim_minutes, errors="coerce").fillna(0.0).astype(float)
     else:
         out["_sim_min"] = derive_sim_minutes(out, date_str=date_str, team_tri=team_tri)
+
+    # Guardrail: some upstream paths (e.g. teams with no rotation-stint history, such as a
+    # first-season expansion franchise) can hand back per-player minutes that were never
+    # capped/rescaled to a regulation team total, inflating headcount and scoring. Re-cap here
+    # so every path into this function ends up with a realistic total regardless of source.
+    sim_min_total = float(pd.to_numeric(out["_sim_min"], errors="coerce").fillna(0.0).sum())
+    if sim_min_total > 0.0 and not np.isclose(sim_min_total, float(league.regulation_team_minutes), atol=1.0):
+        caps = minutes_caps_from_team_df(out, base_minutes=out["_sim_min"])
+        out["_sim_min"] = cap_and_redistribute_minutes(
+            out["_sim_min"], total_target=league.regulation_team_minutes, cap=caps, iters=12
+        ).astype(float)
 
     pred_cols = {
         "pts": "pred_pts",
