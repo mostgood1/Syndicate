@@ -273,18 +273,19 @@ def fetch_schedule_for_date(sport: str, date_str: str, *, force_refresh: bool = 
     if fetcher is None:
         return []
 
-    # NBA/WNBA read a local file on every call (cheap; no second-order cache
-    # needed) and only hit the network when nothing's on disk yet -- the TTL
-    # cache below is for MLB/NHL, which always make a live API call.
-    if normalized_sport in ("nba", "wnba") and not force_refresh:
-        raw_rows = fetcher(date_str)
+    # Every sport goes through the same TTL cache, no exceptions. NBA/WNBA's
+    # fetcher falls back to a subprocess CLI network call whenever the local
+    # schedule file has no rows for the date -- without this cache, a caller
+    # invoked every tick (e.g. the tip-off force-window check in
+    # live_refresh_loop.py, which runs on every loop iteration regardless of
+    # the surrounding interval throttle) would spawn that subprocess call
+    # every single tick forever. Confirmed cause of a production OOM.
+    cached = None if force_refresh else _read_cache(normalized_sport, date_str)
+    if cached is not None:
+        raw_rows = cached
     else:
-        cached = None if force_refresh else _read_cache(normalized_sport, date_str)
-        if cached is not None:
-            raw_rows = cached
-        else:
-            raw_rows = fetcher(date_str)
-            _write_cache(normalized_sport, date_str, raw_rows)
+        raw_rows = fetcher(date_str)
+        _write_cache(normalized_sport, date_str, raw_rows)
 
     events: list[ScheduleEvent] = []
     for row in raw_rows:
