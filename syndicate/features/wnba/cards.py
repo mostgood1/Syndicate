@@ -1783,6 +1783,11 @@ def get_wnba_overview(selected_date: str) -> dict[str, Any]:
             "source_path": str(processed_root() / f"game_cards_{requested_date}.csv"),
         }
 
+    # Deferred import: syndicate.blueprints.home imports get_wnba_overview from
+    # this module at module level, so a top-level import back would be circular.
+    from syndicate.blueprints.home import _finalize_home_prop_rows
+    from syndicate.blueprints.home import _load_home_prop_items
+
     cards_context = build_cards_page_context(requested_date, allow_stored_date_fallback=True)
     games = list(cards_context.get("games") or [])
     prop_rows = _finalize_home_prop_rows(
