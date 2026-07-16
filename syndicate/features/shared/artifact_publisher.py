@@ -40,6 +40,20 @@ HOT_ARTIFACT_PATTERNS: tuple[str, ...] = (
     "*_source/source_artifacts/data/processed/cards_props_snapshot_*.json",
     "*_source/source_artifacts/data/processed/smart_sim_*.json",
     "*_source/source_artifacts/data/market/*.json",
+    # Phase 3 of migrating off the daily-update GHA cron: these were only
+    # ever synced by the retired pipeline's blanket Sync-SportSourceArtifacts
+    # robocopy. Confirmed live reads (not just worker-side generation) before
+    # adding: season_betting_card_manifest -> nba/betting_card.py's
+    # build_season_betting_card_manifest_payload, consumed by
+    # blueprints/nba.py; live_player_lens_tuning -> nba/cards.py and
+    # wnba/cards.py's live-game rendering. Deliberately NOT adding
+    # calibration_active.json/prob_calibration.json/manifests/* -- those are
+    # worker-only inputs to the odds refresh scripts, never read by any
+    # blueprint, so pushing them would just reproduce the old robocopy's
+    # "copy everything" bulk-data mistake.
+    "*_source/source_artifacts/data/processed/season_betting_card_manifest_*.json",
+    "*_source/source_artifacts/data/processed/live_player_lens_tuning_*.csv",
+    "*_source/source_artifacts/current_week.json",
     # Same set again, one directory shallower: some sports (confirmed for WNBA)
     # write their processed artifacts straight to "<sport>_source/data/processed/"
     # rather than nesting under a "source_artifacts" nested root, so the patterns
@@ -55,6 +69,9 @@ HOT_ARTIFACT_PATTERNS: tuple[str, ...] = (
     "*_source/data/processed/cards_props_snapshot_*.json",
     "*_source/data/processed/smart_sim_*.json",
     "*_source/data/market/*.json",
+    "*_source/data/processed/season_betting_card_manifest_*.json",
+    "*_source/data/processed/live_player_lens_tuning_*.csv",
+    "*_source/current_week.json",
     # MLB's vendored daily sim (vendor/mlb_bettingv2/tools/daily_update.py,
     # triggered from live_refresh_loop.py's MLB daily-sim gate) writes under
     # data/daily/, data/manager/, data/park/, data/umpire/ -- none of which

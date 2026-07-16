@@ -28,6 +28,34 @@ class HotArtifactAllowlistTests(unittest.TestCase):
         )
         self.assertTrue(is_hot_artifact_relative_path(HOT_RELATIVE_PATH))
 
+    def test_accepts_phase3_calibration_and_manifest_files_with_confirmed_live_reads(self) -> None:
+        # Only files confirmed read by a blueprint/cards.py at request time
+        # belong here -- see the allowlist's own comment for what was
+        # deliberately excluded (calibration_active.json, prob_calibration.json,
+        # manifests/*) because nothing in the web-serving path reads them.
+        self.assertTrue(is_hot_artifact_relative_path("nfl_source/current_week.json"))
+        self.assertTrue(is_hot_artifact_relative_path("nfl_source/source_artifacts/current_week.json"))
+        self.assertTrue(
+            is_hot_artifact_relative_path(
+                "nba_source/data/processed/season_betting_card_manifest_2025_retuned.json"
+            )
+        )
+        self.assertTrue(
+            is_hot_artifact_relative_path(
+                "nba_source/source_artifacts/data/processed/live_player_lens_tuning_2026-05-28.csv"
+            )
+        )
+        self.assertTrue(
+            is_hot_artifact_relative_path(
+                "wnba_source/data/processed/live_player_lens_tuning_2026-05-29.csv"
+            )
+        )
+
+    def test_rejects_worker_only_calibration_and_manifest_files(self) -> None:
+        self.assertFalse(is_hot_artifact_relative_path("nfl_source/calibration_active.json"))
+        self.assertFalse(is_hot_artifact_relative_path("nfl_source/prob_calibration.json"))
+        self.assertFalse(is_hot_artifact_relative_path("nfl_source/manifests/mirror_refresh_latest.json"))
+
     def test_rejects_paths_outside_allowlist(self) -> None:
         self.assertFalse(is_hot_artifact_relative_path("reports/intelligence/evaluation_ledger_chunks/part_1.json"))
         self.assertFalse(is_hot_artifact_relative_path("mlb_source/source_artifacts/data/statcast/2026.csv"))
