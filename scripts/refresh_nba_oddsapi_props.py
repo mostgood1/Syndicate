@@ -2055,6 +2055,43 @@ def _ensure_player_logs_for_props_refresh(*, source_root: Path, date_str: str, l
     return False, "player_logs missing and no local fetch fallback is available"
 
 
+def _predict_date_backoff_marker_path(*, source_root: Path, date_str: str) -> Path:
+    return source_root / "data" / "processed" / f".predict_date_attempt_{date_str}.json"
+
+
+def _predict_date_recently_attempted(*, source_root: Path, date_str: str, cooldown_minutes: float) -> bool:
+    if cooldown_minutes <= 0:
+        return False
+    marker_path = _predict_date_backoff_marker_path(source_root=source_root, date_str=date_str)
+    try:
+        payload = json.loads(marker_path.read_text(encoding="utf-8"))
+        started_at = dt.datetime.fromisoformat(str(payload.get("started_at") or ""))
+    except Exception:
+        return False
+    age_minutes = (dt.datetime.now(dt.timezone.utc) - started_at).total_seconds() / 60.0
+    return age_minutes < cooldown_minutes
+
+
+def _mark_predict_date_attempt(*, source_root: Path, date_str: str) -> None:
+    marker_path = _predict_date_backoff_marker_path(source_root=source_root, date_str=date_str)
+    try:
+        marker_path.parent.mkdir(parents=True, exist_ok=True)
+        marker_path.write_text(
+            json.dumps({"started_at": dt.datetime.now(dt.timezone.utc).isoformat()}),
+            encoding="utf-8",
+        )
+    except Exception:
+        pass
+
+
+def _predict_date_backoff_minutes() -> float:
+    raw = (os.environ.get("REFRESH_PREDICT_DATE_BACKOFF_MINUTES") or "10").strip()
+    try:
+        return max(0.0, float(raw))
+    except Exception:
+        return 10.0
+
+
 def _ensure_game_predictions_for_props_refresh(*, source_root: Path, date_str: str, log_file: Path, heartbeat_cb: callable) -> tuple[bool, str | None]:
     processed_root = source_root / "data" / "processed"
     pred_path = processed_root / f"predictions_{date_str}.csv"
@@ -2079,7 +2116,18 @@ def _ensure_game_predictions_for_props_refresh(*, source_root: Path, date_str: s
             _append_log(log_file, f"Using existing game predictions artifact: {pred_path}")
             return True, None
 
+    backoff_minutes = _predict_date_backoff_minutes()
+    if _predict_date_recently_attempted(source_root=source_root, date_str=date_str, cooldown_minutes=backoff_minutes):
+        # predict-date loads ~20 sklearn/ONNX models (measured ~175MB peak RSS)
+        # that this pipeline never used to pay for while predict-date was
+        # silently failing with ModuleNotFoundError (fixed above). Now that it
+        # actually runs, a crash mid-load (OOM-killed container, timeout) would
+        # otherwise retry this same expensive bootstrap every single refresh
+        # cycle with no cooldown -- a tight crash-loop. Back off instead.
+        return False, f"predict-date bootstrap attempted within the last {backoff_minutes:.0f} min; backing off to avoid repeated OOM retries"
+
     _append_log(log_file, f"Generating required game predictions artifact via source bootstrap: {pred_path}")
+    _mark_predict_date_attempt(source_root=source_root, date_str=date_str)
     bootstrap_result = _ensure_source_game_inputs(
         source_root=source_root,
         package_name="nba_betting",
