@@ -419,6 +419,17 @@ services:
         value: "2"
       - key: SYNDICATE_SCHEDULE_ADAPTER_TTL_SECONDS
         value: "900"
+      # Look-ahead: proactively warms tomorrow's slate during idle ticks
+      # instead of only reacting once the calendar date rolls over -- another
+      # piece of what the GHA daily-update cron used to cover. Defaults off
+      # here for the same dark-launch reasoning as the MLB daily sim trigger
+      # above; flip to "true" once a session's worth of logs confirm it
+      # behaves as expected (reports/live_refresh_loop/latest_live_refresh_tick.json
+      # -> "lookAhead").
+      - key: SYNDICATE_LOOK_AHEAD_ENABLED
+        value: "false"
+      - key: SYNDICATE_LOOK_AHEAD_INTERVAL_SECONDS
+        value: "3600"
       - key: MLB_BETTING_DATA_ROOT
         value: /opt/render/project/data/mlb_source/source_artifacts/data
       - key: MLB_LIVE_LENS_DIR

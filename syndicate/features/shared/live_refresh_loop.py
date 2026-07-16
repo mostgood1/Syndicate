@@ -8,7 +8,7 @@ import os
 import subprocess
 import sys
 import threading
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -526,6 +526,109 @@ def _launch_mlb_daily_sim(date_str: str, decision: dict[str, Any]) -> dict[str, 
 		return {"ok": False, "error": f"{type(exc).__name__}: {exc}", "reason": decision.get("reason")}
 
 
+# ---------------------------------------------------------------------------
+# Look-ahead: proactively warm tomorrow's slate during idle ticks instead of
+# only reacting once central_today_iso() rolls over to a new date. Reuses the
+# same schedule_adapter helpers as the MLB tip-off-window check above (they
+# already accept an arbitrary date_str), and the same single-active-refresh
+# guard launch_refresh_run already enforces, so a look-ahead launch that
+# collides with the day's own tick just skips gracefully like any other tick.
+# ---------------------------------------------------------------------------
+
+def _look_ahead_enabled() -> bool:
+	# Defaults off, matching _mlb_daily_sim_enabled()'s dark-launch posture for
+	# the same class of feature (replacing a piece of the GHA daily-update
+	# cron): flip SYNDICATE_LOOK_AHEAD_ENABLED on once logs confirm it behaves
+	# as expected.
+	return _env_bool("SYNDICATE_LOOK_AHEAD_ENABLED", default=False)
+
+
+def _look_ahead_interval_seconds() -> int:
+	raw = str(os.environ.get("SYNDICATE_LOOK_AHEAD_INTERVAL_SECONDS") or "").strip()
+	try:
+		value = int(raw or 3600)
+	except Exception:
+		value = 3600
+	return max(300, value)
+
+
+def _last_look_ahead_check_path() -> Path:
+	return _meta_dir() / "last_look_ahead_check.json"
+
+
+def _read_last_look_ahead_check() -> dict[str, Any]:
+	payload = read_json_file(_last_look_ahead_check_path())
+	return payload if isinstance(payload, dict) else {}
+
+
+def _record_look_ahead_check(epoch: float, date_str: str, *, launched: bool) -> None:
+	write_json_file(
+		_last_look_ahead_check_path(),
+		{"epoch": epoch, "date": date_str, "launched": bool(launched), "recordedAt": _utc_now()},
+	)
+
+
+def _look_ahead_target_date(selected_date: str) -> str:
+	return (date.fromisoformat(selected_date) + timedelta(days=1)).isoformat()
+
+
+def _look_ahead_has_scheduled_games(date_str: str, *, sports: str | None) -> bool:
+	configured = [item.strip().lower() for item in (sports or "").split(",") if item.strip()] if sports else list(_LIVE_STATUS_CHECKERS.keys())
+	for sport in configured:
+		try:
+			if fetch_schedule_for_date(sport, date_str):
+				return True
+		except Exception:
+			continue
+	return False
+
+
+def _look_ahead_decision(*, now_epoch: float, selected_date: str, any_live: bool | None) -> dict[str, Any]:
+	if not _look_ahead_enabled():
+		return {"launch": False, "reason": "disabled"}
+	if any_live:
+		# Never compete with a live tick for the container's resources.
+		return {"launch": False, "reason": "sport_currently_live"}
+	target_date = _look_ahead_target_date(selected_date)
+	last = _read_last_look_ahead_check()
+	last_epoch = float(last.get("epoch") or 0.0)
+	last_date = str(last.get("date") or "")
+	interval = _look_ahead_interval_seconds()
+	if last_epoch > 0.0 and last_date == target_date and (now_epoch - last_epoch) < interval:
+		return {"launch": False, "reason": "within_check_interval", "date": target_date}
+	if not _look_ahead_has_scheduled_games(target_date, sports=_live_refresh_loop_sports()):
+		_record_look_ahead_check(now_epoch, target_date, launched=False)
+		return {"launch": False, "reason": "no_games_scheduled", "date": target_date}
+	_record_look_ahead_check(now_epoch, target_date, launched=True)
+	return {"launch": True, "reason": "warm_next_day_slate", "date": target_date}
+
+
+def _launch_look_ahead_refresh(decision: dict[str, Any]) -> dict[str, Any]:
+	target_date = str(decision.get("date") or "")
+	try:
+		result = launch_refresh_run(
+			date=target_date,
+			sports=_live_refresh_loop_sports(),
+			phase="pregame",
+			regions=_live_refresh_loop_regions(),
+			mode=_live_refresh_loop_mode(),
+			execution_mode=_live_refresh_loop_execution_mode(),
+			launch_mode=_live_refresh_loop_launch_mode(),
+			skip_mirror=bool(_live_refresh_loop_skip_mirror()),
+			mirror_only=False,
+			dry_run=False,
+			force_refresh=False,
+		)
+		print(f"[live_refresh_loop] LOOK_AHEAD_TRIGGERED date={target_date} reason={decision.get('reason')}", flush=True)
+		return {"ok": True, "launched": True, "date": target_date, "result": result, "reason": decision.get("reason")}
+	except ValueError as exc:
+		# Same single-active-refresh guard the main tick already respects --
+		# skip gracefully and retry next interval rather than erroring.
+		return {"ok": False, "launched": False, "skipped": True, "date": target_date, "error": str(exc)}
+	except Exception as exc:
+		return {"ok": False, "launched": False, "date": target_date, "error": f"{type(exc).__name__}: {exc}"}
+
+
 def _live_refresh_loop_phase() -> str:
 	phase = str(os.environ.get("SYNDICATE_LIVE_ODDS_REFRESH_PHASE") or "live").strip().lower()
 	return phase if phase in {"live", "pregame", "all"} else "live"
@@ -646,6 +749,20 @@ def _run_live_refresh_tick() -> dict[str, Any]:
 	except Exception as exc:
 		meta["ok"] = False
 		meta["error"] = f"{type(exc).__name__}: {exc}"
+
+	# Look-ahead: while idle, proactively warm tomorrow's slate instead of only
+	# reacting once central_today_iso() rolls over. Independent of the above
+	# today-scoped launch -- a collision with it (or with the day's own tick)
+	# is handled by launch_refresh_run's existing single-active-refresh guard.
+	try:
+		look_ahead_decision = _look_ahead_decision(now_epoch=tick_started_epoch, selected_date=selected_date, any_live=any_live)
+		if look_ahead_decision.get("launch"):
+			meta["lookAhead"] = _launch_look_ahead_refresh(look_ahead_decision)
+		else:
+			meta["lookAhead"] = {"ok": False, "launched": False, "reason": look_ahead_decision.get("reason")}
+	except Exception as exc:
+		meta["lookAhead"] = {"ok": False, "launched": False, "error": f"{type(exc).__name__}: {exc}"}
+
 	meta["finishedAt"] = _utc_now()
 	write_json_file(_meta_dir() / "latest_live_refresh_tick.json", meta)
 	try:

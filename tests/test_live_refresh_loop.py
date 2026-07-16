@@ -519,6 +519,144 @@ class LiveRefreshLoopTests(unittest.TestCase):
 
         self.assertFalse(payload["ok"])
 
+    def test_look_ahead_target_date_computes_next_day(self) -> None:
+        self.assertEqual(live_refresh_loop._look_ahead_target_date("2026-07-15"), "2026-07-16")
+        self.assertEqual(live_refresh_loop._look_ahead_target_date("2026-12-31"), "2027-01-01")
+
+    def test_look_ahead_decision_skips_when_disabled(self) -> None:
+        with patch.dict(os.environ, {"SYNDICATE_LOOK_AHEAD_ENABLED": "false"}, clear=False):
+            decision = live_refresh_loop._look_ahead_decision(now_epoch=1000.0, selected_date="2026-07-15", any_live=False)
+
+        self.assertFalse(decision["launch"])
+        self.assertEqual(decision["reason"], "disabled")
+
+    def test_look_ahead_decision_skips_when_any_live(self) -> None:
+        with patch.dict(os.environ, {"SYNDICATE_LOOK_AHEAD_ENABLED": "true"}, clear=False):
+            decision = live_refresh_loop._look_ahead_decision(now_epoch=1000.0, selected_date="2026-07-15", any_live=True)
+
+        self.assertFalse(decision["launch"])
+        self.assertEqual(decision["reason"], "sport_currently_live")
+
+    def test_look_ahead_decision_launches_when_idle_with_scheduled_games(self) -> None:
+        with patch.dict(
+            os.environ, {"SYNDICATE_LOOK_AHEAD_ENABLED": "true"}, clear=False
+        ), patch.object(live_refresh_loop, "_read_last_look_ahead_check", return_value={}), patch.object(
+            live_refresh_loop, "_record_look_ahead_check"
+        ) as mocked_record, patch.object(
+            live_refresh_loop, "fetch_schedule_for_date", return_value=[{"id": "401857071"}]
+        ):
+            decision = live_refresh_loop._look_ahead_decision(now_epoch=1000.0, selected_date="2026-07-15", any_live=False)
+
+        self.assertTrue(decision["launch"])
+        self.assertEqual(decision["date"], "2026-07-16")
+        self.assertEqual(decision["reason"], "warm_next_day_slate")
+        mocked_record.assert_called_once_with(1000.0, "2026-07-16", launched=True)
+
+    def test_look_ahead_decision_skips_when_no_games_scheduled(self) -> None:
+        with patch.dict(
+            os.environ, {"SYNDICATE_LOOK_AHEAD_ENABLED": "true"}, clear=False
+        ), patch.object(live_refresh_loop, "_read_last_look_ahead_check", return_value={}), patch.object(
+            live_refresh_loop, "_record_look_ahead_check"
+        ) as mocked_record, patch.object(
+            live_refresh_loop, "fetch_schedule_for_date", return_value=[]
+        ):
+            decision = live_refresh_loop._look_ahead_decision(now_epoch=1000.0, selected_date="2026-07-15", any_live=False)
+
+        self.assertFalse(decision["launch"])
+        self.assertEqual(decision["reason"], "no_games_scheduled")
+        mocked_record.assert_called_once_with(1000.0, "2026-07-16", launched=False)
+
+    def test_look_ahead_decision_skips_within_check_interval(self) -> None:
+        with patch.dict(
+            os.environ, {"SYNDICATE_LOOK_AHEAD_ENABLED": "true", "SYNDICATE_LOOK_AHEAD_INTERVAL_SECONDS": "3600"}, clear=False
+        ), patch.object(
+            live_refresh_loop,
+            "_read_last_look_ahead_check",
+            return_value={"epoch": 1000.0, "date": "2026-07-16", "launched": True},
+        ), patch.object(live_refresh_loop, "fetch_schedule_for_date") as mocked_fetch:
+            decision = live_refresh_loop._look_ahead_decision(now_epoch=1500.0, selected_date="2026-07-15", any_live=False)
+
+        self.assertFalse(decision["launch"])
+        self.assertEqual(decision["reason"], "within_check_interval")
+        mocked_fetch.assert_not_called()
+
+    def test_launch_look_ahead_refresh_calls_launch_refresh_run_with_pregame_phase(self) -> None:
+        with patch.object(
+            live_refresh_loop,
+            "launch_refresh_run",
+            return_value={"ok": True, "state": "running"},
+        ) as mocked_launch:
+            result = live_refresh_loop._launch_look_ahead_refresh({"date": "2026-07-16", "reason": "warm_next_day_slate"})
+
+        self.assertTrue(result["ok"])
+        self.assertTrue(result["launched"])
+        mocked_launch.assert_called_once_with(
+            date="2026-07-16",
+            sports=None,
+            phase="pregame",
+            regions="us",
+            mode="fast",
+            execution_mode="source",
+            launch_mode="detached_subprocess",
+            skip_mirror=True,
+            mirror_only=False,
+            dry_run=False,
+            force_refresh=False,
+        )
+
+    def test_launch_look_ahead_refresh_skips_gracefully_on_active_refresh_guard(self) -> None:
+        with patch.object(
+            live_refresh_loop,
+            "launch_refresh_run",
+            side_effect=ValueError("A refresh run is already active"),
+        ):
+            result = live_refresh_loop._launch_look_ahead_refresh({"date": "2026-07-16", "reason": "warm_next_day_slate"})
+
+        self.assertFalse(result["ok"])
+        self.assertFalse(result["launched"])
+        self.assertTrue(result["skipped"])
+
+    def test_run_tick_launches_look_ahead_refresh_when_enabled_idle_and_games_scheduled(self) -> None:
+        with patch.dict(
+            os.environ,
+            {"SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP": "true", "SYNDICATE_LOOK_AHEAD_ENABLED": "true"},
+            clear=False,
+        ), patch.object(live_refresh_loop, "central_today_iso", return_value="2026-07-15"), patch.object(
+            live_refresh_loop, "_any_tracked_sport_game_live", return_value=False
+        ), patch.object(
+            live_refresh_loop, "_should_force_sim_rerun", return_value=False
+        ), patch.object(
+            live_refresh_loop, "_read_last_look_ahead_check", return_value={}
+        ), patch.object(
+            live_refresh_loop, "_record_look_ahead_check"
+        ), patch.object(
+            live_refresh_loop, "fetch_schedule_for_date", return_value=[{"id": "401857071"}]
+        ), patch.object(
+            live_refresh_loop,
+            "launch_refresh_run",
+            return_value={"ok": True, "state": "running"},
+        ) as mocked_launch:
+            payload = live_refresh_loop._run_live_refresh_tick()
+
+        self.assertTrue(payload["lookAhead"]["ok"])
+        self.assertTrue(payload["lookAhead"]["launched"])
+        self.assertEqual(payload["lookAhead"]["date"], "2026-07-16")
+        # Today's own tick call plus the look-ahead call for tomorrow.
+        self.assertEqual(mocked_launch.call_count, 2)
+        mocked_launch.assert_any_call(
+            date="2026-07-16",
+            sports=None,
+            phase="pregame",
+            regions="us",
+            mode="fast",
+            execution_mode="source",
+            launch_mode="detached_subprocess",
+            skip_mirror=True,
+            mirror_only=False,
+            dry_run=False,
+            force_refresh=False,
+        )
+
     def test_start_loop_returns_false_when_disabled(self) -> None:
         with patch.dict(os.environ, {}, clear=True):
             started = live_refresh_loop.start_live_refresh_background_loop()
