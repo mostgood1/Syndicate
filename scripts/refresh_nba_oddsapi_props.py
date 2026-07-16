@@ -567,6 +567,18 @@ def _source_worker_env(source_root: Path) -> dict[str, str]:
     return env
 
 
+def _vendor_code_root(package_name: str) -> Path:
+    # The hosted "source_root" for a sport (e.g. SYNDICATE_NBA_SOURCE_ROOT on
+    # Render) is a persistent *data* disk, not a code checkout -- the vendored
+    # nba_betting/wnba_betting package only ever lives in this repo's own
+    # vendor/<package>_repo checkout, so subprocess invocations of it must use
+    # this root for cwd/PYTHONPATH regardless of where source_root resolves.
+    override = str(os.environ.get(f"SYNDICATE_VENDOR_ROOT_{package_name.upper()}") or "").strip()
+    if override:
+        return Path(override).expanduser().resolve()
+    return REPO_ROOT / "vendor" / f"{package_name}_repo"
+
+
 def _run_source_processed_export(
     *,
     source_root: Path,
@@ -581,9 +593,10 @@ def _run_source_processed_export(
     if _path_has_meaningful_content(existing_path):
         return str(existing_path), 0
 
+    code_root = _vendor_code_root(package_name)
     rc = _run_to_file(
         [
-            _source_python(source_root),
+            _source_python(code_root),
             "-m",
             f"{package_name}.cli",
             command_name,
@@ -591,8 +604,8 @@ def _run_source_processed_export(
             date_str,
         ],
         log_file,
-        cwd=source_root,
-        env=_source_worker_env(source_root),
+        cwd=code_root,
+        env=_source_worker_env(code_root),
         timeout_s=15 * 60,
         heartbeat_cb=heartbeat_cb,
         heartbeat_every_s=5.0,
@@ -1739,16 +1752,17 @@ def _run_source_subprocess_cli_command(
     heartbeat_cb: callable | None,
     timeout_s: float,
 ) -> int:
+    code_root = _vendor_code_root(package_name)
     return _run_to_file(
         [
-            _source_python(source_root),
+            _source_python(code_root),
             "-m",
             f"{package_name}.cli",
             *command_parts,
         ],
         log_file,
-        cwd=source_root,
-        env=_source_worker_env(source_root),
+        cwd=code_root,
+        env=_source_worker_env(code_root),
         timeout_s=timeout_s,
         heartbeat_cb=heartbeat_cb,
         heartbeat_every_s=5.0,
@@ -1842,9 +1856,10 @@ def _run_source_predict_date(
     log_file: Path,
     heartbeat_cb: callable | None,
 ) -> int:
+    code_root = _vendor_code_root(package_name)
     return _run_to_file(
         [
-            _source_python(source_root),
+            _source_python(code_root),
             "-m",
             f"{package_name}.cli",
             "predict-date",
@@ -1852,8 +1867,8 @@ def _run_source_predict_date(
             date_str,
         ],
         log_file,
-        cwd=source_root,
-        env=_source_worker_env(source_root),
+        cwd=code_root,
+        env=_source_worker_env(code_root),
         timeout_s=20 * 60,
         heartbeat_cb=heartbeat_cb,
         heartbeat_every_s=5.0,
@@ -2072,13 +2087,17 @@ def _ensure_game_predictions_for_props_refresh(*, source_root: Path, date_str: s
         log_file=log_file,
         heartbeat_cb=heartbeat_cb,
     )
-    repo_pred_path = source_root / f"predictions_{date_str}.csv"
-    if (not pred_path.exists() or _count_csv_rows_quick(pred_path) <= 0) and repo_pred_path.exists() and repo_pred_path.is_file():
-        try:
-            pred_path.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(repo_pred_path, pred_path)
-        except Exception:
-            pass
+    code_root = _vendor_code_root("nba_betting")
+    for repo_pred_path in (
+        code_root / "data" / "processed" / f"predictions_{date_str}.csv",
+        source_root / f"predictions_{date_str}.csv",
+    ):
+        if (not pred_path.exists() or _count_csv_rows_quick(pred_path) <= 0) and repo_pred_path.exists() and repo_pred_path.is_file():
+            try:
+                pred_path.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(repo_pred_path, pred_path)
+            except Exception:
+                pass
     if _count_csv_rows_quick(pred_path) <= 0:
         game_odds_path = processed_root / f"game_odds_{date_str}.csv"
         return False, f"source bootstrap did not produce {pred_path.name} (rc={bootstrap_result.get('predict_date')})"
