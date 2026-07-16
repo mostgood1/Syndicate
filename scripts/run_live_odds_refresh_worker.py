@@ -186,8 +186,10 @@ def _run_tick() -> dict[str, object] | None:
     try:
         _log_worker_memory("tick_start")
         meta = _run_live_refresh_tick()
-        _log_worker_memory("tick_end", ok=bool(meta.get("ok", False)), skipped=bool(meta.get("skipped")))
+        _log_worker_memory("tick_end", ok=bool(meta.get("ok", False)), skipped=bool(meta.get("skipped")), error=meta.get("error"))
         print(f"LIVE ODDS REFRESH TICK: {meta.get('ok', False)}")
+        if meta.get("skipped") or meta.get("error"):
+            print(f"LIVE ODDS REFRESH SKIP/ERROR DETAIL: {meta.get('error')}", flush=True)
         return meta
     except Exception as exc:
         _log_worker_memory("tick_error", error=f"{type(exc).__name__}: {exc}")
