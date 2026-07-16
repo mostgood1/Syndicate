@@ -1811,55 +1811,79 @@ def _build_local_game_cards_artifact(*, source_root: Path, processed_root: Path,
                 allowed_matchups = set()
                 props_market_rows_by_matchup = {}
 
-        rows_out: list[dict[str, object]] = []
+        # game_odds_{date}.csv is frequently seeded with one row per
+        # bookmaker/market rather than one row per matchup -- group by
+        # (home_team, away_team) first so each real game produces exactly one
+        # game_cards row instead of one row per underlying source row.
+        rows_by_matchup: dict[tuple[str, str], list[dict[str, object]]] = {}
+        matchup_order: list[tuple[str, str]] = []
         with game_odds_path.open("r", encoding="utf-8", newline="") as handle:
             reader = csv.DictReader(handle)
-            for idx, row in enumerate(reader, start=1):
+            for row in reader:
                 if not isinstance(row, dict):
                     continue
                 home_name = str(row.get("home_team") or "").strip()
                 away_name = str(row.get("visitor_team") or row.get("away_team") or "").strip()
                 if not home_name or not away_name:
                     continue
-                if allowed_matchups and (home_name.casefold(), away_name.casefold()) not in allowed_matchups:
+                key = (home_name.casefold(), away_name.casefold())
+                if allowed_matchups and key not in allowed_matchups:
                     continue
-                # game_odds_{date}.csv is frequently only ever seeded with a bare
-                # matchup skeleton (no prices) -- fall back to aggregating the raw
-                # h2h/spreads/totals rows from the props snapshot for this matchup
-                # whenever the game_odds row itself has nothing usable.
-                home_ml = _float_or_none(row.get("home_ml"))
-                away_ml = _float_or_none(row.get("away_ml"))
-                home_spread = _float_or_none(row.get("home_spread"))
-                away_spread = _float_or_none(row.get("away_spread"))
-                total = _float_or_none(row.get("total"))
-                if None in (home_ml, away_ml, home_spread, away_spread, total):
-                    market_rows = props_market_rows_by_matchup.get((home_name.casefold(), away_name.casefold())) or []
-                    if market_rows:
-                        aggregated = _aggregate_game_odds_from_market_rows(
-                            market_rows, home_name=home_name, away_name=away_name
-                        )
-                        home_ml = home_ml if home_ml is not None else aggregated["home_ml"]
-                        away_ml = away_ml if away_ml is not None else aggregated["away_ml"]
-                        home_spread = home_spread if home_spread is not None else aggregated["home_spread"]
-                        away_spread = away_spread if away_spread is not None else aggregated["away_spread"]
-                        total = total if total is not None else aggregated["total"]
-                rows_out.append(
-                    {
-                        "date": date_str,
-                        "game_id": str(row.get("game_id") or idx),
-                        "home_team": home_name,
-                        "visitor_team": away_name,
-                        "commence_time": str(row.get("commence_time") or "").strip(),
-                        "home_ml": home_ml,
-                        "away_ml": away_ml,
-                        "home_spread": home_spread,
-                        "away_spread": away_spread,
-                        "total": total,
-                        "bookmaker": str(row.get("bookmaker") or "oddsapi_consensus").strip() or "oddsapi_consensus",
-                        "home_tri": _to_tricode_local(home_name),
-                        "away_tri": _to_tricode_local(away_name),
-                    }
-                )
+                if key not in rows_by_matchup:
+                    matchup_order.append(key)
+                rows_by_matchup.setdefault(key, []).append(row)
+
+        rows_out: list[dict[str, object]] = []
+        for idx, key in enumerate(matchup_order, start=1):
+            group_rows = rows_by_matchup[key]
+            first_row = group_rows[0]
+            home_name = str(first_row.get("home_team") or "").strip()
+            away_name = str(first_row.get("visitor_team") or first_row.get("away_team") or "").strip()
+
+            def _first_group_value(field: str) -> float | None:
+                for candidate_row in group_rows:
+                    value = _float_or_none(candidate_row.get(field))
+                    if value is not None:
+                        return value
+                return None
+
+            # game_odds_{date}.csv is frequently only ever seeded with a bare
+            # matchup skeleton (no prices) -- fall back to aggregating the raw
+            # h2h/spreads/totals rows from the props snapshot for this matchup
+            # whenever no row in the group has anything usable.
+            home_ml = _first_group_value("home_ml")
+            away_ml = _first_group_value("away_ml")
+            home_spread = _first_group_value("home_spread")
+            away_spread = _first_group_value("away_spread")
+            total = _first_group_value("total")
+            if None in (home_ml, away_ml, home_spread, away_spread, total):
+                market_rows = props_market_rows_by_matchup.get(key) or []
+                if market_rows:
+                    aggregated = _aggregate_game_odds_from_market_rows(
+                        market_rows, home_name=home_name, away_name=away_name
+                    )
+                    home_ml = home_ml if home_ml is not None else aggregated["home_ml"]
+                    away_ml = away_ml if away_ml is not None else aggregated["away_ml"]
+                    home_spread = home_spread if home_spread is not None else aggregated["home_spread"]
+                    away_spread = away_spread if away_spread is not None else aggregated["away_spread"]
+                    total = total if total is not None else aggregated["total"]
+            rows_out.append(
+                {
+                    "date": date_str,
+                    "game_id": str(first_row.get("game_id") or idx),
+                    "home_team": home_name,
+                    "visitor_team": away_name,
+                    "commence_time": str(first_row.get("commence_time") or "").strip(),
+                    "home_ml": home_ml,
+                    "away_ml": away_ml,
+                    "home_spread": home_spread,
+                    "away_spread": away_spread,
+                    "total": total,
+                    "bookmaker": str(first_row.get("bookmaker") or "oddsapi_consensus").strip() or "oddsapi_consensus",
+                    "home_tri": _to_tricode_local(home_name),
+                    "away_tri": _to_tricode_local(away_name),
+                }
+            )
 
         if not rows_out:
             if out_path.exists() and out_path.is_file():
