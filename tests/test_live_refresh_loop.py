@@ -596,6 +596,41 @@ class LiveRefreshLoopTests(unittest.TestCase):
         self.assertEqual(exit_code, 0)
         mocked_start_reports.assert_called_once()
 
+    def test_run_live_odds_refresh_worker_recycles_after_max_uptime(self) -> None:
+        # A long-lived worker doing routine multi-sport file I/O every tick
+        # accumulates page cache over hours of uptime with no single call to
+        # blame (see docs/fix_notes_log.md); it should exit cleanly on its own
+        # once max uptime is reached so Render restarts it fresh, rather than
+        # relying only on _LIVE_REFRESH_LOOP_STOP ever being set.
+        with patch.object(run_live_odds_refresh_worker, "_acquire_process_lock", return_value=True), patch.object(
+            run_live_odds_refresh_worker,
+            "_start_live_lens_reports",
+            return_value=None,
+        ), patch.object(run_live_odds_refresh_worker, "_run_tick", return_value=None) as mocked_tick, patch.object(
+            run_live_odds_refresh_worker,
+            "_live_refresh_loop_interval_seconds",
+            return_value=5,
+        ), patch.object(run_live_odds_refresh_worker, "_max_uptime_seconds", return_value=0.0), patch.object(
+            run_live_odds_refresh_worker.time, "sleep", return_value=None
+        ), patch.object(
+            run_live_odds_refresh_worker.signal,
+            "signal",
+            side_effect=ValueError("skip signals"),
+        ), patch.object(run_live_odds_refresh_worker.sys, "argv", ["run_live_odds_refresh_worker.py"]), patch.object(
+            run_live_odds_refresh_worker._LIVE_REFRESH_LOOP_STOP,
+            "is_set",
+            return_value=False,
+        ) as mocked_is_set, patch.object(run_live_odds_refresh_worker, "_release_process_lock") as mocked_release:
+            exit_code = run_live_odds_refresh_worker.main()
+
+        self.assertEqual(exit_code, 0)
+        mocked_tick.assert_called_once()
+        mocked_release.assert_called_once()
+        # Only one is_set() check (the while-loop guard) should have run before
+        # the uptime recycle broke out -- proving the stop event was never
+        # what ended the loop.
+        self.assertEqual(mocked_is_set.call_count, 1)
+
 
 if __name__ == "__main__":
     unittest.main()

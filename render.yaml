@@ -376,6 +376,15 @@ services:
         value: "60"
       - key: SYNDICATE_LIVE_ODDS_REFRESH_IDLE_INTERVAL_SECONDS
         value: "900"
+      # This worker's own container memory was observed climbing from ~416MB
+      # to ~989MB over a single session with no repeated expensive call to
+      # blame -- ordinary page cache accumulation from routine multi-sport
+      # file I/O every tick in a process that never restarts. Force a clean
+      # self-exit periodically so Render restarts it fresh and drops the
+      # accumulated cache back to baseline instead of climbing toward another
+      # OOM kill.
+      - key: SYNDICATE_LIVE_ODDS_WORKER_MAX_UPTIME_SECONDS
+        value: "21600"
       - key: SYNDICATE_INTELLIGENCE_REFRESH_INTERVAL_SECONDS
         value: "60"
       - key: SYNDICATE_LIVE_ODDS_REFRESH_LAUNCH_MODE

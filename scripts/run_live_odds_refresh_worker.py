@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import atexit
 import gc
+import random
 import signal
 import sys
 import time
@@ -158,6 +159,28 @@ def _handle_stop(_signum: int, _frame: object) -> None:
     _LIVE_REFRESH_LOOP_STOP.set()
 
 
+def _max_uptime_seconds() -> float | None:
+    # Long-lived worker processes doing routine multi-sport file I/O every
+    # tick accumulate page cache over hours of uptime that never gets
+    # credited back (observed climbing from ~416MB to ~989MB container
+    # memory in production with no single repeated expensive call to blame --
+    # see docs/fix_notes_log.md). Render restarts the process on exit
+    # regardless of exit code, so a periodic clean self-exit resets the
+    # container's page cache to baseline instead of letting it climb
+    # indefinitely toward another OOM kill. 0 or unset disables the restart.
+    raw = str(os.environ.get("SYNDICATE_LIVE_ODDS_WORKER_MAX_UPTIME_SECONDS") or "21600").strip()
+    try:
+        value = float(raw)
+    except Exception:
+        value = 21600.0
+    if value <= 0:
+        return None
+    # +/-10% jitter so the restart doesn't land at the same wall-clock offset
+    # every single day (which could otherwise coincide with a live game).
+    jitter = value * random.uniform(-0.1, 0.1)
+    return max(300.0, value + jitter)
+
+
 def _run_tick() -> None:
     try:
         _log_worker_memory("tick_start")
@@ -228,15 +251,25 @@ def main() -> int:
             _log_worker_memory("run_once_finally")
             _release_process_lock()
 
+    loop_started_at = time.monotonic()
+    max_uptime_seconds = _max_uptime_seconds()
+    recycled_for_uptime = False
+
     try:
-        _log_worker_memory("loop_start", interval_seconds=interval_seconds)
+        _log_worker_memory("loop_start", interval_seconds=interval_seconds, max_uptime_seconds=max_uptime_seconds)
         while not _LIVE_REFRESH_LOOP_STOP.is_set():
             _log_worker_memory("loop_tick_begin", interval_seconds=interval_seconds)
             _run_tick()
+            uptime_seconds = time.monotonic() - loop_started_at
+            if max_uptime_seconds is not None and uptime_seconds >= max_uptime_seconds:
+                recycled_for_uptime = True
+                _log_worker_memory("loop_recycle_for_uptime", uptime_seconds=uptime_seconds, max_uptime_seconds=max_uptime_seconds)
+                print(f"LIVE ODDS REFRESH WORKER RECYCLING after {uptime_seconds:.0f}s uptime to reset accumulated page cache", flush=True)
+                break
             _log_worker_memory("loop_sleep", interval_seconds=interval_seconds)
             time.sleep(interval_seconds)
     finally:
-        _log_worker_memory("loop_finally")
+        _log_worker_memory("loop_finally", recycled_for_uptime=recycled_for_uptime)
         _release_process_lock()
 
     return 0
