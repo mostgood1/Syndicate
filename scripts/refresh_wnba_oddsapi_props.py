@@ -3406,7 +3406,7 @@ def _existing_refresh_state(*, source_root: Path, date_str: str, do_edges: bool,
         required_paths.append(predictions_path)
     if do_edges:
         required_paths.append(edges_path)
-    if any(not path.exists() or not path.is_file() for path in required_paths):
+    if any(not _path_has_meaningful_content(path) for path in required_paths):
         return None
 
     started = str(started_at or "") or str(dt.datetime.utcnow().isoformat())
@@ -3460,7 +3460,7 @@ def _existing_artifact_bundle_state(*, artifact_root: Path, date_str: str, do_ed
         required_paths.append(predictions_path)
     if do_edges:
         required_paths.append(edges_path)
-    if any(not path.exists() or not path.is_file() for path in required_paths):
+    if any(not _path_has_meaningful_content(path) for path in required_paths):
         return None
 
     game_cards_rows = int(_count_csv_rows_quick(game_cards_path))

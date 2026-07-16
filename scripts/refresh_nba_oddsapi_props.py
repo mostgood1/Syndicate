@@ -2537,7 +2537,7 @@ def _existing_refresh_state(*, source_root: Path, date_str: str, do_edges: bool,
         required_paths.append(edges_path)
     if do_export:
         required_paths.append(recs_path)
-    if any(not path.exists() or not path.is_file() for path in required_paths):
+    if any(not _path_has_meaningful_content(path) for path in required_paths):
         return None
 
     game_cards_path = processed_root / f"game_cards_{date_str}.csv"
@@ -2595,7 +2595,7 @@ def _existing_artifact_bundle_state(*, artifact_root: Path, date_str: str, do_ed
         required_paths.append(edges_path)
     if do_export:
         required_paths.append(recs_path)
-    if any(not path.exists() or not path.is_file() for path in required_paths):
+    if any(not _path_has_meaningful_content(path) for path in required_paths):
         return None
 
     game_cards_path = processed_root / f"game_cards_{date_str}.csv"
