@@ -355,12 +355,14 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
         self.assertAlmostEqual(float(row.get("total")), 197.5)
 
     def test_build_local_game_cards_artifact_writes_and_reads_through_keyvalue_backend(self) -> None:
-        # Regression: game_cards.csv is read cross-service (the live-lens
-        # loop on live-odds-worker needs what the web service just wrote),
-        # so on Render (SYNDICATE_REFRESH_STATE_BACKEND=keyvalue) both the
-        # write and this same script's own re-read of game_cards.csv (for
-        # top-by-game building) must go through the keyvalue store rather
-        # than a plain local file, which would be invisible cross-service.
+        # Regression: game_cards.csv must be written to BOTH the keyvalue
+        # store (this same script's own re-read, for top-by-game building,
+        # goes through the keyvalue store) AND plain local disk -- every
+        # external reader (syndicate/features/wnba/sources.py, cards.py,
+        # archive.py) and artifact_publisher.py's HOT_ARTIFACT_PATTERNS HTTP
+        # push use plain pathlib access and were never made keyvalue-aware,
+        # so a keyvalue-only write left the file invisible to the live site
+        # despite the refresh pipeline succeeding (confirmed live on Render).
         module = self._load_module()
         fake_client = _FakeKeyValueClient()
 
@@ -392,8 +394,8 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
             self.assertEqual(rows, 1)
             self.assertIsNotNone(out_path)
             assert out_path is not None
-            # Went to the keyvalue store, not local disk.
-            self.assertFalse(out_path.exists())
+            # Went to both the keyvalue store and plain local disk.
+            self.assertTrue(out_path.exists())
             self.assertTrue(fake_client.store)
 
             # This script's own re-read (used to build top_by_game) must see

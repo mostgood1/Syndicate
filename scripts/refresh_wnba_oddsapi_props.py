@@ -1646,18 +1646,27 @@ _GAME_CARDS_HEADER_ORDER = [
 
 
 def _write_game_cards_csv_rows(out_path: Path, rows_out: list[dict[str, object]]) -> None:
-    # game_cards.csv is read cross-service (the live-lens background loop on
-    # the live-odds-worker service needs the same data the web service just
-    # wrote), so this goes through the keyvalue-aware writer rather than a
-    # plain local file write -- each Render service has its own separate
-    # local disk, so a plain write here would be invisible to any other
-    # service reading the same nominal path.
+    # game_cards.csv needs to be visible in two different places that don't
+    # agree on a backend: this script's own re-read (_local_game_cards_index,
+    # used to build top_by_game) goes through the keyvalue-aware helpers, but
+    # every external reader in syndicate/features/wnba/ (sources.py, cards.py,
+    # archive.py) -- plus artifact_publisher.py's HOT_ARTIFACT_PATTERNS HTTP
+    # push, which globs the local filesystem -- uses plain pathlib access and
+    # was never made keyvalue-aware. A keyvalue-only write left the file
+    # genuinely invisible to the live site despite the pipeline succeeding
+    # (confirmed live on Render: rc_export=0 with real row counts, but the
+    # file existed nowhere any external reader could find it). Writing both
+    # keeps this script's own keyvalue-based re-read working while also
+    # making the file visible everywhere else.
     buffer = io.StringIO()
     writer = csv.DictWriter(buffer, fieldnames=_GAME_CARDS_HEADER_ORDER)
     writer.writeheader()
     for current in rows_out:
         writer.writerow({field: current.get(field, "") for field in _GAME_CARDS_HEADER_ORDER})
-    _keyvalue_write_text_file(out_path, buffer.getvalue())
+    content = buffer.getvalue()
+    _keyvalue_write_text_file(out_path, content)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(content, encoding="utf-8")
 
 
 def _build_local_game_cards_artifact(*, source_root: Path, processed_root: Path, date_str: str, log_file: Path | None = None) -> tuple[int, Path | None]:
