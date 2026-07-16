@@ -18,7 +18,9 @@ from flask import request
 from flask import Response
 from flask import url_for
 
+from syndicate.features.shared.artifact_publisher import HOT_ARTIFACT_PATTERNS
 from syndicate.features.shared.artifact_publisher import is_hot_artifact_relative_path
+from syndicate.features.shared.artifact_publisher import relative_to_data_root
 from syndicate.features.shared.ops_refresh import build_refresh_plan
 from syndicate.features.shared.ops_refresh import _assert_no_active_refresh_run
 from syndicate.features.shared.ops_refresh import cancel_latest_refresh_run
@@ -283,6 +285,32 @@ def api_ops_artifacts_publish() -> Any:
         return jsonify({"ok": False, "error": f"{type(exc).__name__}: {exc}"}), 500
 
     return jsonify({"ok": True, "relative_path": relative_path, "bytes": target_path.stat().st_size}), 200
+
+
+@ops_bp.get("/api/ops/artifacts/export")
+def api_ops_artifacts_export() -> Any:
+    # Phase 4 of migrating off the daily-update GHA cron: read-only
+    # counterpart to /api/ops/artifacts/publish above. The GHA runner has no
+    # filesystem access to any Render disk, so this lets the reduced
+    # backup-only workflow pull the current hot-artifact set back down over
+    # HTTP and git-commit it as a cold-start safety net, instead of
+    # regenerating everything by re-running the full pipeline. Scoped to the
+    # exact same allowlist as the publish endpoint -- never returns
+    # bulk/historical data.
+    root = data_root()
+    artifacts: dict[str, str] = {}
+    for pattern in HOT_ARTIFACT_PATTERNS:
+        for path in root.glob(pattern):
+            if not path.is_file():
+                continue
+            relative_path = relative_to_data_root(path)
+            if not relative_path or not is_hot_artifact_relative_path(relative_path):
+                continue
+            try:
+                artifacts[relative_path] = path.read_text(encoding="utf-8")
+            except Exception:
+                continue
+    return jsonify({"ok": True, "count": len(artifacts), "artifacts": artifacts})
 
 
 @ops_bp.get("/api/ops/mlb/sims-list")

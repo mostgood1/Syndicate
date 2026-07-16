@@ -276,5 +276,61 @@ class ArtifactPublishEndpointTests(unittest.TestCase):
             self.assertEqual(leftovers, [])
 
 
+class ArtifactExportEndpointTests(unittest.TestCase):
+    # Phase 4 of migrating off the daily-update GHA cron: read-only
+    # counterpart to /api/ops/artifacts/publish, letting the reduced
+    # backup-only workflow pull the current hot-artifact set back down for a
+    # git-committed cold-start safety net.
+    def setUp(self) -> None:
+        app = create_app()
+        app.testing = True
+        self.client = app.test_client()
+
+    def test_export_requires_admin_token(self) -> None:
+        response = self.client.get("/api/ops/artifacts/export")
+        self.assertEqual(response.status_code, 503)
+
+    def test_export_rejects_unauthorized_request(self) -> None:
+        with patch.dict(os.environ, {"ADMIN_TOKEN": "secret-token"}, clear=False):
+            response = self.client.get(
+                "/api/ops/artifacts/export",
+                headers={"Authorization": "Bearer wrong-token"},
+            )
+        self.assertEqual(response.status_code, 401)
+
+    def test_export_returns_only_allowlisted_artifacts_with_content(self) -> None:
+        with TemporaryDirectory() as tmp_dir:
+            data_root = Path(tmp_dir)
+            hot_path = data_root / HOT_RELATIVE_PATH
+            hot_path.parent.mkdir(parents=True, exist_ok=True)
+            hot_path.write_text(json.dumps({"candidate_count": 5}), encoding="utf-8")
+
+            bulk_path = data_root / "mlb_source" / "source_artifacts" / "data" / "statcast" / "2026.csv"
+            bulk_path.parent.mkdir(parents=True, exist_ok=True)
+            bulk_path.write_text("bulk,data\n1,2\n", encoding="utf-8")
+
+            with patch.dict(
+                os.environ,
+                {"ADMIN_TOKEN": "secret-token", "SYNDICATE_DATA_ROOT": str(data_root)},
+                clear=False,
+            ):
+                response = self.client.get(
+                    "/api/ops/artifacts/export",
+                    headers={"Authorization": "Bearer secret-token"},
+                )
+
+            self.assertEqual(response.status_code, 200)
+            payload = response.get_json()
+            self.assertTrue(payload["ok"])
+            self.assertIn(HOT_RELATIVE_PATH, payload["artifacts"])
+            self.assertEqual(
+                json.loads(payload["artifacts"][HOT_RELATIVE_PATH])["candidate_count"], 5
+            )
+            self.assertNotIn(
+                "mlb_source/source_artifacts/data/statcast/2026.csv", payload["artifacts"]
+            )
+            self.assertEqual(payload["count"], len(payload["artifacts"]))
+
+
 if __name__ == "__main__":
     unittest.main()

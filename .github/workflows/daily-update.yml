@@ -22,6 +22,11 @@ on:
         required: false
         type: number
         default: 30
+      run_full_pipeline:
+        description: 'Regenerate everything locally instead of backing up Render (manual fallback for backfills/recovery; Render workers own the daily generation now)'
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -39,6 +44,7 @@ jobs:
       DAILY_UPDATE_BASE_URL: ${{ github.event.inputs.base_url || '' }}
       DAILY_UPDATE_FORCE_WINDOW_MINUTES: ${{ github.event.inputs.event_sim_force_window_minutes || 30 }}
       DAILY_UPDATE_FORCE_REBUILD_TODAY: ${{ github.run_attempt > 1 }}
+      RUN_FULL_PIPELINE: ${{ github.event.inputs.run_full_pipeline || 'false' }}
 
     steps:
       - name: Check out repository
@@ -111,7 +117,8 @@ jobs:
           tests.test_game_board_simulation_contract
           tests.test_simulation_adapter
 
-      - name: Run daily pipeline
+      - name: Run daily pipeline (full regeneration -- manual fallback only)
+        if: ${{ env.RUN_FULL_PIPELINE == 'true' }}
         shell: pwsh
         run: |
           Write-Host 'Starting daily_update_in_season.ps1'
@@ -192,6 +199,60 @@ jobs:
         env:
           ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
 
+      - name: Pull current artifacts from Render (backup-only default path)
+        if: ${{ env.RUN_FULL_PIPELINE != 'true' }}
+        shell: pwsh
+        run: |
+          # Render's refresh-worker/live-odds-worker now generate this data
+          # live and continuously -- this Action no longer regenerates it.
+          # Since the GHA runner has no filesystem access to any Render disk,
+          # this pulls the current hot-artifact set back down over HTTP via
+          # the read-only counterpart to the worker->web publish endpoint
+          # (see syndicate/blueprints/ops.py:api_ops_artifacts_export), so
+          # the commit step below can still keep a git-committed cold-start
+          # safety net -- not the primary source of truth anymore.
+          $baseUrl = if ($env:DAILY_UPDATE_BASE_URL) { $env:DAILY_UPDATE_BASE_URL } else { 'https://syndicate-an21.onrender.com' }
+          $adminToken = $env:ADMIN_TOKEN
+          if ([string]::IsNullOrWhiteSpace($adminToken)) {
+            Write-Error 'ADMIN_TOKEN secret not set; cannot pull artifacts from Render. Add it in repo Settings > Secrets (value must match the syndicate web service''s ADMIN_TOKEN in the Render dashboard), or re-run this workflow with run_full_pipeline=true.'
+            exit 1
+          }
+
+          Write-Host "==> Pulling current hot artifacts from $baseUrl"
+          $response = Invoke-RestMethod -Uri "$baseUrl/api/ops/artifacts/export" -Headers @{ Authorization = "Bearer $adminToken" } -Method Get -TimeoutSec 60
+
+          if (-not $response.ok) {
+            throw "Artifact export request failed: $($response.error)"
+          }
+
+          # git-add each written file directly here rather than relying on the
+          # commit step's directory-root heuristic below to rediscover them --
+          # that heuristic predates the shallow-layout and current_week.json
+          # patterns (Phase 3) and would silently miss files that don't live
+          # under its hardcoded manifests/source_artifacts subpaths, which is
+          # exactly the drift risk of keeping two independent path lists.
+          git config user.name 'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+
+          $count = 0
+          foreach ($relativePath in $response.artifacts.PSObject.Properties.Name) {
+            $targetPath = Join-Path 'data' $relativePath
+            $targetDir = Split-Path $targetPath -Parent
+            if (-not (Test-Path $targetDir)) {
+              New-Item -ItemType Directory -Path $targetDir -Force | Out-Null
+            }
+            Set-Content -Path $targetPath -Value $response.artifacts.$relativePath -NoNewline -Encoding utf8
+            git add -f -- $targetPath
+            $count += 1
+          }
+
+          Write-Host "==> Wrote $count artifact file(s) under data/"
+          if ($count -eq 0) {
+            Write-Warning 'No artifacts were returned by the export endpoint -- nothing to back up this run.'
+          }
+        env:
+          ADMIN_TOKEN: ${{ secrets.ADMIN_TOKEN }}
+
       - name: Commit and push pipeline outputs
         shell: pwsh
         run: |
@@ -264,7 +325,12 @@ jobs:
           $stagedFiles = @(& git diff --cached --name-only --relative)
           Write-Host 'Files staged for commit:'
           Write-Host ($stagedFiles -join "`n")
-          $artifactTreePresent = ($stagedFiles | Select-String -Pattern '^data/[^/]+_source/(manifests|source_artifacts)/' -Quiet)
+          # Broadened from '(manifests|source_artifacts)/' -- the backup-only
+          # pull step above can write to either the deep source_artifacts/data/
+          # layout (MLB/NBA) or the shallow data/ layout some sports (confirmed
+          # WNBA) use, and requiring the former would spuriously fail this gate
+          # on any run where only shallow-layout sports had fresh artifacts.
+          $artifactTreePresent = ($stagedFiles | Select-String -Pattern '^data/[^/]+_source/' -Quiet)
           if (-not $artifactTreePresent) {
             Write-Error 'ERROR: artifacts not found in staged pipeline outputs; failing workflow to indicate Stage 2 failure.'
             exit 1
@@ -286,6 +352,12 @@ jobs:
           git push origin "HEAD:$branch"
 
       - name: Trigger Render web redeploy
+        # Only meaningful when the full pipeline just regenerated everything
+        # locally -- web needs a fresh bootstrap-from-git to pick that up. The
+        # default backup-only path commits a snapshot of data web already has
+        # live via the hot-artifact push, so forcing a redeploy would just add
+        # a brief cold-start with no new data to show for it.
+        if: ${{ env.RUN_FULL_PIPELINE == 'true' }}
         shell: pwsh
         run: |
           $hookUrl = $env:RENDER_WEB_DEPLOY_HOOK_URL
@@ -303,7 +375,7 @@ jobs:
           RENDER_WEB_DEPLOY_HOOK_URL: ${{ secrets.RENDER_WEB_DEPLOY_HOOK_URL }}
 
       - name: Upload daily update log
-        if: always()
+        if: ${{ env.RUN_FULL_PIPELINE == 'true' }}
         uses: actions/upload-artifact@v4
         with:
           name: daily-update-log
