@@ -7,7 +7,7 @@ import subprocess
 import sys
 import time
 import traceback
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -236,6 +236,92 @@ def _launch_autorun_weekly_sports_refresh(
         run_exit_code=None,
         latest_manifest_state=str((_latest_manifest_payload(latest_manifest_path).get("state") or "")).strip().lower() or None,
         launch_pid=int(result.get("pid") or 0) or None,
+        refresh_cycle=refresh_cycle,
+    )
+    return True
+
+
+# Prediction reconciliation/grading never runs on Render today -- it was only
+# ever invoked from scripts/daily_update.ps1's GHA pipeline. Runs in-process
+# (unlike the launch_refresh_run-based autoruns above) since it's a light
+# read/write over the prediction ledger, not a heavy subprocess. Reconciles
+# both yesterday's and today's Central-time dates on every run: matching
+# predictions are skipped cheaply (see reconcile_prediction_results_for_date),
+# so this is safe to call repeatedly rather than needing to precisely
+# replicate the old pipeline's exact run-time semantics.
+def _reconciliation_auto_refresh_enabled() -> bool:
+    raw_value = str(os.environ.get("RECONCILIATION_ENABLE_REFRESH_WORKER_AUTORUN") or "").strip().lower()
+    return raw_value in {"1", "true", "yes", "on"}
+
+
+def _reconciliation_interval_seconds() -> int:
+    raw_value = str(os.environ.get("RECONCILIATION_REFRESH_INTERVAL_SECONDS") or "").strip()
+    try:
+        value = int(raw_value or 86400)
+    except ValueError:
+        value = 86400
+    return max(1, value)
+
+
+def _reconciliation_autorun_status_path() -> Path:
+    return _refresh_state_store()["reports_root"]() / "refresh_status" / "latest" / "reconciliation_autorun_status.json"
+
+
+def _launch_autorun_reconciliation(
+    *,
+    latest_manifest_path: Path,
+    worker_status_path: Path,
+    refresh_cycle: dict[str, int],
+) -> bool:
+    if not _reconciliation_auto_refresh_enabled():
+        return False
+
+    status_path = _reconciliation_autorun_status_path()
+    last_status = _refresh_state_store()["read_json_file"](status_path) or {}
+    last_epoch = float((last_status or {}).get("epoch") or 0.0)
+    if last_epoch > 0.0 and (time.time() - last_epoch) < float(_reconciliation_interval_seconds()):
+        return False
+
+    from syndicate.features.prediction_reconciliation import reconcile_prediction_results_for_date
+
+    today_date = central_today_iso()
+    yesterday_date = (date.fromisoformat(today_date) - timedelta(days=1)).isoformat()
+    target_dates = (yesterday_date, today_date)
+    summaries: dict[str, Any] = {}
+    error_text: str | None = None
+    try:
+        for target_date in target_dates:
+            result = reconcile_prediction_results_for_date(target_date)
+            summaries[target_date] = result.get("summary")
+    except Exception as exc:
+        error_text = f"{type(exc).__name__}: {exc}"
+
+    _refresh_state_store()["write_json_file"](
+        status_path,
+        {"epoch": time.time(), "dates": list(target_dates), "summaries": summaries, "error": error_text},
+    )
+
+    if error_text:
+        _write_worker_status(
+            worker_status_path=worker_status_path,
+            latest_manifest_path=latest_manifest_path,
+            state="error",
+            detail=f"Failed to auto-run prediction reconciliation: {error_text}",
+            ran_job=False,
+            latest_manifest_state=str((_latest_manifest_payload(latest_manifest_path).get("state") or "")).strip().lower() or None,
+            refresh_cycle=refresh_cycle,
+        )
+        return False
+
+    refresh_cycle["claimed_count"] = int(refresh_cycle.get("claimed_count") or 0) + 1
+    _write_worker_status(
+        worker_status_path=worker_status_path,
+        latest_manifest_path=latest_manifest_path,
+        state="launched",
+        detail=f"Auto-ran prediction reconciliation for {yesterday_date} and {today_date}.",
+        ran_job=True,
+        run_exit_code=0,
+        latest_manifest_state=str((_latest_manifest_payload(latest_manifest_path).get("state") or "")).strip().lower() or None,
         refresh_cycle=refresh_cycle,
     )
     return True
@@ -582,6 +668,13 @@ def main() -> int:
             if args.run_once:
                 return 0
         elif _launch_autorun_weekly_sports_refresh(
+            latest_manifest_path=latest_manifest_path,
+            worker_status_path=worker_status_path,
+            refresh_cycle=refresh_cycle,
+        ):
+            if args.run_once:
+                return 0
+        elif _launch_autorun_reconciliation(
             latest_manifest_path=latest_manifest_path,
             worker_status_path=worker_status_path,
             refresh_cycle=refresh_cycle,

@@ -288,6 +288,87 @@ class RefreshWorkerTests(unittest.TestCase):
         self.assertEqual(module._active_weekly_sports_for_date("2026-10-15"), "nfl,ncaaf")
         self.assertEqual(module._active_weekly_sports_for_date("2026-12-01"), "nfl,ncaaf,ncaab")
 
+    def test_main_run_once_autoruns_reconciliation_when_enabled(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        module = self._load_module(repo_root)
+
+        with TemporaryDirectory() as tmp_dir:
+            reports_root = Path(tmp_dir) / "reports"
+            latest_manifest_path = reports_root / "refresh_status" / "latest" / "refresh_status_latest.json"
+            worker_status_path = reports_root / "refresh_status" / "latest" / "refresh_worker_status.json"
+            latest_manifest_path.parent.mkdir(parents=True, exist_ok=True)
+            latest_manifest_path.write_text(json.dumps({"state": "idle"}), encoding="utf-8")
+
+            fake_summary = {"date": "placeholder", "predictions": 0, "resolved": 0, "skipped": 0, "result_files": []}
+
+            with patch.dict(
+                module.os.environ,
+                {
+                    "SYNDICATE_REPORTS_ROOT": str(reports_root),
+                    "RECONCILIATION_ENABLE_REFRESH_WORKER_AUTORUN": "1",
+                },
+                clear=True,
+            ), patch.object(
+                sys,
+                "argv",
+                [
+                    "run_refresh_worker.py",
+                    "--latest-manifest",
+                    str(latest_manifest_path),
+                    "--worker-status",
+                    str(worker_status_path),
+                    "--run-once",
+                ],
+            ), patch.object(module, "central_today_iso", return_value="2026-07-15"), patch(
+                "syndicate.features.prediction_reconciliation.reconcile_prediction_results_for_date",
+                return_value={"ok": True, "summary": fake_summary},
+            ) as mocked_reconcile:
+                exit_code = module.main()
+
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(mocked_reconcile.call_count, 2)
+            called_dates = sorted(call.args[0] for call in mocked_reconcile.call_args_list)
+            self.assertEqual(called_dates, ["2026-07-14", "2026-07-15"])
+            worker_status = json.loads(worker_status_path.read_text(encoding="utf-8"))
+            self.assertEqual(worker_status["state"], "launched")
+            self.assertTrue(worker_status["ranJob"])
+
+    def test_main_run_once_skips_reconciliation_when_disabled(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        module = self._load_module(repo_root)
+
+        with TemporaryDirectory() as tmp_dir:
+            reports_root = Path(tmp_dir) / "reports"
+            latest_manifest_path = reports_root / "refresh_status" / "latest" / "refresh_status_latest.json"
+            worker_status_path = reports_root / "refresh_status" / "latest" / "refresh_worker_status.json"
+            latest_manifest_path.parent.mkdir(parents=True, exist_ok=True)
+            latest_manifest_path.write_text(json.dumps({"state": "idle"}), encoding="utf-8")
+
+            with patch.dict(
+                module.os.environ,
+                {"SYNDICATE_REPORTS_ROOT": str(reports_root)},
+                clear=True,
+            ), patch.object(
+                sys,
+                "argv",
+                [
+                    "run_refresh_worker.py",
+                    "--latest-manifest",
+                    str(latest_manifest_path),
+                    "--worker-status",
+                    str(worker_status_path),
+                    "--run-once",
+                ],
+            ), patch(
+                "syndicate.features.prediction_reconciliation.reconcile_prediction_results_for_date"
+            ) as mocked_reconcile:
+                exit_code = module.main()
+
+            self.assertEqual(exit_code, 0)
+            mocked_reconcile.assert_not_called()
+            worker_status = json.loads(worker_status_path.read_text(encoding="utf-8"))
+            self.assertEqual(worker_status["state"], "idle")
+
     def test_main_run_once_marks_worker_status_claimed_when_pending(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]
         module = self._load_module(repo_root)

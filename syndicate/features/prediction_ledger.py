@@ -8,12 +8,24 @@ from pathlib import Path
 from statistics import mean
 from typing import Any, Mapping
 
-from syndicate.features.shared.source_roots import repo_root_from
+from syndicate.features.shared.refresh_state_store import data_root
 
 
 SCHEMA_VERSION = 1
-DEFAULT_LEDGER_PATH = repo_root_from(__file__) / "data" / "prediction_ledger.json"
-DEFAULT_SIGNAL_WEIGHTS_PATH = repo_root_from(__file__) / "data" / "signal_weights.json"
+
+
+def _default_ledger_path() -> Path:
+    # data_root() honors SYNDICATE_DATA_ROOT (the persistent Render disk) and
+    # falls back to the local repo's data/ dir otherwise. A module-level
+    # constant computed from repo_root_from(__file__) would instead resolve
+    # to the ephemeral code checkout on Render -- wiped on every redeploy,
+    # separate from the persistent disk -- so predictions recorded via
+    # record_prediction() never actually survived a deploy.
+    return data_root() / "prediction_ledger.json"
+
+
+def _default_signal_weights_path() -> Path:
+    return data_root() / "signal_weights.json"
 
 
 def _utc_now() -> str:
@@ -130,7 +142,7 @@ def _write_signal_weights(path: Path, payload: Mapping[str, Any]) -> None:
 
 
 def _signal_weight(signal_name: Any, *, weights_payload: Mapping[str, Any] | None = None) -> float:
-    payload = weights_payload if isinstance(weights_payload, Mapping) else _read_signal_weights(DEFAULT_SIGNAL_WEIGHTS_PATH)
+    payload = weights_payload if isinstance(weights_payload, Mapping) else _read_signal_weights(_default_signal_weights_path())
     default_weight = _coerce_float(payload.get("default_weight")) or 1.0
     weights = payload.get("weights") if isinstance(payload.get("weights"), Mapping) else {}
     key = _normalize_text(signal_name)
@@ -141,7 +153,7 @@ def _signal_weight(signal_name: Any, *, weights_payload: Mapping[str, Any] | Non
 
 
 def _update_signal_weights_from_prediction(record: Mapping[str, Any], *, weights_path: Path | None = None) -> dict[str, Any]:
-    path = Path(weights_path) if weights_path is not None else DEFAULT_SIGNAL_WEIGHTS_PATH
+    path = Path(weights_path) if weights_path is not None else _default_signal_weights_path()
     payload = _read_signal_weights(path)
     weights = dict(payload.get("weights") or {})
     signals = record.get("signals") if isinstance(record.get("signals"), Mapping) else {}
@@ -300,7 +312,7 @@ def record_prediction(
             "features_snapshot": features_snapshot,
         }
     )
-    path = Path(ledger_path) if ledger_path is not None else DEFAULT_LEDGER_PATH
+    path = Path(ledger_path) if ledger_path is not None else _default_ledger_path()
     return _upsert_prediction_record(path, payload)
 
 
@@ -325,7 +337,7 @@ def record_result(
             "pnl": pnl,
         }
     )
-    path = Path(ledger_path) if ledger_path is not None else DEFAULT_LEDGER_PATH
+    path = Path(ledger_path) if ledger_path is not None else _default_ledger_path()
     payload = _read_payload(path)
     results = [dict(item) for item in payload.get("results", []) if isinstance(item, Mapping)]
     result_index = _latest_result_index(results)
@@ -352,14 +364,14 @@ def record_result(
 
 
 def result_exists(prediction_id: Any, ledger_path: Path | str | None = None) -> bool:
-    path = Path(ledger_path) if ledger_path is not None else DEFAULT_LEDGER_PATH
+    path = Path(ledger_path) if ledger_path is not None else _default_ledger_path()
     payload = _read_payload(path)
     results = [dict(item) for item in payload.get("results", []) if isinstance(item, Mapping)]
     return _normalize_text(prediction_id) in _latest_result_index(results)
 
 
 def load_all_predictions(ledger_path: Path | str | None = None) -> list[dict[str, Any]]:
-    path = Path(ledger_path) if ledger_path is not None else DEFAULT_LEDGER_PATH
+    path = Path(ledger_path) if ledger_path is not None else _default_ledger_path()
     payload = _read_payload(path)
     predictions = [dict(item) for item in payload.get("predictions", []) if isinstance(item, Mapping)]
     results = [dict(item) for item in payload.get("results", []) if isinstance(item, Mapping)]
@@ -642,8 +654,6 @@ def analyze_prediction_performance(ledger_path: Path | str | None = None) -> dic
 
 __all__ = [
     "SCHEMA_VERSION",
-    "DEFAULT_LEDGER_PATH",
-    "DEFAULT_SIGNAL_WEIGHTS_PATH",
     "PredictionRecord",
     "PredictionResult",
     "record_prediction",

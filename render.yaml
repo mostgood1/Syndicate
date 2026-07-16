@@ -153,6 +153,19 @@ services:
         value: "false"
       - key: WEEKLY_SPORTS_REFRESH_INTERVAL_SECONDS
         value: "21600"
+      # Phase 2 of migrating off the daily-update GHA cron: prediction
+      # reconciliation/grading never ran on Render, only from
+      # daily_update.ps1. Fixed alongside this: prediction_ledger.py's
+      # default ledger path was resolving inside the ephemeral code checkout
+      # instead of the persistent data disk, so predictions never actually
+      # survived a redeploy -- see syndicate/features/prediction_ledger.py's
+      # _default_ledger_path(). Defaults off for the same dark-launch
+      # reasoning used elsewhere in this file; flip on once a session's
+      # worth of predictions have accumulated at the corrected path.
+      - key: RECONCILIATION_ENABLE_REFRESH_WORKER_AUTORUN
+        value: "false"
+      - key: RECONCILIATION_REFRESH_INTERVAL_SECONDS
+        value: "86400"
       # Temporary mitigation for a confirmed production OOM in WNBA's smart-sim
       # predictions step: play-by-play-level simulation is far more memory-hungry
       # than the box-score-level fallback and the refresh subprocess dies before
