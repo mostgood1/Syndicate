@@ -8,8 +8,11 @@ __pycache__/
 
 tmp_*.log
 tmp_*.json
+tmp_*.py
+tmp_*.txt
 .tmp_*.json
 *.tmp
+scratch_*.log
 
 .DS_Store
 Thumbs.db
@@ -28,6 +31,11 @@ data/*_source/data/cache/
 data/*_source/source_artifacts/data/cache/
 data/*_source/source_artifacts/
 data/tmp_*/
+
+# SmartSim 2.0 historical-truth caches: regenerable via ncaaf_historical_loader.py /
+# nfl_historical_loader.py (CFBD API / nflverse release download); mirror caches, not source.
+data/nfl_source/historical_truth/
+data/ncaaf_source/historical_truth/
 
 # Generated source trees are operational artifacts, not Render deploy inputs.
 data/*_source/data/
