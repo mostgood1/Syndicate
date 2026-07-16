@@ -293,6 +293,10 @@ class LiveRefreshLoopTests(unittest.TestCase):
         ), patch.object(
             live_refresh_loop, "_should_force_sim_rerun", return_value=False
         ), patch.object(
+            live_refresh_loop, "_read_last_pregame_launch", return_value={}
+        ), patch.object(
+            live_refresh_loop, "_record_pregame_launch"
+        ), patch.object(
             live_refresh_loop,
             "launch_refresh_run",
             return_value={"ok": True, "state": "running"},
@@ -316,6 +320,75 @@ class LiveRefreshLoopTests(unittest.TestCase):
             dry_run=False,
             force_refresh=False,
         )
+
+    def test_pregame_relaunch_blocked_false_when_no_prior_launch(self) -> None:
+        with patch.object(live_refresh_loop, "_read_last_pregame_launch", return_value={}):
+            blocked = live_refresh_loop._pregame_relaunch_blocked(now_epoch=1000.0, date_str="2026-07-16")
+        self.assertFalse(blocked)
+
+    def test_pregame_relaunch_blocked_true_within_cooldown_window(self) -> None:
+        with patch.dict(
+            os.environ, {"SYNDICATE_LIVE_ODDS_PREGAME_RELAUNCH_COOLDOWN_SECONDS": "1800"}, clear=False
+        ), patch.object(
+            live_refresh_loop,
+            "_read_last_pregame_launch",
+            return_value={"epoch": 1000.0, "date": "2026-07-16"},
+        ):
+            blocked = live_refresh_loop._pregame_relaunch_blocked(now_epoch=1500.0, date_str="2026-07-16")
+        self.assertTrue(blocked)
+
+    def test_pregame_relaunch_blocked_false_after_cooldown_expires(self) -> None:
+        with patch.dict(
+            os.environ, {"SYNDICATE_LIVE_ODDS_PREGAME_RELAUNCH_COOLDOWN_SECONDS": "1800"}, clear=False
+        ), patch.object(
+            live_refresh_loop,
+            "_read_last_pregame_launch",
+            return_value={"epoch": 1000.0, "date": "2026-07-16"},
+        ):
+            blocked = live_refresh_loop._pregame_relaunch_blocked(now_epoch=1000.0 + 1801.0, date_str="2026-07-16")
+        self.assertFalse(blocked)
+
+    def test_pregame_relaunch_blocked_false_for_different_date(self) -> None:
+        with patch.dict(
+            os.environ, {"SYNDICATE_LIVE_ODDS_PREGAME_RELAUNCH_COOLDOWN_SECONDS": "1800"}, clear=False
+        ), patch.object(
+            live_refresh_loop,
+            "_read_last_pregame_launch",
+            return_value={"epoch": 1000.0, "date": "2026-07-15"},
+        ):
+            blocked = live_refresh_loop._pregame_relaunch_blocked(now_epoch=1500.0, date_str="2026-07-16")
+        self.assertFalse(blocked)
+
+    def test_run_tick_skips_pregame_relaunch_within_cooldown(self) -> None:
+        # The production incident this guards against: a fixed 60s outer
+        # sleep let every tick relaunch the full predict-date + SmartSim
+        # pipeline before the previous cold-start attempt (20-30+ minutes)
+        # could finish, so game_cards_<date>.csv never got produced. This
+        # cooldown blocks a relaunch independently of the outer interval fix
+        # and of _assert_no_active_refresh_run's own PID-based guard.
+        with patch.dict(
+            os.environ,
+            {"SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP": "true"},
+            clear=False,
+        ), patch.object(live_refresh_loop, "central_today_iso", return_value="2026-07-16"), patch.object(
+            live_refresh_loop, "_any_tracked_sport_game_live", return_value=False
+        ), patch.object(
+            live_refresh_loop, "_should_force_sim_rerun", return_value=False
+        ), patch.object(
+            live_refresh_loop, "_pregame_relaunch_blocked", return_value=True
+        ), patch.object(
+            live_refresh_loop, "_record_pregame_launch"
+        ) as mocked_record, patch.object(
+            live_refresh_loop,
+            "launch_refresh_run",
+        ) as mocked_launch:
+            payload = live_refresh_loop._run_live_refresh_tick()
+
+        self.assertFalse(payload["ok"])
+        self.assertTrue(payload["skipped"])
+        self.assertIn("cooldown", payload["error"])
+        mocked_launch.assert_not_called()
+        mocked_record.assert_not_called()
 
     def test_run_tick_uses_live_phase_and_short_interval_when_a_game_is_live(self) -> None:
         with patch.dict(
@@ -626,6 +699,10 @@ class LiveRefreshLoopTests(unittest.TestCase):
         ), patch.object(
             live_refresh_loop, "_should_force_sim_rerun", return_value=False
         ), patch.object(
+            live_refresh_loop, "_read_last_pregame_launch", return_value={}
+        ), patch.object(
+            live_refresh_loop, "_record_pregame_launch"
+        ), patch.object(
             live_refresh_loop, "_read_last_look_ahead_check", return_value={}
         ), patch.object(
             live_refresh_loop, "_record_look_ahead_check"
@@ -733,6 +810,37 @@ class LiveRefreshLoopTests(unittest.TestCase):
 
         self.assertEqual(exit_code, 0)
         mocked_start_reports.assert_called_once()
+
+    def test_run_live_odds_refresh_worker_sleeps_for_adaptive_idle_interval(self) -> None:
+        # A fixed 60s sleep regardless of tick phase meant every pregame tick
+        # relaunched the full predict-date + SmartSim pipeline before the
+        # previous cold-start attempt (20-30+ minutes) could finish -- each
+        # attempt got cut off ~60-70s in as the next tick's launch collided
+        # with it, so a cold WNBA/MLB slate could never complete. The loop
+        # must use the adaptive interval (900s idle/pregame) computed from
+        # the tick's own result, not the fixed base interval.
+        pregame_meta = {"phase": "pregame", "adaptive": True, "anyLive": False}
+        with patch.object(run_live_odds_refresh_worker, "_acquire_process_lock", return_value=True), patch.object(
+            run_live_odds_refresh_worker,
+            "_start_live_lens_reports",
+            return_value=None,
+        ), patch.object(run_live_odds_refresh_worker, "_run_tick", return_value=pregame_meta), patch.object(
+            run_live_odds_refresh_worker,
+            "_live_refresh_loop_interval_seconds",
+            return_value=60,
+        ), patch.object(run_live_odds_refresh_worker.time, "sleep", return_value=None) as mocked_sleep, patch.object(
+            run_live_odds_refresh_worker.signal,
+            "signal",
+            side_effect=ValueError("skip signals"),
+        ), patch.object(run_live_odds_refresh_worker.sys, "argv", ["run_live_odds_refresh_worker.py"]), patch.object(
+            run_live_odds_refresh_worker._LIVE_REFRESH_LOOP_STOP,
+            "is_set",
+            side_effect=[False, True],
+        ):
+            exit_code = run_live_odds_refresh_worker.main()
+
+        self.assertEqual(exit_code, 0)
+        mocked_sleep.assert_called_once_with(900)
 
     def test_run_live_odds_refresh_worker_recycles_after_max_uptime(self) -> None:
         # A long-lived worker doing routine multi-sport file I/O every tick

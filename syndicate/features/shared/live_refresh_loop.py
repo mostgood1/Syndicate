@@ -688,6 +688,47 @@ def _status_payload() -> dict[str, Any]:
 	}
 
 
+# Pregame relaunch cooldown: defense-in-depth against the retry-storm
+# confirmed in production on 2026-07-16 -- the outer worker loop's fixed 60s
+# sleep (now fixed separately, see run_live_odds_refresh_worker.py) let every
+# tick relaunch the full predict-date + SmartSim pipeline before the previous
+# cold-start attempt (20-30+ minutes) could finish, so a cold WNBA/MLB slate
+# never completed. This cooldown applies independently of that fix and of
+# _assert_no_active_refresh_run's own PID-based guard, so a pregame relaunch
+# is blocked for a fixed window after the last attempt regardless of whether
+# that guard correctly detects an in-flight detached subprocess.
+def _pregame_relaunch_cooldown_seconds() -> int:
+	raw = str(os.environ.get("SYNDICATE_LIVE_ODDS_PREGAME_RELAUNCH_COOLDOWN_SECONDS") or "").strip()
+	try:
+		value = int(raw or 1800)
+	except Exception:
+		value = 1800
+	return max(0, value)
+
+
+def _last_pregame_launch_path() -> Path:
+	return _meta_dir() / "last_pregame_refresh_launch.json"
+
+
+def _read_last_pregame_launch() -> dict[str, Any]:
+	payload = read_json_file(_last_pregame_launch_path())
+	return payload if isinstance(payload, dict) else {}
+
+
+def _record_pregame_launch(epoch: float, date_str: str) -> None:
+	write_json_file(_last_pregame_launch_path(), {"epoch": epoch, "date": date_str, "recordedAt": _utc_now()})
+
+
+def _pregame_relaunch_blocked(*, now_epoch: float, date_str: str) -> bool:
+	cooldown = _pregame_relaunch_cooldown_seconds()
+	if cooldown <= 0:
+		return False
+	last = _read_last_pregame_launch()
+	last_epoch = float(last.get("epoch") or 0.0)
+	last_date = str(last.get("date") or "")
+	return last_epoch > 0.0 and last_date == date_str and (now_epoch - last_epoch) < cooldown
+
+
 def _run_live_refresh_tick() -> dict[str, Any]:
 	tick_started_epoch = datetime.now(timezone.utc).timestamp()
 	adaptive_enabled = _live_refresh_loop_adaptive_enabled()
@@ -724,31 +765,38 @@ def _run_live_refresh_tick() -> dict[str, Any]:
 			meta["mlbDailySim"] = {"launched": False, "reason": mlb_decision.get("reason")}
 	except Exception as exc:
 		meta["mlbDailySim"] = {"launched": False, "error": f"{type(exc).__name__}: {exc}"}
-	try:
-		result = launch_refresh_run(
-			date=meta["date"],
-			sports=_live_refresh_loop_sports(),
-			phase=str(meta["phase"]),
-			regions=str(meta["regions"]),
-			mode=str(meta["mode"]),
-			execution_mode=str(meta["executionMode"]),
-			launch_mode=_live_refresh_loop_launch_mode(),
-			skip_mirror=bool(meta["skipMirror"]),
-			mirror_only=False,
-			dry_run=False,
-			force_refresh=force_sim_rerun,
-		)
-		meta["ok"] = True
-		meta["result"] = result
-		if force_sim_rerun:
-			print(f"[live_refresh_loop] LINEUP_INJURY_CHANGE_RESIM_TRIGGERED date={meta['date']} phase={meta['phase']}", flush=True)
-	except ValueError as exc:
+	if effective_phase == "pregame" and _pregame_relaunch_blocked(now_epoch=tick_started_epoch, date_str=selected_date):
 		meta["ok"] = False
 		meta["skipped"] = True
-		meta["error"] = str(exc)
-	except Exception as exc:
-		meta["ok"] = False
-		meta["error"] = f"{type(exc).__name__}: {exc}"
+		meta["error"] = "pregame refresh relaunch blocked by cooldown (previous attempt still within cooldown window)"
+	else:
+		if effective_phase == "pregame":
+			_record_pregame_launch(tick_started_epoch, selected_date)
+		try:
+			result = launch_refresh_run(
+				date=meta["date"],
+				sports=_live_refresh_loop_sports(),
+				phase=str(meta["phase"]),
+				regions=str(meta["regions"]),
+				mode=str(meta["mode"]),
+				execution_mode=str(meta["executionMode"]),
+				launch_mode=_live_refresh_loop_launch_mode(),
+				skip_mirror=bool(meta["skipMirror"]),
+				mirror_only=False,
+				dry_run=False,
+				force_refresh=force_sim_rerun,
+			)
+			meta["ok"] = True
+			meta["result"] = result
+			if force_sim_rerun:
+				print(f"[live_refresh_loop] LINEUP_INJURY_CHANGE_RESIM_TRIGGERED date={meta['date']} phase={meta['phase']}", flush=True)
+		except ValueError as exc:
+			meta["ok"] = False
+			meta["skipped"] = True
+			meta["error"] = str(exc)
+		except Exception as exc:
+			meta["ok"] = False
+			meta["error"] = f"{type(exc).__name__}: {exc}"
 
 	# Look-ahead: while idle, proactively warm tomorrow's slate instead of only
 	# reacting once central_today_iso() rolls over. Independent of the above

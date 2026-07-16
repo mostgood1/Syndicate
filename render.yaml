@@ -409,6 +409,18 @@ services:
       # OOM kill.
       - key: SYNDICATE_LIVE_ODDS_WORKER_MAX_UPTIME_SECONDS
         value: "21600"
+      # Confirmed production incident 2026-07-16: this worker's outer tick
+      # loop was sleeping a fixed 60s regardless of phase (a separate bug,
+      # also fixed), so every tick relaunched the full predict-date +
+      # SmartSim pipeline before the previous cold-start attempt (20-30+ min)
+      # could finish -- game_cards_<date>.csv never got produced for WNBA/MLB.
+      # This cooldown blocks a pregame relaunch for this long after the last
+      # attempt, independent of the interval fix and of
+      # _assert_no_active_refresh_run's own PID-based guard. On by default
+      # (not a dark launch) since it's a fix for already-broken behavior, not
+      # new functionality.
+      - key: SYNDICATE_LIVE_ODDS_PREGAME_RELAUNCH_COOLDOWN_SECONDS
+        value: "1800"
       - key: SYNDICATE_INTELLIGENCE_REFRESH_INTERVAL_SECONDS
         value: "60"
       - key: SYNDICATE_LIVE_ODDS_REFRESH_LAUNCH_MODE

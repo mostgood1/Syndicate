@@ -22,6 +22,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from syndicate.features.shared.live_refresh_loop import _live_refresh_loop_interval_seconds
+from syndicate.features.shared.live_refresh_loop import _live_refresh_loop_interval_for_meta
 from syndicate.features.shared.live_refresh_loop import _run_live_refresh_tick
 from syndicate.features.shared.live_refresh_loop import _acquire_process_lock
 from syndicate.features.shared.live_refresh_loop import _release_process_lock
@@ -181,15 +182,17 @@ def _max_uptime_seconds() -> float | None:
     return max(300.0, value + jitter)
 
 
-def _run_tick() -> None:
+def _run_tick() -> dict[str, object] | None:
     try:
         _log_worker_memory("tick_start")
         meta = _run_live_refresh_tick()
         _log_worker_memory("tick_end", ok=bool(meta.get("ok", False)), skipped=bool(meta.get("skipped")))
         print(f"LIVE ODDS REFRESH TICK: {meta.get('ok', False)}")
+        return meta
     except Exception as exc:
         _log_worker_memory("tick_error", error=f"{type(exc).__name__}: {exc}")
         print(f"LIVE ODDS REFRESH ERROR: {exc}")
+        return None
 
 
 def _start_live_lens_reports() -> None:
@@ -259,15 +262,27 @@ def main() -> int:
         _log_worker_memory("loop_start", interval_seconds=interval_seconds, max_uptime_seconds=max_uptime_seconds)
         while not _LIVE_REFRESH_LOOP_STOP.is_set():
             _log_worker_memory("loop_tick_begin", interval_seconds=interval_seconds)
-            _run_tick()
+            meta = _run_tick()
+            # Use the adaptive interval (900s idle/pregame, 60s once a game is
+            # actually live -- see _live_refresh_loop_interval_for_meta) rather
+            # than the fixed base interval. Sleeping a fixed 60s regardless of
+            # phase meant every pregame tick relaunched the full predict-date +
+            # SmartSim pipeline before the previous attempt could possibly
+            # finish (confirmed taking 20-30+ minutes cold), so the cold-start
+            # WNBA/MLB slate could never complete -- each attempt got cut off
+            # ~60-70s in as the next tick's launch collided with it.
+            try:
+                sleep_seconds = _live_refresh_loop_interval_for_meta(meta) if meta is not None else interval_seconds
+            except Exception:
+                sleep_seconds = interval_seconds
             uptime_seconds = time.monotonic() - loop_started_at
             if max_uptime_seconds is not None and uptime_seconds >= max_uptime_seconds:
                 recycled_for_uptime = True
                 _log_worker_memory("loop_recycle_for_uptime", uptime_seconds=uptime_seconds, max_uptime_seconds=max_uptime_seconds)
                 print(f"LIVE ODDS REFRESH WORKER RECYCLING after {uptime_seconds:.0f}s uptime to reset accumulated page cache", flush=True)
                 break
-            _log_worker_memory("loop_sleep", interval_seconds=interval_seconds)
-            time.sleep(interval_seconds)
+            _log_worker_memory("loop_sleep", interval_seconds=sleep_seconds)
+            time.sleep(sleep_seconds)
     finally:
         _log_worker_memory("loop_finally", recycled_for_uptime=recycled_for_uptime)
         _release_process_lock()
