@@ -16,6 +16,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from syndicate.features.shared.ops_refresh import launch_refresh_run
+from syndicate.features.shared.ops_refresh import _active_sports_for_date
 from pipeline.intelligence_state import start_intelligence_state_background_loop
 from syndicate.features.shared.timezone import central_today_iso
 
@@ -142,6 +143,95 @@ def _launch_autorun_mlb_refresh(
         latest_manifest_path=latest_manifest_path,
         state="launched",
         detail=f"Auto-launched MLB refresh because {selected_date} report was stale.",
+        ran_job=True,
+        run_exit_code=None,
+        latest_manifest_state=str((_latest_manifest_payload(latest_manifest_path).get("state") or "")).strip().lower() or None,
+        launch_pid=int(result.get("pid") or 0) or None,
+        refresh_cycle=refresh_cycle,
+    )
+    return True
+
+
+# NFL/NCAAF/NCAAB have no live worker coverage today -- they only ever
+# refreshed via the daily-update GHA cron, since live_refresh_loop.py's
+# adaptive tick only covers MLB/NBA/WNBA/NHL. Mirrors the MLB autorun above,
+# but these are weekly (not daily) sports, so it uses its own last-attempt
+# marker for staleness instead of a per-date report file, and reuses
+# ops_refresh's own season-window gate rather than duplicating those windows
+# here.
+def _weekly_sports_auto_refresh_enabled() -> bool:
+    raw_value = str(os.environ.get("WEEKLY_SPORTS_ENABLE_REFRESH_WORKER_AUTORUN") or "").strip().lower()
+    return raw_value in {"1", "true", "yes", "on"}
+
+
+def _weekly_sports_refresh_interval_seconds() -> int:
+    raw_value = str(os.environ.get("WEEKLY_SPORTS_REFRESH_INTERVAL_SECONDS") or "").strip()
+    try:
+        value = int(raw_value or 21600)
+    except ValueError:
+        value = 21600
+    return max(1, value)
+
+
+def _weekly_sports_autorun_status_path() -> Path:
+    return _refresh_state_store()["reports_root"]() / "refresh_status" / "latest" / "weekly_sports_autorun_status.json"
+
+
+def _active_weekly_sports_for_date(selected_date: str) -> str:
+    active = {item.strip().lower() for item in _active_sports_for_date(selected_date).split(",") if item.strip()}
+    return ",".join(sport for sport in ("nfl", "ncaaf", "ncaab") if sport in active)
+
+
+def _launch_autorun_weekly_sports_refresh(
+    *,
+    latest_manifest_path: Path,
+    worker_status_path: Path,
+    refresh_cycle: dict[str, int],
+) -> bool:
+    if not _weekly_sports_auto_refresh_enabled():
+        return False
+    selected_date = central_today_iso()
+    weekly_sports = _active_weekly_sports_for_date(selected_date)
+    if not weekly_sports:
+        return False
+
+    status_path = _weekly_sports_autorun_status_path()
+    last_status = _refresh_state_store()["read_json_file"](status_path) or {}
+    last_epoch = float((last_status or {}).get("epoch") or 0.0)
+    if last_epoch > 0.0 and (time.time() - last_epoch) < float(_weekly_sports_refresh_interval_seconds()):
+        return False
+
+    try:
+        result = launch_refresh_run(
+            date=selected_date,
+            sports=weekly_sports,
+            phase="live",
+            execution_mode="source",
+            regions="us",
+            skip_mirror=True,
+            mode=str(os.environ.get("SYNDICATE_LIVE_ODDS_REFRESH_MODE") or "full"),
+            launch_mode="web_process",
+        )
+    except Exception as exc:
+        _refresh_state_store()["write_json_file"](status_path, {"epoch": time.time(), "sports": weekly_sports, "date": selected_date, "error": f"{type(exc).__name__}: {exc}"})
+        _write_worker_status(
+            worker_status_path=worker_status_path,
+            latest_manifest_path=latest_manifest_path,
+            state="error",
+            detail=f"Failed to auto-launch weekly-sports refresh ({weekly_sports}): {type(exc).__name__}: {exc}",
+            ran_job=False,
+            latest_manifest_state=str((_latest_manifest_payload(latest_manifest_path).get("state") or "")).strip().lower() or None,
+            refresh_cycle=refresh_cycle,
+        )
+        return False
+
+    _refresh_state_store()["write_json_file"](status_path, {"epoch": time.time(), "sports": weekly_sports, "date": selected_date})
+    refresh_cycle["claimed_count"] = int(refresh_cycle.get("claimed_count") or 0) + 1
+    _write_worker_status(
+        worker_status_path=worker_status_path,
+        latest_manifest_path=latest_manifest_path,
+        state="launched",
+        detail=f"Auto-launched weekly-sports refresh ({weekly_sports}) for {selected_date}.",
         ran_job=True,
         run_exit_code=None,
         latest_manifest_state=str((_latest_manifest_payload(latest_manifest_path).get("state") or "")).strip().lower() or None,
@@ -485,6 +575,13 @@ def main() -> int:
             if args.run_once:
                 return 0
         elif _launch_autorun_mlb_refresh(
+            latest_manifest_path=latest_manifest_path,
+            worker_status_path=worker_status_path,
+            refresh_cycle=refresh_cycle,
+        ):
+            if args.run_once:
+                return 0
+        elif _launch_autorun_weekly_sports_refresh(
             latest_manifest_path=latest_manifest_path,
             worker_status_path=worker_status_path,
             refresh_cycle=refresh_cycle,

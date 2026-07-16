@@ -142,6 +142,17 @@ services:
         value: "60"
       - key: MLB_LIVE_ODDSAPI_REFRESH_INTERVAL_SECONDS
         value: "60"
+      # Phase 1 of migrating off the daily-update GHA cron: NFL/NCAAF/NCAAB
+      # have no live worker coverage today (live_refresh_loop.py's adaptive
+      # tick only covers MLB/NBA/WNBA/NHL), so they only ever refreshed via
+      # the daily Action. Mirrors MLB_ENABLE_REFRESH_WORKER_AUTORUN above but
+      # gated by season windows (these are weekly, not daily, sports) via
+      # _active_weekly_sports_for_date(); defaults off for the same
+      # dark-launch reasoning used elsewhere in this file.
+      - key: WEEKLY_SPORTS_ENABLE_REFRESH_WORKER_AUTORUN
+        value: "false"
+      - key: WEEKLY_SPORTS_REFRESH_INTERVAL_SECONDS
+        value: "21600"
       # Temporary mitigation for a confirmed production OOM in WNBA's smart-sim
       # predictions step: play-by-play-level simulation is far more memory-hungry
       # than the box-score-level fallback and the refresh subprocess dies before
