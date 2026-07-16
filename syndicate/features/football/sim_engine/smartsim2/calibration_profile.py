@@ -68,6 +68,24 @@ class CalibrationProfile:
     touchdown_weight_multiplier: float = 1.0
     field_goal_weight_multiplier: float = 1.0
 
+    # Red-zone-specific scoring distribution: these two isolate red-zone
+    # behavior from the general touchdown_weight_multiplier/gain formulas
+    # above, so a league can raise red-zone efficiency (more trips ending in
+    # touchdowns instead of stalling into a field-goal attempt or
+    # turnover-on-downs) without moving the overall (all-field-position)
+    # touchdown rate or ordinary drive yardage.
+    # Additive bonus to the touchdown outcome weight while play_state.red_zone
+    # is true (play_simulator._play_outcome_weights); replaces the literal
+    # `red_zone * 0.33` term.
+    red_zone_touchdown_weight_bonus: float = 0.33
+    # Multiplies the ordinary-GAIN outcome weight while play_state.field_goal_range
+    # is true (play_simulator._play_outcome_weights); replaces the literal
+    # `gain *= 0.80` scoring-zone stiffening. Lower values stall more drives
+    # into field-goal attempts/turnovers-on-downs; higher values (closer to
+    # 1.0) keep more red-zone possessions alive long enough to score a
+    # touchdown instead.
+    red_zone_gain_stiffening: float = 0.80
+
     def to_dict(self) -> dict[str, float | str]:
         return {
             "name": self.name,
@@ -91,6 +109,8 @@ class CalibrationProfile:
             "fourth_down_conversion_multiplier": self.fourth_down_conversion_multiplier,
             "touchdown_weight_multiplier": self.touchdown_weight_multiplier,
             "field_goal_weight_multiplier": self.field_goal_weight_multiplier,
+            "red_zone_touchdown_weight_bonus": self.red_zone_touchdown_weight_bonus,
+            "red_zone_gain_stiffening": self.red_zone_gain_stiffening,
         }
 
 

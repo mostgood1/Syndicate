@@ -1,4 +1,4 @@
-"""SmartSim 2.0 NCAAF Calibration Profile v1.
+"""SmartSim 2.0 NCAAF Calibration Profile v2.
 
 Defines the second Football Core calibration profile, built exclusively
 from profile-level parameters on the shared ``CalibrationProfile`` seam
@@ -21,6 +21,13 @@ measured truth deltas and one measurement pass (see
 not from an iterative multi-pass calibration loop like the NFL profile's
 seven iterations. Treat these values as the starting point for that process,
 not its endpoint.
+
+v2 addition (see ``ncaaf_week1_shakeout_report.md`` and
+``ncaaf_calibration_profile_v2_report.md``): ``red_zone_touchdown_weight_bonus``
+and ``red_zone_gain_stiffening`` were added to the shared seam and tuned to
+close a red-zone-conversion gap the v1 validation pass never measured
+(72.6-76.4% simulated vs 85.6% truth). Still Experimental -- one more
+parameter sweep, not a multi-iteration calibration loop.
 """
 
 from __future__ import annotations
@@ -80,6 +87,28 @@ NCAAF_CALIBRATION_PROFILE = CalibrationProfile(
     # probability, used above) and field_goal_attempt_* (attempt probability).
     touchdown_weight_multiplier=0.66,
     field_goal_weight_multiplier=1.0,
+    # v2 addition (post-Week-1-shakeout): red_zone_conversion_rate measured
+    # 72.6-76.4% in simulation vs 85.6% truth -- a gap the v1 validation pass
+    # never isolated because red-zone entries were increasing (via the
+    # yardage multipliers above) without a matched red-zone scoring lever.
+    # red_zone_touchdown_weight_bonus raised 0.33 -> 0.58: a 6-point grid
+    # sweep (800-game batches per point) showed this monotonically improves
+    # both red-zone success (TD+FG share of red-zone entries) and red-zone
+    # touchdown share specifically, while leaving yards/drive, yards/play,
+    # and possessions/game essentially unchanged (this lever only fires
+    # inside play_state.red_zone, a small share of all plays). 0.58 was
+    # chosen as the point where red-zone-success and red-zone-TD-share
+    # normalized error both drop by roughly a fifth to a third without
+    # pushing the (already near-exact) overall touchdown_rate past ~13%
+    # normalized error -- more aggressive values in the sweep bought
+    # further red-zone gains at a steeper cost to that already-good fit.
+    red_zone_touchdown_weight_bonus=0.58,
+    # red_zone_gain_stiffening measured and left at the shared/NFL default
+    # (0.80): the same sweep varied this independently and found no clear
+    # red-zone-success improvement, while raising it (less red-zone gain
+    # suppression) pushed yards/drive and yards/play upward away from their
+    # already-good fit. Not a useful NCAAF-specific lever.
+    red_zone_gain_stiffening=0.80,
 )
 
 __all__ = ["NCAAF_CALIBRATION_PROFILE"]

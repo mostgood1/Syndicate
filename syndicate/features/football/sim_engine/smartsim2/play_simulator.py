@@ -88,7 +88,9 @@ def _play_outcome_weights(
     penalty = 0.035 + (1.0 - priors.coach_continuity_index) * 0.03 + late_down * 0.01
     turnover = priors.turnover_probability * (0.095 + long_yardage * 0.045 + trailing * 0.015)
     incomplete_pass = 0.165 + long_yardage * 0.06 + late_down * 0.03 + trailing * 0.02
-    touchdown = priors.touchdown_probability * (0.04 + field_position_factor * 0.22 + red_zone * 0.33 + trailing * 0.03) * profile.touchdown_weight_multiplier
+    touchdown = priors.touchdown_probability * (
+        0.04 + field_position_factor * 0.22 + red_zone * profile.red_zone_touchdown_weight_bonus + trailing * 0.03
+    ) * profile.touchdown_weight_multiplier
     field_goal_attempt = priors.field_goal_probability * (
         0.01 + red_zone * 0.18 + (1.0 if play_state.field_goal_range else 0.0) * 0.30 + late_down * 0.12 - leading * 0.04
     ) * profile.field_goal_weight_multiplier
@@ -149,7 +151,7 @@ def _play_outcome_weights(
     if play_state.field_goal_range:
         # Scoring-zone defensive stiffening: compressed field shortens gains and
         # forces more stalled series that settle for field-goal attempts.
-        gain *= 0.80
+        gain *= profile.red_zone_gain_stiffening
         incomplete_pass += 0.07
 
     weights = {
