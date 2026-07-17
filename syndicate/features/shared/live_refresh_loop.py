@@ -306,26 +306,31 @@ def _hash_file_bytes(path: Path) -> str | None:
 		return None
 
 
-def _nba_lineup_injury_fingerprint(date_str: str) -> str | None:
-	root = data_root() / "nba_source" / "source_artifacts" / "data"
+def _basketball_lineup_injury_fingerprint(sport: str, date_str: str) -> str | None:
+	# The vendored CLI writes through <sport>_BETTING_DATA_ROOT
+	# (= data_root()/<sport>_source/data on Render), while older bootstrap
+	# artifacts live under the source_artifacts-nested variant. Hash both so
+	# the change-detection actually sees the files fetch-injuries just wrote
+	# -- fingerprinting only the source_artifacts path meant a fresh injury
+	# report never changed the fingerprint and never forced a resim.
+	base = data_root() / f"{sport}_source"
 	parts = [
-		_hash_file_bytes(root / "raw" / "injuries.csv"),
-		_hash_file_bytes(root / "processed" / f"league_status_{date_str}.csv"),
+		_hash_file_bytes(base / "data" / "raw" / "injuries.csv"),
+		_hash_file_bytes(base / "data" / "processed" / f"league_status_{date_str}.csv"),
+		_hash_file_bytes(base / "source_artifacts" / "data" / "raw" / "injuries.csv"),
+		_hash_file_bytes(base / "source_artifacts" / "data" / "processed" / f"league_status_{date_str}.csv"),
 	]
 	if all(part is None for part in parts):
 		return None
 	return "|".join(part or "" for part in parts)
+
+
+def _nba_lineup_injury_fingerprint(date_str: str) -> str | None:
+	return _basketball_lineup_injury_fingerprint("nba", date_str)
 
 
 def _wnba_lineup_injury_fingerprint(date_str: str) -> str | None:
-	root = data_root() / "wnba_source" / "source_artifacts" / "data"
-	parts = [
-		_hash_file_bytes(root / "raw" / "injuries.csv"),
-		_hash_file_bytes(root / "processed" / f"league_status_{date_str}.csv"),
-	]
-	if all(part is None for part in parts):
-		return None
-	return "|".join(part or "" for part in parts)
+	return _basketball_lineup_injury_fingerprint("wnba", date_str)
 
 
 _LINEUP_INJURY_FETCH_PACKAGES = {

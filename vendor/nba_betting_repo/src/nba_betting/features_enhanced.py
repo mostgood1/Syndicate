@@ -228,9 +228,16 @@ def add_injury_features(df: pd.DataFrame) -> pd.DataFrame:
     Returns:
         DataFrame with additional injury features
     """
-    # Load injury database
-    injury_file = paths.root / "data" / "raw" / "injuries.csv"
-    
+    # Load injury database. fetch-injuries writes through paths.data_raw
+    # (honors NBA_BETTING_DATA_ROOT, the persistent disk on Render), so
+    # reading from the repo-checkout-relative paths.root/"data" here meant
+    # the fetched file was never found in hosted runs and every injury
+    # feature silently zeroed. Keep the checkout path as a fallback for
+    # repos that still have a committed copy.
+    injury_file = paths.data_raw / "injuries.csv"
+    if not injury_file.exists():
+        injury_file = paths.root / "data" / "raw" / "injuries.csv"
+
     if not injury_file.exists():
         print("No injury data found. Run: python -m nba_betting.cli fetch-injuries")
         # Add empty columns

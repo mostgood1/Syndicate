@@ -1943,6 +1943,21 @@ def _ensure_source_game_inputs(
     _seed_game_odds_from_props_snapshot(source_root=source_root, date_str=date_str, log_file=log_file)
     _seed_game_odds_from_raw_history(source_root=source_root, date_str=date_str, log_file=log_file)
 
+    # Non-fatal: injury data feeds the enhanced feature set (9 features) and
+    # the sim's exclusion/pace-drag inputs. Without this the only fetch was
+    # the live loop's interval-gated lineup check, so downstream prediction
+    # steps regularly ran with zero injury signal.
+    rc_injuries = _run_source_subprocess_cli_command(
+        source_root=source_root,
+        package_name=package_name,
+        command_parts=["fetch-injuries", "--date", date_str],
+        log_file=log_file,
+        heartbeat_cb=heartbeat_cb,
+        timeout_s=3 * 60,
+    )
+    if int(rc_injuries) != 0:
+        _append_log(log_file, f"fetch-injuries failed with exit code {int(rc_injuries)}; continuing without fresh injury data")
+
     game_cards_path = processed_root / f"game_cards_{date_str}.csv"
     if not game_cards_path.exists() or not game_cards_path.is_file() or _count_csv_rows_quick(game_cards_path) <= 0:
         _run_source_subprocess_cli_command(
