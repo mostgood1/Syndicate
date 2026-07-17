@@ -166,14 +166,14 @@ services:
         value: "false"
       - key: RECONCILIATION_REFRESH_INTERVAL_SECONDS
         value: "86400"
-      # Temporary mitigation for a confirmed production OOM in WNBA's smart-sim
-      # predictions step: play-by-play-level simulation is far more memory-hungry
-      # than the box-score-level fallback and the refresh subprocess dies before
-      # producing any output. Trades sim fidelity for actually getting real
-      # WNBA odds/predictions flowing again while the underlying memory blowup
-      # is root-caused. Revert once that's fixed.
+      # Play-by-play-level smart sim re-enabled: the OOM this originally
+      # mitigated was root-caused to the live-odds-worker's fixed 60s tick
+      # relaunching the full pipeline before the previous attempt finished
+      # (since fixed with adaptive intervals, pregame relaunch cooldown, and
+      # periodic worker recycling). PBP mode drives quarter scores from
+      # possession simulation and returns real per-minute scoring buckets.
       - key: REFRESH_PREDICT_PROPS_SMART_SIM_PBP
-        value: "false"
+        value: "true"
 
   - type: worker
     name: refresh-worker
@@ -305,14 +305,14 @@ services:
         value: "30"
       - key: MLB_LIVE_ODDSAPI_REFRESH_INTERVAL_SECONDS
         value: "60"
-      # Temporary mitigation for a confirmed production OOM in WNBA's smart-sim
-      # predictions step: play-by-play-level simulation is far more memory-hungry
-      # than the box-score-level fallback and the refresh subprocess dies before
-      # producing any output. Trades sim fidelity for actually getting real
-      # WNBA odds/predictions flowing again while the underlying memory blowup
-      # is root-caused. Revert once that's fixed.
+      # Play-by-play-level smart sim re-enabled: the OOM this originally
+      # mitigated was root-caused to the live-odds-worker's fixed 60s tick
+      # relaunching the full pipeline before the previous attempt finished
+      # (since fixed with adaptive intervals, pregame relaunch cooldown, and
+      # periodic worker recycling). PBP mode drives quarter scores from
+      # possession simulation and returns real per-minute scoring buckets.
       - key: REFRESH_PREDICT_PROPS_SMART_SIM_PBP
-        value: "false"
+        value: "true"
 
   - type: worker
     name: live-odds-worker
@@ -510,12 +510,12 @@ services:
         value: "true"
       - key: SYNDICATE_LIVE_LENS_INTERVAL_SECONDS
         value: "60"
-      # Temporary mitigation for a confirmed production OOM in WNBA's smart-sim
-      # predictions step: play-by-play-level simulation is far more memory-hungry
-      # than the box-score-level fallback and the refresh subprocess dies before
-      # producing any output. Trades sim fidelity for actually getting real
-      # WNBA odds/predictions flowing again while the underlying memory blowup
-      # is root-caused. Revert once that's fixed.
+      # Play-by-play-level smart sim re-enabled: the OOM this originally
+      # mitigated was root-caused to the live-odds-worker's fixed 60s tick
+      # relaunching the full pipeline before the previous attempt finished
+      # (since fixed with adaptive intervals, pregame relaunch cooldown, and
+      # periodic worker recycling). PBP mode drives quarter scores from
+      # possession simulation and returns real per-minute scoring buckets.
       - key: REFRESH_PREDICT_PROPS_SMART_SIM_PBP
-        value: "false"
+        value: "true"
 

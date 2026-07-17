@@ -4092,20 +4092,25 @@ def simulate_smart_game(
     hq_sims = np.zeros((n_sims, 4), dtype=int)
     aq_sims = np.zeros((n_sims, 4), dtype=int)
 
-    # Regulation segment buckets (for live-lens interval ladders)
-    # - 3-minute segments (legacy): 4 per quarter
-    # - 1-minute segments (native): 12 per quarter
+    # Regulation segment buckets (for live-lens interval ladders), derived
+    # from the active league's quarter length. These were hardcoded to the
+    # NBA shape (12 one-minute buckets, 4x3-minute segments) which, for the
+    # WNBA's 10-minute quarters, (a) spread quarter scoring across 12 minute
+    # buckets in the legacy path (diluting per-minute rates ~20% with two
+    # phantom minutes) and (b) made the PBP path's returned 10-bucket
+    # q_minute_pts arrays fail the shape check below and get discarded.
+    quarter_seconds = int(getattr(LEAGUE, "regulation_period_seconds", 12 * 60) or (12 * 60))
     n_seg_per_q = 4
-    n_min_per_q = 12
+    n_min_per_q = max(1, quarter_seconds // 60)
     hqseg_sims = np.zeros((n_sims, 4, n_seg_per_q), dtype=int)
     aqseg_sims = np.zeros((n_sims, 4, n_seg_per_q), dtype=int)
     hqmin_sims = np.zeros((n_sims, 4, n_min_per_q), dtype=int)
     aqmin_sims = np.zeros((n_sims, 4, n_min_per_q), dtype=int)
-    seg_seconds = 3 * 60
+    seg_seconds = max(1, quarter_seconds // n_seg_per_q)
     min_seconds = 60
 
-    # Overtime (5-minute periods). Variable count across sims.
-    ot_seconds = 5 * 60
+    # Overtime periods, league-configured (5 minutes in both leagues today).
+    ot_seconds = int(getattr(LEAGUE, "overtime_period_seconds", 5 * 60) or (5 * 60))
     home_ot_sims: list[list[int]] = [[] for _ in range(n_sims)]
     away_ot_sims: list[list[int]] = [[] for _ in range(n_sims)]
 
