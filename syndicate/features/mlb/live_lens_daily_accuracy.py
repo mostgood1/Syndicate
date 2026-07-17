@@ -95,38 +95,53 @@ def _iter_team_players(feed: dict[str, Any], side: str) -> list[dict[str, Any]]:
     return [player for player in players.values() if isinstance(player, dict)]
 
 
-def _feed_stat_indexes(feed: dict[str, Any] | None) -> tuple[dict[str, dict[str, Any]], dict[str, dict[str, Any]]]:
+def _feed_stat_indexes(
+    feed: dict[str, Any] | None,
+) -> tuple[dict[str, dict[str, Any]], dict[str, dict[str, Any]], dict[int, dict[str, Any]], dict[int, dict[str, Any]]]:
     batting_index: dict[str, dict[str, Any]] = {}
     pitching_index: dict[str, dict[str, Any]] = {}
+    batting_by_id: dict[int, dict[str, Any]] = {}
+    pitching_by_id: dict[int, dict[str, Any]] = {}
     if not isinstance(feed, dict):
-        return batting_index, pitching_index
+        return batting_index, pitching_index, batting_by_id, pitching_by_id
     for side in ("away", "home"):
         for player_obj in _iter_team_players(feed, side):
             person = player_obj.get("person") if isinstance(player_obj.get("person"), dict) else {}
             name = _normalize_live_name((person or {}).get("fullName"))
-            if not name:
-                continue
+            try:
+                person_id = int((person or {}).get("id") or 0)
+            except (TypeError, ValueError):
+                person_id = 0
             stats = player_obj.get("stats") if isinstance(player_obj.get("stats"), dict) else {}
             batting = stats.get("batting") if isinstance(stats.get("batting"), dict) else None
             pitching = stats.get("pitching") if isinstance(stats.get("pitching"), dict) else None
             if isinstance(batting, dict) and batting:
-                batting_index[name] = batting
+                if name:
+                    batting_index[name] = batting
+                if person_id > 0:
+                    batting_by_id[person_id] = batting
             if isinstance(pitching, dict) and pitching:
-                pitching_index[name] = pitching
-    return batting_index, pitching_index
+                if name:
+                    pitching_index[name] = pitching
+                if person_id > 0:
+                    pitching_by_id[person_id] = pitching
+    return batting_index, pitching_index, batting_by_id, pitching_by_id
 
 
-def _actual_from_feed(feed: dict[str, Any] | None, owner: Any, market: Any, prop: Any) -> float | None:
-    batting_index, pitching_index = _feed_stat_indexes(feed)
+def _actual_from_feed(feed: dict[str, Any] | None, owner: Any, market: Any, prop: Any, *, player_id: int | None = None) -> float | None:
+    batting_index, pitching_index, batting_by_id, pitching_by_id = _feed_stat_indexes(feed)
     name = _normalize_live_name(owner)
+    pid = int(player_id or 0)
     market_key = str(market or "").strip().lower()
     prop_key = str(prop or "").strip().lower()
     if market_key == "pitcher_props":
-        stats = pitching_index.get(name) or {}
+        # MLBAM id match first; normalized-name only as fallback (accents,
+        # suffixes, and Jr./Sr. variants silently miss on name matching).
+        stats = (pitching_by_id.get(pid) if pid > 0 else None) or pitching_index.get(name) or {}
         if prop_key == "strikeouts":
             return _safe_float(stats.get("strikeOuts"))
         return None
-    stats = batting_index.get(name) or {}
+    stats = (batting_by_id.get(pid) if pid > 0 else None) or batting_index.get(name) or {}
     stat_map = {
         "hits": "hits",
         "runs": "runs",
@@ -198,9 +213,18 @@ def _registry_rows(path: Path, selected_date: str) -> tuple[list[dict[str, Any]]
             game_pk_int = int(game_pk or 0)
         except Exception:
             game_pk_int = 0
+        try:
+            entry_player_id = int(entry.get("playerId") or 0)
+        except Exception:
+            entry_player_id = 0
         if game_pk_int > 0 and game_pk_int not in feed_cache:
             feed_cache[game_pk_int] = load_json_or_gz_file(raw_feed_live_path(selected_date, game_pk_int))
-        actual = _actual_from_feed(feed_cache.get(game_pk_int), owner, market, prop) if game_pk_int > 0 else None
+        actual = (
+            _actual_from_feed(feed_cache.get(game_pk_int), owner, market, prop, player_id=entry_player_id)
+            if game_pk_int > 0
+            else None
+        )
+        actual_from_feed = actual is not None
         if actual is not None:
             feed_resolved += 1
         else:
@@ -232,7 +256,7 @@ def _registry_rows(path: Path, selected_date: str) -> tuple[list[dict[str, Any]]
                 "result": result,
                 "first_seen_at": entry.get("firstSeenAt"),
                 "last_seen_at": entry.get("lastSeenAt"),
-                "actual_source": "feed_live" if _actual_from_feed(feed_cache.get(game_pk_int), owner, market, prop) is not None else "registry",
+                "actual_source": "feed_live" if actual_from_feed else "registry",
             }
         )
 

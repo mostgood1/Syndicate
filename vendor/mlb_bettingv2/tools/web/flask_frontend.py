@@ -2380,6 +2380,7 @@ def _enrich_live_prop_rows_with_registry(
                 "date": str(d),
                 "gamePk": _safe_int(item.get("game_pk") or item.get("gamePk")),
                 "owner": _prop_owner_name(item),
+                "playerId": _prop_owner_id(item),
                 "market": item.get("market"),
                 "prop": item.get("prop"),
                 "selection": item.get("selection"),
@@ -2410,6 +2411,8 @@ def _enrich_live_prop_rows_with_registry(
             entry["lastSeenAt"] = stamp_text
             entry["lastSeenSnapshot"] = snapshot
             entry["seenCount"] = int(_safe_int(entry.get("seenCount")) or 0) + 1
+            if not (_safe_int(entry.get("playerId")) or 0):
+                entry["playerId"] = _prop_owner_id(item)
             changed = True
 
         if write_observation_log:
@@ -13299,6 +13302,16 @@ def _lookup_boxscore_row(rows: Any, player_name: Any) -> Optional[Dict[str, Any]
 
 def _prop_owner_name(reco: Dict[str, Any]) -> str:
     return str(reco.get("player_name") or reco.get("pitcher_name") or "").strip()
+
+
+def _prop_owner_id(reco: Dict[str, Any]) -> Optional[int]:
+    """Best-effort MLBAM id for the prop's player, so settlement can match by
+    id instead of normalized-name (which silently drops accent/suffix variants)."""
+    for key in ("player_id", "playerId", "batter_id", "batterId", "hitter_id", "hitterId", "pitcher_id", "pitcherId", "mlbam_id", "mlbamId"):
+        value = _safe_int(reco.get(key))
+        if value is not None and int(value) > 0:
+            return int(value)
+    return None
 
 
 def _prop_side(card: Dict[str, Any], reco: Dict[str, Any]) -> Optional[str]:
