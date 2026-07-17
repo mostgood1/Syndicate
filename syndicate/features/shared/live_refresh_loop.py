@@ -147,7 +147,7 @@ def _live_refresh_loop_adaptive_enabled() -> bool:
 	return _env_bool("SYNDICATE_LIVE_ODDS_REFRESH_ADAPTIVE", default=True)
 
 
-def _mlb_has_live_game(date_str: str) -> bool:
+def _mlb_has_live_game_via_report(date_str: str) -> bool:
 	path = data_root() / "mlb_source" / "source_artifacts" / "data" / "live_lens" / f"live_lens_report_{date_str.replace('-', '_')}.json"
 	payload = read_json_file(path)
 	counts = payload.get("counts") if isinstance(payload, dict) else None
@@ -157,6 +157,42 @@ def _mlb_has_live_game(date_str: str) -> bool:
 		return int(counts.get("live") or 0) > 0
 	except (TypeError, ValueError):
 		return False
+
+
+def _mlb_has_live_game_via_schedule(date_str: str, *, timeout_s: float = 15.0) -> bool:
+	helper = REPO_ROOT / "scripts" / "fetch_mlb_live_game_pks_for_date.py"
+	if not helper.exists():
+		return False
+	python_exe = sys.executable if (sys.executable and Path(sys.executable).exists()) else "python"
+	try:
+		result = subprocess.run(
+			[python_exe, str(helper), "--date", date_str],
+			cwd=str(REPO_ROOT),
+			capture_output=True,
+			text=True,
+			timeout=timeout_s,
+		)
+		if result.returncode != 0:
+			return False
+		payload = json.loads(result.stdout or "{}")
+		live_game_pks = payload.get("live_game_pks") if isinstance(payload, dict) else None
+		return isinstance(live_game_pks, list) and len(live_game_pks) > 0
+	except Exception:
+		return False
+
+
+def _mlb_has_live_game(date_str: str) -> bool:
+	# live_lens_report_<date>.json's own generation cadence/timing can lag
+	# actual game state (its rebuild is a separate step from this adaptive
+	# phase check), which left the odds-refresh loop stuck reporting
+	# anyLive=false -- and therefore never switching to live-phase odds
+	# refresh -- through an entire live game on 2026-07-17 despite the report
+	# itself showing counts.live>0 moments earlier. The schedule-status check
+	# is authoritative and decoupled from that report's own timing, so either
+	# source saying "live" is enough.
+	if _mlb_has_live_game_via_report(date_str):
+		return True
+	return _mlb_has_live_game_via_schedule(date_str)
 
 
 def _wnba_has_live_game(date_str: str) -> bool:
