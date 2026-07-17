@@ -411,6 +411,13 @@ class GameConfig:
     extra_innings: int = 3
     # Baseball full-game markets settle to a winner. Keep tied finals opt-in only.
     allow_ties_after_max_innings: bool = False
+    # Extra-innings placed runner (regular-season MLB rule): each extra
+    # half-inning starts with the previous lineup spot on second base.
+    extras_placed_runner: bool = True
+    # End the game as soon as the home team takes the lead in the bottom of
+    # the final regulation inning or later (walk-off). Without this, walk-off
+    # halves play to 3 outs and inflate totals/home margins.
+    end_on_walkoff: bool = True
     rng_seed: Optional[int] = None
     max_pitches_per_pa: int = 20
     weather: WeatherFactors = field(default_factory=WeatherFactors)

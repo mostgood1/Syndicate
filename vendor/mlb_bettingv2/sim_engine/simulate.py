@@ -390,6 +390,7 @@ def _pick_misc_pitch_advance_event(rng: random.Random, pitch_call: PitchCall) ->
 RUNNER_SRC_HIT_REACH = "hit_reach"
 RUNNER_SRC_BB_HBP = "bb_hbp"
 RUNNER_SRC_NON_HIT_REACH = "non_hit_reach"
+RUNNER_SRC_PLACED = "placed"
 
 
 def _sync_runner_reach_sources(source_by_id: Dict[int, str], half: Optional[InningHalfState]) -> None:
@@ -2067,6 +2068,33 @@ def simulate_game(
             runs_scored=0,
             next_batter_index=next_idx,
         )
+        if (
+            bool(getattr(cfg, "extras_placed_runner", True))
+            and int(state.inning) > int(getattr(cfg, "innings", 9) or 9)
+        ):
+            placed_id = 0
+            batters = list(getattr(state.batting_roster().lineup, "batters", []) or [])
+            if batters:
+                prev_idx = (int(next_idx) - 1) % len(batters)
+                try:
+                    placed_id = int(getattr(getattr(batters[prev_idx], "player", None), "mlbam_id", 0) or 0)
+                except Exception:
+                    placed_id = 0
+            state.half.bases = BaseState.SECOND
+            state.half.runner_on_2b = placed_id
+            if placed_id > 0:
+                state.runner_reach_source_by_id[placed_id] = RUNNER_SRC_PLACED
+            if pbp_mode == "pitch":
+                _log(
+                    {
+                        "type": "PLACED_RUNNER",
+                        "inning": int(state.inning),
+                        "half": "top" if state.top else "bottom",
+                        "batting_team_id": int(batting.team_id),
+                        "runner_id": int(placed_id),
+                        "base": "2B",
+                    }
+                )
         if pbp_mode == "pitch":
             _log(
                 {
@@ -2154,6 +2182,7 @@ def simulate_game(
     extra_innings_cap = max(0, int(getattr(cfg, "extra_innings", 0) or 0))
     max_innings = cfg.innings + extra_innings_cap
     allow_tied_final = bool(getattr(cfg, "allow_ties_after_max_innings", False))
+    end_on_walkoff = bool(getattr(cfg, "end_on_walkoff", True))
 
     def game_over_after_half(finished_top: bool) -> bool:
         # After top half: if home is leading in regulation or extras, skip bottom.
@@ -2306,7 +2335,11 @@ def simulate_game(
                                     break
                                 if allow_tied_final and state.inning > max_innings:
                                     break
-                                if state.inning > innings_target and state.home_score != state.away_score:
+                                # Only a completed BOTTOM half can end the game on
+                                # score here; after a top half the home team still
+                                # gets to bat (game_over_after_half already ends
+                                # home-leading cases).
+                                if (not finished_top) and state.inning > innings_target and state.home_score != state.away_score:
                                     break
                                 continue
         except Exception:
@@ -2828,6 +2861,18 @@ def simulate_game(
         # advance lineup regardless
         half.next_batter_index = (half.next_batter_index + 1) % len(batting_roster.lineup.batters)
 
+        # Walk-off: home team takes the lead in the bottom of the final
+        # regulation inning or later -> the game ends immediately. Checked at
+        # PA granularity (a mid-PA go-ahead wild pitch ends after this PA).
+        if (
+            end_on_walkoff
+            and (not state.top)
+            and state.inning >= innings_target
+            and (state.home_score + half.runs_scored) > state.away_score
+        ):
+            end_half_inning()
+            break
+
         if half.outs >= 3:
             finished_top = end_half_inning()
 
@@ -2836,7 +2881,9 @@ def simulate_game(
             if allow_tied_final and state.inning > max_innings:
                 break
             # If we've completed regulation innings and are not tied, stop.
-            if state.inning > innings_target and state.home_score != state.away_score:
+            # Only after a BOTTOM half: after a top half the home team still
+            # gets to bat (game_over_after_half already ends home-leading cases).
+            if (not finished_top) and state.inning > innings_target and state.home_score != state.away_score:
                 break
 
         # continue until break
