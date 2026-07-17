@@ -701,12 +701,14 @@ def _simw_chunk(start_i: int, n: int) -> Dict[str, Any]:
                 except Exception:
                     continue
                 tb = int(h + d2 + 2 * d3 + 3 * hr)
+                hrr = int(h + rr + rbi)
                 hitter_stat_values = {
                     "H": h,
                     "HR": hr,
                     "TB": tb,
                     "R": rr,
                     "RBI": rbi,
+                    "H+R+RBI": hrr,
                     "2B": d2,
                     "3B": d3,
                     "SB": sb,
@@ -740,6 +742,7 @@ def _simw_chunk(start_i: int, n: int) -> Dict[str, Any]:
                     _inc_ge("triples_1plus", pid)
                 if hr >= 1:
                     _inc_ge("hr_1plus", pid)
+                _inc_ge_thresholds("hits_runs_rbis", pid, hrr, 5)
                 _inc_ge_thresholds("runs", pid, rr, 3)
                 _inc_ge_thresholds("rbi", pid, rbi, 4)
                 _inc_ge_thresholds("total_bases", pid, tb, 5)

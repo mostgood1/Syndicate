@@ -148,6 +148,11 @@ def _actual_stat(actual_batter_box: Dict[str, Dict[int, Dict[str, int]]], batter
                 return int(hits + doubles + 2 * triples + 3 * home_runs)
             except Exception:
                 return 0
+        if str(key) == "H+R+RBI":
+            try:
+                return int(int(row.get("H") or 0) + int(row.get("R") or 0) + int(row.get("RBI") or 0))
+            except Exception:
+                return 0
         try:
             return int(row.get(key) or 0)
         except Exception:
