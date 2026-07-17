@@ -83,6 +83,13 @@ HOT_ARTIFACT_PATTERNS: tuple[str, ...] = (
     "*_source/source_artifacts/data/daily/ladders/daily_ladders_*.json",
     "*_source/source_artifacts/data/daily/top_props/daily_top_props_*.json",
     "*_source/source_artifacts/data/daily/lineups_last_known_by_team.json",
+    # Daily odds/lineup snapshots: confirmed live reads on web -- MLB cards.py
+    # reads snapshots/<date>/{oddsapi_game_lines,oddsapi_hitter_props,
+    # oddsapi_pitcher_props,lineups}.json for market tiles and lineup state,
+    # and hr_targets.py walks the date dir. These are written worker-side by
+    # refresh_mlb_oddsapi.py; without publishing them the web board renders
+    # ml/totals as null (observed 2026-07-16). Small per-date JSONs, not bulk.
+    "*_source/source_artifacts/data/daily/snapshots/*/*.json",
     "*_source/source_artifacts/data/manager/manager_tendencies.json",
     "*_source/source_artifacts/data/manager/probable_pitcher_overrides.json",
     "*_source/source_artifacts/data/park/park_factors.json",
@@ -91,6 +98,7 @@ HOT_ARTIFACT_PATTERNS: tuple[str, ...] = (
     "*_source/data/daily/ladders/daily_ladders_*.json",
     "*_source/data/daily/top_props/daily_top_props_*.json",
     "*_source/data/daily/lineups_last_known_by_team.json",
+    "*_source/data/daily/snapshots/*/*.json",
     "*_source/data/manager/manager_tendencies.json",
     "*_source/data/manager/probable_pitcher_overrides.json",
     "*_source/data/park/park_factors.json",

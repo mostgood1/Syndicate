@@ -51,6 +51,24 @@ class HotArtifactAllowlistTests(unittest.TestCase):
             )
         )
 
+    def test_accepts_daily_odds_and_lineup_snapshots(self) -> None:
+        # Confirmed live reads: MLB cards.py loads snapshots/<date>/oddsapi_*
+        # and lineups.json for market tiles; hr_targets.py walks the date dir.
+        for name in ("oddsapi_game_lines_2026_07_16", "oddsapi_hitter_props_2026_07_16", "oddsapi_pitcher_props_2026_07_16", "lineups", "probables", "meta"):
+            self.assertTrue(
+                is_hot_artifact_relative_path(
+                    f"mlb_source/source_artifacts/data/daily/snapshots/2026-07-16/{name}.json"
+                ),
+                name,
+            )
+        self.assertTrue(
+            is_hot_artifact_relative_path("mlb_source/data/daily/snapshots/2026-07-16/lineups.json")
+        )
+        # Non-JSON or deeper nesting stays excluded.
+        self.assertFalse(
+            is_hot_artifact_relative_path("mlb_source/source_artifacts/data/daily/snapshots/2026-07-16/raw/feed.csv")
+        )
+
     def test_rejects_worker_only_calibration_and_manifest_files(self) -> None:
         self.assertFalse(is_hot_artifact_relative_path("nfl_source/calibration_active.json"))
         self.assertFalse(is_hot_artifact_relative_path("nfl_source/prob_calibration.json"))
