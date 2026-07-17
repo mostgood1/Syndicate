@@ -67,7 +67,7 @@ from sim_engine.data.statsapi import (
     load_feed_live_from_raw,
     parse_confirmed_lineup_ids,
 )
-from sim_engine.data.build_roster import build_team, build_team_roster
+from sim_engine.data.build_roster import build_team, build_team_roster, print_statcast_batter_apply_diagnostics
 from sim_engine.data.statcast_bvp import apply_starter_bvp_hr_multipliers, default_bvp_cache
 from sim_engine.data.statcast_pitch_splits import default_statcast_cache
 from sim_engine.models import GameConfig
@@ -7675,6 +7675,7 @@ def main() -> int:
             for o in outputs
         ],
     }
+    print_statcast_batter_apply_diagnostics()
     summary_path = out_ROOT_DIR / f"daily_summary_{args.date.replace('-', '_')}.json"
     _write_json(summary_path, summary)
     if str(getattr(args, "write_derived_artifacts", "on") or "on") == "on":

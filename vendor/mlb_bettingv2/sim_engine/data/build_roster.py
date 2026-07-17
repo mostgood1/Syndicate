@@ -1006,14 +1006,37 @@ def _apply_statcast_features_to_pitcher(prof: PitcherProfile, season: int) -> bo
     return applied
 
 
+# Diagnostic-only counters for _apply_statcast_features_to_batter's miss
+# points. Added 2026-07-17: HR Targets' batter statcast fields (barrel rate,
+# xwOBA, pitch-type HR matchup) are computed by this function and consumed
+# throughout _hitter_hr_target_support, but sampled production roster
+# snapshots showed 0/330 selected HR-target rows had any of them populated,
+# despite the source file (player_features_latest.json) confirmed to have a
+# real entry for at least one of the affected players. Static tracing ruled
+# out schema/path/key-format mismatches between the builder and this reader;
+# these counters answer empirically, from the next real sim run's own logs,
+# exactly which branch is actually being hit at production scale.
+_STATCAST_BATTER_APPLY_DIAG: Dict[str, int] = {"calls": 0, "bad_id": 0, "empty_features_file": 0, "id_not_found": 0, "blend_none": 0, "applied": 0, "not_applied": 0}
+
+
+def print_statcast_batter_apply_diagnostics() -> None:
+    d = _STATCAST_BATTER_APPLY_DIAG
+    print(f"[statcast_diag] batter feature apply: calls={d['calls']} applied={d['applied']} not_applied={d['not_applied']} bad_id={d['bad_id']} empty_features_file={d['empty_features_file']} id_not_found={d['id_not_found']} blend_none={d['blend_none']}", flush=True)
+
+
 def _apply_statcast_features_to_batter(prof: BatterProfile, season: int) -> bool:
+    _STATCAST_BATTER_APPLY_DIAG["calls"] += 1
     if prof.player.mlbam_id <= 0:
+        _STATCAST_BATTER_APPLY_DIAG["bad_id"] += 1
         return False
     m = _load_statcast_features_anykey(season)
     if not isinstance(m, dict) or not m:
+        _STATCAST_BATTER_APPLY_DIAG["empty_features_file"] += 1
         return False
     batters = m.get("batters") or {}
     entry = batters.get(str(prof.player.mlbam_id)) if isinstance(batters, dict) else None
+    if entry is None:
+        _STATCAST_BATTER_APPLY_DIAG["id_not_found"] += 1
     prior_entry = None
     if int(season) > 0:
         pm = _load_statcast_features_anykey(int(season) - 1)
@@ -1028,6 +1051,7 @@ def _apply_statcast_features_to_batter(prof: BatterProfile, season: int) -> bool
         league_overall.update(dict(league_all.get("batter") or {}))
     entry = _blend_statcast_feature_entry(entry, prior_entry, league_overall=league_overall)
     if not isinstance(entry, dict):
+        _STATCAST_BATTER_APPLY_DIAG["blend_none"] += 1
         return False
 
     applied = False
@@ -1119,6 +1143,7 @@ def _apply_statcast_features_to_batter(prof: BatterProfile, season: int) -> bool
             prof.vs_pitch_type_hr = out_hr
             applied = True
 
+    _STATCAST_BATTER_APPLY_DIAG["applied" if applied else "not_applied"] += 1
     return applied
 
 
