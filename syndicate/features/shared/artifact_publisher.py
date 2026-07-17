@@ -90,6 +90,13 @@ HOT_ARTIFACT_PATTERNS: tuple[str, ...] = (
     # refresh_mlb_oddsapi.py; without publishing them the web board renders
     # ml/totals as null (observed 2026-07-16). Small per-date JSONs, not bulk.
     "*_source/source_artifacts/data/daily/snapshots/*/*.json",
+    # Per-game sim artifacts: cards.py hydrates output segments and starter
+    # ladder badges from data/daily/sims/<date>/sim_*.json (and game detail
+    # rides the same lookup). In the GHA era these reached web via git sync;
+    # worker-centric sims left them stranded worker-side, so compact cards
+    # rendered without sim tiles (observed 2026-07-17). ~200-400KB per game,
+    # current + next day only -- not the bulk/historical case above.
+    "*_source/source_artifacts/data/daily/sims/*/sim_*.json",
     "*_source/source_artifacts/data/manager/manager_tendencies.json",
     "*_source/source_artifacts/data/manager/probable_pitcher_overrides.json",
     "*_source/source_artifacts/data/park/park_factors.json",
@@ -99,6 +106,7 @@ HOT_ARTIFACT_PATTERNS: tuple[str, ...] = (
     "*_source/data/daily/top_props/daily_top_props_*.json",
     "*_source/data/daily/lineups_last_known_by_team.json",
     "*_source/data/daily/snapshots/*/*.json",
+    "*_source/data/daily/sims/*/sim_*.json",
     "*_source/data/manager/manager_tendencies.json",
     "*_source/data/manager/probable_pitcher_overrides.json",
     "*_source/data/park/park_factors.json",
