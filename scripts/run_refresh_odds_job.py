@@ -340,8 +340,73 @@ def _queue_intelligence_snapshot_refresh(*, run_summary_path: Path) -> tuple[str
     return queued_key, payload
 
 
-def _echo_captured_output(*, stdout_text: str, stderr_text: str) -> None:
-    return
+def _echo_captured_output(*, stdout_text: str, stderr_text: str, failed: bool = False) -> None:
+    # On Render this process is launched with stdout/stderr DEVNULL'd, so these
+    # prints are free there; locally and under GHA they are the fastest way to
+    # see why a refresh failed. Full stdout echo stays gated behind the memory
+    # trace flag because the result JSON can be large.
+    if failed and stderr_text.strip():
+        print("[refresh_job_child_stderr_tail]", flush=True)
+        print(stderr_text[-4000:], flush=True)
+    if not _memory_trace_enabled():
+        return
+    if stdout_text.strip():
+        print("[refresh_job_child_stdout]", flush=True)
+        print(stdout_text, flush=True)
+    if stderr_text.strip():
+        print("[refresh_job_child_stderr]", flush=True)
+        print(stderr_text, flush=True)
+
+
+def _failure_summary_from_result(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    """Compact per-sport failure detail from a refresh_odds_sources result payload.
+
+    Bounded by design: this is persisted through the shared refresh-state store
+    (Redis on Render) so the web service can surface WHY a worker-side refresh
+    cycle failed without access to the worker's disk.
+    """
+    summary: list[dict[str, Any]] = []
+    results = payload.get("results") if isinstance(payload, dict) else None
+    if not isinstance(results, list):
+        return summary
+    for sport_result in results:
+        if not isinstance(sport_result, dict) or bool(sport_result.get("ok")):
+            continue
+        entry: dict[str, Any] = {"sport": sport_result.get("sport"), "ok": False}
+        failing_steps: list[dict[str, Any]] = []
+        step_groups: list[Any] = [sport_result.get("refresh_steps")]
+        generation = sport_result.get("generation")
+        if isinstance(generation, dict):
+            step_groups.append(generation.get("steps"))
+        seen_steps: set[str] = set()
+        for group in step_groups:
+            if not isinstance(group, list):
+                continue
+            for step in group:
+                if not isinstance(step, dict) or bool(step.get("ok")):
+                    continue
+                name = str(step.get("name") or "unnamed")
+                if name in seen_steps:
+                    continue
+                seen_steps.add(name)
+                failing_steps.append(
+                    {
+                        "name": name,
+                        "return_code": step.get("return_code"),
+                        "stderr_tail": str(step.get("stderr_tail") or step.get("stderr") or "")[-1600:] or None,
+                    }
+                )
+        if failing_steps:
+            entry["failing_steps"] = failing_steps
+        post_refresh = sport_result.get("post_refresh")
+        if isinstance(post_refresh, dict) and not bool(post_refresh.get("ok")) and not bool(post_refresh.get("dry_run")):
+            meta = post_refresh.get("meta") if isinstance(post_refresh.get("meta"), dict) else {}
+            entry["post_refresh_error"] = str(meta.get("error") or post_refresh.get("stderr") or "post refresh tracking sync failed")[:800]
+        mirror = sport_result.get("mirror")
+        if isinstance(mirror, dict) and not bool(mirror.get("ok")) and not bool(mirror.get("dry_run")):
+            entry["mirror_error"] = str(mirror.get("stderr_tail") or mirror.get("stderr") or "mirror step failed")[-800:]
+        summary.append(entry)
+    return summary
 
 def _stderr_tail(stderr_chunks: list[str], *, limit: int = 2000) -> str:
     return "".join(stderr_chunks)[-limit:]
@@ -464,16 +529,24 @@ def main() -> int:
     }
     if failure_error:
         failure_payload["error"] = failure_error
-    if return_code != 0:
-        _echo_captured_output(stdout_text=stdout_text, stderr_text=stderr_text)
-    else:
-        _echo_captured_output(stdout_text=stdout_text, stderr_text=stderr_text)
+    failure_summary: list[dict[str, Any]] = []
+    if return_code != 0 and stdout_payload:
+        failure_summary = _failure_summary_from_result(stdout_payload)
+        if failure_summary:
+            failure_payload["failureSummary"] = failure_summary
+            print(f"ODDS_REFRESH_FAILURE_SUMMARY {json.dumps(failure_summary, default=str)}", flush=True)
+    _echo_captured_output(stdout_text=stdout_text, stderr_text=stderr_text, failed=return_code != 0)
     if return_code == 0 and stdout_payload:
         print(f"RESULT_FILE_WRITE_BEGIN path={stdout_path}", flush=True)
         _safe_write_json(stdout_path, stdout_payload)
     else:
         if stdout_text.strip() and not stdout_payload:
             failure_payload["stdout"] = stdout_text
+        if stdout_payload:
+            # Keep the child's full parsed result: it names the failing sport,
+            # step, and (post-fix) that step's stderr tail. Discarding it made
+            # worker-side failures undiagnosable from published artifacts.
+            failure_payload["result"] = stdout_payload
         print(f"RESULT_FILE_WRITE_BEGIN path={stdout_path}", flush=True)
         _safe_write_json(stdout_path, failure_payload)
     print(f"SNAPSHOT_WRITTEN path={stdout_path} ok={return_code == 0}", flush=True)
@@ -504,6 +577,7 @@ def main() -> int:
             "stdoutBufferLen": len(stdout_text),
             "stderrBufferLen": len(stderr_text),
             "stderrTail": stderr_text[-2000:],
+            **({"failureSummary": failure_summary} if failure_summary else {}),
         },
     )
     if return_code == 0:

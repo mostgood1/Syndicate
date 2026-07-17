@@ -1207,9 +1207,17 @@ def _run_command(step: RefreshStep, *, dry_run: bool = False) -> dict[str, Any]:
     }
 
 
+_FAILED_STEP_STDERR_TAIL_CHARS = 1600
+
+
 def _compact_step_result(step_result: dict[str, Any]) -> None:
     if not isinstance(step_result, dict):
         return
+    # Keep a bounded stderr tail on FAILED steps: without it, the emitted JSON
+    # is the only surviving record on Render (wrapper stdout/stderr are
+    # DEVNULL'd) and a failing sport is undiagnosable from artifacts alone.
+    if not bool(step_result.get("ok")) and isinstance(step_result.get("stderr"), str) and step_result["stderr"].strip():
+        step_result["stderr_tail"] = step_result["stderr"][-_FAILED_STEP_STDERR_TAIL_CHARS:]
     if isinstance(step_result.get("stdout"), str):
         step_result["stdout"] = ""
     if isinstance(step_result.get("stderr"), str):
@@ -1227,6 +1235,14 @@ def _compact_step_result_view(step_result: dict[str, Any] | None) -> dict[str, A
         "started_at": step_result.get("started_at"),
         "finished_at": step_result.get("finished_at"),
     }
+    if not bool(step_result.get("ok")):
+        stderr_tail = step_result.get("stderr_tail")
+        if not (isinstance(stderr_tail, str) and stderr_tail.strip()):
+            raw_stderr = step_result.get("stderr")
+            if isinstance(raw_stderr, str) and raw_stderr.strip():
+                stderr_tail = raw_stderr[-_FAILED_STEP_STDERR_TAIL_CHARS:]
+        if isinstance(stderr_tail, str) and stderr_tail.strip():
+            compact["stderr_tail"] = stderr_tail
     row_counts = step_result.get("row_counts")
     if isinstance(row_counts, dict) and row_counts:
         compact["row_counts"] = row_counts
