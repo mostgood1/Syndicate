@@ -195,7 +195,37 @@ def _mlb_has_live_game(date_str: str) -> bool:
 	return _mlb_has_live_game_via_schedule(date_str)
 
 
-def _wnba_has_live_game(date_str: str) -> bool:
+def _espn_has_live_game(sport: str, date_str: str, *, timeout_s: float = 12.0) -> bool:
+	# Independent, authoritative fallback for the same class of bug fixed for
+	# MLB above: each sport's _has_live_game check below trusts a locally
+	# written artifact from a decoupled process (its own live-state/odds
+	# tick), and if that process's rebuild cadence lags actual game state,
+	# the adaptive phase decision silently starves live games of live odds
+	# with no error surfaced anywhere. ESPN's public scoreboard API is
+	# already used for exactly this purpose elsewhere in this repo (see
+	# syndicate/features/wnba/cards.py's _public_scoreboard_live_state_payload).
+	helper = REPO_ROOT / "scripts" / "fetch_espn_live_status_for_date.py"
+	if not helper.exists():
+		return False
+	python_exe = sys.executable if (sys.executable and Path(sys.executable).exists()) else "python"
+	try:
+		result = subprocess.run(
+			[python_exe, str(helper), "--sport", sport, "--date", date_str],
+			cwd=str(REPO_ROOT),
+			capture_output=True,
+			text=True,
+			timeout=timeout_s,
+		)
+		if result.returncode != 0:
+			return False
+		payload = json.loads(result.stdout or "{}")
+		live_event_ids = payload.get("live_event_ids") if isinstance(payload, dict) else None
+		return isinstance(live_event_ids, list) and len(live_event_ids) > 0
+	except Exception:
+		return False
+
+
+def _wnba_has_live_game_via_artifact(date_str: str) -> bool:
 	path = data_root() / "wnba_source" / "source_artifacts" / "data" / "processed" / "live_snapshots" / f"live_state_{date_str}.jsonl"
 	try:
 		if not path.exists():
@@ -218,7 +248,13 @@ def _wnba_has_live_game(date_str: str) -> bool:
 	return any(bool(game.get("in_progress")) for game in games if isinstance(game, dict))
 
 
-def _nba_has_live_game(date_str: str) -> bool:
+def _wnba_has_live_game(date_str: str) -> bool:
+	if _wnba_has_live_game_via_artifact(date_str):
+		return True
+	return _espn_has_live_game("wnba", date_str)
+
+
+def _nba_has_live_game_via_artifact(date_str: str) -> bool:
 	path = data_root() / "nba_source" / "source_artifacts" / "data" / "processed" / "live_snapshots" / f"live_state_{date_str}.jsonl"
 	try:
 		if not path.exists():
@@ -241,7 +277,13 @@ def _nba_has_live_game(date_str: str) -> bool:
 	return any(bool(game.get("in_progress")) for game in games if isinstance(game, dict))
 
 
-def _nhl_has_live_game(date_str: str) -> bool:
+def _nba_has_live_game(date_str: str) -> bool:
+	if _nba_has_live_game_via_artifact(date_str):
+		return True
+	return _espn_has_live_game("nba", date_str)
+
+
+def _nhl_has_live_game_via_artifact(date_str: str) -> bool:
 	path = data_root() / "nhl_source" / "source_artifacts" / "data" / "odds" / "games" / f"date={date_str}" / "scoreboard.csv"
 	if not path.exists():
 		return False
@@ -251,6 +293,12 @@ def _nhl_has_live_game(date_str: str) -> bool:
 	except Exception:
 		return False
 	return any(str(row.get("gameState") or "").strip().upper() in {"LIVE", "CRIT"} for row in rows)
+
+
+def _nhl_has_live_game(date_str: str) -> bool:
+	if _nhl_has_live_game_via_artifact(date_str):
+		return True
+	return _espn_has_live_game("nhl", date_str)
 
 
 _LIVE_STATUS_CHECKERS = {
