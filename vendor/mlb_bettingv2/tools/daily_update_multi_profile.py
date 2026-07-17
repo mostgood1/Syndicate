@@ -824,7 +824,9 @@ def _collect_daily_rfi_targets(
     source_profile: str,
 ) -> Dict[str, Any]:
     rows: List[Dict[str, Any]] = []
+    games_scanned = 0
     for sim_path in sorted(source_sim_dir.glob("sim_*_pk*_g*.json")):
+        games_scanned += 1
         loaded = _read_json(sim_path)
         sim_obj = loaded if isinstance(loaded, dict) else {}
         segments = (((sim_obj.get("sim") or {}).get("segments") or {})) if isinstance(sim_obj, dict) else {}
@@ -858,7 +860,14 @@ def _collect_daily_rfi_targets(
         "season": int(season),
         "generated_at": datetime.now().isoformat(),
         "tool": "tools/daily_update_multi_profile.py",
-        "locked": True,
+        # Only lock in the doc once real sim files were actually scanned --
+        # zero qualifying NRFI/YRFI signals is a legitimate slate outcome
+        # and should stay locked, but an empty sim_dir (sims not built yet)
+        # must NOT lock, or every later run preserves this stale empty doc
+        # forever via _is_locked_rfi_targets_doc, even once real sims exist
+        # (observed 2026-07-17: locked at 09:46 before sims existed, then
+        # silently kept through a fully successful 12:30 regeneration).
+        "locked": bool(games_scanned > 0),
         "source_profile": str(source_profile),
         "source_sim_dir": _rel(source_sim_dir),
         "thresholds": {
@@ -870,7 +879,7 @@ def _collect_daily_rfi_targets(
         },
         "counts": {
             "rows": int(len(rows)),
-            "games": int(len(rows)),
+            "games": int(games_scanned),
         },
         "signals": rows,
     }
