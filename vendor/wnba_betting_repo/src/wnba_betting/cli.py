@@ -608,6 +608,16 @@ def _load_schedule_day(date_str: str) -> pd.DataFrame:
         day_frame = frame.copy()
         day_frame[day_col] = pd.to_datetime(day_frame[day_col], errors="coerce").dt.date
         day_frame = day_frame[day_frame[day_col] == target_date].copy()
+        # A game's date_est can match today's slate while the schedule marks
+        # it Postponed/Cancelled -- e.g. 2026-07-16 DAL@NYL, status
+        # "Postponed", still had date_est=2026-07-16. Without this filter it
+        # gets treated as a real matchup to predict, which then shows up as
+        # "missing" props/odds coverage forever since no book ever posts
+        # lines on a game that isn't being played.
+        status_col = next((col for col in ("game_status_text", "status_text", "status") if col in day_frame.columns), None)
+        if status_col:
+            excluded_statuses = {"postponed", "cancelled", "canceled", "suspended"}
+            day_frame = day_frame[~day_frame[status_col].astype(str).str.strip().str.lower().isin(excluded_statuses)]
         return day_frame.reset_index(drop=True) if not day_frame.empty else pd.DataFrame()
 
     try:
