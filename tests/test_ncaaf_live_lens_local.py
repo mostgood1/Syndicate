@@ -25,7 +25,7 @@ class NcaafLiveLensLocalTests(unittest.TestCase):
                     "gamePk": "1_UNLV_Sam_Houston",
                     "away": {"abbr": "UNLV", "name": "UNLV"},
                     "home": {"abbr": "SHU", "name": "Sam Houston"},
-                    "summary": "SmartSim projects Sam Houston 34.2 - 24.1 UNLV with a total of 58.3 and a home win probability of 73.1%.",
+                    "summary": "Enhanced Totals Engine projects Sam Houston 34.2 - 24.1 UNLV with a total of 58.3 and a home win probability of 73.1%.",
                     "href": "/ncaaf/game/1_UNLV_Sam_Houston?week=1",
                     "href_label": "Open NCAAF game detail",
                     "ncaaf_card": {
@@ -35,7 +35,7 @@ class NcaafLiveLensLocalTests(unittest.TestCase):
                             "total_points": "58.3",
                             "spread_label": "Sam Houston by 10.1",
                             "win_probability": "73.1%",
-                            "source_label": "SmartSim runtime",
+                            "source_label": "Enhanced Totals Engine",
                             "kickoff": "2025-09-01T19:00:00Z",
                             "venue": "Test Stadium",
                         },
@@ -48,8 +48,8 @@ class NcaafLiveLensLocalTests(unittest.TestCase):
         with patch("syndicate.features.ncaaf.live_lens.build_smartsim_cards_page_context", return_value=runtime_cards_context):
             context = build_smartsim_live_lens_page_context(1)
 
-        self.assertEqual(context["source_title"], "NCAAF SmartSim live lens runtime")
-        self.assertEqual(context["rank_cards"][0]["eyebrow"], "SmartSim runtime")
+        self.assertEqual(context["source_title"], "NCAAF Enhanced Totals Engine live lens runtime")
+        self.assertEqual(context["rank_cards"][0]["eyebrow"], "Enhanced Totals Engine")
         self.assertIn("34.2", context["rank_cards"][0]["list_items"][0])
         self.assertIn("73.1%", context["rank_cards"][0]["list_items"][3])
         self.assertEqual(context["rows"], 1)

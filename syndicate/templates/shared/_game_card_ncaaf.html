@@ -97,7 +97,7 @@
           <div class="cards-box-head">
             <div>
               <div class="cards-table-kicker">Section 2</div>
-              <div class="cards-table-title"><strong>SmartSim</strong></div>
+              <div class="cards-table-title"><strong>Enhanced Totals Engine</strong></div>
             </div>
             <span class="cards-overview-badge{% if scoreboard and scoreboard.home_points != '-' %} is-ready{% else %} is-suppressed{% endif %}">Projection</span>
           </div>
@@ -129,17 +129,40 @@
       </div>
     </section>
 
+    {% if scoreboard and scoreboard.projection_sources %}
+      {% set is_public_trial = scoreboard.projection_sources_mode == 'public_trial' %}
+      <section class="cards-panel" data-panel-id="{{ 'blend-trial-public' if is_public_trial else 'blend-trial-diagnostic' }}">
+        <div class="cards-panel-card cards-panel-card--overview-main">
+          <div class="cards-box-head">
+            <div>
+              <div class="cards-table-kicker">{{ 'Experimental preview' if is_public_trial else 'Internal diagnostic -- not publicly visible' }}</div>
+              <div class="cards-table-title"><strong>{{ 'Model Comparison' if is_public_trial else 'Blend Trial: Source Comparison' }}</strong></div>
+            </div>
+            <span class="cards-overview-badge">{{ 'Preview' if is_public_trial else 'Diagnostic' }}</span>
+          </div>
+          {% if is_public_trial %}
+            <div class="cards-empty-copy">You're seeing this because you're part of a limited SmartSim 2.0 trial. These additional projections are experimental and shown alongside our standard projection, not in place of it.</div>
+          {% endif %}
+          <div class="cards-summary-grid">
+            <div class="cards-data-pair"><span>{{ scoreboard.projection_sources.enhanced_totals_engine.label }}</span><strong>Margin {{ scoreboard.projection_sources.enhanced_totals_engine.margin }} | Total {{ scoreboard.projection_sources.enhanced_totals_engine.total }}</strong></div>
+            <div class="cards-data-pair"><span>{{ scoreboard.projection_sources.smartsim2.label }}</span><strong>Margin {{ scoreboard.projection_sources.smartsim2.margin }} | Total {{ scoreboard.projection_sources.smartsim2.total }}</strong></div>
+            <div class="cards-data-pair"><span>{{ scoreboard.projection_sources.consensus_projection.label }}</span><strong>Margin {{ scoreboard.projection_sources.consensus_projection.margin }} | Total {{ scoreboard.projection_sources.consensus_projection.total }}</strong></div>
+          </div>
+        </div>
+      </section>
+    {% endif %}
+
     {% if smartsim_reason_items %}
       <section class="cards-panel" data-panel-id="smartsim-reasons">
         <div class="cards-panel-card cards-panel-card--overview-main">
           <div class="cards-box-head">
             <div>
               <div class="cards-table-kicker">Section 3</div>
-              <div class="cards-table-title"><strong>SmartSim Reasons</strong></div>
+              <div class="cards-table-title"><strong>Enhanced Totals Engine Reasons</strong></div>
             </div>
             <span class="cards-overview-badge">Why it leans</span>
           </div>
-          <div class="cards-mini-copy">{{ smartsim_reasons.lead if smartsim_reasons and smartsim_reasons.lead is defined else 'SmartSim reasons derived from the current team and matchup context.' }}</div>
+          <div class="cards-mini-copy">{{ smartsim_reasons.lead if smartsim_reasons and smartsim_reasons.lead is defined else 'Enhanced Totals Engine reasons derived from the current team and matchup context.' }}</div>
           <div class="cards-callout-list">
             {% for item in smartsim_reason_items[:5] %}
               <div class="cards-callout">
@@ -247,7 +270,7 @@
       </div>
       <div class="cards-mini-metrics cards-mini-metrics--rail">
         <div class="cards-mini-metric">
-          <span>SmartSim</span>
+          <span>Source</span>
           <strong>{{ scoreboard.source_label if scoreboard and scoreboard.source_label else 'Runtime' }}</strong>
         </div>
         <div class="cards-mini-metric">

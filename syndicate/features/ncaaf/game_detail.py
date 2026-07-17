@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from syndicate.features.ncaaf.cards import build_cards_page_context
 from syndicate.features.ncaaf.cards import build_smartsim_cards_page_context
+from syndicate.features.ncaaf.smartsim2_projection import LEGACY_ENGINE_SOURCE_LABEL
+from syndicate.features.ncaaf.smartsim2_trial_monitoring import record_trial_page_view
 from syndicate.features.ncaaf.sources import build_module_links
 from syndicate.features.shared.game_board_contract import build_single_game_board_context
 
@@ -25,9 +27,9 @@ def build_game_detail_page_context(selected_week: int, game_pk: str) -> dict:
             "gamePk": str(game_pk),
             "away": {"abbr": "AWY", "name": "Unavailable"},
             "home": {"abbr": "HOM", "name": "Unavailable"},
-            "status": "SmartSim game unavailable",
+            "status": f"{LEGACY_ENGINE_SOURCE_LABEL} game unavailable",
             "detail": week_label,
-            "summary": "No stored NCAAF SmartSim game card was available for this week and game id.",
+            "summary": f"No stored NCAAF {LEGACY_ENGINE_SOURCE_LABEL} game card was available for this week and game id.",
             "metrics": [
                 {"label": "Game", "value": str(game_pk)},
                 {"label": "Week", "value": str(resolved_week)},
@@ -37,7 +39,7 @@ def build_game_detail_page_context(selected_week: int, game_pk: str) -> dict:
                 {
                     "eyebrow": "Game unavailable",
                     "title": "No saved NCAAF game card",
-                    "body": "Syndicate could not find a stored weekly SmartSim NCAAF card for this week and game id.",
+                    "body": f"Syndicate could not find a stored weekly {LEGACY_ENGINE_SOURCE_LABEL} NCAAF card for this week and game id.",
                     "items": ["Return to the NCAAF cards board to choose a week with saved runtime cards."],
                 }
             ],
@@ -54,8 +56,20 @@ def build_game_detail_page_context(selected_week: int, game_pk: str) -> dict:
         matchup_context = {}
         smartsim_reasons = {}
 
+    if scoreboard:
+        try:
+            season_for_monitoring = int(str(week_label or "0").split()[0])
+        except (ValueError, IndexError):
+            season_for_monitoring = 0
+        record_trial_page_view(
+            route="/ncaaf/game/<id>",
+            season=season_for_monitoring,
+            week=resolved_week,
+            scoreboards=[scoreboard],
+        )
+
     board_header_title = f"{_team_name(game, 'away')} @ {_team_name(game, 'home')}"
-    board_header_meta = "SmartSim Game Hub | " + str(scoreboard.get("source_label") or game.get("status") or "NCAAF").strip()
+    board_header_meta = "NCAAF Game Hub | " + str(scoreboard.get("source_label") or game.get("status") or "NCAAF").strip()
 
     header_stats = [
         {"label": "Game", "value": f"{game['away']['abbr']} @ {game['home']['abbr']}"},
@@ -80,12 +94,12 @@ def build_game_detail_page_context(selected_week: int, game_pk: str) -> dict:
         game=game,
         game_pk=game_pk,
         module_links=build_module_links(resolved_week, "Cards"),
-        source_path=str(cards_context.get("source_path") or "NCAAF SmartSim cards runtime"),
-        source_title="NCAAF SmartSim game hub" if game.get("status") != "SmartSim game unavailable" else "NCAAF game unavailable",
+        source_path=str(cards_context.get("source_path") or f"NCAAF {LEGACY_ENGINE_SOURCE_LABEL} cards runtime"),
+        source_title=f"NCAAF {LEGACY_ENGINE_SOURCE_LABEL} game hub" if game.get("status") != f"{LEGACY_ENGINE_SOURCE_LABEL} game unavailable" else "NCAAF game unavailable",
         using_sample_data=using_sample_data,
         route_path=f"/ncaaf/game/{game_pk}",
         intro_title="NCAAF Game Hub",
-        intro_body="SmartSim Game Hub surfaces the projection, the evidence behind it, and the matchup context that explains why the model leans the way it does.",
+        intro_body="NCAAF Game Hub surfaces the projection, the evidence behind it, and the matchup context that explains why the model leans the way it does.",
         cards_grid_class="cards-grid",
         cards_stylesheet=None,
         teaser={
@@ -116,8 +130,8 @@ def build_game_detail_page_context(selected_week: int, game_pk: str) -> dict:
             "show_matchup_context": bool(matchup_context.get("items")),
             "smartsim_reasons": smartsim_reasons,
             "matchup_context": matchup_context,
-            "source_title": "NCAAF SmartSim game hub",
-            "source_path": str(cards_context.get("source_path") or "NCAAF SmartSim cards runtime"),
+            "source_title": f"NCAAF {LEGACY_ENGINE_SOURCE_LABEL} game hub",
+            "source_path": str(cards_context.get("source_path") or f"NCAAF {LEGACY_ENGINE_SOURCE_LABEL} cards runtime"),
             "header_stats": header_stats,
         }
     )

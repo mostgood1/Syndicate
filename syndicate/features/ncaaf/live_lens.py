@@ -5,6 +5,7 @@ from typing import Any
 
 from syndicate.features.ncaaf.cards import build_smartsim_cards_page_context
 from syndicate.features.ncaaf.cards import build_cards_page_context
+from syndicate.features.ncaaf.smartsim2_projection import LEGACY_ENGINE_SOURCE_LABEL
 from syndicate.features.ncaaf.sources import available_weeks
 from syndicate.features.ncaaf.sources import build_module_links
 from syndicate.features.shared.live_lens_contract import attach_live_lens_contract
@@ -72,15 +73,15 @@ def _runtime_rank_card(game: dict[str, Any]) -> dict[str, Any]:
     ]
     return {
         "title": f"{_safe_text(away.get('abbr'), 'AWY')} @ {_safe_text(home.get('abbr'), 'HOM')}",
-        "eyebrow": "SmartSim runtime",
+        "eyebrow": LEGACY_ENGINE_SOURCE_LABEL,
         "badge": _safe_text(scoreboard.get("win_probability"), "Watch"),
-        "meta": _safe_text(scoreboard.get("source_label"), "SmartSim runtime"),
+        "meta": _safe_text(scoreboard.get("source_label"), LEGACY_ENGINE_SOURCE_LABEL),
         "metrics": metrics,
         "summary": _safe_text(game.get("summary"), "NCAAF live lens row."),
         "list_items": list_items,
         "href": _safe_text(game.get("href"), "/ncaaf/cards"),
         "href_label": _safe_text(game.get("href_label"), "Open NCAAF game detail"),
-        "live_lens_note": _safe_text(summary.get("ready_label"), "SmartSim runtime"),
+        "live_lens_note": _safe_text(summary.get("ready_label"), LEGACY_ENGINE_SOURCE_LABEL),
     }
 
 
@@ -158,9 +159,9 @@ def build_smartsim_live_lens_page_context(selected_week: int) -> dict[str, objec
     games = cards_context.get("games") if isinstance(cards_context.get("games"), list) else []
     rank_cards = [_runtime_rank_card(game) for game in games if isinstance(game, dict)]
     warning_panel = {
-        "eyebrow": "SmartSim runtime",
-        "title": "NCAAF live lens now uses runtime SmartSim cards",
-        "body": "This live-lens board reads the SmartSim cards runtime first so matchup signals stay aligned with projected score, spread, total, and win probability.",
+        "eyebrow": LEGACY_ENGINE_SOURCE_LABEL,
+        "title": f"NCAAF live lens now uses runtime {LEGACY_ENGINE_SOURCE_LABEL} cards",
+        "body": f"This live-lens board reads the {LEGACY_ENGINE_SOURCE_LABEL} cards runtime first so matchup signals stay aligned with projected score, spread, total, and win probability.",
         "list_items": [f"Season: {season}", f"Week: {resolved_week}", f"Games surfaced: {len(games)}"],
     }
     if not rank_cards:
@@ -170,17 +171,17 @@ def build_smartsim_live_lens_page_context(selected_week: int) -> dict[str, objec
         selected_date=f"{season} Week {resolved_week}",
         route_path="/ncaaf/live-lens",
         intro_title="NCAAF Live Lens",
-        intro_body="NCAAF live lens now uses SmartSim runtime cards first so the board stays aligned with the projected game shape.",
+        intro_body=f"NCAAF live lens now uses {LEGACY_ENGINE_SOURCE_LABEL} runtime cards first so the board stays aligned with the projected game shape.",
         aria_label="NCAAF live lens board",
-        source_path=str(cards_context.get("source_path") or "NCAAF SmartSim predicted totals"),
-        source_title="NCAAF SmartSim live lens runtime",
+        source_path=str(cards_context.get("source_path") or f"NCAAF {LEGACY_ENGINE_SOURCE_LABEL} predicted totals"),
+        source_title=f"NCAAF {LEGACY_ENGINE_SOURCE_LABEL} live lens runtime",
         rank_cards=rank_cards,
         using_sample_data=False,
         header_stats=[
             {"label": "Games", "value": str(len(games))},
             {"label": "Season", "value": str(season)},
             {"label": "Week", "value": str(resolved_week)},
-            {"label": "Source", "value": Path(str(cards_context.get('source_path') or '')).name if cards_context.get("source_path") else "SmartSim"},
+            {"label": "Source", "value": Path(str(cards_context.get('source_path') or '')).name if cards_context.get("source_path") else LEGACY_ENGINE_SOURCE_LABEL},
         ],
         module_links=build_module_links(resolved_week, "Live Lens", season=season),
         warning_panel=warning_panel,
@@ -195,7 +196,7 @@ def build_smartsim_live_lens_page_context(selected_week: int) -> dict[str, objec
         empty_state={
             "eyebrow": "NCAAF live lens",
             "title": "No NCAAF live-lens rows were available for this week",
-            "body": "The SmartSim live-lens board only renders runtime cards, and none were available for the requested week.",
+            "body": f"The {LEGACY_ENGINE_SOURCE_LABEL} live-lens board only renders runtime cards, and none were available for the requested week.",
             "list_items": [f"Week: {selected_week}"],
         } if not rank_cards else None,
     )

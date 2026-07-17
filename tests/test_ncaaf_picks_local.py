@@ -32,10 +32,10 @@ class NcaafPicksLocalTests(unittest.TestCase):
         ), patch("syndicate.features.ncaaf.picks._prediction_source_path", return_value=Path("/tmp/predicted_totals.csv")):
             context = build_smartsim_picks_page_context(1)
 
-        self.assertEqual(context["source_title"], "NCAAF SmartSim picks runtime")
+        self.assertEqual(context["source_title"], "NCAAF Enhanced Totals Engine picks runtime")
         self.assertEqual(context["rank_cards"][0]["meta"], "UNLV at Sam Houston")
-        self.assertEqual(context["rank_cards"][0]["eyebrow"], "SmartSim runtime")
-        self.assertIn("SmartSim projects Sam Houston", context["rank_cards"][0]["summary"])
+        self.assertEqual(context["rank_cards"][0]["eyebrow"], "Enhanced Totals Engine")
+        self.assertIn("Enhanced Totals Engine projects Sam Houston", context["rank_cards"][0]["summary"])
 
     def test_smartsim_picks_runtime_falls_back_to_summaries(self) -> None:
         fallback_context = {"date": "2025-01-01", "rank_cards": [], "source_title": "Fallback"}

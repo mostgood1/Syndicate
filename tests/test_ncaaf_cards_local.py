@@ -41,10 +41,10 @@ class NcaafCardsLocalTests(unittest.TestCase):
         ):
             context = build_smartsim_cards_page_context(1)
 
-        self.assertEqual(context["source_title"], "NCAAF SmartSim cards runtime")
+        self.assertEqual(context["source_title"], "NCAAF Enhanced Totals Engine cards runtime")
         self.assertEqual(context["board_contract"]["source_kind"], "smartsim_runtime")
-        self.assertEqual(context["games"][0]["detail"], "SmartSim runtime")
-        self.assertIn("SmartSim projects Sam Houston", context["games"][0]["summary"])
+        self.assertEqual(context["games"][0]["detail"], "Enhanced Totals Engine")
+        self.assertIn("Enhanced Totals Engine projects Sam Houston", context["games"][0]["summary"])
         self.assertEqual(context["games"][0]["ncaaf_card"]["scoreboard"]["home_points"], "34.2")
         self.assertEqual(context["games"][0]["ncaaf_card"]["scoreboard"]["away_points"], "24.1")
         self.assertIn("team_context", context["games"][0]["ncaaf_card"])
@@ -59,7 +59,7 @@ class NcaafCardsLocalTests(unittest.TestCase):
             ["Conference Context", "Returning Production", "Portal Impact", "Coach Continuity", "Roster Comparison"],
         )
         self.assertIn("smartsim_reasons", context["games"][0]["ncaaf_card"])
-        self.assertTrue(context["games"][0]["ncaaf_card"]["smartsim_reasons"]["summary"].startswith("SmartSim favors"))
+        self.assertTrue(context["games"][0]["ncaaf_card"]["smartsim_reasons"]["summary"].startswith("Enhanced Totals Engine favors"))
         self.assertIsNotNone(context["games"][0]["ncaaf_card"]["summary"]["coverage_score"])
         self.assertIn(context["games"][0]["ncaaf_card"]["summary"]["publication_status"], {"publishable", "suppressed"})
         self.assertIn(context["games"][0]["ncaaf_card"]["summary"]["publication_priority"], {0, 1, 2, 3})
@@ -222,13 +222,13 @@ class NcaafCardsLocalTests(unittest.TestCase):
                             "total_points": "58.3",
                             "spread_label": "Sam Houston by 10.1",
                             "win_probability": "73.1%",
-                            "source_label": "SmartSim runtime",
+                            "source_label": "Enhanced Totals Engine",
                             "kickoff": "2025-09-01T19:00:00Z",
                             "venue": "Test Stadium",
                         },
                         "summary": {"ready_label": "Publication blocked"},
                         "smartsim_reasons": {
-                            "lead": "SmartSim favors Sam Houston because of higher returning production, stronger roster experience, and positive portal balance.",
+                            "lead": "Enhanced Totals Engine favors Sam Houston because of higher returning production, stronger roster experience, and positive portal balance.",
                             "summary": "SmartSim favors Sam Houston because of higher returning production, stronger roster experience, and positive portal balance.",
                             "favored_team": "Sam Houston",
                             "items": [
@@ -267,11 +267,11 @@ class NcaafCardsLocalTests(unittest.TestCase):
         self.assertEqual(context["board_header_title"], "UNLV @ Sam Houston")
         self.assertTrue(context["show_source_summary"])
         self.assertTrue(context["show_matchup_context"])
-        self.assertEqual(context["source_title"], "NCAAF SmartSim game hub")
+        self.assertEqual(context["source_title"], "NCAAF Enhanced Totals Engine game hub")
         self.assertEqual(context["header_stats"][1]["value"], "34.2 - 24.1")
-        self.assertEqual(context["cards_header_meta"], "SmartSim Game Hub | SmartSim runtime")
+        self.assertEqual(context["cards_header_meta"], "NCAAF Game Hub | Enhanced Totals Engine")
         self.assertTrue(context["show_smartsim_reasons"])
-        self.assertTrue(context["smartsim_reasons"]["lead"].startswith("SmartSim favors Sam Houston because of"))
+        self.assertTrue(context["smartsim_reasons"]["lead"].startswith("Enhanced Totals Engine favors Sam Houston because of"))
         self.assertEqual(
             [item["label"] for item in context["smartsim_reasons"]["items"]],
             ["Returning Production", "Roster Experience", "Portal Activity", "Coach Continuity", "Conference / Subdivision Context"],

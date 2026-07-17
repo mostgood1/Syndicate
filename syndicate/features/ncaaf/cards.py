@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+import os
 import re
 from typing import Any
 from functools import lru_cache
@@ -8,6 +9,7 @@ from pathlib import Path
 
 from syndicate.features.ncaaf.sources import available_weeks
 from syndicate.features.ncaaf.sources import build_module_links
+from syndicate.features.ncaaf.sources import default_ncaaf_source_root
 from syndicate.features.ncaaf.sources import default_season
 from syndicate.features.ncaaf.sources import default_week
 from syndicate.features.ncaaf.sources import format_moneyline
@@ -15,6 +17,14 @@ from syndicate.features.ncaaf.sources import format_num
 from syndicate.features.ncaaf.sources import format_pct
 from syndicate.features.ncaaf.sources import load_json
 from syndicate.features.ncaaf.sources import summary_path
+from syndicate.features.ncaaf.smartsim2_blend import compute_blend
+from syndicate.features.ncaaf.smartsim2_projection import CONSENSUS_SOURCE_LABEL
+from syndicate.features.ncaaf.smartsim2_projection import LEGACY_ENGINE_SOURCE_LABEL
+from syndicate.features.ncaaf.smartsim2_projection import SMARTSIM2_PUBLIC_LABEL
+from syndicate.features.ncaaf.smartsim2_projection import SMARTSIM2_SOURCE_LABEL
+from syndicate.features.ncaaf.smartsim2_projection import SmartSimNcaafProjection
+from syndicate.features.ncaaf.smartsim2_projection import read_projection_artifact
+from syndicate.features.ncaaf.smartsim2_trial_monitoring import record_trial_page_view
 from syndicate.features.shared.discrete_nav import neighboring_values
 from syndicate.features.shared.discrete_nav import resolve_selected_value
 from syndicate.features.shared.game_board_contract import apply_game_board_contract
@@ -60,7 +70,7 @@ _NCAAF_CARD_CONTRACT_VERSION = "1"
 
 @lru_cache(maxsize=1)
 def _prediction_rows() -> tuple[dict[str, Any], ...]:
-    data_root = Path(__file__).resolve().parents[3] / "data" / "ncaaf_source" / "data"
+    data_root = default_ncaaf_source_root() / "data"
     if not data_root.exists():
         return ()
     candidate_paths = sorted(
@@ -89,7 +99,7 @@ def _prediction_rows() -> tuple[dict[str, Any], ...]:
 
 @lru_cache(maxsize=1)
 def _prediction_source_path() -> Path | None:
-    data_root = Path(__file__).resolve().parents[3] / "data" / "ncaaf_source" / "data"
+    data_root = default_ncaaf_source_root() / "data"
     if not data_root.exists():
         return None
     candidate_paths = sorted(
@@ -132,6 +142,184 @@ def _prediction_index() -> dict[tuple[str, str, str], dict[str, Any]]:
             continue
         index.setdefault((week, away_team, home_team), row)
     return index
+
+
+_BLEND_TRIAL_DIAGNOSTICS_ENV_VAR = "SMARTSIM_BLEND_TRIAL_DIAGNOSTICS"
+
+
+def _blend_trial_diagnostics_enabled() -> bool:
+    """Internal-only gate for the Phase 2B blend-trial diagnostic view.
+
+    Off by default (production/public behavior is completely unaffected).
+    Deliberately an environment variable, not a query parameter or request
+    header -- it cannot be toggled by an external HTTP request, only by
+    whoever controls the process environment. See smartsim_blend_trial_plan.md
+    Stage 1 and smartsim_blend_trial_report.md.
+    """
+    return os.environ.get(_BLEND_TRIAL_DIAGNOSTICS_ENV_VAR, "").strip().lower() in {"1", "true", "yes"}
+
+
+# --- Phase 3: Public Blend Trial rollout controls -------------------------
+# Separate and independent from the Phase 2B internal-diagnostics flag above
+# -- that flag is untouched and still governs the engineer-only view. These
+# control whether a *public* (but deliberately narrow) audience can see the
+# same three-way comparison, styled as a real feature rather than a
+# diagnostic. Two independent mechanisms, either of which grants visibility,
+# both gated behind one master switch -- see smartsim_public_trial_report.md.
+_PUBLIC_TRIAL_MASTER_ENV_VAR = "SMARTSIM_PUBLIC_TRIAL_ENABLED"
+_PUBLIC_TRIAL_TOKEN_ALLOWLIST_ENV_VAR = "SMARTSIM_PUBLIC_TRIAL_TOKENS"
+_PUBLIC_TRIAL_IP_ALLOWLIST_ENV_VAR = "SMARTSIM_PUBLIC_TRIAL_IP_ALLOWLIST"
+_PUBLIC_TRIAL_TOKEN_PARAM = "smartsim_trial"
+
+
+def _public_trial_master_enabled() -> bool:
+    """The kill switch: if this is off, no request-level check is even attempted."""
+    return os.environ.get(_PUBLIC_TRIAL_MASTER_ENV_VAR, "").strip().lower() in {"1", "true", "yes"}
+
+
+def _env_list(env_var: str) -> frozenset[str]:
+    raw = os.environ.get(env_var, "")
+    return frozenset(item.strip() for item in raw.split(",") if item.strip())
+
+
+def _public_trial_visible_for_request() -> bool:
+    """Per-request gate for the public blend trial.
+
+    Requires the master switch to be on, AND (a request context to exist --
+    this is always False for CLI/batch callers such as the projection
+    generation script or tests run outside an app context -- AND (the
+    request's trial token matches the configured allowlist, OR the client's
+    IP matches the configured IP allowlist)). Either allowlist mechanism is
+    independently sufficient once the master switch is on; both default to
+    empty (nobody whitelisted) so enabling the master switch alone still
+    shows nothing until an allowlist is actually configured.
+    """
+    if not _public_trial_master_enabled():
+        return False
+    try:
+        from flask import request as flask_request
+        from flask import has_request_context
+    except Exception:  # noqa: BLE001 - flask always installed in this app, but stay defensive
+        return False
+    if not has_request_context():
+        return False
+
+    token_allowlist = _env_list(_PUBLIC_TRIAL_TOKEN_ALLOWLIST_ENV_VAR)
+    if token_allowlist:
+        token = str(flask_request.args.get(_PUBLIC_TRIAL_TOKEN_PARAM) or flask_request.cookies.get(_PUBLIC_TRIAL_TOKEN_PARAM) or "").strip()
+        if token and token in token_allowlist:
+            return True
+
+    ip_allowlist = _env_list(_PUBLIC_TRIAL_IP_ALLOWLIST_ENV_VAR)
+    if ip_allowlist and str(flask_request.remote_addr or "").strip() in ip_allowlist:
+        return True
+
+    return False
+
+
+@lru_cache(maxsize=16)
+def _smartsim2_projection_index(season: int, week: int) -> dict[tuple[str, str], SmartSimNcaafProjection]:
+    """Shadow-mode lookup for SmartSim 2.0 projections, keyed by (home, away).
+
+    Returns an empty dict (never raises) when the artifact for this season/week
+    has not been generated yet -- SmartSim 2.0 availability must never affect
+    the legacy engine's own output. See smartsim_shadow_mode_report.md.
+    """
+    data_root = default_ncaaf_source_root() / "data"
+    try:
+        projections = read_projection_artifact(season=season, week=week, data_root=data_root)
+    except Exception:
+        return {}
+    return {(_normalize_text(p.home_team), _normalize_text(p.away_team)): p for p in projections}
+
+
+def _attach_smartsim2_shadow_fields(
+    scoreboard: dict[str, Any],
+    *,
+    row: dict[str, Any],
+    week: int,
+    engine_home_points: float | None,
+    engine_away_points: float | None,
+    engine_total_points: float | None,
+    engine_margin: float | None,
+) -> None:
+    """Additive-only: adds smartsim2_*/blend_* keys, never touches existing ones.
+
+    Phase 1 (shadow mode): these fields are captured for monitoring only and
+    are not read by any template today (verified against syndicate/templates
+    before this integration landed) -- adding them cannot change published
+    output. See smartsim_production_integration_plan.md task 5.
+    """
+    scoreboard["smartsim2_available"] = False
+    season = default_season()
+    index = _smartsim2_projection_index(season, week)
+    home_name = _normalize_text(row.get("home_team"))
+    away_name = _normalize_text(row.get("away_team"))
+    projection = index.get((home_name, away_name))
+    if projection is None:
+        return
+
+    scoreboard["smartsim2_available"] = True
+    scoreboard["smartsim2_source_label"] = SMARTSIM2_SOURCE_LABEL
+    scoreboard["smartsim2_home_points"] = projection.home_score_mean
+    scoreboard["smartsim2_away_points"] = projection.away_score_mean
+    scoreboard["smartsim2_total_points"] = projection.total_mean
+    scoreboard["smartsim2_margin"] = projection.margin_mean
+    scoreboard["smartsim2_margin_stdev"] = projection.margin_stdev
+    scoreboard["smartsim2_total_stdev"] = projection.total_stdev
+    scoreboard["smartsim2_home_win_rate"] = projection.home_win_rate
+    scoreboard["smartsim2_profile_name"] = projection.profile_name
+    scoreboard["smartsim2_rating_source"] = projection.rating_source
+
+    if engine_home_points is None or engine_away_points is None or engine_total_points is None:
+        return
+    if engine_margin is None:
+        engine_margin = engine_home_points - engine_away_points
+    result = compute_blend(
+        engine_margin=engine_margin,
+        smartsim_margin=projection.margin_mean,
+        engine_total=engine_total_points,
+        smartsim_total=projection.total_mean,
+    )
+    scoreboard["blend_margin"] = result.margin
+    scoreboard["blend_total"] = result.total
+    scoreboard["blend_margin_applied"] = result.smartsim_margin_used
+    scoreboard["blend_total_applied"] = result.total_blended
+
+    if _public_trial_visible_for_request():
+        visibility_mode = "public_trial"
+    elif _blend_trial_diagnostics_enabled():
+        visibility_mode = "internal_diagnostic"
+    else:
+        visibility_mode = None
+
+    if visibility_mode is not None:
+        smartsim2_label = SMARTSIM2_PUBLIC_LABEL if visibility_mode == "public_trial" else SMARTSIM2_SOURCE_LABEL
+        scoreboard["projection_sources_mode"] = visibility_mode
+        scoreboard["projection_sources"] = {
+            "enhanced_totals_engine": {
+                "label": LEGACY_ENGINE_SOURCE_LABEL,
+                "home_points": engine_home_points,
+                "away_points": engine_away_points,
+                "margin": engine_margin,
+                "total": engine_total_points,
+            },
+            "smartsim2": {
+                "label": smartsim2_label,
+                "home_points": projection.home_score_mean,
+                "away_points": projection.away_score_mean,
+                "margin": projection.margin_mean,
+                "total": projection.total_mean,
+                "available": True,
+            },
+            "consensus_projection": {
+                "label": CONSENSUS_SOURCE_LABEL,
+                "margin": result.margin,
+                "total": result.total,
+                "margin_blended": result.smartsim_margin_used,
+                "total_blended": result.total_blended,
+            },
+        }
 
 
 def _scoreboard_projection(row: dict[str, Any], week: int) -> dict[str, Any]:
@@ -185,16 +373,26 @@ def _runtime_scoreboard_projection(row: dict[str, Any], week: int) -> dict[str, 
         spread_label = f"{away_name} by {abs(margin):.1f}"
     kickoff = str(row.get("start_date_api") or row.get("start_date") or "").strip()
     venue = str(row.get("venue") or "").strip()
-    return {
+    scoreboard = {
         "home_points": _format_decimal(home_points, places=1),
         "away_points": _format_decimal(away_points, places=1),
         "total_points": _format_decimal(total_points, places=1),
         "spread_label": spread_label,
         "win_probability": format_pct(win_probability),
-        "source_label": "SmartSim runtime",
+        "source_label": LEGACY_ENGINE_SOURCE_LABEL,
         "kickoff": kickoff,
         "venue": venue,
     }
+    _attach_smartsim2_shadow_fields(
+        scoreboard,
+        row=row,
+        week=week,
+        engine_home_points=home_points,
+        engine_away_points=away_points,
+        engine_total_points=total_points,
+        engine_margin=margin,
+    )
+    return scoreboard
 
 
 def _runtime_publication_profile(scoreboard: dict[str, Any]) -> dict[str, Any]:
@@ -787,9 +985,9 @@ def _build_smartsim_reasons_items(home_context: dict[str, Any], away_context: di
     if len(lead_phrases) > 2:
         lead_text = f"{', '.join(lead_phrases[:2])}, and {lead_phrases[2]}"
     if lead_text:
-        summary = f"SmartSim favors {favored_name} because of {lead_text.lower()}."
+        summary = f"{LEGACY_ENGINE_SOURCE_LABEL} favors {favored_name} because of {lead_text.lower()}."
     else:
-        summary = f"SmartSim favors {favored_name} because the current matchup context leans that way."
+        summary = f"{LEGACY_ENGINE_SOURCE_LABEL} favors {favored_name} because the current matchup context leans that way."
 
     return {
         "lead": summary,
@@ -1057,7 +1255,7 @@ def _collapse_games(summary: dict[str, Any], week: int, *, limit: int = 16) -> l
                 ],
                 "market_tiles": [
                     {"label": "Coverage", "title": _format_decimal(ncaaf_card["summary"]["coverage_score"], places=3), "sub": ncaaf_card["summary"]["ready_label"]},
-                    {"label": "Tier", "title": str(ncaaf_card["summary"]["coverage_tier"] or "-").upper(), "sub": "SmartSim tier"},
+                    {"label": "Tier", "title": str(ncaaf_card["summary"]["coverage_tier"] or "-").upper(), "sub": "Enhanced Totals Engine tier"},
                     {"label": "Status", "title": str(ncaaf_card["summary"]["publication_status"] or "-").title(), "sub": "Publication state"},
                     {"label": "Priority", "title": str(ncaaf_card["summary"]["publication_priority"] or "-"), "sub": "Board order"},
                 ],
@@ -1092,7 +1290,7 @@ def _build_smartsim_ncaaf_card_contract(row: dict[str, Any], week: int, *, seaso
         {"label": "Win probability", "value": scoreboard.get("win_probability") or "-"},
     ]
     summary_text = (
-        f"SmartSim projects {home_team} {scoreboard.get('home_points') or '-'} - "
+        f"{LEGACY_ENGINE_SOURCE_LABEL} projects {home_team} {scoreboard.get('home_points') or '-'} - "
         f"{scoreboard.get('away_points') or '-'} {away_team} with a total of "
         f"{scoreboard.get('total_points') or '-'} and a home win probability of "
         f"{scoreboard.get('win_probability') or '-'}."
@@ -1140,13 +1338,13 @@ def _build_smartsim_ncaaf_card_contract(row: dict[str, Any], week: int, *, seaso
         "href": f"/ncaaf/game/{f'{week}_{away_team}_{home_team}'.replace(' ', '_')}?week={week}",
         "href_label": "Open NCAAF game detail",
         "status": f"Week {week}",
-        "detail": "SmartSim runtime",
+        "detail": LEGACY_ENGINE_SOURCE_LABEL,
         "summary": summary_text,
         "metrics": metric_rows,
         "smartsim_reasons": smartsim_reasons,
         "panels": [
             {
-                "eyebrow": "SmartSim runtime",
+                "eyebrow": LEGACY_ENGINE_SOURCE_LABEL,
                 "title": "Projection contract",
                 "body": "Cards now read directly from the predicted totals snapshot instead of saved recommendation summaries.",
                 "items": [
@@ -1158,19 +1356,19 @@ def _build_smartsim_ncaaf_card_contract(row: dict[str, Any], week: int, *, seaso
                 ],
             },
             {
-                "eyebrow": "SmartSim runtime",
+                "eyebrow": LEGACY_ENGINE_SOURCE_LABEL,
                 "title": "Source and fallback",
                 "body": "The runtime cards path can fall back to the summary artifact path if the predicted-totals snapshot is unavailable.",
                 "items": [
-                    f"Projection source: {scoreboard.get('source_label') or 'SmartSim runtime'}",
+                    f"Projection source: {scoreboard.get('source_label') or LEGACY_ENGINE_SOURCE_LABEL}",
                     f"Kickoff: {scoreboard.get('kickoff') or 'Kickoff unavailable'}",
                     f"Venue: {scoreboard.get('venue') or 'Venue unavailable'}",
                 ],
             },
         ],
         "market_tiles": [
-            {"label": "Coverage", "title": _format_decimal(coverage_score, places=3), "sub": "SmartSim tier"},
-            {"label": "Tier", "title": str(coverage_tier or "-").upper(), "sub": "SmartSim tier"},
+            {"label": "Coverage", "title": _format_decimal(coverage_score, places=3), "sub": "Enhanced Totals Engine tier"},
+            {"label": "Tier", "title": str(coverage_tier or "-").upper(), "sub": "Enhanced Totals Engine tier"},
             {"label": "Status", "title": str(publication_status or "-").title(), "sub": "Publication state"},
             {"label": "Priority", "title": str(publication_priority or "-"), "sub": "Board order"},
         ],
@@ -1214,7 +1412,7 @@ def _build_smartsim_ncaaf_card_contract(row: dict[str, Any], week: int, *, seaso
                 "kickoff": scoreboard.get("kickoff") or f"{_week_label(week, season=season)} kickoff unavailable",
                 "venue": scoreboard.get("venue") or "Venue unavailable",
                 "status": f"Week {week}",
-                "status_detail": "SmartSim runtime",
+                "status_detail": LEGACY_ENGINE_SOURCE_LABEL,
             },
             "team_context": team_context,
             "matchup_context": matchup_context,
@@ -1237,6 +1435,16 @@ def build_smartsim_cards_page_context(selected_week: int) -> dict[str, Any]:
         _build_smartsim_ncaaf_card_contract(row, resolved_week, season=season)
         for row in runtime_rows[:16]
     ]
+    record_trial_page_view(
+        route="/ncaaf/cards",
+        season=season,
+        week=resolved_week,
+        scoreboards=[
+            game["ncaaf_card"]["scoreboard"]
+            for game in games
+            if isinstance(game.get("ncaaf_card"), dict) and isinstance(game["ncaaf_card"].get("scoreboard"), dict)
+        ],
+    )
     weeks = runtime_weeks
     prev_week, next_week = neighboring_values(weeks, resolved_week, fallback=resolved_week)
     source_path = _prediction_source_path()
@@ -1264,12 +1472,12 @@ def build_smartsim_cards_page_context(selected_week: int) -> dict[str, Any]:
                 }
                 for game in games
             ],
-            "source_path": str(source_path) if source_path else "NCAAF SmartSim predicted totals",
-            "source_title": "NCAAF SmartSim cards runtime",
+            "source_path": str(source_path) if source_path else f"NCAAF {LEGACY_ENGINE_SOURCE_LABEL} predicted totals",
+            "source_title": f"NCAAF {LEGACY_ENGINE_SOURCE_LABEL} cards runtime",
             "empty_state": {
                 "eyebrow": "NCAAF cards",
-                "title": "No SmartSim cards were available for this week",
-                "body": "The cards board first reads the predicted-totals SmartSim snapshot and falls back to saved weekly summaries only if the runtime path is unavailable.",
+                "title": f"No {LEGACY_ENGINE_SOURCE_LABEL} cards were available for this week",
+                "body": f"The cards board first reads the {LEGACY_ENGINE_SOURCE_LABEL} predicted-totals snapshot and falls back to saved weekly summaries only if the runtime path is unavailable.",
                 "list_items": [
                     f"Requested week: {selected_week}",
                     f"Resolved week: {resolved_week}",
@@ -1278,7 +1486,7 @@ def build_smartsim_cards_page_context(selected_week: int) -> dict[str, Any]:
             "using_sample_data": False,
             "route_path": "/ncaaf/cards",
             "intro_title": "NCAAF Cards",
-            "intro_body": "NCAAF cards now read directly from SmartSim predicted totals first, with saved recommendation summaries kept as a fallback path.",
+            "intro_body": f"NCAAF cards now read directly from {LEGACY_ENGINE_SOURCE_LABEL} predicted totals first, with saved recommendation summaries kept as a fallback path.",
             "cards_control_links": [
                 {"label": "Betting Card", "href": betting_href},
                 {"label": "Picks", "href": f"/ncaaf/picks?week={resolved_week}"},
@@ -1288,7 +1496,7 @@ def build_smartsim_cards_page_context(selected_week: int) -> dict[str, Any]:
                 {"label": "Games", "value": str(len(games))},
                 {"label": "Candidates", "value": str(len(runtime_rows))},
                 {"label": "Weeks", "value": str(len(weeks) or "-")},
-                {"label": "Source", "value": "SmartSim" if games else "No data"},
+                {"label": "Source", "value": LEGACY_ENGINE_SOURCE_LABEL if games else "No data"},
             ],
             "cards_stylesheet": None,
             "cards_grid_class": "cards-grid",
@@ -1296,7 +1504,7 @@ def build_smartsim_cards_page_context(selected_week: int) -> dict[str, Any]:
             "show_intro": True,
             "teaser": {
                 "label": "NCAAF picks",
-                "body": "Use the picks board for the historical weekly recommendation rows that remain separate from the SmartSim cards path.",
+                "body": f"Use the picks board for the historical weekly recommendation rows that remain separate from the {LEGACY_ENGINE_SOURCE_LABEL} cards path.",
                 "href": f"/ncaaf/picks?week={resolved_week}",
                 "cta": "Open NCAAF picks",
             },

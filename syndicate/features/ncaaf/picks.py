@@ -14,6 +14,8 @@ from syndicate.features.ncaaf.sources import summary_path
 from syndicate.features.shared.discrete_nav import neighboring_values
 from syndicate.features.shared.discrete_nav import resolve_selected_value
 from syndicate.features.shared.rank_board import build_rank_page_context
+from syndicate.features.ncaaf.smartsim2_projection import LEGACY_ENGINE_SOURCE_LABEL
+from syndicate.features.ncaaf.smartsim2_trial_monitoring import record_trial_page_view
 
 from syndicate.features.ncaaf.cards import _prediction_source_path
 from syndicate.features.ncaaf.cards import _prediction_weeks
@@ -148,16 +150,23 @@ def _runtime_pick_cards(week: int, *, season: int) -> list[dict[str, Any]]:
             }
         )
     ordered_rows = sorted(candidate_rows, key=lambda item: (item["score"], str(item["home_team"]), str(item["away_team"])), reverse=True)
+    shown_rows = ordered_rows[:12]
+    record_trial_page_view(
+        route="/ncaaf/picks",
+        season=season,
+        week=week,
+        scoreboards=[item["scoreboard"] for item in shown_rows],
+    )
     cards: list[dict[str, Any]] = []
-    for item in ordered_rows[:12]:
+    for item in shown_rows:
         row = item["row"]
         scoreboard = item["scoreboard"]
         home_team = item["home_team"]
         away_team = item["away_team"]
         cards.append(
             {
-                "title": f"{home_team} vs {away_team} SmartSim candidate",
-                "eyebrow": "SmartSim runtime",
+                "title": f"{home_team} vs {away_team} {LEGACY_ENGINE_SOURCE_LABEL} candidate",
+                "eyebrow": LEGACY_ENGINE_SOURCE_LABEL,
                 "badge": f"{scoreboard.get('win_probability') or '-'} win prob",
                 "meta": f"{away_team} at {home_team}",
                 "metrics": [
@@ -167,18 +176,45 @@ def _runtime_pick_cards(week: int, *, season: int) -> list[dict[str, Any]]:
                     {"label": "Total", "value": scoreboard.get("total_points") or "-"},
                 ],
                 "summary": (
-                    f"SmartSim projects {home_team} {scoreboard.get('home_points') or '-'} - {scoreboard.get('away_points') or '-'} "
+                    f"{LEGACY_ENGINE_SOURCE_LABEL} projects {home_team} {scoreboard.get('home_points') or '-'} - {scoreboard.get('away_points') or '-'} "
                     f"{away_team} with a projected total of {scoreboard.get('total_points') or '-'} and a home win probability of {scoreboard.get('win_probability') or '-'}."
                 ),
                 "list_items": [
                     f"Projected spread: {scoreboard.get('spread_label') or '-'}",
                     f"Home mean: {scoreboard.get('home_points') or '-'}",
                     f"Away mean: {scoreboard.get('away_points') or '-'}",
-                    f"Projection source: {scoreboard.get('source_label') or 'SmartSim runtime'}",
+                    f"Projection source: {scoreboard.get('source_label') or LEGACY_ENGINE_SOURCE_LABEL}",
+                    *_diagnostic_source_list_items(scoreboard),
                 ],
             }
         )
     return cards
+
+
+def _diagnostic_source_list_items(scoreboard: dict[str, Any]) -> list[str]:
+    """Blend-trial source-comparison rows -- empty unless projection_sources
+    was attached (internal diagnostics env var, or the Phase 3 public-trial
+    gate; see cards._blend_trial_diagnostics_enabled /
+    cards._public_trial_visible_for_request). Wording depends on
+    projection_sources_mode so a public-trial tester never sees "internal
+    diagnostic" language. Reuses the picks board's existing generic
+    list_items rendering, so no template change was needed for this surface."""
+    sources = scoreboard.get("projection_sources")
+    if not isinstance(sources, dict):
+        return []
+    is_public_trial = scoreboard.get("projection_sources_mode") == "public_trial"
+    header = (
+        "You're seeing this because you're part of a limited SmartSim 2.0 trial:"
+        if is_public_trial
+        else "Internal diagnostic -- not publicly visible:"
+    )
+    lines = [header]
+    for key in ("enhanced_totals_engine", "smartsim2", "consensus_projection"):
+        source = sources.get(key)
+        if not isinstance(source, dict):
+            continue
+        lines.append(f"{source.get('label')}: margin {source.get('margin')} | total {source.get('total')}")
+    return lines
 
 
 def _clamp_week(selected_week: int) -> int:
@@ -201,9 +237,9 @@ def build_smartsim_picks_page_context(selected_week: int) -> dict[str, Any]:
     empty_state = None
     if not cards:
         empty_state = {
-            "eyebrow": "NCAAF SmartSim picks",
+            "eyebrow": f"NCAAF {LEGACY_ENGINE_SOURCE_LABEL} picks",
             "title": "No runtime picks were available.",
-            "body": "The SmartSim picks board first reads the predicted-totals snapshot and falls back to saved weekly summaries only if the runtime source is unavailable.",
+            "body": f"The {LEGACY_ENGINE_SOURCE_LABEL} picks board first reads the predicted-totals snapshot and falls back to saved weekly summaries only if the runtime source is unavailable.",
             "list_items": [
                 f"Requested week: {selected_week}",
                 f"Resolved week: {resolved_week}",
@@ -214,10 +250,10 @@ def build_smartsim_picks_page_context(selected_week: int) -> dict[str, Any]:
             selected_date=_selected_date_token(resolved_week, season=season),
             route_path="/ncaaf/picks",
             intro_title="NCAAF Picks",
-            intro_body="NCAAF picks now generate SmartSim runtime candidates first, then fall back to summary artifacts if the runtime source is missing.",
+            intro_body=f"NCAAF picks now generate {LEGACY_ENGINE_SOURCE_LABEL} runtime candidates first, then fall back to summary artifacts if the runtime source is missing.",
             aria_label="NCAAF picks board",
-            source_path=source_path or "NCAAF SmartSim predicted totals",
-            source_title="NCAAF SmartSim picks runtime",
+            source_path=source_path or f"NCAAF {LEGACY_ENGINE_SOURCE_LABEL} predicted totals",
+            source_title=f"NCAAF {LEGACY_ENGINE_SOURCE_LABEL} picks runtime",
             source_date_display=f"Week {resolved_week}",
             rank_cards=cards,
             using_sample_data=False,
@@ -235,9 +271,9 @@ def build_smartsim_picks_page_context(selected_week: int) -> dict[str, Any]:
             next_href=f"/ncaaf/picks?week={next_week}",
             empty_state=empty_state,
             warning_panel={
-                "eyebrow": "SmartSim runtime",
+                "eyebrow": LEGACY_ENGINE_SOURCE_LABEL,
                 "title": "Picks are now generated from runtime projections first",
-                "body": "The picks board uses SmartSim projection rows as its primary candidate source and only reverts to stored weekly summaries if the runtime source fails.",
+                "body": f"The picks board uses {LEGACY_ENGINE_SOURCE_LABEL} projection rows as its primary candidate source and only reverts to stored weekly summaries if the runtime source fails.",
                 "list_items": [
                     "Candidate rows are built from home_mean, away_mean, win_probability, projected_spread, and projected_total.",
                     "Summary artifacts remain as a fallback path only.",
