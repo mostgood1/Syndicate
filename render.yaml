@@ -441,8 +441,11 @@ services:
       # GHA pipeline. Only meaningful on this service: live_refresh_loop.py's
       # background thread only runs where SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP
       # is true, which today is live-odds-worker only.
+      # Flipped on 2026-07-16: the GHA daily-update went backup-only (Phase 4,
+      # 3d67ed55) which left MLB with no sim owner -- the worker is now the
+      # sole in-environment sim runner.
       - key: SYNDICATE_ENABLE_MLB_DAILY_SIM_TRIGGER
-        value: "false"
+        value: "true"
       - key: SYNDICATE_EVENT_SIM_FORCE_WINDOW_MINUTES
         value: "30"
       - key: SYNDICATE_MLB_SIM_CHECK_INTERVAL_SECONDS
