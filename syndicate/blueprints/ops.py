@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import fnmatch
 import os
 import threading
 import subprocess
@@ -297,7 +298,28 @@ def api_ops_artifacts_export() -> Any:
     # regenerating everything by re-running the full pipeline. Scoped to the
     # exact same allowlist as the publish endpoint -- never returns
     # bulk/historical data.
+    #
+    # Optional filters (both stay allowlist-scoped):
+    #   ?path=<relative_path>     exact single artifact
+    #   ?pattern=<fnmatchglob>    subset of the hot-artifact set
+    # Exporting everything at once can exceed Render's proxy timeout (502),
+    # so callers debugging a single artifact should always pass ?path=.
     root = data_root()
+    exact_path = str(request.args.get("path") or "").strip().replace("\\", "/")
+    if exact_path:
+        if exact_path.startswith("/") or ".." in exact_path.split("/"):
+            return jsonify({"ok": False, "error": "invalid path."}), 400
+        if not is_hot_artifact_relative_path(exact_path):
+            return jsonify({"ok": False, "error": "path is not an allowed hot artifact."}), 403
+        target = root / Path(exact_path)
+        if not target.is_file():
+            return jsonify({"ok": True, "count": 0, "artifacts": {}})
+        try:
+            return jsonify({"ok": True, "count": 1, "artifacts": {exact_path: target.read_text(encoding="utf-8")}})
+        except Exception as exc:
+            return jsonify({"ok": False, "error": f"{type(exc).__name__}: {exc}"}), 500
+
+    subset_pattern = str(request.args.get("pattern") or "").strip().replace("\\", "/")
     artifacts: dict[str, str] = {}
     for pattern in HOT_ARTIFACT_PATTERNS:
         for path in root.glob(pattern):
@@ -305,6 +327,8 @@ def api_ops_artifacts_export() -> Any:
                 continue
             relative_path = relative_to_data_root(path)
             if not relative_path or not is_hot_artifact_relative_path(relative_path):
+                continue
+            if subset_pattern and not fnmatch.fnmatch(relative_path, subset_pattern):
                 continue
             try:
                 artifacts[relative_path] = path.read_text(encoding="utf-8")
