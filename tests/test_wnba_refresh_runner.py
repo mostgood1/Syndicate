@@ -1870,7 +1870,11 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
                     {
                         "home": "POR",
                         "away": "ATL",
-                        "periods": {"q1": {"away_mean": 21.4, "home_mean": 19.8, "total_mean": 41.2, "margin_mean": -1.6, "p_home_win": 0.41}},
+                        # Real raw smart_sim payloads have a top-level "quarters"
+                        # list keyed by "q", not a "periods" dict keyed by "q1" --
+                        # see test_cards_sim_detail_export_uses_source_cards_api_fallback
+                        # below for the same (correct) shape used elsewhere.
+                        "quarters": [{"q": 1, "away_pts_mu": 21.4, "home_pts_mu": 19.8}],
                         "players_summary": {"home": 1, "away": 1},
                         "players": {"home": [{"player_name": "Home Player"}], "away": [{"player_name": "Away Player"}]},
                         "missing_prop_players": {"home": [], "away": []},
@@ -1968,9 +1972,7 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
                     {
                         "home": "POR",
                         "away": "ATL",
-                        "periods": {
-                            "q1": {"away_mean": 21.4, "home_mean": 19.8, "total_mean": 41.2, "margin_mean": -1.6, "p_home_win": 0.41}
-                        },
+                        "quarters": [{"q": 1, "away_pts_mu": 21.4, "home_pts_mu": 19.8}],
                         "players_summary": {"home": 1, "away": 1},
                         "players": {"home": [{"player_name": "Home Player"}], "away": [{"player_name": "Away Player"}]},
                         "missing_prop_players": {"home": [], "away": []},

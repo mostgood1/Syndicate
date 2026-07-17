@@ -3879,20 +3879,41 @@ def _build_cards_sim_detail_from_local_smart_sim(*, processed_root: Path, date_s
         missing = payload.get("missing_prop_players") if isinstance(payload.get("missing_prop_players"), dict) else {}
         injuries = payload.get("injuries") if isinstance(payload.get("injuries"), dict) else {}
         players_summary = payload.get("players_summary") if isinstance(payload.get("players_summary"), dict) else {}
-        periods_payload = payload.get("periods") if isinstance(payload.get("periods"), dict) else {}
+        # The raw smart_sim payload has a top-level "quarters" list (each entry
+        # keyed by "q" with home_pts_mu/away_pts_mu/etc.), not a "periods"
+        # dict keyed by "q1"/"q2"/... with home_mean/away_mean -- that schema
+        # never existed in this file, so periods_payload was always empty and
+        # every game's aggregated quarters came out as [], even when the raw
+        # per-game smart_sim file had real quarter-level pregame data.
+        quarters_payload = payload.get("quarters") if isinstance(payload.get("quarters"), list) else []
+        quarters_by_number: dict[int, dict[str, object]] = {}
+        for entry in quarters_payload:
+            if not isinstance(entry, dict):
+                continue
+            try:
+                quarters_by_number[int(entry.get("q"))] = entry
+            except (TypeError, ValueError):
+                continue
         quarters = []
         for quarter_number in range(1, 5):
-            quarter_payload = periods_payload.get(f"q{quarter_number}") if isinstance(periods_payload.get(f"q{quarter_number}"), dict) else None
+            quarter_payload = quarters_by_number.get(quarter_number)
             if not isinstance(quarter_payload, dict):
                 continue
+            home_mean = quarter_payload.get("home_pts_mu")
+            away_mean = quarter_payload.get("away_pts_mu")
+            total_mean = None
+            margin_mean = None
+            if isinstance(home_mean, (int, float)) and isinstance(away_mean, (int, float)):
+                total_mean = home_mean + away_mean
+                margin_mean = home_mean - away_mean
             quarters.append(
                 {
                     "q": int(quarter_number),
-                    "away_pts_mu": quarter_payload.get("away_mean"),
-                    "home_pts_mu": quarter_payload.get("home_mean"),
-                    "total_mean": quarter_payload.get("total_mean"),
-                    "margin_mean": quarter_payload.get("margin_mean"),
-                    "p_home_win": quarter_payload.get("p_home_win"),
+                    "away_pts_mu": away_mean,
+                    "home_pts_mu": home_mean,
+                    "total_mean": total_mean,
+                    "margin_mean": margin_mean,
+                    "p_home_win": None,
                 }
             )
         summary = {
