@@ -454,8 +454,12 @@ services:
         value: "2700"
       - key: SYNDICATE_MLB_SIM_COUNT
         value: "1000"
+      # 1 worker after the 2026-07-17 OOM: each sim worker is a full resident
+      # interpreter, and the sim phase shares this 2GB box with the odds and
+      # live-lens loops (and WNBA generation). Slower sim phase, but the box
+      # stays inside memory. Revisit after a clean cycle or an instance upgrade.
       - key: SYNDICATE_MLB_SIM_WORKERS
-        value: "2"
+        value: "1"
       - key: SYNDICATE_SCHEDULE_ADAPTER_TTL_SECONDS
         value: "900"
       # Look-ahead: proactively warms tomorrow's slate during idle ticks
