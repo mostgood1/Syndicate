@@ -128,12 +128,18 @@ class NPUGamePredictor:
             "htp_graph_finalization_optimization_mode": "3"
         }
         
-        providers = [
-            ("QNNExecutionProvider", qnn_options),
-            "CPUExecutionProvider"  # Fallback
-        ]
-        
-        # Session options for better performance  
+        # Only request QNN when this onnxruntime build actually has it --
+        # unconditionally listing an unavailable provider raises on CPU-only
+        # builds (e.g. the standard onnxruntime wheel on Render), which sent
+        # every model load into the sklearn-joblib fallback whose pickles
+        # crash under the installed sklearn (missing multi_class attribute).
+        available_providers = set(ort.get_available_providers())
+        providers = []
+        if "QNNExecutionProvider" in available_providers:
+            providers.append(("QNNExecutionProvider", qnn_options))
+        providers.append("CPUExecutionProvider")
+
+        # Session options for better performance
         sess_options = ort.SessionOptions()
         sess_options.enable_profiling = False
         sess_options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL

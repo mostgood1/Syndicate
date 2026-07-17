@@ -72,11 +72,15 @@ class NPUPropsPredictor:
             "runtime": "htp",
         }
         
-        providers = [
-            ("QNNExecutionProvider", qnn_options),
-            "CPUExecutionProvider"  # Fallback
-        ]
-        
+        # Only request QNN when this onnxruntime build actually has it --
+        # unconditionally listing an unavailable provider raises on CPU-only
+        # builds (e.g. the standard onnxruntime wheel on Render).
+        available_providers = set(ort.get_available_providers())
+        providers = []
+        if "QNNExecutionProvider" in available_providers:
+            providers.append(("QNNExecutionProvider", qnn_options))
+        providers.append("CPUExecutionProvider")
+
         # Optimized session options
         sess_options = ort.SessionOptions()
         sess_options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
