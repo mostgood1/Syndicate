@@ -152,6 +152,11 @@ def _copy_existing_live_snapshot_artifact(*, source_root: Path, file_name: str, 
     if not source.exists() or not source.is_file():
         return None
     destination.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        if source.resolve() == destination.resolve():
+            return str(destination)
+    except Exception:
+        pass
     shutil.copy2(source, destination)
     return str(destination)
 
@@ -3019,7 +3024,10 @@ def _export_game_cards_artifact(*, source_root: Path, date_str: str, processed_r
         return None
     destination = processed_root / source.name
     destination.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(source, destination)
+    # Same-path safe: source_root and artifact_root are the same directory in
+    # production, so a raw copy2 here raises SameFileError (crashed the WNBA
+    # twin's export stage live on 7/17).
+    _copy_file_with_fallback(source, destination)
     return str(destination)
 
 
@@ -3036,7 +3044,10 @@ def _export_boxscores_artifact(*, source_root: Path, date_str: str, processed_ro
         return None
     destination = processed_root / source.name
     destination.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(source, destination)
+    # Same-path safe: source_root and artifact_root are the same directory in
+    # production, so a raw copy2 here raises SameFileError (crashed the WNBA
+    # twin's export stage live on 7/17).
+    _copy_file_with_fallback(source, destination)
     return str(destination)
 
 
@@ -3053,7 +3064,10 @@ def _export_recommendations_artifact(*, source_root: Path, date_str: str, proces
         return None
     destination = processed_root / source.name
     destination.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(source, destination)
+    # Same-path safe: source_root and artifact_root are the same directory in
+    # production, so a raw copy2 here raises SameFileError (crashed the WNBA
+    # twin's export stage live on 7/17).
+    _copy_file_with_fallback(source, destination)
     return str(destination)
 
 
@@ -3511,7 +3525,10 @@ def _export_recon_games_artifact(*, source_root: Path, date_str: str, processed_
         return None
     destination = processed_root / source.name
     destination.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(source, destination)
+    # Same-path safe: source_root and artifact_root are the same directory in
+    # production, so a raw copy2 here raises SameFileError (crashed the WNBA
+    # twin's export stage live on 7/17).
+    _copy_file_with_fallback(source, destination)
     return str(destination)
 
 
@@ -3839,7 +3856,10 @@ def _export_recon_quarters_artifact(*, source_root: Path, date_str: str, process
         return None
     destination = processed_root / source.name
     destination.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(source, destination)
+    # Same-path safe: source_root and artifact_root are the same directory in
+    # production, so a raw copy2 here raises SameFileError (crashed the WNBA
+    # twin's export stage live on 7/17).
+    _copy_file_with_fallback(source, destination)
     return str(destination)
 
 
@@ -3965,7 +3985,10 @@ def _export_recon_props_artifact(*, source_root: Path, date_str: str, processed_
         return None
     destination = processed_root / source.name
     destination.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(source, destination)
+    # Same-path safe: source_root and artifact_root are the same directory in
+    # production, so a raw copy2 here raises SameFileError (crashed the WNBA
+    # twin's export stage live on 7/17).
+    _copy_file_with_fallback(source, destination)
     return str(destination)
 
 
