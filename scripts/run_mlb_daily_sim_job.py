@@ -62,7 +62,13 @@ def main() -> int:
         "--workers", str(int(args.workers)),
         "--git-push", "off",
         "--validate-render-frontend", "off",
-        "--build-next-day", "on",
+        # Next-day build off in the worker-centric loop: the date-rollover
+        # first_appearance gate sims the new day at midnight Central and the
+        # look-ahead warms next-day odds, so chaining tomorrow's slate here
+        # only doubled runtime/memory and -- because the publish sweep runs
+        # after the WHOLE job -- delayed today's artifacts by tomorrow's
+        # entire build time.
+        "--build-next-day", "off",
         # Empty current-day odds must not kill the sim run: the live-odds
         # loop owns odds ingestion on its own cadence, and on late launches
         # (or All-Star-break days where the only game is already final) the
