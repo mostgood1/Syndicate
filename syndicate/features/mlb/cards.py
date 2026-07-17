@@ -2291,6 +2291,11 @@ def _trim_source_cards_games(games: list[dict[str, Any]]) -> list[dict[str, Any]
         "trackedGameLines",
         "oddsRefreshedAt",
         "odds_refreshed_at",
+        # cards_source.js reads card.predictions.{full,first5,first3,live}
+        # for the compact-card sim/projection tiles -- dropping this key
+        # left every daily-summary-sourced card with no sim data displayed
+        # even once the summary itself was fully populated (2026-07-17).
+        "predictions",
     }
 
     trimmed_games: list[dict[str, Any]] = []
