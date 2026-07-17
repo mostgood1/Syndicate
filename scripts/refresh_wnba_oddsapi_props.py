@@ -124,7 +124,13 @@ def _copy_matching_files(*, source_directory: Path, pattern: str, destination_di
 
 def _copy_existing_processed_artifact(*, source_root: Path, processed_root: Path, file_name: str) -> str | None:
     source = source_root / "data" / "processed" / file_name
-    if not source.exists() or not source.is_file():
+    # A bare existence check treats a stale/corrupted 0-byte leftover (e.g.
+    # from the same-file-copy truncation bug, or any other partial write) as
+    # "already there, done" -- short-circuiting the caller's fresh-rebuild
+    # fallback forever, since this file will keep "existing" on every future
+    # run without ever getting real content. Require actual content instead,
+    # same as the other reuse-checks in this file.
+    if not _path_has_meaningful_content(source):
         return None
     destination = processed_root / file_name
     destination.parent.mkdir(parents=True, exist_ok=True)
