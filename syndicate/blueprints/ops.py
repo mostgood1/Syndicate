@@ -337,6 +337,31 @@ def api_ops_artifacts_export() -> Any:
     return jsonify({"ok": True, "count": len(artifacts), "artifacts": artifacts})
 
 
+@ops_bp.get("/api/ops/live-refresh/state")
+def api_ops_live_refresh_state() -> Any:
+    # Read-only view of the live-refresh loop's shared state (tick meta, gate
+    # checks). Written by the live-odds-worker through the Redis-backed
+    # refresh-state store, so the web service can serve it without sharing a
+    # disk -- this is the only way to see WHY the worker's MLB daily-sim /
+    # look-ahead gates did or didn't fire on a given tick.
+    from syndicate.features.shared.refresh_state_store import read_json_file as _state_read_json
+    from syndicate.features.shared.refresh_state_store import reports_root as _state_reports_root
+
+    base = _state_reports_root() / "live_refresh_loop"
+    state = {
+        "latest_tick": _state_read_json(base / "latest_live_refresh_tick.json"),
+        "loop_status": _state_read_json(base / "live_refresh_loop_status.json"),
+        "last_mlb_sim_check": _state_read_json(base / "last_mlb_sim_check.json"),
+        "last_look_ahead_check": _state_read_json(base / "last_look_ahead_check.json"),
+    }
+    run_stamp = str(request.args.get("sim_run") or "").strip()
+    sim_date = str(request.args.get("sim_date") or "").strip()
+    if run_stamp and sim_date:
+        sim_base = base / "mlb_sim_runs"
+        state["sim_run_status"] = _state_read_json(sim_base / f"{sim_date}_{run_stamp}_status.json")
+    return jsonify({"ok": True, "state": normalize_timestamped_payload(state)})
+
+
 @ops_bp.get("/api/ops/mlb/sims-list")
 def api_ops_mlb_sims_list() -> Any:
     # Protected endpoint: requires admin token (enforced by before_request)
