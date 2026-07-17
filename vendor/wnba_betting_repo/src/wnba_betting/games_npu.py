@@ -166,6 +166,37 @@ class NPUGamePredictor:
                 break
         if self.feature_columns is None:
             raise FileNotFoundError("Feature columns not found: feature_columns_enhanced.joblib or feature_columns.joblib")
+
+        # Training-envelope clip bounds: linear models extrapolate linearly, so
+        # a single out-of-distribution feature (confirmed live: rest_days of
+        # ~3,363 when the games history file was a stale single-season stub;
+        # also season_day_number drifting ~+9 sigma with a 10-year frame)
+        # produces impossible outputs (+58..72 point margins). Clip inference
+        # inputs to mean +/- 3.5 sigma of the training scaler so predictions
+        # can never leave the neighborhood of the training support.
+        self.feature_clip_low = None
+        self.feature_clip_high = None
+        for stats_source in ("spread_margin_enhanced.joblib", "totals_enhanced.joblib", "spread_margin.joblib", "totals.joblib"):
+            stats_path = self.models_dir / stats_source
+            if not stats_path.exists():
+                continue
+            try:
+                pipeline = joblib.load(stats_path)
+                scaler = getattr(pipeline, "named_steps", {}).get("scaler")
+                if scaler is None or not hasattr(scaler, "mean_"):
+                    continue
+                mean = np.asarray(scaler.mean_, dtype=np.float64)
+                scale = np.asarray(scaler.scale_, dtype=np.float64)
+                if len(mean) != len(self.feature_columns):
+                    continue
+                self.feature_clip_low = (mean - 3.5 * scale).astype(np.float32)
+                self.feature_clip_high = (mean + 3.5 * scale).astype(np.float32)
+                print(f"[OK] Feature clip bounds loaded from {stats_source}")
+                break
+            except Exception:
+                continue
+        if self.feature_clip_low is None:
+            print("[WARN] No feature clip bounds available; out-of-distribution inputs will not be clamped")
         
         # Load main game models (win_prob, spread_margin, totals)
         for model_name, model_type in self.model_types.items():
@@ -288,8 +319,17 @@ class NPUGamePredictor:
         total_cpu = len(self.fallback_models) + halves_cpu_count + quarters_cpu_count
         print(f"[READY] Ready with {total_npu + total_cpu} models ({total_npu} NPU-accelerated)")
     
+    def _clip_features_to_training_envelope(self, features: np.ndarray) -> np.ndarray:
+        if self.feature_clip_low is None or self.feature_clip_high is None:
+            return features
+        arr = np.asarray(features, dtype=np.float32)
+        if arr.shape[-1] != len(self.feature_clip_low):
+            return features
+        return np.clip(arr, self.feature_clip_low, self.feature_clip_high)
+
     def predict_game(self, features: np.ndarray, include_periods: bool = True) -> Dict[str, Any]:
         """Predict full game outcomes using NPU where available"""
+        features = self._clip_features_to_training_envelope(features)
         predictions = {}
         inference_times = {}
         
