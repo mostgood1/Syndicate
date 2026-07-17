@@ -873,6 +873,29 @@ def _daily_update_run_lock_path(*, workflow: str, season: int, date_str: str, ou
     return (_DATA_DIR / "runtime" / "locks" / f"daily_update_{safe_workflow}_{int(season)}_{safe_date}_{out_digest}.lock").resolve()
 
 
+def _run_lock_expired(metadata: Dict[str, Any]) -> bool:
+    """Treat a run lock as stale once it exceeds a max age, regardless of PID.
+
+    In containers (Render), an OOM-killed run leaves its lock behind and PID
+    recycling in the restarted container can make the dead holder's PID look
+    alive to _process_exists, wedging every future run. No legitimate ui-daily
+    run should outlive this window.
+    """
+    try:
+        max_age_hours = float(os.environ.get("MLB_DAILY_UPDATE_LOCK_MAX_AGE_HOURS") or 3.0)
+    except Exception:
+        max_age_hours = 3.0
+    created_raw = str((metadata or {}).get("created_at") or "").strip()
+    if not created_raw:
+        return True
+    try:
+        created = datetime.fromisoformat(created_raw)
+    except Exception:
+        return True
+    age_seconds = (datetime.now() - created).total_seconds()
+    return age_seconds > max_age_hours * 3600.0
+
+
 def _read_run_lock_metadata(lock_path: Path) -> Dict[str, Any]:
     try:
         payload = json.loads(lock_path.read_text(encoding="utf-8"))
@@ -903,7 +926,7 @@ def _acquire_daily_update_run_lock(*, workflow: str, season: int, date_str: str,
             fd = os.open(str(lock_path), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
         except FileExistsError:
             existing = _read_run_lock_metadata(lock_path)
-            if _process_exists(existing.get("pid")):
+            if _process_exists(existing.get("pid")) and not _run_lock_expired(existing):
                 return None, existing
             try:
                 lock_path.unlink()
