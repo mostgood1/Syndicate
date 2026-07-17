@@ -357,8 +357,15 @@ def api_ops_live_refresh_state() -> Any:
     run_stamp = str(request.args.get("sim_run") or "").strip()
     sim_date = str(request.args.get("sim_date") or "").strip()
     if run_stamp and sim_date:
+        from syndicate.features.shared.refresh_state_store import read_text_file as _state_read_text
+
         sim_base = base / "mlb_sim_runs"
         state["sim_run_status"] = _state_read_json(sim_base / f"{sim_date}_{run_stamp}_status.json")
+        log_text = _state_read_text(sim_base / f"{sim_date}_{run_stamp}.log")
+        if log_text:
+            # Combined stdout+stderr of the sim subprocess; tail is where the
+            # traceback lives. Bounded to keep the response reasonable.
+            state["sim_run_log_tail"] = log_text[-8000:]
     return jsonify({"ok": True, "state": normalize_timestamped_payload(state)})
 
 
