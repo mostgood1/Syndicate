@@ -184,6 +184,15 @@ def _read_basketball_schedule_rows(sport: str, date_str: str) -> list[dict[str, 
                 row_date = str(row.get("date_utc") or "").strip()[:10]
                 if row_date != date_str:
                     continue
+                # A postponed/cancelled game's date_utc can still match the
+                # query date -- without this it reads back as a real
+                # scheduled event (wrong tip-off-window triggers, wrong
+                # "does this date have games" answers). Same underlying gap
+                # as vendor/wnba_betting_repo/.../cli.py's _load_schedule_day,
+                # fixed there for the same reason.
+                status_text = str(row.get("game_status_text") or "").strip().lower()
+                if status_text in {"postponed", "cancelled", "canceled", "suspended"}:
+                    continue
                 rows.append(
                     {
                         "event_id": row.get("game_id"),

@@ -37,6 +37,16 @@ def main() -> int:
     for game in games:
         if not isinstance(game, dict):
             continue
+        # A postponed/cancelled game's date still matches the query date in
+        # MLB's schedule API, so without this it reads back as a real
+        # scheduled event -- wrong tip-off-window triggers, wrong "does this
+        # date have games" answers downstream in live_refresh_loop.py. Same
+        # underlying gap fixed in schedule_adapter.py's basketball path and
+        # the vendored WNBA CLI's own schedule filter.
+        status = game.get("status") if isinstance(game.get("status"), dict) else {}
+        detailed_state = str(status.get("detailedState") or "").strip().lower()
+        if detailed_state in {"postponed", "cancelled", "canceled", "suspended"}:
+            continue
         game_pk = game.get("gamePk")
         teams = game.get("teams") or {}
         home_team = ((teams.get("home") or {}).get("team") or {})
