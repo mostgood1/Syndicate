@@ -42,6 +42,23 @@ From the 68-game sample (small — treat as directional):
 
 Live-side evidence: the fitted live ranking model's side priors record **overs hitting 36.7%** (381/1,041) vs unders 50.9% — live over-candidates are systematically bad, and the model is leaning on priors/floors to compensate.
 
+### Backfilled 44-day scorecard (added 2026-07-16)
+
+After backfilling feed_live actuals (618 games fetched) and reconciling all 46 archived sim days, the measured baseline is now **44 days / 547 games / 1,025 starters / 9,846 hitter-prop observations** (May 28–Jul 12, *pre-dating the extras/walk-off engine fixes*):
+
+| Market | Result | Read |
+|---|---|---|
+| Moneyline | acc 0.554 ±0.042, Brier 0.2472, logloss 0.6876 | Better than the June-week sample suggested; modestly better than coin, still shy of the ~0.57 favorite baseline. The extras top-half bug (fixed) was depressing this. |
+| Totals | MAE 3.59 | Confirmed high. |
+| Run line (fav −1.5) | acc 0.578, Brier 0.2419 | Held up at scale. |
+| Starters | SO MAE 2.06, outs MAE 5.51, **pitch bias +7.35** | Workload over-projection confirmed on n=1,025. Top re-fit target. |
+| Hits 1+ | p 0.652 vs emp 0.550 (**+10.2pt**) | Over-projection confirmed at scale; hits 2+ +6.2pt. |
+| TB 4+/5+ | p 0.116/0.057 vs emp 0.146/0.067 | **Under**-projected power tail. |
+| HR (top-N) | p 0.077 vs emp 0.120 | HR under-projection confirmed (n=9,846). |
+| Runs / RBI / 2B / 3B / SB | all within ~2pt | Well calibrated. |
+
+**The single clearest engine-shape diagnosis:** the sim distributes too much of its offense as singles and not enough as extra-base/HR outcomes — hits over-projected ~10pt while TB4+/HR under-projected — with starter workload over-projected ~7 pitches. Phase 1 sweeps should target in-play hit rate down + HR-on-contact/xb-share up simultaneously (they trade off through the same run environment), then re-fit the manager hooks. H+R+RBI buckets now settle correctly (emp 0.421/0.277/0.170/0.095) but model p is 0.0 in all archived artifacts — sims generated after commit `a5cdfb33` will populate real probabilities.
+
 ---
 
 ## 3. Optimization plan
