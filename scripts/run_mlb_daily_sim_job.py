@@ -63,6 +63,13 @@ def main() -> int:
         "--git-push", "off",
         "--validate-render-frontend", "off",
         "--build-next-day", "on",
+        # Empty current-day odds must not kill the sim run: the live-odds
+        # loop owns odds ingestion on its own cadence, and on late launches
+        # (or All-Star-break days where the only game is already final) the
+        # OddsAPI legitimately returns no markets. Without this the workflow
+        # exits 1 before simming AND before the queued next-day build, which
+        # left the board empty on 2026-07-16.
+        "--allow-empty-current-oddsapi", "on",
     ]
     vendor_cwd = REPO_ROOT / "vendor" / "mlb_bettingv2"
 
