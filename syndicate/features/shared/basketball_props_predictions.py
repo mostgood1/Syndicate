@@ -12,6 +12,7 @@ from . import basketball_props_calibration
 from . import basketball_props_features
 from . import basketball_props_onnx
 from . import basketball_props_smart_sim
+from .source_roots import repo_root_from
 
 
 _TEAM_ALIASES = {
@@ -120,6 +121,34 @@ def _to_tricode(name: object) -> str:
     return value
 
 
+def _models_dir_for_source_root(source_root: Path) -> Path:
+    """Resolve the props model artifacts directory for a source root.
+
+    On Render, source_root is a persistent *data* disk
+    (e.g. /opt/render/project/data/wnba_source) that has no models/
+    directory -- the trained model artifacts only ship inside this repo's
+    vendored code checkout (vendor/<pkg>_repo/models). Blindly using
+    source_root/models made PureONNXPredictorLocal raise FileNotFoundError
+    on props_feature_columns.joblib every run, silently downgrading all
+    props predictions to the priors + rolling-stat fallback. Same
+    ephemeral-vs-persistent path class as _vendor_code_root in
+    refresh_wnba_oddsapi_props.py.
+    """
+    local = source_root / "models"
+    try:
+        gate = local / "props_feature_columns.joblib"
+        if gate.is_file() and gate.stat().st_size > 0:
+            return local
+    except OSError:
+        pass
+    name = str(source_root).lower()
+    package_name = "wnba_betting" if "wnba" in name else "nba_betting"
+    override = str(os.environ.get(f"SYNDICATE_VENDOR_ROOT_{package_name.upper()}") or "").strip()
+    if override:
+        return Path(override).expanduser().resolve() / "models"
+    return repo_root_from(__file__) / "vendor" / f"{package_name}_repo" / "models"
+
+
 def _export_props_predictions_without_smart_sim_local(*, source_root: Path, date_str: str, out_path: Path) -> tuple[int, Path]:
     src_root = source_root / "src"
     if str(src_root) not in sys.path:
@@ -136,7 +165,7 @@ def _export_props_predictions_without_smart_sim_local(*, source_root: Path, date
 
     preds = basketball_props_onnx.predict_props_pure_onnx_local(
         features_df=feats,
-        models_dir=source_root / "models",
+        models_dir=_models_dir_for_source_root(source_root),
         processed_root=source_root / "data" / "processed",
     )
     if preds is None or getattr(preds, "empty", False):

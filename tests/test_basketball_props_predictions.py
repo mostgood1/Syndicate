@@ -912,6 +912,35 @@ class BasketballPropsPredictionsTests(unittest.TestCase):
             used_meta = processed_root / "props_player_calibration_used_2026-05-22.json"
             self.assertTrue(used_meta.exists())
 
+    def test_models_dir_resolves_to_vendor_checkout_when_data_disk_has_no_models(self) -> None:
+        # Regression: on Render, source_root is a persistent data disk with no
+        # models/ directory (models only ship in vendor/<pkg>_repo/models), so
+        # using source_root/models unconditionally made every props prediction
+        # run fall back to priors + rolling stats instead of the ONNX models.
+        from syndicate.features.shared.basketball_props_predictions import _models_dir_for_source_root
+
+        with TemporaryDirectory() as tmp_dir:
+            wnba_root = Path(tmp_dir) / "wnba_source"
+            wnba_root.mkdir()
+            resolved = _models_dir_for_source_root(wnba_root)
+            self.assertTrue(str(resolved).replace("\\", "/").endswith("vendor/wnba_betting_repo/models"))
+
+            nba_root = Path(tmp_dir) / "nba_source"
+            nba_root.mkdir()
+            resolved = _models_dir_for_source_root(nba_root)
+            self.assertTrue(str(resolved).replace("\\", "/").endswith("vendor/nba_betting_repo/models"))
+
+            # A real local models dir (non-empty gate file) still wins.
+            local_models = wnba_root / "models"
+            local_models.mkdir()
+            (local_models / "props_feature_columns.joblib").write_bytes(b"x" * 10)
+            self.assertEqual(_models_dir_for_source_root(wnba_root), local_models)
+
+            # ...but a stale 0-byte gate file does not.
+            (local_models / "props_feature_columns.joblib").write_bytes(b"")
+            resolved = _models_dir_for_source_root(wnba_root)
+            self.assertTrue(str(resolved).replace("\\", "/").endswith("vendor/wnba_betting_repo/models"))
+
     def test_league_quarter_lengths_differ_between_nba_and_wnba(self) -> None:
         nba = smart_sim_module._NBA_LEAGUE_LOCAL
         wnba = smart_sim_module._WNBA_LEAGUE_LOCAL
