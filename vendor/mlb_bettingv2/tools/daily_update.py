@@ -2059,7 +2059,7 @@ def _build_prior_eval_command(
     if reconcile_mode == "artifact":
         prior_sim_dir = (_DATA_DIR / "daily" / "sims" / str(prior_date)).resolve()
         return [
-            str(Path(sys.executable).resolve()),
+            sys.executable,  # do NOT .resolve(): on Linux venvs that dereferences the symlink to the system interpreter (no site-packages)
             str((_ROOT_DIR / "tools" / "eval" / "reconcile_daily_sim_artifacts.py").resolve()),
             "--date",
             str(prior_date),
@@ -2077,7 +2077,7 @@ def _build_prior_eval_command(
             str(getattr(args, "hitter_props_prob_calibration", "") or ""),
         ]
     cmd = [
-        str(Path(sys.executable).resolve()),
+        sys.executable,  # do NOT .resolve(): on Linux venvs that dereferences the symlink to the system interpreter (no site-packages)
         str((_ROOT_DIR / "tools" / "eval" / "eval_sim_day_vs_actual.py").resolve()),
         "--date",
         str(prior_date),
@@ -2272,7 +2272,7 @@ def _publish_live_season_manifests(
         else "betting_day_payloads"
     )
     cmd = [
-        str(Path(sys.executable).resolve()),
+        sys.executable,  # do NOT .resolve(): on Linux venvs that dereferences the symlink to the system interpreter (no site-packages)
         str((_ROOT_DIR / "tools" / "eval" / "build_season_betting_cards_manifest.py").resolve()),
         "--season",
         str(int(season)),
@@ -2557,7 +2557,7 @@ def _build_next_day_ui_daily_command(args: argparse.Namespace, raw_argv: List[st
     )
     next_season = _season_from_date_str(str(next_date), int(args.season))
     cmd = [
-        str(Path(sys.executable).resolve()),
+        sys.executable,  # do NOT .resolve(): on Linux venvs that dereferences the symlink to the system interpreter (no site-packages)
         str(Path(__file__).resolve()),
         "--workflow",
         "ui-daily",
@@ -3419,7 +3419,7 @@ def _run_ui_daily_workflow(args: argparse.Namespace, *, raw_argv: List[str]) -> 
         "--season",
         str(int(args.season)),
         "--python-exe",
-        str(Path(sys.executable).resolve()),
+        sys.executable,  # do NOT .resolve(): on Linux venvs that dereferences the symlink to the system interpreter (no site-packages)
         "--out-game",
         str(game_out),
         "--out-pitcher",
