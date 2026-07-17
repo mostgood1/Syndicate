@@ -8516,10 +8516,37 @@ def odds_refresh_cmd(date_str: str | None, api_key: str | None, min_prop_edge: f
             cfg = OddsApiConfig(api_key=api_key)
             go = fetch_game_odds_current(cfg, pd.to_datetime(target_date))
             if go is not None and not go.empty:
+                # fetch_game_odds_current returns the long per-bookmaker
+                # market rows (snapshot_ts/market/outcome_name/point/price).
+                # Dumping that verbatim into game_odds_<date>.csv -- despite
+                # this step's own "standardized CSV" label -- broke every
+                # downstream consumer expecting one consensus row per game
+                # (home_ml/home_spread/total), most damagingly the smart
+                # sim's market_total/market_home_spread anchors which read
+                # this file. Convert to consensus first, like odds-snapshots
+                # and predict-date already do.
                 out_csv = paths.data_processed / f"game_odds_{target_date}.csv"
                 out_csv.parent.mkdir(parents=True, exist_ok=True)
-                go.to_csv(out_csv, index=False)
-                console.print({"game_odds_rows": int(len(go)), "output": str(out_csv)})
+                wide = consensus_lines_at_close(go)
+                if wide is not None and not wide.empty:
+                    tmp = wide.copy()
+                    tmp["date"] = str(target_date)
+                    tmp = tmp.rename(columns={"away_team": "visitor_team"})
+                    if "spread_point" in tmp.columns:
+                        tmp["home_spread"] = tmp["spread_point"]
+                        tmp["away_spread"] = tmp["home_spread"].apply(lambda x: -x if pd.notna(x) else pd.NA)
+                    if "total_point" in tmp.columns:
+                        tmp["total"] = tmp["total_point"]
+                    cols = [c for c in [
+                        "date", "commence_time", "home_team", "visitor_team",
+                        "home_ml", "away_ml", "home_spread", "away_spread", "total",
+                    ] if c in tmp.columns]
+                    out_df = tmp[cols].copy()
+                    out_df["bookmaker"] = "oddsapi_consensus"
+                    out_df.to_csv(out_csv, index=False)
+                    console.print({"game_odds_rows": int(len(out_df)), "output": str(out_csv)})
+                else:
+                    console.print("No consensus rows from current game odds", style="yellow")
             else:
                 console.print("No game odds returned (OddsAPI)", style="yellow")
         else:
