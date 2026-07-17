@@ -558,10 +558,16 @@ class PureONNXPredictorLocal:
 
 
 def predict_props_pure_onnx_local(*, features_df, models_dir: Path, processed_root: Path):
+    # Constructor failures are model-availability problems (missing files,
+    # onnxruntime absent, opset newer than the installed runtime supports,
+    # corrupt exports) -- degrade to the priors fallback like a missing
+    # models dir always has, instead of killing the whole predictions stage.
+    # Confirmed live: opset-22 exports under onnxruntime 1.18 raised
+    # ort Fail here and took down every props prediction run. Inference
+    # errors after a successful load still raise -- those are real bugs.
     try:
         predictor = PureONNXPredictorLocal(models_dir=models_dir)
-        return predictor.predict(features_df)
     except Exception as exc:
-        if isinstance(exc, FileNotFoundError) or exc.__class__.__name__ in {"ImportError", "ModuleNotFoundError"}:
-            return _predict_props_without_models_local(features_df=features_df, processed_root=processed_root)
-        raise
+        print(f"[WARN] Props ONNX models unavailable ({type(exc).__name__}: {exc}); using priors + rolling-stat fallback predictions")
+        return _predict_props_without_models_local(features_df=features_df, processed_root=processed_root)
+    return predictor.predict(features_df)
