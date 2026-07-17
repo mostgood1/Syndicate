@@ -561,6 +561,14 @@ def _mlb_sim_input_fingerprint(date_str: str) -> str | None:
 def _mlb_daily_sim_decision(*, now_epoch: float, date_str: str) -> dict[str, Any]:
 	if not _mlb_daily_sim_enabled():
 		return {"force": False, "reason": "disabled"}
+	if _mlb_daily_sim_process_still_running():
+		# A previously launched sim subprocess is still alive. Every other
+		# branch below (first_appearance, tip_off_window, fingerprint_change)
+		# would just relaunch and immediately bounce off daily_update.py's own
+		# run lock -- harmless, but on a slate with lineups posting throughout
+		# pregame this fired on nearly every tick, each one spawning a doomed
+		# subprocess purely to print "already holds the lock" and exit.
+		return {"force": False, "reason": "previous_run_still_active"}
 	try:
 		events = fetch_schedule_for_date("mlb", date_str)
 	except Exception:
@@ -592,7 +600,24 @@ def _mlb_daily_sim_decision(*, now_epoch: float, date_str: str) -> dict[str, Any
 	return {"force": False, "reason": "no_change"}
 
 
+_MLB_SIM_PROCESS: subprocess.Popen | None = None
+
+
+def _mlb_daily_sim_process_still_running() -> bool:
+	global _MLB_SIM_PROCESS
+	if _MLB_SIM_PROCESS is None:
+		return False
+	try:
+		still_running = _MLB_SIM_PROCESS.poll() is None
+	except Exception:
+		return False
+	if not still_running:
+		_MLB_SIM_PROCESS = None
+	return still_running
+
+
 def _launch_mlb_daily_sim(date_str: str, decision: dict[str, Any]) -> dict[str, Any]:
+	global _MLB_SIM_PROCESS
 	command = [
 		sys.executable if (sys.executable and Path(sys.executable).exists()) else "python",
 		str(REPO_ROOT / "scripts" / "run_mlb_daily_sim_job.py"),
@@ -609,6 +634,7 @@ def _launch_mlb_daily_sim(date_str: str, decision: dict[str, Any]) -> dict[str, 
 		popen_kwargs["start_new_session"] = True
 	try:
 		process = subprocess.Popen(command, **popen_kwargs)
+		_MLB_SIM_PROCESS = process
 		print(f"[live_refresh_loop] MLB_DAILY_SIM_TRIGGERED date={date_str} reason={decision.get('reason')} pid={process.pid}", flush=True)
 		return {"ok": True, "pid": process.pid, "command": command, "reason": decision.get("reason")}
 	except Exception as exc:
