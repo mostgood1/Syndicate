@@ -465,8 +465,11 @@ services:
       # above; flip to "true" once a session's worth of logs confirm it
       # behaves as expected (reports/live_refresh_loop/latest_live_refresh_tick.json
       # -> "lookAhead").
+      # Flipped on 2026-07-16 together with the MLB daily sim trigger: with
+      # the GHA daily-update backup-only, the worker owns next-day warm-up too
+      # (gates: never while live, hourly, only when tomorrow has games).
       - key: SYNDICATE_LOOK_AHEAD_ENABLED
-        value: "false"
+        value: "true"
       - key: SYNDICATE_LOOK_AHEAD_INTERVAL_SECONDS
         value: "3600"
       - key: MLB_BETTING_DATA_ROOT
