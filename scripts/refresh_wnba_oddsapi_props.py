@@ -128,11 +128,25 @@ def _copy_existing_processed_artifact(*, source_root: Path, processed_root: Path
         return None
     destination = processed_root / file_name
     destination.parent.mkdir(parents=True, exist_ok=True)
-    _copy_file_with_fallback(source, destination)
+    if not _copy_file_with_fallback(source, destination):
+        return None
     return str(destination)
 
 
-def _copy_file_with_fallback(source: Path, destination: Path) -> None:
+def _copy_file_with_fallback(source: Path, destination: Path) -> bool:
+    # source and destination are frequently the exact same path (source-root
+    # and artifact-root resolve to the same directory in production), in
+    # which case there's nothing to copy. shutil.copy2 correctly raises
+    # SameFileError (an OSError subclass) for that, but the OSError fallback
+    # below opens destination in "wb" mode -- which truncates it -- before
+    # reading source, corrupting the file to 0 bytes when they're the same
+    # path. Detect and skip that case explicitly instead of falling into it.
+    try:
+        if source.resolve() == destination.resolve():
+            return True
+    except OSError:
+        if source == destination:
+            return True
     try:
         shutil.copy2(source, destination)
     except OSError:
@@ -143,6 +157,7 @@ def _copy_file_with_fallback(source: Path, destination: Path) -> None:
             shutil.copystat(source, destination)
         except OSError:
             pass
+    return True
 
 
 def _copy_existing_live_lens_artifact(*, source_root: Path, file_name: str, destinations: tuple[tuple[Path, str | None], ...]) -> dict[str, str]:
