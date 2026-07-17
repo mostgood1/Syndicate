@@ -584,6 +584,77 @@ def _vendor_code_root(package_name: str) -> Path:
     return REPO_ROOT / "vendor" / f"{package_name}_repo"
 
 
+def _games_history_max_date(path: Path) -> str | None:
+    try:
+        if not path.exists() or not path.is_file() or path.stat().st_size <= 0:
+            return None
+        import pandas as pd
+
+        frame = pd.read_csv(path, usecols=["date"])
+        if frame.empty:
+            return None
+        max_date = pd.to_datetime(frame["date"], errors="coerce").max()
+        if pd.isna(max_date):
+            return None
+        return max_date.date().isoformat()
+    except Exception:
+        return None
+
+
+def _games_history_is_stale(path: Path, *, date_str: str, stale_days: int = 30) -> bool:
+    max_date_text = _games_history_max_date(path)
+    if not max_date_text:
+        return True
+    try:
+        target = dt.date.fromisoformat(str(date_str))
+        newest = dt.date.fromisoformat(max_date_text)
+    except Exception:
+        return True
+    return (target - newest).days > int(stale_days)
+
+
+def _seed_games_history_from_checkout_if_fresher(
+    *, raw_path: Path, package_name: str, date_str: str, feature_candidates: tuple[Path, ...], log_file: Path
+) -> bool:
+    """Heal a missing/stale raw games history from the vendored checkout copy.
+
+    Mirrors refresh_wnba_oddsapi_props.py: the checkout ships a committed
+    full-history games_nba_api.csv, a reliable offline fallback when the
+    network fetch fails or returns a partial file (stats.nba.com frequently
+    times out or blocks datacenter IPs). Only overwrites when the checkout's
+    newest game date is strictly fresher, and invalidates derived features
+    files so they rebuild from the new data.
+    """
+    if not _games_history_is_stale(raw_path, date_str=date_str):
+        return False
+    checkout_path = _vendor_code_root(package_name) / "data" / "raw" / "games_nba_api.csv"
+    checkout_max = _games_history_max_date(checkout_path)
+    if not checkout_max:
+        return False
+    current_max = _games_history_max_date(raw_path)
+    if current_max and checkout_max <= current_max:
+        return False
+    try:
+        raw_path.parent.mkdir(parents=True, exist_ok=True)
+        _copy_file_with_fallback(checkout_path, raw_path)
+    except Exception as exc:
+        _append_log(log_file, f"games history seed from checkout failed: {exc}")
+        return False
+    _append_log(
+        log_file,
+        f"Seeded games history from vendored checkout: {checkout_path} -> {raw_path} "
+        f"(checkout max date {checkout_max}, previous max date {current_max or 'none'})",
+    )
+    for stale_feature_path in feature_candidates:
+        try:
+            if stale_feature_path.exists():
+                stale_feature_path.unlink()
+                _append_log(log_file, f"Invalidated stale derived features {stale_feature_path.name} after history seed")
+        except Exception:
+            pass
+    return True
+
+
 def _run_source_processed_export(
     *,
     source_root: Path,
@@ -1895,6 +1966,56 @@ def _run_source_subprocess_cli_command(
     )
 
 
+def _ensure_rotation_inputs_for_props_refresh(
+    *,
+    source_root: Path,
+    package_name: str,
+    date_str: str,
+    log_file: Path,
+    heartbeat_cb: callable | None,
+) -> None:
+    """Build the rotation/lineup artifacts the smart sim silently degrades without.
+
+    Mirrors refresh_wnba_oddsapi_props.py (minus write-pregame-expected-minutes,
+    which only the WNBA fork's CLI provides). All steps are non-fatal and
+    once-per-date via a marker file.
+    """
+    processed_root = source_root / "data" / "processed"
+    marker_path = processed_root / f"_rotation_inputs_{date_str}.json"
+    if _path_has_meaningful_content(marker_path):
+        return
+    try:
+        yesterday = (dt.date.fromisoformat(str(date_str)) - dt.timedelta(days=1)).isoformat()
+    except Exception:
+        return
+    results: dict[str, int] = {}
+    steps = (
+        (["update-rotations-espn-history", "--date", yesterday], 10 * 60),
+        (["update-pbp-espn-history", "--date", yesterday], 10 * 60),
+        (["build-lineup-teammate-effects"], 10 * 60),
+    )
+    for command_parts, timeout_s in steps:
+        rc = _run_source_subprocess_cli_command(
+            source_root=source_root,
+            package_name=package_name,
+            command_parts=list(command_parts),
+            log_file=log_file,
+            heartbeat_cb=heartbeat_cb,
+            timeout_s=timeout_s,
+        )
+        results[command_parts[0]] = int(rc)
+        if int(rc) != 0:
+            _append_log(log_file, f"rotation input step {command_parts[0]} failed with exit code {int(rc)}; continuing")
+    try:
+        marker_path.parent.mkdir(parents=True, exist_ok=True)
+        marker_path.write_text(
+            json.dumps({"date": date_str, "built_at": dt.datetime.utcnow().isoformat(), "results": results}),
+            encoding="utf-8",
+        )
+    except Exception:
+        pass
+
+
 def _ensure_source_game_inputs(
     *,
     source_root: Path,
@@ -1923,8 +2044,14 @@ def _ensure_source_game_inputs(
         timeout_s=10 * 60,
     )
 
+    # A bare exists/size check let a partial fetch (confirmed live on the
+    # WNBA twin: a single-season stub from stats.nba.com timing out on
+    # Render's datacenter IPs) satisfy this forever, which fed the models
+    # multi-year rest-day outliers and produced garbage predictions. Fetch
+    # when the history is missing OR stale, then heal from the vendored
+    # checkout's committed copy if the fetch still left us stale.
     rc_fetch = 0
-    if not any(path.exists() and path.is_file() and path.stat().st_size > 0 for path in raw_candidates):
+    if _games_history_is_stale(raw_candidates[0], date_str=date_str):
         rc_fetch = _run_source_subprocess_cli_command(
             source_root=source_root,
             package_name=package_name,
@@ -1932,6 +2059,13 @@ def _ensure_source_game_inputs(
             log_file=log_file,
             heartbeat_cb=heartbeat_cb,
             timeout_s=45 * 60,
+        )
+        _seed_games_history_from_checkout_if_fresher(
+            raw_path=raw_candidates[0],
+            package_name=package_name,
+            date_str=date_str,
+            feature_candidates=feature_candidates,
+            log_file=log_file,
         )
 
     rc_build_features = 0
@@ -1962,6 +2096,14 @@ def _ensure_source_game_inputs(
     )
     if int(rc_injuries) != 0:
         _append_log(log_file, f"fetch-injuries failed with exit code {int(rc_injuries)}; continuing without fresh injury data")
+
+    _ensure_rotation_inputs_for_props_refresh(
+        source_root=source_root,
+        package_name=package_name,
+        date_str=date_str,
+        log_file=log_file,
+        heartbeat_cb=heartbeat_cb,
+    )
 
     game_cards_path = processed_root / f"game_cards_{date_str}.csv"
     if not game_cards_path.exists() or not game_cards_path.is_file() or _count_csv_rows_quick(game_cards_path) <= 0:
