@@ -3290,13 +3290,26 @@ def _apply_player_priors_local(*, smart_sim_module, team_df, priors, team_tri: s
         return pd.DataFrame()
 
 
-def _season_from_date_str_local(*, date_str: str) -> int:
+def _season_from_date_str_local(*, date_str: str, league=None) -> int:
+    # Season file naming conventions differ per league (confirmed against each
+    # vendored repo's own season_year_from_date):
+    #   - NBA labels seasons by their *ending* calendar year: July 2026 ->
+    #     season 2027 (the upcoming 2026-27 season).
+    #   - WNBA plays inside one calendar year and labels by *start* year:
+    #     July 2026 -> season 2026 (production files are
+    #     team_advanced_stats_2026_asof_*.csv).
+    # The old NBA-only formula computed 2027 for in-season WNBA dates, so the
+    # as-of advanced-stats lookup never matched for WNBA at all.
     try:
         import pandas as pd
 
         ts = pd.to_datetime(str(date_str), errors="coerce")
         if ts is None or pd.isna(ts):
             raise ValueError("bad date")
+        code = str(getattr(league, "code", "") or "").strip().lower()
+        if code == "wnba":
+            start_month = int(getattr(league, "season_start_month", 5) or 5)
+            return int(ts.year) if int(ts.month) >= start_month else int(ts.year) - 1
         return int(ts.year + 1) if int(ts.month) >= 7 else int(ts.year)
     except Exception:
         try:
@@ -3328,8 +3341,18 @@ def _load_team_advanced_stats_asof_local(*, processed_root: Path, season: int, a
         return cached
     file_asof = processed_root / f"team_advanced_stats_{int(season)}_asof_{str(as_of_date_str).strip()}.csv"
     file_season = processed_root / f"team_advanced_stats_{int(season)}.csv"
-    file_path = file_asof if file_asof.exists() else file_season
-    if not file_path.exists():
+
+    def _has_content(path: Path) -> bool:
+        # A 0-byte file (seen in production after a partial/failed write) must
+        # not shadow the season fallback -- pd.read_csv raises on it and the
+        # whole loader would return empty, flattening every team to baseline.
+        try:
+            return path.is_file() and path.stat().st_size > 0
+        except OSError:
+            return False
+
+    file_path = file_asof if _has_content(file_asof) else file_season
+    if not _has_content(file_path):
         _TEAM_ADVANCED_STATS_CACHE_LOCAL[cache_key] = pd.DataFrame()
         return _TEAM_ADVANCED_STATS_CACHE_LOCAL[cache_key]
     try:
@@ -3431,11 +3454,20 @@ def _team_adj_from_advanced_stats_local(*, processed_root: Path, date_str: str, 
     try:
         import numpy as np
 
-        season = _season_from_date_str_local(date_str=date_str)
+        season = _season_from_date_str_local(date_str=date_str, league=league)
         if season <= 0:
             diag["reason"] = "bad_season"
             return None, None, 1.0, diag
-        df = _load_team_advanced_stats_asof_local(processed_root=processed_root, season=int(season), as_of_date_str=str(date_str))
+        # The as-of file is written with a compact YYYYMMDD suffix
+        # (team_advanced_stats_2026_asof_20260716.csv), not the ISO YYYY-MM-DD
+        # date_str used everywhere else -- same conversion _load_adv_map
+        # already does. Passing the dashed date here made the as-of lookup
+        # miss every time, falling through to the seasonal file (a known
+        # stale/empty placeholder in this pipeline), so home/away team
+        # adjustments came back None and every sim ran both teams at
+        # identical league-baseline efficiencies.
+        compact_date_str = str(date_str).strip().replace("-", "")
+        df = _load_team_advanced_stats_asof_local(processed_root=processed_root, season=int(season), as_of_date_str=compact_date_str)
         if df is None or df.empty:
             diag["reason"] = "missing_team_advanced_stats"
             return None, None, 1.0, diag
@@ -4371,8 +4403,11 @@ def _smart_sim_run_date_local(*, processed_root: Path, raw_root: Path, date_str:
 
     adv_map: dict[str, dict[str, float]] = {}
     try:
-        dts = pd.to_datetime(date_str, errors="coerce")
-        season_year = int(dts.year + 1) if (not pd.isna(dts) and int(dts.month) >= 7) else (int(dts.year) if not pd.isna(dts) else None)
+        # League-aware: WNBA labels seasons by start year (July 2026 ->
+        # season 2026); the old inline NBA-only formula computed 2027 and the
+        # as-of file lookup never matched for in-season WNBA dates.
+        season_year_value = _season_from_date_str_local(date_str=date_str, league=_league_for_code_local(league_code))
+        season_year = int(season_year_value) if int(season_year_value) > 0 else None
     except Exception:
         season_year = None
 

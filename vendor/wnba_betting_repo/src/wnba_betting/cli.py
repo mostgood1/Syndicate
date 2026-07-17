@@ -1870,8 +1870,14 @@ def _ensure_team_advanced_stats_asof(season: int, as_of: str) -> Path | None:
     as_of_s = str(as_of).strip()
     safe = as_of_s.replace(":", "-")
     out_path = paths.data_processed / f"team_advanced_stats_{int(season)}_asof_{safe}.csv"
-    if out_path.exists():
-        return out_path
+    try:
+        # A bare exists() check let a 0-byte leftover (from a partial/failed
+        # write) permanently block the rebuild -- every downstream consumer
+        # then read an empty file and ran teams at league-baseline ratings.
+        if out_path.is_file() and out_path.stat().st_size > 0:
+            return out_path
+    except OSError:
+        pass
     local_min_games = 1 if LEAGUE.code != "nba" else 10
     try:
         from .advanced_stats_boxscores import compute_team_advanced_stats_from_boxscores

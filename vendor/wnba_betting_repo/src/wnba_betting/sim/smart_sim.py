@@ -553,8 +553,17 @@ def _load_team_advanced_stats_asof(season: int, as_of_date_str: str) -> pd.DataF
     fp_asof = paths.data_processed / f"team_advanced_stats_{s}_asof_{ds}.csv"
     fp_season = paths.data_processed / f"team_advanced_stats_{s}.csv"
 
-    fp = fp_asof if fp_asof.exists() else fp_season
-    if not fp.exists():
+    def _has_content(path: Path) -> bool:
+        # A 0-byte as-of leftover must not shadow the season fallback --
+        # pd.read_csv raises on it and the loader would return empty,
+        # flattening every team to league-baseline ratings.
+        try:
+            return path.is_file() and path.stat().st_size > 0
+        except OSError:
+            return False
+
+    fp = fp_asof if _has_content(fp_asof) else fp_season
+    if not _has_content(fp):
         return pd.DataFrame()
 
     try:
