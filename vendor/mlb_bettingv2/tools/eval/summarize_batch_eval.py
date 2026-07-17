@@ -99,6 +99,7 @@ def main() -> int:
     props_acc: Dict[str, Tuple[float, float]] = {}
     hitter_hr_acc: Dict[str, Tuple[float, float]] = {}
     hitter_props_acc: Dict[str, Tuple[float, float]] = {}
+    starters_acc: Dict[str, Tuple[float, float]] = {}
 
     total_days = 0
     total_games = 0
@@ -213,6 +214,25 @@ def main() -> int:
                 if n_acc > 0:
                     _acc_wavg(props_acc, f"{prefix}_accuracy", float(v_acc), float(n_acc))
 
+        # Starter workload realism (pitch-count bias, SO/outs MAE), weighted by
+        # starters scored that day. Distinct from pitcher_props_at_market_lines
+        # above: that block only populates once market lines reach the eval
+        # (empty across the entire 2026 backfill -- see Phase 0 of the MLB sim
+        # accuracy plan), while this reads sim-vs-actual directly and is
+        # populated whenever sims + feed_live actuals exist, independent of
+        # odds availability. This is what starter-hook/leash tuning needs to
+        # score against.
+        starters_block = _get(obj, ["assessment", "full_game", "pitcher_props_starters"]) or {}
+        try:
+            n_starters = int(starters_block.get("starters") or 0)
+        except Exception:
+            n_starters = 0
+        if n_starters > 0:
+            for k in ("pitches_bias", "so_mae", "outs_mae", "pitches_mae"):
+                v = starters_block.get(k)
+                if isinstance(v, (int, float)):
+                    _acc_wavg(starters_acc, k, float(v), float(n_starters))
+
         # Hitter HR likelihood scoring (weight by n)
         hr = _get(obj, ["assessment", "full_game", "hitter_hr_likelihood_topn"]) or {}
         try:
@@ -274,6 +294,7 @@ def main() -> int:
         "first5_weighted": finalize(f5_acc),
         "first3_weighted": finalize(f3_acc),
         "pitcher_props_at_market_lines_weighted": finalize(props_acc),
+        "pitcher_props_starters_weighted": finalize(starters_acc),
         "hitter_hr_likelihood_topn_weighted": finalize(hitter_hr_acc),
         "hitter_props_likelihood_topn_weighted": finalize(hitter_props_acc),
         "per_day": per_day,
