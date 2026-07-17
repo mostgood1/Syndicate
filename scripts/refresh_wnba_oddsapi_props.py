@@ -3309,6 +3309,15 @@ def _run_refresh_via_cli(
     if refresh_mode == "full" and not state.get("error") and int(state["snapshot_rows"] or 0) > 0 and (do_edges or do_export):
         state["phase"] = "predictions"
         state["phase_started_at"] = dt.datetime.utcnow().isoformat()
+        # Seed consensus game_odds from the fresh snapshot BEFORE the smart
+        # sim runs -- the sim's job builder reads game_odds for its
+        # market_total/market_home_spread anchors, and the export stage's own
+        # seeding call (inside _ensure_source_game_inputs) happens after the
+        # sim has already run, so anchors were always one run stale.
+        try:
+            _seed_game_odds_from_props_snapshot(source_root=source_root, date_str=date_str, log_file=log_file)
+        except Exception as exc:
+            _append_log(log_file, f"pre-predictions game_odds seed failed (non-fatal): {exc}")
         player_logs_ok, player_logs_error = _ensure_player_logs_for_props_refresh(
             source_root=source_root,
             date_str=date_str,
