@@ -52,21 +52,41 @@
   }
 
   // Single-game detail pages (/<sport>/game/<id>) render through this same
-  // shared template for every sport (MLB/NBA/NCAAB/NCAAF/NFL/WNBA -- NHL
-  // redirects to its cards board instead), but unlike each sport's cards
-  // listing page, no JS ever ran here to keep it live: it was a pure
-  // one-shot server render with zero rehydration, so anyone watching a live
-  // game on its detail page never saw updated numbers without a manual
-  // reload. This re-fetches the page's own URL in the background (not a
-  // navigation/reload) and swaps in the freshly rendered content containers,
-  // matching the ~30s silent-rehydration behavior already used on cards
-  // listing pages (see shared/polling.js, static/mlb/cards_source.js).
+  // shared template for every sport (MLB/NBA/NCAAB/NCAAF/NFL/WNBA -- NHL's
+  // /game/ route redirects to its cards board instead), and NCAAB/NCAAF/NFL's
+  // /cards listing pages ALSO render through it with no sport-specific script
+  // at all (MLB/NBA/WNBA/NHL each have a separate, bespoke primary cards
+  // experience with its own polling; game_cards_board.html is only their
+  // `?client=board` fallback variant). Every one of these pages was a pure
+  // one-shot server render with zero rehydration: a live game on its detail
+  // page, or an entire NCAAB/NCAAF/NFL slate, never showed updated numbers
+  // without a manual reload no matter how fresh the backend data was.
   //
-  // Deliberately scoped to /game/ paths only: cards listing pages that
-  // already run their own JSON-driven refresh (MLB/NBA/WNBA) would otherwise
-  // get double-refreshed by two competing mechanisms.
-  function installGameDetailAutoRefresh() {
-    if (!/\/game\//.test(window.location.pathname)) return;
+  // This re-fetches the page's own URL in the background (not a
+  // navigation/reload) and swaps in the freshly rendered content containers,
+  // matching the ~30s silent-rehydration behavior already used by MLB/NBA/
+  // WNBA/NHL's bespoke cards scripts (see shared/polling.js).
+  //
+  // Skips pages that already loaded one of those bespoke scripts (relevant
+  // when MLB/NBA/WNBA are viewed with ?client=board, which also renders this
+  // shared template but WITH their own script tag) so two refresh
+  // mechanisms never compete over the same DOM.
+  const BESPOKE_CARDS_SCRIPT_SELECTOR = [
+    'mlb/cards_source.js',
+    'nba/cards_source.js',
+    'wnba/cards-parity.js',
+  ].map(function (name) { return 'script[src*="' + name + '"]'; }).join(', ');
+
+  function pageHasBespokeCardsRefresh() {
+    return Boolean(document.querySelector(BESPOKE_CARDS_SCRIPT_SELECTOR));
+  }
+
+  function installSharedBoardAutoRefresh() {
+    const pathname = window.location.pathname;
+    const isGameDetail = /\/game\//.test(pathname);
+    const isCardsListing = /\/cards\/?$/.test(pathname);
+    if (!isGameDetail && !isCardsListing) return;
+    if (pageHasBespokeCardsRefresh()) return;
     if (!window.SyndicatePolling || typeof window.SyndicatePolling.start !== 'function') return;
 
     const SWAP_CONTAINER_IDS = ['cardsHeaderMeta', 'cardsScoreboard', 'cardsGrid', 'cardsHrTargets'];
@@ -120,8 +140,8 @@
   }
 
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', installGameDetailAutoRefresh);
+    document.addEventListener('DOMContentLoaded', installSharedBoardAutoRefresh);
   } else {
-    installGameDetailAutoRefresh();
+    installSharedBoardAutoRefresh();
   }
 })();
