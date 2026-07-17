@@ -372,6 +372,17 @@ class BasketballPropsPredictionsTests(unittest.TestCase):
             smart_sim_module,
             "_player_usage_weights_local",
             side_effect=lambda **kwargs: usage_calls.append(dict(kwargs)) or {"local_usage": kwargs["col_pm"]},
+        ), patch.object(
+            # The flat local stub is now a fallback used only when the real
+            # vendored events.py possession engine can't be imported (e.g.
+            # missing vendor checkout) -- force that path here so this test
+            # still exercises the fallback routing/usage-helper patching it
+            # was written to verify, rather than hitting the real engine
+            # (which requires real rng/players/etc. this synthetic test
+            # doesn't provide).
+            smart_sim_module,
+            "_call_real_events_entrypoint_local",
+            return_value=None,
         ):
             pbp_out = smart_sim_module._simulate_pbp_game_boxscore_local(mode="pbp")
             event_out = smart_sim_module._simulate_event_level_boxscore_local(mode="event")

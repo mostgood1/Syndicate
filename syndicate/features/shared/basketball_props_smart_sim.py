@@ -3,16 +3,19 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass, is_dataclass
 from datetime import datetime
 import importlib
+import inspect
 import json
 import math
 import os
 import re
+import sys
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
 from syndicate.features.shared.memory_observability import log_list_memory
 from syndicate.features.shared.memory_observability import log_runtime_memory
+from syndicate.features.shared.source_roots import repo_root_from
 
 
 _SMARTSIM_WORKER_STATE: dict[str, object] | None = None
@@ -23,6 +26,7 @@ _TOTALS_CALIBRATION_CACHE_LOCAL: dict[tuple[str, str], dict[str, Any] | None] = 
 _TEAM_ADVANCED_STATS_CACHE_LOCAL: dict[tuple[str, int, str], object] = {}
 _PREGAME_EXPECTED_MINUTES_CACHE_LOCAL: dict[tuple[str, str], object] = {}
 _MARKET_PLAYER_NAMES_CACHE_LOCAL: dict[tuple[str, str], dict[tuple[str, str], set[str]]] = {}
+_REAL_SMART_SIM_MODULE_CACHE_LOCAL: dict[str, Any] = {}
 
 
 def _json_default_local(value: Any) -> Any:
@@ -721,8 +725,58 @@ def _simulate_smart_game_local(*, date_str: str, home_tri: str, away_tri: str, p
     }
 
 
+def _vendor_smart_sim_code_root_local(*, package_name: str) -> Path:
+    # Same ephemeral-checkout-vs-persistent-data-disk split as
+    # _models_dir_for_source_root in basketball_props_predictions.py: the
+    # trained-model-adjacent simulation code only ships inside this repo's
+    # vendor/<pkg>_repo checkout, never on the Render data disk.
+    override = str(os.environ.get(f"SYNDICATE_VENDOR_ROOT_{package_name.upper()}") or "").strip()
+    if override:
+        return Path(override).expanduser().resolve()
+    return repo_root_from(__file__) / "vendor" / f"{package_name}_repo"
+
+
+def _import_real_smart_sim_module_local(*, package_name: str) -> Any | None:
+    """Import the vendored <package>.sim.smart_sim module (the real engine).
+
+    Cached per package so the (only-needed-once) sys.path mutation and
+    import cost is paid once per process, not once per game. Returns None
+    if the vendor checkout/package is unavailable, so callers can fall back
+    to the flat local stub rather than crash the refresh pipeline.
+    """
+    if package_name in _REAL_SMART_SIM_MODULE_CACHE_LOCAL:
+        return _REAL_SMART_SIM_MODULE_CACHE_LOCAL[package_name]
+    module = None
+    try:
+        vendor_root = _vendor_smart_sim_code_root_local(package_name=package_name)
+        src_root = vendor_root / "src"
+        src_root_s = str(src_root)
+        if src_root.is_dir() and src_root_s not in sys.path:
+            sys.path.insert(0, src_root_s)
+        module = importlib.import_module(f"{package_name}.sim.smart_sim")
+        if not hasattr(module, "simulate_smart_game"):
+            module = None
+    except Exception:
+        module = None
+    _REAL_SMART_SIM_MODULE_CACHE_LOCAL[package_name] = module
+    return module
+
+
 def _build_local_smart_sim_module(*, processed_root: Path, league_code: str):
     source_root = processed_root.parent.parent if processed_root.parent.name.lower() == "data" else processed_root.parent
+    package_name = "wnba_betting" if str(league_code or "").strip().lower() == "wnba" else "nba_betting"
+    real_module = _import_real_smart_sim_module_local(package_name=package_name)
+    if real_module is not None:
+        # The real module's internal helpers (simulate_pbp_game_boxscore,
+        # _rotation_sim_minutes_from_history, _apply_player_priors, etc.)
+        # are swapped for Render-data-root-aware local ports by
+        # _call_source_simulate_smart_game_local's monkeypatch dict, keyed
+        # by these exact function names. Pin `paths` explicitly too (rather
+        # than trusting the module's own env-var-derived singleton) so this
+        # always matches the processed_root the caller actually wants,
+        # regardless of WNBA_BETTING_DATA_ROOT/NBA_BETTING_DATA_ROOT drift.
+        real_module.paths = SimpleNamespace(data_processed=processed_root, data_raw=source_root / "data" / "raw", root=source_root)
+        return real_module
     return SimpleNamespace(
         simulate_smart_game=_simulate_smart_game_local,
         paths=SimpleNamespace(data_processed=processed_root, root=source_root),
@@ -2953,11 +3007,64 @@ def _call_events_entrypoint_local(*, entrypoint_name: str, kwargs: dict[str, Any
             setattr(events_module, "_player_usage_weights", original_value)
 
 
-def _simulate_pbp_game_boxscore_local(**kwargs):
+def _import_real_events_module_local(*, package_name: str) -> Any | None:
+    """Import the vendored <package>.sim.events module (the real possession engine).
+
+    events.py has zero dependency on the `paths` singleton (pure computation
+    over already-passed-in DataFrames/rng), so unlike smart_sim.py it needs
+    no path pinning -- just the same sys.path setup, cached per package.
+    """
+    cache_key = f"{package_name}.events"
+    if cache_key in _REAL_SMART_SIM_MODULE_CACHE_LOCAL:
+        return _REAL_SMART_SIM_MODULE_CACHE_LOCAL[cache_key]
+    module = None
+    try:
+        vendor_root = _vendor_smart_sim_code_root_local(package_name=package_name)
+        src_root = vendor_root / "src"
+        src_root_s = str(src_root)
+        if src_root.is_dir() and src_root_s not in sys.path:
+            sys.path.insert(0, src_root_s)
+        module = importlib.import_module(f"{package_name}.sim.events")
+        if not hasattr(module, "simulate_pbp_game_boxscore") or not hasattr(module, "simulate_event_level_boxscore"):
+            module = None
+    except Exception:
+        module = None
+    _REAL_SMART_SIM_MODULE_CACHE_LOCAL[cache_key] = module
+    return module
+
+
+def _call_real_events_entrypoint_local(*, entrypoint_name: str, league_code: str, kwargs: dict[str, Any]):
+    package_name = "wnba_betting" if str(league_code or "").strip().lower() == "wnba" else "nba_betting"
+    real_module = _import_real_events_module_local(package_name=package_name)
+    if real_module is None:
+        return None
+    fn = getattr(real_module, entrypoint_name, None)
+    if fn is None:
+        return None
+    params = inspect.signature(fn).parameters
+    if not any(p.kind is inspect.Parameter.VAR_KEYWORD for p in params.values()):
+        kwargs = {k: v for k, v in kwargs.items() if k in params}
+    return fn(**kwargs)
+
+
+def _simulate_pbp_game_boxscore_local(*, league_code: str = "nba", **kwargs):
+    # _local_simulate_pbp_game_boxscore below is a flat, deterministic
+    # stand-in (rounds the Gaussian quarter-mean straight to an integer
+    # score with zero per-sim variance) -- it produced identical score_q
+    # p10/p50/p90 across every simulation. The real events.py possession
+    # engine is pure computation with no file-I/O/paths dependency, so it
+    # is safe to call directly; only fall back to the flat stand-in if the
+    # vendor checkout genuinely can't be imported.
+    result = _call_real_events_entrypoint_local(entrypoint_name="simulate_pbp_game_boxscore", league_code=league_code, kwargs=kwargs)
+    if result is not None:
+        return result
     return _call_events_entrypoint_local(entrypoint_name="simulate_pbp_game_boxscore", kwargs=kwargs)
 
 
-def _simulate_event_level_boxscore_local(**kwargs):
+def _simulate_event_level_boxscore_local(*, league_code: str = "nba", **kwargs):
+    result = _call_real_events_entrypoint_local(entrypoint_name="simulate_event_level_boxscore", league_code=league_code, kwargs=kwargs)
+    if result is not None:
+        return result
     return _call_events_entrypoint_local(entrypoint_name="simulate_event_level_boxscore", kwargs=kwargs)
 
 
@@ -3830,8 +3937,8 @@ def _call_source_simulate_smart_game_local(*, smart_sim_module, processed_root: 
             date_str=date_str,
             lookback_days=lookback_days,
         ),
-        "simulate_pbp_game_boxscore": lambda **inner_kwargs: _simulate_pbp_game_boxscore_local(**inner_kwargs),
-        "simulate_event_level_boxscore": lambda **inner_kwargs: _simulate_event_level_boxscore_local(**inner_kwargs),
+        "simulate_pbp_game_boxscore": lambda **inner_kwargs: _simulate_pbp_game_boxscore_local(league_code=league_code, **inner_kwargs),
+        "simulate_event_level_boxscore": lambda **inner_kwargs: _simulate_event_level_boxscore_local(league_code=league_code, **inner_kwargs),
         "_rotation_sim_minutes_for_team": lambda team_df, date_str, home_tri, away_tri, team_tri, side, game_id: _rotation_sim_minutes_for_team_local(
             smart_sim_module=smart_sim_module,
             league_code=league_code,
@@ -3872,7 +3979,15 @@ def _call_source_simulate_smart_game_local(*, smart_sim_module, processed_root: 
             original_values[name] = getattr(smart_sim_module, name, None)
             setattr(smart_sim_module, name, value)
         simulate_smart_game = getattr(smart_sim_module, "simulate_smart_game")
-        return simulate_smart_game(**kwargs)
+        # The real vendored simulate_smart_game's signature has no
+        # processed_root param (it resolves paths via the module-level
+        # `paths` singleton, pinned above) and no **kwargs catch-all, unlike
+        # the flat local stub -- drop args it doesn't declare rather than
+        # let an unexpected-keyword TypeError silently fail every game.
+        params = inspect.signature(simulate_smart_game).parameters
+        accepts_var_keyword = any(p.kind is inspect.Parameter.VAR_KEYWORD for p in params.values())
+        call_kwargs = kwargs if accepts_var_keyword else {k: v for k, v in kwargs.items() if k in params}
+        return simulate_smart_game(**call_kwargs)
     finally:
         for name, value in original_values.items():
             try:
