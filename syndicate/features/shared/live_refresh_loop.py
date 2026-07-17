@@ -21,6 +21,7 @@ from syndicate.features.shared.refresh_state_store import read_json_file
 from syndicate.features.shared.refresh_state_store import reports_root
 from syndicate.features.shared.refresh_state_store import write_json_file
 from syndicate.features.shared.source_roots import repo_root_from
+from syndicate.features.shared.timezone import central_datetime_from_epoch
 from syndicate.features.shared.timezone import central_today_iso
 
 try:
@@ -642,6 +643,59 @@ def _launch_mlb_daily_sim(date_str: str, decision: dict[str, Any]) -> dict[str, 
 
 
 # ---------------------------------------------------------------------------
+# Evening next-day sim: with the GHA daily-update cron reduced to backup-only,
+# nothing simmed tomorrow's slate until the date-rollover first_appearance
+# gate fired after midnight Central -- fine for correctness, but it meant
+# tomorrow's board never populated the evening before the way the old cron's
+# --build-next-day step used to. This reuses the exact same sim launch path
+# as the regular daily-sim gate (_launch_mlb_daily_sim / the shared
+# _MLB_SIM_PROCESS tracking), just pointed at tomorrow's date and gated to a
+# configurable evening window instead of firing all day.
+# ---------------------------------------------------------------------------
+
+def _mlb_evening_next_day_sim_enabled() -> bool:
+	# Dark-launch default off, same posture as every other piece of the
+	# worker-centric replacement for the GHA cron in this file.
+	return _env_bool("SYNDICATE_MLB_EVENING_NEXT_DAY_SIM_ENABLED", default=False)
+
+
+def _mlb_evening_next_day_sim_start_hour() -> int:
+	raw = str(os.environ.get("SYNDICATE_MLB_EVENING_NEXT_DAY_SIM_START_HOUR") or "").strip()
+	try:
+		value = int(raw or 18)
+	except Exception:
+		value = 18
+	return max(0, min(23, value))
+
+
+def _mlb_evening_next_day_sim_decision(*, now_epoch: float, selected_date: str, any_live: bool | None) -> dict[str, Any]:
+	if not _mlb_evening_next_day_sim_enabled():
+		return {"force": False, "reason": "disabled"}
+	if any_live:
+		# Same posture as look-ahead: never compete with a live tick for the
+		# container's resources.
+		return {"force": False, "reason": "sport_currently_live"}
+	local_hour = central_datetime_from_epoch(now_epoch).hour
+	if local_hour < _mlb_evening_next_day_sim_start_hour():
+		return {"force": False, "reason": "before_evening_window"}
+	if _mlb_daily_sim_process_still_running():
+		# Covers both "today's sim is still running" and "we already launched
+		# tomorrow's sim earlier this evening and it's still going" -- either
+		# way, don't stack a second sim job on the same box.
+		return {"force": False, "reason": "previous_run_still_active"}
+	target_date = _look_ahead_target_date(selected_date)
+	if _mlb_daily_summary_path(target_date).exists():
+		return {"force": False, "reason": "already_simmed"}
+	try:
+		events = fetch_schedule_for_date("mlb", target_date)
+	except Exception:
+		events = []
+	if not events:
+		return {"force": False, "reason": "no_games_scheduled"}
+	return {"force": True, "reason": "evening_next_day_sim", "date": target_date}
+
+
+# ---------------------------------------------------------------------------
 # Look-ahead: proactively warm tomorrow's slate during idle ticks instead of
 # only reacting once central_today_iso() rolls over to a new date. Reuses the
 # same schedule_adapter helpers as the MLB tip-off-window check above (they
@@ -925,6 +979,15 @@ def _run_live_refresh_tick() -> dict[str, Any]:
 			meta["lookAhead"] = {"ok": False, "launched": False, "reason": look_ahead_decision.get("reason")}
 	except Exception as exc:
 		meta["lookAhead"] = {"ok": False, "launched": False, "error": f"{type(exc).__name__}: {exc}"}
+
+	try:
+		evening_sim_decision = _mlb_evening_next_day_sim_decision(now_epoch=tick_started_epoch, selected_date=selected_date, any_live=any_live)
+		if evening_sim_decision.get("force"):
+			meta["mlbEveningNextDaySim"] = _launch_mlb_daily_sim(str(evening_sim_decision.get("date")), evening_sim_decision)
+		else:
+			meta["mlbEveningNextDaySim"] = {"launched": False, "reason": evening_sim_decision.get("reason")}
+	except Exception as exc:
+		meta["mlbEveningNextDaySim"] = {"launched": False, "error": f"{type(exc).__name__}: {exc}"}
 
 	meta["finishedAt"] = _utc_now()
 	write_json_file(_meta_dir() / "latest_live_refresh_tick.json", meta)

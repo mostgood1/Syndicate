@@ -476,6 +476,19 @@ services:
         value: "true"
       - key: SYNDICATE_LOOK_AHEAD_INTERVAL_SECONDS
         value: "3600"
+      # Evening next-day sim: with the GHA cron's --build-next-day step gone
+      # (removed in e13a1a03 to stop doubling sim-job runtime/memory), tomorrow's
+      # board only populated after the midnight-Central date rollover's
+      # first_appearance gate. This restores evening-before availability by
+      # reusing the same daily-sim launch path, pointed at tomorrow's date,
+      # gated to fire only from 18:00 Central onward (never while any sport is
+      # live, never if a sim is already running, never if tomorrow is already
+      # simmed). One evening's worth of logs should confirm behavior before
+      # this is considered proven the way SYNDICATE_LOOK_AHEAD_ENABLED is.
+      - key: SYNDICATE_MLB_EVENING_NEXT_DAY_SIM_ENABLED
+        value: "true"
+      - key: SYNDICATE_MLB_EVENING_NEXT_DAY_SIM_START_HOUR
+        value: "18"
       - key: MLB_BETTING_DATA_ROOT
         value: /opt/render/project/data/mlb_source/source_artifacts/data
       - key: MLB_LIVE_LENS_DIR
