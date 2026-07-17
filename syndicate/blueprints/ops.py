@@ -369,6 +369,32 @@ def api_ops_live_refresh_state() -> Any:
     return jsonify({"ok": True, "state": normalize_timestamped_payload(state)})
 
 
+@ops_bp.post("/api/ops/live-refresh/force-mlb-resim")
+def api_ops_live_refresh_force_mlb_resim() -> Any:
+    # Ops lever: invalidate the MLB daily-sim gate's stored input fingerprint
+    # so the live-odds-worker's next tick fires a fingerprint_change launch.
+    # The gate state lives in the Redis-backed refresh-state store, which web
+    # shares with the worker -- this is the only remote way to force a re-sim
+    # without waiting for a lineup change or the tip-off window (e.g. after an
+    # OOM stranded a completed-but-unpublished run on the worker disk).
+    from syndicate.features.shared.refresh_state_store import write_json_file as _state_write_json
+    from syndicate.features.shared.refresh_state_store import reports_root as _state_reports_root
+    from syndicate.features.shared.timezone import central_today_iso
+
+    date_str = str(request.args.get("date") or "").strip() or central_today_iso()
+    marker = f"forced-resim:{datetime.now(timezone.utc).isoformat(timespec='seconds')}"
+    payload = {
+        "date": date_str,
+        # epoch must be >0 (interval guard requires it) but old enough that the
+        # within_check_interval branch never triggers.
+        "epoch": 1.0,
+        "fingerprint": marker,
+        "launched": False,
+    }
+    _state_write_json(_state_reports_root() / "live_refresh_loop" / "last_mlb_sim_check.json", payload)
+    return jsonify({"ok": True, "date": date_str, "marker": marker, "note": "next live-odds-worker tick will launch with reason=fingerprint_change"})
+
+
 @ops_bp.get("/api/ops/mlb/sims-list")
 def api_ops_mlb_sims_list() -> Any:
     # Protected endpoint: requires admin token (enforced by before_request)
