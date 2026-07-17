@@ -1707,16 +1707,141 @@ def _seed_game_odds_from_raw_history(*, source_root: Path, date_str: str, log_fi
     return True
 
 
+def _aggregate_game_odds_from_market_rows(
+    group_rows: list[dict[str, object]], *, home_name: str, away_name: str
+) -> dict[str, float | None]:
+    # Ported from refresh_wnba_oddsapi_props.py: consensus moneyline/spread/
+    # total from the raw h2h/spreads/totals rows in a props snapshot group.
+    home_ml_values: list[float] = []
+    away_ml_values: list[float] = []
+    home_spread_values: list[float] = []
+    away_spread_values: list[float] = []
+    total_values: list[float] = []
+
+    for current in group_rows:
+        market = str(current.get("market") or "").strip().lower()
+        outcome_name = str(current.get("outcome_name") or "").strip()
+        point_value = _float_or_none(current.get("point"))
+        price_value = _float_or_none(current.get("price"))
+        if market == "h2h":
+            if outcome_name == home_name and price_value is not None:
+                home_ml_values.append(price_value)
+            elif outcome_name == away_name and price_value is not None:
+                away_ml_values.append(price_value)
+        elif market == "spreads" and point_value is not None:
+            if outcome_name == home_name:
+                home_spread_values.append(point_value)
+            elif outcome_name == away_name:
+                away_spread_values.append(point_value)
+        elif market == "totals" and point_value is not None:
+            total_values.append(point_value)
+
+    home_spread = _mean_or_none(home_spread_values)
+    away_spread = _mean_or_none(away_spread_values)
+    if home_spread is None and away_spread is not None:
+        home_spread = -float(away_spread)
+    if away_spread is None and home_spread is not None:
+        away_spread = -float(home_spread)
+
+    return {
+        "home_ml": _mean_or_none(home_ml_values),
+        "away_ml": _mean_or_none(away_ml_values),
+        "home_spread": home_spread,
+        "away_spread": away_spread,
+        "total": _mean_or_none(total_values),
+    }
+
+
+def _game_odds_frame_has_prices(frame) -> bool:
+    import pandas as pd
+
+    if frame is None or getattr(frame, "empty", True):
+        return False
+    for column in ("home_ml", "away_ml", "home_spread", "away_spread", "total"):
+        if column in frame.columns and pd.to_numeric(frame[column], errors="coerce").notna().any():
+            return True
+    return False
+
+
+def _build_game_odds_rows_from_snapshot_frame(frame, *, date_str: str):
+    """One consensus-priced game_odds row per matchup from a props snapshot.
+
+    Same enrichment as refresh_wnba_oddsapi_props.py: the snapshot is fetched
+    with h2h/spreads/totals alongside player-prop markets, so consensus
+    moneyline/spread/total are derivable here instead of writing a bare
+    matchup skeleton that leaves the smart sim's market anchors null.
+    """
+    import pandas as pd
+
+    rows_out: list[dict[str, object]] = []
+    working = frame.dropna(subset=["home_team", "away_team"])
+    for (home_name, away_name), group in working.groupby(["home_team", "away_team"], sort=False):
+        home_text = str(home_name).strip()
+        away_text = str(away_name).strip()
+        if not home_text or not away_text:
+            continue
+        row_payload: dict[str, object] = {
+            "date": date_str,
+            "game_id": "",
+            "home_team": home_text,
+            "visitor_team": away_text,
+            "commence_time": "",
+            "home_ml": None,
+            "away_ml": None,
+            "home_spread": None,
+            "away_spread": None,
+            "total": None,
+            "bookmaker": "oddsapi_consensus",
+        }
+        for column, key in (("event_id", "game_id"), ("commence_time", "commence_time")):
+            if column in group.columns:
+                values = group[column].dropna()
+                if not values.empty:
+                    row_payload[key] = str(values.iloc[0]).strip()
+        if "market" in group.columns:
+            aggregated = _aggregate_game_odds_from_market_rows(
+                group.to_dict("records"), home_name=home_text, away_name=away_text
+            )
+            for key in ("home_ml", "away_ml", "home_spread", "away_spread", "total"):
+                row_payload[key] = aggregated.get(key)
+        rows_out.append(row_payload)
+    return pd.DataFrame(rows_out)
+
+
 def _seed_game_odds_from_props_snapshot(*, source_root: Path, date_str: str, log_file: Path) -> bool:
     processed_path = source_root / "data" / "processed" / f"game_odds_{date_str}.csv"
-    if _path_has_meaningful_content(processed_path):
-        return True
-
     snapshot_candidates = (
         source_root / "data" / "processed" / f"oddsapi_player_props_{date_str}.csv",
         source_root / "data" / "raw" / f"odds_nba_player_props_{date_str}.csv",
     )
     import pandas as pd
+
+    if _path_has_meaningful_content(processed_path):
+        snapshot_has_market_rows = False
+        for candidate in snapshot_candidates:
+            if not candidate.exists() or not candidate.is_file():
+                continue
+            try:
+                candidate_frame = pd.read_csv(candidate, nrows=5)
+            except Exception:
+                continue
+            if "market" in candidate_frame.columns:
+                snapshot_has_market_rows = True
+                break
+        try:
+            existing = pd.read_csv(processed_path)
+        except Exception:
+            existing = pd.DataFrame()
+        if snapshot_has_market_rows and not _game_odds_frame_has_prices(existing):
+            # A price-less skeleton (the old seeder's output) would otherwise
+            # satisfy the reuse check forever, keeping the sim's market
+            # anchors null even though the snapshot has real market rows.
+            _append_log(
+                log_file,
+                f"Enriching price-less game_odds slate for {date_str} with consensus prices from props snapshot",
+            )
+        else:
+            return True
 
     for candidate in snapshot_candidates:
         if not candidate.exists() or not candidate.is_file():
@@ -1728,17 +1853,13 @@ def _seed_game_odds_from_props_snapshot(*, source_root: Path, date_str: str, log
             continue
         if frame.empty or not {"home_team", "away_team"}.issubset(frame.columns):
             continue
-        out = frame[["home_team", "away_team"]].dropna().drop_duplicates().copy()
-        out = out.rename(columns={"away_team": "visitor_team"})
-        out.insert(0, "date", date_str)
-        if "commence_time" in frame.columns:
-            times = frame[["home_team", "away_team", "commence_time"]].dropna(subset=["home_team", "away_team"]).copy()
-            times = times.rename(columns={"away_team": "visitor_team"})
-            times = times.drop_duplicates(subset=["home_team", "visitor_team"], keep="first")
-            out = out.merge(times, on=["home_team", "visitor_team"], how="left")
+        out = _build_game_odds_rows_from_snapshot_frame(frame, date_str=date_str)
+        if out.empty:
+            continue
         processed_path.parent.mkdir(parents=True, exist_ok=True)
         out.to_csv(processed_path, index=False)
-        _append_log(log_file, f"Seeded fallback game odds slate from props snapshot: {processed_path} (rows={len(out)})")
+        priced = int(pd.to_numeric(out.get("total"), errors="coerce").notna().sum()) if "total" in out.columns else 0
+        _append_log(log_file, f"Seeded game odds slate from props snapshot: {processed_path} (rows={len(out)}, priced={priced})")
         return True
     return False
 

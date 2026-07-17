@@ -162,6 +162,55 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
         self.assertEqual(written[0].get("side"), "Home Team")
         self.assertEqual(written[1].get("side"), "Under")
 
+    def test_seed_game_odds_writes_consensus_prices_from_snapshot(self) -> None:
+        # Regression: the seeder wrote a bare matchup skeleton (no prices)
+        # even though the snapshot carries h2h/spreads/totals rows, leaving
+        # the smart sim's market_total/market_home_spread anchors null in
+        # every production run. It must now emit one consensus-priced row per
+        # matchup, and a pre-existing price-less skeleton must get enriched
+        # rather than satisfying the reuse check forever.
+        module = self._load_module()
+        import tempfile
+
+        snapshot_header = "snapshot_ts,event_id,commence_time,bookmaker,bookmaker_title,market,outcome_name,player_name,point,price,last_update,home_team,away_team\n"
+        snapshot_rows = (
+            "2026-07-17T20:00:00Z,401,2026-07-17T23:00:00Z,draftkings,DraftKings,h2h,Washington Mystics,,,-140,2026-07-17T20:00:00Z,Washington Mystics,Portland Fire\n"
+            "2026-07-17T20:00:00Z,401,2026-07-17T23:00:00Z,draftkings,DraftKings,h2h,Portland Fire,,,120,2026-07-17T20:00:00Z,Washington Mystics,Portland Fire\n"
+            "2026-07-17T20:00:00Z,401,2026-07-17T23:00:00Z,draftkings,DraftKings,spreads,Washington Mystics,,-4.5,-110,2026-07-17T20:00:00Z,Washington Mystics,Portland Fire\n"
+            "2026-07-17T20:00:00Z,401,2026-07-17T23:00:00Z,draftkings,DraftKings,totals,Over,,164.5,-110,2026-07-17T20:00:00Z,Washington Mystics,Portland Fire\n"
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            source_root = Path(tmp_dir) / "source"
+            raw_root = source_root / "data" / "raw"
+            processed_root = source_root / "data" / "processed"
+            raw_root.mkdir(parents=True)
+            processed_root.mkdir(parents=True)
+            (raw_root / "odds_wnba_player_props_2026-07-17.csv").write_text(snapshot_header + snapshot_rows, encoding="utf-8")
+            # Pre-existing price-less skeleton from the old seeder.
+            (processed_root / "game_odds_2026-07-17.csv").write_text(
+                "date,home_team,visitor_team,commence_time\n"
+                "2026-07-17,Washington Mystics,Portland Fire,2026-07-17T23:00:00Z\n",
+                encoding="utf-8",
+            )
+
+            ok = module._seed_game_odds_from_props_snapshot(
+                source_root=source_root, date_str="2026-07-17", log_file=Path(tmp_dir) / "refresh.log"
+            )
+            self.assertTrue(ok)
+
+            import pandas as pd
+
+            out = pd.read_csv(processed_root / "game_odds_2026-07-17.csv")
+
+        self.assertEqual(len(out), 1)
+        row = out.iloc[0]
+        self.assertEqual(float(row["home_ml"]), -140.0)
+        self.assertEqual(float(row["away_ml"]), 120.0)
+        self.assertEqual(float(row["home_spread"]), -4.5)
+        self.assertEqual(float(row["away_spread"]), 4.5)
+        self.assertEqual(float(row["total"]), 164.5)
+
     def test_build_local_game_cards_artifact_uses_raw_team_odds_snapshot(self) -> None:
         module = self._load_module()
 
