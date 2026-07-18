@@ -3538,6 +3538,16 @@ def _load_home_pregame_prop_items(
     return []
 
 
+# Sports with a real live-prop data source below (mlb/nhl/nba/wnba). NFL/
+# NCAAF/NCAAB have no branch here (falls through to []) so their
+# live_odds_game_ids must never be built from live_prop_items -- an empty
+# set from a sport with no source at all is indistinguishable from "checked,
+# nothing live right now," and treating it as the latter forces is_live to
+# False for every genuinely-live game of those three sports. See
+# _live_odds_backed_live_flag()'s None-vs-empty-set handling.
+_LIVE_PROP_SOURCED_SPORTS = {"mlb", "nba", "nhl", "wnba"}
+
+
 def _load_home_live_prop_items(
     slug: str,
     *,
@@ -4398,7 +4408,25 @@ def _build_sport_overview(
                     context_label=context_label,
                     home_games=home_games,
                 )
-                live_prop_items = list(pregame_prop_items)
+                # Was `list(pregame_prop_items)` -- a literal copy, not an
+                # independent live source, so the Live Props rail always
+                # mirrored pregame even with no game live. The real WNBA
+                # live-lens path (same helper NBA uses) already exists in
+                # _load_home_live_prop_items; this just wires it in.
+                live_prop_items = _finalize_home_prop_rows(
+                    _load_home_prop_items(
+                        slug,
+                        context_label=context_label,
+                        home_games=home_games,
+                        season=season,
+                        week=selected_week,
+                        is_active_today=active_today,
+                        lane="live",
+                    ),
+                    slug=slug,
+                    context_label=context_label,
+                    home_games=home_games,
+                )
                 source_title = str(wnba_overview.get("source_title") or "WNBA cards").strip()
                 source_path = str(wnba_overview.get("source_path") or "").strip()
     else:
@@ -4444,7 +4472,7 @@ def _build_sport_overview(
     betting_href, betting_label = _link_lookup_any(links, ["Betting Card"])
     picks_href, picks_label = _link_lookup_any(links, ["Picks", "Season Review"])
     game_bar["items"] = game_items
-    live_odds_game_ids = _game_identity_set(live_prop_items)
+    live_odds_game_ids = _game_identity_set(live_prop_items) if slug in _LIVE_PROP_SOURCED_SPORTS else None
     props_bar["items"] = list(pregame_prop_items)
     if game_bar["items"]:
         overview_stats = [{"label": "Games", "value": str(game_count)}] + overview_stats[1:]
