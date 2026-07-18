@@ -13,7 +13,7 @@ from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
-from syndicate.features.shared.artifact_publisher import publish_changed_hot_artifacts
+from syndicate.features.shared.artifact_publisher import sweep_changed_hot_artifacts
 from syndicate.features.shared.ops_refresh import is_refresh_run_active
 from syndicate.features.shared.ops_refresh import launch_refresh_run
 from syndicate.features.shared.schedule_adapter import events_starting_within
@@ -1148,8 +1148,21 @@ def _run_live_refresh_tick() -> dict[str, Any]:
 	write_json_file(_meta_dir() / "latest_live_refresh_tick.json", meta)
 	try:
 		publish_since_epoch = _hot_artifact_publish_since_epoch(tick_started_epoch=tick_started_epoch)
-		meta["publishedArtifacts"] = publish_changed_hot_artifacts(publish_since_epoch)
-		_record_hot_artifact_publish_watermark(tick_started_epoch)
+		sweep_result = sweep_changed_hot_artifacts(publish_since_epoch)
+		meta["publishedArtifacts"] = sweep_result.published_count
+		if sweep_result.all_succeeded:
+			# Only advance the watermark once every candidate in this window
+			# is confirmed published -- publish_hot_artifact never raises on
+			# a transient failure (network blip, web service momentarily
+			# unreachable), so advancing unconditionally would silently and
+			# permanently skip a file that failed for a reason that would
+			# have succeeded on retry. Leaving the watermark in place makes
+			# the next tick re-sweep this same window, including any file
+			# that failed here (re-publishing an already-succeeded file is
+			# a harmless duplicate POST).
+			_record_hot_artifact_publish_watermark(tick_started_epoch)
+		else:
+			meta["publishFailedCount"] = len(sweep_result.failed_paths)
 	except Exception:
 		meta["publishedArtifacts"] = 0
 	return meta

@@ -22,7 +22,7 @@ import json
 import logging
 import os
 from pathlib import Path
-from typing import Any
+from typing import Any, NamedTuple
 from urllib import error as urllib_error
 from urllib import request as urllib_request
 
@@ -214,7 +214,31 @@ def publish_hot_artifacts(paths: Any) -> int:
     return published
 
 
-def publish_changed_hot_artifacts(since_epoch_seconds: float) -> int:
+class HotArtifactSweepResult(NamedTuple):
+    """Outcome of a publish_hot_artifacts_since sweep.
+
+    publish_hot_artifact never raises -- a network blip or a momentarily
+    unreachable web service just returns False and is logged, not thrown.
+    That means a bare published-count return can't tell a caller "every
+    candidate in this window went through" from "some silently failed" --
+    a caller that advances a persisted watermark on any non-raising return
+    would permanently skip a file that failed for a transient reason, the
+    exact same class of "async output missing on web forever" bug this was
+    built to prevent in the first place. all_succeeded lets watermark-based
+    callers only advance past a window once every candidate in it is
+    confirmed published, so a real failure retries on the next sweep
+    instead of vanishing.
+    """
+
+    published_count: int
+    failed_paths: tuple[Path, ...]
+
+    @property
+    def all_succeeded(self) -> bool:
+        return not self.failed_paths
+
+
+def sweep_changed_hot_artifacts(since_epoch_seconds: float) -> HotArtifactSweepResult:
     """Sweep the allowlisted hot-artifact locations under the data root and publish
     any file modified at or after ``since_epoch_seconds``.
 
@@ -222,9 +246,10 @@ def publish_changed_hot_artifacts(since_epoch_seconds: float) -> int:
     where we can't easily hook every downstream write site directly.
     """
     if not _publish_url() or not _admin_token():
-        return 0
+        return HotArtifactSweepResult(published_count=0, failed_paths=())
     root = _data_root()
     published = 0
+    failed: list[Path] = []
     for pattern in HOT_ARTIFACT_PATTERNS:
         for candidate in root.glob(pattern):
             try:
@@ -234,4 +259,16 @@ def publish_changed_hot_artifacts(since_epoch_seconds: float) -> int:
                 continue
             if publish_hot_artifact(candidate):
                 published += 1
-    return published
+            else:
+                failed.append(candidate)
+    return HotArtifactSweepResult(published_count=published, failed_paths=tuple(failed))
+
+
+def publish_changed_hot_artifacts(since_epoch_seconds: float) -> int:
+    """Back-compat wrapper over sweep_changed_hot_artifacts for callers that
+    only care about the published count, not per-file success (e.g. callers
+    that publish synchronously right after their own subprocess finishes,
+    where there's no persisted watermark to protect against advancing past
+    a failed file -- see run_mlb_daily_sim_job.py / run_queued_refresh_job.py).
+    """
+    return sweep_changed_hot_artifacts(since_epoch_seconds).published_count
