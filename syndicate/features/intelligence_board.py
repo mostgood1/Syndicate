@@ -279,10 +279,17 @@ def build_intelligence_board_contract(response: Mapping[str, Any] | None) -> dic
     cards = [_recommendation_card(item) for item in recommendations if isinstance(item, Mapping)]
     cards.sort(
         key=lambda card: (
-            int(card.get("publication_priority") or 0),
-            float(card.get("coverage_score") or 0.0),
-            float(card.get("simulated_edge") or 0.0),
-            float(card.get("confidence") or 0.0),
+            int(_number(card.get("publication_priority")) or 0),
+            _number(card.get("coverage_score")) or 0.0,
+            _number(card.get("simulated_edge")) or 0.0,
+            # confidence can be a display-formatted percent string (e.g.
+            # "63.0%", from MLB HR Targets fallback candidates --
+            # intelligence.py's _mlb_hr_targets_candidates) rather than a bare
+            # float; a plain float() crashed the whole board-publish call
+            # whenever one of these reached this sort. _number() (defined
+            # above) already strips "%" and tolerates "-"/empty by returning
+            # None.
+            _number(card.get("confidence")) or 0.0,
         ),
         reverse=True,
     )
