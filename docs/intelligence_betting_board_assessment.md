@@ -240,6 +240,8 @@ Validation:
 
 ### Phase 4: Sport parity hardening
 
+> **Partially addressed** (2026-07-18): WNBA's live-props rail was a literal copy of pregame props rather than an independently sourced live lane (`syndicate/blueprints/home.py`, `_build_sport_overview`'s WNBA branch), and NFL/NCAAF/NCAAB's total absence of a live-props source was silently forcing `is_live` to `False` on their dashboard games/props even when genuinely live (`_live_odds_backed_live_flag` call site). Both fixed. The broader lane-naming/evidence-depth/fallback-precedence parity work below remains open -- NFL/NCAAF still have no live-prop artifact pipeline at all (a data-pipeline build, not a code-wiring fix), deferred until closer to their season start; NCAAB has an existing live-state/live-lines artifact contract not yet wired into `_load_home_live_prop_items`, a cheaper follow-on.
+
 Goal: make every sport meet the same minimum board expectations.
 
 What to change:
