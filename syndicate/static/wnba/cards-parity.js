@@ -33,6 +33,18 @@
   const filtersEl = document.getElementById('cardsFilters');
   const propsStripEl = document.getElementById('cardsPropsStrip');
   const note = document.getElementById('note');
+  // WNBA quarters are 10 minutes (40-minute regulation), not the NBA's
+  // 12-minute/48-minute game -- this file was built against the NBA's
+  // cards-parity.js and these constants were never adapted. Every
+  // elapsed/remaining-minutes computation below (live pacing, blend
+  // weights toward pregame priors, player-minutes projection caps) was
+  // silently running WNBA games through NBA-length math, which
+  // systematically overstates remaining time and can leave a genuinely
+  // finished WNBA game computing several "minutes remaining" -- a very
+  // plausible cause of quarter/half interval markets gating to "off card"
+  // rather than ever activating.
+  const WNBA_QUARTER_MINUTES = 10;
+  const WNBA_REGULATION_MINUTES = 40;
   const API_BASE_PATH = '/wnba/api';
   const SOURCE_CARDS_API_BASE_PATH = `${API_BASE_PATH}/source/cards`;
   const CARDS_PAYLOAD_PATH = document.body?.dataset?.cardsPayloadPath || SOURCE_CARDS_API_BASE_PATH;
@@ -764,7 +776,7 @@
       return null;
     }
     if (status.final) {
-      return 48;
+      return WNBA_REGULATION_MINUTES;
     }
     if (!status.in_progress) {
       return 0;
@@ -775,12 +787,12 @@
       return null;
     }
     if (period <= 4) {
-      const remaining = Number.isFinite(clockMinutes) ? clampNumber(clockMinutes, 0, 12) : 0;
-      return clampNumber(((period - 1) * 12) + (12 - remaining), 0, 48);
+      const remaining = Number.isFinite(clockMinutes) ? clampNumber(clockMinutes, 0, WNBA_QUARTER_MINUTES) : 0;
+      return clampNumber(((period - 1) * WNBA_QUARTER_MINUTES) + (WNBA_QUARTER_MINUTES - remaining), 0, WNBA_REGULATION_MINUTES);
     }
     const overtimePeriod = period - 5;
     const remaining = Number.isFinite(clockMinutes) ? clampNumber(clockMinutes, 0, 5) : 0;
-    return 48 + (overtimePeriod * 5) + (5 - remaining);
+    return WNBA_REGULATION_MINUTES + (overtimePeriod * 5) + (5 - remaining);
   }
 
   function impliedProbFromAmerican(value) {
@@ -1114,7 +1126,7 @@
     const currentMargin = Number.isFinite(homePts) && Number.isFinite(awayPts) ? homePts - awayPts : null;
     const elapsedMinutesRaw = liveElapsedMinutes(liveState);
     const elapsedMinutes = Number.isFinite(elapsedMinutesRaw) ? elapsedMinutesRaw : null;
-    const remainingMinutes = Number.isFinite(elapsedMinutes) ? Math.max(0, 48 - Math.min(48, elapsedMinutes)) : null;
+    const remainingMinutes = Number.isFinite(elapsedMinutes) ? Math.max(0, WNBA_REGULATION_MINUTES - Math.min(WNBA_REGULATION_MINUTES, elapsedMinutes)) : null;
     const pregamePrior = game?.sim?.context?.pregame_prior || {};
     const pregameTotal = finiteFirst(pregamePrior?.pred_total_adjusted, pregamePrior?.pred_total, score.total_mean);
     const pregameMargin = finiteFirst(pregamePrior?.pred_margin_adjusted, pregamePrior?.pred_margin, score.margin_mean);
@@ -1203,14 +1215,14 @@
       if (!Number.isFinite(possEst)) {
         return Number.isFinite(pregame) ? pregame : null;
       }
-      const projected = (possEst / Math.max(elapsedMinutes, 1)) * 48;
+      const projected = (possEst / Math.max(elapsedMinutes, 1)) * WNBA_REGULATION_MINUTES;
       if (!Number.isFinite(projected)) {
         return Number.isFinite(pregame) ? pregame : null;
       }
       if (!Number.isFinite(pregame)) {
         return projected;
       }
-      const blendWeight = clampNumber(elapsedMinutes / 48, 0.18, 1);
+      const blendWeight = clampNumber(elapsedMinutes / WNBA_REGULATION_MINUTES, 0.18, 1);
       return ((1 - blendWeight) * pregame) + (blendWeight * projected);
     }
 
@@ -1249,7 +1261,7 @@
       const elapsedForRate = Math.max(elapsedMinutes, 1);
       const liveRate = currentTotal / elapsedForRate;
       const paceRaw = currentTotal + (liveRate * Math.max(0, remainingMinutes || 0));
-      const blendWeight = clampNumber(elapsedForRate / 48, 0.12, 1);
+      const blendWeight = clampNumber(elapsedForRate / WNBA_REGULATION_MINUTES, 0.12, 1);
       let projection = Number.isFinite(pregameTotal)
         ? ((1 - blendWeight) * pregameTotal) + (blendWeight * paceRaw)
         : paceRaw;
@@ -1711,7 +1723,7 @@
       && Number.isFinite(homeSpread)
       && Number.isFinite(elapsedMinutes)
     ) {
-      const blendWeight = clampNumber(Math.max(elapsedMinutes, 0) / 48, 0, 1);
+      const blendWeight = clampNumber(Math.max(elapsedMinutes, 0) / WNBA_REGULATION_MINUTES, 0, 1);
       const projectedMargin = Number.isFinite(pregameMargin)
         ? ((1 - blendWeight) * pregameMargin) + (blendWeight * currentMargin)
         : currentMargin;
@@ -1762,10 +1774,10 @@
 
     let mlSignal = null;
     if (liveState.in_progress && Number.isFinite(currentMargin) && Number.isFinite(elapsedMinutes) && Number.isFinite(homeMl) && Number.isFinite(awayMl)) {
-      const minLeft = Number.isFinite(remainingMinutes) ? remainingMinutes : 48;
+      const minLeft = Number.isFinite(remainingMinutes) ? remainingMinutes : WNBA_REGULATION_MINUTES;
       const scale = 6 + (0.35 * minLeft);
       const scoreProb = 1 / (1 + Math.exp(-(currentMargin / scale)));
-      const blendWeight = clampNumber(Math.max(elapsedMinutes, 0) / 48, 0, 1);
+      const blendWeight = clampNumber(Math.max(elapsedMinutes, 0) / WNBA_REGULATION_MINUTES, 0, 1);
       const pHomeModel = Number.isFinite(pregameHomeWin)
         ? ((1 - blendWeight) * pregameHomeWin) + (blendWeight * scoreProb)
         : scoreProb;
@@ -2741,7 +2753,7 @@
     if (!Number.isFinite(played) || played <= 0) {
       return Number.isFinite(simMean) ? simMean : actualValue;
     }
-    const targetMinutes = Number.isFinite(simMin) && simMin > 0 ? Math.max(played, Math.min(48, simMin)) : 48;
+    const targetMinutes = Number.isFinite(simMin) && simMin > 0 ? Math.max(played, Math.min(WNBA_REGULATION_MINUTES, simMin)) : WNBA_REGULATION_MINUTES;
     const rawProjection = (actualValue / played) * targetMinutes;
     if (!Number.isFinite(simMean)) {
       return Math.max(actualValue, rawProjection);
@@ -4869,7 +4881,7 @@
     const liveAwayPoss = toFiniteNumber(liveLens?.awayPossessions);
     const liveHomePoss = toFiniteNumber(liveLens?.homePossessions);
     const liveGamePace = Number.isFinite(Number(liveLens?.currentTotal)) && Number.isFinite(Number(liveLens?.elapsedMinutes)) && Number(liveLens?.elapsedMinutes) > 0
-      ? (Number(liveLens.currentTotal) / Number(liveLens.elapsedMinutes)) * 48
+      ? (Number(liveLens.currentTotal) / Number(liveLens.elapsedMinutes)) * WNBA_REGULATION_MINUTES
       : null;
 
     function shootingBreakdown(bucket) {
