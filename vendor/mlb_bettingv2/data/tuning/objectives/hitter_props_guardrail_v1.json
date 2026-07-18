@@ -1,0 +1,7 @@
+{
+  "name": "hitter_props_guardrail_v1",
+  "description": "Guardrail objective for the starter-hook-add-pitches sweep: a starter-hook change shifts bullpen exposure and could indirectly move hitter-HR calibration. Required as --objective-hitterprops by sweep_mgr_starter_hook_add_pitches.py; the sweep enforces this must not regress past holdout_tol on the holdout split.",
+  "metrics": [
+    {"path": "hitter_hr_likelihood_topn_weighted.hr_brier", "direction": "lower", "weight": 1.0}
+  ]
+}

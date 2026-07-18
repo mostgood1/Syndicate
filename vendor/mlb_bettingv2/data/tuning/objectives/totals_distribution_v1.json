@@ -1,0 +1,11 @@
+{
+  "name": "totals_distribution_v1",
+  "description": "Primary objective for the pm_run_env_sigma sweep: totals/run-margin distribution calibration (Phase 1 priority #5 of the MLB sim accuracy plan). No PIT/coverage metric exists in summarize_batch_eval.py yet, so mae_total_runs/mae_run_margin stand in as the measured proxy. ML brier is carried since it derives from the same run-scoring distribution; starter workload and HR brier are low-weight sanity terms so a totals win doesn't quietly regress the already-promoted Phase 1 #1/#3 fixes.",
+  "metrics": [
+    {"path": "full_weighted.mae_total_runs", "direction": "lower", "weight": 3.0},
+    {"path": "full_weighted.mae_run_margin", "direction": "lower", "weight": 2.0},
+    {"path": "full_weighted.brier_home_win", "direction": "lower", "weight": 1.0},
+    {"path": "pitcher_props_starters_weighted.pitches_bias", "direction": "lower_abs", "weight": 0.5},
+    {"path": "hitter_hr_likelihood_topn_weighted.hr_brier", "direction": "lower", "weight": 0.5}
+  ]
+}
