@@ -7,6 +7,7 @@ import json
 import os
 import subprocess
 import sys
+import tempfile
 import threading
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
@@ -20,6 +21,7 @@ from syndicate.features.shared.refresh_state_store import data_root
 from syndicate.features.shared.refresh_state_store import read_json_file
 from syndicate.features.shared.refresh_state_store import reports_root
 from syndicate.features.shared.refresh_state_store import write_json_file
+from syndicate.features.shared.refresh_state_store import write_text_file
 from syndicate.features.shared.source_roots import repo_root_from
 from syndicate.features.shared.timezone import central_datetime_from_epoch
 from syndicate.features.shared.timezone import central_today_iso
@@ -602,6 +604,62 @@ def _mlb_daily_sim_decision(*, now_epoch: float, date_str: str) -> dict[str, Any
 
 
 _MLB_SIM_PROCESS: subprocess.Popen | None = None
+_MLB_SIM_LOG_HANDLE: Any = None
+_MLB_SIM_LOG_PATH: Path | None = None
+_MLB_SIM_RUN_META: dict[str, Any] | None = None
+
+
+def _mlb_sim_log_dir() -> Path:
+	override = str(os.environ.get("SYNDICATE_MLB_SIM_LOG_DIR") or "").strip()
+	path = Path(override) if override else Path(tempfile.gettempdir()) / "syndicate_mlb_sim_logs"
+	path.mkdir(parents=True, exist_ok=True)
+	return path
+
+
+def _mlb_sim_runs_state_dir() -> Path:
+	return reports_root() / "live_refresh_loop" / "mlb_sim_runs"
+
+
+def _persist_finished_mlb_sim_run() -> None:
+	# The worker's own stdout/stderr is the only place a sim subprocess's
+	# traceback lives, and the web service has no way to see it directly (no
+	# shared disk, no Render log API). _launch_mlb_daily_sim captures the
+	# subprocess's output to a local file; this copies it into the shared
+	# (Redis-backed) state store the moment we notice the process has exited,
+	# so /api/ops/live-refresh/state?sim_date=&sim_run= can surface it remotely.
+	global _MLB_SIM_LOG_HANDLE, _MLB_SIM_LOG_PATH, _MLB_SIM_RUN_META, _MLB_SIM_PROCESS
+	meta = _MLB_SIM_RUN_META
+	if meta is None:
+		return
+	try:
+		if _MLB_SIM_LOG_HANDLE is not None:
+			try:
+				_MLB_SIM_LOG_HANDLE.close()
+			except Exception:
+				pass
+		log_text = ""
+		if _MLB_SIM_LOG_PATH is not None and _MLB_SIM_LOG_PATH.exists():
+			try:
+				log_text = _MLB_SIM_LOG_PATH.read_text(encoding="utf-8", errors="replace")
+			except Exception:
+				log_text = ""
+		date_str = str(meta.get("date") or "")
+		run_stamp = str(meta.get("run_stamp") or "")
+		sim_base = _mlb_sim_runs_state_dir()
+		if log_text:
+			write_text_file(sim_base / f"{date_str}_{run_stamp}.log", log_text[-40000:])
+		returncode = _MLB_SIM_PROCESS.returncode if _MLB_SIM_PROCESS is not None else None
+		status_payload = dict(meta)
+		status_payload["state"] = "finished"
+		status_payload["exit_code"] = returncode
+		status_payload["finished_at"] = _utc_now()
+		write_json_file(sim_base / f"{date_str}_{run_stamp}_status.json", status_payload)
+	except Exception:
+		pass
+	finally:
+		_MLB_SIM_LOG_HANDLE = None
+		_MLB_SIM_LOG_PATH = None
+		_MLB_SIM_RUN_META = None
 
 
 def _mlb_daily_sim_process_still_running() -> bool:
@@ -613,12 +671,14 @@ def _mlb_daily_sim_process_still_running() -> bool:
 	except Exception:
 		return False
 	if not still_running:
+		_persist_finished_mlb_sim_run()
 		_MLB_SIM_PROCESS = None
 	return still_running
 
 
 def _launch_mlb_daily_sim(date_str: str, decision: dict[str, Any]) -> dict[str, Any]:
-	global _MLB_SIM_PROCESS
+	global _MLB_SIM_PROCESS, _MLB_SIM_LOG_HANDLE, _MLB_SIM_LOG_PATH, _MLB_SIM_RUN_META
+	run_stamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
 	command = [
 		sys.executable if (sys.executable and Path(sys.executable).exists()) else "python",
 		str(REPO_ROOT / "scripts" / "run_mlb_daily_sim_job.py"),
@@ -633,12 +693,39 @@ def _launch_mlb_daily_sim(date_str: str, decision: dict[str, Any]) -> dict[str, 
 		popen_kwargs["creationflags"] = getattr(subprocess, "DETACHED_PROCESS", 0) | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
 	else:
 		popen_kwargs["start_new_session"] = True
+	log_path = _mlb_sim_log_dir() / f"{date_str}_{run_stamp}.log"
+	log_handle: Any = None
+	try:
+		log_handle = open(log_path, "wb")
+		popen_kwargs["stdout"] = log_handle
+		popen_kwargs["stderr"] = subprocess.STDOUT
+	except Exception:
+		log_handle = None
 	try:
 		process = subprocess.Popen(command, **popen_kwargs)
 		_MLB_SIM_PROCESS = process
-		print(f"[live_refresh_loop] MLB_DAILY_SIM_TRIGGERED date={date_str} reason={decision.get('reason')} pid={process.pid}", flush=True)
-		return {"ok": True, "pid": process.pid, "command": command, "reason": decision.get("reason")}
+		_MLB_SIM_LOG_HANDLE = log_handle
+		_MLB_SIM_LOG_PATH = log_path if log_handle is not None else None
+		_MLB_SIM_RUN_META = {
+			"date": date_str,
+			"run_stamp": run_stamp,
+			"pid": process.pid,
+			"reason": decision.get("reason"),
+			"command": command,
+			"started_at": _utc_now(),
+		}
+		try:
+			write_json_file(_mlb_sim_runs_state_dir() / f"{date_str}_{run_stamp}_status.json", {**_MLB_SIM_RUN_META, "state": "running"})
+		except Exception:
+			pass
+		print(f"[live_refresh_loop] MLB_DAILY_SIM_TRIGGERED date={date_str} reason={decision.get('reason')} pid={process.pid} run_stamp={run_stamp}", flush=True)
+		return {"ok": True, "pid": process.pid, "command": command, "reason": decision.get("reason"), "run_stamp": run_stamp}
 	except Exception as exc:
+		if log_handle is not None:
+			try:
+				log_handle.close()
+			except Exception:
+				pass
 		return {"ok": False, "error": f"{type(exc).__name__}: {exc}", "reason": decision.get("reason")}
 
 
