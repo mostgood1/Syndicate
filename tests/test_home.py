@@ -512,6 +512,148 @@ class HomePageCommandCenterTests(unittest.TestCase):
         self.assertTrue(game_row_live["is_live"])
         self.assertTrue(prop_row_live["is_live"])
 
+    def test_build_sport_overview_wnba_live_props_sourced_independently_of_pregame(self) -> None:
+        # Was `live_prop_items = list(pregame_prop_items)` -- a literal copy,
+        # not an independently sourced live rail. Locks in that the WNBA
+        # branch now calls the same lane="live" dispatcher every other sport
+        # uses, instead of duplicating pregame rows.
+        app = create_app()
+        app.testing = True
+
+        sport = {"slug": "wnba", "name": "WNBA", "primary_label": "Open WNBA cards"}
+        home_game = {
+            "game_id": "wnba-game-1",
+            "away": {"abbr": "LAS", "name": "Las Vegas Aces"},
+            "home": {"abbr": "SEA", "name": "Seattle Storm"},
+            "status_badge": "Live",
+            "status": {"abstract": "Live", "detailed": "Live"},
+        }
+        pregame_rows = [{"game_id": "wnba-game-1", "heading": "Pregame prop", "is_live": False}]
+        live_rows = [{"game_id": "wnba-game-1", "heading": "Live prop", "is_live": True}]
+
+        def _load_home_prop_items_side_effect(slug, **kwargs):
+            self.assertEqual(slug, "wnba")
+            return live_rows if kwargs.get("lane") == "live" else []
+
+        with app.app_context():
+            with patch("syndicate.blueprints.home.central_today_iso", return_value="2026-07-18"), patch(
+                "syndicate.blueprints.home.wnba_available_dates",
+                return_value=["2026-07-18"],
+            ), patch(
+                "syndicate.blueprints.home.wnba_has_games_for_date",
+                return_value=True,
+            ), patch(
+                "syndicate.blueprints.home.build_wnba_module_links",
+                return_value=[],
+            ), patch(
+                "syndicate.blueprints.home._prefer_today_or_latest",
+                return_value="2026-07-18",
+            ), patch(
+                "syndicate.blueprints.home.get_wnba_overview",
+                return_value={"status": "ok", "games": [home_game], "prop_rows": pregame_rows, "source_title": "WNBA cards", "source_path": ""},
+            ), patch(
+                "syndicate.blueprints.home._compact_game_cards",
+                return_value=[home_game],
+            ), patch(
+                "syndicate.blueprints.home.get_active_games",
+                side_effect=lambda games: games,
+            ), patch(
+                "syndicate.blueprints.home._finalize_home_prop_rows",
+                side_effect=lambda rows, **kwargs: rows,
+            ), patch(
+                "syndicate.blueprints.home._load_home_prop_items",
+                side_effect=_load_home_prop_items_side_effect,
+            ) as mocked_load_home_prop_items, patch(
+                "syndicate.blueprints.home._link_lookup_any",
+                return_value=(None, None),
+            ), patch(
+                "syndicate.blueprints.home._link_lookup",
+                return_value=None,
+            ), patch(
+                "syndicate.blueprints.home._secondary_links",
+                return_value=[],
+            ), patch(
+                "syndicate.blueprints.home._rail_links",
+                return_value=[],
+            ):
+                overview = _build_sport_overview(sport, "2026-07-18", force_refresh=True)
+
+        mocked_load_home_prop_items.assert_any_call(
+            "wnba",
+            context_label="2026-07-18",
+            home_games=[home_game],
+            season=None,
+            week=None,
+            is_active_today=True,
+            lane="live",
+        )
+        live_items = overview.get("home_rails", {}).get("live", {}).get("items")
+        self.assertEqual(live_items, live_rows)
+        self.assertNotEqual(live_items, pregame_rows)
+
+    def test_nfl_is_live_not_forced_false_without_live_prop_source(self) -> None:
+        # NFL/NCAAF/NCAAB have no branch in _load_home_live_prop_items, so
+        # live_prop_items is always []. Before the fix, _game_identity_set([])
+        # produced an empty-but-real set, which _live_odds_backed_live_flag
+        # treats as "confirmed nothing live" -- forcing is_live False for
+        # every game of these sports even when genuinely live. The fix routes
+        # sports with no live-prop source to live_odds_game_ids=None instead,
+        # which _live_odds_backed_live_flag already treats as "no
+        # corroboration available, trust the fallback flag."
+        app = create_app()
+        app.testing = True
+
+        sport = {"slug": "nfl", "name": "NFL", "primary_label": "Open NFL cards"}
+        home_game = {"game_id": "nfl-game-1", "is_live": True, "status_badge": "Live", "status": {"abstract": "Live", "detailed": "Live"}}
+        game_item = {"game_id": "nfl-game-1", "is_live": True}
+
+        with app.app_context():
+            with patch("syndicate.blueprints.home.central_today_iso", return_value="2026-09-07"), patch(
+                "syndicate.blueprints.home.nfl_latest_season", return_value=2026
+            ), patch(
+                "syndicate.blueprints.home.nfl_tracked_week", return_value={"week": 1}
+            ), patch(
+                "syndicate.blueprints.home.nfl_default_week", return_value=1
+            ), patch(
+                "syndicate.blueprints.home.build_nfl_module_links", return_value=[]
+            ), patch(
+                "syndicate.blueprints.home.nfl_week_summaries", return_value=[]
+            ), patch(
+                "syndicate.blueprints.home._is_active_today", return_value=True
+            ), patch(
+                "syndicate.blueprints.home._load_home_game_items",
+                return_value=([game_item], 1),
+            ), patch(
+                "syndicate.blueprints.home._load_home_games",
+                return_value=[home_game],
+            ), patch(
+                "syndicate.blueprints.home.get_active_games",
+                side_effect=lambda games: games,
+            ), patch(
+                "syndicate.blueprints.home._load_home_prop_items",
+                return_value=[],
+            ), patch(
+                "syndicate.blueprints.home._finalize_home_prop_rows",
+                side_effect=lambda rows, **kwargs: rows,
+            ), patch(
+                "syndicate.blueprints.home._link_lookup_any",
+                return_value=(None, None),
+            ), patch(
+                "syndicate.blueprints.home._link_lookup",
+                return_value=None,
+            ), patch(
+                "syndicate.blueprints.home._secondary_links",
+                return_value=[],
+            ), patch(
+                "syndicate.blueprints.home._rail_links",
+                return_value=[],
+            ):
+                overview = _build_sport_overview(sport, "2026-09-07", force_refresh=True)
+
+        dashboard_games = overview.get("dashboard_games") or []
+        self.assertEqual(len(dashboard_games), 1)
+        self.assertTrue(dashboard_games[0]["is_live"])
+
     def test_home_prop_hero_metrics_prefers_explicit_sim_projection(self) -> None:
         live_box, sim_box = _home_prop_hero_metrics(
             {
