@@ -1002,6 +1002,43 @@ def _pregame_relaunch_blocked(*, now_epoch: float, date_str: str) -> bool:
 	return last_epoch > 0.0 and last_date == date_str and (now_epoch - last_epoch) < cooldown
 
 
+def _hot_artifact_publish_watermark_path() -> Path:
+	return _meta_dir() / "last_hot_artifact_publish_epoch.json"
+
+
+def _hot_artifact_publish_since_epoch(*, tick_started_epoch: float) -> float:
+	# Refreshes launch as detached (non-blocking) subprocesses that can take
+	# several minutes to finish writing output -- almost always longer than
+	# the launching tick's own brief synchronous execution. Using EACH tick's
+	# own start time as the publish "since" cutoff (the previous behavior)
+	# means a file's fixed mtime is compared against a monotonically
+	# increasing sequence of cutoffs: too early for the launching tick (the
+	# file doesn't exist yet) and, once any later tick's start time passes
+	# the file's mtime, too late for every tick after that -- the file can
+	# permanently never satisfy `mtime >= since_epoch_seconds` again.
+	# Confirmed live: recommendations_2026-07-18.csv/game_cards_2026-07-18.csv
+	# existed on the worker's disk from a clean, completed refresh run but
+	# never reached the web service. A persisted watermark (floor = the end
+	# of the last successful sweep) instead of each tick's own start time
+	# fixes this: any file written since the last sweep gets caught by the
+	# next one, regardless of how long the async refresh took or how many
+	# tick intervals passed in between.
+	payload = read_json_file(_hot_artifact_publish_watermark_path())
+	try:
+		stored = float(payload.get("epoch")) if isinstance(payload, dict) and payload.get("epoch") is not None else None
+	except (TypeError, ValueError):
+		stored = None
+	if stored is None or stored <= 0.0:
+		# No prior watermark (fresh deploy/backend): start tracking from now
+		# rather than sweeping the full artifact history on the first tick.
+		return tick_started_epoch
+	return stored
+
+
+def _record_hot_artifact_publish_watermark(epoch: float) -> None:
+	write_json_file(_hot_artifact_publish_watermark_path(), {"epoch": epoch, "recordedAt": _utc_now()})
+
+
 def _run_live_refresh_tick() -> dict[str, Any]:
 	tick_started_epoch = datetime.now(timezone.utc).timestamp()
 	adaptive_enabled = _live_refresh_loop_adaptive_enabled()
@@ -1110,7 +1147,9 @@ def _run_live_refresh_tick() -> dict[str, Any]:
 	meta["finishedAt"] = _utc_now()
 	write_json_file(_meta_dir() / "latest_live_refresh_tick.json", meta)
 	try:
-		meta["publishedArtifacts"] = publish_changed_hot_artifacts(tick_started_epoch)
+		publish_since_epoch = _hot_artifact_publish_since_epoch(tick_started_epoch=tick_started_epoch)
+		meta["publishedArtifacts"] = publish_changed_hot_artifacts(publish_since_epoch)
+		_record_hot_artifact_publish_watermark(tick_started_epoch)
 	except Exception:
 		meta["publishedArtifacts"] = 0
 	return meta
