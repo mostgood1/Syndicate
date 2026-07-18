@@ -27,6 +27,7 @@ from syndicate.features.intelligence import _balanced_recommendation_order
 from syndicate.features.intelligence import collect_candidates
 from syndicate.features.intelligence import collect_all_recommendations
 from syndicate.features.intelligence import _apply_candidate_tier_penalty
+from syndicate.features.intelligence import filter_candidates
 from syndicate.features.intelligence import _greedy_low_correlation_selection
 from syndicate.features.intelligence import _query_preferences
 from syndicate.features.intelligence import _score_candidates
@@ -35,6 +36,7 @@ from syndicate.features.intelligence import rank_global_recommendations
 from syndicate.features.intelligence import _shard_key_from_context_label
 from syndicate.features.intelligence_board import build_intelligence_board_contract
 from syndicate.features.intelligence.signals.normalization import _numeric_hint
+from syndicate.features.intelligence.signals.normalization import _safe_text
 from syndicate.features.shared.market_id import attach_market_id
 from syndicate.features.shared.odds_control_plane import load_odds_history_payload_for_sport
 from syndicate.features.shared.odds_control_plane import odds_history_roots_for_sport
@@ -1329,6 +1331,9 @@ class IntelligenceStateService:
         )
         if not raw_candidates:
             try:
+                # collect_all_recommendations() already runs _score_candidates()
+                # + filter_candidates() internally, so it doesn't need the
+                # explicit scoring/filtering step below applied a second time.
                 raw_candidates = _profile_stage(
                     "simulation_aggregation_fallback",
                     collect_all_recommendations,
@@ -1338,6 +1343,39 @@ class IntelligenceStateService:
                 )
             except TypeError:
                 raw_candidates = []
+        elif _env_bool("SYNDICATE_BOARD_APPLY_EDGE_FILTER", default=True):
+            # The on-demand /api/intelligence/query path (run_intelligence_query)
+            # runs _score_candidates() (edge/score computation, final-game state
+            # re-guard) and filter_candidates() (edge-below-threshold quality
+            # gate) after collect_candidates(); this background-loop path used
+            # to stop at collect_candidates() and publish the raw pool, so the
+            # cached board most page loads read could disagree with what a live
+            # query would return -- notably, no edge-quality gate at all. Route
+            # through the same two stages so both paths apply the same gate.
+            # Deliberately NOT calling the ranking/narrative/parlay layer here
+            # (_balanced_recommendation_order etc.) -- that stays query-only,
+            # board publication keeps its own ranking step further below.
+            # Toggle exists to disable this gate in production without a code
+            # revert if published-candidate volume drops more than expected.
+            tracked = _tracked_repo_files()
+            advanced_by_sport = {
+                _safe_text(sport_row.get("slug"), "sport").lower(): _advanced_input_rows_for_sport(sport_row, tracked)
+                for sport_row in overview
+                if isinstance(sport_row, dict)
+            }
+            scored_candidates = _profile_stage(
+                "candidate_scoring",
+                _score_candidates,
+                raw_candidates,
+                advanced_by_sport,
+                preferences,
+            )
+            raw_candidates = _profile_stage(
+                "candidate_edge_filter",
+                filter_candidates,
+                scored_candidates,
+                sport=None,
+            )
 
         raw_candidates = [candidate for candidate in raw_candidates if isinstance(candidate, Mapping)]
         candidate_build_started_at = time.perf_counter()
