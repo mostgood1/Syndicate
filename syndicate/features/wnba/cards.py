@@ -43,6 +43,7 @@ from syndicate.features.wnba.sources import processed_root
 from syndicate.features.wnba.sources import processed_path
 from syndicate.features.wnba.sources import _source_roots as _wnba_source_roots
 from syndicate.features.shared.source_roots import repo_root_from as _repo_root_from
+from syndicate.features.shared.timezone import CENTRAL_TIMEZONE
 from syndicate.features.shared.timezone import central_now
 from syndicate.features.shared.timezone import central_today_iso
 
@@ -528,6 +529,30 @@ def _status_fields_from_value(
 
 def _wnba_generated_at() -> str:
     return central_now().isoformat(timespec="seconds")
+
+
+def _format_start_time_local(commence_time: Any) -> str:
+    """Format a raw commence_time (ISO-8601 UTC) into a friendly local clock time.
+
+    Mirrors mlb/cards.py's _format_start_time_local: without this,
+    _source_game_from_row fed the raw ISO string straight through as
+    status.detailed (e.g. "2026-07-16T00:07:50Z"), and since
+    _status_from_game's "Scheduled" fallback only fires when detail is
+    genuinely empty, every pregame WNBA card displayed the raw UTC
+    timestamp instead of a readable time -- confirmed live via a rendered
+    /wnba/api/source/cards payload.
+    """
+    text = str(commence_time or "").strip()
+    if not text:
+        return "Scheduled"
+    try:
+        stamp = datetime.fromisoformat(text.replace("Z", "+00:00"))
+        if stamp.tzinfo is None:
+            stamp = stamp.replace(tzinfo=CENTRAL_TIMEZONE)
+        local_stamp = stamp.astimezone(CENTRAL_TIMEZONE)
+        return f"{local_stamp.strftime('%I').lstrip('0') or '12'}:{local_stamp.strftime('%M')} {local_stamp.strftime('%p')} CT"
+    except Exception:
+        return "Scheduled"
 
 
 def _parse_utc_datetime(value: Any) -> datetime | None:
@@ -1597,7 +1622,7 @@ def _source_game_from_row(
         "home_logo": _source_logo_url(home_tri),
         "start_time": str(row.get("commence_time") or "").strip() or None,
         "odds": {"commence_time": str(row.get("commence_time") or "").strip() or None},
-        "status": {"detailed": str(row.get("commence_time") or "Scheduled").strip() or "Scheduled"},
+        "status": {"detailed": _format_start_time_local(row.get("commence_time"))},
         "summary": f"{row.get('bookmaker') or 'Consensus'} market snapshot",
         "game_market_recommendations": game_market_recommendations,
         "evidence_pack": evidence_pack[:3],
@@ -1862,7 +1887,7 @@ def _game_from_row(
     evidence_pack = [dict(item.get("evidence_pack") or {}) for item in game_market_recommendations if item.get("evidence_pack")]
     normalized_status = _normalized_game_status(
         status_text=row.get("status"),
-        detail_text=row.get("commence_time"),
+        detail_text=_format_start_time_local(row.get("commence_time")),
         start_time_utc=row.get("commence_time"),
         in_progress=row.get("in_progress"),
         final=row.get("final"),
@@ -2045,7 +2070,12 @@ def _games_from_public_scoreboard(selected_date: str) -> tuple[list[dict[str, An
             "away_tri": away_tri,
             "home_tri": home_tri,
             "bookmaker": "ESPN",
-            "commence_time": selected_date,
+            # Prefer ESPN's real game start time (now surfaced by
+            # _public_scoreboard_live_state_payload); the query date is a
+            # last-resort stand-in only, not an actual game time -- using
+            # it as commence_time previously showed as a bare/misleading
+            # timestamp in the card's scheduled-time display.
+            "commence_time": game.get("start_time") or selected_date,
             "status": game.get("status") or "Scheduled",
             "in_progress": bool(game.get("in_progress")),
             "final": bool(game.get("final")),
@@ -2794,10 +2824,11 @@ def _public_scoreboard_live_state_payload(selected_date: str) -> dict[str, Any] 
             period = inferred_period
         if not clock and inferred_clock:
             clock = inferred_clock
+        espn_start_time = competition.get("date") or event.get("date")
         normalized_status = _normalized_game_status(
             status_text=status_text,
             detail_text=status_text,
-            start_time_utc=competition.get("date") or event.get("date"),
+            start_time_utc=espn_start_time,
             in_progress=in_progress,
             final=final,
             away_pts=away_pts,
@@ -2836,6 +2867,16 @@ def _public_scoreboard_live_state_payload(selected_date: str) -> dict[str, Any] 
                 "away_pts": away_pts,
                 "status_id": None,
                 "status": normalized_status["detail"],
+                # _normalized_game_status's own return never includes the
+                # parsed start time (only an internal helper it calls does,
+                # and that value is discarded before returning) -- use the
+                # raw ESPN date directly instead. Without this,
+                # _games_from_public_scoreboard had no real value to use
+                # and fell back to hardcoding the query date as
+                # "commence_time", which then displayed as a bare date (or,
+                # after the detail-formatting fix on its own, a misleading
+                # "12:00 AM" from treating the query date as a timestamp).
+                "start_time": str(espn_start_time or "").strip() or None,
                 "period": period,
                 "clock": clock,
                 "in_progress": bool(normalized_status["in_progress"]),
