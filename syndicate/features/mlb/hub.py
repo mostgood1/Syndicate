@@ -93,6 +93,7 @@ def build_hub_context() -> dict[str, Any]:
     season = _season_from_date(cards_date)
     live_lens_date = cards_date
     hr_targets_date = cards_date
+    k_ladder_targets_date = cards_date
     rfi_targets_date = cards_date
     top_prop_counts = _top_prop_lane_counts(cards_date)
     profiles = _available_betting_profiles(season)
@@ -147,6 +148,7 @@ def build_hub_context() -> dict[str, Any]:
             "body": "The supporting ladders and target boards should stay one click away from the main MLB pane.",
             "links": [
                 {"label": f"HR targets {hr_targets_date}", "href": f"/mlb/hr-targets?date={hr_targets_date}"},
+                {"label": f"K ladder targets {k_ladder_targets_date}", "href": f"/mlb/k-ladder-targets?date={k_ladder_targets_date}"},
                 {"label": f"RFI targets {rfi_targets_date}", "href": f"/mlb/rfi-targets?date={rfi_targets_date}"},
                 {"label": f"Pitcher ladders {cards_date}", "href": f"/mlb/pitcher-ladders?date={cards_date}"},
                 {"label": f"Hitter ladders {cards_date}", "href": f"/mlb/hitter-ladders?date={cards_date}"},
@@ -168,6 +170,7 @@ def build_hub_context() -> dict[str, Any]:
         "launch_date": cards_date,
         "live_lens_date": live_lens_date,
         "hr_targets_date": hr_targets_date,
+        "k_ladder_targets_date": k_ladder_targets_date,
         "rfi_targets_date": rfi_targets_date,
         "default_profile": default_profile,
         "profiles": profiles,
