@@ -4346,20 +4346,30 @@ def _candidate_has_usable_projection(candidate: dict[str, Any]) -> bool:
     return False
 
 
-def classify_candidate(candidate: dict[str, Any]) -> dict[str, Any] | None:
+def _classify_candidate_with_reason(candidate: dict[str, Any]) -> tuple[dict[str, Any] | None, str | None]:
+    # Single source of truth for candidate validity: classify_candidate() and
+    # _candidate_classification_removal_reason() used to be two independently
+    # maintained implementations of this same predicate, and the reason-only
+    # copy had already drifted into a hand-approximated superset rather than a
+    # true mirror. Both are now thin wrappers around this.
     normalized = normalize_candidate(candidate)
     if not _safe_text(normalized.get("selection"), ""):
-        return None
+        return None, "missing_selection"
     if not _safe_text(normalized.get("type"), ""):
-        return None
+        return None, "missing_type"
     has_projection = normalized.get("projection") is not None and _safe_text(normalized.get("projection"), "") not in {"", "-"}
     has_odds = normalized.get("odds") is not None and _safe_text(normalized.get("odds"), "") not in {"", "-"}
     if not (has_projection or has_odds):
-        return None
+        return None, "missing_projection_or_odds"
     source_strength = _numeric_hint(normalized.get("source_strength"))
     tier = "tier_1" if has_projection and has_odds and source_strength is not None and float(source_strength) > 0.7 else "tier_2"
     normalized["tier"] = tier
-    return normalized
+    return normalized, None
+
+
+def classify_candidate(candidate: dict[str, Any]) -> dict[str, Any] | None:
+    classified, _reason = _classify_candidate_with_reason(candidate)
+    return classified
 
 
 def _candidate_is_source_backed(candidate: dict[str, Any]) -> bool:
@@ -6167,8 +6177,8 @@ def _log_candidate_pipeline(
 def _sport_candidate_summary(candidates: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
     rows = [dict(candidate) for candidate in candidates if isinstance(candidate, Mapping)]
 
-    def _sport_count(target_sport: str) -> int:
-        return sum(1 for candidate in rows if _safe_text(candidate.get("sport_slug") or candidate.get("sport"), "").lower() == target_sport)
+    def _candidate_sport(candidate: Mapping[str, Any]) -> str:
+        return _safe_text(candidate.get("sport_slug") or candidate.get("sport"), "").lower() or "unknown"
 
     def _candidate_metrics(candidate: Mapping[str, Any]) -> dict[str, Any]:
         market_profile = candidate.get("market_profile") if isinstance(candidate.get("market_profile"), Mapping) else {}
@@ -6177,7 +6187,7 @@ def _sport_candidate_summary(candidates: Iterable[Mapping[str, Any]]) -> dict[st
         if calibration_error is None:
             calibration_error = _numeric_hint(sport_profile.get("calibration_error"))
         return {
-            "sport": _safe_text(candidate.get("sport_slug") or candidate.get("sport"), "").lower(),
+            "sport": _candidate_sport(candidate),
             "name": _safe_text(candidate.get("name"), candidate.get("pick"), candidate.get("selection"), candidate.get("player_name")),
             "score": _numeric_hint(candidate.get("score")),
             "edge": _numeric_hint(candidate.get("edge")),
@@ -6187,14 +6197,18 @@ def _sport_candidate_summary(candidates: Iterable[Mapping[str, Any]]) -> dict[st
         }
 
     scored_rows = sorted(rows, key=lambda candidate: float(candidate.get("score") or 0.0), reverse=True)
-    wnba_rows = [candidate for candidate in scored_rows if _safe_text(candidate.get("sport_slug") or candidate.get("sport"), "").lower() == "wnba"]
-    mlb_rows = [candidate for candidate in scored_rows if _safe_text(candidate.get("sport_slug") or candidate.get("sport"), "").lower() == "mlb"]
+    by_sport: dict[str, int] = {}
+    top_by_sport: dict[str, list[dict[str, Any]]] = {}
+    for candidate in scored_rows:
+        sport_key = _candidate_sport(candidate)
+        by_sport[sport_key] = by_sport.get(sport_key, 0) + 1
+        bucket = top_by_sport.setdefault(sport_key, [])
+        if len(bucket) < 10:
+            bucket.append(_candidate_metrics(candidate))
     return {
         "total": len(rows),
-        "wnba": _sport_count("wnba"),
-        "mlb": _sport_count("mlb"),
-        "top_wnba": [_candidate_metrics(candidate) for candidate in wnba_rows[:10]],
-        "top_mlb": [_candidate_metrics(candidate) for candidate in mlb_rows[:10]],
+        "by_sport": by_sport,
+        "top_by_sport": top_by_sport,
     }
 
 
@@ -6227,15 +6241,8 @@ def _collect_candidate_trace(candidate: Mapping[str, Any], *, reason: str, stage
 
 
 def _candidate_classification_removal_reason(candidate: Mapping[str, Any]) -> str:
-    if not _safe_text(candidate.get("selection"), ""):
-        return "missing_selection"
-    if not _safe_text(candidate.get("type"), ""):
-        return "missing_type"
-    has_projection = candidate.get("projection") is not None and _safe_text(candidate.get("projection"), "") not in {"", "-"}
-    has_odds = candidate.get("odds") is not None and _safe_text(candidate.get("odds"), "") not in {"", "-"}
-    if not (has_projection or has_odds):
-        return "missing_projection_or_odds"
-    return "classification_rejected"
+    _classified, reason = _classify_candidate_with_reason(dict(candidate))
+    return reason or "classification_rejected"
 
 
 def collect_candidates(overview: list[dict[str, Any]], preferences: dict[str, Any], odds_history_by_sport: dict[str, dict[str, Any]] | None = None) -> list[dict[str, Any]]:
@@ -6247,8 +6254,19 @@ def collect_candidates(overview: list[dict[str, Any]], preferences: dict[str, An
     _log_candidate_stage(pipeline_name="collect_candidates", stage="_enrich_candidates_with_odds_history", before=candidates, after=enriched_candidates)
     normalized_candidates = [normalize_candidate(candidate) for candidate in enriched_candidates]
     _log_candidate_stage(pipeline_name="collect_candidates", stage="normalize_candidate", before=enriched_candidates, after=normalized_candidates)
-    classified_candidates = [classified for candidate in normalized_candidates if (classified := classify_candidate(candidate)) is not None]
+    classified_candidates: list[dict[str, Any]] = []
+    second_pass_pruned: list[dict[str, Any]] = []
+    for candidate in normalized_candidates:
+        classified = classify_candidate(candidate)
+        if classified is None:
+            second_pass_pruned.append(
+                _collect_candidate_trace(candidate, reason=_candidate_classification_removal_reason(candidate), stage="second_pass_classification")
+            )
+            continue
+        classified_candidates.append(classified)
     _log_candidate_stage(pipeline_name="collect_candidates", stage="classify_candidate", before=normalized_candidates, after=classified_candidates)
+    for removed_candidate in second_pass_pruned:
+        _log_json_event(logging.INFO, "collect_candidates_pruned", pipeline="collect_candidates", **removed_candidate)
     universal_candidates = [candidate for candidate in (UniversalCandidate.from_raw(classified) for classified in classified_candidates) if candidate is not None]
     _log_candidate_stage(pipeline_name="collect_candidates", stage="UniversalCandidate.from_raw", before=classified_candidates, after=universal_candidates)
     return universal_candidates
@@ -6260,8 +6278,20 @@ def score_candidate(
     preferences: dict[str, Any] | None = None,
     advanced_context: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
-    scored_candidate = classify_candidate(candidate)
+    scored_candidate, rejection_reason = _classify_candidate_with_reason(candidate)
     if scored_candidate is None:
+        # score_candidate() used to drop a failed classification silently
+        # here, with only an aggregate count surfacing further up the call
+        # chain (in _score_candidates' is_valid_candidate() check) -- this is
+        # the third of three classify passes a candidate flows through
+        # (_collect_candidates, collect_candidates, score_candidate), so a
+        # reasoned trace at each one matters for diagnosing candidate drops.
+        _log_json_event(
+            logging.INFO,
+            "collect_candidates_pruned",
+            pipeline="score_candidate",
+            **_collect_candidate_trace(normalize_candidate(candidate), reason=rejection_reason or "classification_rejected", stage="scoring_classification"),
+        )
         return normalize_candidate(candidate)
 
     _apply_candidate_state_guard(scored_candidate)
