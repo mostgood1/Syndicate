@@ -78,7 +78,7 @@ Trigger surface:
 - [pipeline/intelligence_state.py](../pipeline/intelligence_state.py)
 
 Path:
-- `IntelligenceStateService._background_loop()` -> `_compute_response()` -> `run_routed_intelligence_pipeline()` -> `run_intelligence_pipeline()` -> `run_intelligence_query()`.
+- `IntelligenceStateService._background_loop()` -> `_compute_board_publication_response()` -> `_build_candidate_pool()` -> `write_latest_intelligence_state()`. This does **not** route through `run_routed_intelligence_pipeline()` / `run_intelligence_pipeline()` / `run_intelligence_query()` -- that chain is reached only from `_compute_response()`, the request-path cache-miss method invoked synchronously from `get_response()`, not from the loop. `_build_candidate_pool()` does share `collect_candidates()` -> `_score_candidates()` -> `filter_candidates()` with `run_intelligence_query()`'s candidate generation (as of the Path A/B unification), but not the narrative/analysis-view/parlay layer beyond that.
 
 Execution mode:
 - Background thread or background process loop.
@@ -111,22 +111,22 @@ How often it can run:
 Concurrency:
 - Can run concurrently across requests.
 
-### 2. Intelligence state background worker
+### 2. Intelligence state on-demand cache-miss path
 
 Trigger surface:
 - [pipeline/intelligence_state.py](../pipeline/intelligence_state.py)
 
 Path:
-- `_background_loop()` calls `_compute_response()` which routes through `run_routed_intelligence_pipeline()`.
+- `get_response()` calls `_compute_response()` (synchronously, in the request thread) which routes through `run_routed_intelligence_pipeline()`. **Not** `_background_loop()` -- the loop calls `_compute_board_publication_response()` instead, which does not reach `run_routed_intelligence_pipeline()` at all (see the Intelligence state worker path above).
 
 Execution mode:
-- Background thread or background process loop.
+- Synchronous, in the request thread.
 
 How often it can run:
-- On queued payloads and stale watched payloads.
+- On a cache miss for a query response.
 
 Concurrency:
-- Serialized inside one service instance, but can still run concurrently across processes.
+- Can run concurrently across requests.
 
 ## Execution paths to `run_intelligence_pipeline()`
 
@@ -149,22 +149,22 @@ How often it can run:
 Concurrency:
 - Can run concurrently across requests.
 
-### 2. Intelligence state worker
+### 2. Intelligence state on-demand cache-miss path
 
 Trigger surface:
 - [pipeline/intelligence_state.py](../pipeline/intelligence_state.py)
 
 Path:
-- `_background_loop()` -> `_compute_response()` -> `run_routed_intelligence_pipeline()` -> `run_intelligence_pipeline()`.
+- `get_response()` -> `_compute_response()` -> `run_routed_intelligence_pipeline()` -> `run_intelligence_pipeline()`, synchronously in the request thread on a cache miss. `_background_loop()` does not reach this chain -- see the note under "Intelligence state worker" above.
 
 Execution mode:
-- Background loop.
+- Synchronous, in the request thread.
 
 How often it can run:
-- On queued payloads and stale watched payloads.
+- On a cache miss for a query response.
 
 Concurrency:
-- Serialized inside a service instance, but concurrent across processes is still possible.
+- Can run concurrently across requests.
 
 ### 3. Test-only direct calls
 
@@ -200,7 +200,7 @@ Concurrency:
 ### Intelligence refresh
 
 - [syndicate/templates/intelligence.html](../syndicate/templates/intelligence.html) polls the intelligence query API on an interval and also refreshes on focus and visibility changes.
-- [pipeline/intelligence_state.py](../pipeline/intelligence_state.py) runs `IntelligenceStateService._background_loop()` which now routes work through `run_routed_intelligence_pipeline()` and persists with `write_latest_intelligence_state()`.
+- [pipeline/intelligence_state.py](../pipeline/intelligence_state.py) runs `IntelligenceStateService._background_loop()` which routes work through `_compute_board_publication_response()` -> `_build_candidate_pool()` (not `run_routed_intelligence_pipeline()`) and persists with `write_latest_intelligence_state()`.
 - The same service also persists request-path worker snapshots through `_persist_locked()`, which depends on `write_json_file()` in [syndicate/features/shared/refresh_state_store.py](../syndicate/features/shared/refresh_state_store.py).
 - [scripts/run_refresh_worker.py](../scripts/run_refresh_worker.py) runs a separate forever refresh loop.
 - [syndicate/app.py](../syndicate/app.py) can optionally start `start_intelligence_state_background_loop(app)`.
