@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any
 
 from syndicate.features.shared.artifact_publisher import publish_changed_hot_artifacts
+from syndicate.features.shared.ops_refresh import is_refresh_run_active
 from syndicate.features.shared.ops_refresh import launch_refresh_run
 from syndicate.features.shared.schedule_adapter import events_starting_within
 from syndicate.features.shared.schedule_adapter import fetch_schedule_for_date
@@ -573,6 +574,17 @@ def _mlb_daily_sim_decision(*, now_epoch: float, date_str: str) -> dict[str, Any
 		# subprocess purely to print "already holds the lock" and exit.
 		return {"force": False, "reason": "previous_run_still_active"}
 	try:
+		if is_refresh_run_active():
+			# Don't stack the sim's 1000-game Monte Carlo run + multi-profile
+			# target generation on top of an in-flight odds refresh (which can
+			# itself spawn WNBA SmartSim) -- confirmed OOM signature was two
+			# independent heavy pipelines peaking concurrently in the same
+			# container. One extra tick of delay here is cheap; a container
+			# restart mid-sim is not.
+			return {"force": False, "reason": "odds_refresh_active"}
+	except Exception:
+		pass
+	try:
 		events = fetch_schedule_for_date("mlb", date_str)
 	except Exception:
 		events = []
@@ -770,6 +782,11 @@ def _mlb_evening_next_day_sim_decision(*, now_epoch: float, selected_date: str, 
 		# tomorrow's sim earlier this evening and it's still going" -- either
 		# way, don't stack a second sim job on the same box.
 		return {"force": False, "reason": "previous_run_still_active"}
+	try:
+		if is_refresh_run_active():
+			return {"force": False, "reason": "odds_refresh_active"}
+	except Exception:
+		pass
 	target_date = _look_ahead_target_date(selected_date)
 	if _mlb_daily_summary_path(target_date).exists():
 		return {"force": False, "reason": "already_simmed"}

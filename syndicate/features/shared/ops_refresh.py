@@ -480,6 +480,36 @@ def _assert_no_active_refresh_run() -> None:
         raise ValueError("A refresh run is already queued for the external runner. Cancel it before starting a new run.")
 
 
+def is_refresh_run_active() -> bool:
+    # Read-only check (no state mutation, unlike _assert_no_active_refresh_run):
+    # is an odds-refresh run currently in flight? Used by the MLB daily-sim
+    # gate to avoid stacking a second heavy pipeline (1000-sim run + the
+    # daily_update_multi_profile HR/K-ladder/RFI target generation pass) on
+    # top of an in-flight odds refresh -- which can itself spawn WNBA SmartSim
+    # -- in the same worker container. Two independent peak-memory pipelines
+    # running concurrently is the leading OOM hypothesis; false negatives here
+    # just mean occasional stacking as before, so this stays conservative
+    # rather than replicating the full stale-pid/external-runner reconciliation
+    # logic above.
+    try:
+        context = _latest_refresh_manifest_context()
+    except Exception:
+        return False
+    manifest = context.get("manifest") if isinstance(context, dict) else None
+    if not isinstance(manifest, dict):
+        return False
+    if str(manifest.get("state") or "").strip().lower() != "running":
+        return False
+    pid_raw = manifest.get("pid")
+    pid = int(pid_raw) if isinstance(pid_raw, int) or (isinstance(pid_raw, str) and str(pid_raw).strip().isdigit()) else None
+    if pid is None:
+        return False
+    try:
+        return bool(_pid_is_running(pid))
+    except Exception:
+        return False
+
+
 def _update_latest_state(*, state: str, exit_code: int | None = None, canceled_at: str | None = None, finished_at: str | None = None) -> dict[str, Any]:
     context = _latest_refresh_manifest_context()
     _ensure_refresh_context_consistent(context)
