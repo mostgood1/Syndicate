@@ -23,6 +23,7 @@ except ImportError:
 from ..config import paths
 from ..league import season_start_year_from_date
 from ..roster_files import pick_rosters_file
+from ..teams import to_tricode, TEAM_TRICODES, _NAME_TO_TRI
 try:
     from ..teams import to_tricode as _to_tri
 except Exception:
@@ -355,31 +356,32 @@ class ESPNInjuryScraper:
                 if not team_header:
                     continue
                 team_name_raw = team_header.get_text(strip=True)
-                # Use module-level mapper to avoid attribute issues if class helper is missing
-                team_abbr = _map_team_name_to_abbr(team_name_raw)
-                # Harden: if header is noisy (e.g., page-wide "Team Injuries...") try to extract a real team name/tri
-                KNOWN_TRIS = {
-                    'ATL','BOS','BKN','CHA','CHI','CLE','DAL','DEN','DET','GSW','HOU','IND','LAC','LAL','MEM','MIA','MIL','MIN','NOP','NYK','OKC','ORL','PHI','PHX','POR','SAC','SAS','TOR','UTA','WAS'
-                }
-                if (not team_abbr) or (len(team_abbr) != 3) or (team_abbr.upper() not in KNOWN_TRIS):
+                # _map_team_name_to_abbr/KNOWN_TRIS below this point used to be a
+                # hand-copied set of NBA team names+tricodes (this file started
+                # life as the NBA fork's scraper) -- every "Atlanta Dream",
+                # "Chicago Sky", etc. header failed that lookup, so every WNBA
+                # section got silently discarded and this scraper always
+                # returned zero rows despite the ESPN page having real, current
+                # injury data. Resolve against the actual WNBA team table
+                # instead (confirmed real headers are clean team names, e.g.
+                # "Atlanta Dream" -- the noisy page-wide "Team Injuries..."
+                # blob correctly fails to_tricode and gets skipped below).
+                team_abbr = to_tricode(team_name_raw)
+                if not team_abbr or team_abbr.upper() not in TEAM_TRICODES:
                     txt = (team_name_raw or '').strip()
-                    # Try to spot a known full team name inside the text
-                    name_map = {
-                        'Atlanta Hawks': 'ATL','Boston Celtics':'BOS','Brooklyn Nets':'BKN','Charlotte Hornets':'CHA','Chicago Bulls':'CHI','Cleveland Cavaliers':'CLE','Dallas Mavericks':'DAL','Denver Nuggets':'DEN','Detroit Pistons':'DET','Golden State Warriors':'GSW','Houston Rockets':'HOU','Indiana Pacers':'IND','LA Clippers':'LAC','Los Angeles Clippers':'LAC','LA Lakers':'LAL','Los Angeles Lakers':'LAL','Memphis Grizzlies':'MEM','Miami Heat':'MIA','Milwaukee Bucks':'MIL','Minnesota Timberwolves':'MIN','New Orleans Pelicans':'NOP','New York Knicks':'NYK','Oklahoma City Thunder':'OKC','Orlando Magic':'ORL','Philadelphia 76ers':'PHI','Phoenix Suns':'PHX','Portland Trail Blazers':'POR','Sacramento Kings':'SAC','San Antonio Spurs':'SAS','Toronto Raptors':'TOR','Utah Jazz':'UTA','Washington Wizards':'WAS'
-                    }
                     found = None
-                    for full, tri in name_map.items():
+                    for full, tri in _NAME_TO_TRI.items():
                         if full in txt:
                             found = tri; break
-                    # Or a parenthetical tri like (LAL)
                     if not found and '(' in txt and ')' in txt:
                         maybe = txt.split('(')[-1].split(')')[0].strip().upper()
-                        if maybe in KNOWN_TRIS:
+                        if maybe in TEAM_TRICODES:
                             found = maybe
                     team_abbr = found or ''
                 # If still not a valid tri code, skip this section entirely
-                if not team_abbr or (team_abbr.upper() not in KNOWN_TRIS):
+                if not team_abbr or (team_abbr.upper() not in TEAM_TRICODES):
                     continue
+                team_abbr = team_abbr.upper()
 
                 table = section.find('table')
                 if not table:
