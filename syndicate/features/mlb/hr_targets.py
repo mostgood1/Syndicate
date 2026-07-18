@@ -501,6 +501,89 @@ def _summary_target_matchup(team: str, away_abbr: str, home_abbr: str) -> str:
     return normalized_team or "-"
 
 
+def _hr_target_summary_stats(target: dict[str, Any]) -> list[dict[str, str]]:
+    # Reuses the drivers[] breakdown (_hr_target_driver_payload) that was
+    # already computed for every row but, before this, never reached any
+    # template -- feeds _content_panel.html's summary_stats strip.
+    stats: list[dict[str, str]] = []
+    for driver in target.get("drivers") or []:
+        if not isinstance(driver, dict):
+            continue
+        display = str(driver.get("display") or "").strip()
+        label = str(driver.get("label") or "").strip()
+        if not label or not display:
+            continue
+        stats.append({"label": label, "value": display})
+    return stats
+
+
+def _hr_target_context_table(target: dict[str, Any]) -> list[dict[str, Any]]:
+    # Opposing-pitcher/venue/weather/lineup-confidence detail: computed into
+    # every row by daily_update_multi_profile.py's HR-target context builder
+    # but, before this, folded only into an opaque "Support" number -- never
+    # shown as its own labeled stat. Feeds _content_panel.html's table_groups.
+    row = target.get("source_row") if isinstance(target.get("source_row"), dict) else {}
+    if not row:
+        return []
+
+    def _pct(value: Any) -> str | None:
+        num = _safe_float(value)
+        return f"{num * 100.0:.1f}%" if num is not None else None
+
+    pitcher_rows: list[dict[str, str]] = []
+    pitcher_hand = str(row.get("opponent_pitcher_hand") or "").strip()
+    if pitcher_hand:
+        pitcher_rows.append({"name": "Throws", "detail": "", "value": pitcher_hand})
+    hr_rate = _pct(row.get("pitcher_hr_rate"))
+    if hr_rate:
+        pitcher_rows.append({"name": "HR rate allowed", "detail": "season rate", "value": hr_rate})
+    k_rate = _pct(row.get("pitcher_k_rate"))
+    if k_rate:
+        pitcher_rows.append({"name": "K rate", "detail": "season rate", "value": k_rate})
+    primary_pitch = str(row.get("opponent_primary_pitch_type") or "").strip()
+    if primary_pitch:
+        pitcher_rows.append({"name": "Primary pitch", "detail": "", "value": primary_pitch})
+
+    park_rows: list[dict[str, str]] = []
+    venue_name = str(row.get("venue_name") or "").strip()
+    if venue_name:
+        roof = str(row.get("roof_type") or "").strip()
+        park_rows.append({"name": venue_name, "detail": roof, "value": _format_num(row.get("park_hr_mult")) + "x HR" if row.get("park_hr_mult") is not None else "-"})
+    weather_condition = str(row.get("weather_condition") or "").strip()
+    temp = _safe_float(row.get("weather_temp_f"))
+    wind_speed = _safe_float(row.get("weather_wind_speed_mph"))
+    wind_dir = str(row.get("weather_wind_direction") or "").strip()
+    if weather_condition or temp is not None:
+        detail_bits = []
+        if temp is not None:
+            detail_bits.append(f"{temp:.0f}°F")
+        if wind_speed is not None and wind_speed > 0:
+            wind_label = f"{wind_speed:.0f} mph" + (f" {wind_dir}" if wind_dir and wind_dir != "unknown" else "")
+            detail_bits.append(wind_label)
+        park_rows.append(
+            {
+                "name": weather_condition or "Weather",
+                "detail": " | ".join(detail_bits),
+                "value": _format_num(row.get("weather_hr_mult")) + "x HR" if row.get("weather_hr_mult") is not None else "-",
+            }
+        )
+
+    lineup_rows: list[dict[str, str]] = []
+    lineup_status = str(row.get("lineup_status") or "").strip()
+    lineup_confidence = _pct(row.get("lineup_confidence"))
+    if lineup_status:
+        lineup_rows.append({"name": "Lineup status", "detail": "", "value": (lineup_status.replace("_", " ").title() + (f" ({lineup_confidence})" if lineup_confidence else ""))})
+
+    groups: list[dict[str, Any]] = []
+    if pitcher_rows:
+        groups.append({"heading": f"Opposing pitcher", "rows": pitcher_rows})
+    if park_rows:
+        groups.append({"heading": "Park & weather", "rows": park_rows})
+    if lineup_rows:
+        groups.append({"heading": "Lineup", "rows": lineup_rows})
+    return groups
+
+
 def _cards_from_targets(targets: list[dict[str, Any]], *, selected_date: str) -> list[dict[str, Any]]:
     cards: list[dict[str, Any]] = []
     for target in targets:
@@ -508,18 +591,31 @@ def _cards_from_targets(targets: list[dict[str, Any]], *, selected_date: str) ->
         href = f"/mlb/hr-targets?date={selected_date}"
         if game_pk is not None:
             href = f"{href}&game={int(game_pk)}"
+        support_display = target.get("support") or "-"
+        support_label = str(target.get("support_label") or "").strip()
+        if support_label:
+            support_display = f"{support_display} ({support_label})"
+        pa_mean = target.get("pa_mean")
+        lineup_order = target.get("lineup_order")
+        metrics = [
+            {"label": "HR 1+", "value": target["probability"]},
+            {"label": "Support", "value": support_display},
+        ]
+        if pa_mean is not None:
+            metrics.append({"label": "PA", "value": _format_num(pa_mean)})
+        if lineup_order is not None:
+            metrics.append({"label": "Lineup", "value": str(int(lineup_order))})
         cards.append(
             {
                 "title": target["player_name"],
                 "eyebrow": target["team"],
                 "badge": target["probability"],
                 "meta": target["matchup"],
-                "metrics": [
-                    {"label": "HR 1+", "value": target["probability"]},
-                    {"label": "Support", "value": target["support"]},
-                ],
+                "metrics": metrics,
                 "summary": target["writeup"],
                 "list_items": target["reasons"],
+                "summary_stats": _hr_target_summary_stats(target),
+                "table_groups": _hr_target_context_table(target),
                 "headshot_url": target.get("headshot_url"),
                 "team_logo_url": target.get("team_logo_url"),
                 "opponent_logo_url": target.get("opponent_logo_url"),

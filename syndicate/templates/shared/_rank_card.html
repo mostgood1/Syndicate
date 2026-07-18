@@ -34,7 +34,7 @@
   {% with metrics=card.metrics %}
     {% include 'shared/_metric_list.html' %}
   {% endwith %}
-  {% with eyebrow='Summary', title='Why it stands out', body=card.summary, list_items=card.list_items %}
+  {% with eyebrow='Summary', title='Why it stands out', body=card.summary, list_items=card.list_items, summary_stats=card.summary_stats, table_groups=card.table_groups %}
     {% include 'shared/_content_panel.html' %}
   {% endwith %}
   {% if card.href %}
