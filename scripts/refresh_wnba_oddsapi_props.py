@@ -924,6 +924,45 @@ def _games_history_is_stale(path: Path, *, date_str: str, stale_days: int = 30) 
     return (target - newest).days > int(stale_days)
 
 
+def _games_history_fetch_years_needed(path: Path, *, bootstrap_years: int = 10, incremental_years: int = 1) -> int:
+    """Decide how many seasons `fetch --years N` needs to re-walk.
+
+    WNBA's fetch has no bulk history endpoint (unlike NBA's LeagueGameLog) --
+    it walks ESPN's scoreboard one day at a time per season, with no
+    incremental/resume state wired into the CLI, so every call re-walks
+    every requested season from scratch (~8 minutes/season at measured
+    per-request timing; 10 seasons is ~80 minutes against a 45-minute
+    subprocess timeout -- always dies partway through the first season on a
+    cold/stale start). Prior seasons are final and immutable, so once the
+    file already has broad multi-season coverage there is nothing left to
+    gain from re-walking them -- only the current season can have new
+    games. Only request the full bootstrap when the file is missing or
+    still looks like an early/partial history.
+    """
+    try:
+        import pandas as pd
+
+        if not path.exists() or not path.is_file() or path.stat().st_size <= 0:
+            return bootstrap_years
+        frame = pd.read_csv(path, usecols=["season"]) if _csv_has_column(path, "season") else None
+        if frame is None or frame.empty:
+            return bootstrap_years
+        distinct_seasons = frame["season"].nunique(dropna=True)
+        return incremental_years if int(distinct_seasons) >= 3 else bootstrap_years
+    except Exception:
+        return bootstrap_years
+
+
+def _csv_has_column(path: Path, column: str) -> bool:
+    try:
+        import pandas as pd
+
+        header = pd.read_csv(path, nrows=0)
+        return column in header.columns
+    except Exception:
+        return False
+
+
 def _seed_games_history_from_checkout_if_fresher(
     *, raw_path: Path, package_name: str, date_str: str, feature_candidates: tuple[Path, ...], log_file: Path
 ) -> bool:
@@ -931,8 +970,9 @@ def _seed_games_history_from_checkout_if_fresher(
 
     The checkout ships a committed full-history games_nba_api.csv that is kept
     current by dev/GHA runs, so it is a reliable offline fallback when the
-    network fetch fails or returns a partial file (stats.nba.com frequently
-    times out or blocks datacenter IPs). Only overwrites when the checkout's
+    network fetch fails or returns a partial file (a --years 10 fetch on a
+    cold/stale start always exceeds the pipeline's subprocess timeout -- see
+    _games_history_fetch_years_needed). Only overwrites when the checkout's
     newest game date is strictly fresher than what is already on disk, and
     invalidates the derived features files so they rebuild from the new data.
     """
@@ -2684,19 +2724,32 @@ def _ensure_source_game_inputs(
     )
 
     # A bare exists/size check let a partial fetch (confirmed live: a
-    # 2017-only ~20KB stub, from stats.nba.com timing out on Render's
-    # datacenter IPs after the first season chunk) satisfy this forever.
-    # Downstream, rest-days computed against a 2017 "last game" came out
-    # ~3,363 days -- +90 sigma through the models -- producing the garbage
-    # +58..72 margins / 115 totals seen in production. Fetch when the
-    # history is missing OR stale, then heal from the vendored checkout's
-    # committed copy if the fetch still left us stale.
+    # 2017-only ~20KB stub) satisfy this forever. Downstream, rest-days
+    # computed against a 2017 "last game" came out ~3,363 days -- +90 sigma
+    # through the models -- producing the garbage +58..72 margins / 115
+    # totals seen in production. Fetch when the history is missing OR
+    # stale, then heal from the vendored checkout's committed copy if the
+    # fetch still left us stale.
+    #
+    # `fetch --years N` walks ESPN's scoreboard ONE DAY AT A TIME per
+    # season (WNBA has no bulk history endpoint, unlike NBA's LeagueGameLog)
+    # with no incremental/resume state wired into the CLI -- a fresh
+    # --years 10 call always re-walks all ~1,830 days from scratch, which
+    # measured out to ~80 minutes even at optimistic per-request timing.
+    # That is why a stale/missing history file always produced a
+    # single-season stub: the pipeline's 45-minute subprocess timeout
+    # killed the fetch partway through the FIRST season, every time. Prior
+    # seasons are final/immutable, so once broad multi-season coverage
+    # already exists there is no need to re-walk them -- only the current
+    # season can have new games, cutting steady-state fetches from ~80
+    # minutes to a few minutes.
     rc_fetch = 0
     if _games_history_is_stale(raw_candidates[0], date_str=date_str):
+        fetch_years = _games_history_fetch_years_needed(raw_candidates[0])
         rc_fetch = _run_source_subprocess_cli_command(
             source_root=source_root,
             package_name=package_name,
-            command_parts=["fetch", "--years", "10"],
+            command_parts=["fetch", "--years", str(fetch_years)],
             log_file=log_file,
             heartbeat_cb=heartbeat_cb,
             timeout_s=45 * 60,
@@ -3267,7 +3320,15 @@ def _repair_predictions_slate_from_game_odds_if_needed(*, processed_root: Path, 
 
 
 def _predict_props_cli_args(*, source_root: Path, date_str: str, out_path: Path) -> list[str]:
-    smart_sim_n_sims = max(1, _env_int("REFRESH_PREDICT_PROPS_SMART_SIM_N_SIMS", 150))
+    # 150 made sense as a cap when smart_sim was a flat point-mean stub;
+    # now that the real possession-level Monte Carlo engine is wired in
+    # (see basketball_props_smart_sim._build_local_smart_sim_module), prop
+    # tail probabilities and interval bands benefit from more samples.
+    # Measured locally: cost scales ~linearly at ~0.16-0.2s/sim/game, so
+    # 500 costs a WNBA slate (4-6 games, workers=1) roughly 6-8 minutes
+    # instead of 2-3 -- comfortably time-bounded, no observed per-game
+    # memory growth (each game's simulate_smart_game call is self-contained).
+    smart_sim_n_sims = max(1, _env_int("REFRESH_PREDICT_PROPS_SMART_SIM_N_SIMS", 500))
     smart_sim_workers = max(1, _env_int("REFRESH_PREDICT_PROPS_SMART_SIM_WORKERS", 1))
     calib_window = max(1, _env_int("REFRESH_PREDICT_PROPS_CALIB_WINDOW", 7))
     player_calib_window = max(1, _env_int("REFRESH_PREDICT_PROPS_PLAYER_CALIB_WINDOW", 30))
@@ -3504,7 +3565,7 @@ def _run_refresh_via_cli(
                         player_min_pairs=max(1, _env_int("REFRESH_PREDICT_PROPS_PLAYER_MIN_PAIRS", 6)),
                         player_shrink_k=max(1, _env_int("REFRESH_PREDICT_PROPS_PLAYER_SHRINK_K", 8)),
                         use_smart_sim=_env_bool("REFRESH_WNBA_USE_SMART_SIM", True),
-                        smart_sim_n_sims=max(1, _env_int("REFRESH_PREDICT_PROPS_SMART_SIM_N_SIMS", 150)),
+                        smart_sim_n_sims=max(1, _env_int("REFRESH_PREDICT_PROPS_SMART_SIM_N_SIMS", 500)),
                         smart_sim_pbp=_env_bool("REFRESH_PREDICT_PROPS_SMART_SIM_PBP", True),
                         smart_sim_workers=max(1, _env_int("REFRESH_PREDICT_PROPS_SMART_SIM_WORKERS", 1)),
                         smart_sim_overwrite=bool(smart_sim_overwrite),
