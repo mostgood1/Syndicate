@@ -3519,6 +3519,306 @@ def _collect_daily_hr_targets(
     }
 
 
+# ---------------------------------------------------------------------------
+# K Ladder Target: daily strikeout-ladder predictor, mirroring HR Targets'
+# architecture (own policy presets, additive support score, per-game/team
+# caps) but targeting starting pitchers against their real strikeouts market
+# line instead of a fixed batter HR-probability floor. Reuses the exact
+# probability/edge primitives and the "baseball reasons" generators already
+# proven in production by _collect_pitcher_recommendations (below) rather
+# than duplicating that math -- this is a separate SELECTION/RANKING view
+# over the same sim + market data, the same relationship HR Targets has to
+# the hitter_props locked-policy recommendations.
+# ---------------------------------------------------------------------------
+
+_K_LADDER_TARGET_POLICY_PRESETS: Dict[str, Dict[str, Any]] = {
+    "default": {
+        "preset": "default",
+        "label": "Balanced strikeout-ladder sweep winner",
+        # P(actual SO > market line), calibrated. 0.58 means the model needs
+        # to meaningfully favor the over, not just barely cross 50/50.
+        "min_prob": 0.58,
+        "min_edge": 0.0,
+        "min_support_score": 55.0,
+        "high_support_score": 70.0,
+        "high_support_min_prob": 0.52,
+        "max_per_game": 1,
+        "max_per_team": 1,
+    },
+}
+_DEFAULT_K_LADDER_TARGET_POLICY_PRESET = "default"
+
+
+def _resolve_k_ladder_target_policy(preset_name: Optional[str]) -> Dict[str, Any]:
+    key = str(preset_name or _DEFAULT_K_LADDER_TARGET_POLICY_PRESET).strip().lower()
+    return dict(_K_LADDER_TARGET_POLICY_PRESETS.get(key) or _K_LADDER_TARGET_POLICY_PRESETS[_DEFAULT_K_LADDER_TARGET_POLICY_PRESET])
+
+
+def _k_ladder_target_support(
+    *,
+    p_over: float,
+    edge: float,
+    pitcher_profile: Dict[str, Any],
+    line_value: float,
+) -> tuple[float, List[str]]:
+    # Simpler than _hitter_hr_target_support's ~10-term formula: three clear,
+    # numerically defensible contributors (model conviction, market edge,
+    # workload runway) rather than an unverified attempt to replicate HR's
+    # exact weighting blind. The qualitative color HR gets from its many
+    # reason-string contributors comes from the k_target_reasons list below
+    # instead, which reuses the same proven reason generators as the
+    # pitcher_props recommendation engine.
+    score = 50.0
+    reasons: List[str] = []
+
+    prob_gap = float(p_over) - 0.5
+    prob_points = max(-20.0, min(25.0, prob_gap * 100.0))
+    score += prob_points
+    if prob_gap > 0.08:
+        reasons.append(f"Modeled strikeout total clears {line_value:g} with room to spare ({p_over * 100.0:.1f}% to go over).")
+
+    edge_points = max(-10.0, min(15.0, float(edge) * 100.0))
+    score += edge_points
+    if edge > 0.03:
+        reasons.append(f"Model favors the over by {edge * 100.0:.1f} points versus the market's own no-vig price.")
+
+    stamina_pitches = _safe_float(pitcher_profile.get("stamina_pitches") if isinstance(pitcher_profile, dict) else None)
+    availability_mult = _safe_float(pitcher_profile.get("availability_mult") if isinstance(pitcher_profile, dict) else None)
+    if stamina_pitches is not None:
+        workload_points = max(-10.0, min(10.0, (float(stamina_pitches) - 90.0) * 0.25))
+        score += workload_points
+        if availability_mult is not None and availability_mult < 0.9:
+            score -= (1.0 - float(availability_mult)) * 15.0
+            reasons.append("Bullpen usage the last few days trims this starter's workload ceiling.")
+        elif stamina_pitches >= 98.0:
+            reasons.append(f"Projected workload runway of about {stamina_pitches:.0f} pitches supports a deeper strikeout total.")
+
+    return float(max(0.0, min(100.0, score))), reasons
+
+
+def _k_ladder_target_label(score: float) -> str:
+    if score >= 78.0:
+        return "strong"
+    if score >= 60.0:
+        return "solid"
+    if score >= 45.0:
+        return "watch"
+    return "thin"
+
+
+def _collect_daily_k_ladder_targets(
+    sim_dir: Path,
+    pitcher_lines_path: Path,
+    snapshots_dir: Optional[Path],
+    *,
+    date: str,
+    season: int,
+    source_profile: str,
+    so_prob_calibration: Optional[Dict[str, Any]],
+    policy_preset: Optional[str] = None,
+) -> Dict[str, Any]:
+    resolved_policy = _resolve_k_ladder_target_policy(policy_preset)
+    empty_doc = {
+        "date": str(date),
+        "season": int(season),
+        "generated_at": datetime.now().isoformat(),
+        "tool": "tools/daily_update_multi_profile.py",
+        "source_sim_dir": _rel(sim_dir),
+        "source_profile": str(source_profile),
+        "policy": dict(resolved_policy),
+        "counts": {"games": 0, "rows": 0},
+        "games": [],
+        "rows": [],
+    }
+    if not pitcher_lines_path.exists() or not sim_dir.exists():
+        return empty_doc
+
+    pitcher_odds_raw = (_read_json(pitcher_lines_path).get("pitcher_props") or {})
+    pitcher_odds = {normalize_pitcher_name(str(name)): markets for name, markets in pitcher_odds_raw.items()}
+    market_spec = PITCHER_MARKET_SPECS.get("strikeouts") or {}
+    dist_key = str(market_spec.get("dist_key") or "so_dist")
+    mean_key = str(market_spec.get("mean_key") or "so_mean")
+
+    roster_cache: Dict[Tuple[int, int], Optional[Dict[str, Any]]] = {}
+
+    def _roster_for(sim_obj: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        if snapshots_dir is None or not snapshots_dir.exists():
+            return None
+        try:
+            game_pk = int(sim_obj.get("game_pk") or 0)
+        except Exception:
+            return None
+        try:
+            game_number = int(((sim_obj.get("schedule") or {}).get("game_number") or 1))
+        except Exception:
+            game_number = 1
+        cache_key = (game_pk, int(game_number or 1))
+        if cache_key in roster_cache:
+            return roster_cache[cache_key]
+        doc = None
+        matches = sorted(snapshots_dir.glob(f"roster_*_pk{game_pk}_g{int(game_number or 1)}.json"))
+        if not matches:
+            matches = sorted(snapshots_dir.glob(f"roster_*_pk{game_pk}_g*.json"))
+        if matches:
+            try:
+                raw = _read_json(matches[0])
+                doc = raw if isinstance(raw, dict) else None
+            except Exception:
+                doc = None
+        roster_cache[cache_key] = doc
+        return doc
+
+    game_docs: List[Dict[str, Any]] = []
+    all_rows: List[Dict[str, Any]] = []
+
+    for sim_obj in _iter_sim_records(sim_dir):
+        base = _base_game_row(sim_obj)
+        roster_snapshot = _roster_for(sim_obj)
+        season_value = _season_from_date_str(sim_obj.get("date")) or _safe_int(sim_obj.get("season")) or int(season)
+        starter_names = sim_obj.get("starter_names") or {}
+        starters = sim_obj.get("starters") or {}
+        sim_pitcher_props = ((sim_obj.get("sim") or {}).get("pitcher_props") or {})
+
+        game_candidates: List[Dict[str, Any]] = []
+        for side in ("away", "home"):
+            starter_name = str(starter_names.get(side) or "").strip()
+            starter_id = starters.get(side)
+            if not starter_name or starter_id is None:
+                continue
+            pred = sim_pitcher_props.get(str(int(starter_id)))
+            if not isinstance(pred, dict):
+                continue
+            markets = pitcher_odds.get(normalize_pitcher_name(starter_name))
+            if not isinstance(markets, dict):
+                continue
+            props_market = markets.get("strikeouts") or {}
+            line = props_market.get("line")
+            if line is None:
+                continue
+            line_value = float(line)
+            p_raw = _prob_over_line_from_dist(pred.get(dist_key) or {}, line_value)
+            if p_raw is None:
+                continue
+            p_over = apply_prob_calibration(float(p_raw), so_prob_calibration)
+
+            side_probs = market_side_probabilities(props_market.get("over_odds"), props_market.get("under_odds"))
+            market_prob_over = side_probs.get("over") if isinstance(side_probs, dict) else None
+            edge = (float(p_over) - float(market_prob_over)) if isinstance(market_prob_over, (int, float)) else 0.0
+
+            team_doc = (sim_obj.get(side) or {}) if isinstance(sim_obj.get(side), dict) else {}
+            team_abbr = str(team_doc.get("abbreviation") or "").strip()
+            opp_side = "home" if side == "away" else "away"
+            opp_team_doc = (sim_obj.get(opp_side) or {}) if isinstance(sim_obj.get(opp_side), dict) else {}
+            opponent_id = _safe_int(opp_team_doc.get("id"))
+            opponent_label = str(opp_team_doc.get("abbreviation") or opp_team_doc.get("name") or "opponent").strip()
+
+            pitcher_profile: Dict[str, Any] = {}
+            opponent_lineup: List[Dict[str, Any]] = []
+            if isinstance(roster_snapshot, dict):
+                side_doc = (roster_snapshot.get(side) or {}) if isinstance(roster_snapshot.get(side), dict) else {}
+                opp_doc = (roster_snapshot.get(opp_side) or {}) if isinstance(roster_snapshot.get(opp_side), dict) else {}
+                candidate_profile = side_doc.get("starter_profile") if isinstance(side_doc.get("starter_profile"), dict) else {}
+                if candidate_profile and int(candidate_profile.get("id") or 0) == int(starter_id):
+                    pitcher_profile = candidate_profile
+                    opponent_lineup = opp_doc.get("lineup") if isinstance(opp_doc.get("lineup"), list) else []
+
+            support_score, support_reasons = _k_ladder_target_support(
+                p_over=float(p_over),
+                edge=float(edge),
+                pitcher_profile=pitcher_profile,
+                line_value=line_value,
+            )
+            support_label = _k_ladder_target_label(support_score)
+
+            k_target_reasons: List[str] = list(support_reasons)
+            if pitcher_profile:
+                for reason in (
+                    _pitcher_bvp_reason(pitcher_profile, opponent_lineup),
+                    _pitcher_opponent_team_reason(pitcher_profile, opponent_id, opponent_label, int(season_value), "strikeouts", selection="over", line_value=float(line_value)),
+                    _pitcher_recent_form_reason(pitcher_profile, int(season_value), "strikeouts", selection="over", line_value=float(line_value)),
+                    _pitcher_statcast_quality_reason(pitcher_profile, prop="strikeouts", selection="over"),
+                    _pitch_mix_reason(pitcher_profile, prop="strikeouts", selection="over"),
+                    _opponent_lineup_reason(pitcher_profile, opponent_lineup, prop="strikeouts", selection="over"),
+                    _pitcher_workload_reason(pitcher_profile, prop="strikeouts", selection="over"),
+                ):
+                    _append_unique_reason(k_target_reasons, reason)
+
+            row = {
+                **base,
+                "pitcher_id": int(starter_id),
+                "pitcher_name": starter_name,
+                "team": team_abbr,
+                "team_side": side,
+                "opponent": opponent_label,
+                "opponent_team_id": opponent_id,
+                "matchup": f"{base.get('away_abbr')} @ {base.get('home_abbr')}",
+                "market_line": float(line_value),
+                "p_so_over": float(p_over),
+                "market_prob_over": (float(market_prob_over) if isinstance(market_prob_over, (int, float)) else None),
+                "edge": float(edge),
+                "odds": props_market.get("over_odds"),
+                mean_key: pred.get(mean_key),
+                "so_mean": pred.get(mean_key),
+                "k_support_score": float(support_score),
+                "k_support_label": support_label,
+                "k_target_reasons": _trim_reason_list(k_target_reasons),
+                "k_target_summary": " ".join(k_target_reasons[:2]) if k_target_reasons else "",
+                "sim_sample_size": _sim_sample_size_from_sim_obj(sim_obj),
+                "source": "pitcher_props.so_dist",
+            }
+
+            meets_min_prob = float(p_over) >= float(resolved_policy["min_prob"])
+            meets_high_support_exception = (
+                float(support_score) >= float(resolved_policy["high_support_score"])
+                and float(p_over) >= float(resolved_policy["high_support_min_prob"])
+            )
+            meets_edge = float(edge) >= float(resolved_policy["min_edge"])
+            meets_support = float(support_score) >= float(resolved_policy["min_support_score"])
+            if (meets_min_prob or meets_high_support_exception) and meets_edge and meets_support:
+                game_candidates.append(row)
+
+        game_candidates.sort(key=lambda r: (float(r.get("k_support_score") or 0.0), float(r.get("p_so_over") or 0.0)), reverse=True)
+        selected = game_candidates[: int(resolved_policy.get("max_per_game") or 1)]
+        for idx, row in enumerate(selected, start=1):
+            row["game_rank"] = int(idx)
+            all_rows.append(row)
+
+        if selected:
+            game_docs.append(
+                {
+                    "date": str(base.get("date") or date),
+                    "game_pk": base.get("game_pk"),
+                    "away": base.get("away"),
+                    "home": base.get("home"),
+                    "away_abbr": base.get("away_abbr"),
+                    "home_abbr": base.get("home_abbr"),
+                    "game_number": base.get("game_number"),
+                    "targets": selected,
+                }
+            )
+
+    all_rows.sort(key=lambda r: (float(r.get("k_support_score") or 0.0), float(r.get("p_so_over") or 0.0)), reverse=True)
+    for idx, row in enumerate(all_rows, start=1):
+        row["slate_rank"] = int(idx)
+
+    return {
+        "date": str(date),
+        "season": int(season),
+        "generated_at": datetime.now().isoformat(),
+        "tool": "tools/daily_update_multi_profile.py",
+        "source_sim_dir": _rel(sim_dir),
+        "source_snapshot_dir": (_rel(snapshots_dir) if snapshots_dir is not None and snapshots_dir.exists() else None),
+        "source_profile": str(source_profile),
+        "policy": dict(resolved_policy),
+        "counts": {
+            "games": int(len(game_docs)),
+            "rows": int(len(all_rows)),
+        },
+        "games": game_docs,
+        "rows": all_rows,
+    }
+
+
 def _hr_targets_doc_source_priority(doc: Optional[Dict[str, Any]]) -> int:
     if not isinstance(doc, dict):
         return -1
@@ -5898,6 +6198,9 @@ def main() -> int:
     hr_targets_path = out_game / f"daily_summary_{token}_hr_targets.json"
     hr_targets_doc: Optional[Dict[str, Any]] = None
     hr_targets_error: Optional[str] = None
+    k_ladder_targets_path = out_game / f"daily_summary_{token}_k_targets.json"
+    k_ladder_targets_doc: Optional[Dict[str, Any]] = None
+    k_ladder_targets_error: Optional[str] = None
     rfi_targets_path = out_game / f"daily_summary_{token}_rfi_targets.json"
     rfi_targets_doc: Optional[Dict[str, Any]] = None
     rfi_targets_error: Optional[str] = None
@@ -6014,6 +6317,35 @@ def main() -> int:
         print(f"[multi-profile] HR targets build failed: {hr_targets_error}")
 
     try:
+        pitcher_profile_info = profile_info.get("pitcher_props_recos") if isinstance(profile_info.get("pitcher_props_recos"), dict) else {}
+        k_ladder_sim_dir = _path_from_maybe_relative(pitcher_profile_info.get("sim_dir")) or pitcher_sim_dir
+        k_ladder_snapshot_dir = _path_from_maybe_relative(pitcher_profile_info.get("snapshot_dir"))
+        if k_ladder_sim_dir is not None and pitcher_lines_path.exists():
+            k_ladder_targets_doc = _collect_daily_k_ladder_targets(
+                k_ladder_sim_dir,
+                pitcher_lines_path,
+                k_ladder_snapshot_dir,
+                date=str(args.date),
+                season=int(args.season),
+                source_profile="pitcher_props_recos",
+                so_prob_calibration=so_prob_calibration,
+            )
+            if int(k_ladder_targets_doc["counts"]["rows"]) > 0:
+                _write_json(k_ladder_targets_path, k_ladder_targets_doc)
+                print(f"[multi-profile] Wrote K ladder targets artifact: {_rel(k_ladder_targets_path)} (rows={k_ladder_targets_doc['counts']['rows']})")
+            elif k_ladder_targets_path.exists():
+                print(f"[multi-profile] Kept existing K ladder targets artifact (0 new candidates): {_rel(k_ladder_targets_path)}")
+            else:
+                _write_json(k_ladder_targets_path, k_ladder_targets_doc)
+                print(f"[multi-profile] Wrote empty K ladder targets artifact (0 candidates): {_rel(k_ladder_targets_path)}")
+        else:
+            k_ladder_targets_error = "missing pitcher sim_dir or pitcher lines"
+            print(f"[multi-profile] K ladder targets skipped: {k_ladder_targets_error}")
+    except Exception as e:
+        k_ladder_targets_error = f"{type(e).__name__}: {e}"
+        print(f"[multi-profile] K ladder targets build failed: {k_ladder_targets_error}")
+
+    try:
         game_profile = profile_info.get("game_recos") if isinstance(profile_info.get("game_recos"), dict) else {}
         game_sim_dir = _path_from_maybe_relative(game_profile.get("sim_dir"))
 
@@ -6109,6 +6441,13 @@ def main() -> int:
             "rows": int(((hr_targets_doc or {}).get("counts") or {}).get("rows") or 0),
             "policy_preset": str(((hr_targets_doc or {}).get("policy") or {}).get("preset") or args.hr_target_policy_preset),
             "error": hr_targets_error,
+        },
+        "k_ladder_targets": {
+            "artifact_path": (_rel(k_ladder_targets_path) if k_ladder_targets_doc is not None else None),
+            "games": int(((k_ladder_targets_doc or {}).get("counts") or {}).get("games") or 0),
+            "rows": int(((k_ladder_targets_doc or {}).get("counts") or {}).get("rows") or 0),
+            "policy_preset": str(((k_ladder_targets_doc or {}).get("policy") or {}).get("preset") or _DEFAULT_K_LADDER_TARGET_POLICY_PRESET),
+            "error": k_ladder_targets_error,
         },
         "rfi_targets": {
             "artifact_path": (_rel(rfi_targets_path) if rfi_targets_doc is not None else None),

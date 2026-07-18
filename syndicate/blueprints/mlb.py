@@ -20,6 +20,7 @@ from syndicate.features.mlb.game_detail import build_game_detail_page_context
 from syndicate.features.mlb.hub import build_hub_context
 from syndicate.features.mlb.hitter_ladders import build_hitter_ladders_page_context
 from syndicate.features.mlb.hr_targets import build_hr_targets_page_context
+from syndicate.features.mlb.k_ladder_targets import build_k_ladder_targets_page_context
 from syndicate.features.mlb.ladders_common import build_module_links
 from syndicate.features.mlb.live_lens import read_latest_live_lens_api_payload
 from syndicate.features.mlb.live_lens import read_latest_live_lens_page_context
@@ -454,6 +455,20 @@ def api_hr_targets():
         include_app=True,
     )
     return jsonify(payload)
+
+
+@mlb_bp.get("/k-ladder-targets")
+def k_ladder_targets():
+    selected_date = _iso_or_today(request.args.get("date"))
+    context = build_k_ladder_targets_page_context(selected_date)
+    return render_template("shared/rank_board.html", **context)
+
+
+@mlb_bp.get("/api/k-ladder-targets")
+def api_k_ladder_targets():
+    selected_date = _iso_or_today(request.args.get("date"))
+    context = build_k_ladder_targets_page_context(selected_date)
+    return jsonify(_rank_payload(context, {"targets": context["targets"]}))
 
 
 @mlb_bp.get("/rfi-targets")
