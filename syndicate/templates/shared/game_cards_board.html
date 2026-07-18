@@ -100,6 +100,53 @@
     </section>
   {% endif %}
 
+  {% if k_targets_shelf %}
+    <section class="cards-hr-targets" id="cardsKTargets" aria-label="{{ k_targets_shelf.label }}">
+      <div class="cards-hr-targets-card">
+        <div class="cards-hr-targets-head">
+          <div class="cards-hr-targets-copy">
+            <div class="cards-hr-targets-kicker">{{ k_targets_shelf.kicker }}</div>
+            <div class="cards-table-title">{{ k_targets_shelf.title }}</div>
+            <div class="cards-mini-copy">{{ k_targets_shelf.body }}</div>
+          </div>
+          <div class="cards-hr-targets-actions">
+            {% if k_targets_shelf.source_path %}
+              <span class="cards-source-meta-pill">{{ k_targets_shelf.source_path }}</span>
+            {% endif %}
+            <a class="cards-nav-pill" href="{{ k_targets_shelf.href }}">{{ k_targets_shelf.cta }}</a>
+          </div>
+        </div>
+        <div class="cards-hr-targets-grid">
+          {% for row in k_targets_shelf.rows %}
+            <a class="cards-hr-target-chip" href="{{ k_targets_shelf.href }}">
+              <div class="cards-hr-target-chip-top">
+                <span class="cards-hr-target-rank">{{ row.rank }}</span>
+                <span class="cards-source-meta-pill">{{ row.team }}</span>
+              </div>
+              <div class="cards-hr-target-identity">
+                <div class="cards-hr-target-identity-main">
+                  <div class="cards-hr-target-headshot cards-hr-target-headshot-fallback">{{ row.player_name[:2]|upper }}</div>
+                  <div class="cards-hr-target-name-block">
+                    <div class="cards-hr-target-name">{{ row.player_name }}</div>
+                    <div class="cards-hr-target-meta">
+                      <span>{{ row.team }}</span>
+                      <span>{{ row.matchup }}</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="cards-hr-target-prob">{{ row.probability }}<span class="cards-hr-target-prob-label">{{ row.prob_label }}</span></div>
+              </div>
+              <div class="cards-hr-target-metrics">
+                <div class="cards-hr-target-pill"><strong>{{ row.support }}</strong><span>support</span></div>
+              </div>
+              <div class="cards-hr-target-summary">{{ row.summary }}</div>
+            </a>
+          {% endfor %}
+        </div>
+      </div>
+    </section>
+  {% endif %}
+
   <main class="{{ cards_grid_class }}" id="cardsGrid" aria-label="{{ intro_title }} grid">
     {% if games %}
       {% for game in games %}

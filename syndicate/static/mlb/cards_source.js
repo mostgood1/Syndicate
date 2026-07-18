@@ -32,6 +32,7 @@
     filters: document.getElementById("cardsFilters"),
     scoreboard: document.getElementById("cardsScoreboard"),
     hrTargets: document.getElementById("cardsHrTargets"),
+    kTargets: document.getElementById("cardsKTargets"),
     grid: document.getElementById("cardsGrid"),
   };
 
@@ -3321,6 +3322,91 @@
       </div>`;
   }
 
+  function renderKTargets() {
+    if (!root.kTargets) return;
+    const kTargets = state.payload?.kTargets || {};
+    const rows = Array.isArray(kTargets.topRows) ? kTargets.topRows : [];
+    const href = String(kTargets.pageHref || `/mlb/k-ladder-targets?date=${encodeURIComponent(state.date)}`);
+
+    if (!kTargets.found || !rows.length) {
+      root.kTargets.innerHTML = `
+        <div class="cards-hr-targets-card">
+          <div class="cards-hr-targets-head">
+            <div class="cards-hr-targets-copy">
+              <div class="cards-hr-targets-kicker">Best K-line looks</div>
+              <div class="cards-table-title">K Targets</div>
+              <div class="cards-mini-copy">No K targets are available for this slate yet.</div>
+            </div>
+            <a class="cards-nav-pill" href="${escapeHtml(href)}">Open board</a>
+          </div>
+        </div>`;
+      return;
+    }
+
+    root.kTargets.innerHTML = `
+      <div class="cards-hr-targets-card">
+        <div class="cards-hr-targets-head">
+          <div class="cards-hr-targets-copy">
+            <div class="cards-hr-targets-kicker">Best K-line looks</div>
+            <div class="cards-table-title">K Targets</div>
+            <div class="cards-mini-copy">${escapeHtml(String(kTargets.rows || 0))} targets across ${escapeHtml(String(kTargets.games || 0))} games.</div>
+          </div>
+          <div class="cards-hr-targets-actions">
+            ${kTargets.sourcePath ? `<span class="cards-source-meta-pill">${escapeHtml(kTargets.sourcePath)}</span>` : ""}
+            <a class="cards-nav-pill" href="${escapeHtml(href)}">Open board</a>
+          </div>
+        </div>
+        <div class="cards-hr-targets-grid">
+          ${rows.map((row, index) => `
+            <a class="cards-hr-target-chip" href="${escapeHtml(String(row.detailHref || href))}">
+              <div class="cards-hr-target-chip-top">
+                <span class="cards-hr-target-rank">#${index + 1}</span>
+                <span class="cards-source-meta-pill ${hrSupportToneClass(row.supportLabel)}">${escapeHtml(String(row.supportLabel || "watch"))}</span>
+              </div>
+              <div class="cards-hr-target-identity">
+                <div class="cards-hr-target-identity-main">
+                  ${row.headshotUrl
+                    ? `<img class="cards-hr-target-headshot" src="${escapeHtml(String(row.headshotUrl))}" alt="${escapeHtml(String(row.playerName || "Player"))}" loading="lazy" />`
+                    : `<div class="cards-hr-target-headshot cards-hr-target-headshot-fallback">${escapeHtml(hrTargetInitials(row.playerName))}</div>`}
+                  <div class="cards-hr-target-name-block">
+                    <div class="cards-hr-target-name">${escapeHtml(String(row.playerName || "Unknown"))}</div>
+                    <div class="cards-hr-target-meta">
+                      ${row.teamLogoUrl ? `<img class="cards-hr-target-team-logo" src="${escapeHtml(String(row.teamLogoUrl))}" alt="${escapeHtml(String(row.team || "Team"))}" loading="lazy" />` : ""}
+                      <span>${escapeHtml(String(row.team || ""))}</span>
+                      ${row.opponent ? `<span>vs ${escapeHtml(String(row.opponent))}</span>` : ""}
+                    </div>
+                  </div>
+                </div>
+                <div class="cards-hr-target-prob">
+                  ${escapeHtml(String(row.probability || "-"))}
+                  <span class="cards-hr-target-prob-label">${escapeHtml(String(row.probLabel || "K over"))}</span>
+                </div>
+              </div>
+              <div class="cards-hr-target-context-row">
+                <div class="cards-hr-target-context">${escapeHtml(String(row.matchup || ""))}</div>
+                ${row.opponentLogoUrl ? `<img class="cards-hr-target-opponent-logo" src="${escapeHtml(String(row.opponentLogoUrl))}" alt="${escapeHtml(String(row.opponent || "Opponent"))}" loading="lazy" />` : ""}
+              </div>
+              <div class="cards-hr-target-metrics">
+                <div class="cards-hr-target-pill">
+                  <strong>${escapeHtml(String(row.supportScoreDisplay || formatNumber(row.supportScore, 1)))}</strong>
+                  <span>support</span>
+                </div>
+                <div class="cards-hr-target-pill">
+                  <strong>${escapeHtml(row.marketLine == null ? "-" : formatNumber(row.marketLine, 1))}</strong>
+                  <span>line</span>
+                </div>
+                <div class="cards-hr-target-pill">
+                  <strong>${escapeHtml(formatNumber(row.soMean, 1))}</strong>
+                  <span>model K</span>
+                </div>
+              </div>
+              ${hrTargetDriverMarkup(row)}
+              <div class="cards-hr-target-summary">${escapeHtml(String(row.writeup || row.summary || row.matchup || ""))}</div>
+            </a>`).join("")}
+        </div>
+      </div>`;
+  }
+
   function renderScoreboard() {
     if (!root.scoreboard) return;
     root.scoreboard.innerHTML = "";
@@ -3674,6 +3760,7 @@
       renderHeaderMeta();
       renderSourceMeta();
       renderHrTargets();
+      renderKTargets();
       renderFilters();
 
       if (!silent || !slateUnchanged) {
@@ -3715,6 +3802,9 @@
       }
       if (root.hrTargets) {
         root.hrTargets.innerHTML = `<div class="cards-empty-state">Failed to load HR targets.<div class="cards-mini-copy">${escapeHtml(message)}</div></div>`;
+      }
+      if (root.kTargets) {
+        root.kTargets.innerHTML = `<div class="cards-empty-state">Failed to load K targets.<div class="cards-mini-copy">${escapeHtml(message)}</div></div>`;
       }
     } finally {
       state.loadingCards = false;

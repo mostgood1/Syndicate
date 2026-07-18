@@ -667,6 +667,61 @@ def _hr_targets_shelf(selected_date: str) -> dict[str, Any] | None:
     }
 
 
+def _k_targets_shelf(selected_date: str) -> dict[str, Any] | None:
+    summary_path = daily_artifact_path(selected_date, suffix="_k_targets")
+    summary = load_json_file(summary_path)
+    rows = summary.get("rows") if isinstance((summary or {}).get("rows"), list) else []
+    counts = summary.get("counts") if isinstance((summary or {}).get("counts"), dict) else {}
+    top_rows: list[dict[str, str]] = []
+    for index, row in enumerate(rows[:4], start=1):
+        if not isinstance(row, dict):
+            continue
+        support_score = _safe_float(row.get("k_support_score"))
+        pitcher_id = _safe_int(row.get("pitcher_id"))
+        team_id = _safe_int(row.get("team_id"))
+        opponent_team_id = _safe_int(row.get("opponent_team_id"))
+        reasons = [str(item).strip() for item in (row.get("k_target_reasons") or []) if str(item).strip()]
+        writeup = str(row.get("k_target_summary") or "").strip() or (" ".join(reasons[:2]) if reasons else "No summary available.")
+        line = _safe_float(row.get("market_line"))
+        top_rows.append(
+            {
+                "rank": f"#{index}",
+                "player_name": str(row.get("pitcher_name") or "Unknown pitcher").strip() or "Unknown pitcher",
+                "team": str(row.get("team") or "-").strip() or "-",
+                "opponent": str(row.get("opponent") or "-").strip() or "-",
+                "matchup": str(row.get("matchup") or "-").strip() or "-",
+                "probability": _format_pct(row.get("p_so_over")),
+                "prob_label": f"O {_format_num(line)} K" if line is not None else "K over",
+                "support": _format_num(support_score),
+                "summary": writeup,
+                "p_so_over": row.get("p_so_over"),
+                "support_score": support_score,
+                "support_label": str(row.get("k_support_label") or "").strip(),
+                "market_line": line,
+                "so_mean": row.get("so_mean"),
+                "writeup": writeup,
+                "headshot_url": _mlb_headshot_url(pitcher_id),
+                "team_logo_url": _mlb_logo_url(team_id),
+                "opponent_logo_url": _mlb_logo_url(opponent_team_id),
+                "drivers": reasons[:3],
+            }
+        )
+    if not top_rows:
+        return None
+    return {
+        "label": "Strikeout targets",
+        "title": "K Targets",
+        "kicker": "Best K-line looks",
+        "body": f"{len(rows)} targets surfaced for the slate.",
+        "href": f"/mlb/k-ladder-targets?date={selected_date}",
+        "cta": "Open board",
+        "source_path": Path(summary_path).name,
+        "row_count": int(counts.get("rows") or len(rows)),
+        "game_count": int(counts.get("games") or 0),
+        "rows": top_rows,
+    }
+
+
 def _market_title(row: dict[str, Any], away_abbr: str, home_abbr: str) -> str:
     player_name = str(row.get("player_name") or row.get("pitcher_name") or "").strip()
     selection = str(row.get("selection") or "pick").strip().title()
@@ -1920,6 +1975,8 @@ def source_cards_api_payload(context: dict[str, Any]) -> dict[str, Any]:
     games = context.get("games") if isinstance(context.get("games"), list) else []
     hr_targets = context.get("hr_targets_shelf") if isinstance(context.get("hr_targets_shelf"), dict) else None
     hr_rows = hr_targets.get("rows") if hr_targets and isinstance(hr_targets.get("rows"), list) else []
+    k_targets = context.get("k_targets_shelf") if isinstance(context.get("k_targets_shelf"), dict) else None
+    k_rows = k_targets.get("rows") if k_targets and isinstance(k_targets.get("rows"), list) else []
     selected_date = str(context.get("date") or "").strip()
     today_iso = central_today_iso()
     render_web_dyno = _render_web_dyno()
@@ -2066,6 +2123,38 @@ def source_cards_api_payload(context: dict[str, Any]) -> dict[str, Any]:
             }
         )
 
+    k_top_rows = []
+    for row in k_rows:
+        if not isinstance(row, dict):
+            continue
+        k_top_rows.append(
+            {
+                "playerName": str(row.get("player_name") or "").strip(),
+                "team": str(row.get("team") or "").strip(),
+                "opponent": str(row.get("opponent") or "").strip(),
+                "matchup": str(row.get("matchup") or "").strip(),
+                "pSoOver": row.get("p_so_over"),
+                "probability": str(row.get("probability") or "").strip(),
+                "probLabel": str(row.get("prob_label") or "").strip(),
+                "supportLabel": str(row.get("support_label") or "").strip(),
+                "supportScore": row.get("support_score"),
+                "supportScoreDisplay": str(row.get("support") or "").strip(),
+                "marketLine": row.get("market_line"),
+                "soMean": row.get("so_mean"),
+                "writeup": str(row.get("writeup") or row.get("summary") or "").strip(),
+                "summary": str(row.get("summary") or "").strip(),
+                "headshotUrl": str(row.get("headshot_url") or "").strip() or None,
+                "teamLogoUrl": str(row.get("team_logo_url") or "").strip() or None,
+                "opponentLogoUrl": str(row.get("opponent_logo_url") or "").strip() or None,
+                "drivers": [
+                    {"label": "Reason", "display": str(item).strip()}
+                    for item in (row.get("drivers") or [])
+                    if str(item).strip()
+                ],
+                "detailHref": k_targets.get("href") if k_targets else None,
+            }
+        )
+
     moneyline_games = 0
     totals_games = 0
     spread_games = 0
@@ -2202,6 +2291,14 @@ def source_cards_api_payload(context: dict[str, Any]) -> dict[str, Any]:
             "rows": int(hr_targets.get("row_count") or len(hr_rows)) if hr_targets else 0,
             "games": int(hr_targets.get("game_count") or len(source_cards)) if hr_targets else len(source_cards),
             "topRows": top_rows,
+        },
+        "kTargets": {
+            "found": bool(k_targets and k_top_rows),
+            "pageHref": k_targets.get("href") if k_targets else f"/mlb/k-ladder-targets?date={context.get('date')}",
+            "sourcePath": k_targets.get("source_path") if k_targets else None,
+            "rows": int(k_targets.get("row_count") or len(k_rows)) if k_targets else 0,
+            "games": int(k_targets.get("game_count") or len(source_cards)) if k_targets else len(source_cards),
+            "topRows": k_top_rows,
         },
     }
     if cache_key is not None:
@@ -4657,6 +4754,7 @@ def build_cards_page_context(selected_date: str) -> dict[str, Any]:
         "intro_title": "MLB Cards",
         "intro_body": "This is the first real Syndicate route expanded from the MLB app. The layout now follows the MLB card-page structure, and reusable pieces are being extracted into the shared layer immediately.",
         "hr_targets_shelf": _hr_targets_shelf(resolved_date),
+        "k_targets_shelf": _k_targets_shelf(resolved_date),
         "show_app_header": False,
         "show_intro": False,
         "show_source_summary": False,
