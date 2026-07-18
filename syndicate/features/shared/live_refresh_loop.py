@@ -979,6 +979,59 @@ def _pregame_relaunch_cooldown_seconds() -> int:
 	return max(0, value)
 
 
+def _last_odds_refresh_launch_path() -> Path:
+	return _meta_dir() / "last_odds_refresh_launch.json"
+
+
+def _read_last_odds_refresh_launch() -> dict[str, Any]:
+	payload = read_json_file(_last_odds_refresh_launch_path())
+	return payload if isinstance(payload, dict) else {}
+
+
+def _record_odds_refresh_launch(epoch: float) -> None:
+	write_json_file(_last_odds_refresh_launch_path(), {"epoch": epoch, "recordedAt": _utc_now()})
+
+
+def _odds_refresh_starvation_ceiling_seconds() -> int:
+	# The sim-vs-refresh mutual-exclusion gate (see the "MLB daily sim is still
+	# running" check below) was added to stop two heavy pipelines stacking in
+	# the same container. It didn't account for MLB sims relaunching
+	# back-to-back on fingerprint changes (lineup/odds movement) throughout a
+	# live slate -- confirmed in production 2026-07-18: sims chained for 90+
+	# minutes straight, deferring every single odds-refresh tick in that
+	# window, so WNBA/live odds/intelligence data went stale and the board
+	# emptied out. This bounds the worst case: however long the sim mutex has
+	# been blocking, force the refresh through after this many seconds of
+	# staleness rather than deferring indefinitely -- a stale board is worse
+	# than an occasional OOM-restart, which Render recovers from
+	# automatically anyway.
+	raw = str(os.environ.get("SYNDICATE_LIVE_ODDS_REFRESH_STARVATION_CEILING_SECONDS") or "").strip()
+	try:
+		value = int(raw or 900)
+	except Exception:
+		value = 900
+	return max(0, value)
+
+
+def _odds_refresh_starved(*, now_epoch: float) -> bool:
+	ceiling = _odds_refresh_starvation_ceiling_seconds()
+	if ceiling <= 0:
+		return True
+	last = _read_last_odds_refresh_launch()
+	last_epoch = float(last.get("epoch") or 0.0)
+	if last_epoch <= 0.0:
+		# No prior successful refresh recorded -- most commonly a cold worker
+		# start where the very first tick's "first_appearance" sim launch and
+		# the odds-refresh gate land in the same tick. Treat as NOT starved
+		# (preserve the original defer behavior) rather than forcing the
+		# refresh through, since _MLB_SIM_PROCESS can only be non-None if
+		# THIS process already launched a sim -- i.e. this is exactly the
+		# stack-two-heavy-pipelines-at-once case the gate exists to prevent,
+		# not the chained-relaunch staleness case the ceiling exists to bound.
+		return False
+	return (now_epoch - last_epoch) >= ceiling
+
+
 def _last_pregame_launch_path() -> Path:
 	return _meta_dir() / "last_pregame_refresh_launch.json"
 
@@ -1075,7 +1128,7 @@ def _run_live_refresh_tick() -> dict[str, Any]:
 			meta["mlbDailySim"] = {"launched": False, "reason": mlb_decision.get("reason")}
 	except Exception as exc:
 		meta["mlbDailySim"] = {"launched": False, "error": f"{type(exc).__name__}: {exc}"}
-	if _mlb_daily_sim_process_still_running():
+	if _mlb_daily_sim_process_still_running() and not _odds_refresh_starved(now_epoch=tick_started_epoch):
 		# Mirror of the mlbDailySim gate above (is_refresh_run_active): that gate
 		# only stops a NEW sim from launching on top of an in-flight odds refresh,
 		# but does nothing once a sim IS running -- the live-phase tick still
@@ -1086,6 +1139,12 @@ def _run_live_refresh_tick() -> dict[str, Any]:
 		# both pipelines resident at once. Skipping here is symmetric with the
 		# existing one-directional gate and equally conservative -- a delayed
 		# odds tick is cheap, a container OOM-kill is not.
+		#
+		# Bounded by _odds_refresh_starved(): sims relaunching back-to-back on
+		# fingerprint changes throughout a live slate (confirmed in production
+		# 2026-07-18, 90+ minutes straight) made this defer indefinitely,
+		# starving WNBA/live odds/intelligence data and emptying the board.
+		# Past the starvation ceiling, refresh proceeds regardless of sim state.
 		meta["ok"] = False
 		meta["skipped"] = True
 		meta["error"] = "odds refresh deferred: MLB daily sim is still running (avoid stacking two heavy pipelines in the same container)"
@@ -1112,6 +1171,7 @@ def _run_live_refresh_tick() -> dict[str, Any]:
 			)
 			meta["ok"] = True
 			meta["result"] = result
+			_record_odds_refresh_launch(tick_started_epoch)
 			if force_sim_rerun:
 				print(f"[live_refresh_loop] LINEUP_INJURY_CHANGE_RESIM_TRIGGERED date={meta['date']} phase={meta['phase']}", flush=True)
 		except ValueError as exc:
