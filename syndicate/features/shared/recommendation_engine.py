@@ -985,15 +985,20 @@ def filter_candidates(
         before_rows = candidate_rows
         after_rows = filtered
 
-        def _summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
-            def _count(target: str) -> int:
-                return sum(1 for row in rows if str(row.get("sport_slug") or row.get("sport") or "").strip().lower() == target)
+        def _row_sport(row: dict[str, Any]) -> str:
+            return str(row.get("sport_slug") or row.get("sport") or "").strip().lower() or "unknown"
 
-            return {
-                "total": len(rows),
-                "wnba": _count("wnba"),
-                "mlb": _count("mlb"),
-            }
+        def _summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
+            by_sport: dict[str, int] = {}
+            for row in rows:
+                sport_key = _row_sport(row)
+                by_sport[sport_key] = by_sport.get(sport_key, 0) + 1
+            return {"total": len(rows), "by_sport": by_sport}
+
+        rejected_by_sport: dict[str, list[dict[str, Any]]] = {}
+        for item in rejected:
+            rejected_by_sport.setdefault(_row_sport(item), []).append(item)
+        rejected_by_sport = {sport_key: items[:10] for sport_key, items in rejected_by_sport.items()}
 
         logger.info(
             json.dumps(
@@ -1006,7 +1011,7 @@ def filter_candidates(
                         reason: sum(1 for item in rejected if item.get("reason") == reason)
                         for reason in sorted({item.get("reason") for item in rejected if item.get("reason")})
                     },
-                    "rejected_wnba": [item for item in rejected if item.get("sport") == "wnba"][:10],
+                    "rejected_by_sport": rejected_by_sport,
                 },
                 sort_keys=True,
                 default=str,
