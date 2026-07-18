@@ -89,6 +89,34 @@ def _read_container_memory_current_bytes() -> int | None:
     return None
 
 
+def _read_container_memory_max_bytes() -> int | None:
+    # memory.current alone can't say how close a container is to being
+    # OOM-killed -- it includes reclaimable page cache and looks alarming
+    # even when nothing is actually at risk. This reads the cgroup's own
+    # configured ceiling so callers can compute real headroom instead of
+    # guessing from the raw usage number.
+    candidates = (
+        Path("/sys/fs/cgroup/memory.max"),
+        Path("/sys/fs/cgroup/memory/memory.limit_in_bytes"),
+    )
+    for candidate in candidates:
+        try:
+            if not candidate.exists() or not candidate.is_file():
+                continue
+            raw = candidate.read_text(encoding="utf-8", errors="ignore").strip()
+            if not raw or raw == "max":
+                continue
+            value = int(raw)
+            # cgroup v1's unset limit_in_bytes reads as a huge sentinel
+            # (commonly 2^63-1 rounded to page size) rather than "max".
+            if value >= (1 << 62):
+                continue
+            return value
+        except Exception:
+            continue
+    return None
+
+
 def _process_cmdline(value: Any) -> list[str]:
     if not value:
         return []
@@ -351,10 +379,14 @@ def get_all_process_memory_snapshot() -> dict[str, Any]:
             accounted_rss_bytes += rss_bytes
 
     container_memory_bytes = _read_container_memory_current_bytes()
+    container_memory_max_bytes = _read_container_memory_max_bytes()
     payload = {
         "process_count": len(processes),
         "accounted_rss_mb": _bytes_to_mb(accounted_rss_bytes),
         "container_memory_mb": _bytes_to_mb(container_memory_bytes),
+        "container_memory_max_mb": _bytes_to_mb(container_memory_max_bytes),
+        "container_memory_headroom_mb": None,
+        "container_memory_pct_of_max": None,
         "unexplained_memory_mb": None,
         "processes": processes,
         "process_enum_debug": {
@@ -366,6 +398,9 @@ def get_all_process_memory_snapshot() -> dict[str, Any]:
     }
     if isinstance(container_memory_bytes, int):
         payload["unexplained_memory_mb"] = _bytes_to_mb(container_memory_bytes - accounted_rss_bytes)
+        if isinstance(container_memory_max_bytes, int) and container_memory_max_bytes > 0:
+            payload["container_memory_headroom_mb"] = _bytes_to_mb(container_memory_max_bytes - container_memory_bytes)
+            payload["container_memory_pct_of_max"] = round(100.0 * container_memory_bytes / container_memory_max_bytes, 1)
     return payload
 
 
@@ -379,10 +414,17 @@ def log_process_tree_memory(stage: str, **extra: Any) -> dict[str, Any]:
 
 def log_container_memory(stage: str, **extra: Any) -> dict[str, Any]:
     memory_current_bytes = _read_container_memory_current_bytes()
+    memory_max_bytes = _read_container_memory_max_bytes()
     payload = {
         "stage": str(stage or "").strip() or "unknown",
         "memory_current_mb": _bytes_to_mb(memory_current_bytes),
+        "memory_max_mb": _bytes_to_mb(memory_max_bytes),
+        "memory_headroom_mb": None,
+        "memory_pct_of_max": None,
     }
+    if isinstance(memory_current_bytes, int) and isinstance(memory_max_bytes, int) and memory_max_bytes > 0:
+        payload["memory_headroom_mb"] = _bytes_to_mb(memory_max_bytes - memory_current_bytes)
+        payload["memory_pct_of_max"] = round(100.0 * memory_current_bytes / memory_max_bytes, 1)
     payload.update(extra)
     print(f"CONTAINER_MEMORY {json.dumps(payload, default=str, sort_keys=True)}", file=sys.stderr, flush=True)
     return payload
