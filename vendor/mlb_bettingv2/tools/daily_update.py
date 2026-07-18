@@ -865,6 +865,43 @@ def _process_exists(pid: Any) -> bool:
     return True
 
 
+def _process_cmdline(pid: Any) -> Optional[List[str]]:
+    try:
+        pid_i = int(pid or 0)
+    except Exception:
+        return None
+    if pid_i <= 0:
+        return None
+    if sys.platform.startswith("win") or os.name == "nt":
+        return None
+    try:
+        raw = Path(f"/proc/{pid_i}/cmdline").read_bytes()
+    except Exception:
+        return None
+    parts = [part.decode("utf-8", errors="ignore") for part in raw.split(b"\x00") if part]
+    return parts or None
+
+
+def _process_matches_lock(pid: Any, expected_command: Any) -> bool:
+    """Guard against PID reuse: on Render's low-PID-churn containers, a dead
+    lock holder's PID can be reassigned to an unrelated process within
+    minutes, making a stale lock look perpetually "held" via _process_exists
+    (a pure liveness probe with no identity check) alone. Compares the live
+    process's actual cmdline against what the lock metadata recorded when it
+    was acquired; a mismatch means the PID was reused and the lock is stale
+    regardless of its age.
+    """
+    current = _process_cmdline(pid)
+    if current is None:
+        # Can't verify (Windows, /proc unavailable, process just exited) --
+        # fall back to trusting the existing PID-liveness check alone.
+        return True
+    expected = expected_command if isinstance(expected_command, list) else []
+    if not expected:
+        return True
+    return [str(part) for part in current] == [str(part) for part in expected]
+
+
 def _daily_update_run_lock_path(*, workflow: str, season: int, date_str: str, out_ROOT_DIR: Path) -> Path:
     normalized_out = str(out_ROOT_DIR.resolve()).replace("\\", "/").lower()
     out_digest = hashlib.sha1(normalized_out.encode("utf-8")).hexdigest()[:12]
@@ -882,9 +919,9 @@ def _run_lock_expired(metadata: Dict[str, Any]) -> bool:
     run should outlive this window.
     """
     try:
-        max_age_hours = float(os.environ.get("MLB_DAILY_UPDATE_LOCK_MAX_AGE_HOURS") or 3.0)
+        max_age_hours = float(os.environ.get("MLB_DAILY_UPDATE_LOCK_MAX_AGE_HOURS") or 1.0)
     except Exception:
-        max_age_hours = 3.0
+        max_age_hours = 1.0
     created_raw = str((metadata or {}).get("created_at") or "").strip()
     if not created_raw:
         return True
@@ -926,7 +963,11 @@ def _acquire_daily_update_run_lock(*, workflow: str, season: int, date_str: str,
             fd = os.open(str(lock_path), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
         except FileExistsError:
             existing = _read_run_lock_metadata(lock_path)
-            if _process_exists(existing.get("pid")) and not _run_lock_expired(existing):
+            if (
+                _process_exists(existing.get("pid"))
+                and _process_matches_lock(existing.get("pid"), existing.get("command"))
+                and not _run_lock_expired(existing)
+            ):
                 return None, existing
             try:
                 lock_path.unlink()
