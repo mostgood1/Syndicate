@@ -390,6 +390,34 @@ class LiveRefreshLoopTests(unittest.TestCase):
         mocked_launch.assert_not_called()
         mocked_record.assert_not_called()
 
+    def test_run_tick_defers_odds_refresh_while_mlb_daily_sim_is_running(self) -> None:
+        # Production incident: is_refresh_run_active() only stops a NEW sim
+        # from launching on top of an in-flight odds refresh -- it does
+        # nothing once a sim IS running, so the live-phase ~60s tick kept
+        # relaunching the full odds-refresh pipeline (which can spike WNBA to
+        # 1.3-1.5GB RSS) on top of the resident sim process tree for its
+        # whole ~45-55min run. ALL_PROCESS_MEMORY snapshots from Render
+        # showed the container hitting 2048/2048MB (100%) with both
+        # pipelines resident at once. This is the symmetric gate.
+        with patch.dict(
+            os.environ,
+            {"SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP": "true", "SYNDICATE_LIVE_ODDS_REFRESH_ADAPTIVE": "false"},
+            clear=False,
+        ), patch.object(live_refresh_loop, "central_today_iso", return_value="2026-07-18"), patch.object(
+            live_refresh_loop, "_should_force_sim_rerun", return_value=False
+        ), patch.object(
+            live_refresh_loop, "_mlb_daily_sim_process_still_running", return_value=True
+        ), patch.object(
+            live_refresh_loop,
+            "launch_refresh_run",
+        ) as mocked_launch:
+            payload = live_refresh_loop._run_live_refresh_tick()
+
+        self.assertFalse(payload["ok"])
+        self.assertTrue(payload["skipped"])
+        self.assertIn("MLB daily sim is still running", payload["error"])
+        mocked_launch.assert_not_called()
+
     def test_run_tick_uses_live_phase_and_short_interval_when_a_game_is_live(self) -> None:
         with patch.dict(
             os.environ,

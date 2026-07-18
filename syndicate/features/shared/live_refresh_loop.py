@@ -1038,7 +1038,21 @@ def _run_live_refresh_tick() -> dict[str, Any]:
 			meta["mlbDailySim"] = {"launched": False, "reason": mlb_decision.get("reason")}
 	except Exception as exc:
 		meta["mlbDailySim"] = {"launched": False, "error": f"{type(exc).__name__}: {exc}"}
-	if effective_phase == "pregame" and _pregame_relaunch_blocked(now_epoch=tick_started_epoch, date_str=selected_date):
+	if _mlb_daily_sim_process_still_running():
+		# Mirror of the mlbDailySim gate above (is_refresh_run_active): that gate
+		# only stops a NEW sim from launching on top of an in-flight odds refresh,
+		# but does nothing once a sim IS running -- the live-phase tick still
+		# fired every ~60s regardless, relaunching the full odds-refresh pipeline
+		# (which can itself spike WNBA to 1.3-1.5GB RSS) on top of the resident
+		# sim process tree for its whole ~45-55min run. Confirmed via production
+		# ALL_PROCESS_MEMORY snapshots: container hit 2048/2048MB (100%) with
+		# both pipelines resident at once. Skipping here is symmetric with the
+		# existing one-directional gate and equally conservative -- a delayed
+		# odds tick is cheap, a container OOM-kill is not.
+		meta["ok"] = False
+		meta["skipped"] = True
+		meta["error"] = "odds refresh deferred: MLB daily sim is still running (avoid stacking two heavy pipelines in the same container)"
+	elif effective_phase == "pregame" and _pregame_relaunch_blocked(now_epoch=tick_started_epoch, date_str=selected_date):
 		meta["ok"] = False
 		meta["skipped"] = True
 		meta["error"] = "pregame refresh relaunch blocked by cooldown (previous attempt still within cooldown window)"
