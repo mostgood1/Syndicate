@@ -9,6 +9,7 @@ from typing import Any
 
 from syndicate.features.mlb.ladders_common import build_module_links
 from syndicate.features.mlb.sources import daily_artifact_path
+from syndicate.features.mlb.sources import daily_snapshot_oddsapi_hitter_props_path
 from syndicate.features.mlb.sources import default_mlb_source_root
 from syndicate.features.mlb.sources import load_json_file
 
@@ -361,6 +362,70 @@ def _mlb_headshot_url(player_id: int | None) -> str | None:
     )
 
 
+def _normalize_hr_market_name(value: Any) -> str:
+    import unicodedata
+
+    text = " ".join(str(value or "").strip().lower().split())
+    normalized = unicodedata.normalize("NFKD", text)
+    return "".join(ch for ch in normalized if not unicodedata.combining(ch))
+
+
+def _american_odds_implied_prob(odds: Any) -> float | None:
+    try:
+        value = int(odds)
+    except Exception:
+        return None
+    if value == 0:
+        return None
+    if value > 0:
+        return 100.0 / (float(value) + 100.0)
+    return float(-value) / (float(-value) + 100.0)
+
+
+@lru_cache(maxsize=64)
+def _hr_market_lines(selected_date: str) -> dict[str, dict[str, Any]]:
+    # Real HR-prop pricing from the same daily OddsAPI snapshot the sim
+    # pipeline reads for market lines elsewhere -- HR Targets had no
+    # model-vs-market comparison at all before this (a real gap flagged by
+    # the 2026-07-17 audit); K Ladder Targets was built market-aware from
+    # the start, this brings HR Targets to the same standard. HR props are
+    # typically single-sided (over_odds only, no true under price), so this
+    # is a plain implied probability from the over price, not a no-vig
+    # removal -- labeled as "market implied" in the UI to avoid overclaiming
+    # precision the single-sided price doesn't support.
+    path = daily_snapshot_oddsapi_hitter_props_path(selected_date)
+    doc = load_json_file(path)
+    raw = (doc or {}).get("hitter_props") if isinstance(doc, dict) else None
+    if not isinstance(raw, dict):
+        return {}
+    out: dict[str, dict[str, Any]] = {}
+    for name, markets in raw.items():
+        if not isinstance(markets, dict):
+            continue
+        hr_market = markets.get("batter_home_runs")
+        if not isinstance(hr_market, dict):
+            continue
+        out[_normalize_hr_market_name(name)] = hr_market
+    return out
+
+
+def _hr_market_context(player_name: str, selected_date: str, model_prob: float | None) -> dict[str, Any]:
+    lines = _hr_market_lines(selected_date)
+    market = lines.get(_normalize_hr_market_name(player_name))
+    if not isinstance(market, dict):
+        return {}
+    over_odds = market.get("over_odds")
+    implied_prob = _american_odds_implied_prob(over_odds)
+    edge = None
+    if implied_prob is not None and model_prob is not None:
+        edge = float(model_prob) - float(implied_prob)
+    return {
+        "market_odds": over_odds,
+        "market_implied_prob": implied_prob,
+        "market_edge": edge,
+    }
+
+
 def _support_score_display(score: float | None) -> str:
     if score is None:
         return "-"
@@ -429,6 +494,8 @@ def _targets_from_summary(summary: dict[str, Any], *, selected_date: str = "", l
         opponent = str(row.get("opponent") or "").strip() or "-"
         summary_text = _hr_target_writeup(row)
         player_name = str(row.get("player_name") or "").strip() or "Unknown hitter"
+        p_hr_1plus = _safe_float(row.get("p_hr_1plus"))
+        market_context = _hr_market_context(player_name, selected_date, p_hr_1plus) if selected_date else {}
         target = dict(source_row)
         target.update(
             {
@@ -440,7 +507,10 @@ def _targets_from_summary(summary: dict[str, Any], *, selected_date: str = "", l
                 "support": _format_num(support_score),
                 "summary": summary_text,
                 "reasons": [str(item).strip() for item in (row.get("hr_target_reasons") or []) if str(item).strip()][:3],
-                "p_hr_1plus": _safe_float(row.get("p_hr_1plus")),
+                "p_hr_1plus": p_hr_1plus,
+                "market_odds": market_context.get("market_odds"),
+                "market_implied_prob": market_context.get("market_implied_prob"),
+                "market_edge": market_context.get("market_edge"),
                 "support_score": support_score,
                 "support_score_raw": support_score_raw,
                 "support_label": str(row.get("hr_support_label") or "").strip(),
@@ -574,6 +644,17 @@ def _hr_target_context_table(target: dict[str, Any]) -> list[dict[str, Any]]:
     if lineup_status:
         lineup_rows.append({"name": "Lineup status", "detail": "", "value": (lineup_status.replace("_", " ").title() + (f" ({lineup_confidence})" if lineup_confidence else ""))})
 
+    market_rows: list[dict[str, str]] = []
+    market_odds = target.get("market_odds")
+    if market_odds is not None:
+        market_rows.append({"name": "HR prop price", "detail": "over 0.5 HR", "value": str(market_odds)})
+    market_implied = _safe_float(target.get("market_implied_prob"))
+    if market_implied is not None:
+        market_rows.append({"name": "Market implied", "detail": "from odds, not no-vig", "value": _pct(market_implied) or "-"})
+    market_edge = _safe_float(target.get("market_edge"))
+    if market_edge is not None:
+        market_rows.append({"name": "Model vs. market", "detail": "", "value": f"{market_edge * 100.0:+.1f}pt"})
+
     groups: list[dict[str, Any]] = []
     if pitcher_rows:
         groups.append({"heading": f"Opposing pitcher", "rows": pitcher_rows})
@@ -581,6 +662,8 @@ def _hr_target_context_table(target: dict[str, Any]) -> list[dict[str, Any]]:
         groups.append({"heading": "Park & weather", "rows": park_rows})
     if lineup_rows:
         groups.append({"heading": "Lineup", "rows": lineup_rows})
+    if market_rows:
+        groups.append({"heading": "Market", "rows": market_rows})
     return groups
 
 
