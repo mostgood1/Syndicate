@@ -48,6 +48,12 @@ class ScheduleEvent:
     home: str
     away: str
     start_time_utc: str | None  # ISO8601 "...Z"; None if the source couldn't resolve a time
+    # MLB-only (other sports leave these None): StatsAPI numeric team ids, needed
+    # to slice lineups_last_known_by_team.json (keyed by team_id) down to a single
+    # game for per-game sim-input fingerprinting. See live_refresh_loop.py's
+    # _mlb_sim_input_fingerprint_by_game().
+    home_team_id: int | None = None
+    away_team_id: int | None = None
 
     def start_time_epoch(self) -> float | None:
         if not self.start_time_utc:
@@ -106,12 +112,21 @@ def _event_from_row(sport: str, row: dict[str, Any]) -> ScheduleEvent | None:
     if not event_id or not home or not away:
         return None
     start_time_utc = row.get("start_time_utc")
+
+    def _team_id(value: Any) -> int | None:
+        try:
+            return int(value) if value is not None else None
+        except Exception:
+            return None
+
     return ScheduleEvent(
         sport=sport,
         event_id=event_id,
         home=home,
         away=away,
         start_time_utc=str(start_time_utc).strip() if start_time_utc else None,
+        home_team_id=_team_id(row.get("home_team_id")),
+        away_team_id=_team_id(row.get("away_team_id")),
     )
 
 

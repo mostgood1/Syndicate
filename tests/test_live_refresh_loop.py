@@ -480,6 +480,182 @@ class LiveRefreshLoopTests(unittest.TestCase):
         self.assertTrue(payload["ok"])
         mocked_launch.assert_called_once()
 
+    # -- Per-game MLB sim scoping --------------------------------------------
+    # Root fix for the sim-chaining problem above: a lineup/odds/pitcher
+    # fingerprint change or a tip-off window used to resim the WHOLE day's
+    # slate. These fingerprint/decision/launch functions now scope to just
+    # the game(s) actually impacted.
+
+    def test_mlb_sim_input_fingerprint_by_game_isolates_changed_game(self) -> None:
+        with TemporaryDirectory() as tmp_dir:
+            data_root = Path(tmp_dir)
+            daily_dir = data_root / "mlb_source" / "source_artifacts" / "data" / "daily"
+            daily_dir.mkdir(parents=True, exist_ok=True)
+            lineups_path = daily_dir / "lineups_last_known_by_team.json"
+            lineups_path.write_text(json.dumps({"144": {"ids": [1, 2, 3]}, "116": {"ids": [4, 5, 6]}}), encoding="utf-8")
+
+            events = [
+                live_refresh_loop.ScheduleEvent(sport="mlb", event_id="100", home="Atlanta Braves", away="Detroit Tigers", start_time_utc=None, home_team_id=144, away_team_id=116),
+                live_refresh_loop.ScheduleEvent(sport="mlb", event_id="200", home="Boston Red Sox", away="New York Yankees", start_time_utc=None, home_team_id=111, away_team_id=147),
+            ]
+
+            with patch.dict(os.environ, {"SYNDICATE_DATA_ROOT": str(data_root)}, clear=False):
+                before = live_refresh_loop._mlb_sim_input_fingerprint_by_game("2026-07-19", events)
+
+            # Only team 144's (game 100's home team) lineup changes.
+            lineups_path.write_text(json.dumps({"144": {"ids": [1, 2, 999]}, "116": {"ids": [4, 5, 6]}}), encoding="utf-8")
+            with patch.dict(os.environ, {"SYNDICATE_DATA_ROOT": str(data_root)}, clear=False):
+                after = live_refresh_loop._mlb_sim_input_fingerprint_by_game("2026-07-19", events)
+
+        self.assertNotEqual(before["100"], after["100"])
+        self.assertEqual(before["200"], after["200"])
+
+    def test_mlb_sim_input_fingerprint_by_game_degrades_without_team_ids(self) -> None:
+        with TemporaryDirectory() as tmp_dir:
+            data_root = Path(tmp_dir)
+            events = [live_refresh_loop.ScheduleEvent(sport="mlb", event_id="100", home="Atlanta Braves", away="Detroit Tigers", start_time_utc=None)]
+            with patch.dict(os.environ, {"SYNDICATE_DATA_ROOT": str(data_root)}, clear=False):
+                fingerprints = live_refresh_loop._mlb_sim_input_fingerprint_by_game("2026-07-19", events)
+
+        self.assertIn("100", fingerprints)
+
+    def test_mlb_daily_sim_decision_fingerprint_change_isolates_one_game(self) -> None:
+        events = [
+            live_refresh_loop.ScheduleEvent(sport="mlb", event_id="100", home="A", away="B", start_time_utc=None),
+            live_refresh_loop.ScheduleEvent(sport="mlb", event_id="200", home="C", away="D", start_time_utc=None),
+            live_refresh_loop.ScheduleEvent(sport="mlb", event_id="300", home="E", away="F", start_time_utc=None),
+        ]
+        with patch.dict(os.environ, {"SYNDICATE_ENABLE_MLB_DAILY_SIM_TRIGGER": "true"}, clear=False), patch.object(
+            live_refresh_loop, "_mlb_daily_sim_process_still_running", return_value=False
+        ), patch.object(live_refresh_loop, "is_refresh_run_active", return_value=False), patch.object(
+            live_refresh_loop, "fetch_schedule_for_date", return_value=events
+        ), patch.object(
+            live_refresh_loop, "_mlb_daily_summary_path"
+        ) as mocked_summary_path, patch.object(
+            live_refresh_loop, "events_starting_within", return_value=[]
+        ), patch.object(
+            live_refresh_loop, "_read_last_mlb_sim_check", return_value={"epoch": 1000.0, "date": "2026-07-19", "fingerprints": {"100": "aaa", "200": "bbb", "300": "ccc"}}
+        ), patch.object(
+            live_refresh_loop, "_mlb_sim_input_fingerprint_by_game", return_value={"100": "aaa", "200": "CHANGED", "300": "ccc"}
+        ), patch.object(
+            live_refresh_loop, "_record_mlb_sim_check"
+        ) as mocked_record:
+            mocked_summary_path.return_value.exists.return_value = True
+            decision = live_refresh_loop._mlb_daily_sim_decision(now_epoch=2000.0, date_str="2026-07-19")
+
+        self.assertEqual(decision["reason"], "fingerprint_change")
+        self.assertEqual(decision["game_pks"], ["200"])
+        mocked_record.assert_called_once_with(2000.0, "2026-07-19", {"100": "aaa", "200": "CHANGED", "300": "ccc"}, launched=True)
+
+    def test_mlb_daily_sim_decision_falls_back_to_full_slate_on_first_ever_check(self) -> None:
+        events = [
+            live_refresh_loop.ScheduleEvent(sport="mlb", event_id="100", home="A", away="B", start_time_utc=None),
+            live_refresh_loop.ScheduleEvent(sport="mlb", event_id="200", home="C", away="D", start_time_utc=None),
+        ]
+        with patch.dict(os.environ, {"SYNDICATE_ENABLE_MLB_DAILY_SIM_TRIGGER": "true"}, clear=False), patch.object(
+            live_refresh_loop, "_mlb_daily_sim_process_still_running", return_value=False
+        ), patch.object(live_refresh_loop, "is_refresh_run_active", return_value=False), patch.object(
+            live_refresh_loop, "fetch_schedule_for_date", return_value=events
+        ), patch.object(
+            live_refresh_loop, "_mlb_daily_summary_path"
+        ) as mocked_summary_path, patch.object(
+            live_refresh_loop, "events_starting_within", return_value=[]
+        ), patch.object(
+            live_refresh_loop, "_read_last_mlb_sim_check", return_value={}
+        ), patch.object(
+            live_refresh_loop, "_mlb_sim_input_fingerprint_by_game", return_value={"100": "aaa", "200": "bbb"}
+        ), patch.object(live_refresh_loop, "_record_mlb_sim_check"):
+            mocked_summary_path.return_value.exists.return_value = True
+            decision = live_refresh_loop._mlb_daily_sim_decision(now_epoch=2000.0, date_str="2026-07-19")
+
+        self.assertEqual(decision["reason"], "fingerprint_change")
+        self.assertEqual(decision["game_pks"], ["100", "200"])
+
+    def test_mlb_daily_sim_decision_falls_back_to_full_slate_on_old_schema_record(self) -> None:
+        # Pre-migration records stored a singular "fingerprint" string, not
+        # "fingerprints". Reading .get("fingerprints") on that shape returns
+        # None -- must not crash, and must resim the whole slate this once.
+        events = [live_refresh_loop.ScheduleEvent(sport="mlb", event_id="100", home="A", away="B", start_time_utc=None)]
+        with patch.dict(os.environ, {"SYNDICATE_ENABLE_MLB_DAILY_SIM_TRIGGER": "true"}, clear=False), patch.object(
+            live_refresh_loop, "_mlb_daily_sim_process_still_running", return_value=False
+        ), patch.object(live_refresh_loop, "is_refresh_run_active", return_value=False), patch.object(
+            live_refresh_loop, "fetch_schedule_for_date", return_value=events
+        ), patch.object(
+            live_refresh_loop, "_mlb_daily_summary_path"
+        ) as mocked_summary_path, patch.object(
+            live_refresh_loop, "events_starting_within", return_value=[]
+        ), patch.object(
+            live_refresh_loop, "_read_last_mlb_sim_check", return_value={"epoch": 1000.0, "date": "2026-07-19", "fingerprint": "old-style-string"}
+        ), patch.object(
+            live_refresh_loop, "_mlb_sim_input_fingerprint_by_game", return_value={"100": "aaa"}
+        ), patch.object(live_refresh_loop, "_record_mlb_sim_check"):
+            mocked_summary_path.return_value.exists.return_value = True
+            decision = live_refresh_loop._mlb_daily_sim_decision(now_epoch=2000.0, date_str="2026-07-19")
+
+        self.assertEqual(decision["reason"], "fingerprint_change")
+        self.assertEqual(decision["game_pks"], ["100"])
+
+    def test_mlb_daily_sim_decision_tip_off_window_returns_only_starting_soon_game_pks(self) -> None:
+        all_events = [
+            live_refresh_loop.ScheduleEvent(sport="mlb", event_id="100", home="A", away="B", start_time_utc=None),
+            live_refresh_loop.ScheduleEvent(sport="mlb", event_id="200", home="C", away="D", start_time_utc=None),
+        ]
+        starting_soon = [all_events[1]]
+        with patch.dict(os.environ, {"SYNDICATE_ENABLE_MLB_DAILY_SIM_TRIGGER": "true"}, clear=False), patch.object(
+            live_refresh_loop, "_mlb_daily_sim_process_still_running", return_value=False
+        ), patch.object(live_refresh_loop, "is_refresh_run_active", return_value=False), patch.object(
+            live_refresh_loop, "fetch_schedule_for_date", return_value=all_events
+        ), patch.object(
+            live_refresh_loop, "_mlb_daily_summary_path"
+        ) as mocked_summary_path, patch.object(
+            live_refresh_loop, "events_starting_within", return_value=starting_soon
+        ):
+            mocked_summary_path.return_value.exists.return_value = True
+            decision = live_refresh_loop._mlb_daily_sim_decision(now_epoch=2000.0, date_str="2026-07-19")
+
+        self.assertEqual(decision["reason"], "tip_off_window")
+        self.assertEqual(decision["game_pks"], ["200"])
+
+    def test_mlb_daily_sim_decision_first_appearance_has_no_game_pks(self) -> None:
+        events = [live_refresh_loop.ScheduleEvent(sport="mlb", event_id="100", home="A", away="B", start_time_utc=None)]
+        with patch.dict(os.environ, {"SYNDICATE_ENABLE_MLB_DAILY_SIM_TRIGGER": "true"}, clear=False), patch.object(
+            live_refresh_loop, "_mlb_daily_sim_process_still_running", return_value=False
+        ), patch.object(live_refresh_loop, "is_refresh_run_active", return_value=False), patch.object(
+            live_refresh_loop, "fetch_schedule_for_date", return_value=events
+        ), patch.object(
+            live_refresh_loop, "_mlb_daily_summary_path"
+        ) as mocked_summary_path:
+            mocked_summary_path.return_value.exists.return_value = False
+            decision = live_refresh_loop._mlb_daily_sim_decision(now_epoch=2000.0, date_str="2026-07-19")
+
+        self.assertEqual(decision["reason"], "first_appearance")
+        self.assertNotIn("game_pks", decision)
+
+    def test_launch_mlb_daily_sim_includes_only_game_pks_flag_when_scoped(self) -> None:
+        with patch.object(live_refresh_loop.subprocess, "Popen") as mocked_popen:
+            mocked_popen.return_value.pid = 4242
+            live_refresh_loop._launch_mlb_daily_sim("2026-07-19", {"reason": "fingerprint_change", "game_pks": ["200", "100"]})
+
+        command = mocked_popen.call_args[0][0]
+        self.assertIn("--only-game-pks", command)
+        self.assertEqual(command[command.index("--only-game-pks") + 1], "100,200")
+
+    def test_launch_mlb_daily_sim_omits_only_game_pks_flag_for_first_appearance(self) -> None:
+        with patch.object(live_refresh_loop.subprocess, "Popen") as mocked_popen:
+            mocked_popen.return_value.pid = 4242
+            live_refresh_loop._launch_mlb_daily_sim("2026-07-19", {"reason": "first_appearance"})
+
+        command = mocked_popen.call_args[0][0]
+        self.assertNotIn("--only-game-pks", command)
+
+    def test_launch_mlb_daily_sim_omits_only_game_pks_flag_for_evening_next_day(self) -> None:
+        with patch.object(live_refresh_loop.subprocess, "Popen") as mocked_popen:
+            mocked_popen.return_value.pid = 4242
+            live_refresh_loop._launch_mlb_daily_sim("2026-07-20", {"reason": "evening_next_day_sim", "date": "2026-07-20"})
+
+        command = mocked_popen.call_args[0][0]
+        self.assertNotIn("--only-game-pks", command)
+
     def test_run_tick_uses_live_phase_and_short_interval_when_a_game_is_live(self) -> None:
         with patch.dict(
             os.environ,

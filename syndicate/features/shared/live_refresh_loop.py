@@ -18,6 +18,7 @@ from syndicate.features.shared.ops_refresh import is_refresh_run_active
 from syndicate.features.shared.ops_refresh import launch_refresh_run
 from syndicate.features.shared.schedule_adapter import events_starting_within
 from syndicate.features.shared.schedule_adapter import fetch_schedule_for_date
+from syndicate.features.shared.schedule_adapter import ScheduleEvent
 from syndicate.features.shared.refresh_state_store import data_root
 from syndicate.features.shared.refresh_state_store import read_json_file
 from syndicate.features.shared.refresh_state_store import reports_root
@@ -537,10 +538,14 @@ def _read_last_mlb_sim_check() -> dict[str, Any]:
 	return payload if isinstance(payload, dict) else {}
 
 
-def _record_mlb_sim_check(epoch: float, date_str: str, fingerprint: str | None, *, launched: bool) -> None:
+def _record_mlb_sim_check(epoch: float, date_str: str, fingerprints: dict[str, str], *, launched: bool) -> None:
+	# Schema note: this used to store a single "fingerprint" string (one hash
+	# for the whole slate). Now stores "fingerprints", a {game_pk: hash} dict,
+	# so a per-game diff is possible. See _mlb_daily_sim_decision's migration
+	# handling for reading old-schema records left over from before this.
 	write_json_file(
 		_last_mlb_sim_check_path(),
-		{"epoch": epoch, "date": date_str, "fingerprint": fingerprint, "launched": bool(launched), "recordedAt": _utc_now()},
+		{"epoch": epoch, "date": date_str, "fingerprints": dict(fingerprints), "launched": bool(launched), "recordedAt": _utc_now()},
 	)
 
 
@@ -549,17 +554,69 @@ def _mlb_daily_summary_path(date_str: str) -> Path:
 	return data_root() / "mlb_source" / "source_artifacts" / "data" / "daily" / f"daily_summary_{date_slug}.json"
 
 
-def _mlb_sim_input_fingerprint(date_str: str) -> str | None:
+def _read_json_file_lenient(path: Path) -> Any | None:
+	try:
+		if not path.exists() or not path.is_file():
+			return None
+		return json.loads(path.read_text(encoding="utf-8"))
+	except Exception:
+		return None
+
+
+def _hash_json_value(value: Any) -> str:
+	try:
+		encoded = json.dumps(value, sort_keys=True, default=str).encode("utf-8")
+	except Exception:
+		encoded = repr(value).encode("utf-8", errors="replace")
+	return hashlib.sha256(encoded).hexdigest()
+
+
+def _mlb_sim_input_fingerprint_by_game(date_str: str, events: list[ScheduleEvent]) -> dict[str, str]:
+	# Was a single whole-file-hash blob covering all 3 sources at once (see
+	# git history) -- told you THAT something changed, never WHICH game, so
+	# every fingerprint_change trigger resimmed the entire day's slate. This
+	# slices each source down to one game's inputs so only the actually-
+	# changed game(s) need resimming.
 	root = data_root() / "mlb_source" / "source_artifacts" / "data"
 	date_slug = date_str.replace("-", "_")
-	parts = [
-		_hash_file_bytes(root / "daily" / "lineups_last_known_by_team.json"),
-		_hash_file_bytes(root / "market" / "oddsapi" / f"oddsapi_game_lines_{date_slug}.json"),
-		_hash_file_bytes(root / "manager" / "probable_pitcher_overrides.json"),
-	]
-	if all(part is None for part in parts):
-		return None
-	return "|".join(part or "" for part in parts)
+	lineups_doc = _read_json_file_lenient(root / "daily" / "lineups_last_known_by_team.json")
+	if not isinstance(lineups_doc, dict):
+		lineups_doc = {}
+	odds_doc = _read_json_file_lenient(root / "market" / "oddsapi" / f"oddsapi_game_lines_{date_slug}.json")
+	odds_games = odds_doc.get("games") if isinstance(odds_doc, dict) and isinstance(odds_doc.get("games"), list) else []
+	overrides_doc = _read_json_file_lenient(root / "manager" / "probable_pitcher_overrides.json")
+	overrides_for_date = overrides_doc.get(date_str) if isinstance(overrides_doc, dict) else None
+	if not isinstance(overrides_for_date, dict):
+		overrides_for_date = {}
+
+	odds_by_pair: dict[tuple[str, str], list[dict[str, Any]]] = {}
+	for row in odds_games:
+		if isinstance(row, dict):
+			key = (str(row.get("home_team") or "").strip(), str(row.get("away_team") or "").strip())
+			odds_by_pair.setdefault(key, []).append(row)
+
+	fingerprints: dict[str, str] = {}
+	for event in events:
+		game_pk = str(event.event_id or "").strip()
+		if not game_pk:
+			continue
+		if event.home_team_id is not None and event.away_team_id is not None:
+			lineup_slice: Any = {
+				"home": lineups_doc.get(str(event.home_team_id)),
+				"away": lineups_doc.get(str(event.away_team_id)),
+			}
+		else:
+			# Degraded fallback (team ids not resolvable, e.g. a schedule
+			# fetch that predates this deploy still cached): fall back to the
+			# WHOLE lineups file for just this game -- over-inclusive (may
+			# flag this game "changed" when a different team's lineup moved)
+			# but never under-inclusive, and still scoped to one game rather
+			# than today's whole-slate behavior.
+			lineup_slice = {"__whole_file__": lineups_doc}
+		odds_slice = odds_by_pair.get((event.home, event.away), [])
+		override_slice = overrides_for_date.get(game_pk, {})
+		fingerprints[game_pk] = _hash_json_value({"lineups": lineup_slice, "odds": odds_slice, "overrides": override_slice})
+	return fingerprints
 
 
 def _mlb_daily_sim_decision(*, now_epoch: float, date_str: str) -> dict[str, Any]:
@@ -595,8 +652,11 @@ def _mlb_daily_sim_decision(*, now_epoch: float, date_str: str) -> dict[str, Any
 		return {"force": True, "reason": "first_appearance"}
 
 	window_minutes = _event_sim_force_window_minutes()
-	if window_minutes > 0 and events_starting_within(events, now_epoch=now_epoch, window_minutes=window_minutes):
-		return {"force": True, "reason": "tip_off_window"}
+	if window_minutes > 0:
+		starting_soon = events_starting_within(events, now_epoch=now_epoch, window_minutes=window_minutes)
+		if starting_soon:
+			tip_off_game_pks = sorted({str(event.event_id).strip() for event in starting_soon if str(event.event_id or "").strip()})
+			return {"force": True, "reason": "tip_off_window", "game_pks": tip_off_game_pks}
 
 	last = _read_last_mlb_sim_check()
 	last_epoch = float(last.get("epoch") or 0.0)
@@ -605,13 +665,25 @@ def _mlb_daily_sim_decision(*, now_epoch: float, date_str: str) -> dict[str, Any
 	if last_epoch > 0.0 and last_date == date_str and (now_epoch - last_epoch) < interval:
 		return {"force": False, "reason": "within_check_interval"}
 
-	current_fingerprint = _mlb_sim_input_fingerprint(date_str)
-	stored_fingerprint = last.get("fingerprint") if last_date == date_str else None
-	if current_fingerprint != stored_fingerprint:
-		_record_mlb_sim_check(now_epoch, date_str, current_fingerprint, launched=True)
-		return {"force": True, "reason": "fingerprint_change"}
+	current_fingerprints = _mlb_sim_input_fingerprint_by_game(date_str, events)
+	stored_fingerprints = last.get("fingerprints") if last_date == date_str else None
+	if not isinstance(stored_fingerprints, dict):
+		# Covers three cases uniformly: no prior record at all, a prior record
+		# for a different date, and a pre-migration record still holding the
+		# old singular "fingerprint" string key (reading .get("fingerprints")
+		# on that shape returns None for free). In all three we don't know
+		# WHICH game(s) changed, so conservatively resim the whole slate this
+		# one time -- the next check onward stores the new per-game shape and
+		# scoping applies from then on.
+		changed_game_pks = sorted(current_fingerprints.keys())
+	else:
+		changed_game_pks = sorted(game_pk for game_pk, current_hash in current_fingerprints.items() if stored_fingerprints.get(game_pk) != current_hash)
 
-	_record_mlb_sim_check(now_epoch, date_str, current_fingerprint, launched=False)
+	if changed_game_pks:
+		_record_mlb_sim_check(now_epoch, date_str, current_fingerprints, launched=True)
+		return {"force": True, "reason": "fingerprint_change", "game_pks": changed_game_pks}
+
+	_record_mlb_sim_check(now_epoch, date_str, current_fingerprints, launched=False)
 	return {"force": False, "reason": "no_change"}
 
 
@@ -700,6 +772,14 @@ def _launch_mlb_daily_sim(date_str: str, decision: dict[str, Any]) -> dict[str, 
 		"--workers", str(_mlb_sim_workers()),
 		"--reason", str(decision.get("reason") or ""),
 	]
+	game_pks = decision.get("game_pks")
+	if isinstance(game_pks, (list, tuple, set)) and game_pks:
+		# Absent for first_appearance / evening-next-day (whole slate, matching
+		# today's behavior exactly); present for tip_off_window/fingerprint_change
+		# so only the actually-impacted game(s) get resimmed.
+		normalized_game_pks = sorted({str(game_pk).strip() for game_pk in game_pks if str(game_pk or "").strip()})
+		if normalized_game_pks:
+			command.extend(["--only-game-pks", ",".join(normalized_game_pks)])
 	popen_kwargs: dict[str, Any] = {"cwd": str(REPO_ROOT)}
 	if os.name == "nt":
 		popen_kwargs["creationflags"] = getattr(subprocess, "DETACHED_PROCESS", 0) | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)

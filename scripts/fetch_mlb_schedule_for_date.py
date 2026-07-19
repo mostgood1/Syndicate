@@ -57,6 +57,8 @@ def main() -> int:
                 "home": home_team.get("name"),
                 "away": away_team.get("name"),
                 "start_time_utc": game.get("gameDate"),
+                "home_team_id": home_team.get("id"),
+                "away_team_id": away_team.get("id"),
             }
         )
 

@@ -2616,6 +2616,10 @@ def _build_next_day_ui_daily_command(args: argparse.Namespace, raw_argv: List[st
             "--render-validation-base-url",
             "--render-validation-cron-token",
             "--render-validation-timeout-seconds",
+            # Today's --only-game-pks scoping is meaningless for tomorrow's
+            # schedule (different games entirely) -- must not leak through to
+            # the next-day build, which needs its own full slate.
+            "--only-game-pks",
         ),
         flags_no_values=(),
     )
@@ -4883,6 +4887,18 @@ def main() -> int:
         default="auto",
         help="If on, skip rebuilding games that are no longer in a Preview state and preserve any existing artifacts for them. auto enables this for same-day runs.",
     )
+    ap.add_argument(
+        "--only-game-pks",
+        default="",
+        help=(
+            "Optional comma-separated list of MLB gamePk values. When non-empty, only "
+            "these games are (re)simulated for --date; every other scheduled game's "
+            "existing sim/roster artifacts are preserved if present (simulated anyway "
+            "if no adequate existing artifacts are found, to avoid leaving a gap in "
+            "the day's slate). Empty (default) simulates every scheduled game -- "
+            "fully backward compatible."
+        ),
+    )
     ap.add_argument("--cache-ttl-hours", type=int, default=6)
     ap.add_argument(
         "--statcast-starter-splits",
@@ -6709,7 +6725,17 @@ def main() -> int:
     lineup_games: List[Dict[str, Any]] = []
     probable_games: List[Dict[str, Any]] = []
     preserved_started_games: List[Dict[str, Any]] = []
+    preserved_non_targeted_games: List[Dict[str, Any]] = []
     started_game_repairs: List[Dict[str, Any]] = []
+    only_game_pks_raw = str(getattr(args, "only_game_pks", "") or "").strip()
+    only_game_pks: set = set()
+    for _token in only_game_pks_raw.split(","):
+        _token = _token.strip()
+        if _token:
+            try:
+                only_game_pks.add(int(_token))
+            except Exception:
+                continue
     official_starting_lineups_by_game: Dict[int, Dict[str, Any]] = {}
     try:
         official_starting_lineups_by_game = fetch_official_starting_lineups_for_date(client, str(args.date))
@@ -6739,6 +6765,47 @@ def main() -> int:
         sim_path = sim_dir / f"sim_{idx}_{away_abbr}_at_{home_abbr}_pk{game_pk}{gn}.json"
         roster_path = snapshot_dir / f"roster_{idx}_{away_abbr}_at_{home_abbr}_pk{game_pk}{gn}.json"
 
+        if only_game_pks and game_pk and int(game_pk) not in only_game_pks:
+            pk_label = f" gamePk={game_pk}" if game_pk else ""
+            existing_sims = None
+            existing_game_pk = None
+            if sim_path.exists():
+                try:
+                    existing_record = _load_json_if_exists(sim_path)
+                    if isinstance(existing_record, dict) and existing_record:
+                        existing_game_pk = int(existing_record.get("game_pk") or 0)
+                        existing_sims = _safe_int(((existing_record.get("sim") or {}).get("sims")))
+                except Exception:
+                    existing_sims = None
+                    existing_game_pk = None
+            preserve_non_targeted = (
+                sim_path.exists()
+                and roster_path.exists()
+                and game_pk
+                and int(existing_game_pk or 0) == int(game_pk)
+                and existing_sims is not None
+                and int(existing_sims) >= int(args.sims)
+            )
+            if preserve_non_targeted:
+                print(
+                    f"[{idx+1}/{len(games)}] Preserving existing artifacts for non-targeted game:{pk_label} {away_abbr} @ {home_abbr} (not in --only-game-pks allowlist)"
+                )
+                preserved_non_targeted_games.append(
+                    {
+                        "idx": int(idx),
+                        "game_pk": int(game_pk) if game_pk else None,
+                        "away": {"abbr": away_abbr, "team_id": int(away_team.get("id") or 0)},
+                        "home": {"abbr": home_abbr, "team_id": int(home_team.get("id") or 0)},
+                        "sim_path": _relative_path_str(sim_path),
+                        "roster_path": _relative_path_str(roster_path),
+                    }
+                )
+                continue
+            print(
+                f"[{idx+1}/{len(games)}] WARNING: gamePk={game_pk} not in --only-game-pks allowlist but no adequate existing artifacts found -- simulating anyway to avoid leaving a gap in today's slate."
+            )
+            # fall through -- do NOT continue; sim it normally below.
+
         if str(getattr(args, "skip_started_games", "off") or "off") == "on" and abstract_state not in {"preview", "pregame"}:
             status_label = detailed_state or str(status.get("abstractGameState") or "") or "started"
             pk_label = f" gamePk={game_pk}" if game_pk else ""
@@ -6746,8 +6813,16 @@ def main() -> int:
             existing_game_pk = None
             if sim_path.exists():
                 try:
-                    existing_record = _read_json(sim_path)
-                    if isinstance(existing_record, dict):
+                    # Was _read_json(sim_path) -- undefined anywhere in this
+                    # file (confirmed via grep), a silent NameError swallowed
+                    # by this except, so existing_sims/existing_game_pk were
+                    # ALWAYS None and preserve_existing was ALWAYS False --
+                    # --skip-started-games has never actually preserved
+                    # anything, it always fell through to "repair". Found
+                    # while smoke-testing --only-game-pks, which copied this
+                    # exact pattern.
+                    existing_record = _load_json_if_exists(sim_path)
+                    if isinstance(existing_record, dict) and existing_record:
                         existing_game_pk = int(existing_record.get("game_pk") or 0)
                         existing_sims = _safe_int(((existing_record.get("sim") or {}).get("sims")))
                 except Exception:
@@ -7691,6 +7766,9 @@ def main() -> int:
         "games": len(outputs),
         "preserved_started_games": preserved_started_games,
         "preserved_started_games_n": int(len(preserved_started_games)),
+        "preserved_non_targeted_games": preserved_non_targeted_games,
+        "preserved_non_targeted_games_n": int(len(preserved_non_targeted_games)),
+        "only_game_pks": sorted(only_game_pks) if only_game_pks else None,
         "started_game_repairs": started_game_repairs,
         "started_game_repairs_n": int(len(started_game_repairs)),
         "failures": failures,

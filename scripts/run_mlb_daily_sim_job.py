@@ -49,6 +49,7 @@ def main() -> int:
     parser.add_argument("--sims", type=int, default=1000)
     parser.add_argument("--workers", type=int, default=2)
     parser.add_argument("--reason", default="")
+    parser.add_argument("--only-game-pks", default="", help="Comma-separated gamePk allowlist; forwarded to daily_update.py's --only-game-pks unless empty.")
     args = parser.parse_args()
 
     run_stamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
@@ -77,6 +78,9 @@ def main() -> int:
         # left the board empty on 2026-07-16.
         "--allow-empty-current-oddsapi", "on",
     ]
+    only_game_pks = str(args.only_game_pks or "").strip()
+    if only_game_pks:
+        command.extend(["--only-game-pks", only_game_pks])
     vendor_cwd = REPO_ROOT / "vendor" / "mlb_bettingv2"
 
     started_at = _utc_now()
@@ -119,6 +123,7 @@ def main() -> int:
         "sims": int(args.sims),
         "workers": int(args.workers),
         "reason": str(args.reason),
+        "onlyGamePks": only_game_pks,
         "command": command,
         "startedAt": started_at,
         "finishedAt": finished_at,
