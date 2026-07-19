@@ -1,16 +1,33 @@
 {
   "_meta": {
-    "generated_at": "2026-07-18",
-    "description": "First forward-tuning override for PitchModelConfig. Fitted via sweep_pm_hr_rate_mult.py against the 2026-season backfill (35 tune days / 11 disjoint holdout days, seed 2026, 100 sims/game), grid [0.95,1.00,1.10,1.20,1.30] vs 1.03 baseline, with hitter HR/props calibration explicitly disabled during the sweep so the raw parameter effect wasn't masked by the light-calibration band-aid already promoted in hitter_hr_calibration/default.json. See Syndicate/mlb_sim_accuracy_assessment_and_optimization_plan.md Phase 1 item #3.",
-    "selected_value": 1.10,
-    "rationale": "Real, monotonic, correctly-directioned effect confirmed: raw hitter_hr_likelihood_topn_weighted.hr_avg_p rises with the multiplier (0.95->0.071, 1.03 baseline->0.077, 1.10->0.082, 1.30->0.097) while hr_brier improves alongside it (0.1086->0.1081->0.1066). 1.10 is the highest value that still clears the sweep's own holdout guardrail; 1.20 and 1.30 both improve hr_avg_p further but fail it. This closes roughly 13% of the diagnosed gap to the empirical HR rate (~0.125) -- a genuine, safe, small step, not a full fix. The rest of the gap is expected to need park/weather HR weight work (weather_hr_weight, park_hr_weight, currently both 1.0 and unswept), which remains open.",
-    "baseline_hr_rate_mult": 1.03,
-    "baseline_holdout_hr_avg_p": 0.077,
-    "selected_holdout_hr_avg_p": 0.082,
-    "empirical_hr_rate_target": 0.125,
-    "holdout_games": 11,
-    "tune_games": 35,
-    "sweep_artifacts": "vendor/mlb_bettingv2/data/eval/batches/tuning_pm_hr_rate_mult/20260718_182207"
+    "description": "Forward-tuning overrides for PitchModelConfig, active for any sim date >= 2026-04-14 via should_use_forward_tuning(). Each key below has its own provenance block. See Syndicate/mlb_sim_accuracy_assessment_and_optimization_plan.md Phase 1 items #2/#3 for full context.",
+    "hr_rate_mult": {
+      "generated_at": "2026-07-18",
+      "description": "Fitted via sweep_pm_hr_rate_mult.py against the 2026-season backfill (35 tune days / 11 disjoint holdout days, seed 2026, 100 sims/game), grid [0.95,1.00,1.10,1.20,1.30] vs 1.03 baseline, with hitter HR/props calibration explicitly disabled during the sweep so the raw parameter effect wasn't masked by the light-calibration band-aid already promoted in hitter_hr_calibration/default.json.",
+      "selected_value": 1.10,
+      "rationale": "Real, monotonic, correctly-directioned effect confirmed: raw hitter_hr_likelihood_topn_weighted.hr_avg_p rises with the multiplier (0.95->0.071, 1.03 baseline->0.077, 1.10->0.082, 1.30->0.097) while hr_brier improves alongside it (0.1086->0.1081->0.1066). 1.10 is the highest value that still clears the sweep's own holdout guardrail; 1.20 and 1.30 both improve hr_avg_p further but fail it. This closes roughly 13% of the diagnosed gap to the empirical HR rate (~0.125) -- a genuine, safe, small step, not a full fix.",
+      "baseline_hr_rate_mult": 1.03,
+      "baseline_holdout_hr_avg_p": 0.077,
+      "selected_holdout_hr_avg_p": 0.082,
+      "empirical_hr_rate_target": 0.125,
+      "holdout_games": 11,
+      "tune_games": 35,
+      "sweep_artifacts": "vendor/mlb_bettingv2/data/eval/batches/tuning_pm_hr_rate_mult/20260718_182207"
+    },
+    "xb_share_mult": {
+      "generated_at": "2026-07-19",
+      "description": "Fitted via sweep_pm_xb_share_mult.py (pre-existing vendor tool, patched this session to disable hitter calibration during the sweep) against the same 35/11 backfill split, grid [0.80,0.85,0.90,1.00,1.10,1.20] vs 0.94 baseline. Targets the diagnosed excess-singles / under-projected-extra-base engine-shape defect directly -- xb_share_mult scales the singles-vs-extra-base split on contact.",
+      "selected_value": 1.10,
+      "rationale": "The sweep tool's own best.json picks max(combined) among guardrail-passing candidates, which is backwards for this lower-is-better objective -- verified against the raw leaderboard instead. tune_combined improves monotonically from 0.80 to 1.20; only 1.00 and 1.20 fail the holdout guardrail, leaving 1.10 as the best safe candidate. Raw movement at 1.10 vs baseline: total_bases_4plus avg_p 0.117->0.123 (empirical target 0.152, ~17% of gap closed), total_bases_5plus 0.058->0.060 (target 0.070, ~20% closed). total_bases_1plus (the over-projection/excess-singles side) barely moves (0.6588->0.659) -- this is not a redistribution fix, it adds extra-base hits without correcting the singles excess, so that side of the defect remains fully open. hr_avg_p stays flat (0.0771->0.0772), confirming no interaction with the hr_rate_mult override above.",
+      "baseline_xb_share_mult": 0.94,
+      "baseline_holdout_total_bases_4plus_avg_p": 0.117,
+      "selected_holdout_total_bases_4plus_avg_p": 0.123,
+      "empirical_total_bases_4plus_target": 0.152,
+      "holdout_games": 11,
+      "tune_games": 35,
+      "sweep_artifacts": "vendor/mlb_bettingv2/data/eval/batches/tuning_pm_xb_share_mult/20260719_101830"
+    }
   },
-  "hr_rate_mult": 1.10
+  "hr_rate_mult": 1.10,
+  "xb_share_mult": 1.10
 }
