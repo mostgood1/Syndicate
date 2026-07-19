@@ -164,9 +164,10 @@ def main() -> int:
         default="data/tuning/hitter_hr_calibration/default.json",
         help=(
             "Pass through to eval_sim_day_vs_actual.py --hitter-hr-prob-calibration. "
-            "Set to an empty string to sweep the raw (uncalibrated) parameter effect -- "
+            "Set to a literal {\"enabled\":false} JSON string to sweep the raw (uncalibrated) parameter effect -- "
             "the default path is the same production calibration file, which otherwise partially "
-            "masks whatever this sweep is trying to measure."
+            "masks whatever this sweep is trying to measure. Passing an empty string does NOT disable it: "
+            "run_batch_eval_days.py only forwards this flag downstream when the value is non-empty."
         ),
     )
     ap.add_argument(
