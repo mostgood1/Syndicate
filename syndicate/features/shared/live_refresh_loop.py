@@ -1020,14 +1020,22 @@ def _odds_refresh_starved(*, now_epoch: float) -> bool:
 	last = _read_last_odds_refresh_launch()
 	last_epoch = float(last.get("epoch") or 0.0)
 	if last_epoch <= 0.0:
-		# No prior successful refresh recorded -- most commonly a cold worker
-		# start where the very first tick's "first_appearance" sim launch and
-		# the odds-refresh gate land in the same tick. Treat as NOT starved
-		# (preserve the original defer behavior) rather than forcing the
-		# refresh through, since _MLB_SIM_PROCESS can only be non-None if
-		# THIS process already launched a sim -- i.e. this is exactly the
+		# No prior successful refresh recorded. This is the very first time
+		# this check has ever run on this worker's data disk (the record file
+		# is new), most commonly right at a cold worker start where the first
+		# tick's "first_appearance"/"tip_off_window" sim launch and the
+		# odds-refresh gate land in the same tick -- exactly the
 		# stack-two-heavy-pipelines-at-once case the gate exists to prevent,
-		# not the chained-relaunch staleness case the ceiling exists to bound.
+		# not the chained-relaunch staleness case the ceiling exists to
+		# bound. So: not starved *yet* -- but seed the record with now_epoch
+		# so the ceiling has a real anchor to count from. Production incident
+		# 2026-07-18: without this seed, a worker that redeploys while sims
+		# are ALREADY chaining back-to-back never got a first successful
+		# refresh to record, so last_epoch stayed 0 forever and this branch
+		# returned False on every single tick -- the ceiling could never
+		# fire. Seeding here means "count from when we first started
+		# watching," not "count from a success that may never happen."
+		_record_odds_refresh_launch(now_epoch)
 		return False
 	return (now_epoch - last_epoch) >= ceiling
 
