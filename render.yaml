@@ -507,6 +507,16 @@ services:
         value: ./data/wnba_source/source_artifacts/data/live_lens
       - key: SYNDICATE_WNBA_SOURCE_APP_FALLBACK
         value: "false"
+      # 2026-07-19: yesterday's smart-sim engine upgrade (25f34697) raised the
+      # default 150 -> 500, benchmarked safe in isolation but not against a
+      # busy live session's concurrent MLB sim/refresh memory pressure in the
+      # same 2048MB container -- WNBA's refresh process alone was observed at
+      # 745MB+ RSS with total container memory hitting 83% during a live slate,
+      # correlating with a live-odds-worker restart. Split the difference: keep
+      # some of the engine-quality improvement while cutting peak memory/runtime
+      # roughly in half versus 500.
+      - key: REFRESH_PREDICT_PROPS_SMART_SIM_N_SIMS
+        value: "250"
       - key: MLB_ENABLE_LIVE_LENS_LOOP
         value: "true"
       - key: MLB_ENABLE_LIVE_LENS_BACKGROUND_REPORTS
