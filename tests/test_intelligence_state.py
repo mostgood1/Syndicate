@@ -58,7 +58,11 @@ class IntelligenceStateTests(unittest.TestCase):
             key="abc",
             payload={"question": "top edges today"},
             response={"ok": True, "response": {"recommendations": []}},
-            computed_at="2026-06-10T17:31:00Z",
+            # Fresh (not stale): this test is about the cache-hit path skipping
+            # _enqueue_locked, not about staleness -- see
+            # test_start_queues_default_payload_when_persisted_snapshot_is_stale
+            # for that behavior.
+            computed_at=intelligence_state_module._utc_now(),
             source_fingerprint="fingerprint-1",
         )
         service._snapshots["abc"] = snapshot
@@ -76,7 +80,10 @@ class IntelligenceStateTests(unittest.TestCase):
             key=_payload_key({"question": "top edges today", "date": "2026-06-15"}),
             payload={"question": "top edges today", "date": "2026-06-15"},
             response={"ok": True, "response": {"selected_date": "2026-06-15", "recommendations": []}},
-            computed_at="2026-06-10T17:31:00Z",
+            # Fresh: this test is about date-mismatch rejection, not staleness
+            # -- a stale snapshot would fall through to a real (unmocked) sync
+            # attempt below instead of hitting the date check being tested.
+            computed_at=intelligence_state_module._utc_now(),
             source_fingerprint="fingerprint-1",
         )
         service._snapshots[snapshot.key] = snapshot

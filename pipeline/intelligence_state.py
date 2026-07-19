@@ -1549,18 +1549,33 @@ class IntelligenceStateService:
         requested_date = _selected_date_from_payload(normalized_payload)
         requested_sport = _requested_sport_from_payload(normalized_payload)
         with self._lock:
+            # 2026-07-19: this in-process self._snapshots cache is per-process
+            # (web service vs refresh-worker each hold their own), so on a
+            # process that doesn't compute snapshots itself (the web service,
+            # SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP=false), a hit
+            # here used to return unconditionally -- once populated for a given
+            # key (e.g. at process start), it was served forever, even hours
+            # stale, because nothing ever re-synced from the shared persisted
+            # store for that exact key again. Confirmed in production: the
+            # default board query stayed frozen on a snapshot from before a
+            # same-day candidate-classification fix landed, for 3+ hours after
+            # the fix was live and refresh-worker was producing fresh
+            # snapshots the whole time. Now falls through to
+            # _sync_persisted_state_locked() below when the local copy is
+            # stale, same threshold _enqueue_locked already uses to decide
+            # whether a snapshot needs recomputing.
             snapshot = self._snapshots.get(key)
-            if snapshot is not None:
+            if snapshot is not None and not self._is_stale(snapshot):
                 return dict(snapshot.response)
             if requested_sport and requested_sport != "all":
                 for candidate_snapshot in reversed(list(self._snapshots.values())):
-                    if _snapshot_matches_payload(candidate_snapshot, normalized_payload):
+                    if _snapshot_matches_payload(candidate_snapshot, normalized_payload) and not self._is_stale(candidate_snapshot):
                         return dict(candidate_snapshot.response)
             if self._latest_key and self._latest_key in self._snapshots:
                 latest_snapshot = self._snapshots[self._latest_key]
                 latest_date = _selected_date_from_payload(latest_snapshot.payload)
                 latest_sport = _snapshot_sport(latest_snapshot)
-                if allow_latest_fallback or requested_date is None or latest_date is None or latest_date == requested_date:
+                if not self._is_stale(latest_snapshot) and (allow_latest_fallback or requested_date is None or latest_date is None or latest_date == requested_date):
                     if not requested_sport or requested_sport == "all" or latest_sport == requested_sport:
                         return dict(latest_snapshot.response)
             if requested_sport and requested_sport != "all":
