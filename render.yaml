@@ -510,13 +510,18 @@ services:
       # 2026-07-19: yesterday's smart-sim engine upgrade (25f34697) raised the
       # default 150 -> 500, benchmarked safe in isolation but not against a
       # busy live session's concurrent MLB sim/refresh memory pressure in the
-      # same 2048MB container -- WNBA's refresh process alone was observed at
-      # 745MB+ RSS with total container memory hitting 83% during a live slate,
-      # correlating with a live-odds-worker restart. Split the difference: keep
-      # some of the engine-quality improvement while cutting peak memory/runtime
-      # roughly in half versus 500.
+      # same 2048MB container. This runs in-process (cli_module.cli.main(),
+      # not a subprocess -- see refresh_wnba_oddsapi_props.py's
+      # _run_source_cli_command), so its possession-level Monte Carlo cost
+      # lives entirely inside refresh_wnba_oddsapi_props.py's own RSS. First
+      # cut to 250 wasn't enough -- observed the container hit 100%
+      # (2048/2048MB) with this process alone at 1.5GB+ RSS, correlating with
+      # a live-odds-worker restart, even after that change. --smart-sim-pbp
+      # (possession-level mode, stays on) is what produces quarter/interval
+      # props, so n_sims -- not disabling pbp -- is the lever that trades
+      # memory for prediction precision without losing that feature.
       - key: REFRESH_PREDICT_PROPS_SMART_SIM_N_SIMS
-        value: "250"
+        value: "100"
       - key: MLB_ENABLE_LIVE_LENS_LOOP
         value: "true"
       - key: MLB_ENABLE_LIVE_LENS_BACKGROUND_REPORTS
