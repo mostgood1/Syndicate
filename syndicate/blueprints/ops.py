@@ -383,28 +383,71 @@ def api_ops_live_refresh_state() -> Any:
 
 @ops_bp.post("/api/ops/live-refresh/force-mlb-resim")
 def api_ops_live_refresh_force_mlb_resim() -> Any:
-    # Ops lever: invalidate the MLB daily-sim gate's stored input fingerprint
-    # so the live-odds-worker's next tick fires a fingerprint_change launch.
-    # The gate state lives in the Redis-backed refresh-state store, which web
-    # shares with the worker -- this is the only remote way to force a re-sim
-    # without waiting for a lineup change or the tip-off window (e.g. after an
-    # OOM stranded a completed-but-unpublished run on the worker disk).
-    from syndicate.features.shared.refresh_state_store import write_json_file as _state_write_json
-    from syndicate.features.shared.refresh_state_store import reports_root as _state_reports_root
+    # Ops lever: invalidate the MLB daily-sim gate's stored fingerprint for
+    # specific game(s) so the live-odds-worker's next tick fires a scoped
+    # fingerprint_change launch for exactly those games -- without waiting for
+    # a real lineup change or the tip-off window (e.g. after an OOM stranded a
+    # completed-but-unpublished run on the worker disk).
+    #
+    # 2026-07-19 incident: the old version of this endpoint wrote a single
+    # "fingerprint" marker string (pre-migration schema). The gate can't tell
+    # WHICH game changed from a non-dict record, so it fell back to "resim the
+    # whole slate" -- a 45-55min run, exactly what per-game scoping exists to
+    # avoid. Worse, if called more than once, each call queued another
+    # full-slate resim behind the current one, chaining for hours. game_pks is
+    # now required, and only those games' stored hashes are invalidated --
+    # every other game's real current hash is preserved so it reads
+    # "unchanged" next tick, keeping the launch scoped through the normal
+    # per-game diff path.
+    from syndicate.features.shared.live_refresh_loop import _mlb_sim_input_fingerprint_by_game
+    from syndicate.features.shared.live_refresh_loop import _read_last_mlb_sim_check
+    from syndicate.features.shared.live_refresh_loop import _record_mlb_sim_check
+    from syndicate.features.shared.schedule_adapter import fetch_schedule_for_date
     from syndicate.features.shared.timezone import central_today_iso
 
     date_str = str(request.args.get("date") or "").strip() or central_today_iso()
-    marker = f"forced-resim:{datetime.now(timezone.utc).isoformat(timespec='seconds')}"
-    payload = {
+    game_pks_raw = str(request.args.get("game_pks") or "").strip()
+    if not game_pks_raw:
+        return jsonify({
+            "ok": False,
+            "error": "game_pks query param required (comma-separated game_pk values). "
+                     "This endpoint no longer force-resims the whole slate -- pass the specific game(s) that need it.",
+        }), 400
+    requested_game_pks = {piece.strip() for piece in game_pks_raw.split(",") if piece.strip()}
+
+    try:
+        events = fetch_schedule_for_date("mlb", date_str)
+    except Exception as exc:
+        return jsonify({"ok": False, "error": f"failed to load schedule: {type(exc).__name__}: {exc}"}), 500
+    if not events:
+        return jsonify({"ok": False, "error": f"no MLB games scheduled for {date_str}"}), 404
+
+    known_game_pks = {str(event.event_id).strip() for event in events if str(event.event_id or "").strip()}
+    unknown_game_pks = requested_game_pks - known_game_pks
+    if unknown_game_pks:
+        return jsonify({"ok": False, "error": f"game_pks not on {date_str}'s slate: {sorted(unknown_game_pks)}"}), 400
+
+    current_fingerprints = _mlb_sim_input_fingerprint_by_game(date_str, events)
+    last = _read_last_mlb_sim_check()
+    stored_fingerprints = last.get("fingerprints") if str(last.get("date") or "") == date_str else None
+    if not isinstance(stored_fingerprints, dict):
+        stored_fingerprints = {}
+
+    marker_suffix = f"|forced-resim:{datetime.now(timezone.utc).isoformat(timespec='seconds')}"
+    next_fingerprints = dict(current_fingerprints)
+    for game_pk in requested_game_pks:
+        # Guaranteed to differ from the plain hash _mlb_daily_sim_decision computes
+        # next tick, so only these game(s) show as changed -- every other key above
+        # already holds its real current hash and will correctly read "unchanged".
+        next_fingerprints[game_pk] = (stored_fingerprints.get(game_pk) or "") + marker_suffix
+
+    _record_mlb_sim_check(1.0, date_str, next_fingerprints, launched=False)
+    return jsonify({
+        "ok": True,
         "date": date_str,
-        # epoch must be >0 (interval guard requires it) but old enough that the
-        # within_check_interval branch never triggers.
-        "epoch": 1.0,
-        "fingerprint": marker,
-        "launched": False,
-    }
-    _state_write_json(_state_reports_root() / "live_refresh_loop" / "last_mlb_sim_check.json", payload)
-    return jsonify({"ok": True, "date": date_str, "marker": marker, "note": "next live-odds-worker tick will launch with reason=fingerprint_change"})
+        "game_pks": sorted(requested_game_pks),
+        "note": "next live-odds-worker tick will launch scoped to exactly these game(s) via reason=fingerprint_change (once no sim is already active)",
+    })
 
 
 @ops_bp.get("/api/ops/mlb/sims-list")

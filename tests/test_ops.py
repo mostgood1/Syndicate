@@ -11,6 +11,7 @@ from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
 from syndicate.app import create_app
+from syndicate.features.shared.live_refresh_loop import ScheduleEvent
 
 
 class OpsRefreshApiTests(unittest.TestCase):
@@ -265,6 +266,79 @@ class OpsRefreshApiTests(unittest.TestCase):
         payload = response.get_json()
         self.assertTrue(payload["ok"])
         self.assertEqual(payload["memory"], fake_snapshot)
+
+    def test_force_mlb_resim_requires_game_pks(self) -> None:
+        with patch.dict(os.environ, {"ADMIN_TOKEN": "secret-token"}, clear=False):
+            response = self.client.post(
+                "/api/ops/live-refresh/force-mlb-resim?date=2026-07-19",
+                headers={"X-Admin-Token": "secret-token"},
+            )
+
+        self.assertEqual(response.status_code, 400)
+        payload = response.get_json()
+        self.assertFalse(payload["ok"])
+        self.assertIn("game_pks", payload["error"])
+
+    def test_force_mlb_resim_rejects_unknown_game_pks(self) -> None:
+        events = [ScheduleEvent(sport="mlb", event_id="100", home="A", away="B", start_time_utc=None)]
+        with patch.dict(
+            os.environ, {"ADMIN_TOKEN": "secret-token"}, clear=False
+        ), patch("syndicate.features.shared.schedule_adapter.fetch_schedule_for_date", return_value=events):
+            response = self.client.post(
+                "/api/ops/live-refresh/force-mlb-resim?date=2026-07-19&game_pks=999",
+                headers={"X-Admin-Token": "secret-token"},
+            )
+
+        self.assertEqual(response.status_code, 400)
+        payload = response.get_json()
+        self.assertFalse(payload["ok"])
+        self.assertIn("999", payload["error"])
+
+    def test_force_mlb_resim_scopes_invalidation_to_requested_games_only(self) -> None:
+        events = [
+            ScheduleEvent(sport="mlb", event_id="100", home="A", away="B", start_time_utc=None),
+            ScheduleEvent(sport="mlb", event_id="200", home="C", away="D", start_time_utc=None),
+            ScheduleEvent(sport="mlb", event_id="300", home="E", away="F", start_time_utc=None),
+        ]
+        current_fingerprints = {"100": "aaa", "200": "bbb", "300": "ccc"}
+        stored_check = {
+            "date": "2026-07-19",
+            "fingerprints": {"100": "old_aaa", "200": "old_bbb", "300": "old_ccc"},
+        }
+        with patch.dict(
+            os.environ, {"ADMIN_TOKEN": "secret-token"}, clear=False
+        ), patch(
+            "syndicate.features.shared.schedule_adapter.fetch_schedule_for_date", return_value=events
+        ), patch(
+            "syndicate.features.shared.live_refresh_loop._mlb_sim_input_fingerprint_by_game",
+            return_value=current_fingerprints,
+        ), patch(
+            "syndicate.features.shared.live_refresh_loop._read_last_mlb_sim_check", return_value=stored_check
+        ), patch(
+            "syndicate.features.shared.live_refresh_loop._record_mlb_sim_check"
+        ) as mocked_record:
+            response = self.client.post(
+                "/api/ops/live-refresh/force-mlb-resim?date=2026-07-19&game_pks=200",
+                headers={"X-Admin-Token": "secret-token"},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json()
+        self.assertTrue(payload["ok"])
+        self.assertEqual(payload["game_pks"], ["200"])
+
+        mocked_record.assert_called_once()
+        recorded_args = mocked_record.call_args.args
+        recorded_fingerprints = recorded_args[2]
+        # Untouched games keep their real current hash -- they'll read
+        # "unchanged" next tick and stay out of the resim.
+        self.assertEqual(recorded_fingerprints["100"], "aaa")
+        self.assertEqual(recorded_fingerprints["300"], "ccc")
+        # The requested game's stored hash is invalidated (differs from both
+        # its own current hash and its prior stored hash), forcing it -- and
+        # only it -- to show as changed.
+        self.assertNotEqual(recorded_fingerprints["200"], "bbb")
+        self.assertNotEqual(recorded_fingerprints["200"], "old_bbb")
 
     def test_healthz_exposes_public_render_version_metadata_without_admin_auth(self) -> None:
         response = self.client.get("/healthz")
