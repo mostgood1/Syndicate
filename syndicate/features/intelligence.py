@@ -4554,19 +4554,32 @@ def _collect_candidates(overview: list[dict[str, Any]], preferences: dict[str, A
     stage_started_at = time.perf_counter()
     validated_candidates: list[dict[str, Any]] = []
     state_pruned_candidates: list[dict[str, Any]] = []
+    pruned_by_sport: dict[str, dict[str, int]] = {}
     for candidate in candidates:
         if not isinstance(candidate, dict):
             state_pruned_candidates.append({"stage": "post_state_filter", "reason": "non_dict_candidate"})
             continue
         _apply_candidate_state_guard(candidate)
         if bool(candidate.get("state_invalid")):
-            state_pruned_candidates.append(_collect_candidate_trace(candidate, reason=_safe_text(candidate.get("state_note"), "state_invalid"), stage="post_state_filter"))
+            reason = _safe_text(candidate.get("state_note"), "state_invalid")
+            state_pruned_candidates.append(_collect_candidate_trace(candidate, reason=reason, stage="post_state_filter"))
+            sport_bucket = pruned_by_sport.setdefault(_safe_text(candidate.get("sport_slug"), "unknown").lower(), {})
+            sport_bucket[reason] = sport_bucket.get(reason, 0) + 1
             continue
         validated_candidates.append(candidate)
     candidates = validated_candidates
     _log_candidate_stage(pipeline_name="collect_candidates", stage="post_state_filter", before=[], after=candidates)
     for removed_candidate in state_pruned_candidates:
         _log_json_event(logging.INFO, "collect_candidates_pruned", pipeline="collect_candidates", **removed_candidate)
+    if pruned_by_sport:
+        # 2026-07-19: _log_json_event's INFO-level output wasn't reaching
+        # production stdout (no matching lines found for a real prune event
+        # this stage clearly caused per the surrounding candidate_generation
+        # trace counts), which made an entire sport's candidates disappearing
+        # here silent/undiagnosable. This prints unconditionally, same
+        # convention as [INTEL_TRACE], so a repeat is always visible in raw
+        # worker logs without relying on logging-level configuration.
+        print(f"[INTEL_TRACE] {json.dumps({'event': 'post_state_filter_pruned', 'by_sport_reason': pruned_by_sport})}", flush=True)
     _intel_trace_timed("candidate_generation", stage_started_at, stage="post_state_filter", total_candidates=len(candidates))
 
     stage_started_at = time.perf_counter()
