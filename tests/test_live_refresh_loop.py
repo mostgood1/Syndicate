@@ -418,17 +418,51 @@ class LiveRefreshLoopTests(unittest.TestCase):
         self.assertIn("MLB daily sim is still running", payload["error"])
         mocked_launch.assert_not_called()
 
-    def test_run_tick_forces_odds_refresh_past_starvation_ceiling_despite_active_sim(self) -> None:
-        # Production incident 2026-07-18: MLB sims relaunched back-to-back on
-        # fingerprint changes (lineup/odds movement) throughout a live slate,
-        # so _mlb_daily_sim_process_still_running() stayed True for 90+
-        # minutes straight -- every odds-refresh tick deferred in that whole
-        # window, starving WNBA/live odds/intelligence data and emptying the
-        # board. The starvation ceiling bounds this: past it, refresh
-        # proceeds regardless of sim state.
+    def test_run_tick_still_defers_past_starvation_ceiling_when_override_disabled(self) -> None:
+        # Reverted 2026-07-18: the starvation-ceiling override ("force the
+        # refresh through past N minutes regardless of sim state") was found
+        # in production to reintroduce the exact stack-two-heavy-pipelines
+        # OOM the sim-mutex gate exists to prevent -- WNBA's refresh leg
+        # alone spikes to ~1.3-1.5GB RSS in this 2048MB container, and sims
+        # chain back-to-back for hours on a live slate, so "force through"
+        # fired into an actually-still-running sim almost every time, not
+        # occasionally. The override now defaults OFF: even when
+        # _odds_refresh_starved() says the board has gone stale long enough,
+        # the tick must still defer unless the override is explicitly
+        # enabled.
         with patch.dict(
             os.environ,
             {"SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP": "true", "SYNDICATE_LIVE_ODDS_REFRESH_ADAPTIVE": "false"},
+            clear=False,
+        ), patch.object(live_refresh_loop, "central_today_iso", return_value="2026-07-18"), patch.object(
+            live_refresh_loop, "_should_force_sim_rerun", return_value=False
+        ), patch.object(
+            live_refresh_loop, "_mlb_daily_sim_process_still_running", return_value=True
+        ), patch.object(
+            live_refresh_loop, "_odds_refresh_starved", return_value=True
+        ), patch.object(
+            live_refresh_loop,
+            "launch_refresh_run",
+        ) as mocked_launch:
+            payload = live_refresh_loop._run_live_refresh_tick()
+
+        self.assertFalse(payload["ok"])
+        self.assertTrue(payload["skipped"])
+        self.assertIn("MLB daily sim is still running", payload["error"])
+        mocked_launch.assert_not_called()
+
+    def test_run_tick_forces_odds_refresh_past_starvation_ceiling_when_override_enabled(self) -> None:
+        # The override mechanism itself is kept (not deleted) for deliberate,
+        # opt-in future use -- e.g. once paired with an actual
+        # memory-headroom check, or once WNBA's own RSS spike is fixed --
+        # rather than the blind timer this was originally shipped as.
+        with patch.dict(
+            os.environ,
+            {
+                "SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP": "true",
+                "SYNDICATE_LIVE_ODDS_REFRESH_ADAPTIVE": "false",
+                "SYNDICATE_LIVE_ODDS_REFRESH_STARVATION_OVERRIDE_ENABLED": "true",
+            },
             clear=False,
         ), patch.object(live_refresh_loop, "central_today_iso", return_value="2026-07-18"), patch.object(
             live_refresh_loop, "_should_force_sim_rerun", return_value=False

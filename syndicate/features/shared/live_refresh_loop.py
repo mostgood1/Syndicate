@@ -992,6 +992,24 @@ def _record_odds_refresh_launch(epoch: float) -> None:
 	write_json_file(_last_odds_refresh_launch_path(), {"epoch": epoch, "recordedAt": _utc_now()})
 
 
+def _odds_refresh_starvation_override_enabled() -> bool:
+	# Off by default -- reverted 2026-07-18 after confirming in production
+	# that "force through past N minutes" reintroduces the exact
+	# stack-two-heavy-pipelines OOM the sim-mutex gate exists to prevent,
+	# every time it fires, not just occasionally: WNBA's refresh leg alone
+	# has been measured spiking to ~1.3-1.5GB RSS in this 2048MB container,
+	# and a live MLB sim's process tree resident alongside it (~300-400MB)
+	# plus worker/wrapper overhead (~400-450MB) leaves no safe headroom for
+	# that spike at ANY ceiling length while a sim is genuinely still
+	# running -- and sims chain back-to-back for hours on a live slate, so
+	# "genuinely still running" is true almost continuously. A stale board
+	# is the safer failure mode than an OOM crash-loop; this flag exists so
+	# the override can be re-enabled deliberately once paired with an
+	# actual memory-headroom check (or once WNBA's own spike is fixed)
+	# rather than a blind timer.
+	return _env_bool("SYNDICATE_LIVE_ODDS_REFRESH_STARVATION_OVERRIDE_ENABLED", default=False)
+
+
 def _odds_refresh_starvation_ceiling_seconds() -> int:
 	# The sim-vs-refresh mutual-exclusion gate (see the "MLB daily sim is still
 	# running" check below) was added to stop two heavy pipelines stacking in
@@ -1136,7 +1154,7 @@ def _run_live_refresh_tick() -> dict[str, Any]:
 			meta["mlbDailySim"] = {"launched": False, "reason": mlb_decision.get("reason")}
 	except Exception as exc:
 		meta["mlbDailySim"] = {"launched": False, "error": f"{type(exc).__name__}: {exc}"}
-	if _mlb_daily_sim_process_still_running() and not _odds_refresh_starved(now_epoch=tick_started_epoch):
+	if _mlb_daily_sim_process_still_running() and not (_odds_refresh_starvation_override_enabled() and _odds_refresh_starved(now_epoch=tick_started_epoch)):
 		# Mirror of the mlbDailySim gate above (is_refresh_run_active): that gate
 		# only stops a NEW sim from launching on top of an in-flight odds refresh,
 		# but does nothing once a sim IS running -- the live-phase tick still
