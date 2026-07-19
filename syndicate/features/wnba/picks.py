@@ -10,11 +10,11 @@ from syndicate.features.wnba.sources import format_num
 from syndicate.features.wnba.sources import format_pct
 from syndicate.features.wnba.sources import parse_iso_date
 from syndicate.features.wnba.sources import load_json
-from syndicate.features.wnba.sources import processed_path
+from syndicate.features.wnba.sources import processed_path_or_default
 
 
 def _summary_for_date(selected_date: str) -> dict[str, Any]:
-    summary = load_json(processed_path(f"recommendations_slate_{selected_date}.json"))
+    summary = load_json(processed_path_or_default(f"recommendations_slate_{selected_date}.json"))
     return summary if isinstance(summary, dict) else {}
 
 
@@ -76,7 +76,7 @@ def _sections_from_summary(summary: dict[str, Any], *, limit_games: int = 8, lim
 
 
 def build_picks_page_context(selected_date: str) -> dict[str, Any]:
-    summary_path = processed_path(f"recommendations_slate_{selected_date}.json")
+    summary_path = processed_path_or_default(f"recommendations_slate_{selected_date}.json")
     summary = _summary_for_date(selected_date)
     cards = _cards_from_summary(summary)
     using_sample_data = False

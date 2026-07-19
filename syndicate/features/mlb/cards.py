@@ -39,6 +39,7 @@ from syndicate.features.mlb.sources import raw_feed_live_path
 from syndicate.features.mlb.sources import load_json_or_gz_file
 from syndicate.features.mlb.sources import load_json_file
 from syndicate.features.shared.odds_control_plane import load_odds_history_payload_for_sport
+from syndicate.features.shared.odds_control_plane import resolve_current_shard_key
 from syndicate.features.shared.timezone import CENTRAL_TIMEZONE
 from syndicate.features.shared.timezone import central_now
 from syndicate.features.shared.timezone import central_today
@@ -1999,7 +2000,11 @@ def source_cards_api_payload(context: dict[str, Any]) -> dict[str, Any]:
     ops_report_path = daily_ops_report_path(selected_date) if selected_date else None
     lineups_doc = load_json_file(lineups_path) if lineups_path else None
     game_lines_doc = load_json_file(game_lines_path) if game_lines_path else None
-    shared_game_lines_doc = load_odds_history_payload_for_sport("mlb") if selected_date == today_iso and not render_web_dyno else None
+    shared_game_lines_doc = (
+        load_odds_history_payload_for_sport("mlb", resolve_current_shard_key("mlb", selected_date))
+        if selected_date == today_iso and not render_web_dyno
+        else None
+    )
     shared_game_lines_refreshed_at = None
     if isinstance(shared_game_lines_doc, dict):
         shared_game_lines_games = shared_game_lines_doc.get("games") if isinstance(shared_game_lines_doc.get("games"), list) else []

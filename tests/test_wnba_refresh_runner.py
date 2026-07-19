@@ -1544,7 +1544,23 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
                 f"props_recommendations_top_by_game_{date_str}.json": module._export_top_by_game_snapshot,
             }
             for name in expected:
-                (processed_source / name).write_text('{"ok": true}\n', encoding="utf-8")
+                if name.endswith(".csv"):
+                    # _path_has_meaningful_content requires a real header+row shape
+                    # for .csv-suffixed files (guards against stale 0-row leftovers),
+                    # so a JSON placeholder body doesn't count as meaningful for these.
+                    (processed_source / name).write_text("id\n1\n", encoding="utf-8")
+                elif name.startswith("cards_sim_detail_"):
+                    # _export_cards_sim_detail_snapshot only treats an existing file
+                    # as reusable when _cards_sim_detail_has_quarter_content finds real
+                    # per-quarter sim data on at least one game (guards against a stale
+                    # file that never got past pregame for any game reusing forever) --
+                    # a bare placeholder body doesn't qualify.
+                    (processed_source / name).write_text(
+                        json.dumps({"date": date_str, "games": [{"sim": {"quarters": [{"away_pts_mu": 20.0}]}}]}),
+                        encoding="utf-8",
+                    )
+                else:
+                    (processed_source / name).write_text('{"ok": true}\n', encoding="utf-8")
             (processed_source / f"live_lens_signals_{date_str}.jsonl").write_text('{"kind":"signal"}\n', encoding="utf-8")
             (processed_source / f"live_lens_projections_{date_str}.jsonl").write_text('{"kind":"projection"}\n', encoding="utf-8")
             (processed_source / "live_lens_tuning_override.json").write_text('{"alpha":1.25}\n', encoding="utf-8")
@@ -2280,6 +2296,18 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
     def test_export_live_snapshot_artifacts_builds_from_bundle_live_lens_artifacts(self) -> None:
         module = self._load_module()
 
+        # Deliberately not a real WNBA game date (no season play in February):
+        # this repo checkout has real committed live-snapshot data for plenty of
+        # actual game dates (including ones that used to collide here), and
+        # _build_local_live_snapshot_payload's first, non-bundle-scoped call
+        # inside _export_live_snapshot_artifacts resolves processed_root() from
+        # whatever this process's real environment already points at -- in
+        # production that's always the same directory as the bundle, but in a
+        # dev checkout it's this real working tree. Using a date nothing real
+        # was ever generated for keeps this test's result dependent only on the
+        # fixtures written below.
+        date_str = "2031-02-14"
+
         with tempfile.TemporaryDirectory() as tmp_dir:
             tmp_root = Path(tmp_dir)
             source_root = tmp_root / "source"
@@ -2289,37 +2317,45 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
             processed_root.mkdir(parents=True, exist_ok=True)
 
             module._write_live_snapshot_payload(
-                source_snapshots / "live_state_2026-06-05.jsonl",
+                source_snapshots / f"live_state_{date_str}.jsonl",
                 {"ok": True, "games": [{"event_id": "401856963", "home": "LAS", "away": "NYL", "status": "Live"}]},
             )
-            (processed_root / "game_cards_2026-06-05.csv").write_text(
+            (processed_root / f"game_cards_{date_str}.csv").write_text(
                 "date,game_id,event_id,home_team,visitor_team,commence_time,home_ml,away_ml,home_spread,away_spread,total,bookmaker,home_tri,away_tri\n"
-                "2026-06-05,0401,401856963,Las Vegas Aces,New York Liberty,2026-06-05T23:00:00Z,-140,120,-4.5,4.5,163.5,oddsapi_consensus,LAS,NYL\n",
+                f"{date_str},0401,401856963,Las Vegas Aces,New York Liberty,{date_str}T23:00:00Z,-140,120,-4.5,4.5,163.5,oddsapi_consensus,LAS,NYL\n",
                 encoding="utf-8",
             )
-            (processed_root / "live_lens_signals_2026-06-05.jsonl").write_text(
+            (processed_root / f"live_lens_signals_{date_str}.jsonl").write_text(
                 json.dumps({"market": "total", "game_id": "0401", "home": "LAS", "away": "NYL", "live_line": 163.5}) + "\n",
                 encoding="utf-8",
             )
-            (processed_root / "live_lens_projections_2026-06-05.jsonl").write_text(
+            (processed_root / f"live_lens_projections_{date_str}.jsonl").write_text(
                 json.dumps({"market": "player_prop", "game_id": "0401", "home": "LAS", "away": "NYL", "player": "Breanna Stewart", "team": "NYL", "opponent": "LAS", "stat": "pts", "line": 17.5, "proj": 23.0, "sim_mu": 21.0, "klass": "BET"}) + "\n",
                 encoding="utf-8",
             )
 
-            with patch.object(module, "_source_app_fallback_enabled", return_value=False), patch(
+            from syndicate.features.wnba import cards as cards_module
+
+            cards_module._local_live_snapshot_payload.cache_clear()
+            cards_module._local_live_state_payload.cache_clear()
+            with patch.dict(os.environ, {"SYNDICATE_WNBA_SOURCE_ROOT": str(tmp_root / "bundle")}), patch.object(
+                module, "_source_app_fallback_enabled", return_value=False
+            ), patch(
                 "syndicate.features.wnba.cards.build_live_player_boxscore_payload",
                 return_value={"games": [{"event_id": "401856963", "players": []}]},
             ):
                 copied = module._export_live_snapshot_artifacts(
                     source_root=source_root,
-                    date_str="2026-06-05",
+                    date_str=date_str,
                     processed_root=processed_root,
                 )
+            cards_module._local_live_snapshot_payload.cache_clear()
+            cards_module._local_live_state_payload.cache_clear()
 
             self.assertIn("live_lines_path", copied)
             self.assertIn("live_player_lens_path", copied)
-            lines_payload = module._read_live_snapshot_payload(processed_root / "live_snapshots" / "live_lines_2026-06-05.jsonl")
-            lens_payload = module._read_live_snapshot_payload(processed_root / "live_snapshots" / "live_player_lens_2026-06-05.jsonl")
+            lines_payload = module._read_live_snapshot_payload(processed_root / "live_snapshots" / f"live_lines_{date_str}.jsonl")
+            lens_payload = module._read_live_snapshot_payload(processed_root / "live_snapshots" / f"live_player_lens_{date_str}.jsonl")
 
         self.assertIsNotNone(((((lines_payload or {}).get("games") or [{}])[0].get("lines") or {}).get("total")))
         self.assertEqual((((lens_payload or {}).get("games") or [{}])[0].get("rows") or [{}])[0].get("player"), "Breanna Stewart")
@@ -3003,6 +3039,7 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
             required_files = {
                 raw_root / f"odds_wnba_player_props_{date_str}.csv": "id\n1\n",
                 processed_root / f"oddsapi_player_props_{date_str}.csv": "id\n1\n",
+                processed_root / f"predictions_{date_str}.csv": "home_team,visitor_team\nCHI,MIN\n",
                 processed_root / f"props_predictions_{date_str}.csv": "player\nA\n",
                 processed_root / f"props_edges_{date_str}.csv": "player\nA\n",
                 processed_root / f"props_recommendations_{date_str}.csv": "player\nA\n",

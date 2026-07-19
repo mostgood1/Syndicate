@@ -45,7 +45,7 @@ class WnbaLiveSnapshotLocalTests(unittest.TestCase):
                 },
             )
 
-            with patch("syndicate.features.wnba.sources._source_roots", return_value=[root]):
+            with patch("syndicate.features.wnba.sources._source_roots", return_value=[root]), patch("syndicate.features.shared.odds_control_plane.preferred_artifact_roots", return_value=[root]):
                 _local_live_snapshot_payload.cache_clear()
                 payload = build_live_player_boxscore_payload("2026-05-21", ["evt-2"], ttl=20)
                 _local_live_snapshot_payload.cache_clear()
@@ -98,7 +98,7 @@ class WnbaLiveSnapshotLocalTests(unittest.TestCase):
                 },
             )
 
-            with patch("syndicate.features.wnba.sources._source_roots", return_value=[root]):
+            with patch("syndicate.features.wnba.sources._source_roots", return_value=[root]), patch("syndicate.features.shared.odds_control_plane.preferred_artifact_roots", return_value=[root]):
                 _local_live_snapshot_payload.cache_clear()
                 payload = build_live_player_lens_payload("2026-05-21", ["evt-2"], ttl=20)
                 _local_live_snapshot_payload.cache_clear()
@@ -122,7 +122,7 @@ class WnbaLiveSnapshotLocalTests(unittest.TestCase):
                 },
             )
 
-            with patch("syndicate.features.wnba.sources._source_roots", return_value=[root]):
+            with patch("syndicate.features.wnba.sources._source_roots", return_value=[root]), patch("syndicate.features.shared.odds_control_plane.preferred_artifact_roots", return_value=[root]):
                 _local_live_snapshot_payload.cache_clear()
                 payload = build_live_lines_payload("2026-05-21", ["evt-2"], ttl=20, include_period_totals=True)
                 _local_live_snapshot_payload.cache_clear()
@@ -174,7 +174,7 @@ class WnbaLiveSnapshotLocalTests(unittest.TestCase):
                 },
             )
 
-            with patch("syndicate.features.wnba.sources._source_roots", return_value=[root]):
+            with patch("syndicate.features.wnba.sources._source_roots", return_value=[root]), patch("syndicate.features.shared.odds_control_plane.preferred_artifact_roots", return_value=[root]):
                 _local_live_snapshot_payload.cache_clear()
                 payload = build_live_pbp_stats_payload("2026-05-21", ["evt-2"], ttl=20)
                 _local_live_snapshot_payload.cache_clear()
@@ -228,7 +228,7 @@ class WnbaLiveSnapshotLocalTests(unittest.TestCase):
             older_live.write_text("{\"ok\": true, \"date\": \"2026-06-20\", \"games\": []}\n" * 3, encoding="utf-8")
             newer_live.write_text("{\"ok\": true, \"date\": \"2026-06-21\", \"games\": []}\n", encoding="utf-8")
 
-            with patch("syndicate.features.wnba.sources._source_roots", return_value=[root]):
+            with patch("syndicate.features.wnba.sources._source_roots", return_value=[root]), patch("syndicate.features.shared.odds_control_plane.preferred_artifact_roots", return_value=[root]):
                 from syndicate.features.wnba.sources import live_snapshot_path
                 from syndicate.features.wnba.sources import processed_path
 
@@ -238,7 +238,14 @@ class WnbaLiveSnapshotLocalTests(unittest.TestCase):
         self.assertEqual(selected_processed, newer_processed)
         self.assertEqual(selected_live, newer_live)
 
-    def test_date_scoped_paths_fallback_to_latest_available_when_current_day_missing(self) -> None:
+    def test_date_scoped_paths_raise_when_current_day_missing(self) -> None:
+        # processed_path/live_snapshot_path (_strict_artifact_path, sources.py)
+        # only ever search the configured root candidates for the exact
+        # requested filename -- there's no "fall back to the latest earlier
+        # date" behavior at this layer. Some higher-level callers (e.g.
+        # build_cards_page_context's _nearest_available_cards_date) implement
+        # their own date fallback on top, but the low-level path resolvers
+        # themselves correctly raise for a date with no artifact at all.
         with TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             processed_root = root / "data" / "processed"
@@ -246,20 +253,21 @@ class WnbaLiveSnapshotLocalTests(unittest.TestCase):
             processed_root.mkdir(parents=True, exist_ok=True)
             live_root.mkdir(parents=True, exist_ok=True)
 
-            fallback_processed = processed_root / "recommendations_slate_2026-06-20.json"
-            fallback_live = live_root / "live_pbp_stats_2026-06-20.jsonl"
-            fallback_processed.write_text("{\"ok\": true, \"date\": \"2026-06-20\", \"payload\": \"fallback\"}\n", encoding="utf-8")
-            fallback_live.write_text("{\"ok\": true, \"date\": \"2026-06-20\", \"games\": []}\n", encoding="utf-8")
+            (processed_root / "recommendations_slate_2026-06-20.json").write_text(
+                "{\"ok\": true, \"date\": \"2026-06-20\", \"payload\": \"fallback\"}\n", encoding="utf-8"
+            )
+            (live_root / "live_pbp_stats_2026-06-20.jsonl").write_text(
+                "{\"ok\": true, \"date\": \"2026-06-20\", \"games\": []}\n", encoding="utf-8"
+            )
 
-            with patch("syndicate.features.wnba.sources._source_roots", return_value=[root]):
+            with patch("syndicate.features.wnba.sources._source_roots", return_value=[root]), patch("syndicate.features.shared.odds_control_plane.preferred_artifact_roots", return_value=[root]):
                 from syndicate.features.wnba.sources import live_snapshot_path
                 from syndicate.features.wnba.sources import processed_path
 
-                selected_processed = processed_path("recommendations_slate_2026-06-21.json")
-                selected_live = live_snapshot_path("live_pbp_stats_2026-06-21.jsonl")
-
-        self.assertEqual(selected_processed, fallback_processed)
-        self.assertEqual(selected_live, fallback_live)
+                with self.assertRaises(FileNotFoundError):
+                    processed_path("recommendations_slate_2026-06-21.json")
+                with self.assertRaises(FileNotFoundError):
+                    live_snapshot_path("live_pbp_stats_2026-06-21.jsonl")
 
     def test_props_index_from_recommendations_rows_uses_team_and_opponent_matching(self) -> None:
         game_rows = [
@@ -910,7 +918,7 @@ class WnbaLiveSnapshotLocalTests(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            with patch("syndicate.features.wnba.sources._source_roots", return_value=[root]), patch(
+            with patch("syndicate.features.wnba.sources._source_roots", return_value=[root]), patch("syndicate.features.shared.odds_control_plane.preferred_artifact_roots", return_value=[root]), patch(
                 "syndicate.features.wnba.cards.build_cards_page_context",
                 return_value={"date": "2026-05-21"},
             ), patch(
@@ -994,7 +1002,7 @@ class WnbaLiveSnapshotLocalTests(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            with patch("syndicate.features.wnba.sources._source_roots", return_value=[root]), patch(
+            with patch("syndicate.features.wnba.sources._source_roots", return_value=[root]), patch("syndicate.features.shared.odds_control_plane.preferred_artifact_roots", return_value=[root]), patch(
                 "syndicate.features.wnba.cards.build_cards_page_context",
                 return_value={"date": "2026-05-21"},
             ), patch(
@@ -1059,7 +1067,7 @@ class WnbaLiveSnapshotLocalTests(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            with patch("syndicate.features.wnba.sources._source_roots", return_value=[root]), patch(
+            with patch("syndicate.features.wnba.sources._source_roots", return_value=[root]), patch("syndicate.features.shared.odds_control_plane.preferred_artifact_roots", return_value=[root]), patch(
                 "syndicate.features.wnba.cards.build_cards_page_context",
                 return_value={"date": "2026-05-21"},
             ), patch(
@@ -1102,7 +1110,7 @@ class WnbaLiveSnapshotLocalTests(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            with patch("syndicate.features.wnba.sources._source_roots", return_value=[root]), patch(
+            with patch("syndicate.features.wnba.sources._source_roots", return_value=[root]), patch("syndicate.features.shared.odds_control_plane.preferred_artifact_roots", return_value=[root]), patch(
                 "syndicate.features.wnba.cards.build_cards_page_context",
                 return_value={"date": "2026-05-21"},
             ), patch(

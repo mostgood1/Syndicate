@@ -172,14 +172,32 @@ def _build_period_rows(game: dict[str, Any]) -> list[dict[str, Any]]:
         )
     if not rows:
         away_score = _metric_lookup(game.get("metrics", []), "Pred score") or game.get("summary")
+        # sim.periods is the primary source for per-quarter/half win split, but
+        # when it's empty (e.g. the sim engine's period-summary step didn't
+        # produce output for this game) the game-level model win probability
+        # already sitting in betting.p_home_win/p_away_win is a real, available
+        # substitute for the flat 50/50 this used to fall back to -- using it
+        # here means "betting %" only ever reads blank when there's truly no
+        # market/model probability anywhere on the game, not whenever periods
+        # happens to be empty.
+        betting = game.get("betting") if isinstance(game.get("betting"), dict) else {}
+        p_home_win = _safe_float(betting.get("p_home_win"))
+        p_away_win = _safe_float(betting.get("p_away_win"))
+        if p_home_win is None and p_away_win is not None:
+            p_home_win = 1.0 - p_away_win
+        if p_away_win is None and p_home_win is not None:
+            p_away_win = 1.0 - p_home_win
+        home_win_text = _format_pct(p_home_win) if p_home_win is not None else (
+            _metric_lookup(game.get("metrics", []), "Home win") or _metric_lookup(game.get("metrics", []), "Win prob") or "-"
+        )
         rows.append(
             {
                 "label": "Full Game",
                 "main": away_score or game.get("summary") or "Game outlook unavailable",
                 "subtitle": game.get("detail") or game.get("status") or "-",
-                "away_pct": 50.0,
-                "home_pct": 50.0,
-                "home_win": _metric_lookup(game.get("metrics", []), "Home win") or _metric_lookup(game.get("metrics", []), "Win prob") or "-",
+                "away_pct": (p_away_win * 100.0) if p_away_win is not None else 50.0,
+                "home_pct": (p_home_win * 100.0) if p_home_win is not None else 50.0,
+                "home_win": home_win_text,
                 "market": _metric_lookup(game.get("metrics", []), "Spread") or _metric_lookup(game.get("metrics", []), "Total") or "-",
                 "best_edge": _metric_lookup(game.get("metrics", []), "Edge") or "-",
             }

@@ -22,6 +22,7 @@ def build_game_detail_page_context(selected_week: int, game_pk: str) -> dict:
     games = cards_context.get("games") or []
     game = next((item for item in games if str(item.get("gamePk")) == str(game_pk)), None)
     using_sample_data = False
+    game_is_unavailable = game is None
     if game is None:
         game = {
             "gamePk": str(game_pk),
@@ -95,7 +96,7 @@ def build_game_detail_page_context(selected_week: int, game_pk: str) -> dict:
         game_pk=game_pk,
         module_links=build_module_links(resolved_week, "Cards"),
         source_path=str(cards_context.get("source_path") or f"NCAAF {LEGACY_ENGINE_SOURCE_LABEL} cards runtime"),
-        source_title=f"NCAAF {LEGACY_ENGINE_SOURCE_LABEL} game hub" if game.get("status") != f"{LEGACY_ENGINE_SOURCE_LABEL} game unavailable" else "NCAAF game unavailable",
+        source_title="NCAAF game unavailable" if game_is_unavailable else f"NCAAF {LEGACY_ENGINE_SOURCE_LABEL} game hub",
         using_sample_data=using_sample_data,
         route_path=f"/ncaaf/game/{game_pk}",
         intro_title="NCAAF Game Hub",
@@ -130,7 +131,7 @@ def build_game_detail_page_context(selected_week: int, game_pk: str) -> dict:
             "show_matchup_context": bool(matchup_context.get("items")),
             "smartsim_reasons": smartsim_reasons,
             "matchup_context": matchup_context,
-            "source_title": f"NCAAF {LEGACY_ENGINE_SOURCE_LABEL} game hub",
+            "source_title": "NCAAF game unavailable" if game_is_unavailable else f"NCAAF {LEGACY_ENGINE_SOURCE_LABEL} game hub",
             "source_path": str(cards_context.get("source_path") or f"NCAAF {LEGACY_ENGINE_SOURCE_LABEL} cards runtime"),
             "header_stats": header_stats,
         }

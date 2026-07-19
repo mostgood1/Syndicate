@@ -13,7 +13,7 @@ from syndicate.features.wnba.sources import available_dates
 from syndicate.features.wnba.sources import build_module_links
 from syndicate.features.wnba.sources import default_date
 from syndicate.features.wnba.sources import load_json
-from syndicate.features.wnba.sources import processed_path
+from syndicate.features.wnba.sources import processed_path_or_default
 
 
 def _csv_row_count(path: Path) -> int:
@@ -35,10 +35,10 @@ def _summary_counts(path: Path) -> tuple[int, int]:
 
 
 def _archive_card(date_str: str) -> dict[str, Any]:
-    cards_path = processed_path(f"game_cards_{date_str}.csv")
-    picks_path = processed_path(f"recommendations_slate_{date_str}.json")
-    sim_path = processed_path(f"cards_sim_detail_{date_str}.json")
-    props_path = processed_path(f"cards_props_snapshot_{date_str}.json")
+    cards_path = processed_path_or_default(f"game_cards_{date_str}.csv")
+    picks_path = processed_path_or_default(f"recommendations_slate_{date_str}.json")
+    sim_path = processed_path_or_default(f"cards_sim_detail_{date_str}.json")
+    props_path = processed_path_or_default(f"cards_props_snapshot_{date_str}.json")
     card_rows = _csv_row_count(cards_path)
     games_count, picks_count = _summary_counts(picks_path)
     sim_ready = sim_path.exists()
@@ -75,8 +75,8 @@ def build_archive_page_context(selected_date: str | None) -> dict[str, Any]:
     rank_cards = [_archive_card(date_str) for date_str in window_dates]
     rank_cards = selected_first_rank_cards(rank_cards, resolved_date)
 
-    cards_path = processed_path(f"game_cards_{resolved_date}.csv")
-    picks_path = processed_path(f"recommendations_slate_{resolved_date}.json")
+    cards_path = processed_path_or_default(f"game_cards_{resolved_date}.csv")
+    picks_path = processed_path_or_default(f"recommendations_slate_{resolved_date}.json")
     card_rows = _csv_row_count(cards_path)
     games_count, picks_count = _summary_counts(picks_path)
 

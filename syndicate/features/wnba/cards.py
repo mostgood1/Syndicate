@@ -3222,7 +3222,13 @@ def _cards_games_for_live_fallback(selected_date: str) -> list[dict[str, Any]]:
 
 
 def _artifact_processed_root(selected_date: str) -> Path:
-    return processed_path(f"game_cards_{selected_date}.csv").parent
+    # Only the containing directory is needed here, so anchor it on
+    # processed_root() directly rather than a specific game_cards file --
+    # processed_path raises FileNotFoundError for a date with no published
+    # artifact yet, which used to make this (and every caller resolving live
+    # lines/lens data for a not-yet-populated date) crash instead of falling
+    # through to whatever graceful empty-state handling the caller has.
+    return processed_root()
 
 
 def _artifact_live_player_lens_payload(
@@ -3462,8 +3468,13 @@ def _processed_live_player_odds_index(
     selected_date: str,
     games_by_event: dict[str, dict[str, Any]],
 ) -> dict[tuple[str, str, str], list[dict[str, Any]]]:
-    processed_root = processed_path(f"game_cards_{selected_date}.csv").parent
-    odds_path = processed_root / f"oddsapi_player_props_{selected_date}.csv"
+    # Only the containing directory is needed here, so anchor it on
+    # processed_root() directly rather than a specific game_cards file --
+    # processed_path raises FileNotFoundError for a date with no game_cards
+    # artifact at all, which used to make this function 500 even when the
+    # actual target file (oddsapi_player_props) exists and is checked below
+    # with its own graceful .exists() guard.
+    odds_path = processed_root() / f"oddsapi_player_props_{selected_date}.csv"
     if not odds_path.exists():
         return {}
 

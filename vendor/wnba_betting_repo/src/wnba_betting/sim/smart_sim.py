@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from dataclasses import dataclass, field, replace
 from functools import lru_cache
 from typing import Any, Dict, List, Optional, Tuple
@@ -16,6 +17,8 @@ from ..prop_ladders import build_exact_ladder_payload
 from ..player_priors import PlayerPriorsConfig, compute_player_priors, _norm_player_key  # type: ignore
 from ..roster_files import pick_rosters_file
 from ..teams import to_tricode
+
+logger = logging.getLogger(__name__)
 
 
 def _normalize_position(value: Any) -> str:
@@ -4336,6 +4339,12 @@ def simulate_smart_game(
         h2_a = aq_sims[:, 2] + aq_sims[:, 3]
         periods["h2"] = _summarize_period("h2", h2_h, h2_a, None, None)
     except Exception:
+        logger.warning(
+            "smart_sim period-summary computation failed for %s @ %s; periods will be empty",
+            away_tri,
+            home_tri,
+            exc_info=True,
+        )
         periods = {}
 
     margin = home_scores - away_scores

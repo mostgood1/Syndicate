@@ -571,6 +571,59 @@ def _summary_target_matchup(team: str, away_abbr: str, home_abbr: str) -> str:
     return normalized_team or "-"
 
 
+def _backfill_targets_from_daily_summary(
+    existing_targets: list[dict[str, Any]], *, selected_date: str, limit: int
+) -> list[dict[str, Any]]:
+    # The dedicated _hr_targets artifact is generated on its own schedule and
+    # can be sparse or stale relative to the richer per-game daily_summary
+    # artifact (which always has a hitter_hr_likelihood_all breakdown for
+    # every game once the sim has run). Top up the board from it rather than
+    # showing a short list when the primary artifact hasn't caught up yet.
+    remaining = limit - len(existing_targets)
+    if remaining <= 0:
+        return existing_targets
+    daily_summary = load_json_file(daily_artifact_path(selected_date))
+    if not isinstance(daily_summary, dict):
+        return existing_targets
+    outputs = daily_summary.get("outputs") if isinstance(daily_summary.get("outputs"), list) else []
+    candidate_rows: list[dict[str, Any]] = []
+    for output in outputs:
+        if not isinstance(output, dict):
+            continue
+        away = str(output.get("away") or "").strip().upper()
+        home = str(output.get("home") or "").strip().upper()
+        hitters = ((output.get("hitter_hr_likelihood_all") or {}).get("overall")) if isinstance(output.get("hitter_hr_likelihood_all"), dict) else None
+        if not isinstance(hitters, list):
+            continue
+        for hitter in hitters:
+            if not isinstance(hitter, dict):
+                continue
+            team = str(hitter.get("team") or "").strip().upper()
+            candidate_rows.append(
+                {
+                    "player_name": str(hitter.get("name") or "").strip(),
+                    "team": team,
+                    "matchup": _summary_target_matchup(team, away, home),
+                    "p_hr_1plus": hitter.get("p_hr_1plus_cal"),
+                    "pa_mean": hitter.get("pa_mean"),
+                    "lineup_order": hitter.get("lineup_order"),
+                }
+            )
+    if not candidate_rows:
+        return existing_targets
+    candidates = _targets_from_summary({"rows": candidate_rows}, selected_date=selected_date, limit=len(candidate_rows))
+    seen_keys = {_target_key(target) for target in existing_targets}
+    deduped: list[dict[str, Any]] = []
+    for candidate in candidates:
+        key = _target_key(candidate)
+        if key in seen_keys:
+            continue
+        seen_keys.add(key)
+        deduped.append(candidate)
+    deduped.sort(key=lambda item: _safe_float(item.get("p_hr_1plus")) or 0.0, reverse=True)
+    return existing_targets + deduped[:remaining]
+
+
 def _hr_target_summary_stats(target: dict[str, Any]) -> list[dict[str, str]]:
     # Reuses the drivers[] breakdown (_hr_target_driver_payload) that was
     # already computed for every row but, before this, never reached any
@@ -724,7 +777,7 @@ def build_hr_targets_page_context(selected_date: str) -> dict[str, Any]:
     summary_path = daily_artifact_path(selected_date, suffix="_hr_targets")
     summary = load_json_file(summary_path)
     summary_targets = _targets_from_summary(summary, selected_date=selected_date, limit=24) if summary else []
-    targets = summary_targets
+    targets = _backfill_targets_from_daily_summary(summary_targets, selected_date=selected_date, limit=24)
     using_sample_data = False
 
     header_stats = [

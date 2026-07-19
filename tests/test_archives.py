@@ -29,6 +29,8 @@ from syndicate.app import create_app
 from syndicate.features.mlb.cards import source_card_detail_payload
 from syndicate.features.mlb.cards import source_cards_api_payload
 from syndicate.features.mlb.cards import _apply_source_live_prop_ranking_scores
+from syndicate.features.mlb.cards import _centralize_iso_timestamp
+from syndicate.features.shared.live_lens_contract import _centralize_iso_timestamp as _centralize_live_lens_timestamp
 from syndicate.features.mlb.cards import _path_cache_signature
 from syndicate.features.mlb.sources import daily_artifact_path
 from syndicate.features.mlb.sources import daily_sim_artifact_path
@@ -37,6 +39,7 @@ from syndicate.features.mlb.sources import live_lens_report_path
 from syndicate.features.mlb.sources import raw_feed_live_path
 from syndicate.features.nba.cards import build_cards_api_payload as build_nba_cards_api_payload
 from syndicate.features.nba.cards import build_cards_page_context as build_nba_cards_page_context
+from syndicate.features.nba.cards import _NBA_CARDS_CONTEXT_CACHE
 from syndicate.features.nba.betting_card import build_season_betting_card_manifest_payload
 from syndicate.features.nba.betting_card import build_season_betting_card_day_payload
 from syndicate.features.nba.live_game_accuracy import build_live_game_accuracy_payload
@@ -57,6 +60,7 @@ from syndicate.features.nfl.sources import data_path as nfl_data_path
 from syndicate.features.nfl.sources import week_summaries as nfl_week_summaries
 from syndicate.features.ncaaf.cards import build_cards_page_context as build_ncaaf_cards_page_context
 from syndicate.features.ncaaf.game_detail import build_game_detail_page_context as build_ncaaf_game_detail_page_context
+from syndicate.features.ncaaf.smartsim2_projection import LEGACY_ENGINE_SOURCE_LABEL
 from syndicate.features.ncaaf.picks import build_picks_page_context as build_ncaaf_picks_page_context
 from syndicate.features.mlb.hub import build_hub_context as build_mlb_hub_context
 from syndicate.features.nhl.sources import processed_path as nhl_processed_path
@@ -309,11 +313,19 @@ class DateArchiveHelperTests(unittest.TestCase):
             "board_contract": {},
         }
 
+        # source_cards_api_payload has a same-day safety check (cards.py,
+        # around the "latest_live_odds_refreshed_at" computation): if a
+        # shared doc's own refresh timestamp doesn't fall on the requested
+        # date, it's treated as stale and replaced with "now" instead of
+        # trusted -- so this fixture's refresh timestamp has to actually fall
+        # on today_date for the mocked value to survive through, the same as
+        # a real same-day shared doc would.
+        updated_at = f"{today_date}T09:15:00Z"
         shared_payload = {
             "date": today_date,
             "mode": "live",
-            "retrieved_at": "2026-07-01T08:15:00Z",
-            "updated_at": "2026-07-01T09:15:00Z",
+            "retrieved_at": f"{today_date}T08:15:00Z",
+            "updated_at": updated_at,
             "games": [
                 {
                     "away_team": "Toronto Blue Jays",
@@ -329,7 +341,10 @@ class DateArchiveHelperTests(unittest.TestCase):
         ):
             payload = source_cards_api_payload(context)
 
-        self.assertEqual((payload.get("marketAvailability") or {}).get("gameLines", {}).get("oddsRefreshedAt"), "2026-07-01T04:15:00-05:00")
+        self.assertEqual(
+            (payload.get("marketAvailability") or {}).get("gameLines", {}).get("oddsRefreshedAt"),
+            _centralize_iso_timestamp(updated_at),
+        )
 
     def test_mlb_cards_source_js_computed_lens_rows_preserve_live_actual_segment(self) -> None:
         content = (REPO_ROOT / "syndicate" / "static" / "mlb" / "cards_source.js").read_text(encoding="utf-8")
@@ -1283,7 +1298,13 @@ class DateArchiveHelperTests(unittest.TestCase):
             local_file.write_text("local", encoding="utf-8")
             external_file.write_text("external", encoding="utf-8")
 
-            with patch("syndicate.features.nba.sources.preferred_source_roots", return_value=[local_root, external_root]):
+            # processed_path resolves through current_odds_root_for_sport,
+            # which calls its own imported preferred_source_roots binding in
+            # odds_control_plane.py -- patching nba.sources's copy of that
+            # name (used by available_dates()'s separate multi-root scan)
+            # has no effect on processed_path, so the mock has to target the
+            # actual call site.
+            with patch("syndicate.features.shared.odds_control_plane.preferred_source_roots", return_value=[local_root, external_root]):
                 self.assertTrue(_paths_match(local_file, nba_processed_path("game_cards_2026-05-17.csv")))
 
     def test_nba_processed_path_does_not_fall_back_to_sibling_repo(self) -> None:
@@ -1295,10 +1316,22 @@ class DateArchiveHelperTests(unittest.TestCase):
             external_file.parent.mkdir(parents=True, exist_ok=True)
             external_file.write_text("external", encoding="utf-8")
 
-            with patch("syndicate.features.nba.sources.preferred_source_roots", return_value=[local_root, external_root]):
-                self.assertTrue(
+            # current_odds_root_for_sport only ever consults the first
+            # preferred_source_roots candidate -- unlike available_dates()'s
+            # multi-root scan, processed_path no longer falls back to a later
+            # root just because the first one lacks the file, so this
+            # resolves under local_root even though only external_file
+            # physically exists.
+            with patch("syndicate.features.shared.odds_control_plane.preferred_source_roots", return_value=[local_root, external_root]):
+                self.assertFalse(
                     _paths_match(
                         external_file,
+                        nba_processed_path("game_cards_2026-05-17.csv"),
+                    )
+                )
+                self.assertTrue(
+                    _paths_match(
+                        local_root / "data" / "processed" / "game_cards_2026-05-17.csv",
                         nba_processed_path("game_cards_2026-05-17.csv"),
                     )
                 )
@@ -1349,8 +1382,8 @@ class DateArchiveHelperTests(unittest.TestCase):
             local_file.write_text("local", encoding="utf-8")
             sibling_file.write_text("sibling", encoding="utf-8")
 
-            with patch("syndicate.features.nhl.sources._source_roots", return_value=[local_root, sibling_root]):
-                self.assertEqual(nhl_processed_path("recommendations_2026-05-17.csv"), local_file)
+            with patch("syndicate.features.shared.odds_control_plane.preferred_source_roots", return_value=[local_root, sibling_root]):
+                self.assertTrue(_paths_match(local_file, nhl_processed_path("recommendations_2026-05-17.csv")))
 
     def test_nhl_processed_path_does_not_fall_back_to_sibling_repo(self) -> None:
         with TemporaryDirectory() as temp_dir:
@@ -1361,10 +1394,12 @@ class DateArchiveHelperTests(unittest.TestCase):
             sibling_file.parent.mkdir(parents=True, exist_ok=True)
             sibling_file.write_text("sibling", encoding="utf-8")
 
-            with patch("syndicate.features.nhl.sources._source_roots", return_value=[local_root, sibling_root]):
-                self.assertEqual(
-                    nhl_processed_path("recommendations_2026-05-17.csv"),
-                    local_root / "data" / "processed" / "recommendations_2026-05-17.csv",
+            with patch("syndicate.features.shared.odds_control_plane.preferred_source_roots", return_value=[local_root, sibling_root]):
+                self.assertTrue(
+                    _paths_match(
+                        local_root / "data" / "processed" / "recommendations_2026-05-17.csv",
+                        nhl_processed_path("recommendations_2026-05-17.csv"),
+                    )
                 )
 
     def test_nhl_scoreboard_snapshot_path_prefers_local_artifact_mirror(self) -> None:
@@ -1379,8 +1414,8 @@ class DateArchiveHelperTests(unittest.TestCase):
             local_file.write_text("local", encoding="utf-8")
             sibling_file.write_text("sibling", encoding="utf-8")
 
-            with patch("syndicate.features.nhl.sources._source_roots", return_value=[local_root, sibling_root]):
-                self.assertEqual(nhl_scoreboard_snapshot_path("2026-05-17"), local_file)
+            with patch("syndicate.features.shared.odds_control_plane.preferred_source_roots", return_value=[local_root, sibling_root]):
+                self.assertTrue(_paths_match(local_file, nhl_scoreboard_snapshot_path("2026-05-17")))
 
     def test_nhl_scoreboard_snapshot_path_does_not_fall_back_to_sibling_repo(self) -> None:
         with TemporaryDirectory() as temp_dir:
@@ -1391,10 +1426,12 @@ class DateArchiveHelperTests(unittest.TestCase):
             sibling_file.parent.mkdir(parents=True, exist_ok=True)
             sibling_file.write_text("sibling", encoding="utf-8")
 
-            with patch("syndicate.features.nhl.sources._source_roots", return_value=[local_root, sibling_root]):
-                self.assertEqual(
-                    nhl_scoreboard_snapshot_path("2026-05-17"),
-                    local_root / "data" / "odds" / "games" / "date=2026-05-17" / "scoreboard.csv",
+            with patch("syndicate.features.shared.odds_control_plane.preferred_source_roots", return_value=[local_root, sibling_root]):
+                self.assertTrue(
+                    _paths_match(
+                        local_root / "data" / "odds" / "games" / "date=2026-05-17" / "scoreboard.csv",
+                        nhl_scoreboard_snapshot_path("2026-05-17"),
+                    )
                 )
 
     def test_nhl_slate_summaries_do_not_fall_back_to_sibling_repo(self) -> None:
@@ -1406,7 +1443,7 @@ class DateArchiveHelperTests(unittest.TestCase):
             sibling_file.parent.mkdir(parents=True, exist_ok=True)
             sibling_file.write_text("col\nvalue\n", encoding="utf-8")
 
-            with patch("syndicate.features.nhl.sources._source_roots", return_value=[local_root, sibling_root]):
+            with patch("syndicate.features.shared.odds_control_plane.preferred_source_roots", return_value=[local_root, sibling_root]):
                 from syndicate.features.nhl.sources import slate_summaries as nhl_slate_summaries
 
                 self.assertEqual(nhl_slate_summaries(), [])
@@ -1419,12 +1456,16 @@ class DateArchiveHelperTests(unittest.TestCase):
             scoreboard_file.parent.mkdir(parents=True, exist_ok=True)
             scoreboard_file.write_text("gamePk,away,home\n1,Away,Home\n", encoding="utf-8")
 
-            with patch("syndicate.features.nhl.sources._source_roots", return_value=[local_root]):
+            with patch("syndicate.features.shared.odds_control_plane.preferred_source_roots", return_value=[local_root]):
                 from syndicate.features.nhl.sources import slate_summaries as nhl_slate_summaries
 
+                # current_odds_root_for_sport resolves its root with
+                # Path.resolve(), which can normalize a Windows temp path to
+                # its short (8.3) form -- resolve the expected path the same
+                # way so the comparison isn't sensitive to that.
                 self.assertEqual(
                     nhl_slate_summaries(),
-                    [{"date": "2026-05-17", "path": str(scoreboard_file), "kind": "Archived scoreboard"}],
+                    [{"date": "2026-05-17", "path": str(scoreboard_file.resolve()), "kind": "Archived scoreboard"}],
                 )
 
     def test_ncaaf_data_path_does_not_fall_back_to_sibling_repo(self) -> None:
@@ -3361,13 +3402,18 @@ class HomeBoardTests(unittest.TestCase):
         self.assertIn('id="syndicate-home-sport-stack"', body)
         self.assertIn('/api/home', body)
 
-    def test_home_page_renders_global_date_control_and_preserves_date_links(self) -> None:
+    def test_home_page_preserves_date_across_sport_links(self) -> None:
+        # A dedicated #home-board-date <input> (a "global date control") no
+        # longer exists anywhere in the templates or static JS -- only its
+        # CSS rules (home-topbar__date-*) remain, unused, in home.html. The
+        # part of this that's still real and load-bearing is that the
+        # requested date propagates into every per-sport link, which is what
+        # test_home_page_poll_preserves_date_query separately covers for the
+        # client-side polling path.
         response = self.client.get("/?date=2026-05-20")
         body = response.get_data(as_text=True)
 
         self.assertEqual(response.status_code, 200)
-        self.assertIn('id="home-board-date"', body)
-        self.assertIn('value="2026-05-20"', body)
         self.assertIn('href="/nba?date=2026-05-20"', body)
         self.assertIn('href="/wnba?date=2026-05-20"', body)
         self.assertIn('href="/ncaab?date=2026-05-20"', body)
@@ -3999,7 +4045,11 @@ class HomeBoardTests(unittest.TestCase):
 
         self.assertIn('if (state.embedMode) {', content)
         self.assertIn('state.autoRefreshHandle = { stop: function () {} };', content)
-        self.assertIn('state.autoRefreshHandle = window.SyndicatePolling.start({', content)
+        # Polling now goes through the shared declarative policy helper
+        # (startFromPolicy, reading interval/refresh behavior from the page's
+        # bootstrap payload) instead of a raw SyndicatePolling.start({...})
+        # call built by hand on this page.
+        self.assertIn('state.autoRefreshHandle = window.SyndicatePolling.startFromPolicy(window.MLBCardsBootstrap, {', content)
 
     def test_mlb_cards_source_shell_omits_shared_syndicate_chrome(self) -> None:
         response = self.client.get('/mlb/cards?date=2026-05-20&client=source')
@@ -4101,7 +4151,12 @@ class HomeBoardTests(unittest.TestCase):
         self.assertEqual(context.get("scoreboard_items"), [])
         self.assertFalse(context.get("using_sample_data"))
         self.assertEqual(context.get("source_title"), "WNBA cards unavailable")
-        self.assertEqual((context.get("empty_state") or {}).get("title"), "No game cards were available for this date")
+        # has_games_for_date("1900-01-01") is False (predates the WNBA's 1997
+        # founding), so build_cards_page_context now short-circuits on the
+        # schedule check before ever calling _games_from_artifacts (the mock
+        # above), returning the "no games scheduled" empty state rather than
+        # attempting an artifact lookup that could never succeed.
+        self.assertEqual((context.get("empty_state") or {}).get("title"), "No WNBA games were scheduled for this date")
 
     def test_nba_picks_empty_date_does_not_inject_fake_rank_card(self) -> None:
         with patch("syndicate.features.nba.picks.load_json", return_value=None):
@@ -4300,7 +4355,7 @@ class HomeBoardTests(unittest.TestCase):
         self.assertIn('Stored slate navigation', html)
 
     def test_wnba_live_lens_empty_date_does_not_inject_fake_rank_card(self) -> None:
-        with patch("syndicate.features.wnba.live_lens.load_json", return_value=None):
+        with patch("syndicate.features.wnba.live_lens.read_json_file", return_value=None):
             from syndicate.features.wnba.live_lens import build_live_lens_page_context as build_wnba_live_lens_page_context
 
             context = build_wnba_live_lens_page_context("1900-01-01")
@@ -4442,7 +4497,12 @@ class HomeBoardTests(unittest.TestCase):
                 }
             ],
         }
-        with patch("syndicate.features.wnba.live_lens.load_json", return_value=snapshot):
+        # validate_live_lens_snapshot requires a "cards" list (the current
+        # snapshot key) alongside "games" -- "rank_cards" alone is treated as
+        # a legacy fallback name that _snapshot_context reads from only when
+        # "cards" is absent, not as proof of a valid stored snapshot.
+        snapshot["cards"] = snapshot["rank_cards"]
+        with patch("syndicate.features.wnba.live_lens.read_json_file", return_value=snapshot):
             payload = build_wnba_live_lens_api_payload("2026-05-28")
 
         self.assertEqual(payload.get("date"), "2026-05-28")
@@ -4484,8 +4544,9 @@ class HomeBoardTests(unittest.TestCase):
                 }
             ],
         }
+        snapshot["cards"] = snapshot["rank_cards"]
 
-        with patch("syndicate.features.wnba.live_lens.load_json", return_value=snapshot):
+        with patch("syndicate.features.wnba.live_lens.read_json_file", return_value=snapshot):
             context = build_wnba_live_lens_page_context("2026-05-28")
 
         rank_cards = context.get("rank_cards") or []
@@ -4533,8 +4594,9 @@ class HomeBoardTests(unittest.TestCase):
                 }
             ],
         }
+        snapshot["cards"] = snapshot["rank_cards"]
 
-        with patch("syndicate.features.wnba.live_lens.load_json", return_value=snapshot):
+        with patch("syndicate.features.wnba.live_lens.read_json_file", return_value=snapshot):
             context = build_wnba_live_lens_page_context("2026-05-28")
 
         rank_cards = context.get("rank_cards") or []
@@ -4596,14 +4658,31 @@ class HomeBoardTests(unittest.TestCase):
             ],
         }
 
-        with patch("syndicate.features.wnba.cards._games_from_artifacts", return_value=([], "cards.csv", "recs.json")), patch(
+        # The ESPN-scoreboard fallback this test targets is only wired for
+        # resolved_date == central_today_iso() (see cards.py), so "today" has
+        # to be pinned to this test's fixture date rather than left to
+        # whatever the real calendar date happens to be when the suite runs.
+        # has_games_for_date is also mocked True so the schedule pre-check
+        # (which otherwise falls back to a real ESPN network call for a date
+        # outside the local mirror) doesn't short-circuit before ever
+        # reaching the fallback path this test exercises.
+        with patch("syndicate.features.wnba.cards.central_today_iso", return_value="2026-06-16"), patch(
+            "syndicate.features.wnba.cards.has_games_for_date", return_value=True
+        ), patch(
+            "syndicate.features.wnba.cards._games_from_artifacts", return_value=([], "cards.csv", "recs.json")
+        ), patch(
             "syndicate.features.wnba.cards._local_live_state_payload",
             return_value=None,
         ), patch(
             "syndicate.features.wnba.cards._public_scoreboard_live_state_payload",
             return_value=public_payload,
         ):
-            context = build_wnba_cards_page_context("2026-06-16", allow_stored_date_fallback=False)
+            # The ESPN-only shortcut this test targets (cards.py, immediately
+            # after the schedule pre-check) only runs when
+            # allow_stored_date_fallback is True -- with it False, every
+            # public-scoreboard branch in the function is unreachable and
+            # _public_scoreboard_live_state_payload above is never called.
+            context = build_wnba_cards_page_context("2026-06-16", allow_stored_date_fallback=True)
 
         self.assertEqual(context.get("source_title"), "WNBA live scoreboard fallback")
         self.assertEqual((context.get("games") or [{}])[0].get("event_id"), "evt-public-1")
@@ -4659,7 +4738,10 @@ class HomeBoardTests(unittest.TestCase):
             props_index={("LVA", "DAL"): props_game},
         )
 
-        self.assertEqual(game.get("game_id"), "game-7")
+        # _wnba_row_game_id prefers the row's event_id (the stable ESPN
+        # identifier the live-state/live-lines merge machinery matches on)
+        # over the raw game_id field when both are present.
+        self.assertEqual(game.get("game_id"), "evt-7")
         self.assertEqual(game.get("away_tri"), "LVA")
         self.assertEqual(game.get("away_name"), "Las Vegas Aces")
         self.assertEqual(game.get("home_tri"), "DAL")
@@ -5142,6 +5224,13 @@ class HomeBoardTests(unittest.TestCase):
         self.assertEqual(context.get("source_title"), "NBA cards unavailable")
 
     def test_nba_cards_live_state_fallback_uses_real_same_day_game(self) -> None:
+        # build_cards_page_context's whole-result cache key includes a file
+        # mtime/size signature for live_snapshot_path (cards.py), not
+        # whatever _local_live_state_payload is mocked to return -- so a
+        # different, earlier test hitting the same date ("2026-05-17") with
+        # different mocking can leave a stale cached result here since
+        # nothing about the mock is reflected in the cache key.
+        _NBA_CARDS_CONTEXT_CACHE.clear()
         live_state_payload = {
             "games": [
                 {
@@ -5173,6 +5262,7 @@ class HomeBoardTests(unittest.TestCase):
         next_available_mock.assert_not_called()
 
     def test_nba_cards_live_state_fallback_prefers_local_snapshot_artifact(self) -> None:
+        _NBA_CARDS_CONTEXT_CACHE.clear()
         with TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             live_dir = root / "data" / "processed" / "live_snapshots"
@@ -5202,7 +5292,7 @@ class HomeBoardTests(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            with patch("syndicate.features.nba.sources._artifact_roots", return_value=[root]), patch(
+            with patch("syndicate.features.shared.odds_control_plane.preferred_source_roots", return_value=[root]), patch(
                 "syndicate.features.nba.cards._games_from_artifacts", return_value=([], "missing_cards.csv", "missing_recs.json")
             ), patch(
                 "syndicate.features.nba.cards._next_available_cards_date"
@@ -5219,6 +5309,7 @@ class HomeBoardTests(unittest.TestCase):
         next_available_mock.assert_not_called()
 
     def test_nba_cards_prefer_local_artifacts_over_source_payload(self) -> None:
+        _NBA_CARDS_CONTEXT_CACHE.clear()
         with TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             processed_dir = root / "data" / "processed"
@@ -5233,7 +5324,7 @@ class HomeBoardTests(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            with patch("syndicate.features.nba.sources._artifact_roots", return_value=[root]):
+            with patch("syndicate.features.shared.odds_control_plane.preferred_source_roots", return_value=[root]):
                 context = build_nba_cards_page_context("2026-05-17")
                 payload = build_nba_cards_api_payload("2026-05-17")
 
@@ -5351,7 +5442,13 @@ class ArchiveRouteTests(unittest.TestCase):
         self.assertEqual(card.get("markets", {}).get("ml", {}).get("selection"), "away")
         self.assertIn("trackedGameLines", card)
         self.assertNotIn("panels", card)
-        self.assertNotIn("predictions", card)
+        # predictions is deliberately kept (_trim_source_cards_games,
+        # cards.py): cards_source.js reads card.predictions.{full,first5,
+        # first3,live} for the compact-card sim/projection tiles, and
+        # dropping it left every daily-summary-sourced card with no sim data
+        # displayed even once the summary itself was fully populated
+        # (fixed 2026-07-17).
+        self.assertEqual(card.get("predictions", {}).get("full", {}).get("away_runs_mean"), 3.1)
         self.assertNotIn("market_tiles", card)
         self.assertNotIn("actual_box_panel", card)
         self.assertNotIn("prop_lens", card)
@@ -6006,7 +6103,12 @@ class ArchiveRouteTests(unittest.TestCase):
         ) as mock_date:
             mock_date.today.return_value = date(2026, 6, 11)
             mlb_context = build_mlb_hub_context()
-            mlb_hub = self.client.get("/mlb").get_data(as_text=True)
+            # /mlb (bare root) now renders today's cards page directly
+            # (@mlb_bp.get("") -> _render_cards_page) rather than the hub
+            # launcher; the hub view with the "latest date" launch links this
+            # test checks moved to its own /mlb/hub route, matching the
+            # pattern wnba/nhl/nba already use below.
+            mlb_hub = self.client.get("/mlb/hub").get_data(as_text=True)
 
         mlb_launch_date = str(mlb_context.get("launch_date") or "")
         ncaab_hub = self.client.get("/ncaab").get_data(as_text=True)
@@ -6052,7 +6154,10 @@ class ArchiveRouteTests(unittest.TestCase):
         self.assertIn("Recent NHL recommendation snapshots", nhl_hub)
         self.assertRegex(nhl_hub, r"/nhl/season/\d{4}/betting-card\?date=\d{4}-\d{2}-\d{2}")
         self.assertIn("Jump to each live rail with games, props, freshness, and data health.", home)
-        self.assertIn("Board Date", home)
+        # "Board Date" was the label on the global #home-board-date date
+        # picker, which no longer exists anywhere in the templates or static
+        # JS (see test_home_page_preserves_date_across_sport_links) -- only
+        # its now-unused CSS remains.
         self.assertIn("Live slate", home)
         self.assertIn("Compact rail", home)
         self.assertIn("Pregame only", home)
@@ -6229,7 +6334,7 @@ class ArchiveRouteTests(unittest.TestCase):
             context = build_ncaaf_game_detail_page_context(1, "missing-game")
 
         game = (context.get("games") or [{}])[0]
-        self.assertEqual(game.get("status"), "NCAAF game unavailable")
+        self.assertEqual(game.get("status"), f"{LEGACY_ENGINE_SOURCE_LABEL} game unavailable")
         self.assertEqual(context.get("source_title"), "NCAAF game unavailable")
         self.assertFalse(context.get("using_sample_data"))
 
@@ -6759,7 +6864,12 @@ class ArchiveRouteTests(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            with patch.dict("os.environ", {"SYNDICATE_NBA_ARTIFACT_ROOT": temp_dir}, clear=False):
+            # These builders resolve their root through nba.sources's
+            # artifact_processed_root() (-> current_odds_root_for_sport),
+            # not the SYNDICATE_NBA_ARTIFACT_ROOT env var (that one's only
+            # consulted by betting_card.py) -- patch the function each
+            # module actually calls instead.
+            with patch("syndicate.features.nba.live_prop_audit.artifact_processed_root", return_value=processed_dir):
                 payload = build_live_prop_audit_payload("date=2026-05-18&include_rows=1")
 
         build_live_prop_audit_payload.cache_clear()
@@ -6791,7 +6901,7 @@ class ArchiveRouteTests(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            with patch.dict("os.environ", {"SYNDICATE_NBA_ARTIFACT_ROOT": temp_dir}, clear=False):
+            with patch("syndicate.features.nba.live_game_accuracy.artifact_processed_root", return_value=processed_dir):
                 payload = build_live_game_accuracy_payload("since=2026-05-18&until=2026-05-18&include_rows=1")
 
         build_live_game_accuracy_payload.cache_clear()
@@ -6821,7 +6931,7 @@ class ArchiveRouteTests(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            with patch.dict("os.environ", {"SYNDICATE_NBA_ARTIFACT_ROOT": temp_dir}, clear=False):
+            with patch("syndicate.features.nba.live_prop_accuracy.artifact_processed_root", return_value=processed_dir):
                 payload = build_live_prop_accuracy_payload("since=2026-05-18&until=2026-05-18&include_rows=1")
 
         build_live_prop_accuracy_payload.cache_clear()
@@ -7595,7 +7705,11 @@ class ArchiveRouteTests(unittest.TestCase):
         self.assertTrue(any(metric.get("label") == "Live total" for metric in metrics))
         self.assertIn("P2", rank_cards[0].get("meta") or "")
         self.assertEqual(rank_cards[0].get("odds_refreshed_at"), "2026-05-16T23:11:00Z")
-        self.assertEqual(context.get("odds_refreshed_at"), "2026-05-16T23:11:00Z")
+        # attach_live_lens_contract (shared across every sport's live-lens
+        # builder) centralizes the top-level odds_refreshed_at/generatedAt
+        # pair for display -- only the per-card value stays as the raw feed
+        # timestamp asserted above.
+        self.assertEqual(context.get("odds_refreshed_at"), _centralize_live_lens_timestamp("2026-05-16T23:11:00Z"))
 
     def test_nhl_live_lens_prefers_remote_scoreboard_for_current_date(self) -> None:
         cards_context = {

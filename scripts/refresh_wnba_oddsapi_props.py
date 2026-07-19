@@ -772,6 +772,67 @@ def _export_live_snapshot_artifacts(*, source_root: Path, date_str: str, process
     return copied
 
 
+def _live_state_payload_all_final(payload: dict[str, object] | None) -> bool:
+    if not isinstance(payload, dict):
+        return False
+    games = payload.get("games") if isinstance(payload.get("games"), list) else []
+    if not games:
+        return False
+    return all(isinstance(game, dict) and bool(game.get("final")) for game in games)
+
+
+def _live_state_payload_final_count(payload: dict[str, object] | None) -> int:
+    if not isinstance(payload, dict):
+        return 0
+    games = payload.get("games") if isinstance(payload.get("games"), list) else []
+    return sum(1 for game in games if isinstance(game, dict) and bool(game.get("final")))
+
+
+def _settle_recent_past_live_state(*, processed_root: Path, today_str: str, lookback_days: int = 2) -> dict[str, str]:
+    # The main loop above only ever walks forward from --date through
+    # --days-ahead, so once a date stops being "today" nothing ever revisits
+    # its live_state snapshot again. If that day's capture was interrupted
+    # (worker contention, an outage, a game finishing right at the date
+    # rollover), the snapshot is stuck showing pregame/live state forever --
+    # every UI surface reading it (final score, quarter recap, win-prob
+    # display) is stuck right along with it, with no automatic path back to
+    # correct. This re-runs the exact same ESPN-backed live_state build
+    # already used for "today" against each recent past date, and only
+    # writes when it's a genuine improvement (more games final than before),
+    # so a settled date costs one cheap read-and-skip on every later tick.
+    results: dict[str, str] = {}
+    try:
+        today_date = dt.datetime.strptime(today_str, "%Y-%m-%d").date()
+    except Exception:
+        return results
+    live_snapshots_root = processed_root / "live_snapshots"
+    for offset in range(1, max(1, int(lookback_days)) + 1):
+        past_date = (today_date - dt.timedelta(days=offset)).isoformat()
+        state_destination = live_snapshots_root / f"live_state_{past_date}.jsonl"
+        existing_payload = _read_live_snapshot_payload(state_destination)
+        if _live_state_payload_all_final(existing_payload):
+            continue
+        try:
+            fresh_payload = _build_local_live_snapshot_payload(kind="live_state", date_str=past_date, event_ids=[])
+        except Exception as exc:
+            results[past_date] = f"error:{type(exc).__name__}"
+            continue
+        if not _payload_has_snapshot_content("live_state", fresh_payload):
+            results[past_date] = "no_content"
+            continue
+        existing_final_count = _live_state_payload_final_count(existing_payload)
+        fresh_final_count = _live_state_payload_final_count(fresh_payload)
+        if existing_payload is not None and fresh_final_count <= existing_final_count:
+            results[past_date] = "no_improvement"
+            continue
+        if _write_live_snapshot_payload(state_destination, fresh_payload):
+            total_games = len(fresh_payload.get("games") or []) if isinstance(fresh_payload, dict) else 0
+            results[past_date] = f"settled:{fresh_final_count}/{total_games}_final"
+        else:
+            results[past_date] = "write_failed"
+    return results
+
+
 def _count_csv_rows_quick(path: Path | None) -> int:
     try:
         if path is None or not path.exists() or not path.is_file():
@@ -3750,12 +3811,20 @@ def _existing_refresh_state(*, source_root: Path, date_str: str, do_edges: bool,
     processed_root = source_root / "data" / "processed"
     snapshot_path = raw_root / f"odds_wnba_player_props_{date_str}.csv"
     snapshot_alias_path = processed_root / f"oddsapi_player_props_{date_str}.csv"
+    game_predictions_path = processed_root / f"predictions_{date_str}.csv"
     predictions_path = processed_root / f"props_predictions_{date_str}.csv"
     edges_path = processed_root / f"props_edges_{date_str}.csv"
     recs_path = processed_root / f"props_recommendations_{date_str}.csv"
 
     required_paths = [snapshot_path]
     if do_edges or do_export:
+        # props_predictions can only be trusted if the game-level predictions
+        # artifact it was built from is still actually present -- without this,
+        # a leftover props_predictions file from an earlier run looks reusable
+        # even after its upstream game-predictions input has been deleted or
+        # gone stale (e.g. the games-history corruption incident), silently
+        # skipping the re-run that would have regenerated it.
+        required_paths.append(game_predictions_path)
         required_paths.append(predictions_path)
     if do_edges:
         required_paths.append(edges_path)
@@ -3782,6 +3851,7 @@ def _existing_refresh_state(*, source_root: Path, date_str: str, do_edges: bool,
         "recs_rows": int(_count_csv_rows_quick(recs_path)),
         "snapshot_path": str(snapshot_path),
         "snapshot_bundle_path": str(snapshot_path),
+        "game_predictions_path": str(game_predictions_path),
         "predictions_path": str(predictions_path),
         "prediction_bundle_path": str(predictions_path),
         "edges_path": str(edges_path),
@@ -3799,6 +3869,7 @@ def _existing_artifact_bundle_state(*, artifact_root: Path, date_str: str, do_ed
     processed_root = artifact_root / "data" / "processed"
     snapshot_path = raw_root / f"odds_wnba_player_props_{date_str}.csv"
     snapshot_alias_path = processed_root / f"oddsapi_player_props_{date_str}.csv"
+    game_predictions_path = processed_root / f"predictions_{date_str}.csv"
     predictions_path = processed_root / f"props_predictions_{date_str}.csv"
     edges_path = processed_root / f"props_edges_{date_str}.csv"
     recs_path = processed_root / f"props_recommendations_{date_str}.csv"
@@ -3810,6 +3881,9 @@ def _existing_artifact_bundle_state(*, artifact_root: Path, date_str: str, do_ed
 
     required_paths = [snapshot_path]
     if do_edges or do_export:
+        # See _existing_refresh_state: props_predictions alone isn't proof the
+        # upstream game-predictions artifact it depends on is still present.
+        required_paths.append(game_predictions_path)
         required_paths.append(predictions_path)
     if do_edges:
         required_paths.append(edges_path)
@@ -3843,6 +3917,7 @@ def _existing_artifact_bundle_state(*, artifact_root: Path, date_str: str, do_ed
         "smart_sim_files": smart_sim_files,
         "snapshot_path": str(snapshot_path),
         "snapshot_bundle_path": str(snapshot_path),
+        "game_predictions_path": str(game_predictions_path),
         "predictions_path": str(predictions_path),
         "prediction_bundle_path": str(predictions_path),
         "edges_path": str(edges_path),
@@ -4557,6 +4632,15 @@ def _materialize_artifact_bundle(*, state: dict[str, object], artifact_root: Pat
         except Exception:
             reuse_local_processed = source_directory == processed_root
     if date_text and source_directory is not None:
+        # When this run's outputs already live inside the bundle's own processed
+        # dir (reuse_local_processed), the *other* inputs these exporters need
+        # (game_odds, raw player-props snapshots, etc.) live there too -- the
+        # external source_root passed in can be a distinct, unpopulated
+        # directory in that case (a fresh worker container resuming from a
+        # previously materialized bundle), so reading from it would silently
+        # find nothing. artifact_root and source_root are the same directory
+        # in production, so this is a no-op there.
+        effective_source_root = artifact_root if reuse_local_processed else source_root
         smart_sim_files = _copy_matching_files(
             source_directory=source_directory,
             pattern=f"smart_sim_{date_text}_*.json",
@@ -4566,40 +4650,40 @@ def _materialize_artifact_bundle(*, state: dict[str, object], artifact_root: Pat
             copied["smart_sim_paths"] = smart_sim_files
         # Reused refresh states can still be incomplete, so always materialize the
         # render-facing WNBA exports into the published artifact tree.
-        recon_games_path = _export_recon_games_artifact(source_root=source_root, date_str=date_text, processed_root=processed_root)
+        recon_games_path = _export_recon_games_artifact(source_root=effective_source_root, date_str=date_text, processed_root=processed_root)
         if recon_games_path:
             copied["recon_games_path"] = recon_games_path
-        recon_quarters_path = _export_recon_quarters_artifact(source_root=source_root, date_str=date_text, processed_root=processed_root)
+        recon_quarters_path = _export_recon_quarters_artifact(source_root=effective_source_root, date_str=date_text, processed_root=processed_root)
         if recon_quarters_path:
             copied["recon_quarters_path"] = recon_quarters_path
-        game_cards_path = _export_game_cards_artifact(source_root=source_root, date_str=date_text, processed_root=processed_root)
+        game_cards_path = _export_game_cards_artifact(source_root=effective_source_root, date_str=date_text, processed_root=processed_root)
         if game_cards_path:
             copied["game_cards_path"] = game_cards_path
-        boxscores_path = _export_boxscores_artifact(source_root=source_root, date_str=date_text, processed_root=processed_root)
+        boxscores_path = _export_boxscores_artifact(source_root=effective_source_root, date_str=date_text, processed_root=processed_root)
         if boxscores_path:
             copied["boxscores_path"] = boxscores_path
-        recommendations_path = _export_recommendations_artifact(source_root=source_root, date_str=date_text, processed_root=processed_root)
+        recommendations_path = _export_recommendations_artifact(source_root=effective_source_root, date_str=date_text, processed_root=processed_root)
         if recommendations_path:
             copied["recommendations_path"] = recommendations_path
-        recon_props_path = _export_recon_props_artifact(source_root=source_root, date_str=date_text, processed_root=processed_root)
+        recon_props_path = _export_recon_props_artifact(source_root=effective_source_root, date_str=date_text, processed_root=processed_root)
         if recon_props_path:
             copied["recon_props_path"] = recon_props_path
-        recommendations_slate_path = _export_recommendations_slate_snapshot(source_root=source_root, date_str=date_text, processed_root=processed_root)
+        recommendations_slate_path = _export_recommendations_slate_snapshot(source_root=effective_source_root, date_str=date_text, processed_root=processed_root)
         if recommendations_slate_path:
             copied["recommendations_slate_path"] = recommendations_slate_path
-        cards_props_snapshot_path = _export_cards_props_snapshot(source_root=source_root, date_str=date_text, processed_root=processed_root)
+        cards_props_snapshot_path = _export_cards_props_snapshot(source_root=effective_source_root, date_str=date_text, processed_root=processed_root)
         if cards_props_snapshot_path:
             copied["cards_props_snapshot_path"] = cards_props_snapshot_path
-        cards_sim_detail_path = _export_cards_sim_detail_snapshot(source_root=source_root, date_str=date_text, processed_root=processed_root, force_refresh=bool(force_refresh))
+        cards_sim_detail_path = _export_cards_sim_detail_snapshot(source_root=effective_source_root, date_str=date_text, processed_root=processed_root, force_refresh=bool(force_refresh))
         if cards_sim_detail_path:
             copied["cards_sim_detail_path"] = cards_sim_detail_path
-        top_by_game_path = _export_top_by_game_snapshot(source_root=source_root, date_str=date_text, processed_root=processed_root)
+        top_by_game_path = _export_top_by_game_snapshot(source_root=effective_source_root, date_str=date_text, processed_root=processed_root)
         if top_by_game_path:
             copied["top_by_game_path"] = top_by_game_path
-        copied.update(_export_live_lens_artifacts(source_root=source_root, date_str=date_text, processed_root=processed_root, live_lens_root=live_lens_root))
-        copied.update(_build_optional_player_recon_artifacts(source_root=source_root, date_str=date_text, processed_root=processed_root))
+        copied.update(_export_live_lens_artifacts(source_root=effective_source_root, date_str=date_text, processed_root=processed_root, live_lens_root=live_lens_root))
+        copied.update(_build_optional_player_recon_artifacts(source_root=effective_source_root, date_str=date_text, processed_root=processed_root))
         if not reuse_existing_run:
-            copied.update(_export_live_snapshot_artifacts(source_root=source_root, date_str=date_text, processed_root=processed_root))
+            copied.update(_export_live_snapshot_artifacts(source_root=effective_source_root, date_str=date_text, processed_root=processed_root))
     boxscores_history_path = _refresh_boxscores_history_artifact(source_root=source_root, processed_root=processed_root)
     if boxscores_history_path:
         copied["boxscores_history_path"] = boxscores_history_path
@@ -4962,6 +5046,16 @@ def main() -> int:
                 },
             )
         states.append(state)
+    if artifact_root_path is not None:
+        try:
+            settle_results = _settle_recent_past_live_state(
+                processed_root=artifact_root_path / "data" / "processed",
+                today_str=str(args.date),
+            )
+            if settle_results:
+                print(f"[refresh_wnba_oddsapi_props] LIVE_STATE_SETTLE_RECENT_PAST results={settle_results}", flush=True)
+        except Exception as exc:
+            print(f"[refresh_wnba_oddsapi_props] LIVE_STATE_SETTLE_RECENT_PAST_FAILED error={type(exc).__name__}: {exc}", flush=True)
     log_list_memory("refresh_wnba_oddsapi_props.states", states)
     state = states[0] if states else {"date": str(args.date), "error": "no refresh states generated"}
     if len(states) > 1:

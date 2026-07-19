@@ -81,6 +81,19 @@ def processed_path(filename: str) -> Path:
     return _strict_artifact_path(filename, ())
 
 
+def processed_path_or_default(filename: str) -> Path:
+    # Same lookup as processed_path, but for callers that need *a* path to
+    # display or probe with .exists() rather than one guaranteed to already
+    # hold real content -- e.g. an archive/picks page rendering an empty
+    # state for a date with no published artifacts still needs a source_path
+    # string to show, and shouldn't 500 just because that path doesn't
+    # resolve to a real file yet.
+    try:
+        return _strict_artifact_path(filename, ())
+    except FileNotFoundError:
+        return processed_root() / filename
+
+
 def live_snapshot_path(filename: str) -> Path:
     return _strict_artifact_path(filename, ("live_snapshots",))
 

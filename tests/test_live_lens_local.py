@@ -356,8 +356,8 @@ class LocalDailyAccuracyTests(unittest.TestCase):
             artifact_root = Path(tmp_dir)
             _write_daily_accuracy_artifacts(artifact_root, "2026-05-16")
             with patch(
-                "syndicate.features.nba.live_lens_daily_accuracy.processed_path",
-                return_value=artifact_root / "game_cards_2099-01-01.csv",
+                "syndicate.features.nba.live_lens_daily_accuracy._artifact_root",
+                return_value=artifact_root,
             ):
                 payload = build_nba_daily_accuracy("date=2026-05-16")
 
@@ -416,8 +416,8 @@ class LocalGameAccuracyTests(unittest.TestCase):
             artifact_root = Path(tmp_dir)
             _write_game_accuracy_artifacts(artifact_root, "2026-05-16")
             with patch(
-                "syndicate.features.wnba.live_game_accuracy.processed_path",
-                return_value=artifact_root / "game_cards_2099-01-01.csv",
+                "syndicate.features.wnba.live_game_accuracy._artifact_root",
+                return_value=artifact_root,
             ):
                 payload = build_wnba_game_accuracy("start=2026-05-16&end=2026-05-16")
 
@@ -432,8 +432,8 @@ class LocalGameAccuracyTests(unittest.TestCase):
         with TemporaryDirectory() as tmp_dir:
             artifact_root = Path(tmp_dir)
             with patch(
-                "syndicate.features.wnba.live_game_accuracy.processed_path",
-                return_value=artifact_root / "game_cards_2099-01-01.csv",
+                "syndicate.features.wnba.live_game_accuracy._artifact_root",
+                return_value=artifact_root,
             ):
                 payload = build_wnba_game_accuracy("start=2026-05-16&end=2026-05-16")
 
@@ -449,8 +449,8 @@ class LocalPropAccuracyTests(unittest.TestCase):
         with TemporaryDirectory() as tmp_dir:
             artifact_root = Path(tmp_dir)
             with patch(
-                "syndicate.features.wnba.live_prop_accuracy.processed_path",
-                return_value=artifact_root / "game_cards_2099-01-01.csv",
+                "syndicate.features.wnba.live_prop_accuracy._artifact_root",
+                return_value=artifact_root,
             ):
                 payload = build_wnba_prop_accuracy("start=2026-05-16&end=2026-05-16")
 
@@ -464,8 +464,8 @@ class LocalPropAccuracyTests(unittest.TestCase):
         with TemporaryDirectory() as tmp_dir:
             artifact_root = Path(tmp_dir)
             with patch(
-                "syndicate.features.wnba.live_prop_audit.processed_path",
-                return_value=artifact_root / "game_cards_2099-01-01.csv",
+                "syndicate.features.wnba.live_prop_audit._artifact_root",
+                return_value=artifact_root,
             ):
                 payload = build_wnba_prop_audit("date=2026-05-16")
 
@@ -481,8 +481,8 @@ class LocalWnbaDailyAccuracyTests(unittest.TestCase):
         with TemporaryDirectory() as tmp_dir:
             artifact_root = Path(tmp_dir)
             with patch(
-                "syndicate.features.wnba.live_lens_daily_accuracy.processed_path",
-                return_value=artifact_root / "game_cards_2099-01-01.csv",
+                "syndicate.features.wnba.live_lens_daily_accuracy._artifact_root",
+                return_value=artifact_root,
             ):
                 payload = build_wnba_daily_accuracy("date=2026-05-16")
 
@@ -530,8 +530,8 @@ class LocalWnbaDailyAccuracyTests(unittest.TestCase):
             artifact_root = Path(tmp_dir)
             _write_daily_accuracy_artifacts(artifact_root, "2026-05-16")
             with patch(
-                "syndicate.features.wnba.live_lens_daily_accuracy.processed_path",
-                return_value=artifact_root / "game_cards_2099-01-01.csv",
+                "syndicate.features.wnba.live_lens_daily_accuracy._artifact_root",
+                return_value=artifact_root,
             ):
                 payload = build_wnba_daily_accuracy("date=2026-05-16")
 
