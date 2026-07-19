@@ -132,6 +132,8 @@ def _run_batch(
     use_raw: str,
     prop_lines_source: str,
     weight_args: Optional[List[str]],
+    hitter_hr_prob_calibration: Optional[str] = None,
+    hitter_props_prob_calibration: Optional[str] = None,
 ) -> int:
     cmd = [
         sys.executable,
@@ -151,6 +153,10 @@ def _run_batch(
     ]
     if weight_args:
         cmd += list(weight_args)
+    if hitter_hr_prob_calibration is not None:
+        cmd += ["--hitter-hr-prob-calibration", str(hitter_hr_prob_calibration)]
+    if hitter_props_prob_calibration is not None:
+        cmd += ["--hitter-props-prob-calibration", str(hitter_props_prob_calibration)]
     return _run(cmd, cwd=_ROOT)
 
 
@@ -186,6 +192,22 @@ def main() -> int:
         "--prop-lines-source",
         choices=["auto", "oddsapi", "last_known", "bovada", "off"],
         default="last_known",
+    )
+    ap.add_argument(
+        "--hitter-hr-prob-calibration",
+        default="data/tuning/hitter_hr_calibration/default.json",
+        help=(
+            "Pass through to eval_sim_day_vs_actual.py --hitter-hr-prob-calibration. "
+            "Set to a literal {\"enabled\":false} JSON string to sweep the raw (uncalibrated) parameter "
+            "effect -- the default path is the same production calibration file, which otherwise partially "
+            "masks whatever this sweep is trying to measure. Passing an empty string does NOT disable it: "
+            "run_batch_eval_days.py only forwards this flag downstream when the value is non-empty."
+        ),
+    )
+    ap.add_argument(
+        "--hitter-props-prob-calibration",
+        default="data/tuning/hitter_props_calibration/default.json",
+        help="Pass through to eval_sim_day_vs_actual.py --hitter-props-prob-calibration. Same masking caveat as --hitter-hr-prob-calibration.",
     )
     ap.add_argument(
         "--objective-allmetrics",
@@ -291,6 +313,8 @@ def main() -> int:
             use_raw=str(args.use_raw),
             prop_lines_source=str(args.prop_lines_source),
             weight_args=None,
+            hitter_hr_prob_calibration=str(args.hitter_hr_prob_calibration),
+            hitter_props_prob_calibration=str(args.hitter_props_prob_calibration),
         )
         if rc != 0:
             print(f"Baseline batch failed: {bdir} (rc={rc})")
@@ -405,6 +429,8 @@ def main() -> int:
             use_raw=str(args.use_raw),
             prop_lines_source=str(args.prop_lines_source),
             weight_args=weight_args,
+            hitter_hr_prob_calibration=str(args.hitter_hr_prob_calibration),
+            hitter_props_prob_calibration=str(args.hitter_props_prob_calibration),
         )
         if rc_tune != 0:
             leaderboard.append({"id": cand_id, "status": "tune_batch_failed", "returncode": rc_tune, **meta})
@@ -420,6 +446,8 @@ def main() -> int:
             use_raw=str(args.use_raw),
             prop_lines_source=str(args.prop_lines_source),
             weight_args=weight_args,
+            hitter_hr_prob_calibration=str(args.hitter_hr_prob_calibration),
+            hitter_props_prob_calibration=str(args.hitter_props_prob_calibration),
         )
         if rc_hold != 0:
             leaderboard.append({"id": cand_id, "status": "holdout_batch_failed", "returncode": rc_hold, **meta})
