@@ -1138,6 +1138,63 @@ def _odds_refresh_starved(*, now_epoch: float) -> bool:
 	return (now_epoch - last_epoch) >= ceiling
 
 
+def _odds_refresh_memory_overlap_enabled() -> bool:
+	return _env_bool("SYNDICATE_LIVE_ODDS_REFRESH_MEMORY_OVERLAP_ENABLED", default=True)
+
+
+def _odds_refresh_min_headroom_bytes() -> int:
+	# Default matches the worst WNBA-refresh-leg RSS spike measured in
+	# production (~1528MB) plus a margin for the rest of the odds-refresh
+	# process tree (~185MB) and slack -- i.e. this is deliberately set so the
+	# gate only opens when there's real proof the WNBA-sized spike (the
+	# thing that actually caused the 2026-07-18 OOM) would still fit,
+	# not just "some headroom exists."
+	raw = str(os.environ.get("SYNDICATE_LIVE_ODDS_REFRESH_MIN_HEADROOM_MB") or "").strip()
+	try:
+		value = int(raw or 1800)
+	except Exception:
+		value = 1800
+	return max(0, value) * 1024 * 1024
+
+
+def _odds_refresh_memory_headroom_snapshot() -> dict[str, Any] | None:
+	# Unlike the time-based starvation override above (reverted 2026-07-18
+	# after it forced refreshes into an actually-resident sim and OOMed the
+	# container regardless of how long it waited), this checks REAL,
+	# currently-measured memory headroom rather than guessing from elapsed
+	# time or trigger type. A "--only-game-pks"-scoped sim CAN have a much
+	# smaller footprint than the old whole-slate sim -- but not always: a
+	# profile with no same-day baseline yet silently falls back to
+	# simulating everything (see docs/fix_notes_log.md / commit bc614d77),
+	# so scope alone can't prove it's safe. Measuring the container's actual
+	# cgroup headroom at decision time can. Returns None when headroom can't
+	# be measured at all (e.g. local dev without cgroups) -- callers treat
+	# that the same as "not sufficient," preserving the original safe
+	# defer-while-sim-running behavior rather than guessing.
+	if not _odds_refresh_memory_overlap_enabled():
+		return None
+	try:
+		from syndicate.features.shared.memory_observability import _read_container_memory_current_bytes
+		from syndicate.features.shared.memory_observability import _read_container_memory_max_bytes
+	except Exception:
+		return None
+	current_bytes = _read_container_memory_current_bytes()
+	max_bytes = _read_container_memory_max_bytes()
+	if current_bytes is None or max_bytes is None or max_bytes <= 0:
+		return None
+	headroom_bytes = max_bytes - current_bytes
+	min_required_bytes = _odds_refresh_min_headroom_bytes()
+	return {
+		"current_mb": round(current_bytes / 1024 / 1024, 1),
+		"max_mb": round(max_bytes / 1024 / 1024, 1),
+		"headroom_mb": round(headroom_bytes / 1024 / 1024, 1),
+		"min_required_mb": round(min_required_bytes / 1024 / 1024, 1),
+		"sufficient": headroom_bytes >= min_required_bytes,
+	}
+
+
+
+
 def _last_pregame_launch_path() -> Path:
 	return _meta_dir() / "last_pregame_refresh_launch.json"
 
@@ -1234,7 +1291,16 @@ def _run_live_refresh_tick() -> dict[str, Any]:
 			meta["mlbDailySim"] = {"launched": False, "reason": mlb_decision.get("reason")}
 	except Exception as exc:
 		meta["mlbDailySim"] = {"launched": False, "error": f"{type(exc).__name__}: {exc}"}
-	if _mlb_daily_sim_process_still_running() and not (_odds_refresh_starvation_override_enabled() and _odds_refresh_starved(now_epoch=tick_started_epoch)):
+	sim_process_running = _mlb_daily_sim_process_still_running()
+	memory_headroom_snapshot = _odds_refresh_memory_headroom_snapshot() if sim_process_running else None
+	if memory_headroom_snapshot is not None:
+		meta["oddsRefreshMemoryHeadroom"] = memory_headroom_snapshot
+		print(f"[live_refresh_loop] ODDS_REFRESH_MEMORY_HEADROOM_CHECK {json.dumps(memory_headroom_snapshot, sort_keys=True)}", flush=True)
+	memory_headroom_sufficient = bool(memory_headroom_snapshot and memory_headroom_snapshot["sufficient"])
+	if sim_process_running and not (
+		(_odds_refresh_starvation_override_enabled() and _odds_refresh_starved(now_epoch=tick_started_epoch))
+		or memory_headroom_sufficient
+	):
 		# Mirror of the mlbDailySim gate above (is_refresh_run_active): that gate
 		# only stops a NEW sim from launching on top of an in-flight odds refresh,
 		# but does nothing once a sim IS running -- the live-phase tick still
@@ -1246,11 +1312,14 @@ def _run_live_refresh_tick() -> dict[str, Any]:
 		# existing one-directional gate and equally conservative -- a delayed
 		# odds tick is cheap, a container OOM-kill is not.
 		#
-		# Bounded by _odds_refresh_starved(): sims relaunching back-to-back on
-		# fingerprint changes throughout a live slate (confirmed in production
-		# 2026-07-18, 90+ minutes straight) made this defer indefinitely,
-		# starving WNBA/live odds/intelligence data and emptying the board.
-		# Past the starvation ceiling, refresh proceeds regardless of sim state.
+		# Two independent, opt-outable exceptions can let the refresh proceed
+		# anyway: _odds_refresh_starved() (a blind elapsed-time ceiling,
+		# disabled by default -- reverted 2026-07-18 after it forced refreshes
+		# into an actually-resident sim and OOMed regardless of wait length)
+		# and _odds_refresh_memory_headroom_snapshot() (measures REAL cgroup
+		# headroom right now; a --only-game-pks-scoped sim CAN have a much
+		# smaller footprint than the old whole-slate one, but proving it from
+		# measured memory beats guessing from scope or elapsed time).
 		meta["ok"] = False
 		meta["skipped"] = True
 		meta["error"] = "odds refresh deferred: MLB daily sim is still running (avoid stacking two heavy pipelines in the same container)"

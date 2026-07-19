@@ -480,6 +480,101 @@ class LiveRefreshLoopTests(unittest.TestCase):
         self.assertTrue(payload["ok"])
         mocked_launch.assert_called_once()
 
+    # -- Memory-headroom-aware odds-refresh/sim overlap ----------------------
+    # Replaces guessing (elapsed time, trigger type) with a real measurement:
+    # a --only-game-pks-scoped sim CAN have a much smaller footprint than the
+    # old whole-slate sim, but not always (a profile with no same-day
+    # baseline silently falls back to simulating everything), so only actual
+    # measured cgroup headroom can prove it's safe to overlap.
+
+    def test_odds_refresh_memory_headroom_snapshot_none_when_overlap_disabled(self) -> None:
+        with patch.dict(os.environ, {"SYNDICATE_LIVE_ODDS_REFRESH_MEMORY_OVERLAP_ENABLED": "false"}, clear=False):
+            snapshot = live_refresh_loop._odds_refresh_memory_headroom_snapshot()
+        self.assertIsNone(snapshot)
+
+    def test_odds_refresh_memory_headroom_snapshot_none_when_unmeasurable(self) -> None:
+        with patch(
+            "syndicate.features.shared.memory_observability._read_container_memory_current_bytes",
+            return_value=None,
+        ), patch(
+            "syndicate.features.shared.memory_observability._read_container_memory_max_bytes",
+            return_value=2048 * 1024 * 1024,
+        ):
+            snapshot = live_refresh_loop._odds_refresh_memory_headroom_snapshot()
+        self.assertIsNone(snapshot)
+
+    def test_odds_refresh_memory_headroom_snapshot_reports_insufficient_and_sufficient(self) -> None:
+        max_bytes = 2048 * 1024 * 1024
+        with patch.dict(os.environ, {"SYNDICATE_LIVE_ODDS_REFRESH_MIN_HEADROOM_MB": "1800"}, clear=False), patch(
+            "syndicate.features.shared.memory_observability._read_container_memory_current_bytes",
+            return_value=int(1900 * 1024 * 1024),
+        ), patch(
+            "syndicate.features.shared.memory_observability._read_container_memory_max_bytes",
+            return_value=max_bytes,
+        ):
+            tight = live_refresh_loop._odds_refresh_memory_headroom_snapshot()
+        self.assertIsNotNone(tight)
+        self.assertFalse(tight["sufficient"])
+
+        with patch.dict(os.environ, {"SYNDICATE_LIVE_ODDS_REFRESH_MIN_HEADROOM_MB": "1800"}, clear=False), patch(
+            "syndicate.features.shared.memory_observability._read_container_memory_current_bytes",
+            return_value=int(100 * 1024 * 1024),
+        ), patch(
+            "syndicate.features.shared.memory_observability._read_container_memory_max_bytes",
+            return_value=max_bytes,
+        ):
+            roomy = live_refresh_loop._odds_refresh_memory_headroom_snapshot()
+        self.assertIsNotNone(roomy)
+        self.assertTrue(roomy["sufficient"])
+
+    def test_run_tick_proceeds_despite_active_sim_when_memory_headroom_sufficient(self) -> None:
+        with patch.dict(
+            os.environ,
+            {"SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP": "true", "SYNDICATE_LIVE_ODDS_REFRESH_ADAPTIVE": "false"},
+            clear=False,
+        ), patch.object(live_refresh_loop, "central_today_iso", return_value="2026-07-19"), patch.object(
+            live_refresh_loop, "_should_force_sim_rerun", return_value=False
+        ), patch.object(
+            live_refresh_loop, "_mlb_daily_sim_process_still_running", return_value=True
+        ), patch.object(
+            live_refresh_loop,
+            "_odds_refresh_memory_headroom_snapshot",
+            return_value={"current_mb": 100.0, "max_mb": 2048.0, "headroom_mb": 1948.0, "min_required_mb": 1800.0, "sufficient": True},
+        ), patch.object(
+            live_refresh_loop,
+            "launch_refresh_run",
+            return_value={"ok": True, "state": "running"},
+        ) as mocked_launch:
+            payload = live_refresh_loop._run_live_refresh_tick()
+
+        self.assertTrue(payload["ok"])
+        mocked_launch.assert_called_once()
+        self.assertEqual(payload["oddsRefreshMemoryHeadroom"]["sufficient"], True)
+
+    def test_run_tick_still_defers_despite_active_sim_when_memory_headroom_insufficient(self) -> None:
+        with patch.dict(
+            os.environ,
+            {"SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP": "true", "SYNDICATE_LIVE_ODDS_REFRESH_ADAPTIVE": "false"},
+            clear=False,
+        ), patch.object(live_refresh_loop, "central_today_iso", return_value="2026-07-19"), patch.object(
+            live_refresh_loop, "_should_force_sim_rerun", return_value=False
+        ), patch.object(
+            live_refresh_loop, "_mlb_daily_sim_process_still_running", return_value=True
+        ), patch.object(
+            live_refresh_loop,
+            "_odds_refresh_memory_headroom_snapshot",
+            return_value={"current_mb": 1900.0, "max_mb": 2048.0, "headroom_mb": 148.0, "min_required_mb": 1800.0, "sufficient": False},
+        ), patch.object(
+            live_refresh_loop,
+            "launch_refresh_run",
+        ) as mocked_launch:
+            payload = live_refresh_loop._run_live_refresh_tick()
+
+        self.assertFalse(payload["ok"])
+        self.assertTrue(payload["skipped"])
+        mocked_launch.assert_not_called()
+        self.assertEqual(payload["oddsRefreshMemoryHeadroom"]["sufficient"], False)
+
     # -- Per-game MLB sim scoping --------------------------------------------
     # Root fix for the sim-chaining problem above: a lineup/odds/pitcher
     # fingerprint change or a tip-off window used to resim the WHOLE day's
