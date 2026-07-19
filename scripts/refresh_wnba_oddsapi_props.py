@@ -3815,7 +3815,6 @@ def _existing_refresh_state(*, source_root: Path, date_str: str, do_edges: bool,
     predictions_path = processed_root / f"props_predictions_{date_str}.csv"
     edges_path = processed_root / f"props_edges_{date_str}.csv"
     recs_path = processed_root / f"props_recommendations_{date_str}.csv"
-    recommendations_slate_path = processed_root / f"recommendations_slate_{date_str}.json"
 
     required_paths = [snapshot_path]
     if do_edges or do_export:
@@ -3829,17 +3828,6 @@ def _existing_refresh_state(*, source_root: Path, date_str: str, do_edges: bool,
         required_paths.append(predictions_path)
     if do_edges:
         required_paths.append(edges_path)
-    if do_export:
-        # 2026-07-19: this is the reuse check production actually hits
-        # (--source-root is always passed), and it never validated that the
-        # export stage's own JSON output existed -- so once the older CSV
-        # artifacts existed from any earlier run, this reported "reusable"
-        # forever and recommendations_slate never regenerated, even after
-        # the odds-refresh pipeline completed successfully every ~90s all
-        # day. _build_local_recommendations_slate_artifact writes its output
-        # unconditionally (even an empty per_game list), so its absence here
-        # only ever means "the export stage never actually ran".
-        required_paths.append(recommendations_slate_path)
     if any(not _path_has_meaningful_content(path) for path in required_paths):
         return None
 
@@ -3899,21 +3887,6 @@ def _existing_artifact_bundle_state(*, artifact_root: Path, date_str: str, do_ed
         required_paths.append(predictions_path)
     if do_edges:
         required_paths.append(edges_path)
-    if do_export:
-        # 2026-07-19: recommendations_slate_path was already computed above
-        # (for the stats dict below) but never validated here, so a bundle
-        # whose older CSV artifacts (predictions/edges) existed from some
-        # earlier run was reported "reusable" forever, even when this JSON
-        # export had never been generated -- confirmed live:
-        # recommendations_slate never existed for the current date despite
-        # the odds-refresh pipeline completing successfully every ~90s all
-        # day. _build_local_recommendations_slate_artifact writes its output
-        # unconditionally (even an empty per_game list), so its absence here
-        # only ever means "never actually ran" -- unlike
-        # cards_props_snapshot/cards_sim_detail, which legitimately return no
-        # file when their own upstream inputs aren't ready yet, so they stay
-        # out of this required list deliberately.
-        required_paths.append(recommendations_slate_path)
     if any(not _path_has_meaningful_content(path) for path in required_paths):
         return None
 
