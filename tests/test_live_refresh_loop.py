@@ -399,9 +399,19 @@ class LiveRefreshLoopTests(unittest.TestCase):
         # whole ~45-55min run. ALL_PROCESS_MEMORY snapshots from Render
         # showed the container hitting 2048/2048MB (100%) with both
         # pipelines resident at once. This is the symmetric gate.
+        #
+        # 2026-07-19: the mutex now only fully defers when WNBA is the ONLY
+        # configured sport (nothing left to launch once it's excluded) --
+        # see test_run_tick_launches_non_wnba_sports_when_mlb_sim_blocks_wnba
+        # for the (now much more common) case where other sports proceed
+        # anyway.
         with patch.dict(
             os.environ,
-            {"SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP": "true", "SYNDICATE_LIVE_ODDS_REFRESH_ADAPTIVE": "false"},
+            {
+                "SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP": "true",
+                "SYNDICATE_LIVE_ODDS_REFRESH_ADAPTIVE": "false",
+                "SYNDICATE_LIVE_ODDS_REFRESH_SPORTS": "wnba",
+            },
             clear=False,
         ), patch.object(live_refresh_loop, "central_today_iso", return_value="2026-07-18"), patch.object(
             live_refresh_loop, "_should_force_sim_rerun", return_value=False
@@ -418,6 +428,38 @@ class LiveRefreshLoopTests(unittest.TestCase):
         self.assertIn("MLB daily sim is still running", payload["error"])
         mocked_launch.assert_not_called()
 
+    def test_run_tick_launches_non_wnba_sports_when_mlb_sim_blocks_wnba(self) -> None:
+        # The actual measured OOM risk (WNBA's refresh leg spiking ~1.3-1.5GB
+        # RSS) is specific to WNBA, not to refreshing MLB/other sports
+        # alongside a resident MLB sim. On a live 16-game MLB slate, some sim
+        # can stay resident almost continuously (staggered tip-offs), which
+        # previously starved EVERY sport's odds refresh for hours even though
+        # only WNBA's leg posed the actual risk. When the mutex would
+        # otherwise block the whole tick, everything except WNBA should still
+        # launch.
+        with patch.dict(
+            os.environ,
+            {
+                "SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP": "true",
+                "SYNDICATE_LIVE_ODDS_REFRESH_ADAPTIVE": "false",
+                "SYNDICATE_LIVE_ODDS_REFRESH_SPORTS": "mlb,wnba",
+            },
+            clear=False,
+        ), patch.object(live_refresh_loop, "central_today_iso", return_value="2026-07-19"), patch.object(
+            live_refresh_loop, "_should_force_sim_rerun", return_value=False
+        ), patch.object(
+            live_refresh_loop, "_mlb_daily_sim_process_still_running", return_value=True
+        ), patch.object(
+            live_refresh_loop, "launch_refresh_run", return_value={"ok": True, "pid": 4242}
+        ) as mocked_launch:
+            payload = live_refresh_loop._run_live_refresh_tick()
+
+        self.assertTrue(payload["ok"])
+        self.assertNotIn("skipped", payload)
+        mocked_launch.assert_called_once()
+        self.assertEqual(mocked_launch.call_args.kwargs["sports"], "mlb")
+        self.assertEqual(payload["oddsRefreshWnbaSkipped"]["reason"], "mlb_daily_sim_still_running")
+
     def test_run_tick_still_defers_past_starvation_ceiling_when_override_disabled(self) -> None:
         # Reverted 2026-07-18: the starvation-ceiling override ("force the
         # refresh through past N minutes regardless of sim state") was found
@@ -432,7 +474,11 @@ class LiveRefreshLoopTests(unittest.TestCase):
         # enabled.
         with patch.dict(
             os.environ,
-            {"SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP": "true", "SYNDICATE_LIVE_ODDS_REFRESH_ADAPTIVE": "false"},
+            {
+                "SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP": "true",
+                "SYNDICATE_LIVE_ODDS_REFRESH_ADAPTIVE": "false",
+                "SYNDICATE_LIVE_ODDS_REFRESH_SPORTS": "wnba",
+            },
             clear=False,
         ), patch.object(live_refresh_loop, "central_today_iso", return_value="2026-07-18"), patch.object(
             live_refresh_loop, "_should_force_sim_rerun", return_value=False
@@ -554,7 +600,11 @@ class LiveRefreshLoopTests(unittest.TestCase):
     def test_run_tick_still_defers_despite_active_sim_when_memory_headroom_insufficient(self) -> None:
         with patch.dict(
             os.environ,
-            {"SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP": "true", "SYNDICATE_LIVE_ODDS_REFRESH_ADAPTIVE": "false"},
+            {
+                "SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP": "true",
+                "SYNDICATE_LIVE_ODDS_REFRESH_ADAPTIVE": "false",
+                "SYNDICATE_LIVE_ODDS_REFRESH_SPORTS": "wnba",
+            },
             clear=False,
         ), patch.object(live_refresh_loop, "central_today_iso", return_value="2026-07-19"), patch.object(
             live_refresh_loop, "_should_force_sim_rerun", return_value=False

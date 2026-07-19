@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any
 
 from syndicate.features.shared.artifact_publisher import sweep_changed_hot_artifacts
+from syndicate.features.shared.ops_refresh import _active_sports_for_date
 from syndicate.features.shared.ops_refresh import is_refresh_run_active
 from syndicate.features.shared.ops_refresh import launch_refresh_run
 from syndicate.features.shared.schedule_adapter import events_starting_within
@@ -1020,6 +1021,30 @@ def _live_refresh_loop_sports() -> str | None:
 	return raw or None
 
 
+def _live_refresh_loop_effective_sports(selected_date: str) -> list[str]:
+	# Mirrors launch_refresh_run's own sports resolution (configured override,
+	# else season-active-for-date) so the WNBA-exclusion split below sees
+	# exactly the same sport set the unscoped call would have covered.
+	configured = _live_refresh_loop_sports()
+	resolved = configured if configured else _active_sports_for_date(selected_date)
+	return [piece.strip().lower() for piece in resolved.split(",") if piece.strip()]
+
+
+def _live_refresh_loop_sports_excluding_wnba(selected_date: str) -> str | None:
+	# 2026-07-19 incident: the sim-vs-refresh mutex is a blanket gate over the
+	# whole combined sports call, but the actual measured OOM risk (WNBA's
+	# refresh leg spiking ~1.3-1.5GB RSS) is specific to WNBA. On a live MLB
+	# slate with staggered tip-offs, an MLB sim can stay resident almost
+	# continuously for hours, and gating everything on it starved MLB's own
+	# (much cheaper) odds refresh for 3+ hours straight even though nothing
+	# about refreshing MLB itself risks the OOM the mutex exists to prevent.
+	# Used only when the mutex would otherwise block the whole tick -- the
+	# normal (no sim contention) path still launches the full combined set
+	# unchanged.
+	sports = [sport for sport in _live_refresh_loop_effective_sports(selected_date) if sport != "wnba"]
+	return ",".join(sports) if sports else None
+
+
 def _status_payload() -> dict[str, Any]:
 	status_path = _meta_dir() / "live_refresh_loop_status.json"
 	latest_tick_path = _meta_dir() / "latest_live_refresh_tick.json"
@@ -1297,43 +1322,63 @@ def _run_live_refresh_tick() -> dict[str, Any]:
 		meta["oddsRefreshMemoryHeadroom"] = memory_headroom_snapshot
 		print(f"[live_refresh_loop] ODDS_REFRESH_MEMORY_HEADROOM_CHECK {json.dumps(memory_headroom_snapshot, sort_keys=True)}", flush=True)
 	memory_headroom_sufficient = bool(memory_headroom_snapshot and memory_headroom_snapshot["sufficient"])
-	if sim_process_running and not (
+	sim_blocks_refresh = sim_process_running and not (
 		(_odds_refresh_starvation_override_enabled() and _odds_refresh_starved(now_epoch=tick_started_epoch))
 		or memory_headroom_sufficient
-	):
-		# Mirror of the mlbDailySim gate above (is_refresh_run_active): that gate
-		# only stops a NEW sim from launching on top of an in-flight odds refresh,
-		# but does nothing once a sim IS running -- the live-phase tick still
-		# fired every ~60s regardless, relaunching the full odds-refresh pipeline
-		# (which can itself spike WNBA to 1.3-1.5GB RSS) on top of the resident
-		# sim process tree for its whole ~45-55min run. Confirmed via production
-		# ALL_PROCESS_MEMORY snapshots: container hit 2048/2048MB (100%) with
-		# both pipelines resident at once. Skipping here is symmetric with the
-		# existing one-directional gate and equally conservative -- a delayed
-		# odds tick is cheap, a container OOM-kill is not.
-		#
-		# Two independent, opt-outable exceptions can let the refresh proceed
-		# anyway: _odds_refresh_starved() (a blind elapsed-time ceiling,
-		# disabled by default -- reverted 2026-07-18 after it forced refreshes
-		# into an actually-resident sim and OOMed regardless of wait length)
-		# and _odds_refresh_memory_headroom_snapshot() (measures REAL cgroup
-		# headroom right now; a --only-game-pks-scoped sim CAN have a much
-		# smaller footprint than the old whole-slate one, but proving it from
-		# measured memory beats guessing from scope or elapsed time).
-		meta["ok"] = False
-		meta["skipped"] = True
-		meta["error"] = "odds refresh deferred: MLB daily sim is still running (avoid stacking two heavy pipelines in the same container)"
-	elif effective_phase == "pregame" and _pregame_relaunch_blocked(now_epoch=tick_started_epoch, date_str=selected_date):
+	)
+	# Mirror of the mlbDailySim gate above (is_refresh_run_active): that gate
+	# only stops a NEW sim from launching on top of an in-flight odds refresh,
+	# but does nothing once a sim IS running -- the live-phase tick still
+	# fired every ~60s regardless, relaunching the full odds-refresh pipeline
+	# (which can itself spike WNBA to 1.3-1.5GB RSS) on top of the resident
+	# sim process tree for its whole ~45-55min run. Confirmed via production
+	# ALL_PROCESS_MEMORY snapshots: container hit 2048/2048MB (100%) with both
+	# pipelines resident at once. Skipping here is symmetric with the existing
+	# one-directional gate and equally conservative -- a delayed odds tick is
+	# cheap, a container OOM-kill is not.
+	#
+	# Two independent, opt-outable exceptions can let the FULL combined refresh
+	# proceed anyway: _odds_refresh_starved() (a blind elapsed-time ceiling,
+	# disabled by default -- reverted 2026-07-18 after it forced refreshes into
+	# an actually-resident sim and OOMed regardless of wait length) and
+	# _odds_refresh_memory_headroom_snapshot() (measures REAL cgroup headroom
+	# right now; a --only-game-pks-scoped sim CAN have a much smaller
+	# footprint than the old whole-slate one, but proving it from measured
+	# memory beats guessing from scope or elapsed time).
+	#
+	# 2026-07-19: neither exception fired reliably on a genuinely busy 16-game
+	# slate (headroom hovered 900MB-1550MB, never the required 1800MB), so the
+	# mutex deferred EVERY live-phase tick for 3+ hours straight -- even
+	# sports whose refresh leg poses none of the OOM risk the mutex exists to
+	# prevent. Only WNBA's refresh leg has ever been measured causing that
+	# spike, so when the mutex would otherwise block the whole tick, launch
+	# every other configured sport anyway and defer only WNBA specifically.
+	skip_launch = False
+	launch_sports = _live_refresh_loop_sports()
+	if sim_blocks_refresh:
+		effective_sports = _live_refresh_loop_effective_sports(selected_date)
+		if "wnba" in effective_sports:
+			meta["oddsRefreshWnbaSkipped"] = {"reason": "mlb_daily_sim_still_running", "headroom": memory_headroom_snapshot}
+		non_wnba_sports = [sport for sport in effective_sports if sport != "wnba"]
+		if non_wnba_sports:
+			launch_sports = ",".join(non_wnba_sports)
+		else:
+			meta["ok"] = False
+			meta["skipped"] = True
+			meta["error"] = "odds refresh deferred: MLB daily sim is still running (avoid stacking two heavy pipelines in the same container)"
+			skip_launch = True
+	if not skip_launch and effective_phase == "pregame" and _pregame_relaunch_blocked(now_epoch=tick_started_epoch, date_str=selected_date):
 		meta["ok"] = False
 		meta["skipped"] = True
 		meta["error"] = "pregame refresh relaunch blocked by cooldown (previous attempt still within cooldown window)"
-	else:
+		skip_launch = True
+	if not skip_launch:
 		if effective_phase == "pregame":
 			_record_pregame_launch(tick_started_epoch, selected_date)
 		try:
 			result = launch_refresh_run(
 				date=meta["date"],
-				sports=_live_refresh_loop_sports(),
+				sports=launch_sports,
 				phase=str(meta["phase"]),
 				regions=str(meta["regions"]),
 				mode=str(meta["mode"]),
