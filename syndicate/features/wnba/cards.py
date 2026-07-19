@@ -14,6 +14,7 @@ import json
 import math
 import os
 import re
+import time
 from pathlib import Path
 from typing import Any
 from urllib import parse as urllib_parse
@@ -2348,6 +2349,27 @@ def _supplement_games_with_live_state(
     return merged_games, live_source_path, len(extras), updated_count
 
 
+# The direct ESPN merge below (build_cards_page_context's "elif games and
+# allow_stored_date_fallback..." branch) fetches live status/score straight
+# from the public scoreboard on every call and never writes that result to
+# any file or keyvalue entry -- so it has zero effect on the artifact/
+# keyvalue signatures the whole-context cache_key is built from. Once one
+# request computes and caches a context, every later request for the same
+# key replayed that frozen ESPN snapshot forever (confirmed live: a game's
+# score/clock never advanced across repeated requests spanning several
+# minutes of real progress). Bucketing on wall-clock time for "today" only
+# forces a fresh recompute (and therefore a fresh ESPN fetch) on a bounded
+# cadence without affecting caching for any other date, which the ESPN merge
+# never touches and which is safe to cache indefinitely.
+_WNBA_LIVE_CACHE_TTL_SECONDS = 30
+
+
+def _wnba_live_cache_bucket(selected_date: str) -> int:
+    if str(selected_date or "").strip() != central_today_iso():
+        return 0
+    return int(time.time() // _WNBA_LIVE_CACHE_TTL_SECONDS)
+
+
 def build_cards_page_context(selected_date: str, *, allow_stored_date_fallback: bool = False) -> dict[str, Any]:
     requested_date = str(selected_date or "").strip() or parse_iso_date(selected_date).isoformat()
     schedule_has_games = has_games_for_date(requested_date)
@@ -2493,6 +2515,7 @@ def build_cards_page_context(selected_date: str, *, allow_stored_date_fallback: 
         _path_cache_signature(_artifact_root_paths(resolved_date)["props"]),
         _game_cards_or_live_state_signature(_live_state_keyvalue_path(resolved_date)),
         _path_cache_signature(processed_root() / "live_snapshots" / f"live_state_{resolved_date}.jsonl"),
+        _wnba_live_cache_bucket(resolved_date),
     )
     cached_context = _cache_get_context(cache_key)
     if cached_context is not None:
