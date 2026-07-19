@@ -4456,6 +4456,22 @@ def _fallback_live_player_lens_game(game: dict[str, Any], *, event_id: str | Non
     }
 
 
+def _live_state_matchup_key(row: dict[str, Any]) -> tuple[str, str]:
+    # game_cards rows carry away_tri/home_tri (or nested away/home dicts);
+    # the ESPN public-scoreboard rows this gets matched against instead use
+    # flat away/home tricode strings. Accept either shape.
+    away = row.get("away_tri") if row.get("away_tri") else row.get("away")
+    home = row.get("home_tri") if row.get("home_tri") else row.get("home")
+    if isinstance(away, dict):
+        away = away.get("abbr")
+    if isinstance(home, dict):
+        home = home.get("abbr")
+    return (
+        _canonical_wnba_tri(str(away or "").strip().upper()),
+        _canonical_wnba_tri(str(home or "").strip().upper()),
+    )
+
+
 def build_live_state_payload(selected_date: str, ttl: int = 12, *, allow_stored_date_fallback: bool = True) -> dict[str, Any]:
     is_today = str(selected_date).strip() == central_today_iso()
     log_runtime_memory("build_live_state_payload_start", selected_date=selected_date, ttl=int(ttl))
@@ -4518,12 +4534,30 @@ def build_live_state_payload(selected_date: str, ttl: int = 12, *, allow_stored_
         for game in public_games
         if isinstance(game, dict) and str(game.get("event_id") or "").strip()
     }
+    # game_cards event_id comes from OddsAPI (a long hex id), never ESPN's
+    # own numeric event_id that public_by_event_id is keyed on -- so the
+    # direct lookup below never matches for any game sourced that way,
+    # silently dropping the ESPN live merge (real score/clock/period) even
+    # though the fetch itself succeeded. Fall back to matching by matchup
+    # (away/home tricode pair), which is stable across both id schemes.
+    public_by_matchup = {
+        _live_state_matchup_key(game): game
+        for game in public_games
+        if isinstance(game, dict) and all(_live_state_matchup_key(game))
+    }
     out_games = []
     for game in games:
         if not isinstance(game, dict):
             continue
         event_id = str(game.get("event_id") or "").strip()
         public_row = public_by_event_id.get(event_id) if event_id else None
+        matched_public_event_id = event_id if isinstance(public_row, dict) else None
+        if public_row is None:
+            matchup_key = _live_state_matchup_key(game)
+            if all(matchup_key):
+                public_row = public_by_matchup.get(matchup_key)
+                if isinstance(public_row, dict):
+                    matched_public_event_id = str(public_row.get("event_id") or "").strip() or None
         if isinstance(public_row, dict):
             cards_state = _cards_context_live_state_snapshot(game)
             if _live_state_row_needs_cards_override(public_row, cards_state):
@@ -4595,6 +4629,8 @@ def build_live_state_payload(selected_date: str, ttl: int = 12, *, allow_stored_
 
         if event_id:
             public_by_event_id.pop(event_id, None)
+        if matched_public_event_id:
+            public_by_event_id.pop(matched_public_event_id, None)
 
     for event_id, public_row in public_by_event_id.items():
         if not isinstance(public_row, dict):
