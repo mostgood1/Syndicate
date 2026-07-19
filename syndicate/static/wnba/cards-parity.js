@@ -44,7 +44,30 @@
   // plausible cause of quarter/half interval markets gating to "off card"
   // rather than ever activating.
   const WNBA_QUARTER_MINUTES = 10;
+  const WNBA_HALF_MINUTES = 20;
   const WNBA_REGULATION_MINUTES = 40;
+  // Live pace-projection sanity ceilings: liveElapsedMinutes/blend-weight
+  // fixes above correct the SCALE of the elapsed-time math, but the
+  // pace-extrapolation formulas (paceRaw = actual + rate*minutesRemaining)
+  // have no ceiling at all -- if the live-state feed (ESPN) ever reports a
+  // transient bad data point (real points on the board but a clock/period
+  // suggesting only ~1 minute elapsed, a known category of live-feed sync
+  // lag), the extrapolated rate blows up unbounded. Observed live: a total
+  // projection over 1700 with no game actually in progress, gone on the
+  // next refresh once ESPN's data self-corrected. These caps bound the
+  // damage from any single bad input to something merely implausible
+  // instead of absurd, regardless of source.
+  const WNBA_GAME_TOTAL_PACE_CAP = 320;
+  const WNBA_HALF_TOTAL_PACE_CAP = 200;
+  const WNBA_QUARTER_TOTAL_PACE_CAP = 110;
+
+  function clampPaceProjection(value, cap) {
+    const number = Number(value);
+    if (!Number.isFinite(number)) {
+      return number;
+    }
+    return clampNumber(number, 0, cap);
+  }
   const API_BASE_PATH = '/wnba/api';
   const SOURCE_CARDS_API_BASE_PATH = `${API_BASE_PATH}/source/cards`;
   const CARDS_PAYLOAD_PATH = document.body?.dataset?.cardsPayloadPath || SOURCE_CARDS_API_BASE_PATH;
@@ -1077,7 +1100,7 @@
   }
 
   function periodMlScale(minutesRemaining) {
-    const remaining = clampNumber(Number(minutesRemaining) || 0, 0, 24);
+    const remaining = clampNumber(Number(minutesRemaining) || 0, 0, WNBA_HALF_MINUTES);
     return 1.75 + (0.18 * remaining);
   }
 
@@ -1148,16 +1171,16 @@
       ? (currentPeriod <= 2 ? 'h1' : 'h2')
       : null;
     const currentQuarterMinutesElapsed = Number.isFinite(currentPeriod) && Number.isFinite(elapsedMinutes)
-      ? Math.max(0, elapsedMinutes - ((Math.floor(currentPeriod) - 1) * 12))
+      ? Math.max(0, elapsedMinutes - ((Math.floor(currentPeriod) - 1) * WNBA_QUARTER_MINUTES))
       : null;
     const currentQuarterMinutesRemaining = Number.isFinite(currentQuarterMinutesElapsed)
-      ? Math.max(0, 12 - Math.min(12, currentQuarterMinutesElapsed))
+      ? Math.max(0, WNBA_QUARTER_MINUTES - Math.min(WNBA_QUARTER_MINUTES, currentQuarterMinutesElapsed))
       : null;
     const currentHalfMinutesElapsed = Number.isFinite(elapsedMinutes)
-      ? (currentHalfKey === 'h2' ? Math.max(0, elapsedMinutes - 24) : elapsedMinutes)
+      ? (currentHalfKey === 'h2' ? Math.max(0, elapsedMinutes - WNBA_HALF_MINUTES) : elapsedMinutes)
       : null;
     const currentHalfMinutesRemaining = Number.isFinite(currentHalfMinutesElapsed)
-      ? Math.max(0, 24 - Math.min(24, currentHalfMinutesElapsed))
+      ? Math.max(0, WNBA_HALF_MINUTES - Math.min(WNBA_HALF_MINUTES, currentHalfMinutesElapsed))
       : null;
     const useUpcomingQuarter = Boolean(
       liveState.in_progress
@@ -1260,7 +1283,7 @@
     if (liveState.in_progress && Number.isFinite(currentTotal) && Number.isFinite(elapsedMinutes) && Number.isFinite(lineTotal)) {
       const elapsedForRate = Math.max(elapsedMinutes, 1);
       const liveRate = currentTotal / elapsedForRate;
-      const paceRaw = currentTotal + (liveRate * Math.max(0, remainingMinutes || 0));
+      const paceRaw = clampPaceProjection(currentTotal + (liveRate * Math.max(0, remainingMinutes || 0)), WNBA_GAME_TOTAL_PACE_CAP);
       const blendWeight = clampNumber(elapsedForRate / WNBA_REGULATION_MINUTES, 0.12, 1);
       let projection = Number.isFinite(pregameTotal)
         ? ((1 - blendWeight) * pregameTotal) + (blendWeight * paceRaw)
@@ -1386,8 +1409,8 @@
       if (Number.isFinite(halfLine) && Number.isFinite(halfActual) && Number.isFinite(halfMinutesElapsed) && Number(halfMinutesRemaining) > 0) {
         const elapsedForRate = Math.max(halfMinutesElapsed, 1);
         const liveRate = halfActual / elapsedForRate;
-        const paceRaw = halfActual + (liveRate * Math.max(0, halfMinutesRemaining || 0));
-        const blendWeight = halfMinutesElapsed > 0 ? clampNumber(elapsedForRate / 24, 0.15, 1) : 0;
+        const paceRaw = clampPaceProjection(halfActual + (liveRate * Math.max(0, halfMinutesRemaining || 0)), WNBA_HALF_TOTAL_PACE_CAP);
+        const blendWeight = halfMinutesElapsed > 0 ? clampNumber(elapsedForRate / WNBA_HALF_MINUTES, 0.15, 1) : 0;
         const projection = Number.isFinite(halfSim)
           ? ((1 - blendWeight) * halfSim) + (blendWeight * paceRaw)
           : paceRaw;
@@ -1446,8 +1469,8 @@
       if (Number.isFinite(quarterLine) && Number.isFinite(quarterActual) && Number.isFinite(quarterMinutesElapsed) && Number(quarterMinutesRemaining) > 0) {
         const elapsedForRate = Math.max(quarterMinutesElapsed, 1);
         const liveRate = quarterActual / elapsedForRate;
-        const paceRaw = quarterActual + (liveRate * Math.max(0, quarterMinutesRemaining || 0));
-        const blendWeight = quarterMinutesElapsed > 0 ? clampNumber(elapsedForRate / 12, 0.18, 1) : 0;
+        const paceRaw = clampPaceProjection(quarterActual + (liveRate * Math.max(0, quarterMinutesRemaining || 0)), WNBA_QUARTER_TOTAL_PACE_CAP);
+        const blendWeight = quarterMinutesElapsed > 0 ? clampNumber(elapsedForRate / WNBA_QUARTER_MINUTES, 0.18, 1) : 0;
         const projection = Number.isFinite(quarterSim)
           ? ((1 - blendWeight) * quarterSim) + (blendWeight * paceRaw)
           : paceRaw;
@@ -1505,7 +1528,7 @@
       const halfMinutesElapsed = lensHalfMinutesElapsed;
       const halfMinutesRemaining = lensHalfMinutesRemaining;
       if (Number.isFinite(actualHalfMargin) && Number.isFinite(halfMinutesElapsed) && Number(halfMinutesRemaining) > 0) {
-        const blendWeight = halfMinutesElapsed > 0 ? clampNumber(halfMinutesElapsed / 24, 0.18, 1) : 0;
+        const blendWeight = halfMinutesElapsed > 0 ? clampNumber(halfMinutesElapsed / WNBA_HALF_MINUTES, 0.18, 1) : 0;
         const projectedHalfMargin = Number.isFinite(simHalfMargin)
           ? ((1 - blendWeight) * simHalfMargin) + (blendWeight * actualHalfMargin)
           : actualHalfMargin;
@@ -1615,7 +1638,7 @@
       const quarterMinutesElapsed = lensQuarterMinutesElapsed;
       const quarterMinutesRemaining = lensQuarterMinutesRemaining;
       if (Number.isFinite(actualQuarterMargin) && Number.isFinite(quarterMinutesElapsed) && Number(quarterMinutesRemaining) > 0) {
-        const blendWeight = quarterMinutesElapsed > 0 ? clampNumber(quarterMinutesElapsed / 12, 0.22, 1) : 0;
+        const blendWeight = quarterMinutesElapsed > 0 ? clampNumber(quarterMinutesElapsed / WNBA_QUARTER_MINUTES, 0.22, 1) : 0;
         const projectedQuarterMargin = Number.isFinite(simQuarterMargin)
           ? ((1 - blendWeight) * simQuarterMargin) + (blendWeight * actualQuarterMargin)
           : actualQuarterMargin;
@@ -4549,19 +4572,19 @@
     const elapsedMinutesRaw = liveElapsedMinutes(liveState);
     const elapsedMinutes = Number.isFinite(elapsedMinutesRaw) ? elapsedMinutesRaw : null;
     const currentQuarterMinutesElapsed = Number.isFinite(currentPeriod) && Number.isFinite(elapsedMinutes)
-      ? Math.max(0, elapsedMinutes - ((Math.floor(currentPeriod) - 1) * 12))
+      ? Math.max(0, elapsedMinutes - ((Math.floor(currentPeriod) - 1) * WNBA_QUARTER_MINUTES))
       : null;
     const currentQuarterMinutesRemaining = Number.isFinite(currentQuarterMinutesElapsed)
-      ? Math.max(0, 12 - Math.min(12, currentQuarterMinutesElapsed))
+      ? Math.max(0, WNBA_QUARTER_MINUTES - Math.min(WNBA_QUARTER_MINUTES, currentQuarterMinutesElapsed))
       : null;
     const currentHalfKey = Number.isFinite(currentPeriod) && currentPeriod >= 1 && currentPeriod <= 4
       ? (currentPeriod <= 2 ? 'h1' : 'h2')
       : null;
     const currentHalfMinutesElapsed = Number.isFinite(elapsedMinutes)
-      ? (currentHalfKey === 'h2' ? Math.max(0, elapsedMinutes - 24) : elapsedMinutes)
+      ? (currentHalfKey === 'h2' ? Math.max(0, elapsedMinutes - WNBA_HALF_MINUTES) : elapsedMinutes)
       : null;
     const currentHalfMinutesRemaining = Number.isFinite(currentHalfMinutesElapsed)
-      ? Math.max(0, 24 - Math.min(24, currentHalfMinutesElapsed))
+      ? Math.max(0, WNBA_HALF_MINUTES - Math.min(WNBA_HALF_MINUTES, currentHalfMinutesElapsed))
       : null;
     const useUpcomingQuarter = Boolean(
       liveState.in_progress
