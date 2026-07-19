@@ -80,7 +80,7 @@ services:
       - key: SYNDICATE_NHL_SOURCE_CLI_GENERATION
         value: "false"
       - key: WEB_CONCURRENCY
-        value: "1"
+        value: "2"
       - key: GUNICORN_THREADS
         value: "1"
       - key: GUNICORN_TIMEOUT
