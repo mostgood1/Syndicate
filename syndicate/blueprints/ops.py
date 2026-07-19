@@ -248,6 +248,18 @@ def api_ops_version() -> Any:
     return jsonify({"ok": True, "version": _build_version_payload()})
 
 
+@ops_bp.get("/api/ops/memory")
+def api_ops_memory() -> Any:
+    # Read-only, same instrumentation the workers already use to diagnose OOMs
+    # (2026-07-18/19 incidents) -- exposed here too so the web service's own
+    # memory profile can be checked directly instead of guessed at when tuning
+    # gunicorn --workers/--threads (each extra worker is a full extra process;
+    # threads share memory with the existing worker process).
+    from syndicate.features.shared.memory_observability import get_all_process_memory_snapshot
+
+    return jsonify({"ok": True, "memory": get_all_process_memory_snapshot()})
+
+
 @ops_bp.post("/api/ops/bootstrap/run")
 def api_ops_bootstrap_run() -> Any:
     try:

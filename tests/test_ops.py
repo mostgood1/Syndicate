@@ -241,6 +241,31 @@ class OpsRefreshApiTests(unittest.TestCase):
         self.assertEqual(payload["version"]["branch"], "main")
         self.assertEqual(payload["version"]["render_service_name"], "syndicate-web")
 
+    def test_memory_endpoint_requires_admin_token(self) -> None:
+        with patch.dict(os.environ, {"ADMIN_TOKEN": "secret-token"}, clear=False):
+            response = self.client.get("/api/ops/memory")
+
+        self.assertEqual(response.status_code, 401)
+        self.assertFalse(response.get_json()["ok"])
+
+    def test_memory_endpoint_returns_process_snapshot(self) -> None:
+        fake_snapshot = {"accounted_rss_mb": 123.4, "process_count": 2}
+        with patch.dict(
+            os.environ, {"ADMIN_TOKEN": "secret-token"}, clear=False
+        ), patch(
+            "syndicate.features.shared.memory_observability.get_all_process_memory_snapshot",
+            return_value=fake_snapshot,
+        ):
+            response = self.client.get(
+                "/api/ops/memory",
+                headers={"X-Admin-Token": "secret-token"},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json()
+        self.assertTrue(payload["ok"])
+        self.assertEqual(payload["memory"], fake_snapshot)
+
     def test_healthz_exposes_public_render_version_metadata_without_admin_auth(self) -> None:
         response = self.client.get("/healthz")
 
