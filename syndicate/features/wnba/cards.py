@@ -1886,13 +1886,41 @@ def _game_from_row(
     for recommendation in game_market_recommendations:
         recommendation["evidence_pack"] = _wnba_evidence_pack_row(recommendation, score=score)
     evidence_pack = [dict(item.get("evidence_pack") or {}) for item in game_market_recommendations if item.get("evidence_pack")]
+    # _format_start_time_local(commence_time) is only a reasonable "detail"
+    # value for a genuinely-pregame row (it turns a bare start-time string
+    # into "3:00 PM CT" instead of nothing/a raw ISO timestamp). Rows fed
+    # through here that ARE already live or final (e.g. the ESPN-sourced
+    # rows _games_from_public_scoreboard builds, which carry a real detail
+    # string like "5:23 - 3rd Quarter" in row["status"]) had that formatted
+    # start time passed as detail_text unconditionally -- _normalized_game_
+    # status's "live: detail = detail_raw or status_raw" always preferred
+    # the (always-truthy) formatted start time over the real live status
+    # text, so a live/final game's card detail never advanced past its
+    # pregame tip time.
+    row_is_settled = bool(row.get("in_progress")) or bool(row.get("final"))
     normalized_status = _normalized_game_status(
         status_text=row.get("status"),
-        detail_text=_format_start_time_local(row.get("commence_time")),
+        detail_text=row.get("status") if row_is_settled else _format_start_time_local(row.get("commence_time")),
         start_time_utc=row.get("commence_time"),
         in_progress=row.get("in_progress"),
         final=row.get("final"),
     )
+    # Only the ESPN-fallback path (_games_from_public_scoreboard) populates
+    # away_pts/home_pts on the row -- pregame artifact rows have no real
+    # score to report yet, so this is a no-op for them.
+    row_away_pts = _safe_float(row.get("away_pts"))
+    row_home_pts = _safe_float(row.get("home_pts"))
+    away_info = {"abbr": away_tri, "name": away_name, "logo": _source_logo_url(away_tri)}
+    home_info = {"abbr": home_tri, "name": home_name, "logo": _source_logo_url(home_tri)}
+    if row_away_pts is not None:
+        away_info["score"] = row_away_pts
+    if row_home_pts is not None:
+        home_info["score"] = row_home_pts
+    live_state_extra: dict[str, Any] = {}
+    if row_away_pts is not None:
+        live_state_extra["away_pts"] = row_away_pts
+    if row_home_pts is not None:
+        live_state_extra["home_pts"] = row_home_pts
     return {
         "game_id": game_id,
         "gamePk": game_id,
@@ -1903,8 +1931,8 @@ def _game_from_row(
         "home_name": home_name,
         "away_logo": _source_logo_url(away_tri),
         "home_logo": _source_logo_url(home_tri),
-        "away": {"abbr": away_tri, "name": away_name, "logo": _source_logo_url(away_tri)},
-        "home": {"abbr": home_tri, "name": home_name, "logo": _source_logo_url(home_tri)},
+        "away": away_info,
+        "home": home_info,
         "status": _source_status_contract(
             status_text=normalized_status["status"],
             detail_text=normalized_status["detail"],
@@ -1928,6 +1956,7 @@ def _game_from_row(
             "in_progress": bool(normalized_status["in_progress"]),
             "final": bool(normalized_status["final"]),
             "status": normalized_status["detail"],
+            **live_state_extra,
         },
         "warnings": [],
         "metrics": [
@@ -2080,6 +2109,8 @@ def _games_from_public_scoreboard(selected_date: str) -> tuple[list[dict[str, An
             "status": game.get("status") or "Scheduled",
             "in_progress": bool(game.get("in_progress")),
             "final": bool(game.get("final")),
+            "away_pts": game.get("away_pts"),
+            "home_pts": game.get("home_pts"),
         }
         games.append(
             _game_from_row(
