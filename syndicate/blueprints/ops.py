@@ -665,6 +665,23 @@ def api_ops_intelligence_candidate_trace() -> Any:
     except Exception as exc:
         return jsonify({"ok": False, "error": f"build_intelligence_overview: {type(exc).__name__}: {exc}"}), 500
 
+    manifest_check: dict[str, Any] = {}
+    full_pool_check: dict[str, Any] = {}
+    try:
+        from pipeline.intelligence_state import _INTELLIGENCE_STATE_SERVICE
+
+        manifests = _INTELLIGENCE_STATE_SERVICE._available_sport_manifests(date)
+        manifest_check = {"available_sport_slugs": list(manifests.keys())}
+        source_fingerprint = _INTELLIGENCE_STATE_SERVICE._source_state_fingerprint(date)
+        pool = _INTELLIGENCE_STATE_SERVICE._build_candidate_pool(date, source_fingerprint)
+        full_pool_check = {
+            "source_fingerprint": source_fingerprint,
+            "candidate_count": pool.get("candidate_count"),
+            "candidate_pool_keys": list(pool.keys()) if isinstance(pool, dict) else None,
+        }
+    except Exception as exc:
+        manifest_check["error"] = f"{type(exc).__name__}: {exc}"
+
     preferences = _query_preferences(
         "top edges today",
         mode="recommendation",
@@ -674,7 +691,14 @@ def api_ops_intelligence_candidate_trace() -> Any:
         include_games=True,
     )
 
-    result: dict[str, Any] = {"ok": True, "date": date, "preferences": preferences, "sports": []}
+    result: dict[str, Any] = {
+        "ok": True,
+        "date": date,
+        "preferences": preferences,
+        "manifest_check": manifest_check,
+        "full_pool_check": full_pool_check,
+        "sports": [],
+    }
     for sport in overview:
         if not isinstance(sport, dict):
             continue
