@@ -301,6 +301,43 @@
   .board-badge--pregame { background: rgba(168, 85, 247, 0.16); color: #efe0ff; border-color: rgba(168, 85, 247, 0.38); }
   .board-badge--confidence { background: rgba(46, 204, 113, 0.16); color: #d6ffe4; border-color: rgba(46, 204, 113, 0.38); }
 
+  .board-card__reasoning {
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--cards-line);
+    padding: 4px 10px;
+  }
+
+  .board-card__reasoning summary {
+    cursor: pointer;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--cards-text-soft);
+    padding: 6px 0;
+    list-style: none;
+  }
+
+  .board-card__reasoning summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .board-card__reasoning summary::before {
+    content: "▸ ";
+  }
+
+  .board-card__reasoning[open] summary::before {
+    content: "▾ ";
+  }
+
+  .board-card__reasoning p {
+    margin: 0 0 8px;
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--cards-text-soft);
+  }
+
   .board-card__footer {
     display: flex;
     justify-content: space-between;
@@ -803,6 +840,27 @@
     return true;
   }
 
+  // Generic placeholder text real candidates fall back to when no actual
+  // model reasoning exists yet (e.g. a bare market-odds snapshot with no
+  // sim run). Showing these as "Why this pick" would be worse than
+  // showing nothing -- they explain nothing about the pick itself.
+  const GENERIC_REASONING_PATTERNS = [
+    /market snapshot$/i,
+    /^prop projection\s*-?\s*$/i,
+    /^no (?:prop|game[- ]bet)? ?summary available\.?$/i,
+    /^-$/,
+  ];
+
+  function pickReasoning(item) {
+    const candidates = [item.detail, item.writeup, item.reasoning, item.summary, item.basketball_summary];
+    for (const candidate of candidates) {
+      const text = String(candidate || "").trim();
+      if (!text || GENERIC_REASONING_PATTERNS.some((pattern) => pattern.test(text))) continue;
+      return text;
+    }
+    return null;
+  }
+
   function cardFacts(item) {
     const facts = [];
     const matchup = displayMatchup(item);
@@ -826,6 +884,7 @@
     const team = displayTeam(item);
     const title = displayTitle(item);
     const prop = propLine(item);
+    const reasoning = pickReasoning(item);
     const badges = [];
     if (itemState === "live") badges.push('<span class="board-badge board-badge--live">Live</span>');
     if (itemState === "pregame") badges.push('<span class="board-badge board-badge--pregame">Pregame</span>');
@@ -851,6 +910,12 @@
         ` : ""}
         ${movementHtml ? `<div class="board-card__movement">${movementHtml}</div>` : ""}
         ${badges.length ? `<div class="board-card__badges">${badges.join("")}</div>` : ""}
+        ${reasoning ? `
+          <details class="board-card__reasoning">
+            <summary>Why this pick</summary>
+            <p>${escapeHtml(reasoning)}</p>
+          </details>
+        ` : ""}
         <div class="board-card__footer">
           <div class="board-card__actions">
             <button type="button" class="board-action-button board-action-button--add" data-portfolio-action="add">Add</button>
