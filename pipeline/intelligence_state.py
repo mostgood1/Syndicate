@@ -1311,7 +1311,7 @@ class IntelligenceStateService:
         try:
             from syndicate.features.shared.artifact_publisher import pull_hot_artifacts
 
-            pull_hot_artifacts()
+            pull_hot_artifacts(date_str=selected_date)
         except Exception as exc:
             print(f"[intelligence_state] PULL_HOT_ARTIFACTS_FAILED error={exc}", flush=True)
 

@@ -229,6 +229,56 @@ class PullHotArtifactClientTests(unittest.TestCase):
         self.assertEqual(result, 0)
         mocked_urlopen.assert_not_called()
 
+    def test_scopes_request_to_date_pattern_when_provided(self) -> None:
+        with TemporaryDirectory() as tmp_dir:
+            mocked_response = MagicMock()
+            mocked_response.__enter__.return_value = mocked_response
+            mocked_response.read.return_value = json.dumps({"ok": True, "count": 0, "artifacts": {}}).encode("utf-8")
+
+            with patch.dict(
+                os.environ,
+                {
+                    "SYNDICATE_DATA_ROOT": tmp_dir,
+                    "ADMIN_TOKEN": "secret-token",
+                    "SYNDICATE_WEB_PUBLISH_URL": "https://syndicate.onrender.com",
+                },
+                clear=False,
+            ):
+                with patch("urllib.request.urlopen", return_value=mocked_response) as mocked_urlopen:
+                    pull_hot_artifacts(date_str="2026-07-20")
+
+            sent_request = mocked_urlopen.call_args.args[0]
+            self.assertEqual(
+                sent_request.full_url,
+                "https://syndicate.onrender.com/api/ops/artifacts/export?pattern=%2A2026-07-20%2A",
+            )
+
+    def test_unfiltered_request_omits_pattern_query_param(self) -> None:
+        # A full, unfiltered export reproducibly hit Render's proxy timeout
+        # in production once enough sports/days had accumulated hot
+        # artifacts -- date_str scoping (tested above) is the path every
+        # real caller should use. This just confirms omitting date_str still
+        # hits the plain export URL for callers/tests that want that.
+        with TemporaryDirectory() as tmp_dir:
+            mocked_response = MagicMock()
+            mocked_response.__enter__.return_value = mocked_response
+            mocked_response.read.return_value = json.dumps({"ok": True, "count": 0, "artifacts": {}}).encode("utf-8")
+
+            with patch.dict(
+                os.environ,
+                {
+                    "SYNDICATE_DATA_ROOT": tmp_dir,
+                    "ADMIN_TOKEN": "secret-token",
+                    "SYNDICATE_WEB_PUBLISH_URL": "https://syndicate.onrender.com",
+                },
+                clear=False,
+            ):
+                with patch("urllib.request.urlopen", return_value=mocked_response) as mocked_urlopen:
+                    pull_hot_artifacts()
+
+            sent_request = mocked_urlopen.call_args.args[0]
+            self.assertEqual(sent_request.full_url, "https://syndicate.onrender.com/api/ops/artifacts/export")
+
     def test_writes_allowlisted_artifacts_and_skips_the_rest(self) -> None:
         with TemporaryDirectory() as tmp_dir:
             data_root = Path(tmp_dir).resolve()

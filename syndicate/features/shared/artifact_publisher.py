@@ -286,37 +286,19 @@ def publish_changed_hot_artifacts(since_epoch_seconds: float) -> int:
     return sweep_changed_hot_artifacts(since_epoch_seconds).published_count
 
 
-def _export_url() -> str:
+def _export_url(pattern: str | None = None) -> str:
     base = _env("SYNDICATE_WEB_PUBLISH_URL")
     if not base:
         return ""
-    return base.rstrip("/") + "/api/ops/artifacts/export"
+    url = base.rstrip("/") + "/api/ops/artifacts/export"
+    if pattern:
+        from urllib.parse import quote
+
+        url += f"?pattern={quote(pattern, safe='')}"
+    return url
 
 
-def pull_hot_artifacts(*, timeout_seconds: int = 45) -> int:
-    """Best-effort pull of the full hot-artifact set from the web service's
-    disk onto this process's own disk.
-
-    2026-07-20: refresh-worker's board-computation loop reads sport artifacts
-    (recommendations_slate, props_recommendations, game_cards, etc.) from its
-    own Render disk, which is a separate physical disk from the one
-    live-odds-worker (or an on-demand web request) actually writes them to --
-    Render disks are per-service, not shared, and publish_hot_artifact/
-    sweep_changed_hot_artifacts above only ever push worker -> web. Confirmed
-    in production: refresh-worker computed a genuinely empty candidate pool
-    for hours (repeated "Missing WNBA artifact" errors reading its own local
-    disk) while the identical computation, run against the web service's
-    disk, produced real candidates. This is the missing other direction: web
-    -> refresh-worker, pulled (refresh-worker doesn't run an HTTP server, so
-    it can't receive a push). Never raises -- a network blip here should
-    degrade to stale local data, not break board computation.
-    """
-    url = _export_url()
-    token = _admin_token()
-    if not url or not token:
-        print(f"[artifact_publisher] PULL_SKIP_NOT_CONFIGURED url_set={bool(url)} token_set={bool(token)}", flush=True)
-        return 0
-
+def _pull_hot_artifacts_request(url: str, token: str, *, timeout_seconds: int) -> int:
     request_obj = urllib_request.Request(
         url,
         method="GET",
@@ -358,3 +340,40 @@ def pull_hot_artifacts(*, timeout_seconds: int = 45) -> int:
 
     print(f"[artifact_publisher] PULL_OK url={url} artifacts_received={len(artifacts)} written={written}", flush=True)
     return written
+
+
+def pull_hot_artifacts(*, date_str: str | None = None, timeout_seconds: int = 30) -> int:
+    """Best-effort pull of hot artifacts from the web service's disk onto
+    this process's own disk.
+
+    2026-07-20: refresh-worker's board-computation loop reads sport artifacts
+    (recommendations_slate, props_recommendations, game_cards, etc.) from its
+    own Render disk, which is a separate physical disk from the one
+    live-odds-worker (or an on-demand web request) actually writes them to --
+    Render disks are per-service, not shared, and publish_hot_artifact/
+    sweep_changed_hot_artifacts above only ever push worker -> web. Confirmed
+    in production: refresh-worker computed a genuinely empty candidate pool
+    for hours (repeated "Missing WNBA artifact" errors reading its own local
+    disk) while the identical computation, run against the web service's
+    disk, produced real candidates. This is the missing other direction: web
+    -> refresh-worker, pulled (refresh-worker doesn't run an HTTP server, so
+    it can't receive a push). Never raises -- a network blip here should
+    degrade to stale local data, not break board computation.
+
+    date_str scopes the request to today's ?pattern=*<date>* instead of the
+    full combined hot-artifact set: an unfiltered call reproducibly hit
+    Render's proxy timeout (502) in production once enough sports/days had
+    accumulated hot artifacts -- this module's own docstring calls the
+    allowlist "small", but small-per-file times many files times many days
+    is not small in aggregate. Almost every hot artifact is date-suffixed
+    (recommendations/props/game_cards/sims/snapshots), so this still covers
+    the files board computation actually needs; a handful of non-dated
+    files (current_week.json, park_factors.json, etc.) are out of scope for
+    this per-cycle pull and would need a separate, infrequent full sync.
+    """
+    token = _admin_token()
+    if not token or not _env("SYNDICATE_WEB_PUBLISH_URL"):
+        print(f"[artifact_publisher] PULL_SKIP_NOT_CONFIGURED url_set={bool(_env('SYNDICATE_WEB_PUBLISH_URL'))} token_set={bool(token)}", flush=True)
+        return 0
+    pattern = f"*{date_str}*" if date_str else None
+    return _pull_hot_artifacts_request(_export_url(pattern), token, timeout_seconds=timeout_seconds)
